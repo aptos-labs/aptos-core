@@ -6,10 +6,11 @@
 
 use crate::{
     error::{ArithOp, RuntimeError, RuntimeResult, RuntimeStatus, Signedness, VecOp},
+    global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         pinned_roots::PinnedRoots,
-        Heap,
+        AllocationError, Heap,
     },
     invariant_violation,
     memory::{
@@ -24,15 +25,19 @@ use crate::{
     ExecutionContext,
 };
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, DescriptorId, DescriptorProvider, FrameOffset, Function,
-    IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    storage::resource_provider::StorageKey, CallClosureOp, ClosureFuncRef, DescriptorId,
+    DescriptorProvider, FrameOffset, Function, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
+    IntTy, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
+    CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE,
+    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN,
+    OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
-use move_core_types::int256::{I256, U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 
@@ -60,6 +65,10 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
     /// not yet stored in any frame slot (e.g. between two allocations in a
     /// fused micro-op, or in native functions).
     pub(crate) pinned_roots: PinnedRoots,
+    /// Per-transaction global-storage state: working map of cached
+    /// reads / pending writes, linear journal for rollback, and
+    /// checkpoint stack.
+    pub(crate) read_write_set: ResourceReadWriteSet,
     rng: StdRng,
 }
 
@@ -99,6 +108,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
             stack,
             heap: Heap::new(heap_size),
             pinned_roots: PinnedRoots::new(),
+            read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
         }
     }
@@ -109,6 +119,31 @@ impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
 
     pub fn gc_count(&self) -> usize {
         self.heap.gc_count
+    }
+
+    /// TODO: move to execution context
+    pub fn checkpoint(&mut self) {
+        self.read_write_set.checkpoint();
+    }
+
+    /// TODO: move to execution context
+    pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
+        self.read_write_set.rollback(n)
+    }
+
+    /// TODO: move to execution context
+    pub fn checkpoint_depth(&self) -> usize {
+        self.read_write_set.checkpoint_depth()
+    }
+
+    /// TODO: move to execution context
+    pub fn current_epoch(&self) -> u64 {
+        self.read_write_set.current_epoch()
+    }
+
+    /// TODO: move to execution context
+    pub fn journal_len(&self) -> usize {
+        self.read_write_set.journal_len()
     }
 
     /// Reset the context to call a different function, preserving the heap.
@@ -356,6 +391,18 @@ unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: 
             ptr.write_unaligned(val)
         }
     }
+}
+
+/// Read a 32-byte [`AccountAddress`] from a frame slot.
+///
+/// # Safety
+///
+/// `[fp + offset, fp + offset + 32]` must lie within the current
+/// frame's accessible region.
+#[inline(always)]
+unsafe fn read_address(fp: *const u8, offset: FrameOffset) -> AccountAddress {
+    let ptr = unsafe { fp.add(offset.into()) as *const AccountAddress };
+    unsafe { ptr.read() }
 }
 
 /// [`U256`]'s `Shl`/`Shr` trait impls require `Self` as the rhs.
@@ -1287,11 +1334,111 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::IntShl(ref op) => exec_int_shl(fp, op)?,
                 MicroOp::IntShr(ref op) => exec_int_shr(fp, op)?,
                 MicroOp::IntNegate(ref op) => exec_int_negate(fp, op)?,
+
+                MicroOp::Exists { addr, ty, dst } => {
+                    let address = read_address(fp, addr);
+                    let exists = self.read_write_set.exists(
+                        self.exec_ctx.resource_provider(),
+                        StorageKey::Resource(address, ty),
+                    )?;
+                    // TODO(correctness): temporary hack to avoid boolean writes.
+                    write_u64(fp, dst, if exists { 1 } else { 0 });
+                },
+
+                MicroOp::BorrowGlobal { addr, ty, dst } => {
+                    let address = read_address(fp, addr);
+                    let ptr = self.read_write_set.borrow_global(
+                        self.exec_ctx.resource_provider(),
+                        StorageKey::Resource(address, ty),
+                    )?;
+                    // A reference is a 16-byte fat pointer; the borrow points
+                    // at the start of the resource, so the offset half is 0.
+                    write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
+                },
+
+                MicroOp::BorrowGlobalMut { addr, ty, dst } => {
+                    let address = read_address(fp, addr);
+                    let key = StorageKey::Resource(address, ty);
+                    let ptr = match self
+                        .read_write_set
+                        .try_borrow_global_mut(self.exec_ctx.resource_provider(), key)?
+                    {
+                        EntryPtr::Writable(ptr) => ptr,
+                        EntryPtr::NonWritable(ptr) => {
+                            let ptr = self.deep_copy(ptr)?;
+                            self.read_write_set.commit_borrow_global_mut(key, ptr);
+                            ptr
+                        },
+                    };
+                    // A reference is a 16-byte fat pointer; the borrow points
+                    // at the start of the resource, so the offset half is 0.
+                    write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
+                },
+
+                MicroOp::MoveFrom { addr, ty, dst } => {
+                    let address = read_address(fp, addr);
+                    let key = StorageKey::Resource(address, ty);
+                    let entry_ptr = self
+                        .read_write_set
+                        .try_move_from(self.exec_ctx.resource_provider(), key)?;
+                    let ptr = match entry_ptr {
+                        EntryPtr::Writable(ptr) => ptr,
+                        EntryPtr::NonWritable(ptr) => {
+                            let ptr = self.deep_copy(ptr)?;
+                            self.read_write_set.commit_move_from(key);
+                            ptr
+                        },
+                    };
+                    write_ptr(fp, dst, ptr.as_ptr());
+                },
+
+                MicroOp::MoveTo { addr, ty, src } => {
+                    let address = read_address(fp, addr);
+                    let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
+                        invariant_violation!(MoveToNullSource);
+                    };
+
+                    self.read_write_set.move_to(
+                        self.exec_ctx.resource_provider(),
+                        StorageKey::Resource(address, ty),
+                        ptr,
+                    )?;
+                },
             }
         }
 
         self.pc += 1;
         Ok(StepResult::Continue)
+    }
+
+    /// Deep-copy the value tree rooted at the specified source into the
+    /// local heap. Returns the data-region pointer of the freshly-allocated
+    /// root copy.
+    ///
+    /// # Safety
+    ///
+    /// Source must point to the data region of a live object whose header is
+    /// at `src - OBJECT_HEADER_SIZE`.
+    unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
+        let root_guard = self.pinned_roots.pin(root);
+        // SAFETY: `root_guard.get()` returns the caller-supplied root, which
+        // by this function's contract points to a live object.
+        match unsafe { self.heap.try_deep_copy(self.exec_ctx, root_guard.get()) } {
+            Ok(ptr) => Ok(ptr),
+            Err(AllocationError::RuntimeError(err)) => Err(err),
+            Err(AllocationError::OutOfHeapMemory { .. }) => {
+                gc_collect!(self)?;
+                // Re-read the root pointer from the pin, as its address have
+                // been changed by the GC.
+                // SAFETY: the pin keeps the root live across GC; the relocated
+                // pointer still points to the same live object.
+                unsafe {
+                    self.heap
+                        .try_deep_copy(self.exec_ctx, root_guard.get())
+                        .map_err(AllocationError::into_runtime_error)
+                }
+            },
+        }
     }
 
     /// Implementation of `MicroOp::PackClosure`.

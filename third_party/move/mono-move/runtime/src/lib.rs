@@ -3,8 +3,9 @@
 
 //! MonoVM runtime implementation.
 
-mod error;
+pub mod error;
 mod execution_context;
+pub(crate) mod global_storage;
 pub(crate) mod heap;
 mod interpreter;
 mod local_runtime_context;
@@ -19,7 +20,8 @@ pub use heap::pinned_roots::{PinGuard, PinnedRoots};
 pub use interpreter::InterpreterContext;
 pub use local_runtime_context::LocalRuntimeContext;
 pub use memory::{
-    read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u32, write_u64, MemoryRegion,
+    read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
+    write_u64, MemoryRegion,
 };
 pub use mono_move_core::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID,

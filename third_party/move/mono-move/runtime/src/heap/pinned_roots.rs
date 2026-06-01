@@ -34,16 +34,15 @@
 //! single-threaded execution plus the fact that `PinnedRoots` is not
 //! `Sync` rule out any racing access.
 //!
-//! The one place where an overlap *can* happen is [`update_in_place`]:
-//! it takes a raw pointer into `inner.slots` and iterates through it,
-//! calling a user-supplied callback on each entry. If that callback
-//! touched `inner` mutably (via `pin` or by dropping a `PinGuard`), the
-//! raw pointer could be invalidated by a `Vec` reallocation. The function
-//! is therefore `unsafe`, with a contract forbidding the callback from
-//! pinning or dropping guards. Because this dangerous window exists only
-//! inside an `unsafe` block, the external `pin` / `get` / drop APIs stay
-//! safe — safe code alone cannot construct the bad interleaving.
+//! The one place where an overlap *can* happen is [`scan`]: it takes
+//! a raw pointer into `inner.slots` and iterates through it, calling
+//! [`RootScanner::relocate`] on each entry. The scanner has no API
+//! to pin new objects or drop `PinGuard`s, so the iteration pointer
+//! cannot be invalidated by a `Vec` reallocation during the scan.
+//! The constraint is enforced structurally by [`RootScanner`]'s
+//! restricted API rather than by an `unsafe` contract on the caller.
 
+use crate::heap::RootScanner;
 use std::{
     cell::UnsafeCell,
     ptr::{self, NonNull},
@@ -72,13 +71,11 @@ const INITIAL_CAPACITY: usize = 8;
 ///   a call that could produce another reborrow. Since `PinnedRoots` is
 ///   `!Sync` and execution is single-threaded, safe callers cannot create
 ///   overlapping reborrows.
-/// * [`update_in_place`] is the only API that takes a raw pointer into
-///   the `slots` Vec's buffer and uses it after the `&mut Inner` reborrow
-///   has ended. Its callback must not call `pin` or drop any `PinGuard`
-///   belonging to this `PinnedRoots` — both would mutate `inner`, and a
-///   `Vec` reallocation would invalidate the iteration pointer. This is
-///   why `update_in_place` is `unsafe`; the constraint is a contract on
-///   its caller.
+/// * [`scan`] is the only API that takes a raw pointer into the
+///   `slots` Vec's buffer and uses it after the `&mut Inner` reborrow
+///   has ended. The [`RootScanner`] passed in cannot pin new objects
+///   or drop `PinGuard`s (its API has no surface for either), so the
+///   `slots` Vec cannot be reallocated during the scan.
 pub struct PinnedRoots {
     inner: UnsafeCell<Inner>,
 }
@@ -127,25 +124,8 @@ impl PinnedRoots {
         PinGuard { roots: self, idx }
     }
 
-    /// Apply `f` to every currently-pinned slot in-place. `f` receives the
-    /// current pointer and returns the (possibly updated) replacement.
-    ///
-    /// **Intended for the garbage collector only.** Visibility is scoped
-    /// to the parent `heap` module (`pub(super)`) to enforce that at the
-    /// type system level. No other code in the crate may call this
-    /// function; the GC is the sole client. If a new use case appears in
-    /// the future, it should be added alongside the GC path rather than
-    /// by widening the visibility here.
-    ///
-    /// # Safety
-    ///
-    /// `f` must not call [`PinnedRoots::pin`] or drop any [`PinGuard`]
-    /// belonging to this `PinnedRoots`. Either would mutate `inner.slots`
-    /// and, if it triggers a reallocation, invalidate the raw pointer we
-    /// iterate with here — causing UB on subsequent reads/writes. The GC
-    /// satisfies this contract because its scan neither pins new objects
-    /// nor drops any guards.
-    pub(super) unsafe fn update_in_place(&self, mut f: impl FnMut(*mut u8) -> *mut u8) {
+    /// Relocate every currently-pinned slot via the scanner.
+    pub(super) fn scan(&self, scanner: &mut RootScanner<'_>) {
         // SAFETY: We project through the `UnsafeCell`'s raw pointer
         // directly. Going via `&*self.inner.get()` first would derive a
         // read-only Stacked Borrows tag, and writing through a pointer
@@ -158,14 +138,12 @@ impl PinnedRoots {
         for i in 0..len {
             // SAFETY: `slots_ptr` points into `(*cell).slots`'s
             // allocation, which is valid as long as the Vec has not been
-            // reallocated. The caller's contract forbids `f` from doing
-            // anything that could reallocate it, so the pointer remains
-            // valid through this loop.
+            // reallocated. The scanner cannot do anything from that could
+            // reallocate it, so the pointer remains valid through this loop.
             unsafe {
                 let slot = slots_ptr.add(i);
-                let old = *slot;
-                if !old.is_null() {
-                    *slot = f(old);
+                if let Some(new) = scanner.relocate(*slot) {
+                    *slot = new;
                 }
             }
         }
@@ -236,6 +214,11 @@ impl Drop for PinGuard<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        heap::{heap_alloc, Heap, RootScanner},
+        memory::MemoryRegion,
+    };
+    use mono_move_core::{DescriptorId, OBJECT_HEADER_SIZE};
 
     fn fake_ptr(addr: usize) -> NonNull<u8> {
         NonNull::new(addr as *mut u8).unwrap()
@@ -284,38 +267,57 @@ mod tests {
         drop(b);
     }
 
-    #[test]
-    fn update_in_place_relocates() {
-        let roots = PinnedRoots::new();
-        let g = roots.pin(fake_ptr(0x1000));
-        // SAFETY: f doesn't pin or drop guards.
-        unsafe {
-            roots.update_in_place(|p| {
-                if p == fake_ptr(0x1000).as_ptr() {
-                    fake_ptr(0x9000).as_ptr()
-                } else {
-                    p
-                }
-            });
-        }
-        assert_eq!(g.get(), fake_ptr(0x9000));
+    fn fresh_heap_with_obj() -> (Heap, *mut u8) {
+        let mut heap = Heap::new(4096);
+        let obj = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, DescriptorId(0)).unwrap();
+        (heap, obj)
     }
 
     #[test]
-    fn update_in_place_skips_freed_slots() {
+    fn scan_relocates_pinned_slot() {
+        let (heap, obj) = fresh_heap_with_obj();
         let roots = PinnedRoots::new();
-        let a = roots.pin(fake_ptr(0x1000));
-        let b = roots.pin(fake_ptr(0x2000));
+        let g = roots.pin(NonNull::new(obj).unwrap());
+
+        let to_space = MemoryRegion::new(heap.buffer.len());
+        let mut scanner = RootScanner::for_test(&heap, to_space.as_ptr());
+        roots.scan(&mut scanner);
+
+        let after = g.get().as_ptr();
+        assert_ne!(after, obj, "scan should relocate the pinned object");
+        let lo = to_space.as_ptr() as usize;
+        let hi = lo + to_space.len();
+        assert!(
+            (after as usize) >= lo && (after as usize) < hi,
+            "relocated pointer must lie in to-space"
+        );
+    }
+
+    #[test]
+    fn scan_skips_freed_slots() {
+        let (mut heap, obj_a) = fresh_heap_with_obj();
+        let obj_b = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, DescriptorId(0)).unwrap();
+
+        let roots = PinnedRoots::new();
+        let a = roots.pin(NonNull::new(obj_a).unwrap());
+        let b = roots.pin(NonNull::new(obj_b).unwrap());
         drop(a);
-        let mut visited = Vec::new();
-        // SAFETY: f doesn't pin or drop guards.
-        unsafe {
-            roots.update_in_place(|p| {
-                visited.push(p);
-                p
-            });
-        }
-        assert_eq!(visited, vec![fake_ptr(0x2000).as_ptr()]);
-        drop(b);
+
+        let to_space = MemoryRegion::new(heap.buffer.len());
+        let free_ptr = to_space.as_ptr();
+        let initial_free = free_ptr as usize;
+        let mut scanner = RootScanner::for_test(&heap, free_ptr);
+        roots.scan(&mut scanner);
+
+        // Only one object should have been relocated into to-space —
+        // the live one. The freed slot is null and is skipped.
+        let copied_bytes = scanner.cursor() - initial_free;
+        assert!(
+            copied_bytes > 0 && copied_bytes < to_space.len(),
+            "exactly one object should have been relocated (got {} bytes)",
+            copied_bytes
+        );
+        let b_after = b.get().as_ptr();
+        assert_ne!(b_after, obj_b, "live pin should be relocated");
     }
 }

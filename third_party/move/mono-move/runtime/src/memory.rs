@@ -4,7 +4,7 @@
 //! Low-level memory utilities: aligned buffer and raw pointer helpers.
 
 use crate::VEC_DATA_OFFSET;
-use mono_move_core::MAX_ALIGN;
+use mono_move_core::{DescriptorId, MAX_ALIGN};
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
@@ -218,15 +218,20 @@ pub(crate) unsafe fn read_obj_size(obj_ptr: *const u8) -> u32 {
     unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *const u32).read() }
 }
 
-/// Write the total object size (header + aligned payload) into the header.
+/// Write header fields (descriptor ID and size) for the object whose data
+/// region starts at the given pointer.
 ///
 /// # Safety
-/// `obj_ptr` must point to the data region of a writable heap object whose
-/// header lies at `obj_ptr - 8`.
+///
+/// Pointer points to the data region of a valid heap object with header start
+/// at [`HEADER_DESCRIPTOR_NEG_OFFSET`].
 #[inline(always)]
-pub(crate) unsafe fn write_obj_size(obj_ptr: *mut u8, size: u32) {
+pub unsafe fn write_object_header(obj_ptr: *mut u8, descriptor_id: DescriptorId, size: u32) {
     // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *mut u32).write(size) }
+    unsafe {
+        write_descriptor(obj_ptr, descriptor_id.as_u32());
+        (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *mut u32).write(size)
+    }
 }
 
 /// Read the forwarding pointer that the GC writes into a forwarded-from-space

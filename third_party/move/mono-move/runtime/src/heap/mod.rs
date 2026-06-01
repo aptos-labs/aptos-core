@@ -9,14 +9,16 @@
 //! into [`PinnedRoots`]) while still invoking allocation paths that mutate
 //! only the heap.
 
+mod deep_copy;
 pub(crate) mod pinned_roots;
 
 use crate::{
-    error::{RuntimeError, RuntimeResult},
+    error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
+    global_storage::ResourceReadWriteSet,
     invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
-        write_forwarding, write_obj_size, write_ptr, write_u64, MemoryRegion,
+        write_forwarding, write_object_header, write_ptr, write_u64, MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
@@ -67,6 +69,7 @@ pub(crate) mod macros {
             $crate::heap::alloc_obj(
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
                 &$ctx.pinned_roots,
                 $fp,
                 $ctx.current_func,
@@ -90,6 +93,7 @@ pub(crate) mod macros {
             $crate::heap::alloc_vec(
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
                 &$ctx.pinned_roots,
                 $fp,
                 $ctx.current_func,
@@ -115,6 +119,7 @@ pub(crate) mod macros {
             $crate::heap::grow_vec_ref(
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
                 &$ctx.pinned_roots,
                 $ctx.current_func,
                 $ctx.pc,
@@ -133,6 +138,7 @@ pub(crate) mod macros {
             $crate::heap::gc_collect(
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
                 &$ctx.pinned_roots,
                 $ctx.frame_ptr,
                 $ctx.current_func,
@@ -194,6 +200,98 @@ impl Heap {
     }
 }
 
+/// Outcome of a bump-allocation attempt.
+#[derive(Debug)]
+pub(crate) enum AllocationError {
+    /// Heap is full and the requested size did not fit. GC can be triggered to
+    /// free up space and continue. If after GC there is still no space for the
+    /// allocation, converted to [`RuntimeError::OutOfHeapMemory`].
+    OutOfHeapMemory { requested: usize },
+    /// Runtime error, not recoverable.
+    RuntimeError(RuntimeError),
+}
+
+type AllocationResult<T> = Result<T, AllocationError>;
+
+impl From<RuntimeError> for AllocationError {
+    fn from(err: RuntimeError) -> Self {
+        Self::RuntimeError(err)
+    }
+}
+
+impl AllocationError {
+    /// Converts allocation error into non-recoverable [`RuntimeError`].
+    pub(crate) fn into_runtime_error(self) -> RuntimeError {
+        match self {
+            AllocationError::OutOfHeapMemory { requested } => {
+                RuntimeError::OutOfHeapMemory { requested }
+            },
+            AllocationError::RuntimeError(err) => err,
+        }
+    }
+}
+
+/// Runs allocation function; on [`AllocationError::OutOfHeapMemory`] runs GC
+/// once and retries again. If allocation fails on retry, returns a runtime
+/// error.
+pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    pinned_roots: &PinnedRoots,
+    fp: *mut u8,
+    current_func: NonNull<Function>,
+    pc: usize,
+    try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
+) -> RuntimeResult<*mut u8> {
+    match try_alloc(heap) {
+        Ok(ptr) => Ok(ptr),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(heap, provider, rws, pinned_roots, fp, current_func, pc)?;
+            try_alloc(heap).map_err(AllocationError::into_runtime_error)
+        },
+        Err(e) => Err(e.into_runtime_error()),
+    }
+}
+
+/// Root-walking interface for the GC. Passed to each root source that iterates
+/// its allocations and calls [`Self::relocate`] per pointer, writing the
+/// returned value back into the slot.
+pub(crate) struct RootScanner<'a> {
+    /// From-space heap.
+    heap: &'a Heap,
+    /// Bump cursor in to-space. Advances during relocation.
+    free_ptr: *mut u8,
+}
+
+impl<'a> RootScanner<'a> {
+    /// Current to-space bump cursor.
+    pub(crate) fn cursor(&self) -> usize {
+        self.free_ptr as usize
+    }
+
+    /// Relocates a possibly-from-space pointer to its to-space address.
+    /// address. Returns [`None`] when pointer is null or does not belong to
+    /// the heap. Otherwise, returns the copy.
+    ///
+    /// Callers must uphold the object-header-integrity invariant
+    /// documented on [`gc_collect`]: if `ptr` is in-heap, its
+    /// header at `ptr - OBJECT_HEADER_SIZE` must be valid.
+    pub(crate) fn relocate(&mut self, ptr: *mut u8) -> Option<*mut u8> {
+        if ptr.is_null() || !is_heap_ptr(self.heap, ptr) {
+            return None;
+        }
+        Some(gc_copy_object(ptr, &mut self.free_ptr))
+    }
+
+    /// Test-only constructor. Production code only sees a
+    /// `RootScanner` handed in by [`gc_collect`].
+    #[cfg(test)]
+    pub(crate) fn for_test(heap: &'a Heap, free_ptr: *mut u8) -> RootScanner<'a> {
+        RootScanner { heap, free_ptr }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Allocation
 // ---------------------------------------------------------------------------
@@ -206,34 +304,27 @@ impl Heap {
 /// only need to populate the data region (e.g. vector length, captured
 /// values).
 ///
-/// Triggers GC if the bump allocator is full; fails on OOM after GC.
-///
-/// `fp`, `current_func`, `pc` describe the top of the call stack so that GC
-/// (if triggered) can walk frames to find roots. `pinned_roots` is the
-/// auxiliary root set.
-fn heap_alloc<P: DescriptorProvider + ?Sized>(
+/// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
+/// so the caller can trigger GC and retry.
+fn heap_alloc(
     heap: &mut Heap,
-    provider: &P,
-    pinned_roots: &PinnedRoots,
-    fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> RuntimeResult<*mut u8> {
+) -> AllocationResult<*mut u8> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
     // past the bound.
-    let aligned_size =
-        checked_align_max(total_size).ok_or_else(|| RuntimeError::AllocationTooLarge {
+    let aligned_size = checked_align_max(total_size).ok_or_else(|| {
+        AllocationError::from(RuntimeError::AllocationTooLarge {
             requested: total_size,
-        })?;
+        })
+    })?;
     debug_assert!(aligned_size >= OBJECT_HEADER_SIZE);
     if aligned_size > MAX_SINGLE_ALLOCATION_SIZE {
-        return Err(RuntimeError::AllocationTooLarge {
+        return Err(AllocationError::from(RuntimeError::AllocationTooLarge {
             requested: aligned_size,
-        });
+        }));
     }
 
     // Bound check uses integer arithmetic on addresses rather than
@@ -242,12 +333,9 @@ fn heap_alloc<P: DescriptorProvider + ?Sized>(
     // the end of the buffer is UB, so we cannot legally form the
     // out-of-bounds pointer just to compare it.
     if !fits_in_buffer(heap, aligned_size) {
-        gc_collect(heap, provider, pinned_roots, fp, current_func, pc)?;
-        if !fits_in_buffer(heap, aligned_size) {
-            return Err(RuntimeError::OutOfHeapMemory {
-                requested: aligned_size,
-            });
-        }
+        return Err(AllocationError::OutOfHeapMemory {
+            requested: aligned_size,
+        });
     }
 
     unsafe {
@@ -255,8 +343,7 @@ fn heap_alloc<P: DescriptorProvider + ?Sized>(
         heap.bump_ptr = header_start.add(aligned_size);
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
-        write_descriptor(obj_ptr, descriptor_id.as_u32());
-        write_obj_size(obj_ptr, aligned_size as u32);
+        write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
         Ok(obj_ptr)
     }
 }
@@ -270,6 +357,7 @@ fn heap_alloc<P: DescriptorProvider + ?Sized>(
 pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
+    rws: &mut ResourceReadWriteSet,
     pinned_roots: &PinnedRoots,
     fp: *mut u8,
     current_func: NonNull<Function>,
@@ -282,15 +370,15 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
         .ok_or(RuntimeError::VecAllocSizeOverflow)?;
-    heap_alloc(
+    alloc_or_gc(
         heap,
         provider,
+        rws,
         pinned_roots,
         fp,
         current_func,
         pc,
-        total_size,
-        descriptor_id,
+        |h| heap_alloc(h, total_size, descriptor_id),
     )
     // `length` defaults to 0 via heap_alloc's zero-init.
 }
@@ -300,6 +388,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
 pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
+    rws: &mut ResourceReadWriteSet,
     pinned_roots: &PinnedRoots,
     fp: *mut u8,
     current_func: NonNull<Function>,
@@ -326,15 +415,16 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
             });
         },
     };
-    heap_alloc(
+    let total_size = OBJECT_HEADER_SIZE + payload_size;
+    alloc_or_gc(
         heap,
         provider,
+        rws,
         pinned_roots,
         fp,
         current_func,
         pc,
-        OBJECT_HEADER_SIZE + payload_size,
-        descriptor_id,
+        |h| heap_alloc(h, total_size, descriptor_id),
     )
 }
 
@@ -354,6 +444,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
 pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
+    rws: &mut ResourceReadWriteSet,
     pinned_roots: &PinnedRoots,
     current_func: NonNull<Function>,
     pc: usize,
@@ -386,6 +477,7 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
         let new_ptr = alloc_vec(
             heap,
             provider,
+            rws,
             pinned_roots,
             fp,
             current_func,
@@ -443,11 +535,12 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
+    rws: &mut ResourceReadWriteSet,
     pinned_roots: &PinnedRoots,
     frame_ptr: *mut u8,
     current_func: NonNull<Function>,
     pc_top: usize,
-) -> RuntimeResult<()> {
+) -> Result<(), RuntimeInvariantViolation> {
     heap.gc_count += 1;
 
     let to_space = MemoryRegion::new(heap.buffer.len());
@@ -458,9 +551,12 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     // `to_space.end()`, which is the one-past-end address that pointer
     // arithmetic permits. A `+ H` bias would let it overshoot when all
     // of from-space survives, producing UB on `.add` / `.sub`.
-    let mut free_ptr = to_space.as_ptr();
+    let mut scanner = RootScanner {
+        heap,
+        free_ptr: to_space.as_ptr(),
+    };
 
-    // Phase 1: scan roots from the call stack.
+    // Phase 1a: scan roots from the call stack.
     //
     // Two sets of pointer offsets are scanned per frame:
     //   1. `frame_layout.heap_ptr_offsets` — always applies, to every
@@ -480,14 +576,12 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
         let top_func = unsafe { current_func.as_ref() };
         unsafe {
             gc_scan_frame_roots(
-                heap,
+                &mut scanner,
                 frame_ptr,
                 &top_func.frame_layout.heap_ptr_offsets,
-                &mut free_ptr,
             );
-
             if let Some(sp_layout) = top_func.safe_point_layout_at(pc_top) {
-                gc_scan_frame_roots(heap, frame_ptr, &sp_layout.heap_ptr_offsets, &mut free_ptr);
+                gc_scan_frame_roots(&mut scanner, frame_ptr, &sp_layout.heap_ptr_offsets);
             }
         }
     }
@@ -509,36 +603,23 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
         let caller_func_ptr = unsafe { NonNull::new_unchecked(saved_func_ptr as *mut Function) };
         let caller_func = unsafe { caller_func_ptr.as_ref() };
         unsafe {
-            gc_scan_frame_roots(
-                heap,
-                fp,
-                &caller_func.frame_layout.heap_ptr_offsets,
-                &mut free_ptr,
-            );
+            gc_scan_frame_roots(&mut scanner, fp, &caller_func.frame_layout.heap_ptr_offsets);
         }
     }
 
     // Phase 1b: scan the auxiliary pinned-roots set.
-    //
-    // SAFETY: `update_in_place` requires that its callback neither pin
-    // new objects nor drop `PinGuard`s tied to this `PinnedRoots`. Our
-    // callback only calls `gc_copy_object` and `is_heap_ptr`, which don't
-    // touch the pinned-roots set.
-    unsafe {
-        pinned_roots.update_in_place(|old_ptr| {
-            if is_heap_ptr(heap, old_ptr) {
-                gc_copy_object(old_ptr, &mut free_ptr)
-            } else {
-                old_ptr
-            }
-        });
-    }
+    pinned_roots.scan(&mut scanner);
+
+    // Phase 1c: resource read-write set. Working-map and journal writes
+    // point into the local heap and must be relocated alongside the call
+    // stack and pinned roots.
+    rws.scan(&mut scanner);
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
     // `scan_ptr` is a raw cursor — header start of the next object to
     // scan. Object pointers (data starts) are `scan_ptr + H`.
     let mut scan_ptr = to_space.as_ptr();
-    while (scan_ptr as usize) < (free_ptr as usize) {
+    while (scan_ptr as usize) < scanner.cursor() {
         // SAFETY: scan_ptr advances through to-space by each object's
         // aligned size. Object headers were copied verbatim by
         // gc_copy_object, so descriptor_id and size are valid as long
@@ -549,19 +630,13 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
             let obj_size = read_obj_size(obj_ptr) as usize;
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
-                invariant_violation!(GcInvalidObjectSize { size: obj_size });
+                return Err(RuntimeInvariantViolation::GcInvalidObjectSize { size: obj_size });
             }
 
             if descriptor_id == FORWARDED_MARKER {
-                invariant_violation!(GcForwardingMarkerInToSpace);
+                return Err(RuntimeInvariantViolation::GcForwardingMarkerInToSpace);
             }
-            gc_scan_object(
-                provider,
-                heap,
-                obj_ptr,
-                DescriptorId(descriptor_id),
-                &mut free_ptr,
-            )?;
+            gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
@@ -570,6 +645,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     // Phase 3: swap — drop old heap, adopt new one. The bump cursor
     // semantics match `free_ptr` directly (both are raw header-start
     // cursors).
+    let RootScanner { free_ptr, .. } = scanner;
     heap.buffer = to_space;
     heap.bump_ptr = free_ptr;
     Ok(())
@@ -597,25 +673,19 @@ fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
 }
 
 /// Scan a set of pointer offsets in a frame, copying any heap objects
-/// they reference into to-space and updating the frame slots.
+/// they reference into to-space (via `scanner`) and updating the frame
+/// slots.
 ///
 /// # Safety
 ///
 /// - `fp` must point to a valid frame.
 /// - Each entry in `offsets` must be a valid 8-byte-aligned offset within
 ///   the frame's extended size.
-/// - `free_ptr` must point into to-space with sufficient room.
-unsafe fn gc_scan_frame_roots(
-    heap: &Heap,
-    fp: *mut u8,
-    offsets: &[FrameOffset],
-    free_ptr: &mut *mut u8,
-) {
+unsafe fn gc_scan_frame_roots(scanner: &mut RootScanner<'_>, fp: *mut u8, offsets: &[FrameOffset]) {
     unsafe {
         for &offset in offsets {
             let old_ptr = read_ptr(fp, offset);
-            if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                let new_ptr = gc_copy_object(old_ptr, free_ptr);
+            if let Some(new_ptr) = scanner.relocate(old_ptr) {
                 write_ptr(fp, offset, new_ptr);
             }
         }
@@ -688,16 +758,17 @@ fn gc_copy_object(old_ptr: *mut u8, free_ptr: &mut *mut u8) -> *mut u8 {
 ///   room for any objects that will be copied.
 fn gc_scan_object<P: DescriptorProvider + ?Sized>(
     provider: &P,
-    heap: &Heap,
+    scanner: &mut RootScanner<'_>,
     obj_ptr: *mut u8,
     descriptor_id: DescriptorId,
-    free_ptr: &mut *mut u8,
-) -> RuntimeResult<()> {
+) -> Result<(), RuntimeInvariantViolation> {
     let desc = match provider.descriptor(descriptor_id) {
         Some(d) => d,
-        None => invariant_violation!(DescriptorNotFound {
-            descriptor_id: descriptor_id.as_u32(),
-        }),
+        None => {
+            return Err(RuntimeInvariantViolation::DescriptorNotFound {
+                descriptor_id: descriptor_id.as_u32(),
+            })
+        },
     };
 
     // All offsets below are relative to `obj_ptr` (the data-region
@@ -723,8 +794,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
                     let elem_base = data_start.add(i * (*elem_size as usize));
                     for &ptr_off in elem_pointer_offsets {
                         let old_ptr = read_ptr(elem_base, ptr_off as usize);
-                        if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                            let new_ptr = gc_copy_object(old_ptr, free_ptr);
+                        if let Some(new_ptr) = scanner.relocate(old_ptr) {
                             write_ptr(elem_base, ptr_off as usize, new_ptr);
                         }
                     }
@@ -740,8 +810,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
             unsafe {
                 for &off in pointer_offsets {
                     let old_ptr = read_ptr(obj_ptr, off as usize);
-                    if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                        let new_ptr = gc_copy_object(old_ptr, free_ptr);
+                    if let Some(new_ptr) = scanner.relocate(old_ptr) {
                         write_ptr(obj_ptr, off as usize, new_ptr);
                     }
                 }
@@ -760,10 +829,10 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
                 return Ok(());
             }
             for &off in pointer_offsets {
-                let old_ptr = read_ptr(obj_ptr, ENUM_DATA_OFFSET + off as usize);
-                if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                    let new_ptr = gc_copy_object(old_ptr, free_ptr);
-                    write_ptr(obj_ptr, ENUM_DATA_OFFSET + off as usize, new_ptr);
+                let abs_off = ENUM_DATA_OFFSET + off as usize;
+                let old_ptr = read_ptr(obj_ptr, abs_off);
+                if let Some(new_ptr) = scanner.relocate(old_ptr) {
+                    write_ptr(obj_ptr, abs_off, new_ptr);
                 }
             }
         },
@@ -772,8 +841,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
             // fixed data-region offset.
             let off = CLOSURE_CAPTURED_DATA_PTR_OFFSET;
             let old_ptr = read_ptr(obj_ptr, off);
-            if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                let new_ptr = gc_copy_object(old_ptr, free_ptr);
+            if let Some(new_ptr) = scanner.relocate(old_ptr) {
                 write_ptr(obj_ptr, off, new_ptr);
             }
         },
@@ -787,8 +855,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
                 for &off in pointer_offsets {
                     let abs_off = CAPTURED_DATA_VALUES_OFFSET + off as usize;
                     let old_ptr = read_ptr(obj_ptr, abs_off);
-                    if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                        let new_ptr = gc_copy_object(old_ptr, free_ptr);
+                    if let Some(new_ptr) = scanner.relocate(old_ptr) {
                         write_ptr(obj_ptr, abs_off, new_ptr);
                     }
                 }
