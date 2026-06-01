@@ -44,7 +44,7 @@ use aptos_types::{
         combine_sharded_state_updates,
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueChunkWithProof},
+        state_value::{HotStateValueChunkWithProof, StateValue, StateValueChunkWithProof},
         table,
     },
     transaction::{
@@ -885,6 +885,16 @@ impl DbReader for FakeAptosDB {
     ) -> Result<StateValueChunkWithProof> {
         self.inner
             .get_state_value_chunk_with_proof(version, start_idx, chunk_size)
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: Version,
+        start_idx: usize,
+        chunk_size: usize,
+    ) -> Result<HotStateValueChunkWithProof> {
+        self.inner
+            .get_hot_state_value_chunk_with_proof(version, start_idx, chunk_size)
     }
 
     fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
