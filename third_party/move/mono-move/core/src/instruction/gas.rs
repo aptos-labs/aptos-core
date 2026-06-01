@@ -29,6 +29,8 @@ impl HasCfgInfo for MicroOp {
         match self {
             MicroOp::Jump { target }
             | MicroOp::JumpNotZeroU64 { target, .. }
+            | MicroOp::JumpNotZeroByte { target, .. }
+            | MicroOp::JumpZeroByte { target, .. }
             | MicroOp::JumpGreaterEqualU64Imm { target, .. }
             | MicroOp::JumpLessU64Imm { target, .. }
             | MicroOp::JumpGreaterU64Imm { target, .. }
@@ -36,9 +38,11 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpLessU64 { target, .. }
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
+            MicroOp::JumpIntCmp(op) => Some(op.target.0 as usize),
             MicroOp::StoreImm8 { .. }
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
+            | MicroOp::StoreImm1 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -106,7 +110,11 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
-            | MicroOp::MoveTo { .. } => None,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::IntCmp(_)
+            | MicroOp::BoolNot { .. }
+            | MicroOp::BoolAnd { .. }
+            | MicroOp::BoolOr { .. } => None,
         }
     }
 }
@@ -123,6 +131,18 @@ impl RemapTargets for MicroOp {
             MicroOp::JumpNotZeroU64 { target, src } => MicroOp::JumpNotZeroU64 {
                 target: co(target),
                 src,
+            },
+            MicroOp::JumpNotZeroByte { target, src } => MicroOp::JumpNotZeroByte {
+                target: co(target),
+                src,
+            },
+            MicroOp::JumpZeroByte { target, src } => MicroOp::JumpZeroByte {
+                target: co(target),
+                src,
+            },
+            MicroOp::JumpIntCmp(mut op) => {
+                op.target = co(op.target);
+                MicroOp::JumpIntCmp(op)
             },
             MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
                 MicroOp::JumpGreaterEqualU64Imm {
@@ -164,6 +184,7 @@ impl RemapTargets for MicroOp {
             op @ (MicroOp::StoreImm8 { .. }
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
+            | MicroOp::StoreImm1 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -231,7 +252,11 @@ impl RemapTargets for MicroOp {
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
-            | MicroOp::MoveTo { .. }) => op,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::IntCmp(_)
+            | MicroOp::BoolNot { .. }
+            | MicroOp::BoolAnd { .. }
+            | MicroOp::BoolOr { .. }) => op,
         }
     }
 }
@@ -252,6 +277,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::StoreImm8 { .. } => 2,
             MicroOp::StoreImm16 { .. } => 3,
             MicroOp::StoreImm32 { .. } => 4,
+            MicroOp::StoreImm1 { .. } => 2,
             MicroOp::Move8 { .. } => 2,
             MicroOp::Move { size, .. } => 2 + 3 * *size as u64,
 
@@ -290,6 +316,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             | MicroOp::IntNegate(_)
             | MicroOp::IntCast(_) => 5,
 
+            // --- Comparison & boolean logic ---
+            MicroOp::IntCmp(_) => 3,
+            MicroOp::BoolNot { .. } | MicroOp::BoolAnd { .. } | MicroOp::BoolOr { .. } => 2,
+
             // --- Control flow ---
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => 10,
             MicroOp::CallNative { .. } => 10,
@@ -298,6 +328,9 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::AbortMsg { .. } => 5,
             MicroOp::Jump { .. } => 2,
             MicroOp::JumpNotZeroU64 { .. }
+            | MicroOp::JumpNotZeroByte { .. }
+            | MicroOp::JumpZeroByte { .. }
+            | MicroOp::JumpIntCmp(_)
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
             | MicroOp::JumpGreaterU64Imm { .. }

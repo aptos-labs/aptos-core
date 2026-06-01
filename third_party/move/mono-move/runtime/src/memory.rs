@@ -67,6 +67,14 @@ pub unsafe fn read_u8(base: *const u8, byte_offset: impl Into<usize>) -> u8 {
 }
 
 /// # Safety
+/// `base.add(byte_offset)` must be valid and writable for a `u8`.
+#[inline(always)]
+pub unsafe fn write_u8(base: *mut u8, byte_offset: impl Into<usize>, val: u8) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { base.add(byte_offset.into()).write(val) }
+}
+
+/// # Safety
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u64`.
 #[inline(always)]
 pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {

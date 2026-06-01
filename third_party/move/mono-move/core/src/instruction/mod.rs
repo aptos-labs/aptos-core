@@ -128,7 +128,8 @@ mod gas;
 mod unspecialized;
 pub use gas::MicroOpGasSchedule;
 pub use unspecialized::{
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand,
+    CmpKind, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
+    JumpIntCmpOp, ShiftOperand,
 };
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
@@ -276,8 +277,9 @@ pub enum MicroOp {
     /// Store 8 immediate bytes into the destination slot. `imm` is the
     /// little-endian (LE) byte representation of the value:
     /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
-    /// two's-complement) for signed. Narrower primitives (`u8`/`u16`/`u32`/
-    /// `i8`/`i16`/`i32`/`bool`) are widened to 8 bytes by the lowerer.
+    /// two's-complement) for signed. The 2/4-byte primitives (`u16`/`u32`/
+    /// `i16`/`i32`) are widened to 8 bytes by the lowerer; 1-byte types
+    /// (`u8`/`i8`/`bool`) use [`MicroOp::StoreImm1`] instead.
     StoreImm8 {
         dst: FrameOffset,
         imm: [u8; 8],
@@ -302,6 +304,13 @@ pub enum MicroOp {
     StoreImm32 {
         dst: FrameOffset,
         imm: Box<[u8; 32]>,
+    },
+
+    /// Store an immediate byte (1 byte) at the `dst` frame slot.
+    /// Can be used for various 1-byte values (`bool`, `u8`, `i8`).
+    StoreImm1 {
+        dst: FrameOffset,
+        imm: u8,
     },
 
     /// Copy 8 bytes from `src` to `dst`.
@@ -490,6 +499,32 @@ pub enum MicroOp {
     IntCast(IntCastOp),
 
     //======================================================================
+    // Comparison & boolean logic (1-byte boolean results)
+    //======================================================================
+    /// `dst = (lhs <op> rhs)`, writing a 1-byte boolean. See [`IntCmpOp`].
+    IntCmp(IntCmpOp),
+
+    /// `dst = !src`, both `dst` and `src` are 1-byte booleans.
+    BoolNot {
+        dst: FrameOffset,
+        src: FrameOffset,
+    },
+
+    /// `dst = lhs AND rhs`; `dst`, `lhs`, `rhs` are 1-byte booleans.
+    BoolAnd {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = lhs OR rhs`; `dst`, `lhs`, `rhs` are 1-byte booleans.
+    BoolOr {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    //======================================================================
     // Control flow
     //======================================================================
     // Fused compare-and-branch (no separate cmp + flags).
@@ -554,6 +589,22 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
     },
+
+    /// Jump to `target` if the byte at `src` is **not** zero.
+    JumpNotZeroByte {
+        target: CodeOffset,
+        src: FrameOffset,
+    },
+
+    /// Jump to `target` if the byte at `src` **is** zero.
+    JumpZeroByte {
+        target: CodeOffset,
+        src: FrameOffset,
+    },
+
+    /// Unspecialized fused compare-and-branch: jump to `target` if
+    /// `op(lhs, rhs)` holds, dispatching on the operand type.
+    JumpIntCmp(JumpIntCmpOp),
 
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.
     JumpGreaterEqualU64Imm {
@@ -976,7 +1027,7 @@ pub enum MicroOp {
 
     /// Call a closure. Reads the closure at `closure_src`, interleaves its
     /// captured values with the provided arguments into the callee's
-    /// parameter region (using the mask and the callee's `param_sizes`),
+    /// parameter region (using the mask and the callee's `param_slots`),
     /// then performs the standard call protocol.
     ///
     /// For v0 this only supports `ClosureFuncRef::Resolved` closures whose
@@ -1006,6 +1057,9 @@ impl fmt::Display for MicroOp {
                     dst.0,
                     U256::from_le_bytes(**imm)
                 )
+            },
+            MicroOp::StoreImm1 { dst, imm } => {
+                write!(f, "StoreImm1 [{}] <- #{}", dst.0, imm)
             },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
@@ -1109,6 +1163,20 @@ impl fmt::Display for MicroOp {
                 "IntCast.{}->{} [{}] <- [{}]",
                 op.from, op.to, op.dst.0, op.src.0
             ),
+            MicroOp::IntCmp(op) => write!(
+                f,
+                "IntCmp [{}] <- [{}] {} {}",
+                op.dst.0, op.lhs.0, op.op, op.rhs
+            ),
+            MicroOp::BoolNot { dst, src } => {
+                write!(f, "BoolNot [{}] <- ![{}]", dst.0, src.0)
+            },
+            MicroOp::BoolAnd { dst, lhs, rhs } => {
+                write!(f, "BoolAnd [{}] <- [{}] & [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::BoolOr { dst, lhs, rhs } => {
+                write!(f, "BoolOr [{}] <- [{}] | [{}]", dst.0, lhs.0, rhs.0)
+            },
             MicroOp::CallIndirect {
                 module_id,
                 func_name,
@@ -1176,6 +1244,17 @@ impl fmt::Display for MicroOp {
             MicroOp::JumpNotZeroU64 { target, src } => {
                 write!(f, "JumpNotZeroU64 @{} [{}]", target.0, src.0)
             },
+            MicroOp::JumpNotZeroByte { target, src } => {
+                write!(f, "JumpNotZeroByte @{} [{}]", target.0, src.0)
+            },
+            MicroOp::JumpZeroByte { target, src } => {
+                write!(f, "JumpZeroByte @{} [{}]", target.0, src.0)
+            },
+            MicroOp::JumpIntCmp(op) => write!(
+                f,
+                "JumpIntCmp @{} [{}] {} {}",
+                op.target.0, op.lhs.0, op.op, op.rhs
+            ),
             MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
                 write!(
                     f,
@@ -1551,7 +1630,7 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 // Captured values are packed tightly, in the order of their parameter
 // positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
 // Total count is implied by `mask.captured_count()`. Individual sizes are
-// read from the target function's `param_sizes` at call time.
+// read from the target function's `param_slots` at call time.
 
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
 pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
@@ -1579,6 +1658,7 @@ impl MicroOp {
             MicroOp::StoreImm8 { .. }
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
+            | MicroOp::StoreImm1 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -1605,6 +1685,9 @@ impl MicroOp {
             | MicroOp::Return
             | MicroOp::Jump { .. }
             | MicroOp::JumpNotZeroU64 { .. }
+            | MicroOp::JumpNotZeroByte { .. }
+            | MicroOp::JumpZeroByte { .. }
+            | MicroOp::JumpIntCmp(_)
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
             | MicroOp::JumpGreaterU64Imm { .. }
@@ -1649,7 +1732,11 @@ impl MicroOp {
             | MicroOp::IntCast(_)
             | MicroOp::Exists { .. }
             | MicroOp::BorrowGlobal { .. }
-            | MicroOp::MoveTo { .. } => false,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::IntCmp(_)
+            | MicroOp::BoolNot { .. }
+            | MicroOp::BoolAnd { .. }
+            | MicroOp::BoolOr { .. } => false,
         }
     }
 

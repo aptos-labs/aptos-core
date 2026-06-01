@@ -191,8 +191,8 @@ fn make_func(op: MicroOp) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("op"),
         code: Code::from_vec(vec![op, MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: FRAME_SIZE as usize,
         extended_frame_size: FRAME_SIZE as usize + FRAME_METADATA_SIZE,
         zero_frame: false,

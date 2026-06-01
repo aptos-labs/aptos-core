@@ -12,7 +12,7 @@
 //! the unspecialized per-kind variants defined here, which tag-dispatch on
 //! the operand type at runtime.
 
-use super::FrameOffset;
+use super::{CodeOffset, FrameOffset};
 use crate::types::Type;
 use move_core_types::int256::{I256, U256};
 use std::fmt;
@@ -336,4 +336,52 @@ pub struct IntCastOp {
     pub to: IntTy,
     pub dst: FrameOffset,
     pub src: FrameOffset,
+}
+
+/// Comparison relation for [`super::MicroOp::IntCmp`].
+/// Ordering relations apply to signed and unsigned operands alike.
+/// Equality relations apply to any width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CmpKind {
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Neq,
+}
+
+impl fmt::Display for CmpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            CmpKind::Lt => "<",
+            CmpKind::Le => "<=",
+            CmpKind::Gt => ">",
+            CmpKind::Ge => ">=",
+            CmpKind::Eq => "==",
+            CmpKind::Neq => "!=",
+        })
+    }
+}
+
+/// `dst = (lhs <op> rhs)` producing a 1-byte boolean (`0` / `1`).
+/// `lhs` is an integer slot (of the same type as `rhs`).
+/// `dst` is a 1-byte slot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntCmpOp {
+    pub op: CmpKind,
+    pub dst: FrameOffset,
+    pub lhs: FrameOffset,
+    pub rhs: IntOperand,
+}
+
+/// Fused compare-and-branch: jump to `target` if `op(lhs, rhs)` holds. Like
+/// [`IntCmpOp`] but branches on the result instead of storing it.
+/// Note that there are specialized `*U64` variants of this micro-op.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JumpIntCmpOp {
+    pub target: CodeOffset,
+    pub op: CmpKind,
+    pub lhs: FrameOffset,
+    pub rhs: IntOperand,
 }

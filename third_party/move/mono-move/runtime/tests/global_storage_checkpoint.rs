@@ -64,8 +64,8 @@ fn make_program(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 56,
         extended_frame_size: 80,
         zero_frame: true,

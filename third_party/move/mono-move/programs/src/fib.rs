@@ -58,8 +58,8 @@ mod micro_op {
         let fib_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("fib"),
             code: Code::from_vec(vec![]),
-            param_sizes: vec![],
-            param_sizes_sum: 8,
+            param_slots: vec![],
+            param_region_size: 8,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,

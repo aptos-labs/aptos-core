@@ -18,7 +18,7 @@ pub struct DerivedFrameLayout {
     /// `true` iff at least one offset belongs to a non-parameter home slot.
     pub zero_frame: bool,
     /// Byte size of the parameter region.
-    pub param_sizes_sum: u32,
+    pub param_region_size: u32,
 }
 
 /// Derive the GC frame layout for `func_ir`. `home_slot_types` is
@@ -42,21 +42,23 @@ pub fn derive_frame_layout(
     heap_ptr_offsets.sort_by_key(|o| o.0);
     heap_ptr_offsets.dedup();
 
-    let param_sizes_sum: u32 = ctx
+    // Byte size of the parameter region: past the last parameter.
+    let param_region_size: u32 = ctx
         .home_slots
         .iter()
         .take(func_ir.num_params as usize)
-        .map(|s| s.size)
-        .sum();
-    // Is any offset in the non-parameter region?
+        .last()
+        .map(|s| s.offset.0 + s.size)
+        .unwrap_or(0);
+    // Is any pointer slot beyond the parameter region?
     let zero_frame = heap_ptr_offsets
         .last()
-        .is_some_and(|off| off.0 >= param_sizes_sum);
+        .is_some_and(|off| off.0 >= param_region_size);
 
     Ok(DerivedFrameLayout {
         heap_ptr_offsets,
         zero_frame,
-        param_sizes_sum,
+        param_region_size,
     })
 }
 
