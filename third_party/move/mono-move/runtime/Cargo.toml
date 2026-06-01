@@ -23,4 +23,7 @@ rand = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+bcs = { workspace = true }
+mono-move-global-context = { workspace = true }
 proptest = { workspace = true }
+serde = { workspace = true }

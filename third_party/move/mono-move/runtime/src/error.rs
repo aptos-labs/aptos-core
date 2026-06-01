@@ -85,6 +85,9 @@ pub enum RuntimeError {
 
     #[error("resource provider: {0}")]
     ResourceProvider(#[from] ResourceProviderError),
+
+    #[error(transparent)]
+    ValueSerialization(#[from] ValueSerializationError),
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -116,6 +119,44 @@ impl IntoExecutionError for RuntimeError {
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
             ResourceProvider(e) => e.kind(),
+
+            ValueSerialization(e) => e.kind(),
+        }
+    }
+}
+
+/// Failures while serializing a runtime value into BCS.
+#[derive(Debug, Error)]
+pub enum ValueSerializationError {
+    /// The type cannot be BCS-serialized by this code path: references,
+    /// function values, signed integers, enums, and unresolved type
+    /// parameters. The compiler and loader should never hand such a type to
+    /// serialization, so this maps to an invariant violation.
+    #[error("BCS serialization: unsupported type")]
+    UnsupportedType,
+
+    /// A nominal type was reached whose layout has not been populated yet.
+    #[error("BCS serialization: nominal layout not populated")]
+    LayoutUnavailable,
+
+    /// The value tree is deeper than the serializer's recursion limit.
+    #[error("BCS serialization: value nesting too deep")]
+    NestingTooDeep,
+
+    /// A vector is longer than BCS allows for a sequence.
+    #[error("BCS serialization: sequence length {len} exceeds maximum {max}")]
+    SequenceTooLong { len: u64, max: u64 },
+}
+
+impl ValueSerializationError {
+    fn kind(&self) -> ExecutionErrorKind {
+        match self {
+            ValueSerializationError::UnsupportedType
+            | ValueSerializationError::LayoutUnavailable => ExecutionErrorKind::InvariantViolation,
+            ValueSerializationError::NestingTooDeep
+            | ValueSerializationError::SequenceTooLong { .. } => {
+                ExecutionErrorKind::RuntimeLimitExceeded
+            },
         }
     }
 }

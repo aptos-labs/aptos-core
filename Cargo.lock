@@ -12852,13 +12852,16 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
+ "mono-move-global-context",
  "mono-move-loader",
  "move-core-types",
  "proptest",
  "rand 0.7.3",
+ "serde",
  "thiserror 1.0.69",
 ]
 

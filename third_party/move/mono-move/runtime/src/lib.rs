@@ -10,11 +10,12 @@ pub(crate) mod heap;
 mod interpreter;
 mod local_runtime_context;
 pub(crate) mod memory;
+pub mod serialize;
 mod transaction_context;
 mod types;
 mod verifier;
 
-pub use error::{RuntimeError, RuntimeStatus};
+pub use error::{RuntimeError, RuntimeStatus, ValueSerializationError};
 pub use execution_context::{ExecutionContext, LocalExecutionContext};
 pub use heap::pinned_roots::{PinGuard, PinnedRoots};
 pub use interpreter::InterpreterContext;
@@ -27,6 +28,7 @@ pub use mono_move_core::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID,
     TRIVIAL_DESCRIPTOR_ID,
 };
+pub use serialize::{serialize_value, serialized_value_size};
 pub use transaction_context::TransactionContext;
 pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use verifier::{verify_function, verify_program, VerificationError};
