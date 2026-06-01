@@ -1768,7 +1768,7 @@ fn check_depth_of_type_impl(
         Type::Struct { idx, .. } => {
             let formula =
                 DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&[]))
+            check_depth!(formula.solve(&[])?)
         },
         // NB: substitution must be performed before calling this function
         Type::StructInstantiation { idx, ty_args, .. } => {
@@ -1782,7 +1782,7 @@ fn check_depth_of_type_impl(
                 .collect::<PartialVMResult<Vec<_>>>()?;
             let formula =
                 DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&ty_arg_depths))
+            check_depth!(formula.solve(&ty_arg_depths)?)
         },
         Type::Function { args, results, .. } => {
             let mut ty_max_depth = depth;

@@ -105,13 +105,15 @@ impl DepthFormula {
         Ok(DepthFormula::normalize(formulas))
     }
 
-    pub fn solve(&self, tparam_depths: &[u64]) -> u64 {
+    pub fn solve(&self, tparam_depths: &[u64]) -> PartialVMResult<u64> {
         let Self { terms, constant } = self;
         let mut depth = constant.as_ref().copied().unwrap_or(0);
         for (t_i, c_i) in terms {
-            depth = max(depth, tparam_depths[*t_i as usize].saturating_add(*c_i))
+            depth = max(depth, tparam_depths.get(*t_i as usize).ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!("type parameter {t_i} out of bounds"))
+            })?.saturating_add(*c_i))
         }
-        depth
+        Ok(depth)
     }
 
     pub fn scale(&mut self, c: u64) {
