@@ -1244,11 +1244,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
-        let onchain_features: anyhow::Result<Features> = payload.get();
-        if let Err(error) = &onchain_features {
-            warn!("Failed to read on-chain features {}", error);
-        }
-        let features = onchain_features.unwrap_or_default();
+        let features: Features = payload.get().expect("failed to get Features from payload");
         self.encrypted_enabled = features.is_encrypted_transactions_enabled();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
