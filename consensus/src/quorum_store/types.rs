@@ -297,6 +297,10 @@ impl<T: TBatchInfo> Batch<T> {
             "Payload hash doesn't match the digest"
         );
         ensure!(
+            self.payload.num_txns() >= 1,
+            "Batch must contain at least one transaction, got 0",
+        );
+        ensure!(
             self.payload.num_txns() as u64 == self.num_txns(),
             "Payload num txns doesn't match batch info"
         );

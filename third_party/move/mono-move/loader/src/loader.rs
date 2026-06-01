@@ -20,13 +20,13 @@
 use crate::{
     error::{LoaderError, LoaderResult},
     invariant_violation,
-    module_provider::ModuleProvider,
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
+    ModuleProvider,
 };
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{

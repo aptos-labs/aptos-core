@@ -116,7 +116,7 @@
 use crate::{
     align::MAX_ALIGN,
     interner::{InternedIdentifier, InternedModuleId},
-    types::{display_type_list, InternedTypeList},
+    types::{display_type, display_type_list, InternedType, InternedTypeList},
     FunctionPtr,
 };
 use move_core_types::int256::U256;
@@ -852,6 +852,70 @@ pub enum MicroOp {
     },
 
     //======================================================================
+    // Global storage
+    //======================================================================
+    // Access to published resources. In every op `addr` holds the account
+    // address and `ty` the resource type. Reads and writes are tracked in the
+    // per-transaction read-write set.
+    //======================================================================
+    /// Write a boolean into the destination slot `dst`: whether a resource of
+    /// type `ty` exists at the address in `addr`. The boolean is currently
+    /// widened to 8 bytes.
+    Exists {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Immutably borrow the resource of type `ty` at the address in `addr` and
+    /// write a reference to it into the destination slot `dst`. The reference
+    /// is a 16-byte fat pointer pointing directly at the value in global
+    /// storage (no copy). Aborts if the resource does not exist.
+    BorrowGlobal {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Mutably borrow the resource of type `ty` at the address in `addr` and
+    /// write a reference to it into the destination slot `dst`. Unlike
+    /// `BorrowGlobal`, the value is first copied into the current transaction's
+    /// heap (copy-on-write) so it can be mutated in place; the 16-byte fat
+    /// pointer points at that owned copy. Aborts if the resource does not
+    /// exist.
+    ///
+    /// May trigger GC.
+    BorrowGlobalMut {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Move the resource of type `ty` out of the address in `addr` and write
+    /// the owned value into the destination slot `dst`. The owned value is an
+    /// 8-byte heap pointer into the current transaction's heap (not a
+    /// reference). The resource is marked deleted in global storage. Aborts if
+    /// the resource does not exist.
+    ///
+    /// May trigger GC.
+    MoveFrom {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Move the owned value in the source slot `src` into global storage as a
+    /// resource of type `ty` at the address in `addr`. `src` holds an 8-byte
+    /// owned heap pointer. Aborts if the resource already exists.
+    MoveTo {
+        // TODO(correctness):
+        //   Move requires this to be a signer, using address for simplicity for now.
+        addr: FrameOffset,
+        ty: InternedType,
+        src: FrameOffset,
+    },
+
+    //======================================================================
     // Debugging
     //======================================================================
     /// Advance the interpreter's RNG and write a random u64 to `dst`.
@@ -865,6 +929,7 @@ pub enum MicroOp {
     /// Unconditionally trigger a garbage collection cycle.
     /// Useful for testing GC correctness.
     ForceGC,
+
     //======================================================================
     // Missing instructions
     //======================================================================
@@ -873,7 +938,6 @@ pub enum MicroOp {
     // - **Casting**: truncation and widening between integer types,
     //   including signed casts.
     // - **Boolean**: logical Not, And, Or (distinct from bitwise).
-    // - **Global storage**: MoveTo, MoveFrom, BorrowGlobal, Exists.
     // - **Runtime instrumentation**: tracing, profiling, coverage hooks.
     //======================================================================
 
@@ -1314,6 +1378,31 @@ impl fmt::Display for MicroOp {
                 }
                 write!(f, "]")
             },
+            MicroOp::Exists { addr, ty, dst } => {
+                write!(f, "Exists<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::BorrowGlobal { addr, ty, dst } => {
+                write!(f, "BorrowGlobal<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::BorrowGlobalMut { addr, ty, dst } => {
+                write!(f, "BorrowGlobalMut<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::MoveFrom { addr, ty, dst } => {
+                write!(f, "MoveFrom<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::MoveTo { addr, ty, src } => {
+                write!(f, "MoveTo<")?;
+                display_type(f, *ty)?;
+                write!(f, "> addr=[{}], src=[{}]", addr.0, src.0)
+            },
         }
     }
 }
@@ -1433,6 +1522,8 @@ impl MicroOp {
             MicroOp::HeapNew { .. }
             | MicroOp::VecPushBack { .. }
             | MicroOp::PackClosure(_)
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
             | MicroOp::ForceGC => true,
 
             // Non-allocating.
@@ -1504,7 +1595,10 @@ impl MicroOp {
             | MicroOp::IntBitXor(_)
             | MicroOp::IntShl(_)
             | MicroOp::IntShr(_)
-            | MicroOp::IntNegate(_) => false,
+            | MicroOp::IntNegate(_)
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::MoveTo { .. } => false,
         }
     }
 

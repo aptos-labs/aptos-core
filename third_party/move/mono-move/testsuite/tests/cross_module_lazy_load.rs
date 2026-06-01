@@ -43,7 +43,11 @@ fn call_indirect_triggers_lazy_module_load() {
     );
 
     // -- Wrap into a TransactionContext ---------------------------
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(u64::MAX));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        SimpleGasMeter::new(u64::MAX),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+    );
 
     // -- Resolve bar::main through the txn_ctx ---------------------------
     // This lazily loads `bar` (via the loader) and returns a pointer to

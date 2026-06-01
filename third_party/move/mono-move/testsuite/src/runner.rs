@@ -233,7 +233,11 @@ fn execute_function_v2(
         module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
     );
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(u64::MAX));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        SimpleGasMeter::new(u64::MAX),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+    );
 
     // Resolve the entry function via load_function so the entry module is
     // lazily loaded into the read-set and gas is charged for the load.

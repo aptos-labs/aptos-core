@@ -99,7 +99,12 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::ForceGC
             | MicroOp::PackClosure(_)
-            | MicroOp::CallClosure(_) => None,
+            | MicroOp::CallClosure(_)
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
+            | MicroOp::MoveTo { .. } => None,
         }
     }
 }
@@ -217,7 +222,12 @@ impl RemapTargets for MicroOp {
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::ForceGC
             | MicroOp::PackClosure(_)
-            | MicroOp::CallClosure(_)) => op,
+            | MicroOp::CallClosure(_)
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
+            | MicroOp::MoveTo { .. }) => op,
         }
     }
 }
@@ -327,6 +337,12 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Closures ---
             MicroOp::PackClosure(_) => 20,
             MicroOp::CallClosure(_) => 15,
+
+            MicroOp::Exists { .. } => 10,
+            MicroOp::BorrowGlobal { .. } => 10,
+            MicroOp::BorrowGlobalMut { .. } => 20,
+            MicroOp::MoveFrom { .. } => 20,
+            MicroOp::MoveTo { .. } => 20,
         })
     }
 }
