@@ -1351,7 +1351,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         self.exec_ctx.resource_provider(),
                         StorageKey::Resource(address, ty),
                     )?;
-                    write_ptr(fp, dst, ptr.as_ptr());
+                    // A reference is a 16-byte fat pointer; the borrow points
+                    // at the start of the resource, so the offset half is 0.
+                    write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
                 },
 
                 MicroOp::BorrowGlobalMut { addr, ty, dst } => {
@@ -1368,7 +1370,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                             ptr
                         },
                     };
-                    write_ptr(fp, dst, ptr.as_ptr());
+                    // A reference is a 16-byte fat pointer; the borrow points
+                    // at the start of the resource, so the offset half is 0.
+                    write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
                 },
 
                 MicroOp::MoveFrom { addr, ty, dst } => {
@@ -1390,13 +1394,14 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
                 MicroOp::MoveTo { addr, ty, src } => {
                     let address = read_address(fp, addr);
-                    let ptr = read_ptr(fp, src);
-                    debug_assert!(!ptr.is_null(), "MoveTo: null object pointer");
+                    let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
+                        invariant_violation!(MoveToNullSource);
+                    };
 
                     self.read_write_set.move_to(
                         self.exec_ctx.resource_provider(),
                         StorageKey::Resource(address, ty),
-                        NonNull::new_unchecked(ptr),
+                        ptr,
                     )?;
                 },
             }
@@ -1406,7 +1411,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         Ok(StepResult::Continue)
     }
 
-    /// Deep-copy the value graph rooted at the specified source into the
+    /// Deep-copy the value tree rooted at the specified source into the
     /// local heap. Returns the data-region pointer of the freshly-allocated
     /// root copy.
     ///
@@ -1414,18 +1419,24 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     ///
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE`.
-    fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
+    unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
         let root_guard = self.pinned_roots.pin(root);
-        match self.heap.try_deep_copy(self.exec_ctx, root_guard.get()) {
+        // SAFETY: `root_guard.get()` returns the caller-supplied root, which
+        // by this function's contract points to a live object.
+        match unsafe { self.heap.try_deep_copy(self.exec_ctx, root_guard.get()) } {
             Ok(ptr) => Ok(ptr),
             Err(AllocationError::RuntimeError(err)) => Err(err),
             Err(AllocationError::OutOfHeapMemory { .. }) => {
                 gc_collect!(self)?;
                 // Re-read the root pointer from the pin, as its address have
                 // been changed by the GC.
-                self.heap
-                    .try_deep_copy(self.exec_ctx, root_guard.get())
-                    .map_err(AllocationError::into_runtime_error)
+                // SAFETY: the pin keeps the root live across GC; the relocated
+                // pointer still points to the same live object.
+                unsafe {
+                    self.heap
+                        .try_deep_copy(self.exec_ctx, root_guard.get())
+                        .map_err(AllocationError::into_runtime_error)
+                }
             },
         }
     }

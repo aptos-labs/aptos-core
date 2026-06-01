@@ -15,6 +15,12 @@ use thiserror::Error;
 pub type Version = u64;
 
 /// Key to (in-memory) global storage.
+///
+/// A key embeds an [`InternedType`], which is a pointer into the global type
+/// arena. The key is therefore only valid while that arena is alive (for the
+/// duration of execution, bounded by the execution guard). Keys must not be
+/// stored past arena reset, nor compared across two different arenas: equality
+/// and hashing rely on the interned pointer identity.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum StorageKey {
     /// Every resource can be identified in storage by the address where it is

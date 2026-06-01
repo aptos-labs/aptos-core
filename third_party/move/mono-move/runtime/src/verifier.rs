@@ -634,12 +634,17 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
             MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
 
-            MicroOp::Exists { addr, ty: _, dst }
-            | MicroOp::BorrowGlobal { addr, ty: _, dst }
-            | MicroOp::BorrowGlobalMut { addr, ty: _, dst }
-            | MicroOp::MoveFrom { addr, ty: _, dst } => {
+            MicroOp::Exists { addr, ty: _, dst } | MicroOp::MoveFrom { addr, ty: _, dst } => {
+                // Exists writes a bool (currently widened to 8 bytes); MoveFrom
+                // writes an 8-byte owned heap pointer.
                 self.check_frame_access(Some(pc), addr, 32);
                 self.check_frame_access_8(pc, dst);
+            },
+            MicroOp::BorrowGlobal { addr, ty: _, dst }
+            | MicroOp::BorrowGlobalMut { addr, ty: _, dst } => {
+                // Both produce a reference, i.e. a 16-byte fat pointer.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access(Some(pc), dst, 16);
             },
             MicroOp::MoveTo { addr, ty: _, src } => {
                 // TODO(correctness):

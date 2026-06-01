@@ -59,17 +59,18 @@ fn local_ctx_with<'r>(
 /// Frame layout for the mutation tests:
 ///   offset 0:  result slot (8 bytes)
 ///   offset 8:  addr slot (32 bytes)
-///   offset 40: tmp slot (8 bytes, used as `dst` for borrow/move ops)
-/// Total locals = 48 bytes. With FRAME_METADATA_SIZE (24),
-/// `extended_frame_size` must be ≥ 72.
+///   offset 40: tmp slot (16 bytes, used as `dst` for borrow/move ops; a
+///              mutable borrow writes a 16-byte fat-pointer reference)
+/// Total locals = 56 bytes. With FRAME_METADATA_SIZE (24),
+/// `extended_frame_size` must be ≥ 80.
 fn make_program_with_tmp(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
         param_sizes: vec![],
         param_sizes_sum: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 56,
+        extended_frame_size: 80,
         zero_frame: true,
         frame_layout,
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -124,14 +125,15 @@ fn borrow_global_mut_same_epoch_no_extra_copy() {
     resources.install_global(addr(2), resource_ty(), desc_id, &make_resource(0xBBBB));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
-    let result_b: FO = FO(40);
+    let result_a: FO = FO(40);
+    let result_b: FO = FO(56);
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
             MicroOp::BorrowGlobalMut {
                 addr: ADDR,
                 ty: resource_ty(),
-                dst: DST,
+                dst: result_a,
             },
             MicroOp::BorrowGlobalMut {
                 addr: ADDR,
@@ -142,10 +144,10 @@ fn borrow_global_mut_same_epoch_no_extra_copy() {
         ]),
         param_sizes: vec![],
         param_sizes_sum: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 72,
+        extended_frame_size: 96,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(vec![DST, result_b]),
+        frame_layout: FrameLayoutInfo::new(vec![result_a, result_b]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
@@ -153,8 +155,8 @@ fn borrow_global_mut_same_epoch_no_extra_copy() {
     ctx.set_root_arg(8, &addr(2).into_bytes());
     ctx.run().unwrap();
 
-    let first = ctx.root_heap_ptr(0);
-    let second = ctx.root_heap_ptr(40);
+    let first = ctx.root_heap_ptr(40);
+    let second = ctx.root_heap_ptr(56);
     assert_eq!(
         first as usize, second as usize,
         "second same-epoch BorrowGlobalMut must reuse the first's local-heap pointer"
@@ -306,8 +308,8 @@ fn gc_traces_and_relocates_local_heap_writes() {
         ]),
         param_sizes: vec![],
         param_sizes_sum: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 56,
+        extended_frame_size: 80,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![DST, TMP]),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -346,8 +348,8 @@ fn distinct_keys_track_independently() {
     );
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
-    let dst_a: FO = FO(0);
-    let dst_b: FO = FO(40);
+    let dst_a: FO = FO(40);
+    let dst_b: FO = FO(56);
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
@@ -365,8 +367,8 @@ fn distinct_keys_track_independently() {
         ]),
         param_sizes: vec![],
         param_sizes_sum: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 72,
+        extended_frame_size: 96,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![dst_a, dst_b]),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -376,8 +378,8 @@ fn distinct_keys_track_independently() {
     ctx.set_root_arg(8, &addr(7).into_bytes());
     ctx.run().unwrap();
 
-    let a_ptr = ctx.root_heap_ptr(0);
-    let b_ptr = ctx.root_heap_ptr(40);
+    let a_ptr = ctx.root_heap_ptr(40);
+    let b_ptr = ctx.root_heap_ptr(56);
     assert_ne!(a_ptr as usize, b_ptr as usize);
     let a_val = unsafe { *(a_ptr as *const u64) };
     let b_val = unsafe { *(b_ptr as *const u64) };

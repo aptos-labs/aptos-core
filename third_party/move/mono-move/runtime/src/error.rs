@@ -268,6 +268,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("enum tag {tag} out of range for {variant_count} variants")]
     EnumTagOutOfRange { tag: u64, variant_count: usize },
+
+    #[error("MoveTo: null source pointer")]
+    MoveToNullSource,
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

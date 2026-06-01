@@ -1,8 +1,56 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Per-transaction global-storage state: read cache with pending writes and
-//! rollback journal with the checkpoint stack.
+//! Per-transaction global-storage state.
+//!
+//! Tracks every resource a transaction touches in a [`ResourceReadWriteSet`]:
+//! a map from [`StorageKey`] to an [`Entry`], plus an undo journal and a
+//! checkpoint stack for rollback.
+//!
+//! # The read-write set
+//!
+//! Each [`Entry`] contains:
+//!
+//! - `read` ([`StorageRead`]) — the value as seen at the start of the
+//!   transaction, fetched from DB, Block-STM, or a test backend. Either
+//!   `DoesNotExist` or `ExternalHeap`, where the latter points into an arena
+//!   owned by the provider, not by this transaction.
+//! - `write` ([`StorageWrite`]) — the pending modification, if any:
+//!   `NotModified`, `Deleted` (moved out), or `LocalHeap` (the value now lives
+//!   in this transaction's heap and may have been mutated).
+//!
+//! # Copy-on-write
+//!
+//! An immutable borrow can hand out the `ExternalHeap` pointer directly, with
+//! no copy. A mutable borrow needs a value that is both owned by this
+//! transaction's heap and current (see below), so the first mutable borrow of
+//! an external or stale value deep-copies it into the local heap and records a
+//! `LocalHeap` write. Later mutable borrows in the same checkpoint reuse that
+//! copy.
+//!
+//! # Checkpoints and the checkpoint counter
+//!
+//! Rather than snapshotting all state at each checkpoint, the set tags every
+//! `LocalHeap`/`Deleted` write with the [`CheckpointCounter`] value current
+//! when it was made. A new checkpoint just bumps the counter. A write tagged
+//! with an older counter belongs to an earlier checkpoint's snapshot, so it
+//! must be copied before being mutated again — otherwise rolling back to that
+//! checkpoint would observe the later mutation. This is what makes a write
+//! "current" (directly writable) versus "stale" (copy-on-write again).
+//!
+//! # Rollback journal
+//!
+//! Whenever a write overwrites a write from an older counter, the old write is
+//! pushed to the undo `journal`. A [`Checkpoint`] records the journal length at
+//! the time it was taken. `rollback(n)` replays journal entries backwards down
+//! to the recorded length, restoring each resource's prior write. Allocations
+//! that become unreachable are reclaimed by the next GC, not at rollback time.
+//!
+//! # GC interaction
+//!
+//! `LocalHeap` pointers are live roots: the GC scans and relocates them via
+//! [`RootScanner`]. `ExternalHeap` pointers are owned by the provider and are
+//! never relocated.
 
 use crate::{
     error::{GlobalStorageOp, RuntimeError, RuntimeResult},
@@ -15,9 +63,10 @@ use std::{
     ptr::NonNull,
 };
 
-/// Global state can be saved during execution by recording checkpoints. Epoch
-/// is a counter incremented by every checkpoint.
-pub type Epoch = u64;
+/// Counter incremented by every checkpoint. Used to tell whether a pending
+/// write was made in the current checkpoint (and so is directly writable) or
+/// in an older one (and so must be copied before mutation).
+pub type CheckpointCounter = u64;
 
 /// Represents a pending write to storage.
 #[derive(Clone, Copy)]
@@ -25,16 +74,19 @@ pub enum StorageWrite {
     /// There is no write to this resource yet.
     NotModified,
     /// This resource has been moved out at the specified epoch.
-    Deleted { epoch: Epoch },
+    Deleted { epoch: CheckpointCounter },
     /// This resource has been copied into local transaction heap at the
     /// specified epoch. It may or may not be modified.
-    LocalHeap { ptr: NonNull<u8>, epoch: Epoch },
+    LocalHeap {
+        ptr: NonNull<u8>,
+        epoch: CheckpointCounter,
+    },
 }
 
 impl StorageWrite {
     /// Returns true if there is a possible modification made in the current
     /// epoch.
-    fn is_at_epoch(&self, current_epoch: Epoch) -> bool {
+    fn is_at_epoch(&self, current_epoch: CheckpointCounter) -> bool {
         match self {
             StorageWrite::NotModified => false,
             StorageWrite::LocalHeap { epoch, .. } | StorageWrite::Deleted { epoch } => {
@@ -99,7 +151,7 @@ impl Entry {
     /// [`EntryPtr::NonWritable`] if the pointer is not owned or has been
     /// created in earlier epoch: in this case value requires a deep copy.
     /// Returns [`None`] if resource does not exist or was deleted.
-    pub(crate) fn as_ptr_mut(&self, current_epoch: Epoch) -> Option<EntryPtr> {
+    pub(crate) fn as_ptr_mut(&self, current_epoch: CheckpointCounter) -> Option<EntryPtr> {
         match self.write {
             StorageWrite::NotModified => match self.read {
                 StorageRead::DoesNotExist => None,
@@ -129,7 +181,7 @@ struct JournalEntry {
 #[derive(Clone, Copy)]
 struct Checkpoint {
     journal_len: usize,
-    epoch: Epoch,
+    epoch: CheckpointCounter,
 }
 
 /// Per-transaction global storage state.
@@ -143,7 +195,7 @@ pub struct ResourceReadWriteSet {
     /// A list of saved checkpoints.
     checkpoints: Vec<Checkpoint>,
     /// Current epoch, incremented on every new checkpoint.
-    current_epoch: Epoch,
+    current_epoch: CheckpointCounter,
 }
 
 impl ResourceReadWriteSet {
@@ -296,7 +348,7 @@ impl ResourceReadWriteSet {
     }
 
     /// Returns the current epoch.
-    pub fn current_epoch(&self) -> Epoch {
+    pub fn current_epoch(&self) -> CheckpointCounter {
         self.current_epoch
     }
 
@@ -317,8 +369,10 @@ impl ResourceReadWriteSet {
             journal_len: self.journal.len(),
             epoch: self.current_epoch,
         });
-        // Note: this can never overflow in practice.
-        self.current_epoch += 1;
+        self.current_epoch = self
+            .current_epoch
+            .checked_add(1)
+            .expect("Checkpoint counter must never overflow");
     }
 
     /// Undoes the given number of checkpoints.

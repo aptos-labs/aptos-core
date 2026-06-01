@@ -19,17 +19,18 @@ use mono_move_core::{
 use std::ptr::NonNull;
 
 impl Heap {
-    /// Single-pass deep copy of the value graph rooted at the given source.
-    /// Returns the data-region pointer of the freshly-allocated root copy,
-    /// or [`AllocationError::OutOfHeapMemory`] on the first allocation that
-    /// does not fit. There is no GC during copying and the caller has to
-    /// handle memory.
+    /// Single-pass deep copy of the value tree rooted at the given source.
+    /// Move values form a tree (no sharing, no cycles), so a tree copy is
+    /// sufficient. Returns the data-region pointer of the freshly-allocated
+    /// root copy, or [`AllocationError::OutOfHeapMemory`] on the first
+    /// allocation that does not fit. There is no GC during copying: on
+    /// out-of-memory the caller may have to run GC and retry.
     ///
     /// # Safety
     ///
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE` and is valid.
-    pub(crate) fn try_deep_copy<P: DescriptorProvider + ?Sized>(
+    pub(crate) unsafe fn try_deep_copy<P: DescriptorProvider + ?Sized>(
         &mut self,
         descriptors: &P,
         src: NonNull<u8>,
@@ -57,8 +58,9 @@ impl Heap {
             })
         })?;
 
-        // Walk pointer fields. The pointer values are pointing to old data,
-        // so they need to be deep-copied and the source has to be patched.
+        // Walk pointer fields. The freshly-copied object still holds the old
+        // child pointers, so each child is deep-copied and the corresponding
+        // slot in the cloned object is patched with the new pointer.
         match desc.inner() {
             ObjectDescriptorInner::Trivial => {},
             ObjectDescriptorInner::Struct {
@@ -109,6 +111,14 @@ impl Heap {
                 // SAFETY: length lives at `VEC_LENGTH_OFFSET` of every
                 // vector payload.
                 let length = unsafe { read_u64(new.as_ptr(), VEC_LENGTH_OFFSET) } as usize;
+                // Length comes from the GC-maintained object header, not from
+                // attacker-controlled bytes, so a debug assertion suffices
+                // (unlike the enum tag, which is validated unconditionally).
+                debug_assert!(
+                    VEC_DATA_OFFSET + length.saturating_mul(*elem_size as usize)
+                        <= src_size - OBJECT_HEADER_SIZE,
+                    "vector length {length} exceeds object payload"
+                );
                 let elem_size = *elem_size as usize;
                 for i in 0..length {
                     for &offset in elem_pointer_offsets {
@@ -138,7 +148,9 @@ impl Heap {
         let Some(child_src) = NonNull::new(unsafe { read_ptr(parent.as_ptr(), offset) }) else {
             return Ok(());
         };
-        let child_dst = self.try_deep_copy(descriptors, child_src)?;
+        // SAFETY: the parent's descriptor lists this offset as a heap pointer,
+        // so `child_src` points to the data region of a live object.
+        let child_dst = unsafe { self.try_deep_copy(descriptors, child_src)? };
         // SAFETY: same slot as the read above.
         unsafe {
             write_ptr(parent.as_ptr(), offset, child_dst.as_ptr());

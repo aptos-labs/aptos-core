@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Integration tests for the read-only global-storage MicroOps
-//! (`Exists`, `BorrowGlobal`, `MoveFrom`). Each test builds a
+//! Integration tests for the global-storage MicroOps (`Exists`,
+//! `BorrowGlobal`, `BorrowGlobalMut`, `MoveFrom`). Each test builds a
 //! one-function program that invokes exactly one global-storage
 //! MicroOp, pre-populates an in-memory [`ResourceProvider`], wraps it
 //! in [`LocalExecutionContext`], and inspects the root frame.
@@ -223,8 +223,60 @@ fn borrow_global_aborts_on_missing() {
 }
 
 // ---------------------------------------------------------------------------
+// BorrowGlobalMut
+// ---------------------------------------------------------------------------
+
+#[test]
+fn borrow_global_mut_aborts_on_missing() {
+    let (descriptors, _) = fresh_descriptors();
+    let func = make_program(vec![
+        MicroOp::BorrowGlobalMut {
+            addr: ADDR,
+            ty: resource_ty(),
+            dst: DST,
+        },
+        MicroOp::Return,
+    ]);
+
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
+    ctx.set_root_arg(8, &addr(9).into_bytes());
+    assert!(matches!(
+        ctx.run(),
+        Err(RuntimeError::ResourceDoesNotExist {
+            op: GlobalStorageOp::BorrowGlobalMut,
+            ..
+        })
+    ));
+}
+
+// ---------------------------------------------------------------------------
 // MoveFrom
 // ---------------------------------------------------------------------------
+
+#[test]
+fn move_from_aborts_on_missing() {
+    let (descriptors, _) = fresh_descriptors();
+    let func = make_program(vec![
+        MicroOp::MoveFrom {
+            addr: ADDR,
+            ty: resource_ty(),
+            dst: DST,
+        },
+        MicroOp::Return,
+    ]);
+
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
+    ctx.set_root_arg(8, &addr(9).into_bytes());
+    assert!(matches!(
+        ctx.run(),
+        Err(RuntimeError::ResourceDoesNotExist {
+            op: GlobalStorageOp::MoveFrom,
+            ..
+        })
+    ));
+}
 
 #[test]
 fn move_from_marks_deleted_and_second_borrow_aborts() {

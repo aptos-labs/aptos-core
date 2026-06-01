@@ -55,9 +55,9 @@ fn local_ctx_with<'r>(
     LocalRuntimeContext::new(SimpleGasMeter::new(u64::MAX), resources, descriptors)
 }
 
-/// Frame layout: 32B addr at 8, 8B tmp at 40. Locals total 48
-/// bytes; with FRAME_METADATA_SIZE (24), extended_frame_size must
-/// be ≥ 72.
+/// Frame layout: 32B addr at 8, 16B tmp at 40 (a mutable borrow writes a
+/// 16-byte fat-pointer reference). Locals total 56 bytes; with
+/// FRAME_METADATA_SIZE (24), extended_frame_size must be ≥ 80.
 const ADDR: FO = FO(8);
 const TMP: FO = FO(40);
 
@@ -75,8 +75,8 @@ fn make_borrow_mut_program(desc_id: DescriptorId) -> Function {
         ]),
         param_sizes: vec![],
         param_sizes_sum: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 56,
+        extended_frame_size: 80,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![TMP]),
         safe_point_layouts: SortedSafePointEntries::empty(),
