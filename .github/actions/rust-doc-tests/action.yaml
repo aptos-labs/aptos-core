@@ -1,0 +1,16 @@
+name: Rust Doc Tests
+description: Runs only the rust doc tests
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # The source code must be checked out by the workflow that invokes this action.
+
+    # Run the rust doc tests
+    - name: Run rust doc tests
+      run: cargo test --profile ci --locked --doc --workspace --exclude aptos-node-checker
+      shell: bash

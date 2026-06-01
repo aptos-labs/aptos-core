@@ -18,7 +18,7 @@ use guppy::{
 use log::{debug, info, warn};
 use reqwest::Error;
 use std::{
-    fs,
+    env, fs,
     io::Read,
     path::Path,
     process::{Command, Output},
@@ -222,15 +222,18 @@ impl SelectedPackageArgs {
     }
 
     /// Identifies the merge base to compare against. This is done by identifying
-    /// the commit at which the current branch forked off origin/main.
+    /// the commit at which the current branch forked off the GitHub base ref.
     ///
     /// Note: if the merge-base is too old, an error will be returned.
     fn identify_merge_base(&self) -> anyhow::Result<String> {
+        let base_ref = env::var("GITHUB_BASE_REF").unwrap_or_else(|_| "main".to_string());
+        let origin_base_ref = format!("origin/{base_ref}");
+
         // Run the git merge-base command
         let merge_base_output = Command::new("git")
             .arg("merge-base")
             .arg("HEAD")
-            .arg("origin/main")
+            .arg(&origin_base_ref)
             .output()
             .expect("failed to execute git merge-base");
         let merge_base = parse_string_from_output(merge_base_output);

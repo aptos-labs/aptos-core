@@ -25,11 +25,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM rust-base as builder-base
 
 # Confirm that this Dockerfile is being invoked from an appropriate builder.
-# See https://github.com/aptos-labs/aptos-core/pull/2471
-# See https://github.com/aptos-labs/aptos-core/pull/2472
+# This build relies on BuildKit support for .dockerignore and build contexts.
 ARG BUILT_VIA_BUILDKIT
 ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
-RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nThanks!" && false)
 
 # cargo profile and features
 ARG PROFILE
@@ -38,6 +37,7 @@ ARG FEATURES
 ENV FEATURES ${FEATURES}
 ARG CARGO_TARGET_DIR
 ENV CARGO_TARGET_DIR ${CARGO_TARGET_DIR}
+ENV CARGO_NET_GIT_FETCH_WITH_CLI true
 
 RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarch_64/g") \
     && curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v21.5/protoc-21.5-linux-$ARCHITECTURE.zip" \
@@ -45,8 +45,7 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local 'include/*' \
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
-RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git_credentials \
-    git config --global credential.helper store
+RUN git config --global credential.helper "store --file /root/.git-credentials"
 
 COPY --link . /aptos/
 

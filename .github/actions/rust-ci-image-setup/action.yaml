@@ -1,0 +1,60 @@
+name: Rust CI Image Setup
+description: Installs CI tools expected by lint-test jobs on the Rust image or host runner.
+
+runs:
+  using: composite
+  steps:
+    - name: Install CI tools
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        sudo_cmd=()
+        pip_flags=()
+        if [ "$(id -u)" -ne 0 ]; then
+          sudo_cmd=(sudo)
+          pip_flags=(--user)
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+        fi
+
+        "${sudo_cmd[@]}" apt-get update
+        "${sudo_cmd[@]}" apt-get install --no-install-recommends --assume-yes \
+          binutils \
+          build-essential \
+          ca-certificates \
+          curl \
+          git \
+          libdw-dev \
+          libudev-dev \
+          lld \
+          pkg-config \
+          python3 \
+          python3-pip \
+          python3-setuptools \
+          python3-venv \
+          unzip \
+          wget
+
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        if ! command -v cargo >/dev/null 2>&1; then
+          rust_version="$(sed -nE 's/^channel = "([^"]+)"/\1/p' rust-toolchain.toml)"
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain "$rust_version"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.cargo/bin:$PATH"
+        fi
+
+        if command -v rustup >/dev/null 2>&1; then
+          rustup show
+        else
+          cargo --version
+        fi
+
+        if ! command -v cargo-nextest >/dev/null 2>&1; then
+          cargo install cargo-nextest --locked --version 0.9.85
+        fi
+
+        if ! command -v pre-commit >/dev/null 2>&1; then
+          pip3 install "${pip_flags[@]}" pre-commit
+        fi

@@ -1,0 +1,163 @@
+name: "Publish Builder Images"
+run-name: "Publish builder images for ${{ inputs.ref || github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - m1
+    paths:
+      - ".github/workflows/publish-builder-images.yaml"
+      - ".cargo/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker/builder/**"
+      - "rust-toolchain.toml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build."
+        required: true
+        default: "m1"
+      publish_latest:
+        description: "Also publish the latest tag."
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ghcr.io/movementlabsxyz
+  DEBIAN_CONTEXT: docker-image://debian:bullseye@sha256:cf48c31af360e1c0a0aedd33aae4d928b68c2cdf093f1612650eb1ff434d1c34
+  PROFILE: release
+  FEATURES: ""
+  CARGO_TARGET_DIR: /aptos/target
+  BUILT_VIA_BUILDKIT: "true"
+  GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+jobs:
+  publish:
+    name: "Publish Rust builder images"
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Derive image metadata
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git_sha="$(git rev-parse HEAD)"
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          ref_name="${{ inputs.ref || github.ref_name }}"
+          ref_tag="$(printf '%s' "$ref_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^-+//; s/-+$//')"
+          rust_version="$(sed -nE 's/^channel = "([^"]+)"/\1/p' rust-toolchain.toml)"
+          if [ -z "$ref_tag" ]; then
+            ref_tag="$short_sha"
+          fi
+          if [ -z "$rust_version" ]; then
+            echo "Unable to determine Rust version from rust-toolchain.toml" >&2
+            exit 1
+          fi
+
+          echo "git_sha=$git_sha" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "ref_tag=$ref_tag" >> "$GITHUB_OUTPUT"
+          echo "rust_context=docker-image://rust:${rust_version}-bullseye" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.INFRA_GH_USER || github.actor }}
+          password: ${{ secrets.INFRA_GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish images
+        shell: bash
+        env:
+          GIT_SHA: ${{ steps.metadata.outputs.git_sha }}
+          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+          REF_TAG: ${{ steps.metadata.outputs.ref_tag }}
+          RUST_CONTEXT: ${{ steps.metadata.outputs.rust_context }}
+          BUILD_DATE: ${{ steps.metadata.outputs.build_date }}
+          PUBLISH_LATEST: ${{ github.event_name == 'push' && github.ref_name == 'm1' || inputs.publish_latest }}
+        run: |
+          set -euo pipefail
+
+          add_tags() {
+            local -n tags_ref="$1"
+            local image="$2"
+
+            tags_ref+=(--tag "$image:$SHORT_SHA")
+            tags_ref+=(--tag "$image:$REF_TAG")
+            if [ "$PUBLISH_LATEST" = "true" ]; then
+              tags_ref+=(--tag "$image:latest")
+            fi
+          }
+
+          common_build_args=(
+            --build-arg "PROFILE=$PROFILE"
+            --build-arg "FEATURES=$FEATURES"
+            --build-arg "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
+            --build-arg "BUILT_VIA_BUILDKIT=$BUILT_VIA_BUILDKIT"
+          )
+
+          common_metadata_args=(
+            --build-arg "GIT_SHA=$GIT_SHA"
+            --build-arg "GIT_BRANCH=$REF_TAG"
+            --build-arg "GIT_TAG=$REF_TAG"
+            --build-arg "BUILD_DATE=$BUILD_DATE"
+          )
+
+          rust_tags=()
+          add_tags rust_tags "$IMAGE_NAMESPACE/rust"
+          add_tags rust_tags "$IMAGE_NAMESPACE/builder-base"
+
+          docker buildx build \
+            --push \
+            --file docker/builder/builder.Dockerfile \
+            --target builder-base \
+            --build-context "rust=$RUST_CONTEXT" \
+            --secret id=GIT_CREDENTIALS,env=GIT_CREDENTIALS \
+            "${common_build_args[@]}" \
+            "${rust_tags[@]}" \
+            .
+
+          for target in aptos-node-builder tools-builder indexer-builder; do
+            builder_tags=()
+            add_tags builder_tags "$IMAGE_NAMESPACE/$target"
+
+            docker buildx build \
+              --push \
+              --file docker/builder/builder.Dockerfile \
+              --target "$target" \
+              --build-context "builder-base=docker-image://$IMAGE_NAMESPACE/rust:$SHORT_SHA" \
+              --secret id=GIT_CREDENTIALS,env=GIT_CREDENTIALS \
+              "${common_build_args[@]}" \
+              "${builder_tags[@]}" \
+              .
+          done
+
+          tools_tags=()
+          add_tags tools_tags "$IMAGE_NAMESPACE/tools"
+
+          docker buildx build \
+            --push \
+            --file docker/builder/tools.Dockerfile \
+            --target tools \
+            --build-context "debian-base=$DEBIAN_CONTEXT" \
+            --build-context "tools-builder=docker-image://$IMAGE_NAMESPACE/tools-builder:$SHORT_SHA" \
+            "${common_metadata_args[@]}" \
+            "${tools_tags[@]}" \
+            .

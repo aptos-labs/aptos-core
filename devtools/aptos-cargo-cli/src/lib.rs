@@ -465,7 +465,7 @@ fn run_targeted_unit_tests(
     // Add each package to the arguments
     for package in packages_to_test {
         direct_args.push("-p".into());
-        direct_args.push(package);
+        direct_args.push(get_package_name_from_path(&package));
     }
 
     // Create the command to run the unit tests
@@ -712,5 +712,20 @@ mod tests {
 
         // Extract the package name from the path (this should panic)
         get_package_name_from_path(package_path);
+    }
+
+    #[test]
+    fn test_targeted_unit_tests_package_args_strip_paths() {
+        let affected_package_paths = [
+            "file:///home/aptos-core/crates/test-crate#test-crate".to_string(),
+            "file:///home/aptos-core/third_party/move/tools/move-cli#move-cli".to_string(),
+        ];
+
+        let package_names: Vec<_> = affected_package_paths
+            .iter()
+            .map(|package_path| get_package_name_from_path(package_path))
+            .collect();
+
+        assert_eq!(package_names, vec!["test-crate", "move-cli"]);
     }
 }

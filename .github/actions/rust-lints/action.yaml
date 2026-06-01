@@ -1,0 +1,35 @@
+name: Rust Lints
+description: Runs all Rust linters
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # The source code must be checkout out by the workflow that invokes this action.
+
+    # Run pre-commit checks against the PR or push diff. The repository contains
+    # historical files that do not pass these hooks when checked all at once.
+    - name: Run pre-commit checks
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ -n "${GITHUB_BASE_REF:-}" ]; then
+          git fetch --no-tags origin "$GITHUB_BASE_REF"
+          from_ref="origin/$GITHUB_BASE_REF"
+        else
+          from_ref="HEAD^"
+        fi
+
+        pre-commit run --show-diff-on-failure --color=always --from-ref "$from_ref" --to-ref HEAD
+
+    # Run the affected-package Rust lints. Full-repo cargo fmt and cargo sort
+    # do not currently pass on the m1 base branch, so keep formatting checks
+    # scoped to the pre-commit diff above.
+    - name: Run cargo clippy checks
+      shell: bash
+      run: |
+        cargo xclippy

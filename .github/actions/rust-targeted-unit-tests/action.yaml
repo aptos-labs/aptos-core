@@ -1,0 +1,45 @@
+name: Rust Targeted Unit Tests
+description: Runs only the targeted rust unit tests
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # The source code must be checked out by the workflow that invokes this action.
+
+    # Run a postgres database
+    - name: Run postgres database
+      run: |
+        if [ "${USE_POSTGRES_SERVICE:-}" = "true" ]; then
+          echo "Using workflow postgres service."
+          exit 0
+        fi
+        docker run --detach -p 5432:5432 cimg/postgres:14.2
+      shell: bash
+
+    # Output the changed files
+    - name: Output the changed files
+      run: cargo x changed-files -vvv
+      shell: bash
+
+    # Output the affected packages
+    - name: Output the affected packages
+      run: cargo x affected-packages -vvv
+      shell: bash
+
+    # Run only the targeted rust unit tests
+    - name: Run only the targeted unit tests
+      run: |
+        export INDEXER_DATABASE_URL="${INDEXER_DATABASE_URL:-postgresql://postgres@localhost/postgres}"
+        export Z3_EXE="${Z3_EXE:-$HOME/bin/z3}"
+        export CVC5_EXE="${CVC5_EXE:-$HOME/bin/cvc5}"
+        export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
+        export BOOGIE_EXE="${BOOGIE_EXE:-$DOTNET_ROOT/tools/boogie}"
+        cargo x targeted-unit-tests -vvv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+      shell: bash
+      env:
+        RUST_MIN_STACK: "4297152"
+        MVP_TEST_ON_CI: "true"

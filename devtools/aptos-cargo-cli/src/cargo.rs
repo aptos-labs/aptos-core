@@ -58,15 +58,15 @@ impl Cargo {
         info!("Executing command: {:?}", command_to_execute);
 
         // Execute the command
-        let result = self.inner.output();
+        let result = self.inner.status();
 
         // If the command failed, panic immediately with the error.
         // This will ensure that failures are not dropped silently.
         match result {
             Ok(output) => {
-                if !ignore_failed_exit_status && !output.status.success() {
+                if !ignore_failed_exit_status && !output.success() {
                     panic!(
-                        "Command failed: {:?}. Output: {:?}",
+                        "Command failed: {:?}. Status: {:?}",
                         command_to_execute, output
                     );
                 }
