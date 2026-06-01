@@ -31,6 +31,9 @@ pub struct StateSlot {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StateSlotKind {
     ColdVacant,
+    /// Marker for evicting a persisted hot vacancy from the hot state.
+    /// The cold/global state is already vacant, so this must not produce a cold JMT update.
+    EvictedHotVacant,
     HotVacant {
         hot_since_version: Version,
         lru_info: LRUEntry<HashValue>,
@@ -111,6 +114,7 @@ impl StateSlot {
     fn maybe_update_cold_state(&self, min_version: Version) -> Option<Option<&StateValue>> {
         match &self.kind {
             ColdVacant => Some(None),
+            EvictedHotVacant => None,
             HotVacant {
                 hot_since_version, ..
             } => {
@@ -177,7 +181,7 @@ impl StateSlot {
 
     pub fn into_state_value_and_version_opt(self) -> Option<(Version, StateValue)> {
         match self.kind {
-            ColdVacant | HotVacant { .. } => None,
+            ColdVacant | EvictedHotVacant | HotVacant { .. } => None,
             ColdOccupied {
                 value_version,
                 value,
@@ -192,14 +196,14 @@ impl StateSlot {
 
     pub fn into_state_value_opt(self) -> Option<StateValue> {
         match self.kind {
-            ColdVacant | HotVacant { .. } => None,
+            ColdVacant | EvictedHotVacant | HotVacant { .. } => None,
             ColdOccupied { value, .. } | HotOccupied { value, .. } => Some(value),
         }
     }
 
     pub fn as_state_value_opt(&self) -> Option<&StateValue> {
         match &self.kind {
-            ColdVacant | HotVacant { .. } => None,
+            ColdVacant | EvictedHotVacant | HotVacant { .. } => None,
             ColdOccupied { value, .. } | HotOccupied { value, .. } => Some(value),
         }
     }
@@ -209,7 +213,10 @@ impl StateSlot {
     }
 
     pub fn is_cold(&self) -> bool {
-        matches!(self.kind, ColdVacant | ColdOccupied { .. })
+        matches!(
+            self.kind,
+            ColdVacant | EvictedHotVacant | ColdOccupied { .. }
+        )
     }
 
     pub fn is_occupied(&self) -> bool {
@@ -218,14 +225,14 @@ impl StateSlot {
 
     pub fn size(&self) -> usize {
         match &self.kind {
-            ColdVacant | HotVacant { .. } => 0,
+            ColdVacant | EvictedHotVacant | HotVacant { .. } => 0,
             ColdOccupied { value, .. } | HotOccupied { value, .. } => value.size(),
         }
     }
 
     pub fn hot_since_version_opt(&self) -> Option<Version> {
         match &self.kind {
-            ColdVacant | ColdOccupied { .. } => None,
+            ColdVacant | EvictedHotVacant | ColdOccupied { .. } => None,
             HotVacant {
                 hot_since_version, ..
             }
@@ -253,7 +260,7 @@ impl StateSlot {
 
     pub fn value_version_opt(&self) -> Option<Version> {
         match &self.kind {
-            ColdVacant | HotVacant { .. } => None,
+            ColdVacant | EvictedHotVacant | HotVacant { .. } => None,
             ColdOccupied { value_version, .. } | HotOccupied { value_version, .. } => {
                 Some(*value_version)
             },
@@ -275,7 +282,7 @@ impl StateSlot {
                 hot_since_version,
                 lru_info: LRUEntry::uninitialized(),
             },
-            ColdVacant => HotVacant {
+            ColdVacant | EvictedHotVacant => HotVacant {
                 hot_since_version,
                 lru_info: LRUEntry::uninitialized(),
             },
@@ -297,13 +304,70 @@ impl StateSlot {
                 value_version,
                 value,
             },
-            HotVacant { .. } => ColdVacant,
+            HotVacant { .. } if self.state_key.is_some() => ColdVacant,
+            HotVacant { .. } => EvictedHotVacant,
             _ => panic!("Should not be called on cold slots."),
         };
         Self {
             state_key: self.state_key,
             kind,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hot_vacant_slot(state_key: Option<StateKey>) -> StateSlot {
+        let kind = StateSlotKind::HotVacant {
+            hot_since_version: 10,
+            lru_info: LRUEntry::uninitialized(),
+        };
+        match state_key {
+            Some(state_key) => StateSlot::new(state_key, kind),
+            None => StateSlot::new_without_state_key(kind),
+        }
+    }
+
+    #[test]
+    fn keyed_hot_vacant_eviction_remains_cold_deletion() {
+        let state_key = StateKey::raw(b"keyed_hot_vacant");
+        let slot = hot_vacant_slot(Some(state_key.clone())).to_cold();
+
+        assert!(matches!(slot.kind(), StateSlotKind::ColdVacant));
+
+        let (key_hash, value_opt) = slot
+            .maybe_update_jmt(0)
+            .expect("keyed cold vacancy should update cold JMT");
+        assert_eq!(key_hash, *state_key.crypto_hash_ref());
+        assert!(value_opt.is_none());
+    }
+
+    #[test]
+    fn keyless_hot_vacant_eviction_skips_cold_jmt_update() {
+        let slot = hot_vacant_slot(None).to_cold();
+
+        assert!(matches!(slot.kind(), StateSlotKind::EvictedHotVacant));
+        assert!(slot.is_cold());
+        assert!(slot.maybe_update_jmt(0).is_none());
+    }
+
+    #[test]
+    fn evicted_hot_vacant_can_be_made_hot_again() {
+        let slot = StateSlot::new_without_state_key(StateSlotKind::EvictedHotVacant).to_hot(11);
+
+        assert!(matches!(slot.kind(), StateSlotKind::HotVacant {
+            hot_since_version: 11,
+            ..
+        }));
+        assert!(slot.state_key().is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "StateSlot: state_key is None")]
+    fn keyless_cold_vacant_still_panics_on_cold_jmt_update() {
+        StateSlot::new_without_state_key(StateSlotKind::ColdVacant).maybe_update_jmt(0);
     }
 }
 
