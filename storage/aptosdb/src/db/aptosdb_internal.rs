@@ -337,6 +337,40 @@ impl AptosDB {
         }
     }
 
+    pub(super) fn error_if_hot_state_merkle_pruned(
+        &self,
+        data_type: &str,
+        version: Version,
+    ) -> Result<()> {
+        let state_pruner = &self.state_store.state_db.state_pruner;
+        // When hot state is disabled the pruners are absent and nothing is pruned here; the read
+        // path returns a clear `HotStateError` instead.
+        let (Some(merkle_pruner), Some(epoch_snapshot_pruner)) = (
+            state_pruner.hot_state_merkle_pruner.as_ref(),
+            state_pruner.hot_epoch_snapshot_pruner.as_ref(),
+        ) else {
+            return Ok(());
+        };
+
+        let min_readable_version = merkle_pruner.get_min_readable_version();
+        if version >= min_readable_version {
+            return Ok(());
+        }
+
+        let min_readable_epoch_snapshot_version = epoch_snapshot_pruner.get_min_readable_version();
+        if version >= min_readable_epoch_snapshot_version {
+            self.ledger_db.metadata_db().ensure_epoch_ending(version)
+        } else {
+            bail!(
+                "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",
+                data_type,
+                version,
+                min_readable_version,
+                min_readable_epoch_snapshot_version,
+            )
+        }
+    }
+
     pub(super) fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self
             .state_store

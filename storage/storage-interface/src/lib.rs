@@ -20,7 +20,7 @@ use aptos_types::{
         hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueChunkWithProof},
+        state_value::{HotStateValueChunkWithProof, StateValue, StateValueChunkWithProof},
     },
     transaction::{
         IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
@@ -439,6 +439,16 @@ pub trait DbReader: Send + Sync {
             start_idx: usize,
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
+
+        /// Get a chunk of hot state values, addressed by the index. The returned proof and root
+        /// hash are over the hot state Merkle tree (i.e. the `hot_state_checkpoint_hash` committed
+        /// in `TransactionInfoV1`), not the main state tree.
+        fn get_hot_state_value_chunk_with_proof(
+            &self,
+            version: Version,
+            start_idx: usize,
+            chunk_size: usize,
+        ) -> Result<HotStateValueChunkWithProof>;
 
         /// Returns an iterator of state key value pairs starting from the index.
         fn get_state_value_chunk_iter(
