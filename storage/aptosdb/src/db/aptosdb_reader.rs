@@ -35,7 +35,7 @@ use aptos_types::{
         hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueChunkWithProof},
+        state_value::{HotStateValueChunkWithProof, StateValue, StateValueChunkWithProof},
     },
     transaction::{
         IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
@@ -783,6 +783,19 @@ impl DbReader for AptosDB {
             self.error_if_state_merkle_pruned("State merkle", version)?;
             self.state_store
                 .get_value_chunk_with_proof(version, first_index, chunk_size)
+        })
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<HotStateValueChunkWithProof> {
+        gauged_api("get_hot_state_value_chunk_with_proof", || {
+            self.error_if_hot_state_merkle_pruned("Hot state merkle", version)?;
+            self.state_store
+                .get_hot_value_chunk_with_proof(version, first_index, chunk_size)
         })
     }
 
