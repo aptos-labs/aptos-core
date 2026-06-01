@@ -1,0 +1,143 @@
+=== micro-ops ===
+// module 0x99::eq
+
+fun eq_addr() {
+  frame_data_size: 72
+  code:
+    0: Charge #12
+    1: Eq<address> [64] <- [0] == [32]
+    2: Move(1) [0] <- [64]
+    3: Return
+}
+
+fun eq_nested() {
+  frame_data_size: 112
+  code:
+    0: Charge #128
+    1: StoreImm8 [32] <- #0
+    2: Move8 [48] <- [32]
+    3: Move8 [40] <- [0]
+    4: Move8 [72] <- [8]
+    5: Move(16) [56] <- [40]
+    6: StoreImm8 [32] <- #0
+    7: Move8 [48] <- [32]
+    8: Move8 [40] <- [16]
+    9: Move8 [96] <- [24]
+    10: Move(16) [80] <- [40]
+    11: Eq<0x99::eq::Nested> [104] <- [56] == [80]
+    12: Move(1) [0] <- [104]
+    13: Return
+}
+
+fun eq_ref() {
+  frame_data_size: 56
+  code:
+    0: Charge #16
+    1: SlotBorrow [16] <- &[0]
+    2: SlotBorrow [32] <- &[8]
+    3: Eq<&u64> [48] <- [16] == [32]
+    4: Move(1) [0] <- [48]
+    5: Return
+}
+
+fun eq_struct() {
+  frame_data_size: 72
+  code:
+    0: Charge #20
+    1: Move8 [40] <- [8]
+    2: Move8 [32] <- [0]
+    3: Move8 [56] <- [24]
+    4: Move8 [48] <- [16]
+    5: Eq<0x99::eq::Point> [64] <- [32] == [48]
+    6: Move(1) [0] <- [64]
+    7: Return
+}
+
+fun eq_u128() {
+  frame_data_size: 40
+  code:
+    0: Charge #12
+    1: Eq<u128> [32] <- [0] == [16]
+    2: Move(1) [0] <- [32]
+    3: Return
+}
+
+fun eq_u64() {
+  frame_data_size: 24
+  code:
+    0: Charge #12
+    1: Eq<u64> [16] <- [0] == [8]
+    2: Move(1) [0] <- [16]
+    3: Return
+}
+
+fun eq_vec2() {
+  frame_data_size: 48
+  code:
+    0: Charge #42
+    1: Move8 [80] <- [8]
+    2: Move8 [72] <- [0]
+    3: CallIndirect 0x99::eq::vec2
+    4: Move8 [32] <- [72]
+    5: Move8 [80] <- [24]
+    6: Move8 [72] <- [16]
+    7: CallIndirect 0x99::eq::vec2
+    8: Eq<vector<u64>> [40] <- [32] == [72]
+    9: Move(1) [0] <- [40]
+    10: Return
+}
+
+fun eq_vec_len() {
+  frame_data_size: 56
+  code:
+    0: Charge #66
+    1: Move8 [88] <- [8]
+    2: Move8 [80] <- [0]
+    3: CallIndirect 0x99::eq::vec2
+    4: VecNew [24]
+    5: SlotBorrow [32] <- &[24]
+    6: VecPushBack [32].push([16], size=8, desc=2)
+    7: Eq<vector<u64>> [48] <- [80] == [24]
+    8: Move(1) [0] <- [48]
+    9: Return
+  safe_point_layouts:
+    6: [80]
+}
+
+fun neq_struct() {
+  frame_data_size: 72
+  code:
+    0: Charge #20
+    1: Move8 [40] <- [8]
+    2: Move8 [32] <- [0]
+    3: Move8 [56] <- [24]
+    4: Move8 [48] <- [16]
+    5: Neq<0x99::eq::Point> [64] <- [32] != [48]
+    6: Move(1) [0] <- [64]
+    7: Return
+}
+
+fun neq_u64() {
+  frame_data_size: 24
+  code:
+    0: Charge #12
+    1: Neq<u64> [16] <- [0] != [8]
+    2: Move(1) [0] <- [16]
+    3: Return
+}
+
+fun vec2() {
+  frame_data_size: 40
+  code:
+    0: Charge #74
+    1: VecNew [16]
+    2: SlotBorrow [24] <- &[16]
+    3: VecPushBack [24].push([0], size=8, desc=2)
+    4: SlotBorrow [24] <- &[16]
+    5: VecPushBack [24].push([8], size=8, desc=2)
+    6: Move8 [0] <- [16]
+    7: Return
+  safe_point_layouts:
+    3: []
+    5: []
+}

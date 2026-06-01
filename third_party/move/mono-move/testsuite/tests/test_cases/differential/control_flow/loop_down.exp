@@ -43,4 +43,17 @@ fun loop_down() {
     6: Return
 }
 
-fun conditional(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun conditional() {
+  frame_data_size: 16
+  code:
+    0: Charge #3
+    1: JumpNotZeroU64 @6 [0]
+    2: Charge #6
+    3: StoreImm8 [8] <- #0
+    4: Move8 [0] <- [8]
+    5: Return
+    6: Charge #6
+    7: StoreImm8 [8] <- #1
+    8: Move8 [0] <- [8]
+    9: Return
+}

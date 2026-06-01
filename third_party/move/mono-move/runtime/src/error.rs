@@ -271,6 +271,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("MoveTo: null source pointer")]
     MoveToNullSource,
+
+    #[error("comparison not supported for type kind: {kind}")]
+    UnsupportedComparisonType { kind: &'static str },
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

@@ -12,6 +12,7 @@ mod local_runtime_context;
 pub(crate) mod memory;
 mod transaction_context;
 mod types;
+mod value_compare;
 mod verifier;
 
 pub use error::{RuntimeError, RuntimeStatus};

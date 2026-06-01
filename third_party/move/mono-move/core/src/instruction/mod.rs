@@ -931,9 +931,34 @@ pub enum MicroOp {
     ForceGC,
 
     //======================================================================
+    // Comparison
+    //======================================================================
+    // Standalone structural comparison (not fused with a branch). The
+    // operand type drives a recursive value traversal at runtime; the
+    // boolean result is written to `dst`.
+    //======================================================================
+    /// `dst = (lhs == rhs)`. `lhs` and `rhs` are values of type `ty`;
+    /// the result is a 1-byte boolean.
+    Eq {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// `dst = (lhs != rhs)`. `lhs` and `rhs` are values of type `ty`;
+    /// the result is a 1-byte boolean.
+    Neq {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+        ty: InternedType,
+    },
+
+    //======================================================================
     // Missing instructions
     //======================================================================
-    // - **Comparison**: Eq, Neq, Lt, Gt, Le, Ge (standalone, not fused
+    // - **Comparison**: Lt, Gt, Le, Ge (standalone, not fused
     //   with branch — for when the result is used as a value).
     // - **Casting**: truncation and widening between integer types,
     //   including signed casts.
@@ -1403,6 +1428,16 @@ impl fmt::Display for MicroOp {
                 display_type(f, *ty)?;
                 write!(f, "> addr=[{}], src=[{}]", addr.0, src.0)
             },
+            MicroOp::Eq { dst, lhs, rhs, ty } => {
+                write!(f, "Eq<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- [{}] == [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::Neq { dst, lhs, rhs, ty } => {
+                write!(f, "Neq<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- [{}] != [{}]", dst.0, lhs.0, rhs.0)
+            },
         }
     }
 }
@@ -1598,7 +1633,9 @@ impl MicroOp {
             | MicroOp::IntNegate(_)
             | MicroOp::Exists { .. }
             | MicroOp::BorrowGlobal { .. }
-            | MicroOp::MoveTo { .. } => false,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::Eq { .. }
+            | MicroOp::Neq { .. } => false,
         }
     }
 

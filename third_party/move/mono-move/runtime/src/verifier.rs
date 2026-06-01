@@ -11,9 +11,9 @@
 //! publish time.
 
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    types::view_type, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider,
+    FrameOffset, Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp,
+    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -651,6 +651,22 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 //   Move use signer reference, so we need 16 bytes if we no longer use address.
                 self.check_frame_access(Some(pc), addr, 32);
                 self.check_frame_access_8(pc, src);
+            },
+
+            MicroOp::Eq { dst, lhs, rhs, ty } | MicroOp::Neq { dst, lhs, rhs, ty } => {
+                // `dst` holds a boolean in a u64-width slot (see `LdTrue`);
+                // `lhs`/`rhs` are operand-sized values of `ty`. A type without
+                // a computable size (e.g. an unresolved type parameter, or a
+                // nominal whose layout has not been populated) cannot be
+                // bounds-checked and is rejected.
+                self.check_frame_access_8(pc, dst);
+                match view_type(ty).size_and_align() {
+                    Some((size, _)) => {
+                        self.check_frame_access(Some(pc), lhs, size);
+                        self.check_frame_access(Some(pc), rhs, size);
+                    },
+                    None => self.err(Some(pc), "Eq/Neq: operand type has no computable size"),
+                }
             },
         }
     }

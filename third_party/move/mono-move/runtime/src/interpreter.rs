@@ -22,6 +22,7 @@ use crate::{
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
         VEC_LENGTH_OFFSET,
     },
+    value_compare::structural_compare,
     ExecutionContext,
 };
 use mono_move_core::{
@@ -39,7 +40,10 @@ use move_core_types::{
     int256::{I256, U256},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::ptr::{null, NonNull};
+use std::{
+    cmp::Ordering,
+    ptr::{null, NonNull},
+};
 
 // ---------------------------------------------------------------------------
 // Runtime state
@@ -369,7 +373,7 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
 /// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
 /// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
 #[inline(always)]
-unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
+pub(crate) unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
     let ptr = unsafe { base.add(byte_offset.into()) as *const T };
     unsafe {
         if std::mem::align_of::<T>() <= MAX_ALIGN {
@@ -805,6 +809,18 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         self.pc + 1
                     };
                     return Ok(StepResult::Continue);
+                },
+
+                MicroOp::Eq { dst, lhs, rhs, ty } => {
+                    let ord = structural_compare(ty, fp.add(lhs.into()), fp.add(rhs.into()))?;
+                    // Booleans occupy a u64-width slot (see `LdTrue` lowering),
+                    // so write the full 8 bytes.
+                    write_u64(fp, dst, (ord == Ordering::Equal) as u64);
+                },
+
+                MicroOp::Neq { dst, lhs, rhs, ty } => {
+                    let ord = structural_compare(ty, fp.add(lhs.into()), fp.add(rhs.into()))?;
+                    write_u64(fp, dst, (ord != Ordering::Equal) as u64);
                 },
 
                 MicroOp::Jump { target } => {

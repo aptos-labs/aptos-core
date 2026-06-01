@@ -302,6 +302,7 @@ fn execute_function_v2(
 /// be used for both BCS (V1) and raw frame storage (V2).
 #[derive(Copy, Clone, Debug)]
 enum PrimitiveKind {
+    Bool,
     U8,
     U16,
     U32,
@@ -320,6 +321,7 @@ enum PrimitiveKind {
 impl PrimitiveKind {
     fn from_type(ty: &Type) -> Option<Self> {
         Some(match ty {
+            Type::Bool => PrimitiveKind::Bool,
             Type::U8 => PrimitiveKind::U8,
             Type::U16 => PrimitiveKind::U16,
             Type::U32 => PrimitiveKind::U32,
@@ -339,6 +341,7 @@ impl PrimitiveKind {
 
     fn size(self) -> u32 {
         match self {
+            PrimitiveKind::Bool => 1,
             PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
@@ -350,6 +353,7 @@ impl PrimitiveKind {
 
     fn align(self) -> u32 {
         match self {
+            PrimitiveKind::Bool => 1,
             PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
@@ -366,6 +370,7 @@ impl PrimitiveKind {
 
     fn to_move_value(self, s: &str) -> MoveValue {
         match self {
+            PrimitiveKind::Bool => MoveValue::Bool(s.parse().expect("invalid bool literal")),
             PrimitiveKind::U8 => MoveValue::U8(s.parse().expect("invalid u8 literal")),
             PrimitiveKind::U16 => MoveValue::U16(s.parse().expect("invalid u16 literal")),
             PrimitiveKind::U32 => MoveValue::U32(s.parse().expect("invalid u32 literal")),
@@ -389,6 +394,7 @@ impl PrimitiveKind {
     /// mono-move stores in a frame slot.
     fn parse_to_bytes(self, s: &str) -> Vec<u8> {
         match self {
+            PrimitiveKind::Bool => vec![s.parse::<bool>().expect("invalid bool literal") as u8],
             PrimitiveKind::U8 => vec![s.parse::<u8>().expect("invalid u8 literal")],
             PrimitiveKind::U16 => s
                 .parse::<u16>()
@@ -454,6 +460,7 @@ impl PrimitiveKind {
     /// decimal string (or hex for addresses).
     fn format_bytes(self, bytes: &[u8]) -> String {
         match self {
+            PrimitiveKind::Bool => (bytes[0] != 0).to_string(),
             PrimitiveKind::U8 => bytes[0].to_string(),
             PrimitiveKind::U16 => u16::from_le_bytes(bytes[..2].try_into().unwrap()).to_string(),
             PrimitiveKind::U32 => u32::from_le_bytes(bytes[..4].try_into().unwrap()).to_string(),

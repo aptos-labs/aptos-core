@@ -104,7 +104,9 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
-            | MicroOp::MoveTo { .. } => None,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::Eq { .. }
+            | MicroOp::Neq { .. } => None,
         }
     }
 }
@@ -227,7 +229,9 @@ impl RemapTargets for MicroOp {
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
-            | MicroOp::MoveTo { .. }) => op,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::Eq { .. }
+            | MicroOp::Neq { .. }) => op,
         }
     }
 }
@@ -343,6 +347,12 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::BorrowGlobalMut { .. } => 20,
             MicroOp::MoveFrom { .. } => 20,
             MicroOp::MoveTo { .. } => 20,
+
+            // --- Comparison ---
+            // Placeholder constant. The true cost is data-dependent (the
+            // traversal visits every field/element); revisit once the gas
+            // model can charge per visited byte.
+            MicroOp::Eq { .. } | MicroOp::Neq { .. } => 5,
         })
     }
 }

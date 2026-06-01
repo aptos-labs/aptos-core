@@ -51,7 +51,15 @@ fun identity(r0): _0 {
 === micro-ops ===
 // module 0x42::generic_call
 
-fun call_bool(): skipped (lowering: return slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun call_bool() {
+  frame_data_size: 8
+  code:
+    0: Charge #19
+    1: StoreImm8 [32] <- #1
+    2: CallIndirect 0x42::generic_call::identity<bool>
+    3: Move(1) [0] <- [32]
+    4: Return
+}
 
 fun call_u64() {
   frame_data_size: 8

@@ -384,6 +384,9 @@ impl<'a> LoweringState<'a> {
                 let rhs_info = self.slot(*rhs)?;
                 let dst_info = self.def_slot(*dst)?;
                 let lhs_ty = self.slot_type(*lhs)?;
+                // Captured before `lhs` is shadowed below; the structural
+                // comparison ops carry the operand's interned type.
+                let lhs_interned_ty = self.slot_interned_type(*lhs)?;
                 let dst = dst_info.offset;
                 let lhs = lhs_info.offset;
                 let rhs = rhs_info.offset;
@@ -478,9 +481,30 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                             })?;
                         },
-                        // Comparison-to-register and logical and/or are not
-                        // yet lowered for any integer width.
-                        BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
+                        // Structural equality drives a type-directed value
+                        // traversal at runtime; the op carries the operand
+                        // type.
+                        BinaryOp::Cmp(CmpOp::Eq) => {
+                            self.emit(MicroOp::Eq {
+                                dst,
+                                lhs,
+                                rhs,
+                                ty: lhs_interned_ty,
+                            })?;
+                        },
+                        BinaryOp::Cmp(CmpOp::Neq) => {
+                            self.emit(MicroOp::Neq {
+                                dst,
+                                lhs,
+                                rhs,
+                                ty: lhs_interned_ty,
+                            })?;
+                        },
+                        // Ordering-to-register and logical and/or are not yet
+                        // lowered for any type.
+                        BinaryOp::Cmp(CmpOp::Lt | CmpOp::Gt | CmpOp::Le | CmpOp::Ge)
+                        | BinaryOp::Or
+                        | BinaryOp::And => {
                             bail!("BinaryOp {:?} not yet lowered", op)
                         },
                     }

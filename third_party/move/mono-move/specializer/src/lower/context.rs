@@ -349,7 +349,13 @@ fn layout_typed_slots_contiguously(base: u32, types: &[InternedType]) -> Option<
     let mut slots = Vec::with_capacity(types.len());
     let mut offset = base;
     for &ty in types {
-        let (size, align) = type_size_and_align(ty)?;
+        let (size, mut align) = type_size_and_align(ty)?;
+        // Booleans are stored in a u64-width slot: `LdTrue`/`LdFalse` and the
+        // `Eq`/`Neq` comparison ops all write a full 8 bytes. Give the slot
+        // 8-byte alignment so those writes stay within it.
+        if matches!(view_type(ty), Type::Bool) {
+            align = align.max(MIN_SLOT_ALIGN);
+        }
         offset = align_up_u32(offset, align);
         slots.push(TypedSlot {
             slot: SlotInfo {
