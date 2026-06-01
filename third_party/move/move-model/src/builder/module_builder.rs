@@ -1837,6 +1837,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 et.define_type_params(loc, &entry.type_params, false);
+                let self_type_args = entry.type_params.iter().enumerate().map(|(i, _) | Type::TypeParameter(i as u16)).collect();
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
                     let lang_ver_ge_2 =
@@ -1865,7 +1866,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     if lang_ver_ge_2 {
                         let receiver_param_name =
                             et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, self_type_args);
                         et.define_local(loc, receiver_param_name, struct_type, None, None);
                     }
                 } else if let StructLayout::Variants(_) = &entry.layout {
@@ -1873,7 +1874,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     if et.env().language_version.is_at_least(LanguageVersion::V2_0) {
                         let receiver_param_name =
                             et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, self_type_args);
                         et.define_local(loc, receiver_param_name, struct_type, None, None);
                     }
                 }
