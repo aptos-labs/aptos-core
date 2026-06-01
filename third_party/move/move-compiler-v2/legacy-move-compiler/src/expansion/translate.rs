@@ -23,7 +23,7 @@ use crate::{
     },
     shared::{
         builtins,
-        known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
+        known_attributes::{AttributeKind, AttributePosition, KnownAttribute, TestingAttribute},
         unique_map::UniqueMap,
         CompilationEnv, Identifier, Name, NamedAddressMap, NamedAddressMaps, NumericalAddress,
     },
@@ -669,16 +669,35 @@ fn unique_attributes(
                 E::AttributeName_::Known(known)
             },
         };
-        if let Err((_, old_loc)) = attr_map.add(sp(nloc, name_), sp(loc, attr_)) {
-            let msg = format!("Duplicate attribute '{}' attached to the same item", name_);
-            context.env.add_diag(diag!(
-                Declarations::DuplicateItem,
-                (loc, msg),
-                (old_loc, "Attribute previously given here"),
-            ));
-        }
+        add_unique_attribute(context, &mut attr_map, nloc, name_, loc, sp(loc, attr_));
     }
     attr_map
+}
+
+fn add_unique_attribute(
+    context: &mut Context,
+    attr_map: &mut E::Attributes,
+    name_loc: Loc,
+    name_: E::AttributeName_,
+    attr_loc: Loc,
+    attr_: E::Attribute,
+) {
+    let is_repeatable_test = matches!(
+        name_,
+        E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::Test))
+    );
+    if is_repeatable_test {
+        let synthetic = Symbol::from(format!("$test_row_{}", attr_map.len()));
+        let synthetic_key = sp(name_loc, E::AttributeName_::Unknown(synthetic));
+        let _ = attr_map.add(synthetic_key, attr_);
+    } else if let Err((_, old_loc)) = attr_map.add(sp(name_loc, name_), attr_) {
+        let msg = format!("Duplicate attribute '{}' attached to the same item", name_);
+        context.env.add_diag(diag!(
+            Declarations::DuplicateItem,
+            (attr_loc, msg),
+            (old_loc, "Attribute previously given here"),
+        ));
+    }
 }
 
 fn attribute(
