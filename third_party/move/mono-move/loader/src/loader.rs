@@ -149,6 +149,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
     }
 
+    // TODO: Revisit the handling of native functions here.
+    //
+    // Need to make sure:
+    // 1. A registered native function impl does not shadow a Move-body function with the same name.
+    // 2. A missing native function impl only triggers an error when it's actually being called, not
+    //    during load time.
     pub fn load_function(
         &self,
         read_set: &mut ModuleReadSet<'guard>,

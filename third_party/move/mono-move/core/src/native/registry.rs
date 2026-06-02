@@ -11,7 +11,6 @@ use crate::{
     native::{NativeStatus, VMInternalError},
 };
 use shared_dsa::UnorderedMap;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Index into the natives registry's table.
@@ -43,7 +42,7 @@ pub trait NativeContextFamily {
 ///
 /// Without this, we cannot store native functions in a registry, which would
 /// otherwise mandate a fixed lifetime.
-pub type NativeFunction<F> = Arc<
+pub type NativeFunction<F> = Box<
     dyn for<'a> Fn(&mut <F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
         + Send
         + Sync,

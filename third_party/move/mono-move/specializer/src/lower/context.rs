@@ -324,6 +324,11 @@ pub fn try_build_context<'a>(
         let callee_handle = module_ir.module.function_handle_at(handle_idx);
         let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
         let callee_func_name = module_ir.module.interned_identifier_at(callee_handle.name);
+        // TODO: The native registry is trusted unconditionally here.
+        //
+        // Consider cross-checking against the callee module's `is_native` flag
+        // against the callee module's `is_native` flag so a registered impl cannot
+        // shadow a Move-body function with the same qualified name.
         let native_idx = natives.resolve(&NativeName {
             module: callee_module_id,
             function: callee_func_name,

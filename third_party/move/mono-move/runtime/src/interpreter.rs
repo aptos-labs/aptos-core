@@ -28,7 +28,7 @@ use crate::{
     ExecutionContext,
 };
 use mono_move_core::{
-    native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext, VMInternalError},
+    native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     storage::resource_provider::StorageKey,
     CallClosureOp, ClosureFuncRef, DescriptorId, DescriptorProvider, FrameOffset, Function,
     IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
@@ -1906,9 +1906,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 Ok(StepResult::Continue)
             },
             Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
-            Err(VMInternalError::InvariantViolation(msg)) => Err(RuntimeError::InvariantViolation(
-                RuntimeInvariantViolation::NativeInvariantViolation(msg),
-            )),
+            Err(e) => Err(RuntimeError::VMInternal(e)),
         }
     }
 

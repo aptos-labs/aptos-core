@@ -61,7 +61,7 @@ macro_rules! natives {
                 let (addr, module, function) =
                     $crate::parse_qualified_native_name($qname);
                 let func: $crate::NativeFunction<_> =
-                    ::std::sync::Arc::new(|ctx| $func(ctx));
+                    ::std::boxed::Box::new(|ctx| $func(ctx));
                 (addr, module, function, func)
             }),*
         ]
