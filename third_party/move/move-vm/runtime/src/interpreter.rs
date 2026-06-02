@@ -971,7 +971,7 @@ impl InterpreterImpl<'_> {
                 // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
                 //
                 // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
-                if function.ty_param_abilities() != target_func.ty_param_abilities()
+                if function.param_tys().is_empty() || function.ty_param_abilities() != target_func.ty_param_abilities()
                     || function.return_tys() != target_func.return_tys()
                     || &function.param_tys()[0..function.param_tys().len() - 1]
                         != target_func.param_tys()
@@ -1660,11 +1660,11 @@ impl Stack {
     }
 
     /// Pop n types off the stack.
-    pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
+    pub(crate) fn popn_tys(&mut self, n: usize) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
             .types
             .len()
-            .checked_sub(n as usize)
+            .checked_sub(n)
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))?;
         let args = self.types.split_off(remaining_stack_size);
         Ok(args)
@@ -2374,6 +2374,14 @@ impl Frame {
                                 ty_args,
                             )
                             .map(Rc::new)?;
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack_closure(
+                                self.ty_builder(),
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        }
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             module_storage.runtime_environment(),
@@ -2383,15 +2391,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::closure(Box::new(lazy_function), captured))?;
-
-                        if RTTCheck::should_perform_checks() {
-                            verify_pack_closure(
-                                self.ty_builder(),
-                                &mut interpreter.operand_stack,
-                                &function,
-                                *mask,
-                            )?;
-                        }
                     },
                     Bytecode::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
