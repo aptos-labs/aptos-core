@@ -36,7 +36,6 @@ aptos-keygen = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-release-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
-aptos-rosetta = { workspace = true }
 aptos-schemadb = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
