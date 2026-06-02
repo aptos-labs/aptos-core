@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun add_u8(r0, r1): u8 {
@@ -255,7 +256,6 @@ fun negate_i256(r0): i256 {
     0: r1 := negate r0
     1: ret [r1]
 }
-
 === micro-ops ===
 // module 0x66::test
 
@@ -268,9 +268,23 @@ fun add_u8() {
     3: Return
 }
 
-fun sub_u16(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun sub_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntSub [4] <- [0] - u16 [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
 
-fun mul_u32(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun mul_u32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntMul [8] <- [0] * u32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
 
 fun div_u128() {
   frame_data_size: 48
@@ -299,9 +313,23 @@ fun add_i8() {
     3: Return
 }
 
-fun sub_i16(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun sub_i16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntSub [4] <- [0] - i16 [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
 
-fun mul_i32(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun mul_i32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntMul [8] <- [0] * i32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
 
 fun div_i64() {
   frame_data_size: 24
@@ -348,9 +376,23 @@ fun bit_or_u8() {
     3: Return
 }
 
-fun bit_xor_u32(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun bit_xor_u32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntBitXor [8] <- [0] ^ u32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
 
-fun shl_u16(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun shl_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntShl.u16 [4] <- [0] << [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
 
 fun shr_u256() {
   frame_data_size: 72
@@ -379,11 +421,32 @@ fun mul_u128_imm() {
     3: Return
 }
 
-fun bit_and_u32_imm(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun bit_and_u32_imm() {
+  frame_data_size: 8
+  code:
+    0: Charge #21
+    1: IntBitAnd [4] <- [0] & u32 #4095
+    2: Move(4) [0] <- [4]
+    3: Return
+}
 
-fun shl_u16_imm(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun shl_u16_imm() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntShl.u16 [2] <- [0] << #3
+    2: Move(2) [0] <- [2]
+    3: Return
+}
 
-fun sub_i32_imm(): skipped (slot alignment 2/4 (e.g. u16/u32) not yet supported)
+fun sub_i32_imm() {
+  frame_data_size: 8
+  code:
+    0: Charge #21
+    1: IntSub [4] <- [0] - i32 #-10
+    2: Move(4) [0] <- [4]
+    3: Return
+}
 
 fun negate_i8() {
   frame_data_size: 8

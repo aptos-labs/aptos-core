@@ -312,6 +312,20 @@ pub enum MicroOp {
         imm: u8,
     },
 
+    /// Store 2 immediate bytes into the destination slot. Same LE convention
+    /// as `StoreImm8`: `u16.to_le_bytes()` / `i16.to_le_bytes()`.
+    StoreImm2 {
+        dst: FrameOffset,
+        imm: [u8; 2],
+    },
+
+    /// Store 4 immediate bytes into the destination slot. Same LE convention
+    /// as `StoreImm8`: `u32.to_le_bytes()` / `i32.to_le_bytes()`.
+    StoreImm4 {
+        dst: FrameOffset,
+        imm: [u8; 4],
+    },
+
     /// Copy 8 bytes from `src` to `dst`.
     Move8 {
         dst: FrameOffset,
@@ -1061,6 +1075,12 @@ impl fmt::Display for MicroOp {
             MicroOp::StoreImm1 { dst, imm } => {
                 write!(f, "StoreImm1 [{}] <- #{}", dst.0, imm)
             },
+            MicroOp::StoreImm2 { dst, imm } => {
+                write!(f, "StoreImm2 [{}] <- #{}", dst.0, u16::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm4 { dst, imm } => {
+                write!(f, "StoreImm4 [{}] <- #{}", dst.0, u32::from_le_bytes(*imm))
+            },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
             },
@@ -1663,6 +1683,8 @@ impl MicroOp {
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
             | MicroOp::StoreImm1 { .. }
+            | MicroOp::StoreImm2 { .. }
+            | MicroOp::StoreImm4 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }

@@ -313,20 +313,19 @@ impl<'a> LoweringState<'a> {
                     imm: *v,
                 })?;
             },
-            // Narrow unsigned loads zero-extend into an 8-byte slot.
-            // TODO: drop the widening once sub-8-byte stores land.
+            // 2-/4-byte integers store directly into their 2-/4-byte slot.
             Instr::LdU16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm2 {
                     dst: dst_info.offset,
-                    imm: (*v as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdU32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm4 {
                     dst: dst_info.offset,
-                    imm: (*v as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             // 1-byte integers store directly into their 1-byte slot.
@@ -337,21 +336,20 @@ impl<'a> LoweringState<'a> {
                     imm: *v as u8,
                 })?;
             },
-            // Narrow signed loads sign-extend first, then bit-cast for the
-            // LE byte representation.
-            // TODO: drop the widening once sub-8-byte stores land.
+            // 2-/4-byte signed integers store their two's-complement LE bytes
+            // directly into their 2-/4-byte slot.
             Instr::LdI16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm2 {
                     dst: dst_info.offset,
-                    imm: (*v as i64 as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdI32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm4 {
                     dst: dst_info.offset,
-                    imm: (*v as i64 as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdI64(dst, v) => {

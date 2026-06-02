@@ -244,6 +244,14 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_1(pc, dst);
             },
 
+            MicroOp::StoreImm2 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 2);
+            },
+
+            MicroOp::StoreImm4 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 4);
+            },
+
             MicroOp::StoreRandomU64 { dst } => {
                 self.check_frame_access_8(pc, dst);
             },
@@ -585,7 +593,18 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             MicroOp::SlotBorrow { dst, local } => {
-                self.check_frame_access_8(pc, local);
+                // Forms a fat pointer to `local` without dereferencing it, so only
+                // the base offset is checked: `local` must lie in the data region
+                // [0, param_and_local_sizes_sum), not metadata or the callee region.
+                if local.0 as usize >= self.func.param_and_local_sizes_sum {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "SlotBorrow local {} is outside the data region [0, {})",
+                            local.0, self.func.param_and_local_sizes_sum
+                        ),
+                    );
+                }
                 self.check_frame_access(Some(pc), dst, 16);
             },
 

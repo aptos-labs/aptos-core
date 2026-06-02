@@ -43,6 +43,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
             | MicroOp::StoreImm1 { .. }
+            | MicroOp::StoreImm2 { .. }
+            | MicroOp::StoreImm4 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -185,6 +187,8 @@ impl RemapTargets for MicroOp {
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
             | MicroOp::StoreImm1 { .. }
+            | MicroOp::StoreImm2 { .. }
+            | MicroOp::StoreImm4 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -278,6 +282,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::StoreImm16 { .. } => 3,
             MicroOp::StoreImm32 { .. } => 4,
             MicroOp::StoreImm1 { .. } => 2,
+            MicroOp::StoreImm2 { .. } => 2,
+            MicroOp::StoreImm4 { .. } => 2,
             MicroOp::Move8 { .. } => 2,
             MicroOp::Move { size, .. } => 2 + 3 * *size as u64,
 

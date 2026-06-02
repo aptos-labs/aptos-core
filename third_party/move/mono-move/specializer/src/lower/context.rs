@@ -33,26 +33,6 @@ use shared_dsa::{UnorderedMap, UnorderedSet};
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
 const FRAME_ALIGN: u32 = MAX_ALIGN as u32;
 
-/// Largest value alignment: alignment is capped at 8 even for values wider
-/// than 8 bytes.
-const FULL_WORD_ALIGN: u32 = 8;
-
-/// Whether the lowering can load/store a slot of this alignment
-/// width-correctly: currently only 1-byte and full-word (8-byte) alignments.
-fn slot_align_supported(align: u32) -> bool {
-    align == 1 || align >= FULL_WORD_ALIGN
-}
-
-/// `true` iff every slot's alignment is currently lowerable. See
-/// [`slot_align_supported`].
-fn slot_aligns_supported<T>(slots: &[T], align_of: impl Fn(&T) -> u32) -> bool {
-    slots.iter().map(align_of).all(slot_align_supported)
-}
-
-/// Reason string used when a function is skipped for using a slot of an
-/// alignment the lowering cannot yet handle.
-const UNSUPPORTED_ALIGN_SKIP: &str = "slot alignment 2/4 (e.g. u16/u32) not yet supported";
-
 /// Returns the (size, alignment) of a concrete interned type, or None if the
 /// type is not concrete (e.g., contains type parameters or unresolved structs).
 pub fn type_size_and_align(ty: InternedType) -> Option<(Size, Alignment)> {
@@ -202,9 +182,6 @@ pub fn try_build_context<'a>(
             "nominal type not yet supported by gc_layout",
         ));
     }
-    if !slot_aligns_supported(&home_slots, |s| s.align) {
-        return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
-    }
     // `frame_data_size` must be `FRAME_ALIGN`-aligned so that
     // `callee_base = frame_data_size + FRAME_METADATA_SIZE` is also
     // aligned (the runtime writes saved pc/fp/func_id as `u64`s
@@ -227,9 +204,6 @@ pub fn try_build_context<'a>(
         return Ok(BuildContextOutcome::Skipped(
             "nominal type not yet supported by gc_layout",
         ));
-    }
-    if !slot_aligns_supported(&return_slots, |s| s.align) {
-        return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
     }
 
     // The return values are written at offsets [0, ret_size) of the function's
@@ -314,12 +288,6 @@ pub fn try_build_context<'a>(
                 "nominal type not yet supported by gc_layout",
             ));
         }
-        if !slot_aligns_supported(&arg_slots, |s| s.slot.align)
-            || !slot_aligns_supported(&ret_slots, |s| s.slot.align)
-        {
-            return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
-        }
-
         let callee_handle = module_ir.module.function_handle_at(handle_idx);
         let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
         let callee_func_name = module_ir.module.interned_identifier_at(callee_handle.name);
