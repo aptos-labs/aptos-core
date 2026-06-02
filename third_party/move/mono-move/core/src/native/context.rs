@@ -1,0 +1,45 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! Native function interface — the API surface natives are written against.
+
+use super::{result::VMInternalError, value::VMValue};
+
+/// Trait that native functions are written generic over.
+///
+/// Native authors should depend only on this trait, never on a concrete
+/// implementation. This is to enforce a clearer mental boundary and ensure
+/// that natives can work with different VM configurations while still being performant.
+///
+/// ### Convention on Error Handling
+///
+/// Methods that return only errors that should be propagated back to the VM
+/// should use the return type `Result<_, VMInternalError>`.
+///
+/// Methods that return errors that are triggerable by user inputs or the native's
+/// own mistakes should use the return type `Result<Result<_, CustomError>, VMInternalError>` or
+/// simply `Result<NativeResult, CustomError>` if vm internal errors are not possible..
+pub trait NativeContext {
+    /// Number of positional arguments declared by the native's ABI.
+    fn num_args(&self) -> usize;
+
+    /// Reads the `i`-th argument from the calling frame.
+    ///
+    /// Provided as a (relatively) safe ABI to access the arguments, as it
+    /// calculates the offset and size of the argument based on the ABI.
+    fn arg<T: VMValue>(&self, i: usize) -> Result<T, VMInternalError>;
+
+    /// Number of return slots declared by the native's ABI.
+    fn num_returns(&self) -> usize;
+
+    /// Writes the `i`-th return value into the calling frame.
+    ///
+    /// Provided as a (relatively) safe ABI to write the return value, as it
+    /// calculates the offset and size of the return value based on the ABI.
+    fn set_return<T: VMValue>(&mut self, i: usize, value: T) -> Result<(), VMInternalError>;
+
+    // TODO: Escape hatches for raw memory reads and writes for better perf.
+
+    // TODO: Prevent further `arg` or allocator calls after the first `set_return`.
+    // This is to prevent (1) data transmutation (2) GC tracing violations.
+}

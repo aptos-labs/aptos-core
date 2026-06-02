@@ -4,7 +4,7 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use super::{
-    context::{concrete_type_size, LoweringContext, SlotInfo, TypedSlot},
+    context::{concrete_type_size, CallSiteInfo, LoweringContext, SlotInfo, TypedSlot},
     gc_layout::type_pointer_offsets,
     parallel_copy,
 };
@@ -14,9 +14,10 @@ use crate::stackless_exec_ir::{
 };
 use anyhow::{bail, Context, Result};
 use mono_move_core::{
+    native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
     CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, SafePointEntry, ShiftOperand,
+    IntShiftOp, IntTy, MicroOp, SafePointEntry, ShiftOperand, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::FieldHandleIndex;
 use move_core_types::account_address::AccountAddress;
@@ -1184,6 +1185,20 @@ impl<'a> LoweringState<'a> {
         }
     }
 
+    /// Derive a [`NativeABI`] for a native call site from its arg/ret
+    /// slots.
+    fn derive_native_abi(&self, cs: &CallSiteInfo) -> NativeABI {
+        let callee_base = self.ctx.frame_data_size + FRAME_METADATA_SIZE as u32;
+        let to_slot = |s: &TypedSlot| FrameSlot {
+            offset: s.slot.offset.0 - callee_base,
+            size: s.slot.size,
+        };
+        NativeABI {
+            args: cs.arg_slots.iter().map(to_slot).collect(),
+            returns: cs.ret_slots.iter().map(to_slot).collect(),
+        }
+    }
+
     /// Lower one call. Args are written by reverse iteration over the
     /// arg list (reverse-order emit); soundness rests on arg positionality
     /// + return monotonicity (see `BlockAnalysis::analyze`), which
@@ -1255,11 +1270,23 @@ impl<'a> LoweringState<'a> {
             }
         }
 
-        self.emit(MicroOp::CallIndirect {
-            module_id: cs.callee_module_id,
-            func_name: cs.callee_func_name,
-            ty_args: cs.ty_args,
-        })?;
+        match cs.native_idx {
+            Some(native_idx) => {
+                let abi = self.derive_native_abi(cs);
+                self.emit(MicroOp::CallNative {
+                    native_idx,
+                    ty_args: cs.ty_args,
+                    abi: Box::new(abi),
+                })?;
+            },
+            None => {
+                self.emit(MicroOp::CallIndirect {
+                    module_id: cs.callee_module_id,
+                    func_name: cs.callee_func_name,
+                    ty_args: cs.ty_args,
+                })?;
+            },
+        }
         self.call_site_cursor += 1;
 
         // Clear all Xfer bindings (calls clobber the entire callee

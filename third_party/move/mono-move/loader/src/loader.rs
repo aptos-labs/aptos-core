@@ -24,6 +24,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
     ModuleProvider,
@@ -95,21 +96,26 @@ pub struct Loader<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
     module_provider: &'guard dyn ModuleProvider,
     policy: LoadingPolicy,
+    natives: &'guard dyn NativeResolver,
 }
 
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// Creates a new loader. The provided [`ModuleProvider`] processes cache
     /// misses: fetch code from storage, deserialize and verify. Policy
-    /// dictates how the code is loaded.
+    /// dictates how the code is loaded. The [`NativeResolver`] resolves
+    /// native call sites during specialization; pass [`NoNatives`] when
+    /// no natives are registered.
     pub fn new_with_policy(
         guard: &'guard ExecutionGuard<'ctx>,
         module_provider: &'guard dyn ModuleProvider,
         policy: LoadingPolicy,
+        natives: &'guard dyn NativeResolver,
     ) -> Self {
         Self {
             guard,
             module_provider,
             policy,
+            natives,
         }
     }
 
@@ -270,21 +276,27 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             invariant_violation!(UnexpectedReadSetMiss);
         })?;
 
-        let function =
-            match try_lower_function(module.ir(), func_ir, ty_args, self.guard, vec_descriptors)
-                .map_err(LoaderError::Specializer)?
-            {
-                LoweringOutcome::Built(f) => f,
-                // TODO: drop this arm — together with the `LoweringOutcome`
-                // enum and the corresponding `BuildContextOutcome::Skipped`
-                // paths in the specializer — once `try_build_context`
-                // handles nominal types and partial concretization. At that
-                // point `try_lower_function` is total and can go back to
-                // returning `Result<Function>` directly.
-                LoweringOutcome::Skipped(reason) => {
-                    return Err(LoaderError::LoweringSkipped { reason })
-                },
-            };
+        let function = match try_lower_function(
+            module.ir(),
+            func_ir,
+            ty_args,
+            self.guard,
+            vec_descriptors,
+            self.natives,
+        )
+        .map_err(LoaderError::Specializer)?
+        {
+            LoweringOutcome::Built(f) => f,
+            // TODO: drop this arm — together with the `LoweringOutcome`
+            // enum and the corresponding `BuildContextOutcome::Skipped`
+            // paths in the specializer — once `try_build_context`
+            // handles nominal types and partial concretization. At that
+            // point `try_lower_function` is total and can go back to
+            // returning `Result<Function>` directly.
+            LoweringOutcome::Skipped(reason) => {
+                return Err(LoaderError::LoweringSkipped { reason })
+            },
+        };
         Ok((function, function_ms))
     }
 }

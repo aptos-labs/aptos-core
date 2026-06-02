@@ -21,6 +21,7 @@ mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
+mono-move-natives = { workspace = true }
 mono-move-runtime = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
@@ -32,6 +33,7 @@ move-stdlib = { path = "../../move-stdlib" }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
+smallvec = { workspace = true }
 specializer = { workspace = true }
 tempfile = { workspace = true }
 

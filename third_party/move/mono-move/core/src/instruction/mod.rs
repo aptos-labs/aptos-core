@@ -116,6 +116,7 @@
 use crate::{
     align::MAX_ALIGN,
     interner::{InternedIdentifier, InternedModuleId},
+    native::{FrameSlot, NativeABI, NativeIdx},
     types::{display_type, display_type_list, InternedType, InternedTypeList},
     FunctionPtr,
 };
@@ -514,12 +515,24 @@ pub enum MicroOp {
     },
 
     /// Call a function via direct pointer. Same calling convention as
-    /// `CallIndirect`.
+    /// [`MicroOp::CallIndirect`].
     // TODO: Currently dead code — the specializer never emits this. A follow-up
     // pass should patch same-module `CallIndirect` sites to `CallDirect` once
     // the target is known to live in the same module.
     CallDirect {
         ptr: FunctionPtr,
+    },
+
+    /// Call a native function. Native functions follow the same calling convention,
+    /// meaning that the specializer has already emitted micro-ops to place arguments
+    /// into the callee's argument region.
+    ///
+    /// TODO: [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
+    /// and see if we want to move it into a side table instead.
+    CallNative {
+        native_idx: NativeIdx,
+        ty_args: InternedTypeList,
+        abi: Box<NativeABI>,
     },
 
     /// Return from the current function call. The compiler has already
@@ -1120,6 +1133,31 @@ impl fmt::Display for MicroOp {
                 let func = unsafe { ptr.as_ref_unchecked() };
                 write!(f, "CallDirect {}", func.name())
             },
+            MicroOp::CallNative {
+                native_idx,
+                ty_args,
+                abi,
+            } => {
+                write!(f, "CallNative #{}", native_idx.0)?;
+                if !ty_args.is_empty() {
+                    write!(f, "<")?;
+                    display_type_list(f, *ty_args)?;
+                    write!(f, ">")?;
+                }
+                let fmt_slots = |slots: &[FrameSlot]| {
+                    slots
+                        .iter()
+                        .map(|s| format!("({}, {})", s.offset, s.size))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                write!(
+                    f,
+                    " args=[{}] returns=[{}]",
+                    fmt_slots(&abi.args),
+                    fmt_slots(&abi.returns)
+                )
+            },
             MicroOp::Return => {
                 write!(f, "Return")
             },
@@ -1560,6 +1598,7 @@ impl MicroOp {
             | MicroOp::ShrU64Imm { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
+            | MicroOp::CallNative { .. }
             | MicroOp::Return
             | MicroOp::Jump { .. }
             | MicroOp::JumpNotZeroU64 { .. }

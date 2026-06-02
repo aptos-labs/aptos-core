@@ -11,6 +11,7 @@
 //! publish time.
 
 use mono_move_core::{
+    native::{FrameSlot, NativeABI},
     CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
     Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
     CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
@@ -451,6 +452,10 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
+            MicroOp::CallNative { ref abi, .. } => {
+                self.check_native_abi(pc, abi);
+            },
+
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {
                 self.check_frame_access_8(pc, dst);
@@ -878,6 +883,29 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
     fn check_frame_access_1(&mut self, pc: usize, offset: FrameOffset) {
         self.check_frame_access(Some(pc), offset, 1);
+    }
+
+    /// Verify each arg/return slot in a [`NativeABI`] lies within the frame.
+    fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
+        let callee_base = self.func.param_and_local_sizes_sum + FRAME_METADATA_SIZE;
+        let mut check_slot = |slot: &FrameSlot, kind: &str, i: usize| match (callee_base as u32)
+            .checked_add(slot.offset)
+        {
+            Some(abs) => self.check_frame_access(Some(pc), FrameOffset(abs), slot.size),
+            None => self.err(
+                Some(pc),
+                format!(
+                    "CallNative {} {} offset {} overflows when added to callee_base {}",
+                    kind, i, slot.offset, callee_base,
+                ),
+            ),
+        };
+        for (i, slot) in abi.args.iter().enumerate() {
+            check_slot(slot, "arg", i);
+        }
+        for (i, slot) in abi.returns.iter().enumerate() {
+            check_slot(slot, "return", i);
+        }
     }
 
     /// Verify an [`IntBinaryOp`]: dst and lhs are slots of width

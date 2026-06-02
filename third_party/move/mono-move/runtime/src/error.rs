@@ -275,6 +275,12 @@ pub enum RuntimeInvariantViolation {
 
     #[error("MoveTo: null source pointer")]
     MoveToNullSource,
+
+    #[error("CallNative: native_idx {idx} out of bounds in registry of size {registry_size}")]
+    NativeIdxOutOfBounds { idx: u32, registry_size: usize },
+
+    #[error("native function reported invariant violation: {0}")]
+    NativeInvariantViolation(String),
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime
