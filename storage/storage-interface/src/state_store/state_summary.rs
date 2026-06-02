@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
-    hash::{CryptoHash, CORRUPTION_SENTINEL},
+    hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_logger::warn;
@@ -59,6 +59,24 @@ impl StateSummary {
             hot_state_summary: Some(SparseMerkleTree::new_empty()),
             global_state_summary: SparseMerkleTree::new_empty(),
             hot_state_config,
+        }
+    }
+
+    pub fn new_global_only(version: Version, global_state_summary: SparseMerkleTree) -> Self {
+        Self {
+            next_version: version + 1,
+            hot_state_summary: None,
+            global_state_summary,
+            hot_state_config: HotStateConfig::default(),
+        }
+    }
+
+    pub fn new_empty_global_only() -> Self {
+        Self {
+            next_version: 0,
+            hot_state_summary: None,
+            global_state_summary: SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            hot_state_config: HotStateConfig::default(),
         }
     }
 
