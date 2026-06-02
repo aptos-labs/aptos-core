@@ -65,6 +65,19 @@ impl ChangeSetConfigs {
         self.gas_feature_version < 3
     }
 
+    /// From `RELEASE_V1_46`, squashing a full write (an earlier session that wrote a value or a
+    /// resource group) with a later *in-place delayed-field change* on the *same* key (e.g. the gas
+    /// epilogue exchanging an aggregator in that value/group) is rejected outright (fail-closed).
+    /// This covers both the resource-group arm (`WriteResourceGroup ⊕
+    /// ResourceGroupInPlaceDelayedFieldChange`) and the standalone-resource arm
+    /// (`WriteWithDelayedFields ⊕ InPlaceDelayedFieldChange`). Before that version, the merge was
+    /// permitted whenever the materialized sizes happened to match -- a matching size does not
+    /// prove the later session's delayed-field exchange reconciles with what the earlier session
+    /// wrote, so we no longer rely on it. See `VMChangeSet::squash_additional_resource_writes`.
+    pub fn strict_delayed_field_squash(&self) -> bool {
+        self.gas_feature_version >= aptos_gas_schedule::gas_feature_versions::RELEASE_V1_46
+    }
+
     fn for_feature_version_3() -> Self {
         const MB: u64 = 1 << 20;
 
