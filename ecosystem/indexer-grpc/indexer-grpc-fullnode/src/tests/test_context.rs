@@ -28,16 +28,14 @@ use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use crate::tests::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{context::Context, index};
+use aptos_api::{attach_poem_to_runtime, context::Context};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_types::aggregated_signature::AggregatedSignature;
-use bytes::Bytes;
-use hyper::Response;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, iter::once, sync::Arc, time::Duration};
+use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
 use vm_validator::vm_validator::VMValidator;
 
 pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestContext {
@@ -66,13 +64,20 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 
+    let node_config = NodeConfig::default();
+    let context = Context::new(
+        ChainId::test(),
+        db.clone(),
+        mempool.ac_client.clone(),
+        node_config.clone(),
+    );
+    let runtime_handle = tokio::runtime::Handle::current();
+    let api_address =
+        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach poem to runtime");
+
     TestContext::new(
-        Context::new(
-            ChainId::test(),
-            db.clone(),
-            mempool.ac_client.clone(),
-            NodeConfig::default(),
-        ),
+        context,
         rng,
         root_key,
         validator_owner,
@@ -81,6 +86,7 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
         db,
         test_name.to_string(),
         fake_start_time_usecs,
+        api_address,
     )
 }
 
@@ -98,6 +104,7 @@ pub struct TestContext {
     test_name: String,
     golden_output: Option<GoldenOutputs>,
     fake_time_usecs: u64,
+    api_address: SocketAddr,
 }
 
 // TODO: Remove after we add back golden
@@ -113,6 +120,7 @@ impl TestContext {
         db: Arc<AptosDB>,
         test_name: String,
         fake_time_usecs: u64,
+        api_address: SocketAddr,
     ) -> Self {
         Self {
             context,
@@ -126,6 +134,7 @@ impl TestContext {
             test_name,
             golden_output: None,
             fake_time_usecs,
+            api_address,
         }
     }
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -337,32 +346,16 @@ impl TestContext {
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(warp::test::request().method("POST").path(path).json(&body))
+        let url = format!("http://{}/v1{}", self.api_address, path);
+        let resp = reqwest::Client::new()
+            .post(url)
+            .header("content-type", "application/json")
+            .body(serde_json::to_vec(&body).unwrap())
+            .send()
             .await
-    }
-
-    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        req.reply(&self.get_routes_with_poem(address)).await
-    }
-
-    // Currently we still run our tests with warp.
-    // https://github.com/aptos-labs/aptos-core/issues/2966
-    pub fn get_routes_with_poem(
-        &self,
-        poem_address: SocketAddr,
-    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-        let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
-            "v1".to_string(),
-            format!("http://{}/v1", poem_address),
-        ));
-        proxy
-    }
-
-    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
-        let resp = self.reply(req).await;
-
-        let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
-
-        body
+            .expect("Failed to send request");
+        assert_eq!(resp.status().as_u16(), self.expect_status_code);
+        let bytes = resp.bytes().await.expect("Failed to read response body");
+        serde_json::from_slice(&bytes).expect("response body is JSON")
     }
 }

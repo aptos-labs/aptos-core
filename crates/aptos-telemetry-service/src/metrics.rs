@@ -14,11 +14,11 @@ use aptos_metrics_core::{
     register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
     register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
+use bytes::Bytes;
 use flate2::{write::GzEncoder, Compression};
 use once_cell::sync::Lazy;
 use std::{env, io::Write, time::Duration};
 use tokio::time::{self, Instant};
-use warp::hyper::body::Bytes;
 
 const METRICS_EXPORT_FREQUENCY: Duration = Duration::from_secs(15);
 

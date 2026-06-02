@@ -2,35 +2,33 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    auth::with_auth,
+    auth::authorize_request,
     context::Context,
     types::{auth::Claims, common::NodeType},
 };
-use warp::{filters::BoxedFilter, reply, Filter, Rejection, Reply};
+use axum::{extract::Extension, http::HeaderMap, Json};
+use serde_json::Value;
 
-pub fn telemetry_log_env(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("config" / "env" / "telemetry-log")
-        .and(warp::get())
-        .and(with_auth(context.clone(), vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-        ]))
-        .and(context.filter())
-        .and_then(handle_telemetry_log_env)
-        .boxed()
+pub async fn get_telemetry_log_env(
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, crate::errors::ServiceError> {
+    let claims = authorize_request(&context, &headers, &[
+        NodeType::Validator,
+        NodeType::ValidatorFullNode,
+        NodeType::PublicFullNode,
+    ])
+    .await?;
+    Ok(Json(handle_telemetry_log_env(claims, context).await))
 }
 
-async fn handle_telemetry_log_env(
-    claims: Claims,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
+async fn handle_telemetry_log_env(claims: Claims, context: Context) -> Value {
     let env: Option<String> = context
         .log_env_map()
         .get(&claims.chain_id)
         .and_then(|inner| inner.get(&claims.peer_id))
         .cloned();
-    Ok(reply::json(&env))
+    serde_json::to_value(&env).unwrap_or(Value::Null)
 }
 
 #[cfg(test)]
@@ -77,6 +75,6 @@ mod tests {
             .get("/api/v1/config/env/telemetry-log")
             .await;
 
-        assert_eq!(value, log_level)
+        assert_eq!(value, serde_json::json!(log_level))
     }
 }

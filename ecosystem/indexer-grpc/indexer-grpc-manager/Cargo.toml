@@ -19,6 +19,7 @@ aptos-indexer-grpc-utils = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
+axum = { workspace = true }
 build_html = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
@@ -32,7 +33,6 @@ tokio = { workspace = true }
 tokio-scoped = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
-warp = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true }

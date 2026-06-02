@@ -24,11 +24,14 @@ pub fn start_backup_service(
     // to make a request before the server task is actually listening on the
     // socket.
     //
-    // Note: we need to enter the runtime context first to actually bind, since
-    //       tokio TcpListener can only be bound inside a tokio context.
-    let _guard = runtime.enter();
-    let server = warp::serve(routes).bind(address);
-    runtime.handle().spawn(server);
+    let listener = runtime
+        .block_on(tokio::net::TcpListener::bind(address))
+        .expect("failed to bind backup service");
+    runtime.handle().spawn(async move {
+        axum::serve(listener, routes)
+            .await
+            .expect("backup service exited unexpectedly");
+    });
     info!("Backup service spawned.");
     runtime
 }
@@ -46,7 +49,7 @@ mod tests {
     /// 400 - params not provided or failed parsing
     /// 500 - endpoint handler raised error
     ///
-    /// And failure on one endpoint doesn't result in warp::Rejection which makes it fallback to other matches.
+    /// Route handlers return concrete status codes and malformed path params map to 400.
     #[test]
     fn routing_and_error_codes() {
         let tmpdir = TempPath::new();

@@ -25,9 +25,9 @@ aptos-runtimes = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-types = { workspace = true }
 aptos-warp-webserver = { workspace = true }
+axum = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
-futures = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
@@ -36,5 +36,5 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tower-http = { workspace = true, features = ["cors"] }
 url = { workspace = true }
-warp = { workspace = true }

@@ -8,7 +8,14 @@ use aptos_api_types::{
     X_APTOS_LEDGER_OLDEST_VERSION, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
     X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
-use hyper::{header::CONTENT_TYPE, http::HeaderValue};
+use axum::{
+    body::Body,
+    http::{
+        header::{HeaderValue, CONTENT_TYPE},
+        Response as HttpResponse,
+    },
+    response::{IntoResponse, Response as AxumResponse},
+};
 use serde::Serialize;
 
 pub struct Response {
@@ -35,9 +42,9 @@ impl Response {
     }
 }
 
-impl warp::Reply for Response {
-    fn into_response(self) -> warp::reply::Response {
-        let mut res = warp::reply::Response::new(self.body.into());
+impl IntoResponse for Response {
+    fn into_response(self) -> AxumResponse {
+        let mut res = HttpResponse::new(Body::from(self.body));
         let headers = res.headers_mut();
 
         if self.is_bcs_response {
@@ -65,6 +72,6 @@ impl warp::Reply for Response {
             self.ledger_info.oldest_block_height.0.into(),
         );
 
-        res
+        res.into_response()
     }
 }

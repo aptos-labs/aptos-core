@@ -4,6 +4,14 @@
 use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]
 use aptos_system_utils::profiling::start_cpu_profiling;
+use axum::{
+    body::Body,
+    extract::State,
+    http::{Response as HttpResponse, StatusCode},
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
 use backtrace::Backtrace;
 use clap::Parser;
 use figment::{
@@ -13,12 +21,9 @@ use figment::{
 use opentelemetry::trace::TracerProvider;
 use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-#[cfg(target_os = "linux")]
-use std::convert::Infallible;
 use std::{panic::PanicHookInfo, path::PathBuf, process};
 use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
-use warp::{http::Response, reply::Reply, Filter};
 
 /// ServerArgs bootstraps a server with all common pieces. And then triggers the run method for
 /// the specific service.
@@ -103,7 +108,7 @@ where
         self.server_config.get_server_name()
     }
 
-    async fn status_page(&self) -> Result<warp::reply::Response, warp::Rejection> {
+    async fn status_page(&self) -> Result<Response> {
         self.server_config.status_page().await
     }
 }
@@ -122,8 +127,8 @@ pub trait RunnableConfig: Clone + DeserializeOwned + Send + Sync + 'static {
     // Get the server name.
     fn get_server_name(&self) -> String;
 
-    async fn status_page(&self) -> Result<warp::reply::Response, warp::Rejection> {
-        Ok("Status page is not found.".into_response())
+    async fn status_page(&self) -> Result<Response> {
+        Ok((StatusCode::NOT_FOUND, "Status page is not found.").into_response())
     }
 }
 
@@ -254,69 +259,82 @@ async fn register_probes_and_metrics_handler<C>(config: GenericConfig<C>, port: 
 where
     C: RunnableConfig,
 {
-    let readiness = warp::path("readiness")
-        .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
+    let app = Router::new()
+        .route("/readiness", get(readiness_handler))
+        .route("/metrics", get(metrics_handler))
+        .route("/", get(status_handler::<C>))
+        .with_state(config);
 
-    let metrics_endpoint = warp::path("metrics").map(|| {
-        // Metrics encoding.
-        let metrics = aptos_metrics_core::gather();
-        let mut encode_buffer = vec![];
-        let encoder = TextEncoder::new();
-        // If metrics encoding fails, we want to panic and crash the process.
-        encoder
-            .encode(&metrics, &mut encode_buffer)
-            .context("Failed to encode metrics")
-            .unwrap();
+    #[cfg(target_os = "linux")]
+    let app = app.route("/profilez", get(profilez_handler));
 
-        Response::builder()
-            .header("Content-Type", "text/plain")
-            .body(encode_buffer)
-    });
+    let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::UNSPECIFIED, port))
+        .await
+        .expect("Failed to bind probes and metrics listener");
+    axum::serve(listener, app)
+        .await
+        .expect("Probes and metrics server exited unexpectedly");
+}
 
-    let status_endpoint = warp::path::end().and_then(move || {
-        let config = config.clone();
-        async move { config.status_page().await }
-    });
+async fn readiness_handler() -> (StatusCode, &'static str) {
+    (StatusCode::OK, "ready")
+}
 
-    if cfg!(target_os = "linux") {
-        #[cfg(target_os = "linux")]
-        let profilez = warp::path("profilez").and_then(|| async move {
-            // TODO(grao): Consider make the parameters configurable.
-            Ok::<_, Infallible>(match start_cpu_profiling(10, 99, false).await {
-                Ok(body) => {
-                    let response = Response::builder()
-                        .header("Content-Length", body.len())
-                        .header("Content-Disposition", "inline")
-                        .header("Content-Type", "image/svg+xml")
-                        .body(body);
+async fn metrics_handler() -> Response {
+    // Metrics encoding.
+    let metrics = aptos_metrics_core::gather();
+    let mut encode_buffer = vec![];
+    let encoder = TextEncoder::new();
+    // If metrics encoding fails, we want to panic and crash the process.
+    encoder
+        .encode(&metrics, &mut encode_buffer)
+        .context("Failed to encode metrics")
+        .unwrap();
 
-                    match response {
-                        Ok(res) => warp::reply::with_status(res, warp::http::StatusCode::OK),
-                        Err(e) => warp::reply::with_status(
-                            Response::new(format!("Profiling failed: {e:?}.").as_bytes().to_vec()),
-                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                        ),
-                    }
-                },
-                Err(e) => warp::reply::with_status(
-                    Response::new(format!("Profiling failed: {e:?}.").as_bytes().to_vec()),
-                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                ),
-            })
-        });
-        #[cfg(target_os = "linux")]
-        warp::serve(
-            readiness
-                .or(metrics_endpoint)
-                .or(status_endpoint)
-                .or(profilez),
+    HttpResponse::builder()
+        .header("Content-Type", "text/plain")
+        .body(Body::from(encode_buffer))
+        .expect("Failed to build metrics response")
+}
+
+async fn status_handler<C>(State(config): State<GenericConfig<C>>) -> Response
+where
+    C: RunnableConfig,
+{
+    match config.status_page().await {
+        Ok(response) => response,
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to render status page: {err:#}"),
         )
-        .run(([0, 0, 0, 0], port))
-        .await;
-    } else {
-        warp::serve(readiness.or(metrics_endpoint).or(status_endpoint))
-            .run(([0, 0, 0, 0], port))
-            .await;
+            .into_response(),
+    }
+}
+
+#[cfg(target_os = "linux")]
+async fn profilez_handler() -> Response {
+    // TODO(grao): Consider make the parameters configurable.
+    match start_cpu_profiling(10, 99, false).await {
+        Ok(body) => {
+            match HttpResponse::builder()
+                .header("Content-Length", body.len().to_string())
+                .header("Content-Disposition", "inline")
+                .header("Content-Type", "image/svg+xml")
+                .body(Body::from(body))
+            {
+                Ok(response) => response,
+                Err(err) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Profiling failed: {err:?}."),
+                )
+                    .into_response(),
+            }
+        },
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Profiling failed: {err:?}."),
+        )
+            .into_response(),
     }
 }
 

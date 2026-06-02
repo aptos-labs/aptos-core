@@ -14,6 +14,7 @@ use crate::{
     rate_limiter::ContractRateLimiters,
     validator_cache::PeerSetCacheUpdater,
 };
+use anyhow::Context as _;
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
 use clap::Parser;
@@ -23,7 +24,6 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    convert::Infallible,
     env,
     fs::File,
     io::Read,
@@ -32,8 +32,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::net::TcpListener;
 use types::common::ChainCommonName;
-use warp::{Filter, Reply};
 
 mod allowlist_cache;
 mod auth;
@@ -329,25 +329,30 @@ impl AptosTelemetryServiceArgs {
             .run();
         }
 
-        Self::serve(&config, routes(context)).await;
+        if let Err(err) = Self::serve(&config, routes(context)).await {
+            panic!("Failed to start telemetry service: {}", err);
+        }
     }
 
-    async fn serve<F>(config: &TelemetryServiceConfig, routes: F)
-    where
-        F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
-        F::Extract: Reply,
-    {
+    async fn serve(config: &TelemetryServiceConfig, app: axum::Router) -> anyhow::Result<()> {
         match &config.tls_cert_path {
-            None => warp::serve(routes).bind(config.address).await,
-            Some(cert_path) => {
-                warp::serve(routes)
-                    .tls()
-                    .cert_path(cert_path)
-                    .key_path(config.tls_key_path.as_ref().unwrap())
-                    .bind(config.address)
+            None => {
+                let listener = TcpListener::bind(config.address).await.with_context(|| {
+                    format!(
+                        "Failed to bind telemetry service listener on {}",
+                        config.address
+                    )
+                })?;
+                axum::serve(listener, app)
                     .await
+                    .context("Telemetry service server error")?;
+                Ok(())
             },
-        };
+            Some(_) => Err(anyhow::anyhow!(
+                "TLS for aptos-telemetry-service is not yet supported with axum \
+                 (clear tls_cert_path/tls_key_path or migrate to axum rustls listener)"
+            )),
+        }
     }
 }
 

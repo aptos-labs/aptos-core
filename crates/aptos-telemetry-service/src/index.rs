@@ -5,127 +5,155 @@ use crate::{
     auth,
     constants::GCP_CLOUD_TRACE_CONTEXT_HEADER,
     context::Context,
-    custom_contract_auth, custom_contract_ingest, custom_event, debug,
+    custom_contract_auth, custom_contract_ingest, custom_event,
     errors::ServiceError,
     log_ingest,
     metrics::SERVICE_ERROR_COUNTS,
     prometheus_push_metrics, remote_config,
     types::response::{ErrorResponse, HealthResponse, IndexResponse},
 };
-use std::convert::Infallible;
-use warp::{
-    body::BodyDeserializeError,
-    filters::BoxedFilter,
-    http::StatusCode,
-    reject::{
-        InvalidHeader, LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType,
-    },
-    reply, Filter, Rejection, Reply,
+use axum::{
+    extract::{DefaultBodyLimit, Extension, Request},
+    http::{header, StatusCode},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Json as AxumJson, Router,
 };
 
-pub fn routes(
-    context: Context,
-) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
-    let v1_api_prefix = warp::path!("api" / "v1" / ..);
+pub fn routes(context: Context) -> Router {
+    Router::new()
+        .route("/api/v1/", get(get_index))
+        .route("/api/v1/health", get(get_health))
+        .route(
+            "/api/v1/chain-access/:chain_id",
+            get(auth::get_chain_access),
+        )
+        .route("/api/v1/auth", post(auth::post_auth))
+        .route(
+            "/api/v1/ingest/custom-event",
+            post(custom_event::post_custom_event),
+        )
+        .route(
+            "/api/v1/ingest/metrics",
+            post(prometheus_push_metrics::post_metrics_ingest),
+        )
+        .route("/api/v1/ingest/logs", post(log_ingest::post_log_ingest))
+        .route(
+            "/api/v1/config/env/telemetry-log",
+            get(remote_config::get_telemetry_log_env),
+        )
+        .route(
+            "/api/v1/custom-contract/:contract_name/auth-challenge",
+            post(custom_contract_auth::post_auth_challenge),
+        )
+        .route(
+            "/api/v1/custom-contract/:contract_name/auth",
+            post(custom_contract_auth::post_custom_auth),
+        )
+        .route(
+            "/api/v1/custom-contract/:contract_name/ingest/metrics",
+            post(custom_contract_ingest::post_custom_contract_metrics),
+        )
+        .route(
+            "/api/v1/custom-contract/:contract_name/ingest/logs",
+            post(custom_contract_ingest::post_custom_contract_logs),
+        )
+        .route(
+            "/api/v1/custom-contract/:contract_name/ingest/custom-event",
+            post(custom_contract_ingest::post_custom_contract_custom_event),
+        )
+        .fallback(fallback_not_found)
+        .layer(middleware::from_fn(normalize_axum_error_responses))
+        .layer(DefaultBodyLimit::max(
+            crate::constants::MAX_CONTENT_LENGTH as usize,
+        ))
+        .layer(middleware::from_fn(trace_middleware))
+        .layer(Extension(context))
+}
 
-    let v1_api = v1_api_prefix.and(
-        index(context.clone())
-            .or(health())
-            .or(auth::check_chain_access(context.clone()))
-            .or(auth::auth(context.clone()))
-            .or(custom_event::custom_event_ingest(context.clone()))
-            .or(prometheus_push_metrics::metrics_ingest(context.clone()))
-            .or(log_ingest::log_ingest(context.clone()))
-            .or(remote_config::telemetry_log_env(context.clone()))
-            // custom contract auth endpoints
-            .or(custom_contract_auth::auth_challenge(context.clone()))
-            .or(custom_contract_auth::auth(context.clone()))
-            .or(custom_contract_ingest::metrics_ingest(context.clone()))
-            .or(custom_contract_ingest::log_ingest(context.clone()))
-            .or(custom_contract_ingest::custom_event_ingest(context)),
+async fn trace_middleware(request: Request, next: Next) -> Response {
+    let trace_id = request
+        .headers()
+        .get(GCP_CLOUD_TRACE_CONTEXT_HEADER)
+        .and_then(|header_value| header_value.to_str().ok())
+        .and_then(|trace_value| trace_value.split_once('/').map(|parts| parts.0))
+        .unwrap_or_default();
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+    let span = tracing::debug_span!(
+        "request",
+        method = %method,
+        path = path,
+        trace_id = trace_id,
     );
-
-    v1_api
-        .recover(handle_rejection)
-        .with(warp::trace::trace(|info| {
-            let trace_id = info.request_headers()
-                .get(GCP_CLOUD_TRACE_CONTEXT_HEADER)
-                .and_then(|header_value| header_value.to_str().ok().and_then(|trace_value| trace_value.split_once('/').map(|parts| parts.0)))
-                .unwrap_or_default();
-            let span = tracing::debug_span!("request", method=%info.method(), path=%info.path(), trace_id=trace_id);
-            span
-        }))
+    let _guard = span.enter();
+    next.run(request).await
 }
 
-fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path::end()
-        .and(warp::get())
-        .and(context.filter())
-        .and_then(handle_index)
-        .boxed()
-}
-
-async fn handle_index(context: Context) -> anyhow::Result<impl Reply, Rejection> {
-    let resp_payload = IndexResponse {
+async fn get_index(Extension(context): Extension<Context>) -> AxumJson<IndexResponse> {
+    AxumJson(IndexResponse {
         public_key: context.noise_config().public_key(),
-    };
-    Ok(reply::json(&resp_payload))
+    })
 }
 
-/// Health check endpoint for liveness/readiness probes
-/// GET /api/v1/health
-fn health() -> BoxedFilter<(impl Reply,)> {
-    warp::path!("health")
-        .and(warp::get())
-        .map(|| {
-            reply::json(&HealthResponse {
-                status: "ok".to_string(),
-            })
-        })
-        .boxed()
+async fn get_health() -> AxumJson<HealthResponse> {
+    AxumJson(HealthResponse {
+        status: "ok".to_string(),
+    })
 }
 
-pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply, Infallible> {
-    let code;
-    let body;
+async fn fallback_not_found() -> (StatusCode, AxumJson<ErrorResponse>) {
+    let code = StatusCode::NOT_FOUND;
+    (
+        code,
+        AxumJson(ErrorResponse::new(code, "Not Found".to_owned())),
+    )
+}
 
-    if let Some(error) = err.find::<ServiceError>() {
-        code = error.http_status_code();
-        body = reply::json(&ErrorResponse::from(error));
+async fn normalize_axum_error_responses(request: Request, next: Next) -> Response {
+    let response = next.run(request).await;
+    let status = response.status();
+    let is_json = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("application/json"));
 
-        SERVICE_ERROR_COUNTS
-            .with_label_values(&[&format!("{:?}", error.error_code())])
-            .inc();
-    } else if err.is_not_found() {
-        code = StatusCode::NOT_FOUND;
-        body = reply::json(&ErrorResponse::new(code, "Not Found".to_owned()));
-    } else if let Some(cause) = err.find::<BodyDeserializeError>() {
-        code = StatusCode::BAD_REQUEST;
-        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<InvalidHeader>() {
-        code = StatusCode::BAD_REQUEST;
-        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<LengthRequired>() {
-        code = StatusCode::LENGTH_REQUIRED;
-        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<PayloadTooLarge>() {
-        code = StatusCode::PAYLOAD_TOO_LARGE;
-        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
-        code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
-        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<MethodNotAllowed>() {
-        code = StatusCode::METHOD_NOT_ALLOWED;
-        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
-    } else {
-        code = StatusCode::INTERNAL_SERVER_ERROR;
-        body = reply::json(&ErrorResponse::new(
-            code,
-            format!("unexpected error: {:?}", err),
-        ));
+    if is_json {
+        return response;
     }
 
-    debug!("returning an error with status code {}: {:?}", code, err);
+    // Route-level axum rejections (e.g. wrong method/body limit) can bypass
+    // `ServiceError` conversion and otherwise emit non-JSON default bodies.
+    match status {
+        StatusCode::METHOD_NOT_ALLOWED => (
+            StatusCode::METHOD_NOT_ALLOWED,
+            AxumJson(ErrorResponse::new(
+                StatusCode::METHOD_NOT_ALLOWED,
+                "Method Not Allowed".to_string(),
+            )),
+        )
+            .into_response(),
+        StatusCode::PAYLOAD_TOO_LARGE => (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            AxumJson(ErrorResponse::new(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Payload Too Large".to_string(),
+            )),
+        )
+            .into_response(),
+        _ => response,
+    }
+}
 
-    Ok(reply::with_status(body, code).into_response())
+impl IntoResponse for ServiceError {
+    fn into_response(self) -> Response {
+        SERVICE_ERROR_COUNTS
+            .with_label_values(&[&format!("{:?}", self.error_code())])
+            .inc();
+        let status = self.http_status_code();
+        let body = AxumJson(ErrorResponse::from(&self));
+        (status, body).into_response()
+    }
 }

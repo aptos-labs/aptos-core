@@ -8,11 +8,13 @@ use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec, TimerHelper,
 };
 use aptos_storage_interface::Result as DbResult;
-use hyper::Body;
+use axum::{
+    body::Body,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::convert::Infallible;
-use warp::{reply::Response, Rejection, Reply};
 
 pub(super) static LATENCY_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -32,22 +34,19 @@ pub(super) static THROUGHPUT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(super) fn reply_with_bcs_bytes<R: Serialize>(
-    endpoint: &str,
-    record: &R,
-) -> DbResult<Box<dyn Reply>> {
+pub(super) fn reply_with_bcs_bytes<R: Serialize>(endpoint: &str, record: &R) -> DbResult<Response> {
     let bytes = bcs::to_bytes(record)?;
     THROUGHPUT_COUNTER
         .with_label_values(&[endpoint])
         .inc_by(bytes.len() as u64);
-    Ok(Box::new(bytes))
+    Ok(Response::new(Body::from(bytes)))
 }
 
 pub(super) fn reply_with_bytes_sender<F>(
     backup_handler: &BackupHandler,
     endpoint: &'static str,
     f: F,
-) -> Box<dyn Reply>
+) -> Response
 where
     F: FnOnce(BackupHandler, &mut bytes_sender::BytesSender) -> DbResult<()> + Send + 'static,
 {
@@ -61,7 +60,7 @@ where
         abort_on_error(f)(bh, sender)
     });
 
-    Box::new(Response::new(Body::wrap_stream(stream)))
+    Response::new(Body::from_stream(stream))
 }
 
 pub(super) fn abort_on_error<F>(
@@ -80,18 +79,12 @@ where
 }
 
 /// Return 500 on any error raised by the request handler.
-pub(super) fn unwrap_or_500(result: DbResult<Box<dyn Reply>>) -> Box<dyn Reply> {
+pub(super) fn unwrap_or_500(result: DbResult<Response>) -> Response {
     match result {
         Ok(resp) => resp,
         Err(e) => {
             warn!("Request handler exception: {:#}", e);
-            Box::new(warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
         },
     }
-}
-
-/// Return 400 on any rejections (parameter parsing errors).
-pub(super) async fn handle_rejection(err: Rejection) -> DbResult<impl Reply, Infallible> {
-    warn!("bad request: {:?}", err);
-    Ok(warp::http::StatusCode::BAD_REQUEST)
 }

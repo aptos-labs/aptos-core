@@ -7,6 +7,7 @@ use aptos_protos::{
     indexer::v1::{FullnodeInfo, HistoricalDataServiceInfo, LiveDataServiceInfo, StreamInfo},
     util::timestamp::Timestamp,
 };
+use axum::response::Response;
 use build_html::{
     Container, ContainerType, HtmlContainer, HtmlElement, HtmlTag, Table, TableCell, TableCellType,
     TableRow,
@@ -15,9 +16,7 @@ use std::{
     collections::{HashMap, VecDeque},
     time::Duration,
 };
-use warp::{reply::Response, Rejection};
-
-pub(crate) async fn status_page() -> Result<Response, Rejection> {
+pub(crate) async fn status_page() -> Response {
     let mut tabs = vec![];
 
     if let Some(grpc_manager) = GRPC_MANAGER.get() {

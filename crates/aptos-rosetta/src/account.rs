@@ -7,9 +7,7 @@
 //!
 
 use crate::{
-    common::{
-        check_network, get_block_index_from_request, handle_request, native_coin, with_context,
-    },
+    common::{check_network, get_block_index_from_request, into_rosetta_response, native_coin},
     error::{ApiError, ApiResult},
     types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, *},
     RosettaContext,
@@ -21,6 +19,7 @@ use aptos_rest_client::{
     Client,
 };
 use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
+use axum::{extract::State, response::Response, Json};
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -29,18 +28,12 @@ use move_core_types::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::HashSet, str::FromStr};
-use warp::Filter;
 
-/// Account routes e.g. balance
-pub fn routes(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::post().and(
-        warp::path!("account" / "balance")
-            .and(warp::body::json())
-            .and(with_context(server_context))
-            .and_then(handle_request(account_balance)),
-    )
+pub async fn account_balance_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<AccountBalanceRequest>,
+) -> Response {
+    into_rosetta_response(account_balance(request, server_context).await)
 }
 
 /// Account balance command

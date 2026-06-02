@@ -4,7 +4,7 @@
 use crate::{
     context::Context,
     debug, error,
-    errors::{AuthError, ServiceError, ServiceErrorCode},
+    errors::{json_rejection_to_service_error, AuthError, ServiceError, ServiceErrorCode},
     jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header},
     types::{
         auth::{AuthRequest, AuthResponse, Claims},
@@ -12,38 +12,37 @@ use crate::{
     },
     warn,
 };
-use anyhow::Result;
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
 use aptos_types::{chain_id::ChainId, PeerId};
-use reqwest::header::AUTHORIZATION;
-use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
+use axum::{
+    extract::{rejection::JsonRejection, Extension, Json, Path},
+    http::{header::AUTHORIZATION, HeaderMap},
+};
 
-pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("auth")
-        .and(warp::post())
-        .and(context.filter())
-        .and(warp::body::json())
-        .and_then(handle_auth)
-        .boxed()
+pub async fn post_auth(
+    Extension(context): Extension<Context>,
+    body: Result<Json<AuthRequest>, JsonRejection>,
+) -> Result<Json<AuthResponse>, ServiceError> {
+    let Json(body) = body.map_err(json_rejection_to_service_error)?;
+    handle_auth(context, body).await.map(Json)
 }
 
-pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Reply, Rejection> {
+pub async fn handle_auth(
+    context: Context,
+    body: AuthRequest,
+) -> Result<AuthResponse, ServiceError> {
     debug!("received auth request: {:?}", body);
 
     let client_init_message = &body.handshake_msg;
 
-    // Check whether the client (validator) is using the correct server's public key, which the
-    // client includes in its request body.
-    // This is useful for returning a refined error response to the client if it is using an
-    // invalid server public key.
     if body.server_public_key != context.noise_config().public_key() {
-        return Err(reject::custom(ServiceError::bad_request(
-            ServiceErrorCode::AuthError(AuthError::InvalidServerPublicKey, body.chain_id),
+        return Err(ServiceError::bad_request(ServiceErrorCode::AuthError(
+            AuthError::InvalidServerPublicKey,
+            body.chain_id,
         )));
     }
 
-    // build the prologue (chain_id | peer_id | public_key)
     const CHAIN_ID_LENGTH: usize = 1;
     const ID_SIZE: usize = CHAIN_ID_LENGTH + PeerId::LENGTH;
     const PROLOGUE_SIZE: usize = CHAIN_ID_LENGTH + PeerId::LENGTH + x25519::PUBLIC_KEY_SIZE;
@@ -57,10 +56,10 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         .parse_client_init_message(&prologue, client_init_message)
         .map_err(|e| {
             debug!("error performing noise handshake: {}", e);
-            reject::custom(ServiceError::bad_request(ServiceErrorCode::AuthError(
+            ServiceError::bad_request(ServiceErrorCode::AuthError(
                 AuthError::NoiseHandshakeError(e),
                 body.chain_id,
-            )))
+            ))
         })?;
 
     let cache = if body.role_type == RoleType::Validator {
@@ -70,45 +69,39 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
     };
 
     let (epoch, peer_role) = match cache.read().get(&body.chain_id) {
-        Some((epoch, peer_set)) => {
-            match peer_set.get(&body.peer_id) {
-                Some(peer) => {
-                    let remote_public_key = &remote_public_key;
-                    if !peer.keys.contains(remote_public_key) {
-                        warn!("peer found in peer set but public_key is not found. request body: {}, role_type: {}, peer_id: {}, received public_key: {}", body.chain_id, body.role_type, body.peer_id, remote_public_key);
-                        return Err(reject::custom(ServiceError::forbidden(
-                            ServiceErrorCode::AuthError(
-                                AuthError::PeerPublicKeyNotFound,
-                                body.chain_id,
-                            ),
-                        )));
-                    }
-                    Ok((*epoch, peer.role))
-                },
-                None => {
-                    // if not, verify that their peerid is constructed correctly from their public key
-                    let derived_remote_peer_id =
-                        aptos_types::account_address::from_identity_public_key(remote_public_key);
-                    if derived_remote_peer_id != body.peer_id {
-                        return Err(reject::custom(ServiceError::forbidden(
-                            ServiceErrorCode::AuthError(
-                                AuthError::PublicKeyMismatch,
-                                body.chain_id,
-                            ),
-                        )));
-                    } else {
-                        Ok((*epoch, PeerRole::Unknown))
-                    }
-                },
-            }
+        Some((epoch, peer_set)) => match peer_set.get(&body.peer_id) {
+            Some(peer) => {
+                let remote_public_key = &remote_public_key;
+                if !peer.keys.contains(remote_public_key) {
+                    warn!("peer found in peer set but public_key is not found. request body: {}, role_type: {}, peer_id: {}, received public_key: {}", body.chain_id, body.role_type, body.peer_id, remote_public_key);
+                    return Err(ServiceError::forbidden(ServiceErrorCode::AuthError(
+                        AuthError::PeerPublicKeyNotFound,
+                        body.chain_id,
+                    )));
+                }
+                Ok((*epoch, peer.role))
+            },
+            None => {
+                let derived_remote_peer_id =
+                    aptos_types::account_address::from_identity_public_key(remote_public_key);
+                if derived_remote_peer_id != body.peer_id {
+                    return Err(ServiceError::forbidden(ServiceErrorCode::AuthError(
+                        AuthError::PublicKeyMismatch,
+                        body.chain_id,
+                    )));
+                } else {
+                    Ok((*epoch, PeerRole::Unknown))
+                }
+            },
         },
         None => {
             warn!(
                 "Validator set unavailable for Chain ID {}. Rejecting request.",
                 body.chain_id
             );
-            Err(reject::custom(ServiceError::unauthorized(
-                ServiceErrorCode::AuthError(AuthError::ValidatorSetUnavailable, body.chain_id),
+            Err(ServiceError::unauthorized(ServiceErrorCode::AuthError(
+                AuthError::ValidatorSetUnavailable,
+                body.chain_id,
             )))
         },
     }?;
@@ -144,10 +137,10 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
     )
     .map_err(|e| {
         error!("unable to create jwt token: {}", e);
-        reject::custom(ServiceError::internal(ServiceErrorCode::AuthError(
+        ServiceError::internal(ServiceErrorCode::AuthError(
             AuthError::from(e),
             body.chain_id,
-        )))
+        ))
     })?;
 
     let mut rng = rand::rngs::OsRng;
@@ -169,37 +162,29 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
             ))
         })?;
 
-    Ok(reply::json(&AuthResponse {
+    Ok(AuthResponse {
         handshake_msg: server_response,
-    }))
+    })
 }
 
-pub fn with_auth(
-    context: Context,
-    roles: Vec<NodeType>,
-) -> impl Filter<Extract = (Claims,), Error = Rejection> + Clone {
-    warp::header::optional(AUTHORIZATION.as_str())
-        .and_then(jwt_from_header)
-        .and(
-            warp::any()
-                .map(move || (context.clone(), roles.clone()))
-                .untuple_one(),
-        )
-        .and_then(authorize_jwt)
+/// Authorize a JWT from request headers for the given node roles.
+pub async fn authorize_request(
+    context: &Context,
+    headers: &HeaderMap,
+    allow_roles: &[NodeType],
+) -> Result<Claims, ServiceError> {
+    let auth_header = headers
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let token = jwt_from_header(auth_header).await?;
+    authorize_jwt(token, context.clone(), allow_roles.to_vec()).await
 }
 
-pub fn check_chain_access(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("chain-access" / ChainId)
-        .and(warp::get())
-        .and(context.filter())
-        .and_then(handle_check_chain_access)
-        .boxed()
-}
-
-async fn handle_check_chain_access(
-    chain_id: ChainId,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
+pub async fn get_chain_access(
+    Extension(context): Extension<Context>,
+    Path(chain_id): Path<ChainId>,
+) -> Result<Json<bool>, ServiceError> {
     let present = context.chain_set().contains(&chain_id);
-    Ok(reply::json(&present))
+    Ok(Json(present))
 }
