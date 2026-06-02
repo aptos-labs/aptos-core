@@ -22,12 +22,12 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, EntryFunction, ExecutionStatus, IndexedTransactionSummary, Module, Multisig,
-        MultisigTransactionPayload, RawTransaction, ReplayProtector, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionExecutable, TransactionExtraConfig, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionPayloadInner, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus, FeeDistribution,
+        IndexedTransactionSummary, Module, Multisig, MultisigTransactionPayload, RawTransaction,
+        ReplayProtector, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable,
+        TransactionExtraConfig, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionPayloadInner, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -1265,6 +1265,7 @@ impl BlockGen {
     pub fn materialize(
         self,
         universe: &mut AccountInfoUniverse,
+        make_hot_in_epilogue: bool,
     ) -> (Vec<TransactionToCommit>, LedgerInfo) {
         let num_txns = self.txn_gens.len() + 1;
 
@@ -1278,14 +1279,49 @@ impl BlockGen {
             txns_to_commit.push(txn_gen.materialize(universe));
         }
 
+        // The block-ending transaction. In production it's always a `BlockEpilogue`, which is also
+        // where hot-state promotions are recorded; mimic that when asked.
+        let (block_ending_txn, write_set) = if make_hot_in_epilogue {
+            // Promote a resource of an account that was never created, so it stays absent and
+            // lands as a `HotVacant` entry. Derive the address from the block version so it differs
+            // per block and cannot collide with the key-hash addresses in the universe.
+            let mut address = [0u8; AccountAddress::LENGTH];
+            address[..std::mem::size_of::<u64>()]
+                .copy_from_slice(&ledger_info.version().to_be_bytes());
+            let to_make_hot = BTreeSet::from([StateKey::resource_typed::<AccountResource>(
+                &AccountAddress::new(address),
+            )
+            .unwrap()]);
+
+            // The promotion has to ride in the write set too, as V1 so the `hotness` bucket survives
+            // serialization across a restart; that's what persists the `HotVacant`.
+            let mut write_set = WriteSet::default();
+            write_set.add_hotness(to_make_hot.clone());
+
+            (
+                Transaction::block_epilogue_v2(
+                    HashValue::random(),
+                    BlockEndInfo::new_empty(),
+                    FeeDistribution::new(BTreeMap::new()),
+                    to_make_hot,
+                ),
+                write_set.into_v1(),
+            )
+        } else {
+            (
+                Transaction::StateCheckpoint(HashValue::random()),
+                WriteSet::default(),
+            )
+        };
+
         txns_to_commit.push(TransactionToCommit::new(
-            Transaction::StateCheckpoint(HashValue::random()),
+            block_ending_txn,
             TransactionInfo::new_placeholder(
                 0,
                 Some(HashValue::random()),
                 ExecutionStatus::Success,
             ),
-            WriteSet::default(),
+            write_set,
             if ledger_info.ends_epoch() {
                 vec![ContractEvent::new_v2(
                     NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
