@@ -158,12 +158,15 @@ impl TransactionAuthenticator {
 
     /// Return Ok if all AccountAuthenticator's public keys match their signatures, Err otherwise
     pub fn verify(&self, raw_txn: &RawTransaction) -> Result<()> {
-        let num_sigs: usize = self.sender().number_of_signatures()
-            + self
-                .secondary_signers()
-                .iter()
-                .map(|auth| auth.number_of_signatures())
-                .sum::<usize>();
+        // The cap must include every account authenticator that participates in the
+        // transaction. Using `all_signers()` keeps this count consistent with
+        // `to_single_key_authenticators()` and ensures the fee payer signer (when
+        // present in the FeePayer variant) is not omitted from the global cap.
+        let num_sigs: usize = self
+            .all_signers()
+            .iter()
+            .map(|auth| auth.number_of_signatures())
+            .sum();
         if num_sigs > MAX_NUM_OF_SIGS {
             return Err(Error::new(AuthenticationError::MaxSignaturesExceeded));
         }
@@ -2376,6 +2379,94 @@ mod tests {
         let signed_txn = maul_raw_groth16_txn(pk, sig, raw_txn);
 
         assert!(signed_txn.verify_signature().is_err());
+    }
+
+    /// Regression test for a bug where the global `MAX_NUM_OF_SIGS` cap enforced by
+    /// `TransactionAuthenticator::verify()` for the `FeePayer` variant did not include
+    /// the signatures contributed by the `fee_payer_signer`. With the bug, a transaction
+    /// could carry `MAX_NUM_OF_SIGS` signatures in the sender plus additional signatures
+    /// in the fee payer authenticator and still pass `verify()` — even though
+    /// `all_signers()` / `to_single_key_authenticators()` materialized every one of those
+    /// signatures.
+    #[test]
+    fn fee_payer_total_signatures_count_against_max_sigs_cap() {
+        fn build_multi_key_authenticator(num_sigs: usize) -> AccountAuthenticator {
+            assert!(num_sigs > 0 && num_sigs <= MAX_NUM_OF_SIGS);
+            let mut keys = Vec::with_capacity(num_sigs);
+            for _ in 0..num_sigs {
+                let private_key = Ed25519PrivateKey::generate(&mut rand::thread_rng());
+                keys.push(AnyPublicKey::ed25519(private_key.public_key()));
+            }
+            let multi_key = MultiKey::new(keys, num_sigs as u8).unwrap();
+            let signatures: Vec<(u8, AnySignature)> = (0..num_sigs as u8)
+                .map(|i| (i, AnySignature::ed25519(Ed25519Signature::dummy_signature())))
+                .collect();
+            let mk_auth = MultiKeyAuthenticator::new(multi_key, signatures).unwrap();
+            assert_eq!(mk_auth.signatures().len(), num_sigs);
+            AccountAuthenticator::multi_key(mk_auth)
+        }
+
+        let raw_txn = {
+            let sender_key = Ed25519PrivateKey::generate_for_testing();
+            let sender_addr =
+                AuthenticationKey::ed25519(&sender_key.public_key()).account_address();
+            crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+                sender_addr,
+                0,
+                &sender_key,
+                sender_key.public_key(),
+                None,
+                0,
+                0,
+                None,
+            )
+            .into_raw_transaction()
+        };
+
+        // 32 (sender) + 1 (fee payer) = 33 total. Without counting the fee payer signer
+        // against the cap this would erroneously pass; with the fix it must fail with
+        // `MaxSignaturesExceeded`.
+        let over_cap = TransactionAuthenticator::fee_payer(
+            build_multi_key_authenticator(MAX_NUM_OF_SIGS),
+            vec![],
+            vec![],
+            AccountAddress::random(),
+            build_multi_key_authenticator(1),
+        );
+        let err = over_cap
+            .verify(&raw_txn)
+            .expect_err("fee payer signatures must count against MAX_NUM_OF_SIGS");
+        assert_eq!(
+            err.downcast::<AuthenticationError>().unwrap(),
+            AuthenticationError::MaxSignaturesExceeded,
+        );
+        // Sanity check: `all_signers()` does see every signature.
+        let total_sigs: usize = over_cap
+            .all_signers()
+            .iter()
+            .map(|a| a.number_of_signatures())
+            .sum();
+        assert_eq!(total_sigs, MAX_NUM_OF_SIGS + 1);
+
+        // Boundary: sender + secondary + fee payer signers that together sum to exactly
+        // `MAX_NUM_OF_SIGS` must pass the cap check (signature verification itself is
+        // expected to fail later because the dummy signatures are not valid, but the
+        // cap-check error must not be the one raised).
+        let at_cap = TransactionAuthenticator::fee_payer(
+            build_multi_key_authenticator(MAX_NUM_OF_SIGS / 2),
+            vec![],
+            vec![],
+            AccountAddress::random(),
+            build_multi_key_authenticator(MAX_NUM_OF_SIGS / 2),
+        );
+        match at_cap.verify(&raw_txn) {
+            Ok(()) => {},
+            Err(e) => assert!(
+                e.downcast_ref::<AuthenticationError>()
+                    != Some(&AuthenticationError::MaxSignaturesExceeded),
+                "exactly MAX_NUM_OF_SIGS signatures must not trip the cap, got: {e:?}",
+            ),
+        }
     }
 
     #[test]
