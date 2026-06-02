@@ -46,10 +46,8 @@ module aptos_framework::ethereum_derivable_account {
     const EUNEXPECTED_V: u64 = 5;
     /// Malformed data with trailing bytes.
     const EMALFORMED_DATA: u64 = 6;
-    /// Function is deprecated and should not be called.
-    const EDEPRECATED: u64 = 7;
     /// Ethereum address is missing the "0x" prefix.
-    const EINVALID_ETH_ADDR_PREFIX: u64 = 8;
+    const EINVALID_ETH_ADDR_PREFIX: u64 = 7;
 
     enum SIWEAbstractSignature has drop {
         /// Deprecated, use MessageV2 instead
