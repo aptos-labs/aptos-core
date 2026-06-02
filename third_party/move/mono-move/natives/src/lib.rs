@@ -48,7 +48,7 @@ pub(crate) fn parse_qualified_native_name(qname: &str) -> (AccountAddress, Ident
 /// Builds a list of natives from human-readable qualified names and Rust functions.
 ///
 /// Example:
-/// ```rust
+/// ```ignore
 /// let natives = natives![
 ///     ("0x1::test_natives::u64_add", native_u64_add),
 ///     ("0x1::test_natives::u64_identity", native_u64_identity),
