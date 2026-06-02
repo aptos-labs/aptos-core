@@ -103,10 +103,13 @@ export const Environment = {
 
 
 export function getEnvironment() {
-  if (process.env.CI === "true") {
-    return Environment.CI;
-  } else if (import.meta.jest !== undefined) {
+  // jest also runs with CI=true on GitHub Actions, so resolve to TEST first; otherwise
+  // reportError would call core.setFailed and fail the job on tests that intentionally
+  // trigger errors (e.g. the version-mismatch assertion test).
+  if (import.meta.jest !== undefined) {
     return Environment.TEST;
+  } else if (process.env.CI === "true") {
+    return Environment.CI;
   } else {
     return Environment.LOCAL;
   }

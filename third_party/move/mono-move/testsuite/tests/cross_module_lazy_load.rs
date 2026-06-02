@@ -9,11 +9,11 @@
 //! `CallIndirect` at runtime lazily loads it through the transaction
 //! context.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
+use mono_move_core::types::EMPTY_TYPE_LIST;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
-use mono_move_runtime::InterpreterContext;
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_runtime::{ExecutionContext, InterpreterContext, TransactionContext};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -43,7 +43,11 @@ fn call_indirect_triggers_lazy_module_load() {
     );
 
     // -- Wrap into a TransactionContext ---------------------------
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(u64::MAX));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        SimpleGasMeter::new(u64::MAX),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+    );
 
     // -- Resolve bar::main through the txn_ctx ---------------------------
     // This lazily loads `bar` (via the loader) and returns a pointer to

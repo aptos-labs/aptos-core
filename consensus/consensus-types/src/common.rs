@@ -192,6 +192,10 @@ pub fn verify_batch_info_limits<T: TBatchInfo>(
     max_batch_bytes: u64,
 ) -> anyhow::Result<()> {
     ensure!(
+        batch.num_txns() >= 1,
+        "Batch must contain at least one transaction, got 0",
+    );
+    ensure!(
         batch.num_txns() <= max_batch_txns,
         "Batch txn count {} exceeds limit {}",
         batch.num_txns(),
@@ -716,6 +720,13 @@ mod tests {
         let author = PeerId::random();
         let batch = make_batch_info(author, 50, 500_000);
         assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_ok());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_empty_batch() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, 0, 0);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
     }
 
     #[test]

@@ -116,16 +116,19 @@
 use crate::{
     align::MAX_ALIGN,
     interner::{InternedIdentifier, InternedModuleId},
-    types::{display_type_list, InternedTypeList},
+    types::{display_type, display_type_list, InternedType, InternedTypeList},
     FunctionPtr,
 };
+use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
 mod gas;
 mod unspecialized;
 pub use gas::MicroOpGasSchedule;
-pub use unspecialized::{IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand};
+pub use unspecialized::{
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand,
+};
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,8 +217,7 @@ impl fmt::Display for ClosureFuncRef {
                 // when the guard is held.
                 // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
-                let func_name = unsafe { func.name.as_ref_unchecked() };
-                write!(f, "Resolved({})", func_name)
+                write!(f, "Resolved({})", func.name())
             },
         }
     }
@@ -270,10 +272,35 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
-    /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
+    /// Store 8 immediate bytes into the destination slot. `imm` is the
+    /// little-endian (LE) byte representation of the value:
+    /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
+    /// two's-complement) for signed. Narrower primitives (`u8`/`u16`/`u32`/
+    /// `i8`/`i16`/`i32`/`bool`) are widened to 8 bytes by the lowerer.
     StoreImm8 {
         dst: FrameOffset,
-        imm: u64,
+        imm: [u8; 8],
+    },
+
+    /// Store 16 immediate bytes into the destination slot. Same LE
+    /// convention as `StoreImm8`: `u128.to_le_bytes()` / `i128.to_le_bytes()`.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
+    StoreImm16 {
+        dst: FrameOffset,
+        imm: Box<[u8; 16]>,
+    },
+
+    /// Store 32 immediate bytes into the destination slot. For numeric
+    /// values, same LE convention as `StoreImm8`: `U256.to_le_bytes()` /
+    /// `I256.to_le_bytes()`. `AccountAddress` is not numeric — it's a
+    /// 32-byte identifier — so its bytes are copied as-is, with no LE
+    /// reinterpretation.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
+    StoreImm32 {
+        dst: FrameOffset,
+        imm: Box<[u8; 32]>,
     },
 
     /// Copy 8 bytes from `src` to `dst`.
@@ -459,6 +486,7 @@ pub enum MicroOp {
     IntShl(IntShiftOp),
     IntShr(IntShiftOp),
     IntNegate(IntNegateOp),
+    IntCast(IntCastOp),
 
     //======================================================================
     // Control flow
@@ -720,6 +748,36 @@ pub enum MicroOp {
         size: u32,
     },
 
+    /// Copies the 16-byte fat pointer from `src_ref` to `dst_ref`, while
+    /// adding `offset` to the offset part of the fat pointer.
+    ///
+    /// Used to derive a field reference from a struct reference.
+    DeriveRefOffsetImm {
+        dst_ref: FrameOffset,
+        src_ref: FrameOffset,
+        offset: u32,
+    },
+
+    /// Read through a fat pointer (`ref_ptr`) with an extra immediate `offset`.
+    /// Copies `size` bytes from the referenced location (after folding in the
+    /// offset) to `dst`.
+    ReadRefOffset {
+        dst: FrameOffset,
+        ref_ptr: FrameOffset,
+        offset: u32,
+        size: u32,
+    },
+
+    /// Write through a fat pointer (`ref_ptr`) with an extra immediate
+    /// `offset`. Copies `size` bytes from `src` to the referenced location
+    /// (after folding in the offset). Symmetric counterpart to `ReadRefOffset`.
+    WriteRefOffset {
+        ref_ptr: FrameOffset,
+        offset: u32,
+        src: FrameOffset,
+        size: u32,
+    },
+
     //======================================================================
     // Heap object operations (structs and enums)
     //======================================================================
@@ -797,6 +855,70 @@ pub enum MicroOp {
     },
 
     //======================================================================
+    // Global storage
+    //======================================================================
+    // Access to published resources. In every op `addr` holds the account
+    // address and `ty` the resource type. Reads and writes are tracked in the
+    // per-transaction read-write set.
+    //======================================================================
+    /// Write a boolean into the destination slot `dst`: whether a resource of
+    /// type `ty` exists at the address in `addr`. The boolean is currently
+    /// widened to 8 bytes.
+    Exists {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Immutably borrow the resource of type `ty` at the address in `addr` and
+    /// write a reference to it into the destination slot `dst`. The reference
+    /// is a 16-byte fat pointer pointing directly at the value in global
+    /// storage (no copy). Aborts if the resource does not exist.
+    BorrowGlobal {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Mutably borrow the resource of type `ty` at the address in `addr` and
+    /// write a reference to it into the destination slot `dst`. Unlike
+    /// `BorrowGlobal`, the value is first copied into the current transaction's
+    /// heap (copy-on-write) so it can be mutated in place; the 16-byte fat
+    /// pointer points at that owned copy. Aborts if the resource does not
+    /// exist.
+    ///
+    /// May trigger GC.
+    BorrowGlobalMut {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Move the resource of type `ty` out of the address in `addr` and write
+    /// the owned value into the destination slot `dst`. The owned value is an
+    /// 8-byte heap pointer into the current transaction's heap (not a
+    /// reference). The resource is marked deleted in global storage. Aborts if
+    /// the resource does not exist.
+    ///
+    /// May trigger GC.
+    MoveFrom {
+        dst: FrameOffset,
+        addr: FrameOffset,
+        ty: InternedType,
+    },
+
+    /// Move the owned value in the source slot `src` into global storage as a
+    /// resource of type `ty` at the address in `addr`. `src` holds an 8-byte
+    /// owned heap pointer. Aborts if the resource already exists.
+    MoveTo {
+        // TODO(correctness):
+        //   Move requires this to be a signer, using address for simplicity for now.
+        addr: FrameOffset,
+        ty: InternedType,
+        src: FrameOffset,
+    },
+
+    //======================================================================
     // Debugging
     //======================================================================
     /// Advance the interpreter's RNG and write a random u64 to `dst`.
@@ -810,6 +932,7 @@ pub enum MicroOp {
     /// Unconditionally trigger a garbage collection cycle.
     /// Useful for testing GC correctness.
     ForceGC,
+
     //======================================================================
     // Missing instructions
     //======================================================================
@@ -818,7 +941,6 @@ pub enum MicroOp {
     // - **Casting**: truncation and widening between integer types,
     //   including signed casts.
     // - **Boolean**: logical Not, And, Or (distinct from bitwise).
-    // - **Global storage**: MoveTo, MoveFrom, BorrowGlobal, Exists.
     // - **Runtime instrumentation**: tracing, profiling, coverage hooks.
     //======================================================================
 
@@ -851,7 +973,23 @@ impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MicroOp::StoreImm8 { dst, imm } => {
-                write!(f, "StoreImm8 [{}] <- #{}", dst.0, imm)
+                write!(f, "StoreImm8 [{}] <- #{}", dst.0, u64::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm16 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm16 [{}] <- #{}",
+                    dst.0,
+                    u128::from_le_bytes(**imm)
+                )
+            },
+            MicroOp::StoreImm32 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm32 [{}] <- #{}",
+                    dst.0,
+                    U256::from_le_bytes(**imm)
+                )
             },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
@@ -950,6 +1088,11 @@ impl fmt::Display for MicroOp {
             MicroOp::IntNegate(op) => {
                 write!(f, "IntNegate.{} [{}] <- -[{}]", op.ty, op.dst.0, op.src.0)
             },
+            MicroOp::IntCast(op) => write!(
+                f,
+                "IntCast.{}->{} [{}] <- [{}]",
+                op.from, op.to, op.dst.0, op.src.0
+            ),
             MicroOp::CallIndirect {
                 module_id,
                 func_name,
@@ -975,8 +1118,7 @@ impl fmt::Display for MicroOp {
                 // when the guard is held.
                 // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
-                let func_name = unsafe { func.name.as_ref_unchecked() };
-                write!(f, "CallDirect {}", func_name)
+                write!(f, "CallDirect {}", func.name())
             },
             MicroOp::Return => {
                 write!(f, "Return")
@@ -1098,6 +1240,41 @@ impl fmt::Display for MicroOp {
                     ref_ptr.0, src.0, size
                 )
             },
+            MicroOp::DeriveRefOffsetImm {
+                dst_ref,
+                src_ref,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "DeriveRefOffsetImm [{}] <- [{}]+{}",
+                    dst_ref.0, src_ref.0, offset
+                )
+            },
+            MicroOp::ReadRefOffset {
+                dst,
+                ref_ptr,
+                offset,
+                size,
+            } => {
+                write!(
+                    f,
+                    "ReadRefOffset [{}] <- *([{}]+{}) (size={})",
+                    dst.0, ref_ptr.0, offset, size
+                )
+            },
+            MicroOp::WriteRefOffset {
+                ref_ptr,
+                offset,
+                src,
+                size,
+            } => {
+                write!(
+                    f,
+                    "WriteRefOffset *([{}]+{}) <- [{}] (size={})",
+                    ref_ptr.0, offset, src.0, size
+                )
+            },
             MicroOp::HeapNew { dst, descriptor_id } => {
                 write!(f, "HeapNew [{}] desc={}", dst.0, descriptor_id)
             },
@@ -1208,6 +1385,31 @@ impl fmt::Display for MicroOp {
                     write!(f, "[{}]({})", slot.offset.0, slot.size)?;
                 }
                 write!(f, "]")
+            },
+            MicroOp::Exists { addr, ty, dst } => {
+                write!(f, "Exists<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::BorrowGlobal { addr, ty, dst } => {
+                write!(f, "BorrowGlobal<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::BorrowGlobalMut { addr, ty, dst } => {
+                write!(f, "BorrowGlobalMut<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::MoveFrom { addr, ty, dst } => {
+                write!(f, "MoveFrom<")?;
+                display_type(f, *ty)?;
+                write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
+            },
+            MicroOp::MoveTo { addr, ty, src } => {
+                write!(f, "MoveTo<")?;
+                display_type(f, *ty)?;
+                write!(f, "> addr=[{}], src=[{}]", addr.0, src.0)
             },
         }
     }
@@ -1328,10 +1530,14 @@ impl MicroOp {
             MicroOp::HeapNew { .. }
             | MicroOp::VecPushBack { .. }
             | MicroOp::PackClosure(_)
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
             | MicroOp::ForceGC => true,
 
             // Non-allocating.
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -1376,6 +1582,9 @@ impl MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
             | MicroOp::HeapMoveTo8 { .. }
@@ -1394,7 +1603,11 @@ impl MicroOp {
             | MicroOp::IntBitXor(_)
             | MicroOp::IntShl(_)
             | MicroOp::IntShr(_)
-            | MicroOp::IntNegate(_) => false,
+            | MicroOp::IntNegate(_)
+            | MicroOp::IntCast(_)
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::MoveTo { .. } => false,
         }
     }
 

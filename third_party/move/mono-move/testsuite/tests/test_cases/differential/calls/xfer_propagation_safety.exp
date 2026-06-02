@@ -1,0 +1,58 @@
+=== stackless ===
+// module 0x66::test
+
+fun helper(): u64 {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 7
+    1: ret [r0]
+}
+
+fun void_no_arg() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret []
+}
+
+fun trigger(): u64 {
+  slots: params(0), locals(1), temps(0), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call helper, []
+    1: r0 := ld_u64 0
+    2: r0 := move x0
+    3: [] := call void_no_arg, []
+    4: ret [r0]
+}
+=== micro-ops ===
+// module 0x66::test
+
+fun helper() {
+  frame_data_size: 8
+  code:
+    0: Charge #4
+    1: StoreImm8 [0] <- #7
+    2: Return
+}
+
+fun void_no_arg() {
+  frame_data_size: 0
+  code:
+    0: Charge #2
+    1: Return
+}
+
+fun trigger() {
+  frame_data_size: 8
+  code:
+    0: Charge #26
+    1: CallIndirect 0x66::test::helper
+    2: StoreImm8 [0] <- #0
+    3: Move8 [0] <- [32]
+    4: CallIndirect 0x66::test::void_no_arg
+    5: Return
+}

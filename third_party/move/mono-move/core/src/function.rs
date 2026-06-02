@@ -2,35 +2,26 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
-use arc_swap::ArcSwap;
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
-use std::{ptr::NonNull, sync::Arc};
+use std::{fmt, ptr::NonNull};
 
 /// Function's micro-ops.
 pub struct Code {
-    inner: ArcSwap<Vec<MicroOp>>,
+    inner: Box<[MicroOp]>,
 }
 
 impl Code {
     /// Builds code from a vector of micro-ops.
     pub fn from_vec(ops: Vec<MicroOp>) -> Self {
         Self {
-            inner: ArcSwap::from_pointee(ops),
+            inner: ops.into_boxed_slice(),
         }
     }
 
-    /// Snapshot of the current micro-ops.
-    ///
-    /// TODO: decide on if using ArcSwap is good enough for perf and
-    ///   what is the best way to update code and any other relevant
-    ///   information in the function.
-    pub fn load(&self) -> arc_swap::Guard<Arc<Vec<MicroOp>>> {
-        self.inner.load()
-    }
-
-    /// Replaces the micro-ops atomically.
-    pub fn store(&self, ops: Vec<MicroOp>) {
-        self.inner.store(Arc::new(ops));
+    /// The function's micro-ops.
+    #[inline(always)]
+    pub fn get(&self) -> &[MicroOp] {
+        &self.inner
     }
 }
 
@@ -244,6 +235,39 @@ impl Function {
     /// Returns `None` if there is no entry for this exact code offset.
     pub fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
         self.safe_point_layouts.layout_at(pc)
+    }
+
+    /// The function's interned name.
+    pub fn name(&self) -> &str {
+        // SAFETY: any safe `&Function` borrow carries an upstream guarantee
+        // that `name`'s pointee remains valid for the borrow's lifetime.
+        unsafe { self.name.as_ref_unchecked() }
+    }
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "fun {}() {{", self.name())?;
+        writeln!(f, "  frame_data_size: {}", self.param_and_local_sizes_sum)?;
+        writeln!(f, "  code:")?;
+        let code = self.code.get();
+        for (i, op) in code.iter().enumerate() {
+            writeln!(f, "    {}: {}", i, op)?;
+        }
+        let entries = self.safe_point_layouts.entries();
+        if !entries.is_empty() {
+            writeln!(f, "  safe_point_layouts:")?;
+            for entry in entries {
+                let offsets: Vec<String> = entry
+                    .layout
+                    .heap_ptr_offsets
+                    .iter()
+                    .map(|o| o.0.to_string())
+                    .collect();
+                writeln!(f, "    {}: [{}]", entry.code_offset.0, offsets.join(", "))?;
+            }
+        }
+        writeln!(f, "}}")
     }
 }
 

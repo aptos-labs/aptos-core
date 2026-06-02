@@ -376,7 +376,7 @@ impl Verifier {
                 &self
                     .arc_db
                     .state_view_at_version(current_version.checked_sub(1))?,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
                 TransactionSliceMetadata::Chunk {
                     begin: *current_version,
                     end: *current_version + cur_txns.len() as u64,

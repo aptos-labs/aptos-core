@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "9.3.0"
+version = "9.4.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -12769,7 +12769,7 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arc-swap",
+ "bytes",
  "mono-move-alloc",
  "mono-move-gas",
  "move-binary-format",
@@ -12808,15 +12808,14 @@ name = "mono-move-loader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes",
  "mono-move-core",
  "mono-move-gas",
  "mono-move-global-context",
  "mono-move-testsuite",
- "move-binary-format",
  "move-core-types",
  "shared-dsa",
  "specializer",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -12858,7 +12857,10 @@ dependencies = [
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
+ "mono-move-loader",
  "move-core-types",
+ "num-bigint 0.3.3",
+ "paste",
  "proptest",
  "rand 0.7.3",
  "thiserror 1.0.69",
@@ -18427,6 +18429,7 @@ name = "specializer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "mono-move-core",
  "mono-move-gas",
  "move-binary-format",

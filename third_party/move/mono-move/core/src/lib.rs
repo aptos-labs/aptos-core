@@ -3,26 +3,25 @@
 
 pub mod align;
 mod error;
-mod execution_context;
 mod function;
 mod instruction;
 pub mod interner;
 mod object_descriptor;
 mod prepared_module;
+pub mod storage;
 pub mod types;
 
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
-pub use execution_context::{ExecutionContext, LocalExecutionContext};
 pub use function::{
     Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
 };
 pub use instruction::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, MicroOp, MicroOpGasSchedule, PackClosureOp, ShiftOperand,
-    SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntCastOp,
+    IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, MicroOpGasSchedule, PackClosureOp,
+    ShiftOperand, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_FUNC_REF_SIZE, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET,
     ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -35,5 +34,9 @@ pub use object_descriptor::{
 };
 pub use prepared_module::{
     FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
+};
+pub use storage::{
+    ModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
+    NO_RESOURCE_PROVIDER,
 };
 pub use types::{convert_mut_to_immut_ref, strip_ref};

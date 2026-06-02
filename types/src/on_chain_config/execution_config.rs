@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    block_executor::config::BlockExecutorConfigFromOnchain, on_chain_config::OnChainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    on_chain_config::{Features, OnChainConfig},
 };
 use anyhow::{format_err, Result};
 use serde::{Deserialize, Serialize};
@@ -89,12 +90,16 @@ impl OnChainExecutionConfig {
         }
     }
 
-    pub fn block_executor_onchain_config(&self) -> BlockExecutorConfigFromOnchain {
+    pub fn block_executor_onchain_config(
+        &self,
+        features: &Features,
+    ) -> BlockExecutorConfigFromOnchain {
         BlockExecutorConfigFromOnchain::new(
             self.block_gas_limit_type(),
             self.enable_per_block_gas_limit(),
             self.gas_price_to_burn(),
         )
+        .with_features(features)
     }
 
     /// The type of the transaction deduper being used.

@@ -107,7 +107,7 @@ module 0xbeef::very_nested_structure {
     struct W98 has copy, drop, store { id: W97 }
     struct W99 has copy, drop, store { id: W98 }
 
-    public struct NestedStructVector has key, drop, store {
+    struct NestedStructVector has key, drop, store {
         wraps: vector<W99>,
     }
 

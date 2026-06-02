@@ -39,6 +39,7 @@ pub fn native_fib(n: u64) -> u64 {
 ///   [40] callee: n / callee_result
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use crate::maybe_instrument;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
@@ -46,7 +47,7 @@ mod micro_op {
     };
     use mono_move_runtime::ObjectDescriptorTable;
 
-    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+    pub fn program(with_gas_metering: bool) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let n = 0u32;
         let result = n;
         let tmp = 8u32;
@@ -69,10 +70,10 @@ mod micro_op {
         #[rustfmt::skip]
         let code = vec![
             JumpNotZeroU64 { target: CO(3), src: FO(n) },
-            StoreImm8 { dst: FO(result), imm: 0 },
+            StoreImm8 { dst: FO(result), imm: 0u64.to_le_bytes() },
             Return,
             JumpGreaterEqualU64Imm { target: CO(6), src: FO(n), imm: 2 },
-            StoreImm8 { dst: FO(result), imm: 1 },
+            StoreImm8 { dst: FO(result), imm: 1u64.to_le_bytes() },
             Return,
             SubU64Imm { dst: FO(callee_n), src: FO(n), imm: 1 },
             CallDirect { ptr: fib_ptr },
@@ -83,7 +84,11 @@ mod micro_op {
             Return,
         ];
 
-        unsafe { fib_ptr.as_ref_unchecked() }.code.store(code);
+        // `fib` is recursive (`CallDirect { ptr: fib_ptr }` above), so the code
+        // can only be built once the pointer exists. Initialize it once here.
+        let code = maybe_instrument(code, with_gas_metering);
+        let mut p = fib_ptr.as_non_null();
+        unsafe { p.as_mut() }.code = Code::from_vec(code);
 
         (vec![fib_ptr], ObjectDescriptorTable::new())
     }

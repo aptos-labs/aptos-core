@@ -187,17 +187,19 @@ pub(crate) fn emit_parallel_copy(
                 .find(|&i| alive.get(i).expect("alive sized to n"))
                 .expect("remaining > 0 implies at least one alive copy");
             #[cfg(debug_assertions)]
-            let blocks_someone = (0..n).any(|k| {
-                k != chosen
-                    && alive.get(k).expect("alive sized to n")
-                    && blockers[k].get(chosen).expect("blockers sized to n")
-            });
-            debug_assert!(
-                blocks_someone,
-                "cycle-break would not make progress: chosen copy {} blocks no one (ill-formed input \
-                 with overlapping writes, or a non-cyclic dead-end alive copy)",
-                chosen,
-            );
+            {
+                let blocks_someone = (0..n).any(|k| {
+                    k != chosen
+                        && alive.get(k).expect("alive sized to n")
+                        && blockers[k].get(chosen).expect("blockers sized to n")
+                });
+                debug_assert!(
+                    blocks_someone,
+                    "cycle-break would not make progress: chosen copy {} blocks no one (ill-formed input \
+                     with overlapping writes, or a non-cyclic dead-end alive copy)",
+                    chosen,
+                );
+            }
             emit_one(out, Copy {
                 src: copies[chosen].src,
                 dst: scratch,
@@ -249,11 +251,10 @@ fn ranges_overlap(a_off: u32, a_w: u32, b_off: u32, b_w: u32) -> bool {
     a_off < b_off + b_w && b_off < a_off + a_w
 }
 
-/// Debug-only check: for every pair `(j_a, j_b)` with `j_a < j_b`,
-/// `copies[j_a].src` must not overlap `copies[j_b].dst`. Equivalently,
-/// "no low-j src is clobbered by a high-j dst" — exactly the property
-/// reverse-order emit needs.
-#[cfg(any(test, debug_assertions))]
+/// For every pair `(j_a, j_b)` with `j_a < j_b`, `copies[j_a].src`
+/// must not overlap `copies[j_b].dst`. Equivalently, "no low-j src
+/// is clobbered by a high-j dst" — the property reverse-order emit
+/// needs.
 pub(crate) fn reverse_emit_is_safe(copies: &[Copy]) -> bool {
     for j_a in 0..copies.len() {
         for j_b in (j_a + 1)..copies.len() {
@@ -261,6 +262,26 @@ pub(crate) fn reverse_emit_is_safe(copies: &[Copy]) -> bool {
                 copies[j_a].src.0,
                 copies[j_a].width,
                 copies[j_b].dst.0,
+                copies[j_b].width,
+            ) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// For every pair `(j_a, j_b)` with `j_a < j_b`, `copies[j_a].dst`
+/// must not overlap `copies[j_b].src`. Equivalently, "no high-j src
+/// is clobbered by a low-j dst" — the property forward-order emit
+/// needs.
+pub(crate) fn forward_emit_is_safe(copies: &[Copy]) -> bool {
+    for j_a in 0..copies.len() {
+        for j_b in (j_a + 1)..copies.len() {
+            if ranges_overlap(
+                copies[j_a].dst.0,
+                copies[j_a].width,
+                copies[j_b].src.0,
                 copies[j_b].width,
             ) {
                 return false;
@@ -333,6 +354,57 @@ mod tests {
     fn reverse_emit_varied_widths_disjoint_is_safe() {
         let copies = [Copy::from_raw(0, 32, 16), Copy::from_raw(16, 48, 8)];
         assert!(reverse_emit_is_safe(&copies));
+    }
+
+    // ----- forward_emit_is_safe -------------------------------------------
+
+    #[test]
+    fn forward_emit_empty_is_safe() {
+        assert!(forward_emit_is_safe(&[]));
+    }
+
+    #[test]
+    fn forward_emit_backward_chain_is_safe() {
+        // copies[0].dst (= 0) doesn't overlap copies[1].src (= 16). And
+        // copies[1].dst (= 8) doesn't matter for forward-order. So
+        // forward emit is safe.
+        let copies = [Copy::from_raw(8, 0, 8), Copy::from_raw(16, 8, 8)];
+        assert!(forward_emit_is_safe(&copies));
+    }
+
+    #[test]
+    fn forward_emit_cycle_is_unsafe() {
+        // 0 ↔ 8 swap: copies[0].dst (= 8) overlaps copies[1].src (= 8).
+        let copies = [Copy::from_raw(0, 8, 8), Copy::from_raw(8, 0, 8)];
+        assert!(!forward_emit_is_safe(&copies));
+    }
+
+    #[test]
+    fn forward_emit_forward_chain_is_unsafe() {
+        // copies[0].dst (= 8) overlaps copies[1].src (= 8). Emitting in
+        // forward order would clobber copies[1]'s source before it's read.
+        // This is the exact Pack/Unpack overlap hazard.
+        let copies = [Copy::from_raw(0, 8, 8), Copy::from_raw(8, 16, 8)];
+        assert!(!forward_emit_is_safe(&copies));
+    }
+
+    #[test]
+    fn forward_emit_pack_reorder_is_unsafe() {
+        // Pack into [32..48) from previous call's rets at [32..48), with
+        // fields reordered: field a (offset 0) := src@40, field b
+        // (offset 8) := src@32. copies[0].dst = 32 overlaps copies[1].src
+        // = 32. This is the corrupted-Pair scenario.
+        let copies = [Copy::from_raw(40, 32, 8), Copy::from_raw(32, 40, 8)];
+        assert!(!forward_emit_is_safe(&copies));
+    }
+
+    #[test]
+    fn forward_emit_identity_pack_is_safe() {
+        // Natural-order Pack: each field's src happens to equal its
+        // dst (the call ABI laid them out at the same offsets), so
+        // there are no overlapping rectangles between copies at all.
+        let copies = [Copy::from_raw(32, 32, 8), Copy::from_raw(40, 40, 8)];
+        assert!(forward_emit_is_safe(&copies));
     }
 
     // ----- emit_parallel_copy ---------------------------------------------

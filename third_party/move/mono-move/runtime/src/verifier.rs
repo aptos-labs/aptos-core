@@ -82,8 +82,7 @@ struct FunctionVerifier<'a, P: DescriptorProvider + ?Sized> {
 
 impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     fn verify(&mut self) {
-        let code_guard = self.func.code.load();
-        let code = code_guard.as_slice();
+        let code = self.func.code.get();
 
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_point_layouts = self.func.safe_point_layouts.entries();
@@ -233,6 +232,14 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, dst);
             },
 
+            MicroOp::StoreImm16 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+
+            MicroOp::StoreImm32 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 32);
+            },
+
             MicroOp::StoreRandomU64 { dst } => {
                 self.check_frame_access_8(pc, dst);
             },
@@ -362,6 +369,13 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 let size = op.ty.byte_width() as u32;
                 self.check_frame_access(Some(pc), op.src, size);
                 self.check_frame_access(Some(pc), op.dst, size);
+            },
+
+            MicroOp::IntCast(op) => {
+                // Note: the Move bytecode permits casting from one integer type to self, effectively a no-op.
+                // Therefore we must NOT ban it here.
+                self.check_frame_access(Some(pc), op.src, op.from.byte_width() as u32);
+                self.check_frame_access(Some(pc), op.dst, op.to.byte_width() as u32);
             },
 
             MicroOp::Move { dst, src, size } => {
@@ -545,6 +559,37 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), src, size);
             },
 
+            MicroOp::DeriveRefOffsetImm {
+                dst_ref, src_ref, ..
+            } => {
+                self.check_frame_access(Some(pc), src_ref, 16);
+                self.check_frame_access(Some(pc), dst_ref, 16);
+            },
+
+            MicroOp::ReadRefOffset {
+                dst,
+                ref_ptr,
+                offset,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), ref_ptr, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), dst, size);
+            },
+
+            MicroOp::WriteRefOffset {
+                ref_ptr,
+                offset,
+                src,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), ref_ptr, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), src, size);
+            },
+
             // ----- Heap object instructions -----
             MicroOp::HeapNew { dst, descriptor_id } => {
                 self.check_frame_access_8(pc, dst);
@@ -594,6 +639,25 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
             MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
+
+            MicroOp::Exists { addr, ty: _, dst } | MicroOp::MoveFrom { addr, ty: _, dst } => {
+                // Exists writes a bool (currently widened to 8 bytes); MoveFrom
+                // writes an 8-byte owned heap pointer.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access_8(pc, dst);
+            },
+            MicroOp::BorrowGlobal { addr, ty: _, dst }
+            | MicroOp::BorrowGlobalMut { addr, ty: _, dst } => {
+                // Both produce a reference, i.e. a 16-byte fat pointer.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+            MicroOp::MoveTo { addr, ty: _, src } => {
+                // TODO(correctness):
+                //   Move use signer reference, so we need 16 bytes if we no longer use address.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access_8(pc, src);
+            },
         }
     }
 
@@ -765,10 +829,8 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     // -----------------------------------------------------------------------
 
     fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
-        // SAFETY: The function name is allocated in an arena alive during verification.
-        let func_name = unsafe { self.func.name.as_ref_unchecked() }.to_string();
         self.errors.push(VerificationError {
-            func_name,
+            func_name: self.func.name().to_string(),
             pc,
             message: msg.into(),
         });
@@ -856,8 +918,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        // TODO: avoid reloading code.
-        let code_len = self.func.code.load().len();
+        let code_len = self.func.code.get().len();
         if (target.0 as usize) >= code_len {
             self.err(
                 Some(pc),
@@ -872,6 +933,17 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(Some(pc), "size must be > 0");
+        }
+    }
+
+    /// Requires `offset + size` to fit in `u32`, so the access window
+    /// `[offset, offset + size)` cannot wrap.
+    fn check_ref_offset_size_no_overflow(&mut self, pc: usize, offset: u32, size: u32) {
+        if offset.checked_add(size).is_none() {
+            self.err(
+                Some(pc),
+                format!("offset {} + size {} overflows u32", offset, size),
+            );
         }
     }
 }

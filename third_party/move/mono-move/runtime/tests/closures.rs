@@ -148,7 +148,10 @@ fn make_vector_map() -> Function {
                 local: vec,
             },
             // pc 1: i = 0
-            StoreImm8 { dst: i, imm: 0 },
+            StoreImm8 {
+                dst: i,
+                imm: 0u64.to_le_bytes(),
+            },
             // pc 2: LOOP_HEAD — if i >= n goto END (pc 9)
             JumpGreaterEqualU64 {
                 target: CO(9),
@@ -248,7 +251,7 @@ fn identity_no_captures() {
         code: Code::from_vec(vec![
             StoreImm8 {
                 dst: input,
-                imm: 42,
+                imm: 42u64.to_le_bytes(),
             },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
@@ -323,8 +326,14 @@ fn add_captured_a_provided_b() {
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
         code: Code::from_vec(vec![
-            StoreImm8 { dst: a, imm: 10 },
-            StoreImm8 { dst: b, imm: 32 },
+            StoreImm8 {
+                dst: a,
+                imm: 10u64.to_le_bytes(),
+            },
+            StoreImm8 {
+                dst: b,
+                imm: 32u64.to_le_bytes(),
+            },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
@@ -388,8 +397,14 @@ fn add_provided_a_captured_b() {
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
         code: Code::from_vec(vec![
-            StoreImm8 { dst: a, imm: 7 },
-            StoreImm8 { dst: b, imm: 35 },
+            StoreImm8 {
+                dst: a,
+                imm: 7u64.to_le_bytes(),
+            },
+            StoreImm8 {
+                dst: b,
+                imm: 35u64.to_le_bytes(),
+            },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
@@ -453,8 +468,14 @@ fn add_all_captured() {
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
         code: Code::from_vec(vec![
-            StoreImm8 { dst: a, imm: 15 },
-            StoreImm8 { dst: b, imm: 27 },
+            StoreImm8 {
+                dst: a,
+                imm: 15u64.to_le_bytes(),
+            },
+            StoreImm8 {
+                dst: b,
+                imm: 27u64.to_le_bytes(),
+            },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
@@ -557,21 +578,30 @@ fn vector_map_add_captured() {
                 local: vec,
             },
             // pc 2..7: push 2, 3, 4
-            StoreImm8 { dst: tmp, imm: 2 },
+            StoreImm8 {
+                dst: tmp,
+                imm: 2u64.to_le_bytes(),
+            },
             VecPushBack {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
                 descriptor_id: descs.desc_vec_u64,
             },
-            StoreImm8 { dst: tmp, imm: 3 },
+            StoreImm8 {
+                dst: tmp,
+                imm: 3u64.to_le_bytes(),
+            },
             VecPushBack {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
                 descriptor_id: descs.desc_vec_u64,
             },
-            StoreImm8 { dst: tmp, imm: 4 },
+            StoreImm8 {
+                dst: tmp,
+                imm: 4u64.to_le_bytes(),
+            },
             VecPushBack {
                 vec_ref,
                 elem: tmp,
@@ -580,7 +610,10 @@ fn vector_map_add_captured() {
             },
             // === Pack closure: `|x| x + y`, wrapping add_u64 with `b` captured ===
             // pc 8: y = 10
-            StoreImm8 { dst: y, imm: y_val },
+            StoreImm8 {
+                dst: y,
+                imm: y_val.to_le_bytes(),
+            },
             // pc 9: pack with mask=0b10 (capture position 1 = `b`)
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
@@ -601,7 +634,7 @@ fn vector_map_add_captured() {
             },
             StoreImm8 {
                 dst: FO(callee_arg0 + 16),
-                imm: n,
+                imm: n.to_le_bytes(),
             },
             // pc 13: call vector_map
             CallDirect {
@@ -611,10 +644,13 @@ fn vector_map_add_captured() {
             // pc 14: result = 0
             StoreImm8 {
                 dst: result,
-                imm: 0,
+                imm: 0u64.to_le_bytes(),
             },
             // pc 15: i = 0
-            StoreImm8 { dst: i, imm: 0 },
+            StoreImm8 {
+                dst: i,
+                imm: 0u64.to_le_bytes(),
+            },
             // pc 16: SUM_HEAD — if i >= n goto END (pc 21)
             JumpGreaterEqualU64Imm {
                 target: CO(21),

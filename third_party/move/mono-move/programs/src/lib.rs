@@ -8,6 +8,9 @@
 //! - **Micro-op** (feature `micro-op`) — program for the MonoMove interpreter
 //! - **Move bytecode** (feature `move-bytecode`) — for the current Move VM
 
+#[cfg(feature = "micro-op")]
+use mono_move_core::MicroOp;
+
 pub mod bst;
 pub mod fib;
 pub mod int_arith_loop;
@@ -16,6 +19,26 @@ pub mod merge_sort;
 pub mod nested_loop;
 #[cfg(feature = "testing")]
 pub mod testing;
+
+// ---------------------------------------------------------------------------
+// Gas instrumentation helper
+// ---------------------------------------------------------------------------
+
+/// Optionally rewrites micro-ops with gas charges. When `with_gas_metering`
+/// is true, runs the gas instrumentor against [`MicroOpGasSchedule`] before
+/// the code is stored in a function; otherwise returns the code unchanged.
+/// Used by the micro-op program builders to produce metered programs directly.
+#[cfg(feature = "micro-op")]
+pub(crate) fn maybe_instrument(code: Vec<MicroOp>, with_gas_metering: bool) -> Vec<MicroOp> {
+    use mono_move_core::MicroOpGasSchedule;
+    use mono_move_gas::GasInstrumentor;
+
+    if with_gas_metering {
+        GasInstrumentor::new(MicroOpGasSchedule).run(code)
+    } else {
+        code
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Move compilation helper

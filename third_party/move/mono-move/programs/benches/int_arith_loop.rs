@@ -19,9 +19,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-#[path = "helpers.rs"]
-mod helpers;
-
 /// Loop iterations per bench call. With 90 body ops per iter, this gives
 /// ~90k body ops per call — comfortably in the ms range even on the fast
 /// path, so per-call setup (arena alloc, context construction) is
@@ -53,7 +50,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
 
     // -- micro_op u64 (specialized fast path) ------------------------------
     {
-        let (functions, descriptors) = micro_op_u64_loop();
+        let (functions, descriptors) = micro_op_u64_loop(false);
         let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: use `criterion::Bencher::iter_custom` to start/stop the timer
         // around the run, so context construction is excluded from the
@@ -72,7 +69,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
 
     // -- micro_op i64 (unspecialized tag-dispatched) -----------------------
     {
-        let (functions, descriptors) = micro_op_i64_loop();
+        let (functions, descriptors) = micro_op_i64_loop(false);
         let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: use `criterion::Bencher::iter_custom` to start/stop the timer
         // around the run, so context construction is excluded from the
@@ -91,8 +88,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
 
     // -- micro_op u64 with gas instrumentation -----------------------------
     {
-        let (functions_gas, descriptors) = micro_op_u64_loop();
-        helpers::gas_instrument(&functions_gas);
+        let (functions_gas, descriptors) = micro_op_u64_loop(true);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
         group.bench_function("micro_op/u64/gas", |b| {
             b.iter(|| {
@@ -108,8 +104,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
 
     // -- micro_op i64 with gas instrumentation -----------------------------
     {
-        let (functions_gas, descriptors) = micro_op_i64_loop();
-        helpers::gas_instrument(&functions_gas);
+        let (functions_gas, descriptors) = micro_op_i64_loop(true);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
         group.bench_function("micro_op/i64/gas", |b| {
             b.iter(|| {

@@ -4,7 +4,7 @@
 //! Low-level memory utilities: aligned buffer and raw pointer helpers.
 
 use crate::VEC_DATA_OFFSET;
-use mono_move_core::MAX_ALIGN;
+use mono_move_core::{DescriptorId, MAX_ALIGN};
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
@@ -98,6 +98,49 @@ pub unsafe fn write_ptr(base: *mut u8, byte_offset: impl Into<usize>, ptr: *cons
     unsafe { (base.add(byte_offset.into()) as *mut *const u8).write(ptr) }
 }
 
+/// Byte offset of the scalar `offset` half within a 16-byte fat pointer; the
+/// `base` half occupies the first 8 bytes.
+const FAT_PTR_OFFSET_HALF: usize = 8;
+
+/// Read a 16-byte fat pointer `(base, offset)` whose base half starts at
+/// `byte_offset`.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid, aligned, and point to an initialized
+/// 16-byte fat pointer.
+#[inline(always)]
+pub unsafe fn read_fat_ptr(base: *const u8, byte_offset: impl Into<usize>) -> (*mut u8, u64) {
+    let byte_offset = byte_offset.into();
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe {
+        (
+            read_ptr(base, byte_offset),
+            read_u64(base, byte_offset + FAT_PTR_OFFSET_HALF),
+        )
+    }
+}
+
+/// Write a 16-byte fat pointer `(ptr, offset)` whose base half starts at
+/// `byte_offset`.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid, aligned, and writable for a 16-byte
+/// fat pointer.
+#[inline(always)]
+pub unsafe fn write_fat_ptr(
+    base: *mut u8,
+    byte_offset: impl Into<usize>,
+    ptr: *const u8,
+    offset: u64,
+) {
+    let byte_offset = byte_offset.into();
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe {
+        write_ptr(base, byte_offset, ptr);
+        write_u64(base, byte_offset + FAT_PTR_OFFSET_HALF, offset);
+    }
+}
+
 /// # Safety
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u32`.
 #[inline(always)]
@@ -175,15 +218,20 @@ pub(crate) unsafe fn read_obj_size(obj_ptr: *const u8) -> u32 {
     unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *const u32).read() }
 }
 
-/// Write the total object size (header + aligned payload) into the header.
+/// Write header fields (descriptor ID and size) for the object whose data
+/// region starts at the given pointer.
 ///
 /// # Safety
-/// `obj_ptr` must point to the data region of a writable heap object whose
-/// header lies at `obj_ptr - 8`.
+///
+/// Pointer points to the data region of a valid heap object with header start
+/// at [`HEADER_DESCRIPTOR_NEG_OFFSET`].
 #[inline(always)]
-pub(crate) unsafe fn write_obj_size(obj_ptr: *mut u8, size: u32) {
+pub unsafe fn write_object_header(obj_ptr: *mut u8, descriptor_id: DescriptorId, size: u32) {
     // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *mut u32).write(size) }
+    unsafe {
+        write_descriptor(obj_ptr, descriptor_id.as_u32());
+        (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *mut u32).write(size)
+    }
 }
 
 /// Read the forwarding pointer that the GC writes into a forwarded-from-space

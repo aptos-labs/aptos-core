@@ -3,11 +3,13 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
+use mono_move_core::types::EMPTY_TYPE_LIST;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
-use mono_move_runtime::{InterpreterContext, LocalRuntimeContext, RuntimeError};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_runtime::{
+    ExecutionContext, InterpreterContext, LocalRuntimeContext, RuntimeError, TransactionContext,
+};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -76,7 +78,11 @@ fn test_out_of_gas_during_load() {
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
     );
     // 1 gas unit — far below the byte-length cost of any real module.
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(1));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        SimpleGasMeter::new(1),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+    );
 
     let id = guard
         .intern_address_name(&AccountAddress::ONE, ident_str!("test"))
