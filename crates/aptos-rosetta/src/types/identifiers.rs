@@ -8,6 +8,7 @@
 use crate::{
     common::{to_hex_lower, BlockHash, BLOCKCHAIN},
     error::{ApiError, ApiResult},
+    types::Currency,
 };
 use aptos_types::{
     account_address::AccountAddress, chain_id::ChainId, transaction::TransactionInfo,
@@ -40,7 +41,9 @@ impl AccountIdentifier {
     pub fn pool_address(&self) -> ApiResult<Option<AccountAddress>> {
         if let Some(sub_account) = &self.sub_account {
             if let Some(metadata) = &sub_account.metadata {
-                return str_to_account_address(metadata.pool_address.as_str()).map(Some);
+                if let Some(pool_address) = metadata.pool_address.as_deref() {
+                    return str_to_account_address(pool_address).map(Some);
+                }
             }
         }
 
@@ -106,9 +109,29 @@ impl AccountIdentifier {
         }
     }
 
+    pub fn secondary_store_account(store_address: &AccountAddress, currency: &Currency) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(store_address),
+            sub_account: Some(SubAccountIdentifier::new_secondary_store(currency)),
+        }
+    }
+
     /// Returns true if the account doesn't have a sub account
     pub fn is_base_account(&self) -> bool {
         self.sub_account.is_none()
+    }
+
+    pub fn secondary_store_currency(&self) -> Option<&Currency> {
+        self.sub_account.as_ref().and_then(|sub_account| {
+            if sub_account.is_secondary_store() {
+                sub_account
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.currency.as_ref())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn is_total_stake(&self) -> bool {
@@ -241,6 +264,7 @@ const PENDING_INACTIVE_STAKE: &str = "pending_inactive_stake";
 const INACTIVE_STAKE: &str = "inactive_stake";
 const COMMISSION: &str = "commission";
 const REWARDS: &str = "rewards";
+const SECONDARY_STORE: &str = "secondary_store";
 const ACCOUNT_SEPARATOR: char = '-';
 
 impl SubAccountIdentifier {
@@ -336,6 +360,16 @@ impl SubAccountIdentifier {
         }
     }
 
+    pub fn new_secondary_store(currency: &Currency) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: SECONDARY_STORE.to_string(),
+            metadata: Some(SubAccountIdentifierMetadata {
+                pool_address: None,
+                currency: Some(currency.clone()),
+            }),
+        }
+    }
+
     pub fn is_total_stake(&self) -> bool {
         self.address.as_str() == STAKE
     }
@@ -376,6 +410,12 @@ impl SubAccountIdentifier {
         self.address.as_str() == PENDING_INACTIVE_STAKE && self.metadata.is_some()
     }
 
+    pub fn is_secondary_store(&self) -> bool {
+        self.address.as_str() == SECONDARY_STORE
+            && self.metadata.is_some()
+            && self.metadata.as_ref().unwrap().currency.is_some()
+    }
+
     pub fn operator_address(&self) -> ApiResult<AccountAddress> {
         let mut parts = self.address.split(ACCOUNT_SEPARATOR);
 
@@ -397,13 +437,18 @@ impl SubAccountIdentifier {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubAccountIdentifierMetadata {
     /// Hex encoded Pool beginning with 0x
-    pub pool_address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pool_address: Option<String>,
+    /// Store currency
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<Currency>,
 }
 
 impl SubAccountIdentifierMetadata {
     pub fn new_pool_address(pool_address: AccountAddress) -> Self {
         SubAccountIdentifierMetadata {
-            pool_address: to_hex_lower(&pool_address),
+            pool_address: Some(to_hex_lower(&pool_address)),
+            currency: None,
         }
     }
 }
