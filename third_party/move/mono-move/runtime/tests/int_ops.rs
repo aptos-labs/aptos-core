@@ -194,6 +194,7 @@ fn make_func(op: MicroOp) -> Function {
         name: GlobalArenaPtr::from_static("op"),
         module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![op, MicroOp::Return]),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: FRAME_SIZE as usize,

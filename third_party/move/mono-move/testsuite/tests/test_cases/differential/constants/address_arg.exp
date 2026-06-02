@@ -13,7 +13,7 @@ fun identity(r0): address {
 
 fun identity() {
   frame_data_size: 32
+  entry_gas: 198
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }

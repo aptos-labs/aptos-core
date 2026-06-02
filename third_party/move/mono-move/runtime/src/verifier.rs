@@ -434,16 +434,17 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), dst, size);
             },
 
-            MicroOp::Jump { target } => {
+            MicroOp::Jump { target, .. } => {
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpNotZeroU64 { target, src } => {
+            MicroOp::JumpNotZeroU64 { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpNotZeroByte { target, src } | MicroOp::JumpZeroByte { target, src } => {
+            MicroOp::JumpNotZeroByte { target, src, .. }
+            | MicroOp::JumpZeroByte { target, src, .. } => {
                 self.check_frame_access_1(pc, src);
                 self.check_jump(pc, target);
             },
@@ -471,45 +472,35 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_jump(pc, op.target);
             },
 
-            MicroOp::JumpGreaterEqualU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpGreaterEqualU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpLessU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpLessU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpGreaterU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpGreaterU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpLessEqualU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpLessEqualU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpLessU64 { target, lhs, rhs }
-            | MicroOp::JumpGreaterEqualU64 { target, lhs, rhs }
-            | MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpLessU64 {
+                target, lhs, rhs, ..
+            }
+            | MicroOp::JumpGreaterEqualU64 {
+                target, lhs, rhs, ..
+            }
+            | MicroOp::JumpNotEqualU64 {
+                target, lhs, rhs, ..
+            } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
                 self.check_jump(pc, target);
@@ -734,9 +725,6 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_nonzero_size(pc, size);
                 self.check_frame_access(Some(pc), src, size);
             },
-
-            // Inserted by the instrumentation pass; no frame accesses to verify.
-            MicroOp::Charge { .. } => {},
 
             MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
             MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
@@ -1080,6 +1068,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 
+    // TODO: validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.get().len();
         if (target.0 as usize) >= code_len {

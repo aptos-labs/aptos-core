@@ -109,45 +109,43 @@ fun neq(r0, r1, r2, r3): bool {
 
 fun cmp() {
   frame_data_size: 72
+  entry_gas: 103
   code:
-    0: Charge #14
-    1: Move8 [40] <- [8]
-    2: Move8 [32] <- [0]
-    3: Move8 [56] <- [24]
-    4: Move8 [48] <- [16]
-    5: JumpValueCmp @10 [32] != [48] : 0x1::test::Point
-    6: Charge #6
-    7: StoreImm8 [64] <- #10
-    8: Move8 [0] <- [64]
-    9: Return
-    10: Charge #6
-    11: StoreImm8 [64] <- #42
-    12: Move8 [0] <- [64]
-    13: Return
+    0: Move8 [40] <- [8]
+    1: Move8 [32] <- [0]
+    2: Move8 [56] <- [24]
+    3: Move8 [48] <- [16]
+    4: JumpValueCmp @8 [32] != [48] : 0x1::test::Point gas_taken=56 gas_fallthrough=56
+    5: StoreImm8 [64] <- #10
+    6: Move8 [0] <- [64]
+    7: Return
+    8: StoreImm8 [64] <- #42
+    9: Move8 [0] <- [64]
+    10: Return
 }
 
 fun eq() {
   frame_data_size: 72
+  entry_gas: 117
   code:
-    0: Charge #21
-    1: Move8 [40] <- [8]
-    2: Move8 [32] <- [0]
-    3: Move8 [56] <- [24]
-    4: Move8 [48] <- [16]
-    5: ValueCmp [64] <- [32] == [48] : 0x1::test::Point
-    6: Move(1) [0] <- [64]
-    7: Return
+    0: Move8 [40] <- [8]
+    1: Move8 [32] <- [0]
+    2: Move8 [56] <- [24]
+    3: Move8 [48] <- [16]
+    4: ValueCmp [64] <- [32] == [48] : 0x1::test::Point
+    5: Move(1) [0] <- [64]
+    6: Return
 }
 
 fun neq() {
   frame_data_size: 72
+  entry_gas: 117
   code:
-    0: Charge #21
-    1: Move8 [40] <- [8]
-    2: Move8 [32] <- [0]
-    3: Move8 [56] <- [24]
-    4: Move8 [48] <- [16]
-    5: ValueCmp [64] <- [32] != [48] : 0x1::test::Point
-    6: Move(1) [0] <- [64]
-    7: Return
+    0: Move8 [40] <- [8]
+    1: Move8 [32] <- [0]
+    2: Move8 [56] <- [24]
+    3: Move8 [48] <- [16]
+    4: ValueCmp [64] <- [32] != [48] : 0x1::test::Point
+    5: Move(1) [0] <- [64]
+    6: Return
 }

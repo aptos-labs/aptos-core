@@ -67,54 +67,54 @@ fun or_false(r0): bool {
 
 fun and_() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #9
-    1: BoolAnd [2] <- [0] & [1]
-    2: Move(1) [0] <- [2]
-    3: Return
+    0: BoolAnd [2] <- [0] & [1]
+    1: Move(1) [0] <- [2]
+    2: Return
 }
 
 fun or_() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #9
-    1: BoolOr [2] <- [0] | [1]
-    2: Move(1) [0] <- [2]
-    3: Return
+    0: BoolOr [2] <- [0] | [1]
+    1: Move(1) [0] <- [2]
+    2: Return
 }
 
 fun and_true() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: Move(1) [1] <- [0]
-    2: Move(1) [0] <- [1]
-    3: Return
+    0: Move(1) [1] <- [0]
+    1: Move(1) [0] <- [1]
+    2: Return
 }
 
 fun and_false() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #9
-    1: StoreImm1 [1] <- #0
-    2: Move(1) [0] <- [1]
-    3: Return
+    0: StoreImm1 [1] <- #0
+    1: Move(1) [0] <- [1]
+    2: Return
 }
 
 fun or_true() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #9
-    1: StoreImm1 [1] <- #1
-    2: Move(1) [0] <- [1]
-    3: Return
+    0: StoreImm1 [1] <- #1
+    1: Move(1) [0] <- [1]
+    2: Return
 }
 
 fun or_false() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: Move(1) [1] <- [0]
-    2: Move(1) [0] <- [1]
-    3: Return
+    0: Move(1) [1] <- [0]
+    1: Move(1) [0] <- [1]
+    2: Return
 }

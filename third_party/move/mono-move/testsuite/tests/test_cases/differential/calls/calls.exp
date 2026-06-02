@@ -22,17 +22,17 @@ fun caller(): u64 {
 
 fun identity() {
   frame_data_size: 8
+  entry_gas: 54
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 
 fun caller() {
   frame_data_size: 8
+  entry_gas: 92
   code:
-    0: Charge #16
-    1: StoreImm8 [32] <- #10
-    2: CallIndirect 0x66::test::identity
-    3: Move8 [0] <- [32]
-    4: Return
+    0: StoreImm8 [32] <- #10
+    1: CallIndirect 0x66::test::identity
+    2: Move8 [0] <- [32]
+    3: Return
 }

@@ -33,9 +33,9 @@ use mono_move_core::{
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
-    CallClosureOp, ClosureFuncRef, CmpKind, ConstantPoolIndex, DescriptorId, DescriptorProvider,
-    FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
+    DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
     CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
     CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
@@ -751,6 +751,26 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // ---------------------------------------------------------------------------
 
 impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'_, T> {
+    /// Shared body of the conditional `Jump*` micro-ops: charge the chosen
+    /// edge's cost, then jump to `target` or fall through to the next pc.
+    #[inline(always)]
+    fn cond_branch(
+        &mut self,
+        cond: bool,
+        target: CodeOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
+    ) -> RuntimeResult<StepResult> {
+        if cond {
+            self.exec_ctx.gas_meter().charge(gas_taken)?;
+            self.pc = target.into();
+        } else {
+            self.exec_ctx.gas_meter().charge(gas_fallthrough)?;
+            self.pc += 1;
+        }
+        Ok(StepResult::Continue)
+    }
+
     #[inline(always)]
     pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -811,44 +831,59 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     return self.exec_call_native(func, fp, native_idx, abi);
                 },
 
-                MicroOp::JumpNotZeroU64 { target, src } => {
-                    self.pc = if read_u64(fp, src) != 0 {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpNotZeroU64 {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) != 0,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpNotZeroByte { target, src } => {
+                MicroOp::JumpNotZeroByte {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
                     // Read as `u8` only to test against zero; the byte's sign is
                     // irrelevant.
-                    self.pc = if read_u8(fp, src) != 0 {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        read_u8(fp, src) != 0,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpZeroByte { target, src } => {
+                MicroOp::JumpZeroByte {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
                     // Read as `u8` only to test against zero; the byte's sign is
                     // irrelevant.
-                    self.pc = if read_u8(fp, src) == 0 {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        read_u8(fp, src) == 0,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
                 MicroOp::JumpIntCmp(ref op) => {
-                    self.pc = if int_cmp_bool(fp, op.lhs, op.op, &op.rhs) {
-                        op.target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        int_cmp_bool(fp, op.lhs, op.op, &op.rhs),
+                        op.target,
+                        op.gas_taken,
+                        op.gas_fallthrough,
+                    );
                 },
 
                 MicroOp::JumpValueCmp(ref op) => {
@@ -857,12 +892,12 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let a = fp.add(op.lhs.into());
                     let b = fp.add(op.rhs.into());
                     let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
-                    self.pc = if eq ^ op.negate {
-                        op.target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        eq ^ op.negate,
+                        op.target,
+                        op.gas_taken,
+                        op.gas_fallthrough,
+                    );
                 },
 
                 MicroOp::JumpValueRefCmp(ref op) => {
@@ -876,78 +911,121 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         rb.add(ro as usize),
                         op.ty,
                     )?;
-                    self.pc = if eq ^ op.negate {
-                        op.target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        eq ^ op.negate,
+                        op.target,
+                        op.gas_taken,
+                        op.gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) >= imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpGreaterEqualU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) >= imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpLessU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) < imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpLessU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) < imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpGreaterU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) > imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpGreaterU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) > imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) <= imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpLessEqualU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) <= imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpLessU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) < read_u64(fp, rhs) {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpLessU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, lhs) < read_u64(fp, rhs),
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) >= read_u64(fp, rhs) {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpGreaterEqualU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, lhs) >= read_u64(fp, rhs),
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) != read_u64(fp, rhs) {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpNotEqualU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, lhs) != read_u64(fp, rhs),
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::Jump { target } => {
+                MicroOp::Jump { target, gas } => {
+                    self.exec_ctx.gas_meter().charge(gas)?;
                     self.pc = target.into();
                     return Ok(StepResult::Continue);
                 },
@@ -1428,10 +1506,6 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     // are always allocated by HeapNew before being borrowed.
                     debug_assert!(!obj_ptr.is_null(), "HeapBorrow: null object pointer");
                     write_fat_ptr(fp, dst, obj_ptr, offset as u64);
-                },
-
-                MicroOp::Charge { cost } => {
-                    self.exec_ctx.gas_meter().charge(cost)?;
                 },
 
                 MicroOp::PackClosure(ref op) => {
@@ -2046,6 +2120,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         callee: &Function,
         new_fp: *mut u8,
     ) -> RuntimeResult<StepResult> {
+        // Charge the callee's entry block before any of its instructions run.
+        self.exec_ctx.gas_meter().charge(callee.entry_gas)?;
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
@@ -2149,6 +2225,9 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
     pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
+        // Charge the entry function's entry block before any of its instructions run.
+        let func = unsafe { self.current_func.as_ref() };
+        self.exec_ctx.gas_meter().charge(func.entry_gas)?;
         loop {
             match self.step()? {
                 StepResult::Continue => {},

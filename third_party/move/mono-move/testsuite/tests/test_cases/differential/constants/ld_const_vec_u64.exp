@@ -73,63 +73,63 @@ fun nums_modification(): u64 {
 
 fun nums_first() {
   frame_data_size: 48
+  entry_gas: 89
   code:
-    0: Charge #47
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: StoreImm8 [24] <- #0
-    4: VecBorrow [32] <- &[8][[24]] (elem_size=8)
-    5: ReadRef [24] <- *[32] (size=8)
-    6: Move8 [0] <- [24]
-    7: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: StoreImm8 [24] <- #0
+    3: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    4: ReadRef [24] <- *[32] (size=8)
+    5: Move8 [0] <- [24]
+    6: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun nums_last() {
   frame_data_size: 48
+  entry_gas: 89
   code:
-    0: Charge #47
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: StoreImm8 [24] <- #2
-    4: VecBorrow [32] <- &[8][[24]] (elem_size=8)
-    5: ReadRef [24] <- *[32] (size=8)
-    6: Move8 [0] <- [24]
-    7: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: StoreImm8 [24] <- #2
+    3: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    4: ReadRef [24] <- *[32] (size=8)
+    5: Move8 [0] <- [24]
+    6: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun nums_len() {
   frame_data_size: 32
+  entry_gas: 60
   code:
-    0: Charge #18
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: VecLen [24] <- vec_len([8])
-    4: Move8 [0] <- [24]
-    5: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: VecLen [24] <- vec_len([8])
+    3: Move8 [0] <- [24]
+    4: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun nums_modification() {
   frame_data_size: 80
+  entry_gas: 124
   code:
-    0: Charge #82
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [24] <- &[0]
-    3: StoreImm8 [40] <- #0
-    4: VecBorrow [8] <- &[24][[40]] (elem_size=8)
-    5: StoreImm8 [40] <- #400
-    6: WriteRef *[8] <- [40] (size=8)
-    7: SlotBorrow [48] <- &[0]
-    8: StoreImm8 [40] <- #0
-    9: VecBorrow [64] <- &[48][[40]] (elem_size=8)
-    10: ReadRef [40] <- *[64] (size=8)
-    11: Move8 [0] <- [40]
-    12: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [24] <- &[0]
+    2: StoreImm8 [40] <- #0
+    3: VecBorrow [8] <- &[24][[40]] (elem_size=8)
+    4: StoreImm8 [40] <- #400
+    5: WriteRef *[8] <- [40] (size=8)
+    6: SlotBorrow [48] <- &[0]
+    7: StoreImm8 [40] <- #0
+    8: VecBorrow [64] <- &[48][[40]] (elem_size=8)
+    9: ReadRef [40] <- *[64] (size=8)
+    10: Move8 [0] <- [40]
+    11: Return
   safe_point_layouts:
-    1: []
+    0: []
 }

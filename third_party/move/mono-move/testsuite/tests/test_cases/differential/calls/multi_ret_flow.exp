@@ -84,42 +84,42 @@ fun two_rets(): u64 * u64 {
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 126
   code:
-    0: Charge #24
-    1: CallIndirect 0xc0ffee::multi_ret_flow::two_rets
-    2: CallIndirect 0xc0ffee::multi_ret_flow::two_args
-    3: Move8 [0] <- [32]
-    4: Return
+    0: CallIndirect 0xc0ffee::multi_ret_flow::two_rets
+    1: CallIndirect 0xc0ffee::multi_ret_flow::two_args
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun trigger_swap() {
   frame_data_size: 16
+  entry_gas: 178
   code:
-    0: Charge #32
-    1: CallIndirect 0xc0ffee::multi_ret_flow::two_rets
-    2: Move8 [8] <- [40]
-    3: Move8 [0] <- [48]
-    4: Move8 [48] <- [8]
-    5: Move8 [40] <- [0]
-    6: CallIndirect 0xc0ffee::multi_ret_flow::two_args
-    7: Move8 [0] <- [40]
-    8: Return
+    0: CallIndirect 0xc0ffee::multi_ret_flow::two_rets
+    1: Move8 [8] <- [40]
+    2: Move8 [0] <- [48]
+    3: Move8 [48] <- [8]
+    4: Move8 [40] <- [0]
+    5: CallIndirect 0xc0ffee::multi_ret_flow::two_args
+    6: Move8 [0] <- [40]
+    7: Return
 }
 
 fun two_args() {
   frame_data_size: 24
+  entry_gas: 59
   code:
-    0: Charge #7
-    1: AddU64 [16] <- [0] + [8]
-    2: Move8 [0] <- [16]
-    3: Return
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
 }
 
 fun two_rets() {
   frame_data_size: 24
+  entry_gas: 110
   code:
-    0: Charge #6
-    1: StoreImm8 [0] <- #10
-    2: StoreImm8 [8] <- #20
-    3: Return
+    0: StoreImm8 [0] <- #10
+    1: StoreImm8 [8] <- #20
+    2: Return
 }

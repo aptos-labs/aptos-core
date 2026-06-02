@@ -63,7 +63,7 @@ pub trait ExecutionContext {
 
 /// A [`ExecutionContext`] that supports only local execution within a
 /// single executable: `load_function` always errors. Carries a real gas
-/// meter so the interpreter can charge `MicroOp::Charge` costs.
+/// meter so the interpreter can charge per-block costs.
 ///
 /// Intended for tests and benches that don't exercise cross-module dispatch.
 ///

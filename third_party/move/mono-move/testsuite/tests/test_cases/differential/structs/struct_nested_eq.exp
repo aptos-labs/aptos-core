@@ -292,146 +292,146 @@ fun pts_neq(r0, r1, r2, r3, r4, r5, r6, r7): bool {
 
 fun bag_eq() {
   frame_data_size: 72
+  entry_gas: 243
   code:
-    0: Charge #95
-    1: Move8 [112] <- [16]
-    2: Move8 [104] <- [8]
-    3: Move8 [96] <- [0]
-    4: CallIndirect 0x1::test::mk_bag
-    5: Move(16) [48] <- [96]
-    6: Move8 [112] <- [40]
-    7: Move8 [104] <- [32]
-    8: Move8 [96] <- [24]
-    9: CallIndirect 0x1::test::mk_bag
-    10: ValueCmp [64] <- [48] == [96] : 0x1::test::Bag
-    11: Move(1) [0] <- [64]
-    12: Return
+    0: Move8 [112] <- [16]
+    1: Move8 [104] <- [8]
+    2: Move8 [96] <- [0]
+    3: CallIndirect 0x1::test::mk_bag
+    4: Move(16) [48] <- [96]
+    5: Move8 [112] <- [40]
+    6: Move8 [104] <- [32]
+    7: Move8 [96] <- [24]
+    8: CallIndirect 0x1::test::mk_bag
+    9: ValueCmp [64] <- [48] == [96] : 0x1::test::Bag
+    10: Move(1) [0] <- [64]
+    11: Return
 }
 
 fun bag_eq_len() {
   frame_data_size: 64
+  entry_gas: 217
   code:
-    0: Charge #93
-    1: Move8 [96] <- [8]
-    2: Move8 [88] <- [0]
-    3: CallIndirect 0x1::test::mk_bag1
-    4: Move(16) [40] <- [88]
-    5: Move8 [104] <- [32]
-    6: Move8 [96] <- [24]
-    7: Move8 [88] <- [16]
-    8: CallIndirect 0x1::test::mk_bag
-    9: ValueCmp [56] <- [40] == [88] : 0x1::test::Bag
-    10: Move(1) [0] <- [56]
-    11: Return
+    0: Move8 [96] <- [8]
+    1: Move8 [88] <- [0]
+    2: CallIndirect 0x1::test::mk_bag1
+    3: Move(16) [40] <- [88]
+    4: Move8 [104] <- [32]
+    5: Move8 [96] <- [24]
+    6: Move8 [88] <- [16]
+    7: CallIndirect 0x1::test::mk_bag
+    8: ValueCmp [56] <- [40] == [88] : 0x1::test::Bag
+    9: Move(1) [0] <- [56]
+    10: Return
 }
 
 fun bag_neq() {
   frame_data_size: 72
+  entry_gas: 243
   code:
-    0: Charge #95
-    1: Move8 [112] <- [16]
-    2: Move8 [104] <- [8]
-    3: Move8 [96] <- [0]
-    4: CallIndirect 0x1::test::mk_bag
-    5: Move(16) [48] <- [96]
-    6: Move8 [112] <- [40]
-    7: Move8 [104] <- [32]
-    8: Move8 [96] <- [24]
-    9: CallIndirect 0x1::test::mk_bag
-    10: ValueCmp [64] <- [48] != [96] : 0x1::test::Bag
-    11: Move(1) [0] <- [64]
-    12: Return
+    0: Move8 [112] <- [16]
+    1: Move8 [104] <- [8]
+    2: Move8 [96] <- [0]
+    3: CallIndirect 0x1::test::mk_bag
+    4: Move(16) [48] <- [96]
+    5: Move8 [112] <- [40]
+    6: Move8 [104] <- [32]
+    7: Move8 [96] <- [24]
+    8: CallIndirect 0x1::test::mk_bag
+    9: ValueCmp [64] <- [48] != [96] : 0x1::test::Bag
+    10: Move(1) [0] <- [64]
+    11: Return
 }
 
 fun mk_bag() {
   frame_data_size: 64
+  entry_gas: 222
   code:
-    0: Charge #126
-    1: VecNew [24]
-    2: SlotBorrow [32] <- &[24]
-    3: VecPushBack [32].push([8], size=8, desc=2)
-    4: SlotBorrow [32] <- &[24]
-    5: VecPushBack [32].push([16], size=8, desc=2)
-    6: Move8 [56] <- [24]
-    7: Move8 [48] <- [0]
-    8: Move(16) [0] <- [48]
-    9: Return
+    0: VecNew [24]
+    1: SlotBorrow [32] <- &[24]
+    2: VecPushBack [32].push([8], size=8, desc=2)
+    3: SlotBorrow [32] <- &[24]
+    4: VecPushBack [32].push([16], size=8, desc=2)
+    5: Move8 [56] <- [24]
+    6: Move8 [48] <- [0]
+    7: Move(16) [0] <- [48]
+    8: Return
   safe_point_layouts:
-    3: []
-    5: []
+    2: []
+    4: []
 }
 
 fun mk_bag1() {
   frame_data_size: 56
+  entry_gas: 192
   code:
-    0: Charge #96
-    1: VecNew [16]
-    2: SlotBorrow [24] <- &[16]
-    3: VecPushBack [24].push([8], size=8, desc=2)
-    4: Move8 [48] <- [16]
-    5: Move8 [40] <- [0]
-    6: Move(16) [0] <- [40]
-    7: Return
+    0: VecNew [16]
+    1: SlotBorrow [24] <- &[16]
+    2: VecPushBack [24].push([8], size=8, desc=2)
+    3: Move8 [48] <- [16]
+    4: Move8 [40] <- [0]
+    5: Move(16) [0] <- [40]
+    6: Return
   safe_point_layouts:
-    3: []
+    2: []
 }
 
 fun mk_points() {
   frame_data_size: 72
+  entry_gas: 272
   code:
-    0: Charge #130
-    1: VecNew [32]
-    2: SlotBorrow [40] <- &[32]
-    3: Move8 [64] <- [8]
-    4: Move8 [56] <- [0]
-    5: VecPushBack [40].push([56], size=16, desc=3)
-    6: SlotBorrow [40] <- &[32]
-    7: Move8 [64] <- [24]
-    8: Move8 [56] <- [16]
-    9: VecPushBack [40].push([56], size=16, desc=3)
-    10: Move8 [0] <- [32]
-    11: Return
+    0: VecNew [32]
+    1: SlotBorrow [40] <- &[32]
+    2: Move8 [64] <- [8]
+    3: Move8 [56] <- [0]
+    4: VecPushBack [40].push([56], size=16, desc=3)
+    5: SlotBorrow [40] <- &[32]
+    6: Move8 [64] <- [24]
+    7: Move8 [56] <- [16]
+    8: VecPushBack [40].push([56], size=16, desc=3)
+    9: Move8 [0] <- [32]
+    10: Return
   safe_point_layouts:
-    5: []
-    9: []
+    4: []
+    8: []
 }
 
 fun pts_eq() {
   frame_data_size: 80
+  entry_gas: 271
   code:
-    0: Charge #51
-    1: Move8 [128] <- [24]
-    2: Move8 [120] <- [16]
-    3: Move8 [112] <- [8]
-    4: Move8 [104] <- [0]
-    5: CallIndirect 0x1::test::mk_points
-    6: Move8 [64] <- [104]
-    7: Move8 [128] <- [56]
-    8: Move8 [120] <- [48]
-    9: Move8 [112] <- [40]
-    10: Move8 [104] <- [32]
-    11: CallIndirect 0x1::test::mk_points
-    12: ValueCmp [72] <- [64] == [104] : vector<0x1::test::Point>
-    13: Move(1) [0] <- [72]
-    14: Return
+    0: Move8 [128] <- [24]
+    1: Move8 [120] <- [16]
+    2: Move8 [112] <- [8]
+    3: Move8 [104] <- [0]
+    4: CallIndirect 0x1::test::mk_points
+    5: Move8 [64] <- [104]
+    6: Move8 [128] <- [56]
+    7: Move8 [120] <- [48]
+    8: Move8 [112] <- [40]
+    9: Move8 [104] <- [32]
+    10: CallIndirect 0x1::test::mk_points
+    11: ValueCmp [72] <- [64] == [104] : vector<0x1::test::Point>
+    12: Move(1) [0] <- [72]
+    13: Return
 }
 
 fun pts_neq() {
   frame_data_size: 80
+  entry_gas: 271
   code:
-    0: Charge #51
-    1: Move8 [128] <- [24]
-    2: Move8 [120] <- [16]
-    3: Move8 [112] <- [8]
-    4: Move8 [104] <- [0]
-    5: CallIndirect 0x1::test::mk_points
-    6: Move8 [64] <- [104]
-    7: Move8 [128] <- [56]
-    8: Move8 [120] <- [48]
-    9: Move8 [112] <- [40]
-    10: Move8 [104] <- [32]
-    11: CallIndirect 0x1::test::mk_points
-    12: ValueCmp [72] <- [64] != [104] : vector<0x1::test::Point>
-    13: Move(1) [0] <- [72]
-    14: Return
+    0: Move8 [128] <- [24]
+    1: Move8 [120] <- [16]
+    2: Move8 [112] <- [8]
+    3: Move8 [104] <- [0]
+    4: CallIndirect 0x1::test::mk_points
+    5: Move8 [64] <- [104]
+    6: Move8 [128] <- [56]
+    7: Move8 [120] <- [48]
+    8: Move8 [112] <- [40]
+    9: Move8 [104] <- [32]
+    10: CallIndirect 0x1::test::mk_points
+    11: ValueCmp [72] <- [64] != [104] : vector<0x1::test::Point>
+    12: Move(1) [0] <- [72]
+    13: Return
 }

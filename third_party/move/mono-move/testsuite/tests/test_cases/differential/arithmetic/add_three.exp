@@ -31,10 +31,10 @@ fun add_three(r0, r1, r2): u64 {
 
 fun add_three() {
   frame_data_size: 32
+  entry_gas: 64
   code:
-    0: Charge #10
-    1: AddU64 [24] <- [0] + [8]
-    2: AddU64 [24] <- [24] + [16]
-    3: Move8 [0] <- [24]
-    4: Return
+    0: AddU64 [24] <- [0] + [8]
+    1: AddU64 [24] <- [24] + [16]
+    2: Move8 [0] <- [24]
+    3: Return
 }

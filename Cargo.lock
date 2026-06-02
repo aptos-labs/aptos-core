@@ -18446,7 +18446,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "mono-move-core",
- "mono-move-gas",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
