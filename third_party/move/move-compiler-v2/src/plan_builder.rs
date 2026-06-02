@@ -40,6 +40,10 @@ struct TestRow<'a> {
     expected_failure_attr: Option<&'a Attribute>,
 }
 
+fn expected_failure_fingerprint(expected_failure: &Option<ExpectedFailure>) -> String {
+    format!("{expected_failure:?}")
+}
+
 // Constructs a test plan for each module in `env.target`. This also validates the structure of the
 // attributes as the test plan is constructed.
 pub fn construct_test_plan(
@@ -182,6 +186,26 @@ fn build_test_info(
             },
         ));
     }
+
+    if row_count > 1 && function.get_parameters_ref().is_empty() {
+        let distinct_expected_failures = out
+            .iter()
+            .map(|(_, test_case)| expected_failure_fingerprint(&test_case.expected_failure))
+            .collect::<std::collections::BTreeSet<_>>();
+        if distinct_expected_failures.len() < out.len() {
+            let loc = env.get_node_loc(test_attrs[0].node_id());
+            env.error_with_labels(
+                &fn_id_loc,
+                "Redundant parametric rows on a zero-argument function",
+                vec![(
+                    loc,
+                    "At least one row must carry a differentiating expected_failure".to_string(),
+                )],
+            );
+            return Vec::new();
+        }
+    }
+
     out
 }
 
