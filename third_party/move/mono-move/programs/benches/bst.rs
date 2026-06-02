@@ -3,9 +3,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-#[path = "helpers.rs"]
-mod helpers;
-
 const N_OPS: u64 = 5000;
 const KEY_RANGE: u64 = 2500;
 const SEED: u64 = 42;
@@ -31,7 +28,7 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors) = micro_op_bst();
+        let (functions, descriptors) = micro_op_bst(false);
         let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
@@ -48,8 +45,7 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions_gas, descriptors_gas) = micro_op_bst();
-        helpers::gas_instrument(&functions_gas);
+        let (functions_gas, descriptors_gas) = micro_op_bst(true);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {

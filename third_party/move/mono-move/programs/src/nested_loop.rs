@@ -59,6 +59,7 @@ pub fn native_nested_loop(n: u64) -> u64 {
 ///   [32] tmp
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use crate::maybe_instrument;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
@@ -66,7 +67,7 @@ mod micro_op {
     };
     use mono_move_runtime::ObjectDescriptorTable;
 
-    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+    pub fn program(with_gas_metering: bool) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let n = 0u32;
         let sum = 8u32;
         let i = 16u32;
@@ -102,7 +103,7 @@ mod micro_op {
 
         let func_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("nested_loop"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 8,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,

@@ -12766,7 +12766,6 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arc-swap",
  "bytes",
  "mono-move-alloc",
  "mono-move-gas",

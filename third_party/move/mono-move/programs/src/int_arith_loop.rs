@@ -91,6 +91,7 @@ pub fn native_i64_loop(iters: u64) -> i64 {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use super::{ADD, MOD, MUL, ROUNDS_PER_ITER};
+    use crate::maybe_instrument;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
@@ -111,6 +112,7 @@ mod micro_op {
     /// specialized variants or the unspecialized `IntBinaryImm` form.
     fn build(
         name: &'static str,
+        with_gas_metering: bool,
         mut body_round: impl FnMut(&mut Vec<MicroOp>),
     ) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let mut code: Vec<MicroOp> = Vec::with_capacity(8 + ROUNDS_PER_ITER * 3);
@@ -153,7 +155,7 @@ mod micro_op {
 
         let func_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static(name),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 8,
             param_and_local_sizes_sum: PARAM_AND_LOCAL_SIZES_SUM as usize,
@@ -167,8 +169,8 @@ mod micro_op {
     }
 
     /// u64 flavor — each round emits the specialized fast-path variants.
-    pub fn program_u64() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
-        build("int_arith_loop_u64", |code| {
+    pub fn program_u64(with_gas_metering: bool) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+        build("int_arith_loop_u64", with_gas_metering, |code| {
             code.push(MulU64Imm {
                 dst: FO(ACC),
                 src: FO(ACC),
@@ -189,8 +191,8 @@ mod micro_op {
 
     /// i64 flavor — each round emits the unspecialized per-kind form. Body
     /// op count and frame layout are identical to the u64 flavor.
-    pub fn program_i64() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
-        build("int_arith_loop_i64", |code| {
+    pub fn program_i64(with_gas_metering: bool) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+        build("int_arith_loop_i64", with_gas_metering, |code| {
             code.push(IntMul(IntBinaryOp {
                 dst: FO(ACC),
                 lhs: FO(ACC),

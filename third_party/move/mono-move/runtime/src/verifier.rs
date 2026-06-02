@@ -82,8 +82,7 @@ struct FunctionVerifier<'a, P: DescriptorProvider + ?Sized> {
 
 impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     fn verify(&mut self) {
-        let code_guard = self.func.code.load();
-        let code = code_guard.as_slice();
+        let code = self.func.code.get();
 
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_point_layouts = self.func.safe_point_layouts.entries();
@@ -919,8 +918,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        // TODO: avoid reloading code.
-        let code_len = self.func.code.load().len();
+        let code_len = self.func.code.get().len();
         if (target.0 as usize) >= code_len {
             self.err(
                 Some(pc),

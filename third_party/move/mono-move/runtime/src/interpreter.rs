@@ -735,12 +735,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         // executing a call instruction, which stores a valid pointer.
         let func = unsafe { self.current_func.as_ref() };
 
-        // TODO:
-        //  1. Hoist this out and see effects on performance
-        //  2. See if swapping code does not need to be seen by same txn, and
-        //     only its future re-executions see new code.
-        let code_guard = func.code.load();
-        let code = code_guard.as_slice();
+        let code = func.code.get();
 
         if self.pc >= code.len() {
             invariant_violation!(PcOutOfBounds {
