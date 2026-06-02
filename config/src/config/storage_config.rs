@@ -712,6 +712,12 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
+            if (chain_id.is_mainnet() || chain_id.is_testnet())
+                && config_yaml["hot_state_config"]["delete_on_restart"].as_bool() != Some(true)
+            {
+                config.hot_state_config.delete_on_restart = false;
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)
