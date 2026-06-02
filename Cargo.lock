@@ -12766,7 +12766,6 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arc-swap",
  "bytes",
  "mono-move-alloc",
  "mono-move-gas",
@@ -12857,6 +12856,8 @@ dependencies = [
  "mono-move-gas",
  "mono-move-loader",
  "move-core-types",
+ "num-bigint 0.3.3",
+ "paste",
  "proptest",
  "rand 0.7.3",
  "thiserror 1.0.69",

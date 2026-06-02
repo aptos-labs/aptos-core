@@ -265,6 +265,7 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 /// in sequence on the same heap.
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use crate::maybe_instrument;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
@@ -286,7 +287,7 @@ mod micro_op {
     pub const FN_GET: usize = 2;
     pub const FN_REMOVE: usize = 4;
 
-    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+    pub fn program(with_gas_metering: bool) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let mut descriptors = ObjectDescriptorTable::new();
         // BstMap { nodes, free_list, root }: nodes and free_list are heap pointers.
         let desc_bst_map = descriptors.push(ObjectDescriptor::new_struct(24, vec![0, 8]).unwrap());
@@ -296,14 +297,23 @@ mod micro_op {
         // Free-list vector: 8-byte trivial elements.
         let desc_free_list_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
-        let new_ptr = FunctionPtr::new(Box::new(make_new(desc_bst_map)));
-        let get_ptr = FunctionPtr::new(Box::new(make_get()));
-        let alloc_node_ptr = FunctionPtr::new(Box::new(make_alloc_node(desc_nodes_vec)));
-        let remove_node_ptr = FunctionPtr::new(Box::new(make_remove_node(desc_free_list_vec)));
-        let insert_ptr = FunctionPtr::new(Box::new(make_insert(alloc_node_ptr)));
-        let remove_ptr = FunctionPtr::new(Box::new(make_remove(remove_node_ptr)));
+        let new_ptr = FunctionPtr::new(Box::new(make_new(desc_bst_map, with_gas_metering)));
+        let get_ptr = FunctionPtr::new(Box::new(make_get(with_gas_metering)));
+        let alloc_node_ptr =
+            FunctionPtr::new(Box::new(make_alloc_node(desc_nodes_vec, with_gas_metering)));
+        let remove_node_ptr = FunctionPtr::new(Box::new(make_remove_node(
+            desc_free_list_vec,
+            with_gas_metering,
+        )));
+        let insert_ptr = FunctionPtr::new(Box::new(make_insert(alloc_node_ptr, with_gas_metering)));
+        let remove_ptr =
+            FunctionPtr::new(Box::new(make_remove(remove_node_ptr, with_gas_metering)));
         let run_ops_ptr = FunctionPtr::new(Box::new(make_run_ops(
-            new_ptr, insert_ptr, get_ptr, remove_ptr,
+            new_ptr,
+            insert_ptr,
+            get_ptr,
+            remove_ptr,
+            with_gas_metering,
         )));
 
         (
@@ -329,7 +339,7 @@ mod micro_op {
     // Frame layout:
     //   [0] result: bst_ref   [8] nodes (temp)   [16] free_list (temp)
     // =================================================================
-    fn make_new(desc_bst_map: DescriptorId) -> Function {
+    fn make_new(desc_bst_map: DescriptorId, with_gas_metering: bool) -> Function {
         let bst = 0u32;
         let nodes = 8u32;
         let free_list = 16u32;
@@ -348,7 +358,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("new"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 0,
             param_and_local_sizes_sum: 24,
@@ -368,7 +378,7 @@ mod micro_op {
     //   [48] root   [56] idx
     //   [64] node (32B: key[64] val[72] left[80] right[88])
     // =================================================================
-    fn make_get() -> Function {
+    fn make_get(with_gas_metering: bool) -> Function {
         let bst = 0u32;
         let key = 8u32;
         let bst_ref = 16u32;
@@ -413,7 +423,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("get"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 16,
             param_and_local_sizes_sum: 96,
@@ -438,7 +448,7 @@ mod micro_op {
     //   [104] metadata (24B)
     //   [128] callee: bst  [136] callee: key  [144] callee: value
     // =================================================================
-    fn make_insert(alloc_node_ptr: FunctionPtr) -> Function {
+    fn make_insert(alloc_node_ptr: FunctionPtr, with_gas_metering: bool) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
@@ -523,7 +533,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("insert"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 24,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
@@ -549,7 +559,7 @@ mod micro_op {
     //   [72] idx   [80] fl_len
     //   [88] new_node (32B: key[88] val[96] left[104] right[112])
     // =================================================================
-    fn make_alloc_node(desc_nodes_vec: DescriptorId) -> Function {
+    fn make_alloc_node(desc_nodes_vec: DescriptorId, with_gas_metering: bool) -> Function {
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
@@ -596,7 +606,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("alloc_node"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 24,
             param_and_local_sizes_sum: 120,
@@ -626,7 +636,7 @@ mod micro_op {
     //   [104] metadata (24B)
     //   [128] callee: bst / result  [136] callee: idx
     // =================================================================
-    fn make_remove(remove_node_ptr: FunctionPtr) -> Function {
+    fn make_remove(remove_node_ptr: FunctionPtr, with_gas_metering: bool) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
@@ -698,7 +708,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("remove"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 16,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
@@ -725,7 +735,7 @@ mod micro_op {
     //   [80] parent   [88] cur   [96] cur_right
     //   [104] scratch (32B: key[104] val[112] left[120] right[128])
     // =================================================================
-    fn make_remove_node(desc_free_list_vec: DescriptorId) -> Function {
+    fn make_remove_node(desc_free_list_vec: DescriptorId, with_gas_metering: bool) -> Function {
         let bst = 0u32;
         let idx = 8u32;
         let bst_ref = 16u32;
@@ -805,7 +815,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("remove_node"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 16,
             param_and_local_sizes_sum: 136,
@@ -841,6 +851,7 @@ mod micro_op {
         insert_ptr: FunctionPtr,
         get_ptr: FunctionPtr,
         remove_ptr: FunctionPtr,
+        with_gas_metering: bool,
     ) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let ops = 0u32;
@@ -907,7 +918,7 @@ mod micro_op {
 
         Function {
             name: GlobalArenaPtr::from_static("run_ops"),
-            code: Code::from_vec(code),
+            code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
             param_sizes: vec![],
             param_sizes_sum: 8,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,

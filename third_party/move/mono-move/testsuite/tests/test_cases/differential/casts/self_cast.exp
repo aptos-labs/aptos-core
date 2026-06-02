@@ -1,0 +1,11 @@
+=== micro-ops ===
+// module 0x66::test
+
+fun self_cast() {
+  frame_data_size: 16
+  code:
+    0: Charge #9
+    1: IntCast.u64->u64 [8] <- [0]
+    2: Move8 [0] <- [8]
+    3: Return
+}

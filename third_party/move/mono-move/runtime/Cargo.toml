@@ -23,4 +23,6 @@ rand = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+num-bigint = { workspace = true }
+paste = { workspace = true }
 proptest = { workspace = true }

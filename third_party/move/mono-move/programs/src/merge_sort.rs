@@ -61,6 +61,7 @@ pub fn native_merge_sort(v: &mut [u64]) {
 /// and pseudocode.
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use crate::maybe_instrument;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
@@ -69,7 +70,7 @@ mod micro_op {
     use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
     #[rustfmt::skip]
-    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+    pub fn program(with_gas_metering: bool) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let meta = FRAME_METADATA_SIZE as u32;
 
         let mut descriptors = ObjectDescriptorTable::new();
@@ -301,13 +302,15 @@ mod micro_op {
             ]
         };
 
-        unsafe { merge_sort_ptr.as_ref_unchecked() }
-            .code
-            .store(merge_sort_code);
-        unsafe { merge_sort_range_ptr.as_ref_unchecked() }
-            .code
-            .store(merge_sort_range_code);
-        unsafe { merge_ptr.as_ref_unchecked() }.code.store(merge_code);
+        // These functions are mutually recursive, so each one's code can only
+        // be built once all three pointers exist. Initialize them once here.
+        let mut p = merge_sort_ptr.as_non_null();
+        unsafe { p.as_mut() }.code = Code::from_vec(maybe_instrument(merge_sort_code, with_gas_metering));
+        let mut p = merge_sort_range_ptr.as_non_null();
+        unsafe { p.as_mut() }.code =
+            Code::from_vec(maybe_instrument(merge_sort_range_code, with_gas_metering));
+        let mut p = merge_ptr.as_non_null();
+        unsafe { p.as_mut() }.code = Code::from_vec(maybe_instrument(merge_code, with_gas_metering));
 
         (
             vec![merge_sort_ptr, merge_sort_range_ptr, merge_ptr],
