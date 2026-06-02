@@ -315,6 +315,17 @@ impl AptosModuleCacheManagerGuard<'_> {
         }
     }
 
+    /// Testing-only `None` guard whose environment has the delayed-field optimization enabled.
+    /// Exposed (behind the `testing` feature) so cross-session delayed-field PoCs in other crates
+    /// can drive the block executor.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn none_with_delayed_fields_for_testing(state_view: &impl StateView) -> Self {
+        AptosModuleCacheManagerGuard::None {
+            environment: AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view),
+            module_cache: GlobalModuleCache::empty(),
+        }
+    }
+
     /// Takes a shallow snapshot of the current global module cache (hot cache).
     /// Only available under fuzzing. The snapshot shares underlying Arc module code.
     #[cfg(fuzzing)]
