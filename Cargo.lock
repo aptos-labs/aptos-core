@@ -12857,6 +12857,8 @@ dependencies = [
  "mono-move-gas",
  "mono-move-loader",
  "move-core-types",
+ "num-bigint 0.3.3",
+ "paste",
  "proptest",
  "rand 0.7.3",
  "thiserror 1.0.69",

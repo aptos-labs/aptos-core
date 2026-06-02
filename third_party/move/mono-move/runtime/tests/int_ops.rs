@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Property tests for integer arithmetic / bitwise / shift micro-ops.
+//! Property tests for the integer micro-ops: arithmetic, bitwise, shift,
+//! negate, and cast.
 //!
 //! For every supported (type, kind) combination, the property is the same
 //! shape:
@@ -26,15 +27,23 @@
 //!
 //! Each property fires the proptest default (256 cases). Edge values
 //! (MAX, MIN, 0) get hit through proptest's shrinker + random sampling.
+//!
+//! The cast micro-op ([`MicroOp::IntCast`]) is also tested here, in the
+//! cast section at the end, reusing the same single-op harness.
+//!
+//! TODO: Revisit endianness. Interpreter uses native order for built-in types.
+//! I256/U256 currently do not have other endianness exposed.
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, ShiftOperand, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp, IntCastOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, MicroOp, ShiftOperand, SortedSafePointEntries,
+    FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 use move_core_types::int256::{I256, U256};
-use proptest::prelude::*;
+use num_bigint::{BigInt, Sign};
+use proptest::{prelude::*, strategy::BoxedStrategy};
 
 // ---------------------------------------------------------------------------
 // Test-local op-kind enums
@@ -1127,3 +1136,156 @@ prop_negate!(i32_negate, i32, i32::checked_neg);
 prop_negate!(i64_negate, i64, i64::checked_neg);
 prop_negate!(i128_negate, i128, i128::checked_neg);
 prop_negate!(i256_negate, I256, I256::checked_neg);
+
+// ---------------------------------------------------------------------------
+// IntCast — all 12×12 (from, to) pairs
+// ---------------------------------------------------------------------------
+
+/// Helper trait to define various properties/operations for all integer types.
+/// BigInt is used as a convenience as it can represent integers of any size and be
+/// used for range checks.
+trait CastType: Copy + std::fmt::Debug {
+    const TAG: IntTy;
+    const WIDTH: usize;
+    fn to_slot_bytes(self) -> Vec<u8>;
+    fn to_bigint(self) -> BigInt;
+    fn range_bigint() -> (BigInt, BigInt);
+    fn decode(bytes: &[u8]) -> String;
+    fn strategy() -> BoxedStrategy<Self>;
+}
+
+macro_rules! impl_cast_type_native {
+    ($ty:ty, $tag:expr) => {
+        impl CastType for $ty {
+            const TAG: IntTy = $tag;
+            const WIDTH: usize = std::mem::size_of::<$ty>();
+
+            fn to_slot_bytes(self) -> Vec<u8> {
+                self.to_ne_bytes().to_vec()
+            }
+
+            fn to_bigint(self) -> BigInt {
+                BigInt::from(self)
+            }
+
+            fn range_bigint() -> (BigInt, BigInt) {
+                (BigInt::from(<$ty>::MIN), BigInt::from(<$ty>::MAX))
+            }
+
+            fn decode(bytes: &[u8]) -> String {
+                <$ty>::from_ne_bytes(bytes.try_into().unwrap()).to_string()
+            }
+
+            fn strategy() -> BoxedStrategy<Self> {
+                any::<$ty>().boxed()
+            }
+        }
+    };
+}
+
+impl_cast_type_native!(u8, IntTy::U8);
+impl_cast_type_native!(u16, IntTy::U16);
+impl_cast_type_native!(u32, IntTy::U32);
+impl_cast_type_native!(u64, IntTy::U64);
+impl_cast_type_native!(u128, IntTy::U128);
+impl_cast_type_native!(i8, IntTy::I8);
+impl_cast_type_native!(i16, IntTy::I16);
+impl_cast_type_native!(i32, IntTy::I32);
+impl_cast_type_native!(i64, IntTy::I64);
+impl_cast_type_native!(i128, IntTy::I128);
+
+macro_rules! impl_cast_type_wide {
+    ($ty:ty, $tag:expr, $bytes_to_big:expr) => {
+        impl CastType for $ty {
+            const TAG: IntTy = $tag;
+            const WIDTH: usize = 32;
+
+            fn to_slot_bytes(self) -> Vec<u8> {
+                self.to_le_bytes().to_vec()
+            }
+
+            fn to_bigint(self) -> BigInt {
+                $bytes_to_big(&self.to_le_bytes())
+            }
+
+            fn range_bigint() -> (BigInt, BigInt) {
+                (
+                    $bytes_to_big(&<$ty>::MIN.to_le_bytes()),
+                    $bytes_to_big(&<$ty>::MAX.to_le_bytes()),
+                )
+            }
+
+            fn decode(bytes: &[u8]) -> String {
+                <$ty>::from_le_bytes(bytes.try_into().unwrap()).to_string()
+            }
+
+            fn strategy() -> BoxedStrategy<Self> {
+                any::<[u8; 32]>().prop_map(<$ty>::from_le_bytes).boxed()
+            }
+        }
+    };
+}
+
+impl_cast_type_wide!(U256, IntTy::U256, |b: &[u8]| BigInt::from_bytes_le(
+    Sign::Plus,
+    b
+));
+impl_cast_type_wide!(I256, IntTy::I256, |b: &[u8]| {
+    BigInt::from_signed_bytes_le(b)
+});
+
+/// Run the cast micro-op (from `S` to `D`) using the VM runtime.
+fn cast_runtime<S: CastType, D: CastType>(v: S) -> Option<String> {
+    let op = MicroOp::IntCast(IntCastOp {
+        from: S::TAG,
+        to: D::TAG,
+        dst: FO(SLOT_DST),
+        src: FO(SLOT_LHS),
+    });
+    run_wide(op, &v.to_slot_bytes(), &[], D::WIDTH)
+        .ok()
+        .map(|bytes| D::decode(&bytes))
+}
+
+/// Reference impl of a cast (from `S` to `D`).
+fn cast_reference_impl<S: CastType, D: CastType>(v: S) -> Option<String> {
+    let value = v.to_bigint();
+    let (lo, hi) = D::range_bigint();
+    (value >= lo && value <= hi).then(|| value.to_string())
+}
+
+/// Defines one proptest for the (src, dst) cast pair.
+macro_rules! cast_case {
+    ($src:ident, $dst:ident) => {
+        paste::paste! {
+            proptest! {
+                #[test]
+                fn [<cast_from_ $src:lower _to_ $dst:lower>](
+                    v in <$src as CastType>::strategy()
+                ) {
+                    prop_assert_eq!(
+                        cast_runtime::<$src, $dst>(v),
+                        cast_reference_impl::<$src, $dst>(v)
+                    );
+                }
+            }
+        }
+    };
+}
+
+/// Generate a [`cast_case!`] for the full cross product of a type list --
+/// every type cast into every type, including itself.
+macro_rules! cast_matrix {
+    ($($ty:ident),+ $(,)?) => {
+        cast_matrix!(@outer [$($ty),+] [$($ty),+]);
+    };
+    (@outer [$($src:ident),+] $dsts:tt) => {
+        $( cast_matrix!(@inner $src $dsts); )+
+    };
+    (@inner $src:ident [$($dst:ident),+]) => {
+        $( cast_case!($src, $dst); )+
+    };
+}
+
+// Generates all 144 (12 × 12) cast combinations, one test per pair.
+cast_matrix!(u8, u16, u32, u64, u128, U256, i8, i16, i32, i64, i128, I256);

@@ -46,6 +46,9 @@ pub enum RuntimeError {
     #[error("Negate.{ty}: Negate of MIN overflows")]
     NegateMinOverflow { ty: IntTy },
 
+    #[error("Cast.{from}->{to}: value out of range for {to}")]
+    CastOutOfRange { from: IntTy, to: IntTy },
+
     #[error("VecPopBack on empty vector")]
     PopFromEmptyVector,
 
@@ -102,6 +105,7 @@ impl IntoExecutionError for RuntimeError {
             | ArithmeticUnderOverflow { .. }
             | DivisionByZeroOrOverflow { .. }
             | NegateMinOverflow { .. }
+            | CastOutOfRange { .. }
             | PopFromEmptyVector
             | VectorIndexOutOfBounds { .. }
             | InvalidAbortMessage

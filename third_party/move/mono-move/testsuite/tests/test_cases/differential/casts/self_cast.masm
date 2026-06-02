@@ -1,0 +1,20 @@
+// Tests same-type casts (`x as u64` where `x: u64`), which are valid Move
+// bytecode and execute as identity. Written as MASM tests so we don't depend
+// on the compiler not optimizing them out.
+
+// RUN: publish --print(micro-ops)
+module 0x66::test
+
+fun self_cast(a: u64): u64
+    copy_loc a
+    cast_u64
+    ret
+
+// RUN: execute 0x66::test::self_cast --args 42
+// CHECK: results: 42
+
+// RUN: execute 0x66::test::self_cast --args 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::test::self_cast --args 18446744073709551615
+// CHECK: results: 18446744073709551615
