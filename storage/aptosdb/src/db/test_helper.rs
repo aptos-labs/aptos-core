@@ -30,7 +30,7 @@ use proptest::{
     sample::Index,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Debug,
 };
 
@@ -141,6 +141,7 @@ prop_compose! {
         max_user_txns_per_block: usize,
         min_blocks: usize,
         max_blocks: usize,
+        write_set_v1: bool,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
         block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
@@ -150,9 +151,26 @@ prop_compose! {
         let mut smt = root_smt.clone();
 
         let mut result = Vec::new();
+        let mut read_only_key_counter = 0u64;
 
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
+            if write_set_v1 {
+                // Promote each write set to V1 and inject a hot-state read (`MakeHot`) of a
+                // dedicated never-written key, turning it into a `HotVacant` entry. After a restart
+                // such an entry reloads keyless (hash only); evicted untouched it becomes a keyless
+                // cold deletion in the JMT pass. V1 is required so the `hotness` bucket survives
+                // serialization across the restart.
+                for txn in &mut txns_to_commit {
+                    let read_only_key = StateKey::raw(
+                        format!("hot_read_only_key_{read_only_key_counter}").as_bytes(),
+                    );
+                    read_only_key_counter += 1;
+                    let mut write_set = std::mem::take(&mut txn.write_set);
+                    write_set.add_hotness(BTreeSet::from([read_only_key]));
+                    txn.write_set = write_set.into_v1();
+                }
+            }
             smt = update_in_memory_state(&smt, &root_smt, &txns_to_commit);
             let state_checkpoint_root_hash = smt.root_hash();
 
@@ -209,7 +227,7 @@ pub fn arb_blocks_to_commit_with_block_nums(
     arb_blocks_to_commit_with_params(
         5, /* num_accounts */
         2, /* max_user_txns_per_block */
-        min_blocks, max_blocks,
+        min_blocks, max_blocks, false, /* write_set_v1 */
     )
 }
 
@@ -218,12 +236,14 @@ pub fn arb_blocks_to_commit_with_params(
     max_user_txns_per_block: usize,
     min_blocks: usize,
     max_blocks: usize,
+    write_set_v1: bool,
 ) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
     arb_blocks_to_commit_impl(
         num_accounts,
         max_user_txns_per_block,
         min_blocks,
         max_blocks,
+        write_set_v1,
     )
 }
 
