@@ -700,12 +700,17 @@ fn add_unique_attribute(
     attr_loc: Loc,
     attr_: E::Attribute,
 ) {
-    let is_repeatable_test = matches!(
-        name_,
-        E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::Test))
-    );
-    if is_repeatable_test {
-        let synthetic = Symbol::from(format!("$test_row_{}", attr_map.len()));
+    let synthetic_prefix = match name_ {
+        E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::Test)) => {
+            Some("$test_row_")
+        },
+        E::AttributeName_::Known(KnownAttribute::Testing(
+            TestingAttribute::ExpectedFailure,
+        )) => Some("$expected_failure_"),
+        _ => None,
+    };
+    if let Some(prefix) = synthetic_prefix {
+        let synthetic = Symbol::from(format!("{}{}", prefix, attr_map.len()));
         let synthetic_key = sp(name_loc, E::AttributeName_::Unknown(synthetic));
         let _ = attr_map.add(synthetic_key, attr_);
     } else if let Err((_, old_loc)) = attr_map.add(sp(name_loc, name_), attr_) {

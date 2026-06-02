@@ -246,6 +246,23 @@ fn build_test_rows<'a>(
     let mut rows = Vec::with_capacity(test_attrs.len());
     let mut has_error = false;
 
+    if single_row {
+        let top_level_failures = failure_attrs
+            .iter()
+            .copied()
+            .filter(|failure| failure.bracket_group_id() != test_attrs[0].bracket_group_id())
+            .collect::<Vec<_>>();
+        if top_level_failures.len() > 1 {
+            let loc = env.get_node_loc(top_level_failures[1].node_id());
+            env.error_with_labels(
+                fn_id_loc,
+                "Multiple top-level #[expected_failure] attributes on a test function",
+                vec![(loc, "Second top-level occurrence here".to_string())],
+            );
+            has_error = true;
+        }
+    }
+
     if !single_row {
         for failure in failure_attrs {
             if !test_attrs

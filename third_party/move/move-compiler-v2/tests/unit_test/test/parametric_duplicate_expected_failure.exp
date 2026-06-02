@@ -1,0 +1,9 @@
+Diagnostics:
+error: Multiple #[expected_failure] attributes in a single bracket
+  ┌─ tests/unit_test/test/parametric_duplicate_expected_failure.move:6:9
+  │
+4 │     #[test(addr = @0x1), expected_failure, expected_failure(abort_code = 5)]
+  │                                            -------------------------------- Second occurrence here
+5 │     #[test(addr = @0x2)]
+6 │     fun duplicate_expected_failure(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
