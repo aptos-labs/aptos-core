@@ -11,10 +11,9 @@
 //! publish time.
 
 use mono_move_core::{
-    native::{FrameSlot, NativeABI},
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider,
+    FrameOffset, Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp,
+    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -885,26 +884,24 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         self.check_frame_access(Some(pc), offset, 1);
     }
 
-    /// Verify each arg/return slot in a [`NativeABI`] lies within the frame.
+    /// Verify the native's slot region fits within the caller's extended frame.
     fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
-        let callee_base = self.func.param_and_local_sizes_sum + FRAME_METADATA_SIZE;
-        let mut check_slot = |slot: &FrameSlot, kind: &str, i: usize| match (callee_base as u32)
-            .checked_add(slot.offset)
-        {
-            Some(abs) => self.check_frame_access(Some(pc), FrameOffset(abs), slot.size),
-            None => self.err(
+        let callee_base = self.func.frame_size();
+        let end = match callee_base.checked_add(abi.total_frame_size() as usize) {
+            Some(e) => e,
+            None => {
+                self.err(Some(pc), "native slot region overflows usize");
+                return;
+            },
+        };
+        if end > self.func.extended_frame_size {
+            self.err(
                 Some(pc),
                 format!(
-                    "CallNative {} {} offset {} overflows when added to callee_base {}",
-                    kind, i, slot.offset, callee_base,
+                    "native slot region [{}, {}) exceeds extended_frame_size {}",
+                    callee_base, end, self.func.extended_frame_size,
                 ),
-            ),
-        };
-        for (i, slot) in abi.args.iter().enumerate() {
-            check_slot(slot, "arg", i);
-        }
-        for (i, slot) in abi.returns.iter().enumerate() {
-            check_slot(slot, "return", i);
+            );
         }
     }
 

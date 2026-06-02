@@ -28,7 +28,7 @@ use crate::{
     ExecutionContext,
 };
 use mono_move_core::{
-    native::{NativeABI, NativeIdx, NativeResult, ProductionNativeContext, VMInternalError},
+    native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext, VMInternalError},
     storage::resource_provider::StorageKey,
     CallClosureOp, ClosureFuncRef, DescriptorId, DescriptorProvider, FrameOffset, Function,
     IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
@@ -731,10 +731,7 @@ unsafe fn exec_int_cast(fp: *mut u8, op: &IntCastOp) -> RuntimeResult<()> {
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T>
-where
-    T::GasMeter: 'static,
-{
+impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     #[inline(always)]
     pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -1684,7 +1681,7 @@ where
             // Stack-overflow check up front: `call_unchecked` skips the
             // check, so we do it here before writing the callee's
             // parameters at `new_fp`.
-            let new_fp = self.check_stack_for_call(func, fp, callee)?;
+            let new_fp = self.check_stack_for_call(func, fp, callee.extended_frame_size)?;
 
             // Only validate captured-data when the closure actually has
             // captures. Non-capturing closures leave `captured_data_ptr`
@@ -1766,12 +1763,12 @@ where
         &self,
         caller: &Function,
         fp: *mut u8,
-        callee: &Function,
+        callee_extended_frame_size: usize,
     ) -> RuntimeResult<*mut u8> {
         unsafe {
             let new_fp = fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE);
             let stack_end = self.stack.as_ptr().add(self.stack.len());
-            if new_fp.add(callee.extended_frame_size) > stack_end {
+            if new_fp.add(callee_extended_frame_size) > stack_end {
                 return Err(RuntimeError::StackOverflow);
             }
             Ok(new_fp)
@@ -1792,7 +1789,7 @@ where
         fp: *mut u8,
         callee: &Function,
     ) -> RuntimeResult<StepResult> {
-        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee)? };
+        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee.extended_frame_size)? };
         unsafe { self.call_unchecked(caller, fp, callee, new_fp) }
     }
 
@@ -1869,19 +1866,27 @@ where
         native_idx: NativeIdx,
         abi: &NativeABI,
     ) -> RuntimeResult<StepResult> {
-        // Check if we have enough space for a new frame.
-        let slot_region = unsafe { fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE) };
-        let stack_end = unsafe { self.stack.as_ptr().add(self.stack.len()) };
-        if unsafe { fp.add(caller.extended_frame_size) } > stack_end {
-            return Err(RuntimeError::StackOverflow);
-        }
+        // Check if we have enough space on the stack to allocate the native's frame.
+        let new_fp =
+            unsafe { self.check_stack_for_call(caller, fp, abi.total_frame_size() as usize)? };
 
         // Write frame metadata just like normal calls. This is still needed
         // as some natives may want to inspect the call stack.
         unsafe { self.write_frame_metadata(caller, fp) };
 
+        // Zero out return-slot bytes that extend past the args, for extra safety.
+        if abi.total_frame_size() > abi.args_end() {
+            unsafe {
+                std::ptr::write_bytes(
+                    new_fp.add(abi.args_end() as usize),
+                    0,
+                    (abi.total_frame_size() - abi.args_end()) as usize,
+                );
+            }
+        }
+
         let saved_fp = self.frame_ptr;
-        self.frame_ptr = slot_region;
+        self.frame_ptr = new_fp;
         let result = {
             let (registry, gas_meter) = self.exec_ctx.natives_and_gas_meter();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
@@ -1890,17 +1895,17 @@ where
                     registry_size: registry.len(),
                 })
             })?;
-            let mut ctx = ProductionNativeContext::new(slot_region, abi, gas_meter);
+            let mut ctx = ProductionNativeContext::new(new_fp, abi, gas_meter);
             func(&mut ctx)
         };
         self.frame_ptr = saved_fp;
 
         match result {
-            Ok(NativeResult::Success) => {
+            Ok(NativeStatus::Success) => {
                 self.pc += 1;
                 Ok(StepResult::Continue)
             },
-            Ok(NativeResult::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
+            Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
             Err(VMInternalError::InvariantViolation(msg)) => Err(RuntimeError::InvariantViolation(
                 RuntimeInvariantViolation::NativeInvariantViolation(msg),
             )),

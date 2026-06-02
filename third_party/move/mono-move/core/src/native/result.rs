@@ -1,12 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-/// Outcome of a native function invocation. Native bodies return
-/// `Result<NativeResult, VMInternalError>` so VM-internal failures
-/// (the outer `Err`) bubble up via `?` while terminal states (the
-/// outer `Ok`) are chosen explicitly.
+/// Terminal outcome of a native function invocation.
 #[derive(Debug, Clone)]
-pub enum NativeResult {
+pub enum NativeStatus {
     Success,
     Abort { code: u64, message: Option<String> },
 }

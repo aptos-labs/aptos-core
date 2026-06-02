@@ -31,9 +31,10 @@ pub struct ProductionNativeContext<'a, G: GasMeter> {
     pub abi: &'a NativeABI,
     /// Gas meter for the current transaction.
     pub gas_meter: &'a mut G,
-    /// Set to `true` after the first successful [`Self::set_return`].
-    /// Reading args or performing heap allocations after this point is prohibited,
-    /// to prevent data transmutation and GC tracing violations.
+    /// Set to `true` after the first successful [`Self::set_return`];
+    /// blocks further `arg` / heap-allocation calls.
+    //
+    // TODO: relax to per-slot disjointness (see [`NativeContext`]).
     returns_started: bool,
 }
 
@@ -50,21 +51,21 @@ impl<'a, G: GasMeter> ProductionNativeContext<'a, G> {
 
 impl<'a, G: GasMeter> NativeContext for ProductionNativeContext<'a, G> {
     fn num_args(&self) -> usize {
-        self.abi.args.len()
+        self.abi.args().len()
     }
 
-    fn arg<T: VMValue>(&self, i: usize) -> Result<T, VMInternalError> {
+    unsafe fn arg<T: VMValue>(&self, i: usize) -> Result<T, VMInternalError> {
         if self.returns_started {
             return Err(VMInternalError::InvariantViolation(format!(
                 "arg({}) called after a return value was written",
                 i,
             )));
         }
-        let slot = self.abi.args.get(i).copied().ok_or_else(|| {
+        let slot = self.abi.args().get(i).copied().ok_or_else(|| {
             VMInternalError::InvariantViolation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
-                self.abi.args.len(),
+                self.abi.args().len(),
             ))
         })?;
         if T::FRAME_SLOT_SIZE as u32 != slot.size {
@@ -82,15 +83,15 @@ impl<'a, G: GasMeter> NativeContext for ProductionNativeContext<'a, G> {
     }
 
     fn num_returns(&self) -> usize {
-        self.abi.returns.len()
+        self.abi.returns().len()
     }
 
-    fn set_return<T: VMValue>(&mut self, i: usize, value: T) -> Result<(), VMInternalError> {
-        let slot = self.abi.returns.get(i).copied().ok_or_else(|| {
+    unsafe fn set_return<T: VMValue>(&mut self, i: usize, value: T) -> Result<(), VMInternalError> {
+        let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
             VMInternalError::InvariantViolation(format!(
                 "return index {} out of bounds (num_returns={})",
                 i,
-                self.abi.returns.len(),
+                self.abi.returns().len(),
             ))
         })?;
         if T::FRAME_SLOT_SIZE as u32 != slot.size {

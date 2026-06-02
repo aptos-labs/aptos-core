@@ -18,28 +18,33 @@ use super::{result::VMInternalError, value::VMValue};
 ///
 /// Methods that return errors that are triggerable by user inputs or the native's
 /// own mistakes should use the return type `Result<Result<_, CustomError>, VMInternalError>` or
-/// simply `Result<NativeResult, CustomError>` if vm internal errors are not possible..
+/// simply `Result<NativeStatus, CustomError>` if vm internal errors are not possible.
 pub trait NativeContext {
     /// Number of positional arguments declared by the native's ABI.
     fn num_args(&self) -> usize;
 
     /// Reads the `i`-th argument from the calling frame.
     ///
-    /// Provided as a (relatively) safe ABI to access the arguments, as it
-    /// calculates the offset and size of the argument based on the ABI.
-    fn arg<T: VMValue>(&self, i: usize) -> Result<T, VMInternalError>;
+    /// It is guaranteed this would use the correct memory offset and size for the access,
+    /// but the caller is still responsible for ensuring the correct type is being read.
+    ///
+    /// # Safety
+    ///
+    /// `T` must match the slot's Move-level type.
+    unsafe fn arg<T: VMValue>(&self, i: usize) -> Result<T, VMInternalError>;
 
     /// Number of return slots declared by the native's ABI.
     fn num_returns(&self) -> usize;
 
     /// Writes the `i`-th return value into the calling frame.
     ///
-    /// Provided as a (relatively) safe ABI to write the return value, as it
-    /// calculates the offset and size of the return value based on the ABI.
-    fn set_return<T: VMValue>(&mut self, i: usize, value: T) -> Result<(), VMInternalError>;
+    /// It is guaranteed this would use the correct memory offset and size for the access,
+    /// but the caller is still responsible for ensuring the correct type is being written.
+    ///
+    /// # Safety
+    ///
+    /// `T` must match the slot's Move-level type.
+    unsafe fn set_return<T: VMValue>(&mut self, i: usize, value: T) -> Result<(), VMInternalError>;
 
     // TODO: Escape hatches for raw memory reads and writes for better perf.
-
-    // TODO: Prevent further `arg` or allocator calls after the first `set_return`.
-    // This is to prevent (1) data transmutation (2) GC tracing violations.
 }

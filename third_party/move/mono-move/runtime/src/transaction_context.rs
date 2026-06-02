@@ -30,6 +30,9 @@ pub struct TransactionContext<'guard, 'ctx, G: GasMeter> {
     resource_provider: &'guard dyn ResourceProvider,
     // TODO: Move the native registry off the per-transaction context and
     // onto a long-lived owner (e.g. the global context).
+    //
+    // TODO: Enforce that `natives` here and the `NativeResolver` passed
+    // to `loader` are the same instance.
     natives: &'guard ProductionNativeRegistry<G>,
 }
 

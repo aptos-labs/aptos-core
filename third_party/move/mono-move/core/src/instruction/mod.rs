@@ -529,6 +529,9 @@ pub enum MicroOp {
     ///
     /// TODO: [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
     /// and see if we want to move it into a side table instead.
+    ///
+    /// TODO: revisit `is_allocating()` for this op when heap allocation
+    /// within natives is sorted out.
     CallNative {
         native_idx: NativeIdx,
         ty_args: InternedTypeList,
@@ -1154,8 +1157,8 @@ impl fmt::Display for MicroOp {
                 write!(
                     f,
                     " args=[{}] returns=[{}]",
-                    fmt_slots(&abi.args),
-                    fmt_slots(&abi.returns)
+                    fmt_slots(abi.args()),
+                    fmt_slots(abi.returns())
                 )
             },
             MicroOp::Return => {

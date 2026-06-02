@@ -532,6 +532,10 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 ///   in every heap object header are set by the allocator and never
 ///   overwritten by user code. Corrupted headers → wrong copy size or
 ///   wrong reference tracing (UB).
+///
+/// TODO: `current_func` assumes the top frame is always a regular function.
+/// This breaks down when the top frame is a native function. We must fix it
+/// before allowing heap allocations within native functions.
 pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,

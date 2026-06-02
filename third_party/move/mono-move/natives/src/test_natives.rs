@@ -5,29 +5,31 @@
 //! away once real natives are wired up.
 
 use crate::{natives, NativeFunction};
-use mono_move_core::native::{NativeContext, NativeContextFamily, NativeResult, VMInternalError};
+use mono_move_core::native::{NativeContext, NativeContextFamily, NativeStatus, VMInternalError};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
-pub fn native_u64_add<C: NativeContext>(ctx: &mut C) -> Result<NativeResult, VMInternalError> {
-    let a: u64 = ctx.arg(0)?;
-    let b: u64 = ctx.arg(1)?;
+pub fn native_u64_add<C: NativeContext>(ctx: &mut C) -> Result<NativeStatus, VMInternalError> {
+    // SAFETY: u64 matches the Move-level `u64` type of args 0/1 and return 0.
+    let a: u64 = unsafe { ctx.arg(0) }?;
+    let b: u64 = unsafe { ctx.arg(1) }?;
     let sum = match a.checked_add(b) {
         Some(s) => s,
         None => {
-            return Ok(NativeResult::Abort {
+            return Ok(NativeStatus::Abort {
                 code: 1,
                 message: None,
             })
         },
     };
-    ctx.set_return(0, sum)?;
-    Ok(NativeResult::Success)
+    unsafe { ctx.set_return(0, sum) }?;
+    Ok(NativeStatus::Success)
 }
 
-pub fn native_u64_identity<C: NativeContext>(ctx: &mut C) -> Result<NativeResult, VMInternalError> {
-    let x: u64 = ctx.arg(0)?;
-    ctx.set_return(0, x)?;
-    Ok(NativeResult::Success)
+pub fn native_u64_identity<C: NativeContext>(ctx: &mut C) -> Result<NativeStatus, VMInternalError> {
+    // SAFETY: u64 matches the Move-level `u64` type of arg 0 and return 0.
+    let x: u64 = unsafe { ctx.arg(0) }?;
+    unsafe { ctx.set_return(0, x) }?;
+    Ok(NativeStatus::Success)
 }
 
 pub fn make_all_test_natives<F: NativeContextFamily>(

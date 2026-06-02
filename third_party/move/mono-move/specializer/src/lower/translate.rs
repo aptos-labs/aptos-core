@@ -1187,16 +1187,15 @@ impl<'a> LoweringState<'a> {
 
     /// Derive a [`NativeABI`] for a native call site from its arg/ret
     /// slots.
-    fn derive_native_abi(&self, cs: &CallSiteInfo) -> NativeABI {
+    fn derive_native_abi(&self, cs: &CallSiteInfo) -> Result<NativeABI> {
         let callee_base = self.ctx.frame_data_size + FRAME_METADATA_SIZE as u32;
         let to_slot = |s: &TypedSlot| FrameSlot {
             offset: s.slot.offset.0 - callee_base,
             size: s.slot.size,
         };
-        NativeABI {
-            args: cs.arg_slots.iter().map(to_slot).collect(),
-            returns: cs.ret_slots.iter().map(to_slot).collect(),
-        }
+        let args: Vec<FrameSlot> = cs.arg_slots.iter().map(to_slot).collect();
+        let returns: Vec<FrameSlot> = cs.ret_slots.iter().map(to_slot).collect();
+        Ok(NativeABI::new(args, returns)?)
     }
 
     /// Lower one call. Args are written by reverse iteration over the
@@ -1272,7 +1271,7 @@ impl<'a> LoweringState<'a> {
 
         match cs.native_idx {
             Some(native_idx) => {
-                let abi = self.derive_native_abi(cs);
+                let abi = self.derive_native_abi(cs)?;
                 self.emit(MicroOp::CallNative {
                     native_idx,
                     ty_args: cs.ty_args,

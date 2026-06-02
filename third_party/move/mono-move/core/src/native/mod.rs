@@ -9,7 +9,7 @@ pub mod registry;
 pub mod result;
 pub mod value;
 
-pub use abi::{FrameSlot, NativeABI};
+pub use abi::{FrameSlot, NativeABI, NativeABIError};
 pub use context::NativeContext;
 pub use production::{
     ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
@@ -19,5 +19,5 @@ pub use registry::{
     NativeContextFamily, NativeFunction, NativeIdx, NativeName, NativeRegistry,
     NativeRegistryError, NativeResolver, NoNatives,
 };
-pub use result::{NativeResult, VMInternalError};
+pub use result::{NativeStatus, VMInternalError};
 pub use value::VMValue;

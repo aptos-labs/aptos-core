@@ -8,7 +8,7 @@
 use super::context::NativeContext;
 use crate::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::{NativeResult, VMInternalError},
+    native::{NativeStatus, VMInternalError},
 };
 use shared_dsa::UnorderedMap;
 use std::sync::Arc;
@@ -44,7 +44,7 @@ pub trait NativeContextFamily {
 /// Without this, we cannot store native functions in a registry, which would
 /// otherwise mandate a fixed lifetime.
 pub type NativeFunction<F> = Arc<
-    dyn for<'a> Fn(&mut <F as NativeContextFamily>::Of<'a>) -> Result<NativeResult, VMInternalError>
+    dyn for<'a> Fn(&mut <F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
         + Send
         + Sync,
 >;
