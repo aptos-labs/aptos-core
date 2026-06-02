@@ -7,6 +7,7 @@
 use crate::{ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::ProductionNativeRegistry,
     types::InternedTypeList,
     DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ObjectDescriptorTable,
     ResourceProvider,
@@ -89,9 +90,28 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
     }
 }
 
+impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
+    /// Install a populated native registry. Replaces the empty default
+    /// installed by the constructors above.
+    pub fn with_natives(mut self, natives: ProductionNativeRegistry<G>) -> Self {
+        self.inner = self.inner.with_natives(natives);
+        self
+    }
+}
+
 impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
-    fn gas_meter(&mut self) -> &mut impl GasMeter {
+    type GasMeter = G;
+
+    fn gas_meter(&mut self) -> &mut G {
         self.inner.gas_meter()
+    }
+
+    fn natives(&self) -> &ProductionNativeRegistry<G> {
+        self.inner.natives()
+    }
+
+    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
+        self.inner.natives_and_gas_meter()
     }
 
     fn load_function(

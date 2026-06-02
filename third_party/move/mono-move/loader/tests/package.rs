@@ -3,7 +3,7 @@
 
 //! Integration tests for the Package loading policy.
 
-use mono_move_core::types::EMPTY_TYPE_LIST;
+use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST};
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, ModuleRead, ModuleReadSet, ModuleState};
@@ -31,7 +31,8 @@ fn load_package_cache_miss_loads_all_members() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
+    let loader =
+        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);
@@ -75,7 +76,8 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
+    let loader =
+        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_b_module = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());
@@ -148,7 +150,8 @@ fn load_package_cache_hit_walks_dependencies() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
+    let loader =
+        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);

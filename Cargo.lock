@@ -12816,6 +12816,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-natives"
+version = "0.1.0"
+dependencies = [
+ "mono-move-core",
+ "move-core-types",
+]
+
+[[package]]
 name = "mono-move-orchestrator"
 version = "0.1.0"
 dependencies = [
@@ -12877,6 +12885,7 @@ dependencies = [
  "mono-move-gas",
  "mono-move-global-context",
  "mono-move-loader",
+ "mono-move-natives",
  "mono-move-runtime",
  "move-asm",
  "move-binary-format",
@@ -12888,6 +12897,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "smallvec",
  "specializer",
  "tempfile",
  "walkdir",

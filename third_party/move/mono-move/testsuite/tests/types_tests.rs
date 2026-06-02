@@ -3,7 +3,7 @@
 
 //! Integration tests for type interning and metadata resolution.
 
-use mono_move_core::Interner;
+use mono_move_core::{native::NoNatives, Interner};
 use mono_move_gas::NoOpGasMeter;
 use mono_move_global_context::{view_type, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -43,6 +43,7 @@ module 0x1::a {
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Eager),
+        &NoNatives,
     );
 
     let mut read_set = ModuleReadSet::new();

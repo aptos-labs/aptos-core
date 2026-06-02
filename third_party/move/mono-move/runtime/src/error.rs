@@ -3,7 +3,9 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError};
+use mono_move_core::{
+    native::VMInternalError, ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError,
+};
 use mono_move_gas::GasExhaustedError;
 use mono_move_loader::LoaderError;
 use move_core_types::account_address::AccountAddress;
@@ -88,6 +90,9 @@ pub enum RuntimeError {
 
     #[error("resource provider: {0}")]
     ResourceProvider(#[from] ResourceProviderError),
+
+    #[error(transparent)]
+    VMInternal(#[from] VMInternalError),
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -120,6 +125,7 @@ impl IntoExecutionError for RuntimeError {
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
             ResourceProvider(e) => e.kind(),
+            VMInternal(e) => e.kind(),
         }
     }
 }
@@ -275,6 +281,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("MoveTo: null source pointer")]
     MoveToNullSource,
+
+    #[error("CallNative: native_idx {idx} out of bounds in registry of size {registry_size}")]
+    NativeIdxOutOfBounds { idx: u32, registry_size: usize },
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

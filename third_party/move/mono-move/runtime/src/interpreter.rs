@@ -5,7 +5,10 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
-    error::{ArithOp, RuntimeError, RuntimeResult, RuntimeStatus, Signedness, VecOp},
+    error::{
+        ArithOp, RuntimeError, RuntimeInvariantViolation, RuntimeResult, RuntimeStatus, Signedness,
+        VecOp,
+    },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
@@ -25,13 +28,14 @@ use crate::{
     ExecutionContext,
 };
 use mono_move_core::{
-    storage::resource_provider::StorageKey, CallClosureOp, ClosureFuncRef, DescriptorId,
-    DescriptorProvider, FrameOffset, Function, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
-    CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE,
-    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
+    storage::resource_provider::StorageKey,
+    CallClosureOp, ClosureFuncRef, DescriptorId, DescriptorProvider, FrameOffset, Function,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
+    ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::{
@@ -778,6 +782,14 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
                 MicroOp::CallDirect { ptr } => {
                     return self.call(func, fp, ptr.as_ref_unchecked());
+                },
+
+                MicroOp::CallNative {
+                    native_idx,
+                    ref abi,
+                    ..
+                } => {
+                    return self.exec_call_native(func, fp, native_idx, abi);
                 },
 
                 MicroOp::JumpNotZeroU64 { target, src } => {
@@ -1664,7 +1676,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             // Stack-overflow check up front: `call_unchecked` skips the
             // check, so we do it here before writing the callee's
             // parameters at `new_fp`.
-            let new_fp = self.check_stack_for_call(func, fp, callee)?;
+            let new_fp = self.check_stack_for_call(func, fp, callee.extended_frame_size)?;
 
             // Only validate captured-data when the closure actually has
             // captures. Non-capturing closures leave `captured_data_ptr`
@@ -1746,12 +1758,12 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         &self,
         caller: &Function,
         fp: *mut u8,
-        callee: &Function,
+        callee_extended_frame_size: usize,
     ) -> RuntimeResult<*mut u8> {
         unsafe {
             let new_fp = fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE);
             let stack_end = self.stack.as_ptr().add(self.stack.len());
-            if new_fp.add(callee.extended_frame_size) > stack_end {
+            if new_fp.add(callee_extended_frame_size) > stack_end {
                 return Err(RuntimeError::StackOverflow);
             }
             Ok(new_fp)
@@ -1772,7 +1784,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         fp: *mut u8,
         callee: &Function,
     ) -> RuntimeResult<StepResult> {
-        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee)? };
+        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee.extended_frame_size)? };
         unsafe { self.call_unchecked(caller, fp, callee, new_fp) }
     }
 
@@ -1805,6 +1817,26 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 let zero_size = callee.extended_frame_size - callee.param_sizes_sum;
                 std::ptr::write_bytes(new_fp.add(callee.param_sizes_sum), 0, zero_size);
             }
+            self.write_frame_metadata(caller, fp);
+            self.frame_ptr = new_fp;
+        }
+        self.pc = 0;
+        self.current_func = NonNull::from(callee);
+        Ok(StepResult::Continue)
+    }
+
+    /// Write the calling-convention frame metadata `(saved_pc, saved_fp,
+    /// saved_func_ptr)` at the end of the caller's frame. Used by both
+    /// regular calls (where it's read back by `Return`) and native calls
+    /// (where it lets stack-walking natives traverse the chain).
+    ///
+    /// # Safety
+    ///
+    /// `caller` must be the currently executing function and `fp` the
+    /// current frame pointer.
+    #[inline(always)]
+    unsafe fn write_frame_metadata(&self, caller: &Function, fp: *mut u8) {
+        unsafe {
             let meta = fp.add(caller.param_and_local_sizes_sum);
             write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
             write_ptr(meta, META_SAVED_FP_OFFSET, fp);
@@ -1813,11 +1845,64 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 META_SAVED_FUNC_PTR_OFFSET,
                 self.current_func.as_ptr() as *const u8,
             );
-            self.frame_ptr = new_fp;
         }
-        self.pc = 0;
-        self.current_func = NonNull::from(callee);
-        Ok(StepResult::Continue)
+    }
+
+    /// Dispatch a [`MicroOp::CallNative`].
+    ///
+    /// # Safety
+    ///
+    /// `caller` must be the currently executing function and `fp` the
+    /// current frame pointer.
+    unsafe fn exec_call_native(
+        &mut self,
+        caller: &Function,
+        fp: *mut u8,
+        native_idx: NativeIdx,
+        abi: &NativeABI,
+    ) -> RuntimeResult<StepResult> {
+        // Check if we have enough space on the stack to allocate the native's frame.
+        let new_fp =
+            unsafe { self.check_stack_for_call(caller, fp, abi.total_frame_size() as usize)? };
+
+        // Write frame metadata just like normal calls. This is still needed
+        // as some natives may want to inspect the call stack.
+        unsafe { self.write_frame_metadata(caller, fp) };
+
+        // Zero out return-slot bytes that extend past the args, for extra safety.
+        if abi.total_frame_size() > abi.args_end() {
+            unsafe {
+                std::ptr::write_bytes(
+                    new_fp.add(abi.args_end() as usize),
+                    0,
+                    (abi.total_frame_size() - abi.args_end()) as usize,
+                );
+            }
+        }
+
+        let saved_fp = self.frame_ptr;
+        self.frame_ptr = new_fp;
+        let result = {
+            let (registry, gas_meter) = self.exec_ctx.natives_and_gas_meter();
+            let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
+                RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
+                    idx: native_idx.0,
+                    registry_size: registry.len(),
+                })
+            })?;
+            let mut ctx = ProductionNativeContext::new(new_fp, abi, gas_meter);
+            func(&mut ctx)
+        };
+        self.frame_ptr = saved_fp;
+
+        match result {
+            Ok(NativeStatus::Success) => {
+                self.pc += 1;
+                Ok(StepResult::Continue)
+            },
+            Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
+            Err(e) => Err(RuntimeError::VMInternal(e)),
+        }
     }
 
     // TODO: Hoist pc, fp, and current_func into local variables in the run loop

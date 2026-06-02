@@ -46,7 +46,9 @@ use thiserror::Error;
 pub struct GasExhaustedError;
 
 /// Gas metering interface called by the interpreter at charge points.
-pub trait GasMeter {
+///
+/// The `'static` bound is required by the native function interface.
+pub trait GasMeter: 'static {
     /// Deduct `amount` units, returning `Err(GasExhaustedError)` if exhausted.
     fn charge(&mut self, amount: u64) -> Result<(), GasExhaustedError>;
     /// Remaining gas balance.

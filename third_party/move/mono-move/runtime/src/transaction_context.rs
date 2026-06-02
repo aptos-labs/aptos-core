@@ -9,6 +9,7 @@
 use crate::ExecutionContext;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::ProductionNativeRegistry,
     types::InternedTypeList,
     DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ResourceProvider,
 };
@@ -27,6 +28,12 @@ pub struct TransactionContext<'guard, 'ctx, G: GasMeter> {
     //   other fields from interpreter context which should live longer than
     //   a single interpreter session.
     resource_provider: &'guard dyn ResourceProvider,
+    // TODO: Move the native registry off the per-transaction context and
+    // onto a long-lived owner (e.g. the global context).
+    //
+    // TODO: Enforce that `natives` here and the `NativeResolver` passed
+    // to `loader` are the same instance.
+    natives: &'guard ProductionNativeRegistry<G>,
 }
 
 impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
@@ -34,12 +41,14 @@ impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
         loader: Loader<'guard, 'ctx>,
         gas_meter: G,
         resource_provider: &'guard dyn ResourceProvider,
+        natives: &'guard ProductionNativeRegistry<G>,
     ) -> Self {
         Self {
             loader,
             read_set: ModuleReadSet::new(),
             gas_meter,
             resource_provider,
+            natives,
         }
     }
 
@@ -50,8 +59,18 @@ impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
 }
 
 impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 'ctx, G> {
-    fn gas_meter(&mut self) -> &mut impl GasMeter {
+    type GasMeter = G;
+
+    fn gas_meter(&mut self) -> &mut G {
         &mut self.gas_meter
+    }
+
+    fn natives(&self) -> &ProductionNativeRegistry<G> {
+        self.natives
+    }
+
+    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
+        (self.natives, &mut self.gas_meter)
     }
 
     /// Looks up cross-module targets in the read-set, falling back to
