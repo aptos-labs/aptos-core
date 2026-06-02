@@ -141,6 +141,7 @@ prop_compose! {
         max_user_txns_per_block: usize,
         min_blocks: usize,
         max_blocks: usize,
+        make_hot_in_epilogue: bool,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
         block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
@@ -152,7 +153,8 @@ prop_compose! {
         let mut result = Vec::new();
 
         for block_gen in block_gens {
-            let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
+            let (mut txns_to_commit, mut ledger_info) =
+                block_gen.materialize(&mut universe, make_hot_in_epilogue);
             smt = update_in_memory_state(&smt, &root_smt, &txns_to_commit);
             let state_checkpoint_root_hash = smt.root_hash();
 
@@ -209,7 +211,7 @@ pub fn arb_blocks_to_commit_with_block_nums(
     arb_blocks_to_commit_with_params(
         5, /* num_accounts */
         2, /* max_user_txns_per_block */
-        min_blocks, max_blocks,
+        min_blocks, max_blocks, false, /* make_hot_in_epilogue */
     )
 }
 
@@ -218,12 +220,14 @@ pub fn arb_blocks_to_commit_with_params(
     max_user_txns_per_block: usize,
     min_blocks: usize,
     max_blocks: usize,
+    make_hot_in_epilogue: bool,
 ) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
     arb_blocks_to_commit_impl(
         num_accounts,
         max_user_txns_per_block,
         min_blocks,
         max_blocks,
+        make_hot_in_epilogue,
     )
 }
 
