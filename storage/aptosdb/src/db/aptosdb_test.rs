@@ -356,6 +356,7 @@ proptest! {
         2,   /* max_user_txns_per_block */
         80,  /* min_blocks */
         120, /* max_blocks */
+        false, /* write_set_v1 */
     )) {
         aptos_logger::Logger::new().init();
         let tmp_dir = TempPath::new();

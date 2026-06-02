@@ -12,10 +12,15 @@ use crate::{
     print_sections,
 };
 use anyhow::{anyhow, bail};
-use mono_move_core::types::EMPTY_TYPE_LIST;
+use mono_move_core::{
+    native::{NativeName, ProductionContextFamily, ProductionNativeRegistry},
+    types::EMPTY_TYPE_LIST,
+    Interner,
+};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_natives::make_all_test_natives;
 use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus, TransactionContext};
 use move_core_types::{
     account_address::AccountAddress,
@@ -31,6 +36,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
+    RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
@@ -49,7 +55,8 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
-    let mut storage = InMemoryStorage::new();
+    let runtime_env = RuntimeEnvironment::new(crate::v1_test_natives::make_all_v1_test_natives());
+    let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_env);
     let mut module_provider = InMemoryModuleProvider::new();
     let mut snapshot = String::new();
 
@@ -228,15 +235,31 @@ fn execute_function_v2(
     return_kinds: &[PrimitiveKind],
 ) -> Output {
     // Construct a per-transaction context.
+    let mut natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
+    natives
+        .register_all(
+            make_all_test_natives::<ProductionContextFamily<SimpleGasMeter>>()
+                .into_iter()
+                .map(|(addr, module, function, func)| {
+                    let name = NativeName {
+                        module: guard.module_id_of(&addr, &module),
+                        function: guard.identifier_of(&function),
+                    };
+                    (name, func)
+                }),
+        )
+        .expect("test natives have unique qualified names");
     let loader = Loader::new_with_policy(
         guard,
         module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
     );
     let mut txn_ctx = TransactionContext::new(
         loader,
         SimpleGasMeter::new(u64::MAX),
         &mono_move_core::NO_RESOURCE_PROVIDER,
+        &natives,
     );
 
     // Resolve the entry function via load_function so the entry module is

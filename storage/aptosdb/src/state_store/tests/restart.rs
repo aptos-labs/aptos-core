@@ -116,32 +116,35 @@ fn test_restart_impl(
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
+    #![proptest_config(ProptestConfig::with_cases(30))]
 
     #[test]
     fn test_restart(
         (input, split_at, max_items_per_shard, buffered_state_target_items)
-            in arb_blocks_to_commit_with_params(
-                10, /* num_accounts */
-                2,  /* max_user_txns_per_block */
-                3,  /* min_blocks */
-                8,  /* max_blocks */
-            ).prop_flat_map(|blocks| {
-                let len = blocks.len();
-                (
-                    Just(blocks),
-                    proptest::collection::vec(any::<bool>(), len),
-                    1usize..len,
-                    1usize..10,
-                    1usize..1000,
-                )
-            }).prop_map(|(blocks, sync_flags, split_at, max_items_per_shard, buffered_state_target_items)| {
-                let input = blocks
-                    .into_iter()
-                    .zip(sync_flags)
-                    .map(|((txns, li), sync)| (txns, li, sync))
-                    .collect::<Vec<_>>();
-                (input, split_at, max_items_per_shard, buffered_state_target_items)
+            in any::<bool>().prop_flat_map(|write_set_v1| {
+                arb_blocks_to_commit_with_params(
+                    10, /* num_accounts */
+                    2,  /* max_user_txns_per_block */
+                    3,  /* min_blocks */
+                    8,  /* max_blocks */
+                    write_set_v1,
+                ).prop_flat_map(|blocks| {
+                    let len = blocks.len();
+                    (
+                        Just(blocks),
+                        proptest::collection::vec(any::<bool>(), len),
+                        1usize..len,
+                        1usize..10,
+                        1usize..1000,
+                    )
+                }).prop_map(|(blocks, sync_flags, split_at, max_items_per_shard, buffered_state_target_items)| {
+                    let input = blocks
+                        .into_iter()
+                        .zip(sync_flags)
+                        .map(|((txns, li), sync)| (txns, li, sync))
+                        .collect::<Vec<_>>();
+                    (input, split_at, max_items_per_shard, buffered_state_target_items)
+                })
             }),
     ) {
         test_restart_impl(

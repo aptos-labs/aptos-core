@@ -6,6 +6,7 @@ mod error;
 mod function;
 mod instruction;
 pub mod interner;
+pub mod native;
 mod object_descriptor;
 mod prepared_module;
 pub mod storage;

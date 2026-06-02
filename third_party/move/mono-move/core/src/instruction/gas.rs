@@ -76,6 +76,7 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
+            | MicroOp::CallNative { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -200,6 +201,7 @@ impl RemapTargets for MicroOp {
             | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
+            | MicroOp::CallNative { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -290,6 +292,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
 
             // --- Control flow ---
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => 10,
+            MicroOp::CallNative { .. } => 10,
             MicroOp::Return => 2,
             MicroOp::Abort { .. } => 2,
             MicroOp::AbortMsg { .. } => 5,

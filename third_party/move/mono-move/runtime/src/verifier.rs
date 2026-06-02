@@ -11,9 +11,9 @@
 //! publish time.
 
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider,
+    FrameOffset, Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp,
+    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -450,6 +450,10 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
+            MicroOp::CallNative { ref abi, .. } => {
+                self.check_native_abi(pc, abi);
+            },
+
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {
                 self.check_frame_access_8(pc, dst);
@@ -877,6 +881,27 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
     fn check_frame_access_1(&mut self, pc: usize, offset: FrameOffset) {
         self.check_frame_access(Some(pc), offset, 1);
+    }
+
+    /// Verify the native's slot region fits within the caller's extended frame.
+    fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
+        let callee_base = self.func.frame_size();
+        let end = match callee_base.checked_add(abi.total_frame_size() as usize) {
+            Some(e) => e,
+            None => {
+                self.err(Some(pc), "native slot region overflows usize");
+                return;
+            },
+        };
+        if end > self.func.extended_frame_size {
+            self.err(
+                Some(pc),
+                format!(
+                    "native slot region [{}, {}) exceeds extended_frame_size {}",
+                    callee_base, end, self.func.extended_frame_size,
+                ),
+            );
+        }
     }
 
     /// Verify an [`IntBinaryOp`]: dst and lhs are slots of width
