@@ -1939,6 +1939,26 @@ where
         ))
     }
 
+    /// Testing-only public wrapper (behind the `testing` feature) so PoCs in other crates can
+    /// drive parallel block execution with a custom `ExecutorTask`. Mirrors the internal
+    /// `execute_transactions_parallel` signature, including its `Result<_, ()>`.
+    #[cfg(any(test, feature = "testing"))]
+    #[allow(clippy::result_unit_err)]
+    pub fn execute_transactions_parallel_for_testing(
+        &self,
+        signature_verified_block: &TP,
+        base_view: &S,
+        transaction_slice_metadata: &TransactionSliceMetadata,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<T, E::Output>, ()> {
+        self.execute_transactions_parallel(
+            signature_verified_block,
+            base_view,
+            transaction_slice_metadata,
+            module_cache_manager_guard,
+        )
+    }
+
     pub(crate) fn execute_transactions_parallel(
         &self,
         signature_verified_block: &TP,
