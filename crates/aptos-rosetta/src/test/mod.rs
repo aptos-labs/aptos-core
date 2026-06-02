@@ -4,8 +4,9 @@
 use crate::{
     common::native_coin,
     types::{
-        Currency, CurrencyMetadata, OperationType, Transaction, FUNGIBLE_ASSET_MODULE,
-        FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
+        AccountIdentifier, Currency, CurrencyMetadata, OperationType, Transaction,
+        FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE,
+        OBJECT_RESOURCE_GROUP,
     },
     RosettaContext,
 };
@@ -15,6 +16,7 @@ use aptos_crypto::{
 };
 use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData};
 use aptos_types::{
+    account_address::create_derived_object_address,
     account_config::{
         fungible_store::FungibleStoreResource, DepositFAEvent, ObjectCoreResource, WithdrawFAEvent,
     },
@@ -50,6 +52,10 @@ async fn test_rosetta_context() -> RosettaContext {
     currencies.insert(OTHER_CURRENCY.clone());
 
     RosettaContext::new(None, ChainId::test(), None, currencies).await
+}
+
+fn primary_store_address(owner: AccountAddress, metadata: AccountAddress) -> AccountAddress {
+    create_derived_object_address(owner, metadata)
 }
 
 fn test_transaction(
@@ -251,7 +257,7 @@ async fn test_fa_mint() {
     let version = 0;
     let amount = 100;
     let sender = AccountAddress::random();
-    let store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
     let (mint_changes, mint_events) = mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
     let input = test_transaction(sender, version, mint_changes, mint_events);
 
@@ -300,8 +306,8 @@ async fn test_fa_transfer() {
     let amount = 100;
     let sender = AccountAddress::random();
     let receiver = AccountAddress::random();
-    let store_address = AccountAddress::random();
-    let receiver_store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
+    let receiver_store_address = primary_store_address(receiver, APT_ADDRESS);
     let (changes, events) = transfer_fa_output(
         sender,
         APT_ADDRESS,
@@ -371,6 +377,155 @@ async fn test_fa_transfer() {
 }
 
 #[tokio::test]
+async fn test_mainnet_apt_fa_transfer_tracks_primary_stores() {
+    let context = test_rosetta_context().await;
+
+    // Mainnet transaction 4141282946:
+    // https://explorer.aptoslabs.com/txn/4141282946/userTxnOverview?network=mainnet
+    let version = 4_141_282_946;
+    let amount = 100_000;
+    let sender = AccountAddress::from_str(
+        "0x5b470b5a9536d94da23746acf069d1d41e45e2b01605ab4aa1b3892f6cac5f5f",
+    )
+    .unwrap();
+    let receiver = AccountAddress::from_str(
+        "0xc67545d6f3d36ed01efc9b28cbfd0c1ae326d5d262dd077a29539bcee0edce9e",
+    )
+    .unwrap();
+    let store_address = AccountAddress::from_str(
+        "0x9016ac2c7b1016f621e463edf37bf4993a45f810df80bbec1cd1b25453cd0d5e",
+    )
+    .unwrap();
+    let receiver_store_address = AccountAddress::from_str(
+        "0xeba1a450b0a5e7cbda0e2ed079bbbe9bd17aeda5910d832a3b22888e38633d76",
+    )
+    .unwrap();
+
+    assert_eq!(store_address, primary_store_address(sender, APT_ADDRESS));
+    assert_eq!(
+        receiver_store_address,
+        primary_store_address(receiver, APT_ADDRESS)
+    );
+
+    let (changes, events) = transfer_fa_output(
+        sender,
+        APT_ADDRESS,
+        store_address,
+        60_420_417,
+        receiver,
+        receiver_store_address,
+        10_362_875_460,
+        amount,
+    );
+    let input = test_transaction(sender, version, changes, events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+    assert_eq!(3, expected_txn.operations.len(), "Ops: {:#?}", expected_txn);
+
+    let withdraw_op = expected_txn.operations.first().unwrap();
+    assert_eq!(
+        withdraw_op.operation_type,
+        OperationType::Withdraw.to_string()
+    );
+    assert_eq!(
+        withdraw_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender
+    );
+    assert_eq!(
+        withdraw_op.amount.as_ref().unwrap().value,
+        format!("-{}", amount)
+    );
+    assert_eq!(withdraw_op.amount.as_ref().unwrap().currency, native_coin());
+
+    let deposit_op = expected_txn.operations.get(1).unwrap();
+    assert_eq!(
+        deposit_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        deposit_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        receiver
+    );
+    assert_eq!(
+        deposit_op.amount.as_ref().unwrap().value,
+        format!("{}", amount)
+    );
+    assert_eq!(deposit_op.amount.as_ref().unwrap().currency, native_coin());
+}
+
+#[tokio::test]
+async fn test_mainnet_reclaim_non_primary_store_tracks_secondary_store() {
+    let context = test_rosetta_context().await;
+
+    // Mainnet transaction 5519638905:
+    // https://explorer.aptoslabs.com/txn/5519638905/userTxnOverview?network=mainnet
+    let version = 5_519_638_905;
+    let amount = 50_000_000;
+    let sender = AccountAddress::from_str(
+        "0xf10387b231218d7ad53fb44ff6cd9eda5e50b3e3ed6aaf4d13b9f9e54d1f4cae",
+    )
+    .unwrap();
+    let non_primary_store_address = AccountAddress::from_str(
+        "0x76dbc266c7c11ba64308fcfa6b2507c77b3e2bfa48edcf6235e9f15eeeb5839d",
+    )
+    .unwrap();
+    let expected_primary_store_address = AccountAddress::from_str(
+        "0xd0f5f74b99a9fe669a3cbd88215c6ee175113e12a33158b8ad21ce39af5ad6fe",
+    )
+    .unwrap();
+
+    assert_ne!(
+        non_primary_store_address,
+        primary_store_address(sender, APT_ADDRESS)
+    );
+    assert_eq!(
+        expected_primary_store_address,
+        primary_store_address(sender, APT_ADDRESS)
+    );
+
+    let (changes, events) =
+        mint_fa_output(sender, APT_ADDRESS, non_primary_store_address, 0, amount);
+    let input = test_transaction(sender, version, changes, events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+    assert_eq!(2, expected_txn.operations.len(), "Ops: {:#?}", expected_txn);
+
+    let deposit_op = expected_txn.operations.first().unwrap();
+    assert_eq!(
+        deposit_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        deposit_op.account.as_ref().unwrap(),
+        &AccountIdentifier::secondary_store_account(&non_primary_store_address, &native_coin())
+    );
+    assert_eq!(
+        deposit_op.amount.as_ref().unwrap().value,
+        format!("{}", amount)
+    );
+    assert_eq!(deposit_op.amount.as_ref().unwrap().currency, native_coin());
+
+    let fee_op = expected_txn.operations.get(1).unwrap();
+    assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
+    assert_eq!(
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
+        sender
+    );
+}
+
+#[tokio::test]
 async fn test_fa_transfer_other_currency() {
     let context = test_rosetta_context().await;
 
@@ -378,11 +533,12 @@ async fn test_fa_transfer_other_currency() {
     let amount = 100;
     let sender = AccountAddress::random();
     let receiver = AccountAddress::random();
-    let store_address = AccountAddress::random();
-    let receiver_store_address = AccountAddress::random();
+    let fa_metadata_address = AccountAddress::from_str(OTHER_CURRENCY_ADDRESS).unwrap();
+    let store_address = primary_store_address(sender, fa_metadata_address);
+    let receiver_store_address = primary_store_address(receiver, fa_metadata_address);
     let (changes, events) = transfer_fa_output(
         sender,
-        AccountAddress::from_str(OTHER_CURRENCY_ADDRESS).unwrap(),
+        fa_metadata_address,
         store_address,
         amount * 2,
         receiver,
@@ -514,8 +670,8 @@ async fn test_fee_payer_transfer_attributes_fee_to_fee_payer() {
     let sender = AccountAddress::random();
     let fee_payer = AccountAddress::random();
     let receiver = AccountAddress::random();
-    let store_address = AccountAddress::random();
-    let receiver_store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
+    let receiver_store_address = primary_store_address(receiver, APT_ADDRESS);
     let (changes, events) = transfer_fa_output(
         sender,
         APT_ADDRESS,
@@ -584,7 +740,7 @@ async fn test_fee_payer_mint_attributes_fee_to_fee_payer() {
     let amount = 100;
     let sender = AccountAddress::random();
     let fee_payer = AccountAddress::random();
-    let store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
     let (mint_changes, mint_events) = mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
     let input = test_fee_payer_transaction(sender, fee_payer, version, mint_changes, mint_events);
 
@@ -625,7 +781,7 @@ async fn test_fee_payer_storage_refund_attributes_to_fee_payer() {
     let storage_refund = 500u64;
     let sender = AccountAddress::random();
     let fee_payer = AccountAddress::random();
-    let store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
 
     let (mint_changes, mut mint_events) =
         mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
@@ -702,7 +858,7 @@ async fn test_no_fee_payer_storage_refund_attributes_to_sender() {
     let amount = 100;
     let storage_refund = 500u64;
     let sender = AccountAddress::random();
-    let store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
 
     let (mint_changes, mut mint_events) =
         mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
@@ -775,7 +931,7 @@ async fn test_storage_refund_exceeds_gas_fee() {
     let amount = 100;
     let sender = AccountAddress::random();
     let fee_payer = AccountAddress::random();
-    let store_address = AccountAddress::random();
+    let store_address = primary_store_address(sender, APT_ADDRESS);
 
     // gas_used=178 and gas_unit_price=101 from test helpers, so gas fee = 17,978 octas.
     // Set storage refund to 25,000 so it exceeds the gas fee (net = +7,022 for fee payer).
