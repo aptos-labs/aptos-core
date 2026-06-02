@@ -3,9 +3,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-#[path = "helpers.rs"]
-mod helpers;
-
 const N: u64 = 1000;
 
 fn bench_nested_loop(c: &mut Criterion) {
@@ -27,7 +24,7 @@ fn bench_nested_loop(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors) = micro_op_nested_loop();
+        let (functions, descriptors) = micro_op_nested_loop(false);
         let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
@@ -42,8 +39,7 @@ fn bench_nested_loop(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions_gas, descriptors_gas) = micro_op_nested_loop();
-        helpers::gas_instrument(&functions_gas);
+        let (functions_gas, descriptors_gas) = micro_op_nested_loop(true);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {

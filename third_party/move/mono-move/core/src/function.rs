@@ -2,35 +2,26 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
-use arc_swap::ArcSwap;
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
-use std::{fmt, ptr::NonNull, sync::Arc};
+use std::{fmt, ptr::NonNull};
 
 /// Function's micro-ops.
 pub struct Code {
-    inner: ArcSwap<Vec<MicroOp>>,
+    inner: Box<[MicroOp]>,
 }
 
 impl Code {
     /// Builds code from a vector of micro-ops.
     pub fn from_vec(ops: Vec<MicroOp>) -> Self {
         Self {
-            inner: ArcSwap::from_pointee(ops),
+            inner: ops.into_boxed_slice(),
         }
     }
 
-    /// Snapshot of the current micro-ops.
-    ///
-    /// TODO: decide on if using ArcSwap is good enough for perf and
-    ///   what is the best way to update code and any other relevant
-    ///   information in the function.
-    pub fn load(&self) -> arc_swap::Guard<Arc<Vec<MicroOp>>> {
-        self.inner.load()
-    }
-
-    /// Replaces the micro-ops atomically.
-    pub fn store(&self, ops: Vec<MicroOp>) {
-        self.inner.store(Arc::new(ops));
+    /// The function's micro-ops.
+    #[inline(always)]
+    pub fn get(&self) -> &[MicroOp] {
+        &self.inner
     }
 }
 
@@ -259,7 +250,7 @@ impl fmt::Display for Function {
         writeln!(f, "fun {}() {{", self.name())?;
         writeln!(f, "  frame_data_size: {}", self.param_and_local_sizes_sum)?;
         writeln!(f, "  code:")?;
-        let code = self.code.load();
+        let code = self.code.get();
         for (i, op) in code.iter().enumerate() {
             writeln!(f, "    {}: {}", i, op)?;
         }

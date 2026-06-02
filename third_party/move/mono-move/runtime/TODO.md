@@ -58,6 +58,14 @@ interpreter dispatch and execution speed:
   templates and patching in operands. Near-native speed with much less
   complexity than a full JIT compiler
 
+## Code swapping
+- `Function::code` is currently an immutable `Box<[MicroOp]>`. When we add
+  demand-driven re-optimization that swaps in new code at runtime, the swap
+  must preserve this property: a code swap should not be observed by the
+  transaction that triggers it -- only future re-executions should see the new
+  code. The currently-executing transaction must keep running against the code
+  it started with.
+
 ## Deep copy
 - CopyLoc on heap-allocated struct/enum needs recursive deep copy of entire object graph
 - Can trigger GC mid-copy (allocating the copy)

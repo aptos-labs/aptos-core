@@ -182,7 +182,7 @@ mod micro_op {
     /// Run the same ops on micro-op BST and return results in the same format
     /// as `native_run_ops_with_results`.
     fn micro_op_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
-        let (functions, descriptors) = micro_op_bst();
+        let (functions, descriptors) = micro_op_bst(false);
         let fn_new = unsafe { functions[FN_NEW].as_ref_unchecked() };
         let fn_insert = unsafe { functions[FN_INSERT].as_ref_unchecked() };
         let fn_get = unsafe { functions[FN_GET].as_ref_unchecked() };
