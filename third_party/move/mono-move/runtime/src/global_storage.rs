@@ -475,3 +475,549 @@ fn get_or_create_resource_entry<'a>(
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{heap::Heap, write_object_header};
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId,
+        OBJECT_HEADER_SIZE,
+    };
+    use move_core_types::account_address::AccountAddress;
+
+    // An `InternedType` is just an arena pointer; a `'static` node gives a
+    // stable, cheap one without standing up an interner. Two distinct types let
+    // us check that keys discriminate on type, not only address.
+    static TY_A: Type = Type::U64;
+    static TY_B: Type = Type::Bool;
+
+    fn addr(n: u8) -> AccountAddress {
+        let mut bytes = [0u8; AccountAddress::LENGTH];
+        bytes[AccountAddress::LENGTH - 1] = n;
+        AccountAddress::new(bytes)
+    }
+
+    fn key_a(n: u8) -> StorageKey {
+        StorageKey::Resource(addr(n), GlobalArenaPtr::from_static(&TY_A))
+    }
+
+    fn key_b(n: u8) -> StorageKey {
+        StorageKey::Resource(addr(n), GlobalArenaPtr::from_static(&TY_B))
+    }
+
+    // The map only stores and compares these pointers — it never reads through
+    // them (copying a value is the interpreter's job). So any non-null address
+    // is a valid stand-in for a heap value.
+    fn fake_ptr(n: usize) -> NonNull<u8> {
+        NonNull::new(n as *mut u8).expect("non-null")
+    }
+
+    /// Minimal in-crate provider: keys present here are external (committed)
+    /// resources; everything else does not exist.
+    #[derive(Default)]
+    struct Provider {
+        external: HashMap<StorageKey, NonNull<u8>>,
+    }
+
+    impl Provider {
+        fn empty() -> Self {
+            Self::default()
+        }
+
+        fn with(key: StorageKey, ptr: NonNull<u8>) -> Self {
+            let mut external = HashMap::new();
+            external.insert(key, ptr);
+            Self { external }
+        }
+    }
+
+    impl ResourceProvider for Provider {
+        fn get_resource(&self, key: StorageKey) -> Result<StorageRead, ResourceProviderError> {
+            Ok(match self.external.get(&key) {
+                Some(&ptr) => StorageRead::ExternalHeap { ptr, version: 0 },
+                None => StorageRead::DoesNotExist,
+            })
+        }
+    }
+
+    fn entry(read: StorageRead, write: StorageWrite) -> Entry {
+        Entry { read, write }
+    }
+
+    // -- Entry state machine --------------------------------------------------
+
+    #[test]
+    fn exists_reflects_read_and_write_state() {
+        let p = fake_ptr(0x10);
+        // An unmodified entry follows its read.
+        assert!(!entry(StorageRead::DoesNotExist, StorageWrite::NotModified).exists());
+        assert!(entry(
+            StorageRead::ExternalHeap { ptr: p, version: 0 },
+            StorageWrite::NotModified
+        )
+        .exists());
+        // A local write means present, regardless of the read.
+        assert!(entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
+            ptr: p,
+            epoch: 0
+        })
+        .exists());
+        // Deletion shadows any read.
+        assert!(!entry(
+            StorageRead::ExternalHeap { ptr: p, version: 0 },
+            StorageWrite::Deleted { epoch: 0 }
+        )
+        .exists());
+    }
+
+    #[test]
+    fn as_ptr_is_zero_copy_for_external_and_none_when_absent() {
+        let ext = fake_ptr(0x20);
+        let local = fake_ptr(0x21);
+        // An external read hands back the provider's pointer unchanged — the
+        // zero-copy read path.
+        assert_eq!(
+            entry(
+                StorageRead::ExternalHeap {
+                    ptr: ext,
+                    version: 0
+                },
+                StorageWrite::NotModified
+            )
+            .as_ptr(),
+            Some(ext)
+        );
+        assert_eq!(
+            entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
+                ptr: local,
+                epoch: 0
+            })
+            .as_ptr(),
+            Some(local)
+        );
+        assert_eq!(
+            entry(StorageRead::DoesNotExist, StorageWrite::NotModified).as_ptr(),
+            None
+        );
+        assert_eq!(
+            entry(
+                StorageRead::ExternalHeap {
+                    ptr: ext,
+                    version: 0
+                },
+                StorageWrite::Deleted { epoch: 0 }
+            )
+            .as_ptr(),
+            None
+        );
+    }
+
+    #[test]
+    fn as_ptr_mut_writability_tracks_ownership_and_epoch() {
+        let ext = fake_ptr(0x30);
+        let local = fake_ptr(0x31);
+        // An external read is never directly writable — it needs a copy.
+        assert!(matches!(
+            entry(
+                StorageRead::ExternalHeap { ptr: ext, version: 0 },
+                StorageWrite::NotModified
+            )
+            .as_ptr_mut(0),
+            Some(EntryPtr::NonWritable(p)) if p == ext
+        ));
+        // A local write in the current epoch is writable in place.
+        assert!(matches!(
+            entry(
+                StorageRead::DoesNotExist,
+                StorageWrite::LocalHeap { ptr: local, epoch: 5 }
+            )
+            .as_ptr_mut(5),
+            Some(EntryPtr::Writable(p)) if p == local
+        ));
+        // A local write from an older epoch needs a copy.
+        assert!(matches!(
+            entry(
+                StorageRead::DoesNotExist,
+                StorageWrite::LocalHeap { ptr: local, epoch: 4 }
+            )
+            .as_ptr_mut(5),
+            Some(EntryPtr::NonWritable(p)) if p == local
+        ));
+        // Deleted / absent have no pointer.
+        assert!(entry(StorageRead::DoesNotExist, StorageWrite::Deleted {
+            epoch: 0
+        })
+        .as_ptr_mut(0)
+        .is_none());
+        assert!(entry(StorageRead::DoesNotExist, StorageWrite::NotModified)
+            .as_ptr_mut(0)
+            .is_none());
+    }
+
+    // -- Map operations over the provider ------------------------------------
+
+    #[test]
+    fn exists_over_provider() {
+        let k = key_a(1);
+        assert!(!ResourceReadWriteSet::new()
+            .exists(&Provider::empty(), k)
+            .unwrap());
+        assert!(ResourceReadWriteSet::new()
+            .exists(&Provider::with(k, fake_ptr(0x40)), k)
+            .unwrap());
+    }
+
+    #[test]
+    fn keys_discriminate_on_type_at_the_same_address() {
+        // Same address, different resource type — distinct keys.
+        let ka = key_a(1);
+        let kb = key_b(1);
+        let provider = Provider::with(ka, fake_ptr(0x41));
+        let mut rws = ResourceReadWriteSet::new();
+        assert!(rws.exists(&provider, ka).unwrap());
+        assert!(!rws.exists(&provider, kb).unwrap());
+    }
+
+    #[test]
+    fn borrow_global_external_is_zero_copy() {
+        let k = key_a(1);
+        let ptr = fake_ptr(0x42);
+        // The borrow returns the provider's pointer directly — no local copy.
+        assert_eq!(
+            ResourceReadWriteSet::new()
+                .borrow_global(&Provider::with(k, ptr), k)
+                .unwrap(),
+            ptr
+        );
+    }
+
+    #[test]
+    fn borrow_global_missing_aborts() {
+        let k = key_a(1);
+        assert!(matches!(
+            ResourceReadWriteSet::new().borrow_global(&Provider::empty(), k),
+            Err(RuntimeError::ResourceDoesNotExist {
+                op: GlobalStorageOp::BorrowGlobal,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn try_borrow_global_mut_over_each_state() {
+        let k = key_a(1);
+        // Missing -> abort.
+        assert!(matches!(
+            ResourceReadWriteSet::new().try_borrow_global_mut(&Provider::empty(), k),
+            Err(RuntimeError::ResourceDoesNotExist {
+                op: GlobalStorageOp::BorrowGlobalMut,
+                ..
+            })
+        ));
+        // External -> non-writable (copy required).
+        let ext = fake_ptr(0x50);
+        assert!(matches!(
+            ResourceReadWriteSet::new().try_borrow_global_mut(&Provider::with(k, ext), k),
+            Ok(EntryPtr::NonWritable(p)) if p == ext
+        ));
+        // Local same-epoch -> writable in place.
+        let local = fake_ptr(0x51);
+        let mut rws = ResourceReadWriteSet::new();
+        rws.move_to(&Provider::empty(), k, local).unwrap();
+        assert!(matches!(
+            rws.try_borrow_global_mut(&Provider::empty(), k),
+            Ok(EntryPtr::Writable(p)) if p == local
+        ));
+    }
+
+    #[test]
+    fn borrow_global_mut_copies_external_once_then_reuses_in_epoch() {
+        // The first mutable borrow of an external resource is non-writable (the
+        // caller copies into the local heap and commits). A second borrow in the
+        // same epoch is writable and reuses that copy — no second copy.
+        let k = key_a(1);
+        let ext = fake_ptr(0xE0);
+        let provider = Provider::with(k, ext);
+        let mut rws = ResourceReadWriteSet::new();
+
+        assert!(matches!(
+            rws.try_borrow_global_mut(&provider, k),
+            Ok(EntryPtr::NonWritable(p)) if p == ext
+        ));
+        let local = fake_ptr(0xE1);
+        rws.commit_borrow_global_mut(k, local);
+        assert!(matches!(
+            rws.try_borrow_global_mut(&provider, k),
+            Ok(EntryPtr::Writable(p)) if p == local
+        ));
+    }
+
+    #[test]
+    fn move_to_publishes_and_rejects_duplicates() {
+        let k = key_a(1);
+        let mut rws = ResourceReadWriteSet::new();
+        rws.move_to(&Provider::empty(), k, fake_ptr(0x60)).unwrap();
+        assert!(rws.exists(&Provider::empty(), k).unwrap());
+        // Re-publishing over the just-written local resource aborts.
+        assert!(matches!(
+            rws.move_to(&Provider::empty(), k, fake_ptr(0x61)),
+            Err(RuntimeError::ResourceAlreadyExists { .. })
+        ));
+        // Publishing over a committed/external resource aborts too — the
+        // ExternalHeap-already-exists branch the differential harness can't
+        // reach (no committed state across calls).
+        assert!(matches!(
+            ResourceReadWriteSet::new().move_to(
+                &Provider::with(k, fake_ptr(0x62)),
+                k,
+                fake_ptr(0x63)
+            ),
+            Err(RuntimeError::ResourceAlreadyExists { .. })
+        ));
+    }
+
+    #[test]
+    fn move_from_external_requires_copy_then_marks_deleted() {
+        let k = key_a(1);
+        let ext = fake_ptr(0x70);
+        let provider = Provider::with(k, ext);
+        let mut rws = ResourceReadWriteSet::new();
+        // External is non-writable: the caller must deep-copy.
+        assert!(matches!(
+            rws.try_move_from(&provider, k),
+            Ok(EntryPtr::NonWritable(p)) if p == ext
+        ));
+        // The move is not finalized until commit — the resource still exists.
+        assert!(rws.exists(&provider, k).unwrap());
+        rws.commit_move_from(k);
+        // Now it is gone: exists is false and a borrow aborts.
+        assert!(!rws.exists(&provider, k).unwrap());
+        assert!(matches!(
+            rws.borrow_global(&provider, k),
+            Err(RuntimeError::ResourceDoesNotExist {
+                op: GlobalStorageOp::BorrowGlobal,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn move_from_local_is_writable_and_deletes_in_place() {
+        let k = key_a(1);
+        let local = fake_ptr(0x71);
+        let mut rws = ResourceReadWriteSet::new();
+        rws.move_to(&Provider::empty(), k, local).unwrap();
+        // A same-epoch local value is writable; try_move_from deletes it right
+        // away, no commit needed.
+        assert!(matches!(
+            rws.try_move_from(&Provider::empty(), k),
+            Ok(EntryPtr::Writable(p)) if p == local
+        ));
+        assert!(!rws.exists(&Provider::empty(), k).unwrap());
+    }
+
+    #[test]
+    fn move_from_missing_aborts() {
+        let k = key_a(1);
+        assert!(matches!(
+            ResourceReadWriteSet::new().try_move_from(&Provider::empty(), k),
+            Err(RuntimeError::ResourceDoesNotExist {
+                op: GlobalStorageOp::MoveFrom,
+                ..
+            })
+        ));
+    }
+
+    // -- Checkpoints / rollback ----------------------------------------------
+
+    #[test]
+    fn checkpoint_advances_epoch_and_depth() {
+        let mut rws = ResourceReadWriteSet::new();
+        assert_eq!((rws.current_epoch(), rws.checkpoint_depth()), (0, 0));
+        rws.checkpoint();
+        assert_eq!((rws.current_epoch(), rws.checkpoint_depth()), (1, 1));
+    }
+
+    #[test]
+    fn rollback_zero_is_noop() {
+        let mut rws = ResourceReadWriteSet::new();
+        rws.checkpoint();
+        rws.rollback(0).unwrap();
+        assert_eq!((rws.current_epoch(), rws.checkpoint_depth()), (1, 1));
+    }
+
+    #[test]
+    fn rollback_more_than_depth_aborts() {
+        let mut rws = ResourceReadWriteSet::new();
+        rws.checkpoint();
+        assert!(rws.rollback(2).is_err());
+    }
+
+    #[test]
+    fn rollback_undoes_a_publish_made_after_the_checkpoint() {
+        let k = key_a(1);
+        let mut rws = ResourceReadWriteSet::new();
+        rws.checkpoint();
+        rws.move_to(&Provider::empty(), k, fake_ptr(0x80)).unwrap();
+        assert!(rws.exists(&Provider::empty(), k).unwrap());
+        rws.rollback(1).unwrap();
+        assert!(!rws.exists(&Provider::empty(), k).unwrap());
+    }
+
+    #[test]
+    fn rollback_restores_to_deleted_not_absent() {
+        // Design-doc case: an external resource is moved out, then after a
+        // checkpoint re-published. Rolling back must restore the Deleted write,
+        // not the original present state.
+        let k = key_a(1);
+        let provider = Provider::with(k, fake_ptr(0x90));
+        let mut rws = ResourceReadWriteSet::new();
+
+        let _ = rws.try_move_from(&provider, k).unwrap();
+        rws.commit_move_from(k);
+        assert!(!rws.exists(&provider, k).unwrap());
+
+        rws.checkpoint();
+        rws.move_to(&provider, k, fake_ptr(0x91)).unwrap();
+        assert!(rws.exists(&provider, k).unwrap());
+
+        rws.rollback(1).unwrap();
+        assert!(!rws.exists(&provider, k).unwrap());
+    }
+
+    #[test]
+    fn journal_grows_once_per_epoch_for_repeated_mutations() {
+        let k = key_a(1);
+        let provider = Provider::with(k, fake_ptr(0xA0));
+        let mut rws = ResourceReadWriteSet::new();
+
+        // First mutation of an external resource records its pre-txn state.
+        let _ = rws.try_move_from(&provider, k).unwrap();
+        rws.commit_move_from(k);
+        assert_eq!(rws.journal_len(), 1);
+
+        // A second mutation in the same epoch does not grow the journal — the
+        // pre-epoch state is already saved.
+        rws.move_to(&provider, k, fake_ptr(0xA1)).unwrap();
+        assert_eq!(rws.journal_len(), 1);
+    }
+
+    #[test]
+    fn rollback_n_collapses_multiple_checkpoints() {
+        let k = key_a(1);
+        let mut rws = ResourceReadWriteSet::new();
+        rws.checkpoint();
+        rws.checkpoint();
+        rws.move_to(&Provider::empty(), k, fake_ptr(0xB0)).unwrap();
+        assert_eq!(rws.checkpoint_depth(), 2);
+        rws.rollback(2).unwrap();
+        assert_eq!((rws.current_epoch(), rws.checkpoint_depth()), (0, 0));
+        assert!(!rws.exists(&Provider::empty(), k).unwrap());
+    }
+
+    #[test]
+    fn journal_grows_for_first_mutation_each_epoch() {
+        let k = key_a(1);
+        let provider = Provider::with(k, fake_ptr(0xC0));
+        let mut rws = ResourceReadWriteSet::new();
+
+        // First mutable borrow of the external resource: copy + commit records
+        // the pre-txn state.
+        let _ = rws.try_borrow_global_mut(&provider, k).unwrap();
+        rws.commit_borrow_global_mut(k, fake_ptr(0xC1));
+        assert_eq!(rws.journal_len(), 1);
+
+        // The first mutation in a new epoch journals again — the local write is
+        // now from an older epoch.
+        rws.checkpoint();
+        let _ = rws.try_borrow_global_mut(&provider, k).unwrap();
+        rws.commit_borrow_global_mut(k, fake_ptr(0xC2));
+        assert_eq!(rws.journal_len(), 2);
+    }
+
+    #[test]
+    fn rollback_then_remutate_journals_again() {
+        let k = key_a(1);
+        let provider = Provider::with(k, fake_ptr(0xD0));
+        let mut rws = ResourceReadWriteSet::new();
+
+        rws.checkpoint();
+        let _ = rws.try_borrow_global_mut(&provider, k).unwrap();
+        rws.commit_borrow_global_mut(k, fake_ptr(0xD1));
+        assert_eq!(rws.journal_len(), 1);
+
+        rws.rollback(1).unwrap();
+        assert_eq!(rws.journal_len(), 0);
+
+        // After rollback the entry is back to its pre-mutation state, so the
+        // next mutable borrow journals again.
+        let _ = rws.try_borrow_global_mut(&provider, k).unwrap();
+        rws.commit_borrow_global_mut(k, fake_ptr(0xD2));
+        assert_eq!(rws.journal_len(), 1);
+    }
+
+    // -- GC scan --------------------------------------------------------------
+
+    #[test]
+    fn scan_relocates_local_writes_but_not_external_reads() {
+        // A from-space heap holding one object whose payload is a u64.
+        let mut heap = Heap::new(4096);
+        let payload: u64 = 0xABCD;
+        // SAFETY: write a valid `[header | payload]` block at the bump pointer
+        // and advance it, mirroring the allocator's layout.
+        let local = unsafe {
+            let header_start = heap.bump_ptr;
+            let obj = header_start.add(OBJECT_HEADER_SIZE);
+            let total = OBJECT_HEADER_SIZE + 8;
+            write_object_header(obj, DescriptorId(1), total as u32);
+            (obj as *mut u64).write(payload);
+            heap.bump_ptr = header_start.add(total);
+            NonNull::new_unchecked(obj)
+        };
+
+        // To-space for the copy; kept alive for the duration of the scan.
+        let mut to_space = vec![0u64; 512].into_boxed_slice();
+        let mut scanner = RootScanner::for_test(&heap, to_space.as_mut_ptr() as *mut u8);
+
+        // One committed (external) resource and one locally-written resource.
+        let k_ext = key_a(1);
+        let k_local = key_a(2);
+        let ext = fake_ptr(0xDEAD);
+        let mut rws = ResourceReadWriteSet::new();
+        rws.entries.insert(k_ext, Entry {
+            read: StorageRead::ExternalHeap {
+                ptr: ext,
+                version: 0,
+            },
+            write: StorageWrite::NotModified,
+        });
+        rws.entries.insert(k_local, Entry {
+            read: StorageRead::DoesNotExist,
+            write: StorageWrite::LocalHeap {
+                ptr: local,
+                epoch: 0,
+            },
+        });
+
+        rws.scan(&mut scanner);
+
+        // The external read is owned by the provider and must not be relocated.
+        match rws.entries[&k_ext].read {
+            StorageRead::ExternalHeap { ptr, .. } => assert_eq!(ptr, ext),
+            StorageRead::DoesNotExist => panic!("external read must survive the scan"),
+        }
+        // The local write is relocated into to-space, payload preserved.
+        match rws.entries[&k_local].write {
+            StorageWrite::LocalHeap { ptr, .. } => {
+                assert_ne!(ptr, local, "local write must be relocated");
+                // SAFETY: `ptr` is the relocated object in to-space.
+                assert_eq!(unsafe { (ptr.as_ptr() as *const u64).read() }, payload);
+            },
+            StorageWrite::NotModified | StorageWrite::Deleted { .. } => {
+                panic!("local write must stay a LocalHeap write")
+            },
+        }
+    }
+}

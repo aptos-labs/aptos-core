@@ -45,9 +45,25 @@ pub enum RunResult<R> {
 pub struct MonoRunner<'a, 'guard, 'ctx> {
     txn_ctx: &'a mut TxnCtx<'guard, 'ctx>,
     function: &'guard Function,
+    /// Initial heap size for each run, or `None` for the interpreter default.
+    /// A small size makes GC-pressure tests trigger collections.
+    heap_size: Option<usize>,
+    /// Number of garbage collections the most recent [`run`](Self::run)
+    /// performed.
+    gc_count: usize,
 }
 
 impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
+    /// Sets the initial heap size used to build the interpreter on each run.
+    pub fn set_heap_size(&mut self, heap_size: Option<usize>) {
+        self.heap_size = heap_size;
+    }
+
+    /// Number of garbage collections the most recent [`run`](Self::run) ran.
+    pub fn gc_count(&self) -> usize {
+        self.gc_count
+    }
+
     /// Run the entry function once. `set_args` places arguments into the root
     /// frame before execution; on success `extract_returns` reads results from
     /// it.
@@ -59,13 +75,18 @@ impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
         // Each run starts with a full budget; the meter is shared across
         // repeated runs on this context (e.g. bench iterations).
         self.txn_ctx.gas_meter().reset(GAS_BUDGET);
-        let mut interp = InterpreterContext::new(&mut *self.txn_ctx, self.function);
+        let mut interp = match self.heap_size {
+            Some(n) => InterpreterContext::with_heap_size(&mut *self.txn_ctx, self.function, n),
+            None => InterpreterContext::new(&mut *self.txn_ctx, self.function),
+        };
         set_args(&mut interp);
-        match interp.run() {
+        let result = match interp.run() {
             Err(err) => RunResult::Error(format!("{}", err)),
             Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&interp)),
             Ok(RuntimeStatus::Aborted { code, message }) => RunResult::Aborted { code, message },
-        }
+        };
+        self.gc_count = interp.gc_count();
+        result
     }
 
     /// Call an entry whose args are 8-byte words and that returns a single
@@ -151,6 +172,8 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     let mut runner = MonoRunner {
         txn_ctx: &mut txn_ctx,
         function,
+        heap_size: None,
+        gc_count: 0,
     };
     Ok(body(&mut runner))
 }

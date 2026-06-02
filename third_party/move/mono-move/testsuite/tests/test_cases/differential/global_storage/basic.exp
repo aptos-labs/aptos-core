@@ -1,0 +1,489 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x42::globals
+struct Inner has drop + store
+  a: u64
+  b: u64
+
+struct R has key
+  x: u64
+  y: u64
+  inner: Inner
+
+// Function definition at index 0
+#[persistent] public fun borrow_missing(l0: address): u64 acquires R
+    move_loc l0
+    borrow_global R
+    borrow_field R, x
+    read_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun double_publish(l0: signer)
+    borrow_loc l0
+    ld_u64 1
+    ld_u64 1
+    ld_u64 1
+    ld_u64 1
+    // @5
+    pack Inner
+    pack R
+    move_to R
+    borrow_loc l0
+    ld_u64 2
+    // @10
+    ld_u64 2
+    ld_u64 2
+    ld_u64 2
+    pack Inner
+    pack R
+    // @15
+    move_to R
+    ret
+
+// Function definition at index 2
+#[persistent] public fun publish_and_read(l0: signer, l1: address, l2: u64): u64 acquires R
+    local l3: &R
+    borrow_loc l0
+    copy_loc l2
+    copy_loc l2
+    ld_u64 1
+    add
+    // @5
+    copy_loc l2
+    ld_u64 2
+    add
+    move_loc l2
+    ld_u64 3
+    // @10
+    add
+    pack Inner
+    pack R
+    move_to R
+    move_loc l1
+    // @15
+    borrow_global R
+    st_loc l3
+    copy_loc l3
+    borrow_field R, x
+    read_ref
+    // @20
+    copy_loc l3
+    borrow_field R, y
+    read_ref
+    add
+    copy_loc l3
+    // @25
+    borrow_field R, inner
+    borrow_field Inner, a
+    read_ref
+    add
+    move_loc l3
+    // @30
+    borrow_field R, inner
+    borrow_field Inner, b
+    read_ref
+    add
+    ret
+
+// Function definition at index 3
+#[persistent] public fun publish_and_take(l0: signer, l1: address, l2: u64): u64 acquires R
+    local l3: u64
+    local l4: u64
+    local l5: u64
+    borrow_loc l0
+    copy_loc l2
+    copy_loc l2
+    ld_u64 1
+    add
+    // @5
+    copy_loc l2
+    ld_u64 2
+    add
+    move_loc l2
+    ld_u64 3
+    // @10
+    add
+    pack Inner
+    pack R
+    move_to R
+    move_loc l1
+    // @15
+    move_from R
+    unpack R
+    unpack Inner
+    st_loc l3
+    st_loc l4
+    // @20
+    add
+    move_loc l4
+    add
+    move_loc l3
+    add
+    // @25
+    ret
+
+// Function definition at index 4
+#[persistent] public fun publish_mutate_read(l0: signer, l1: address, l2: u64): u64 acquires R
+    local l3: &mut R
+    borrow_loc l0
+    move_loc l2
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    // @5
+    pack Inner
+    pack R
+    move_to R
+    copy_loc l1
+    mut_borrow_global R
+    // @10
+    st_loc l3
+    copy_loc l3
+    borrow_field R, x
+    read_ref
+    ld_u64 1
+    // @15
+    add
+    move_loc l3
+    mut_borrow_field R, inner
+    mut_borrow_field Inner, b
+    write_ref
+    // @20
+    move_loc l1
+    borrow_global R
+    borrow_field R, inner
+    borrow_field Inner, b
+    read_ref
+    // @25
+    ret
+
+// Function definition at index 5
+#[persistent] public fun take_missing(l0: address): u64 acquires R
+    move_loc l0
+    move_from R
+    unpack R
+    pop
+    pop
+    // @5
+    ret
+
+=== stackless ===
+// module 0x42::globals
+
+fun borrow_missing(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: address
+    r1: &0x42::globals::R
+    r2: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_global 0x42::globals::R, r0
+    1: r2 := read_field R::x, r1
+    2: ret [r2]
+}
+
+fun double_publish(r0) {
+  slots: params(1), locals(0), temps(7)
+    r0: signer
+    r1: &signer
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: u64
+    r6: 0x42::globals::Inner
+    r7: 0x42::globals::R
+  code:
+  L0:
+    0: r1 := imm_borrow_loc r0
+    1: r2 := ld_u64 1
+    2: r3 := ld_u64 1
+    3: r4 := ld_u64 1
+    4: r5 := ld_u64 1
+    5: r6 := pack 0x42::globals::Inner, [r4, r5]
+    6: r7 := pack 0x42::globals::R, [r2, r3, r6]
+    7: move_to 0x42::globals::R, r1, r7
+    8: r1 := imm_borrow_loc r0
+    9: r3 := ld_u64 2
+    10: r2 := ld_u64 2
+    11: r5 := ld_u64 2
+    12: r4 := ld_u64 2
+    13: r6 := pack 0x42::globals::Inner, [r5, r4]
+    14: r7 := pack 0x42::globals::R, [r3, r2, r6]
+    15: move_to 0x42::globals::R, r1, r7
+    16: ret []
+}
+
+fun publish_and_read(r0, r1, r2): u64 {
+  slots: params(3), locals(1), temps(7)
+    r0: signer
+    r1: address
+    r2: u64
+    r3: &0x42::globals::R
+    r4: &signer
+    r5: u64
+    r6: u64
+    r7: u64
+    r8: 0x42::globals::Inner
+    r9: 0x42::globals::R
+    r10: &0x42::globals::Inner
+  code:
+  L0:
+    0: r4 := imm_borrow_loc r0
+    1: r5 := add r2, #1
+    2: r6 := add r2, #2
+    3: r7 := add r2, #3
+    4: r8 := pack 0x42::globals::Inner, [r6, r7]
+    5: r9 := pack 0x42::globals::R, [r2, r5, r8]
+    6: move_to 0x42::globals::R, r4, r9
+    7: r3 := imm_borrow_global 0x42::globals::R, r1
+    8: r5 := read_field R::x, r3
+    9: r7 := read_field R::y, r3
+    10: r7 := add r5, r7
+    11: r10 := imm_borrow_field R::inner, r3
+    12: r5 := read_field Inner::a, r10
+    13: r5 := add r7, r5
+    14: r10 := imm_borrow_field R::inner, r3
+    15: r7 := read_field Inner::b, r10
+    16: r7 := add r5, r7
+    17: ret [r7]
+}
+
+fun publish_and_take(r0, r1, r2): u64 {
+  slots: params(3), locals(2), temps(6)
+    r0: signer
+    r1: address
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: &signer
+    r6: u64
+    r7: u64
+    r8: u64
+    r9: 0x42::globals::Inner
+    r10: 0x42::globals::R
+  code:
+  L0:
+    0: r5 := imm_borrow_loc r0
+    1: r6 := add r2, #1
+    2: r7 := add r2, #2
+    3: r8 := add r2, #3
+    4: r9 := pack 0x42::globals::Inner, [r7, r8]
+    5: r10 := pack 0x42::globals::R, [r2, r6, r9]
+    6: move_to 0x42::globals::R, r5, r10
+    7: r10 := move_from 0x42::globals::R, r1
+    8: [r6, r8, r9] := unpack 0x42::globals::R, r10
+    9: [r4, r3] := unpack 0x42::globals::Inner, r9
+    10: r8 := add r6, r8
+    11: r8 := add r8, r4
+    12: r8 := add r8, r3
+    13: ret [r8]
+}
+
+fun publish_mutate_read(r0, r1, r2): u64 {
+  slots: params(3), locals(1), temps(9)
+    r0: signer
+    r1: address
+    r2: u64
+    r3: &mut 0x42::globals::R
+    r4: &signer
+    r5: u64
+    r6: u64
+    r7: u64
+    r8: 0x42::globals::Inner
+    r9: 0x42::globals::R
+    r10: &mut 0x42::globals::Inner
+    r11: &0x42::globals::R
+    r12: &0x42::globals::Inner
+  code:
+  L0:
+    0: r4 := imm_borrow_loc r0
+    1: r5 := ld_u64 0
+    2: r6 := ld_u64 0
+    3: r7 := ld_u64 0
+    4: r8 := pack 0x42::globals::Inner, [r6, r7]
+    5: r9 := pack 0x42::globals::R, [r2, r5, r8]
+    6: move_to 0x42::globals::R, r4, r9
+    7: r3 := mut_borrow_global 0x42::globals::R, r1
+    8: r5 := read_field R::x, r3
+    9: r5 := add r5, #1
+    10: r10 := mut_borrow_field R::inner, r3
+    11: write_field Inner::b, r10, r5
+    12: r11 := imm_borrow_global 0x42::globals::R, r1
+    13: r12 := imm_borrow_field R::inner, r11
+    14: r5 := read_field Inner::b, r12
+    15: ret [r5]
+}
+
+fun take_missing(r0): u64 {
+  slots: params(1), locals(0), temps(4)
+    r0: address
+    r1: 0x42::globals::R
+    r2: u64
+    r3: u64
+    r4: 0x42::globals::Inner
+  code:
+  L0:
+    0: r1 := move_from 0x42::globals::R, r0
+    1: [r2, r3, r4] := unpack 0x42::globals::R, r1
+    2: ret [r2]
+}
+=== micro-ops ===
+// module 0x42::globals
+
+fun borrow_missing() {
+  frame_data_size: 56
+  code:
+    0: Charge #40
+    1: BorrowGlobal<0x42::globals::R> [32] <- addr=[0], ty=
+    2: ReadRefOffset [48] <- *([32]+0) (size=8)
+    3: Move8 [0] <- [48]
+    4: Return
+}
+
+fun double_publish() {
+  frame_data_size: 136
+  code:
+    0: Charge #390
+    1: SlotBorrow [32] <- &[0]
+    2: StoreImm8 [48] <- #1
+    3: StoreImm8 [56] <- #1
+    4: StoreImm8 [64] <- #1
+    5: StoreImm8 [72] <- #1
+    6: Move8 [88] <- [72]
+    7: Move8 [80] <- [64]
+    8: Move(16) [112] <- [80]
+    9: Move8 [104] <- [56]
+    10: Move8 [96] <- [48]
+    11: HeapNew [128] desc=2
+    12: HeapMoveTo [128]+0 <- [96] (size=32)
+    13: MoveTo<0x42::globals::R> signer=[32], src=[128]
+    14: SlotBorrow [32] <- &[0]
+    15: StoreImm8 [56] <- #2
+    16: StoreImm8 [48] <- #2
+    17: StoreImm8 [72] <- #2
+    18: StoreImm8 [64] <- #2
+    19: Move8 [88] <- [64]
+    20: Move8 [80] <- [72]
+    21: Move(16) [112] <- [80]
+    22: Move8 [104] <- [48]
+    23: Move8 [96] <- [56]
+    24: HeapNew [128] desc=2
+    25: HeapMoveTo [128]+0 <- [96] (size=32)
+    26: MoveTo<0x42::globals::R> signer=[32], src=[128]
+    27: Return
+  safe_point_layouts:
+    11: []
+    24: []
+}
+
+fun publish_and_read() {
+  frame_data_size: 200
+  code:
+    0: Charge #326
+    1: SlotBorrow [88] <- &[0]
+    2: AddU64Imm [104] <- [64] + #1
+    3: AddU64Imm [112] <- [64] + #2
+    4: AddU64Imm [120] <- [64] + #3
+    5: Move8 [136] <- [120]
+    6: Move8 [128] <- [112]
+    7: Move(16) [160] <- [128]
+    8: Move8 [152] <- [104]
+    9: Move8 [144] <- [64]
+    10: HeapNew [192] desc=2
+    11: HeapMoveTo [192]+0 <- [144] (size=32)
+    12: MoveTo<0x42::globals::R> signer=[88], src=[192]
+    13: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty=
+    14: ReadRefOffset [104] <- *([72]+0) (size=8)
+    15: ReadRefOffset [120] <- *([72]+8) (size=8)
+    16: AddU64 [120] <- [104] + [120]
+    17: DeriveRefOffsetImm [176] <- [72]+16
+    18: ReadRefOffset [104] <- *([176]+0) (size=8)
+    19: AddU64 [104] <- [120] + [104]
+    20: DeriveRefOffsetImm [176] <- [72]+16
+    21: ReadRefOffset [120] <- *([176]+8) (size=8)
+    22: AddU64 [120] <- [104] + [120]
+    23: Move8 [0] <- [120]
+    24: Return
+  safe_point_layouts:
+    10: []
+}
+
+fun publish_and_take() {
+  frame_data_size: 184
+  code:
+    0: Charge #384
+    1: SlotBorrow [88] <- &[0]
+    2: AddU64Imm [104] <- [64] + #1
+    3: AddU64Imm [112] <- [64] + #2
+    4: AddU64Imm [120] <- [64] + #3
+    5: Move8 [136] <- [120]
+    6: Move8 [128] <- [112]
+    7: Move(16) [160] <- [128]
+    8: Move8 [152] <- [104]
+    9: Move8 [144] <- [64]
+    10: HeapNew [176] desc=2
+    11: HeapMoveTo [176]+0 <- [144] (size=32)
+    12: MoveTo<0x42::globals::R> signer=[88], src=[176]
+    13: MoveFrom<0x42::globals::R> [176] <- addr=[32], ty=
+    14: HeapMoveFrom [144] <- [176]+0 (size=32)
+    15: Move(16) [128] <- [160]
+    16: Move8 [120] <- [152]
+    17: Move8 [104] <- [144]
+    18: Move8 [72] <- [136]
+    19: Move8 [80] <- [128]
+    20: AddU64 [120] <- [104] + [120]
+    21: AddU64 [120] <- [120] + [80]
+    22: AddU64 [120] <- [120] + [72]
+    23: Move8 [0] <- [120]
+    24: Return
+  safe_point_layouts:
+    10: []
+    13: []
+}
+
+fun publish_mutate_read() {
+  frame_data_size: 232
+  code:
+    0: Charge #311
+    1: SlotBorrow [88] <- &[0]
+    2: StoreImm8 [104] <- #0
+    3: StoreImm8 [112] <- #0
+    4: StoreImm8 [120] <- #0
+    5: Move8 [136] <- [120]
+    6: Move8 [128] <- [112]
+    7: Move(16) [160] <- [128]
+    8: Move8 [152] <- [104]
+    9: Move8 [144] <- [64]
+    10: HeapNew [224] desc=2
+    11: HeapMoveTo [224]+0 <- [144] (size=32)
+    12: MoveTo<0x42::globals::R> signer=[88], src=[224]
+    13: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty=
+    14: ReadRefOffset [104] <- *([72]+0) (size=8)
+    15: AddU64Imm [104] <- [104] + #1
+    16: DeriveRefOffsetImm [176] <- [72]+16
+    17: WriteRefOffset *([176]+8) <- [104] (size=8)
+    18: BorrowGlobal<0x42::globals::R> [192] <- addr=[32], ty=
+    19: DeriveRefOffsetImm [208] <- [192]+16
+    20: ReadRefOffset [104] <- *([208]+8) (size=8)
+    21: Move8 [0] <- [104]
+    22: Return
+  safe_point_layouts:
+    10: []
+    13: []
+}
+
+fun take_missing() {
+  frame_data_size: 104
+  code:
+    0: Charge #176
+    1: MoveFrom<0x42::globals::R> [96] <- addr=[0], ty=
+    2: HeapMoveFrom [32] <- [96]+0 (size=32)
+    3: Move(16) [80] <- [48]
+    4: Move8 [72] <- [40]
+    5: Move8 [64] <- [32]
+    6: Move8 [0] <- [64]
+    7: Return
+  safe_point_layouts:
+    1: []
+}

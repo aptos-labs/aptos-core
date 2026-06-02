@@ -263,4 +263,15 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
         self.guard.publish_layout(ty, layout)
     }
+
+    fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> Result<DescriptorId> {
+        Ok(self
+            .guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
+    }
 }

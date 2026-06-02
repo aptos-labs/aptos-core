@@ -739,9 +739,13 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
             MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
 
-            MicroOp::Exists { addr, ty: _, dst } | MicroOp::MoveFrom { addr, ty: _, dst } => {
-                // Exists writes a bool (currently widened to 8 bytes); MoveFrom
-                // writes an 8-byte owned heap pointer.
+            MicroOp::Exists { addr, ty: _, dst } => {
+                // Exists writes a bool.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access_1(pc, dst);
+            },
+            MicroOp::MoveFrom { addr, ty: _, dst } => {
+                // MoveFrom writes an 8-byte owned heap pointer.
                 self.check_frame_access(Some(pc), addr, 32);
                 self.check_frame_access_8(pc, dst);
             },

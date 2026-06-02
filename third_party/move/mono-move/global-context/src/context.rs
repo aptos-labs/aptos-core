@@ -171,6 +171,9 @@ struct Descriptors {
     /// sharing a pointer shape share one descriptor. Pointer-free captures
     /// bypass this cache for `TRIVIAL_DESCRIPTOR_ID`.
     captured_data_by_pointer_offsets: DashMap<Vec<u32>, DescriptorId, ahash::RandomState>,
+    /// Struct-object idempotency cache: `struct_ty -> id`. Inline resources
+    /// laid out as heap objects share one descriptor per type.
+    struct_by_ty: DashMap<InternedType, DescriptorId, ahash::RandomState>,
     /// All descriptors (reserved + user) in id order. Replaced atomically
     /// on append via `ArcSwap::rcu` (CAS loop). Readers `load()` without
     /// locking.
@@ -182,6 +185,7 @@ impl Default for Descriptors {
         Self {
             vector_by_elem: DashMap::default(),
             captured_data_by_pointer_offsets: DashMap::default(),
+            struct_by_ty: DashMap::default(),
             table: ArcSwap::from_pointee(initial_descriptors()),
         }
     }
@@ -196,10 +200,12 @@ impl Descriptors {
         let Self {
             vector_by_elem,
             captured_data_by_pointer_offsets,
+            struct_by_ty,
             table,
         } = self;
         vector_by_elem.clear();
         captured_data_by_pointer_offsets.clear();
+        struct_by_ty.clear();
         table.store(Arc::new(initial_descriptors()));
     }
 }
@@ -671,6 +677,36 @@ impl<'ctx> ExecutionGuard<'ctx> {
                 let desc = Arc::new(
                     ObjectDescriptor::new_vector(elem_size, offsets)
                         .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}")),
+                );
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Materializes a struct-object descriptor for `struct_ty` (the inline
+    /// resource laid out as a heap object) into the shared arena and returns
+    /// its assigned [`DescriptorId`]. Idempotent: subsequent calls with the
+    /// same `struct_ty` return the same id without re-allocating.
+    pub fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(id) = self.ctx.descriptors.struct_by_ty.get(&struct_ty) {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .struct_by_ty
+            .entry(struct_ty)
+            .or_insert_with(|| {
+                let offsets: Vec<u32> = ptr_offsets.iter().map(|o| o.0).collect();
+                let desc = Arc::new(
+                    ObjectDescriptor::new_struct(size, offsets)
+                        .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}")),
                 );
                 self.append_descriptor(desc)
             })

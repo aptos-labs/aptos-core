@@ -1,0 +1,142 @@
+=== micro-ops ===
+// module 0x42::nested_globals
+
+fun mutate_vec_push() {
+  frame_data_size: 216
+  code:
+    0: Charge #262
+    1: VecNew [72]
+    2: SlotBorrow [96] <- &[72]
+    3: VecPushBack [96].push([64], size=8, desc=2)
+    4: SlotBorrow [112] <- &[0]
+    5: StoreImm8 [128] <- #0
+    6: Move8 [144] <- [72]
+    7: Move8 [136] <- [128]
+    8: HeapNew [208] desc=3
+    9: HeapMoveTo [208]+0 <- [136] (size=16)
+    10: MoveTo<0x42::nested_globals::WithVec> signer=[112], src=[208]
+    11: BorrowGlobalMut<0x42::nested_globals::WithVec> [152] <- addr=[32], ty=
+    12: DeriveRefOffsetImm [96] <- [152]+8
+    13: AddU64Imm [128] <- [64] + #1
+    14: VecPushBack [96].push([128], size=8, desc=2)
+    15: BorrowGlobal<0x42::nested_globals::WithVec> [80] <- addr=[32], ty=
+    16: DeriveRefOffsetImm [168] <- [80]+8
+    17: StoreImm8 [128] <- #0
+    18: VecBorrow [184] <- &[168][[128]] (elem_size=8)
+    19: ReadRef [128] <- *[184] (size=8)
+    20: DeriveRefOffsetImm [168] <- [80]+8
+    21: StoreImm8 [200] <- #1
+    22: VecBorrow [184] <- &[168][[200]] (elem_size=8)
+    23: ReadRef [200] <- *[184] (size=8)
+    24: AddU64 [200] <- [128] + [200]
+    25: Move8 [0] <- [200]
+    26: Return
+  safe_point_layouts:
+    3: []
+    8: []
+    11: []
+    14: []
+}
+
+fun publish_nested_read() {
+  frame_data_size: 224
+  code:
+    0: Charge #240
+    1: VecNew [72]
+    2: SlotBorrow [96] <- &[72]
+    3: VecPushBack [96].push([64], size=8, desc=2)
+    4: SlotBorrow [96] <- &[72]
+    5: AddU64Imm [112] <- [64] + #1
+    6: VecPushBack [96].push([112], size=8, desc=2)
+    7: SlotBorrow [120] <- &[0]
+    8: AddU64Imm [112] <- [64] + #7
+    9: Move8 [136] <- [72]
+    10: Move8 [152] <- [136]
+    11: Move8 [144] <- [112]
+    12: HeapNew [216] desc=4
+    13: HeapMoveTo [216]+0 <- [144] (size=16)
+    14: MoveTo<0x42::nested_globals::Outer> signer=[120], src=[216]
+    15: BorrowGlobal<0x42::nested_globals::Outer> [80] <- addr=[32], ty=
+    16: ReadRefOffset [112] <- *([80]+0) (size=8)
+    17: DeriveRefOffsetImm [160] <- [80]+8
+    18: DeriveRefOffsetImm [176] <- [160]+0
+    19: StoreImm8 [192] <- #1
+    20: VecBorrow [200] <- &[176][[192]] (elem_size=8)
+    21: ReadRef [192] <- *[200] (size=8)
+    22: AddU64 [192] <- [112] + [192]
+    23: Move8 [0] <- [192]
+    24: Return
+  safe_point_layouts:
+    3: []
+    6: []
+    12: []
+}
+
+fun publish_vec_read() {
+  frame_data_size: 200
+  code:
+    0: Charge #236
+    1: VecNew [72]
+    2: SlotBorrow [96] <- &[72]
+    3: VecPushBack [96].push([64], size=8, desc=2)
+    4: SlotBorrow [96] <- &[72]
+    5: AddU64Imm [112] <- [64] + #1
+    6: VecPushBack [96].push([112], size=8, desc=2)
+    7: SlotBorrow [120] <- &[0]
+    8: AddU64Imm [112] <- [64] + #7
+    9: Move8 [144] <- [72]
+    10: Move8 [136] <- [112]
+    11: HeapNew [192] desc=3
+    12: HeapMoveTo [192]+0 <- [136] (size=16)
+    13: MoveTo<0x42::nested_globals::WithVec> signer=[120], src=[192]
+    14: BorrowGlobal<0x42::nested_globals::WithVec> [80] <- addr=[32], ty=
+    15: ReadRefOffset [112] <- *([80]+0) (size=8)
+    16: DeriveRefOffsetImm [152] <- [80]+8
+    17: StoreImm8 [168] <- #1
+    18: VecBorrow [176] <- &[152][[168]] (elem_size=8)
+    19: ReadRef [168] <- *[176] (size=8)
+    20: AddU64 [168] <- [112] + [168]
+    21: Move8 [0] <- [168]
+    22: Return
+  safe_point_layouts:
+    3: []
+    6: []
+    11: []
+}
+
+fun publish_vec_take() {
+  frame_data_size: 192
+  code:
+    0: Charge #241
+    1: VecNew [72]
+    2: SlotBorrow [88] <- &[72]
+    3: VecPushBack [88].push([64], size=8, desc=2)
+    4: SlotBorrow [104] <- &[0]
+    5: AddU64Imm [120] <- [64] + #7
+    6: Move8 [136] <- [72]
+    7: Move8 [128] <- [120]
+    8: HeapNew [184] desc=3
+    9: HeapMoveTo [184]+0 <- [128] (size=16)
+    10: MoveTo<0x42::nested_globals::WithVec> signer=[104], src=[184]
+    11: MoveFrom<0x42::nested_globals::WithVec> [184] <- addr=[32], ty=
+    12: HeapMoveFrom [128] <- [184]+0 (size=16)
+    13: Move8 [80] <- [136]
+    14: Move8 [120] <- [128]
+    15: SlotBorrow [144] <- &[80]
+    16: StoreImm8 [160] <- #0
+    17: VecBorrow [168] <- &[144][[160]] (elem_size=8)
+    18: ReadRef [160] <- *[168] (size=8)
+    19: AddU64 [160] <- [120] + [160]
+    20: Move8 [0] <- [160]
+    21: Return
+  safe_point_layouts:
+    3: []
+    8: []
+    11: []
+}
+=== frame-layout ===
+// module 0x42::nested_globals
+fun mutate_vec_push: heap_ptr_offsets=[72, 80, 96, 112, 144, 152, 168, 184] zero_frame=true
+fun publish_nested_read: heap_ptr_offsets=[72, 80, 96, 120, 136, 152, 160, 176, 200] zero_frame=true
+fun publish_vec_read: heap_ptr_offsets=[72, 80, 96, 120, 144, 152, 176] zero_frame=true
+fun publish_vec_take: heap_ptr_offsets=[72, 80, 88, 104, 136, 144, 168] zero_frame=true

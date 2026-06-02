@@ -127,6 +127,27 @@ pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
     )
 }
 
+/// Resource type carried by a global-storage instruction (`exists`,
+/// `move_from`, `move_to`, `borrow_global[_mut]`), if any. The returned type
+/// is the interned resource nominal embedded in the instruction; it may still
+/// contain type parameters that the caller substitutes with the function's
+/// type arguments.
+pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
+    match instr {
+        Instr::Exists(_, ty, _)
+        | Instr::ExistsGeneric(_, ty, _)
+        | Instr::MoveFrom(_, ty, _)
+        | Instr::MoveFromGeneric(_, ty, _)
+        | Instr::MoveTo(ty, _, _)
+        | Instr::MoveToGeneric(ty, _, _)
+        | Instr::ImmBorrowGlobal(_, ty, _)
+        | Instr::ImmBorrowGlobalGeneric(_, ty, _)
+        | Instr::MutBorrowGlobal(_, ty, _)
+        | Instr::MutBorrowGlobalGeneric(_, ty, _) => Some(*ty),
+        _ => None,
+    }
+}
+
 /// Concrete nominal (struct or enum) type whose layout `instr`'s
 /// lowering needs, if any.
 /// TODO: complete the function over all instructions.
