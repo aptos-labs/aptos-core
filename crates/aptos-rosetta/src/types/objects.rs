@@ -28,7 +28,7 @@ use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData, U64};
 use aptos_types::{
     access_path::Path,
-    account_address::AccountAddress,
+    account_address::{create_derived_object_address, AccountAddress},
     account_config::{
         fungible_store::FungibleStoreResource, AccountResource, CoinStoreResourceUntyped,
         CoinWithdraw, DepositFAEvent, ObjectCoreResource, WithdrawEvent,
@@ -2189,12 +2189,19 @@ fn parse_fungible_store_changes(
 
     let owner = maybe_owner.copied().unwrap();
 
+    // We double check if the address is a primary store
+    let account = if is_primary_store(&address, &owner, currency) {
+        AccountIdentifier::base_account(owner)
+    } else {
+        AccountIdentifier::secondary_store_account(&address, currency)
+    };
+
     let withdraw_amounts = get_amount_from_fa_event(events, &WITHDRAW_TYPE_TAG, address);
     for amount in withdraw_amounts {
         operations.push(Operation::withdraw(
             operation_index,
             Some(OperationStatusType::Success),
-            AccountIdentifier::base_account(owner),
+            account.clone(),
             currency.clone(),
             amount,
         ));
@@ -2206,7 +2213,7 @@ fn parse_fungible_store_changes(
         operations.push(Operation::deposit(
             operation_index,
             Some(OperationStatusType::Success),
-            AccountIdentifier::base_account(owner),
+            account.clone(),
             currency.clone(),
             amount,
         ));
@@ -2214,6 +2221,26 @@ fn parse_fungible_store_changes(
     }
 
     Ok(operations)
+}
+
+fn is_primary_store(
+    store_address: &AccountAddress,
+    owner: &AccountAddress,
+    currency: &Currency,
+) -> bool {
+    let metadata_address = match currency.metadata.as_ref().and_then(|metadata| {
+        metadata
+            .fa_address
+            .as_ref()
+            .map(|fa_address| AccountAddress::from_str(fa_address))
+    }) {
+        Some(Ok(metadata_address)) => metadata_address,
+        Some(Err(_)) => return false,
+        None if currency == &native_coin() => AccountAddress::TEN,
+        None => return false,
+    };
+
+    create_derived_object_address(*owner, metadata_address) == *store_address
 }
 
 /// Pulls the balance change from a withdraw or deposit event
