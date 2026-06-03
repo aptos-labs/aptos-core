@@ -3566,13 +3566,17 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_cast(&self, node_id: NodeId, args: &[Exp]) {
-        let mut global_state = self
-            .env
-            .get_cloned_extension::<GlobalNumberOperationState>();
         let arg = args[0].clone();
-        let cast_oper = global_state.get_node_num_oper(node_id);
-        global_state.update_node_oper(args[0].node_id(), cast_oper, true);
-        self.env.set_extension(global_state);
+        let (cast_oper, source_oper) = {
+            let global_state = self
+                .env
+                .get_extension::<GlobalNumberOperationState>()
+                .expect("global number operation state");
+            (
+                global_state.get_node_num_oper(node_id),
+                global_state.get_node_num_oper(arg.node_id()),
+            )
+        };
         let target_type = self.env.get_node_type(node_id).skip_reference().clone();
         let source_type = self
             .env
@@ -3580,6 +3584,36 @@ impl SpecTranslator<'_> {
             .skip_reference()
             .clone();
         let check_cast = |ty: &Type| ty.is_unsigned_int();
+        // bv → int boundary: source produces a bitvector (bv-classified unsigned
+        // int) but target is non-bv (signed or `Num`). Wrap with
+        // `$bv2int.N(...)`. We must NOT propagate `cast_oper` (Arithmetic) onto
+        // the source first — a bv-classified literal arg would otherwise lose
+        // its bv suffix in `translate_value` and feed an `int` into `$bv2int.N`.
+        if source_oper == Bitwise && source_type.is_unsigned_int() && !target_type.is_unsigned_int()
+        {
+            let source_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(arg.node_id())),
+                &source_type,
+                false,
+            );
+            emit!(self.writer, "$bv2int.{}(", source_base);
+            self.translate_exp(&arg);
+            emit!(self.writer, ")");
+            return;
+        }
+        // For the bv→bv and pass-through paths below, propagate `cast_oper` to
+        // the source so leaf expressions (e.g. integer literals) render with
+        // the matching bv/int form. Skip when the source is itself a `Cast`:
+        // nested casts carry their own classification and overwriting it
+        // corrupts the inner bv→bv upcast/downcast logic.
+        if !matches!(arg.as_ref(), ExpData::Call(_, Operation::Cast, _)) {
+            let mut global_state = self
+                .env
+                .get_cloned_extension::<GlobalNumberOperationState>();
+            global_state.update_node_oper(args[0].node_id(), cast_oper, true);
+            self.env.set_extension(global_state);
+        }
         if cast_oper == Bitwise && check_cast(&target_type) && check_cast(&source_type) {
             let target_base = boogie_num_type_base(
                 self.env,
