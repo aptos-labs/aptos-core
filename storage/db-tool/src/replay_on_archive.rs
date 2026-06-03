@@ -19,6 +19,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    on_chain_config::{Features, OnChainConfig},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
@@ -370,13 +371,21 @@ impl Verifier {
                 .map(|info| AuxiliaryInfo::new(*info, None))
                 .collect(),
         );
-        let executed_outputs = executor
+        let state_view = self
+            .arc_db
+            .state_view_at_version(current_version.checked_sub(1))?;
+        let onchain_config = match Features::fetch_config(&state_view) {
+            Some(features) => {
+                BlockExecutorConfigFromOnchain::new_no_block_limit().with_features(&features)
+            },
+            None => BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        };
+        let hotness_in_epilogue = onchain_config.hotness_in_epilogue();
+        let mut executed_outputs = executor
             .execute_block(
                 &txns_provider,
-                &self
-                    .arc_db
-                    .state_view_at_version(current_version.checked_sub(1))?,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
+                &state_view,
+                onchain_config,
                 TransactionSliceMetadata::Chunk {
                     begin: *current_version,
                     end: *current_version + cur_txns.len() as u64,
@@ -384,6 +393,24 @@ impl Verifier {
             )
             .map(BlockOutput::into_transaction_outputs_forced)?;
         assert_eq!(executed_outputs.len(), cur_txns.len());
+
+        // TODO(HotState): this is the same thing we do in `DoGetExecutionOutput`. Ideally
+        // we move this up so the VM produces `WriteSetV1` directly.
+        if hotness_in_epilogue {
+            for (txn, output) in cur_txns.iter().zip(executed_outputs.iter_mut()) {
+                if let Transaction::BlockEpilogue(payload) = txn {
+                    output.add_hotness(
+                        payload
+                            .try_get_keys_to_make_hot()
+                            .cloned()
+                            .unwrap_or_default(),
+                    );
+                }
+            }
+            executed_outputs
+                .iter_mut()
+                .for_each(|output| output.convert_write_set_to_v1());
+        }
 
         for idx in 0..cur_txns.len() {
             let version = *current_version;
