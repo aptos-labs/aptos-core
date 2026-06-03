@@ -165,14 +165,12 @@ impl BlockPayloadStore {
             let block_epoch = ordered_block.epoch();
             let block_round = ordered_block.round();
 
-            // Fetch the block payload
+            // Verify the block payload
             match self.block_payloads.lock().entry((block_epoch, block_round)) {
+                // Get the block payload
                 Entry::Occupied(entry) => {
-                    // Get the block transaction payload
-                    let transaction_payload = match entry.get() {
-                        BlockPayloadStatus::AvailableAndVerified(block_payload) => {
-                            block_payload.transaction_payload()
-                        },
+                    let block_payload = match entry.get() {
+                        BlockPayloadStatus::AvailableAndVerified(block_payload) => block_payload,
                         BlockPayloadStatus::AvailableAndUnverified(_) => {
                             // The payload should have already been verified
                             return Err(Error::InvalidMessageError(format!(
@@ -182,6 +180,21 @@ impl BlockPayloadStore {
                             )));
                         },
                     };
+
+                    // Verify the pre-execution fields in the block payload's block info
+                    if !block_payload
+                        .block()
+                        .match_ordered_only(&ordered_block.block_info())
+                    {
+                        return Err(Error::InvalidMessageError(format!(
+                            "Payload verification failed! Block info mismatch for epoch: {:?} and round: {:?}. \
+                            Expected block info: {:?}, but found: {:?}",
+                            block_epoch,
+                            block_round,
+                            ordered_block.block_info(),
+                            block_payload.block()
+                        )));
+                    }
 
                     // Get the ordered block payload
                     let ordered_block_payload = match ordered_block.block().payload() {
@@ -196,7 +209,9 @@ impl BlockPayloadStore {
                     };
 
                     // Verify the transaction payload against the ordered block payload
-                    transaction_payload.verify_against_ordered_payload(ordered_block_payload)?;
+                    block_payload
+                        .transaction_payload()
+                        .verify_against_ordered_payload(ordered_block_payload)?;
                 },
                 Entry::Vacant(_) => {
                     // The payload is missing (this should never happen)
@@ -976,6 +991,65 @@ mod test {
         block_payload_store.clear_all_payloads();
 
         // Verify the ordered block and ensure it fails (since the payloads are missing)
+        let error = block_payload_store
+            .verify_payloads_against_ordered_block(&ordered_block)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+    }
+
+    #[test]
+    fn test_verify_payloads_against_ordered_block_tampered_block_info() {
+        // Create a new block payload store
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+
+        // Add some verified blocks for the current epoch
+        let current_epoch = 0;
+        let num_verified_blocks = 5;
+        let verified_blocks = create_and_add_blocks_to_store(
+            &mut block_payload_store,
+            num_verified_blocks,
+            current_epoch,
+            true,
+        );
+
+        // Create an ordered block using the verified blocks
+        let ordered_block = OrderedBlock::new(
+            verified_blocks.clone(),
+            create_empty_ledger_info(current_epoch),
+        );
+
+        // Verify the ordered block passes before tampering
+        block_payload_store
+            .verify_payloads_against_ordered_block(&ordered_block)
+            .unwrap();
+
+        // Tamper with the block info of the first block payload by changing timestamp_usecs while
+        // keeping the block ID correct. This simulates the actual attack: a malicious publisher
+        // sets a far-future timestamp to force QS batch expiration while keeping the block ID
+        // intact. match_ordered_only() catches this because it compares timestamp_usecs directly.
+        let tampered_block = &verified_blocks[0];
+        let tampered_block_info = BlockInfo::new(
+            tampered_block.epoch(),
+            tampered_block.round(),
+            tampered_block.id(), // Correct block ID (attacker copies the real one)
+            HashValue::random(),
+            0,
+            u64::MAX, // Tampered timestamp to force batch expiration
+            None,
+        );
+        let block_payloads = block_payload_store.get_block_payloads();
+        let mut block_payloads = block_payloads.lock();
+        let entry = block_payloads
+            .get_mut(&(tampered_block.epoch(), tampered_block.round()))
+            .unwrap();
+        *entry = BlockPayloadStatus::AvailableAndVerified(BlockPayload::new(
+            tampered_block_info,
+            BlockTransactionPayload::empty(),
+        ));
+        drop(block_payloads);
+
+        // Verify the ordered block fails due to the tampered block info
         let error = block_payload_store
             .verify_payloads_against_ordered_block(&ordered_block)
             .unwrap_err();
