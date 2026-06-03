@@ -10,6 +10,7 @@ pub mod native;
 mod object_descriptor;
 mod prepared_module;
 pub mod storage;
+pub mod type_layout;
 pub mod types;
 
 pub use align::{
@@ -41,5 +42,9 @@ pub use prepared_module::{
 pub use storage::{
     ModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
     NO_RESOURCE_PROVIDER,
+};
+pub use type_layout::{
+    reserved_layout_id, reserved_layouts, FieldTypeLayout, LayoutFlags, LayoutId, LayoutKind,
+    LayoutProvider, TypeLayout, TypeLayoutTable,
 };
 pub use types::{convert_mut_to_immut_ref, strip_ref};

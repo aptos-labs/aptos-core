@@ -6670,6 +6670,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxcar"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36f64beae40a84da1b4b26ff2761a5b895c12adc41dc25aaee1c4f2bbfe97a6e"
+
+[[package]]
 name = "brotli"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12779,6 +12785,7 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.11.0",
  "bytes",
  "mono-move-alloc",
  "mono-move-gas",
@@ -12802,6 +12809,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "arc-swap",
+ "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
  "mono-move-alloc",
@@ -12852,6 +12860,7 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
@@ -12861,6 +12870,7 @@ dependencies = [
  "paste",
  "proptest",
  "rand 0.7.3",
+ "serde",
  "thiserror 1.0.69",
 ]
 

@@ -26,8 +26,8 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
-    ModuleProvider,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, LayoutId,
+    LayoutProvider, ModuleId, ModuleProvider, TypeLayout,
 };
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{
@@ -791,5 +791,17 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .loader
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets))
+    }
+
+    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard.layout_id_for(ty)
+    }
+
+    fn layout(&self, id: LayoutId) -> Option<&TypeLayout> {
+        self.loader.guard.layout(id)
+    }
+
+    fn publish_layout(&self, ty: InternedType, layout: TypeLayout) -> LayoutId {
+        self.loader.guard.publish_layout(ty, layout)
     }
 }

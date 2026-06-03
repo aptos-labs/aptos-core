@@ -8,9 +8,9 @@ use crate::{ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ObjectDescriptorTable,
-    ResourceProvider,
+    types::{InternedType, InternedTypeList},
+    DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider, ObjectDescriptor,
+    ObjectDescriptorTable, ResourceProvider, TypeLayout, TypeLayoutTable,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -27,6 +27,7 @@ use mono_move_loader::LoaderResult;
 pub struct LocalRuntimeContext<'r, G: GasMeter = NoOpGasMeter> {
     inner: LocalExecutionContext<'r, G>,
     descriptors: ObjectDescriptorTable,
+    layouts: TypeLayoutTable,
 }
 
 impl LocalRuntimeContext<'static, NoOpGasMeter> {
@@ -36,6 +37,7 @@ impl LocalRuntimeContext<'static, NoOpGasMeter> {
         Self {
             inner: LocalExecutionContext::unmetered(),
             descriptors: ObjectDescriptorTable::new(),
+            layouts: TypeLayoutTable::new(),
         }
     }
 
@@ -44,6 +46,7 @@ impl LocalRuntimeContext<'static, NoOpGasMeter> {
         Self {
             inner: LocalExecutionContext::unmetered(),
             descriptors,
+            layouts: TypeLayoutTable::new(),
         }
     }
 }
@@ -60,6 +63,7 @@ impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
         Self {
             inner: LocalExecutionContext::new(gas_meter, resource_provider),
             descriptors,
+            layouts: TypeLayoutTable::new(),
         }
     }
 }
@@ -71,6 +75,7 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
         Self {
             inner: LocalExecutionContext::with_max_budget(),
             descriptors,
+            layouts: TypeLayoutTable::new(),
         }
     }
 
@@ -86,6 +91,7 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
         Self {
             inner: LocalExecutionContext::with_budget(amount),
             descriptors: ObjectDescriptorTable::new(),
+            layouts: TypeLayoutTable::new(),
         }
     }
 }
@@ -131,5 +137,15 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
 impl<'r, G: GasMeter> DescriptorProvider for LocalRuntimeContext<'r, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.descriptors.descriptor(id)
+    }
+}
+
+impl<'r, G: GasMeter> LayoutProvider for LocalRuntimeContext<'r, G> {
+    fn layout(&self, id: LayoutId) -> Option<&TypeLayout> {
+        self.layouts.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.layouts.layout_id(ty)
     }
 }

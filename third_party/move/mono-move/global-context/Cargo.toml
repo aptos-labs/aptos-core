@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 ahash = { workspace = true }
 anyhow = { workspace = true }
 arc-swap = { workspace = true }
+boxcar = { workspace = true }
 dashmap = { workspace = true }
 fxhash = { workspace = true }
 mono-move-alloc = { workspace = true }

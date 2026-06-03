@@ -93,6 +93,18 @@ pub enum RuntimeError {
 
     #[error(transparent)]
     VMInternal(#[from] VMInternalError),
+
+    #[error("BCS deserialize: unexpected end of input")]
+    BcsEof,
+
+    #[error("BCS deserialize: malformed ULEB128 length")]
+    BcsInvalidUleb,
+
+    #[error("BCS deserialize: sequence length {len} exceeds maximum")]
+    BcsSequenceTooLong { len: u64 },
+
+    #[error("BCS deserialize: {remaining} trailing byte(s) after value")]
+    BcsRemainingInput { remaining: usize },
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -122,6 +134,10 @@ impl IntoExecutionError for RuntimeError {
             | AllocationTooLarge { .. }
             | VecAllocSizeOverflow
             | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
+
+            BcsEof | BcsInvalidUleb | BcsSequenceTooLong { .. } | BcsRemainingInput { .. } => {
+                ExecutionErrorKind::InvalidOperation
+            },
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
             ResourceProvider(e) => e.kind(),
@@ -235,6 +251,12 @@ pub enum RuntimeInvariantViolation {
 
     #[error("descriptor {descriptor_id} not found in descriptor table")]
     DescriptorNotFound { descriptor_id: u32 },
+
+    #[error("type has no published layout")]
+    TypeLayoutNotFound,
+
+    #[error("unreachable: {0}")]
+    Unreachable(String),
 
     #[error("GC scan: invalid object size {size} (expected non-zero, MAX_ALIGN-byte aligned)")]
     GcInvalidObjectSize { size: usize },
