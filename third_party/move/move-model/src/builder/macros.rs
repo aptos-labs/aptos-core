@@ -25,8 +25,9 @@
 //! - `assert_ne!` supports the same forms as `assert_eq!`
 //!
 //! ## `debug_assert!`, `debug_assert_eq!`, `debug_assert_ne!` macros
-//! Same forms as their non-`debug_` counterparts. Active only when compiling with
-//! `--compile-test-code`; otherwise expand to `()` without evaluating their arguments.
+//! Same forms as their non-`debug_` counterparts, but active only when debug
+//! assertions are enabled (on by default, off with `--no-debug-assert`). When off
+//! they expand to `()` without evaluating their arguments. Independent of `#[test]`.
 //!
 //! ## Version requirements
 //! - `assert!(cond)` requires Move 2
@@ -253,7 +254,7 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Shared entry point for `debug_assert*!`.
-    /// In non-test builds the entire call collapses to `()`
+    /// When debug assertions are disabled the entire call collapses to `()`.
     fn expand_debug_macro(
         &self,
         loc: Loc,
@@ -265,11 +266,11 @@ impl ExpTranslator<'_, '_, '_> {
             &format!("`{}` macro", macro_kind),
             LANGUAGE_VERSION_FOR_DEBUG_ASSERT,
         );
-        let testing = self
+        let debug_assert_active = self
             .env()
             .get_extension::<ModelBuilderOptions>()
-            .is_some_and(|opts| opts.compile_for_testing);
-        if !testing {
+            .is_some_and(|opts| opts.compile_debug_assert);
+        if !debug_assert_active {
             return Exp_::Unit { trailing: false };
         }
         match macro_kind {

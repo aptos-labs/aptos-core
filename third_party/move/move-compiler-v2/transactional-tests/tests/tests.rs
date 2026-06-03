@@ -41,6 +41,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/no-access-check/",
     "/no-recursive-type-check/",
     "/testing-constant/",
+    "/debug_assert/",
     "/structs_visibility/",
     "/public_const/",
 ];
@@ -169,6 +170,24 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: &["/structs_visibility/"],
         cross_compile: false,
     },
+    TestConfig {
+        name: "debug-assert-true",
+        runner: |p| run(p, get_config_by_name("debug-assert-true")),
+        experiments: &[(Experiment::COMPILE_DEBUG_ASSERT, true)],
+        language_version: LanguageVersion::latest(),
+        include: &["/debug_assert/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "debug-assert-false",
+        runner: |p| run(p, get_config_by_name("debug-assert-false")),
+        experiments: &[(Experiment::COMPILE_DEBUG_ASSERT, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/debug_assert/"],
+        exclude: &[],
+        cross_compile: false,
+    },
 ];
 
 /// Test files which must use separate baselines because their result
@@ -213,6 +232,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/signed-int/",
     // different expected result
     "/testing-constant/",
+    "/debug_assert/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

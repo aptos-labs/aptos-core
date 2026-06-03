@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- Added `debug_assert!`, `debug_assert_eq!`, and `debug_assert_ne!` macros to the Move v2 compiler (requires Move 2.5). Same forms as their non-`debug_` counterparts; active only with `--compile-test-code` and otherwise expand to `()` without evaluating their arguments.
+- Added `debug_assert!`, `debug_assert_eq!`, and `debug_assert_ne!` macros to the Move v2 compiler (require Move 2.5). Same forms as their non-`debug_` counterparts. On by default under `aptos move test`; `aptos move test --no-debug-assert` disables them.
 
 ## [9.4.0]
 - Set language version 2.4 and bytecode version v10 as default.
