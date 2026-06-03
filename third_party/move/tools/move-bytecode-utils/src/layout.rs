@@ -29,6 +29,33 @@ enum LayoutType {
     Runtime,
 }
 
+/// Upper bound on the number of nodes in a layout built from a type. A small, verifier-legal type
+/// can still describe a very large layout, so the builder caps the node count.
+///
+/// Mirrors the VM's runtime `layout_max_size` and should be kept in sync with it.
+/// This crate can't import that value, so a test in `e2e-move-tests` checks they match.
+pub const MAX_TYPE_LAYOUT_NODES: u64 = 512;
+
+/// Running budget of layout nodes built so far in one traversal, enforcing [`MAX_TYPE_LAYOUT_NODES`].
+#[derive(Default)]
+struct LayoutBudget {
+    nodes: u64,
+}
+
+impl LayoutBudget {
+    /// Accounts for one layout node, failing once the cap is exceeded.
+    fn charge(&mut self) -> anyhow::Result<()> {
+        if self.nodes > MAX_TYPE_LAYOUT_NODES {
+            bail!(
+                "type layout exceeds the maximum of {} nodes",
+                MAX_TYPE_LAYOUT_NODES
+            );
+        }
+        self.nodes += 1;
+        Ok(())
+    }
+}
+
 impl TypeLayoutBuilder {
     /// Construct a WithTypes `TypeLayout` with fields from `t`.
     /// Panics if `resolver` cannot resolve a module whose types are referenced directly or
@@ -37,7 +64,12 @@ impl TypeLayoutBuilder {
         t: &TypeTag,
         compiled_module_view: &impl CompiledModuleView,
     ) -> anyhow::Result<MoveTypeLayout> {
-        Self::build(t, compiled_module_view, LayoutType::WithTypes)
+        Self::build(
+            t,
+            compiled_module_view,
+            LayoutType::WithTypes,
+            &mut LayoutBudget::default(),
+        )
     }
 
     /// Construct a WithFields `TypeLayout` with fields from `t`.
@@ -47,7 +79,12 @@ impl TypeLayoutBuilder {
         t: &TypeTag,
         compiled_module_view: &impl CompiledModuleView,
     ) -> anyhow::Result<MoveTypeLayout> {
-        Self::build(t, compiled_module_view, LayoutType::WithFields)
+        Self::build(
+            t,
+            compiled_module_view,
+            LayoutType::WithFields,
+            &mut LayoutBudget::default(),
+        )
     }
 
     /// Construct a runtime `TypeLayout` from `t`.
@@ -57,15 +94,22 @@ impl TypeLayoutBuilder {
         t: &TypeTag,
         compiled_module_view: &impl CompiledModuleView,
     ) -> anyhow::Result<MoveTypeLayout> {
-        Self::build(t, compiled_module_view, LayoutType::Runtime)
+        Self::build(
+            t,
+            compiled_module_view,
+            LayoutType::Runtime,
+            &mut LayoutBudget::default(),
+        )
     }
 
     fn build(
         t: &TypeTag,
         compiled_module_view: &impl CompiledModuleView,
         layout_type: LayoutType,
+        budget: &mut LayoutBudget,
     ) -> anyhow::Result<MoveTypeLayout> {
         use TypeTag::*;
+        budget.charge()?;
         Ok(match t {
             Bool => MoveTypeLayout::Bool,
             U8 => MoveTypeLayout::U8,
@@ -86,11 +130,13 @@ impl TypeLayoutBuilder {
                 elem_t,
                 compiled_module_view,
                 layout_type,
+                budget,
             )?)),
             Struct(s) => MoveTypeLayout::new_struct(StructLayoutBuilder::build(
                 s,
                 compiled_module_view,
                 layout_type,
+                budget,
             )?),
             Function(_) => MoveTypeLayout::Function,
         })
@@ -102,8 +148,10 @@ impl TypeLayoutBuilder {
         type_arguments: &[MoveTypeLayout],
         compiled_module_view: &impl CompiledModuleView,
         layout_type: LayoutType,
+        budget: &mut LayoutBudget,
     ) -> anyhow::Result<MoveTypeLayout> {
         use SignatureToken::*;
+        budget.charge()?;
         Ok(match s {
             Function(..) => bail!("function types NYI for MoveTypeLayout"),
             Vector(t) => MoveTypeLayout::Vector(Box::new(Self::build_from_signature_token(
@@ -112,6 +160,7 @@ impl TypeLayoutBuilder {
                 type_arguments,
                 compiled_module_view,
                 layout_type,
+                budget,
             )?)),
             Struct(shi) => MoveTypeLayout::new_struct(StructLayoutBuilder::build_from_handle_idx(
                 m,
@@ -119,6 +168,7 @@ impl TypeLayoutBuilder {
                 vec![],
                 compiled_module_view,
                 layout_type,
+                budget,
             )?),
             StructInstantiation(shi, type_actuals) => {
                 let actual_layouts = type_actuals
@@ -130,6 +180,7 @@ impl TypeLayoutBuilder {
                             type_arguments,
                             compiled_module_view,
                             layout_type,
+                            budget,
                         )
                     })
                     .collect::<anyhow::Result<Vec<_>>>()?;
@@ -139,6 +190,7 @@ impl TypeLayoutBuilder {
                     actual_layouts,
                     compiled_module_view,
                     layout_type,
+                    budget,
                 )?)
             },
             TypeParameter(i) => type_arguments[*i as usize].clone(),
@@ -167,14 +219,24 @@ impl StructLayoutBuilder {
         s: &StructTag,
         compiled_module_view: &impl CompiledModuleView,
     ) -> anyhow::Result<MoveStructLayout> {
-        Self::build(s, compiled_module_view, LayoutType::Runtime)
+        Self::build(
+            s,
+            compiled_module_view,
+            LayoutType::Runtime,
+            &mut LayoutBudget::default(),
+        )
     }
 
     pub fn build_with_fields(
         s: &StructTag,
         compiled_module_view: &impl CompiledModuleView,
     ) -> anyhow::Result<MoveStructLayout> {
-        Self::build(s, compiled_module_view, LayoutType::WithFields)
+        Self::build(
+            s,
+            compiled_module_view,
+            LayoutType::WithFields,
+            &mut LayoutBudget::default(),
+        )
     }
 
     /// Construct an expanded `TypeLayout` from `s`.
@@ -184,11 +246,12 @@ impl StructLayoutBuilder {
         s: &StructTag,
         compiled_module_view: &impl CompiledModuleView,
         layout_type: LayoutType,
+        budget: &mut LayoutBudget,
     ) -> anyhow::Result<MoveStructLayout> {
         let type_arguments = s
             .type_args
             .iter()
-            .map(|t| TypeLayoutBuilder::build(t, compiled_module_view, layout_type))
+            .map(|t| TypeLayoutBuilder::build(t, compiled_module_view, layout_type, budget))
             .collect::<anyhow::Result<Vec<MoveTypeLayout>>>()?;
         Self::build_from_name(
             &s.module_id(),
@@ -196,6 +259,7 @@ impl StructLayoutBuilder {
             type_arguments,
             compiled_module_view,
             layout_type,
+            budget,
         )
     }
 
@@ -205,6 +269,7 @@ impl StructLayoutBuilder {
         type_arguments: Vec<MoveTypeLayout>,
         compiled_module_view: &impl CompiledModuleView,
         layout_type: LayoutType,
+        budget: &mut LayoutBudget,
     ) -> anyhow::Result<MoveStructLayout> {
         let s_handle = m.struct_handle_at(s.struct_handle);
         if s_handle.type_parameters.len() != type_arguments.len() {
@@ -224,6 +289,7 @@ impl StructLayoutBuilder {
                             &type_arguments,
                             compiled_module_view,
                             layout_type,
+                            budget,
                         )
                     })
                     .collect::<anyhow::Result<Vec<MoveTypeLayout>>>()?;
@@ -296,6 +362,7 @@ impl StructLayoutBuilder {
                             &type_arguments,
                             compiled_module_view,
                             layout_type,
+                            budget,
                         )?;
                         let vector_layout = MoveTypeLayout::Vector(Box::new(layout));
                         let identifier = Identifier::new(LEGACY_OPTION_VEC)?;
@@ -319,6 +386,7 @@ impl StructLayoutBuilder {
                                         &type_arguments,
                                         compiled_module_view,
                                         layout_type,
+                                        budget,
                                     )
                                 })
                                 .collect::<anyhow::Result<Vec<MoveTypeLayout>>>()?;
@@ -357,6 +425,7 @@ impl StructLayoutBuilder {
         type_arguments: Vec<MoveTypeLayout>,
         module_viewer: &impl CompiledModuleView,
         layout_type: LayoutType,
+        budget: &mut LayoutBudget,
     ) -> anyhow::Result<MoveStructLayout> {
         let module = match module_viewer.view_compiled_module(declaring_module) {
             Err(_) | Ok(None) => bail!("Could not find module"),
@@ -378,6 +447,7 @@ impl StructLayoutBuilder {
             type_arguments,
             module_viewer,
             layout_type,
+            budget,
         )
     }
 
@@ -387,10 +457,18 @@ impl StructLayoutBuilder {
         type_arguments: Vec<MoveTypeLayout>,
         compiled_module_view: &impl CompiledModuleView,
         layout_type: LayoutType,
+        budget: &mut LayoutBudget,
     ) -> anyhow::Result<MoveStructLayout> {
         if let Some(def) = m.find_struct_def(s) {
             // declared internally
-            Self::build_from_definition(m, def, type_arguments, compiled_module_view, layout_type)
+            Self::build_from_definition(
+                m,
+                def,
+                type_arguments,
+                compiled_module_view,
+                layout_type,
+                budget,
+            )
         } else {
             let handle = m.struct_handle_at(s);
             let name = m.identifier_at(handle.name);
@@ -402,6 +480,7 @@ impl StructLayoutBuilder {
                 type_arguments,
                 compiled_module_view,
                 layout_type,
+                budget,
             )
         }
     }
