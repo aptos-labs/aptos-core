@@ -2,25 +2,36 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup_types::transaction::{
-        backup::{TransactionBackupController, TransactionBackupOpt},
-        restore::TransactionRestoreBatchController,
+    backup_types::{
+        epoch_ending::restore::EpochHistory,
+        state_snapshot::{
+            backup::{StateSnapshotBackupController, StateSnapshotBackupOpt},
+            restore::{StateSnapshotRestoreController, StateSnapshotRestoreOpt},
+        },
+        transaction::{
+            backup::{TransactionBackupController, TransactionBackupOpt},
+            restore::TransactionRestoreBatchController,
+        },
     },
     storage::{local_fs::LocalFs, BackupStorage},
     utils::{
         backup_service_client::BackupServiceClient,
-        test_utils::{start_local_backup_service, tmp_db_with_random_content},
-        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
-        RocksdbOpt, TrustedWaypointOpt,
+        test_utils::{start_local_backup_service, tmp_db_empty, tmp_db_with_random_content},
+        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, GlobalRestoreOptions,
+        ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use aptos_db::AptosDB;
+use aptos_db::{
+    db::test_helper::arb_blocks_to_commit_with_block_nums, state_restore::StateSnapshotRestoreMode,
+    AptosDB,
+};
 use aptos_executor_types::VerifyExecutionMode;
+use aptos_proptest_helpers::ValueGenerator;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
 use itertools::zip_eq;
-use std::{convert::TryInto, mem::size_of, sync::Arc};
+use std::{collections::HashMap, convert::TryInto, mem::size_of, sync::Arc};
 use tokio::time::Duration;
 
 #[test]
@@ -175,6 +186,169 @@ fn end_to_end() {
             .take(target_version as usize)
             .collect::<Vec<_>>()
     );
+
+    rt.shutdown_timeout(Duration::from_secs(1));
+}
+
+// Exercise the KV-only replay path across multiple epoch boundaries and
+// assert that VersionData is written at every epoch-ending version inside the
+// replay range. Without `save_kv_split_at_epoch_ends`, batches straddling an
+// epoch end would drop the VersionData row at that version.
+#[test]
+fn kv_only_replay_writes_version_data_at_epoch_ends() {
+    // Build a source DB with enough blocks that at proptest's ~25% per-block
+    // epoch-ending rate we always get >= 2 epoch endings. `deterministic()`
+    // keeps both the data and the chunk/epoch alignment stable across runs.
+    let (_src_db_dir, src_db) = tmp_db_empty();
+    let blocks =
+        ValueGenerator::deterministic().generate(arb_blocks_to_commit_with_block_nums(40, 40));
+    let mut cur_ver: Version = 0;
+    for (txns, li) in &blocks {
+        src_db
+            .save_transactions_for_test(txns, cur_ver, Some(li), true /* sync_commit */)
+            .unwrap();
+        cur_ver += txns.len() as u64;
+    }
+    let target_version = cur_ver - 1;
+
+    let epoch_endings: Vec<(u64, Version)> = blocks
+        .iter()
+        .filter_map(|(_, li)| {
+            let li = li.ledger_info();
+            li.ends_epoch().then(|| (li.epoch(), li.version()))
+        })
+        .collect();
+    assert!(
+        epoch_endings.len() >= 2,
+        "test data needs >= 2 epoch endings, got {}",
+        epoch_endings.len(),
+    );
+    let (snapshot_epoch, snapshot_version) = epoch_endings[0];
+
+    let tgt_db_dir = TempPath::new();
+    tgt_db_dir.create_as_dir().unwrap();
+    let backup_dir = TempPath::new();
+    backup_dir.create_as_dir().unwrap();
+    let store: Arc<dyn BackupStorage> = Arc::new(LocalFs::new(backup_dir.path().to_path_buf()));
+
+    let (rt, port) = start_local_backup_service(Arc::clone(&src_db));
+    let client = Arc::new(BackupServiceClient::new(format!(
+        "http://localhost:{}",
+        port
+    )));
+
+    let global_backup_opt = GlobalBackupOpt {
+        max_chunk_size: 2048,
+        concurrent_data_requests: 2,
+    };
+
+    // Snapshot at the first epoch ending; restoring it provides the baseline
+    // VersionData that the KV-only path needs at `first_version - 1`.
+    let state_snapshot_manifest = rt
+        .block_on(
+            StateSnapshotBackupController::new(
+                StateSnapshotBackupOpt {
+                    epoch: snapshot_epoch,
+                },
+                global_backup_opt.clone(),
+                Arc::clone(&client),
+                Arc::clone(&store),
+            )
+            .run(),
+        )
+        .unwrap();
+
+    let txn_manifest = rt
+        .block_on(
+            TransactionBackupController::new(
+                TransactionBackupOpt {
+                    start_version: 0,
+                    num_transactions: cur_ver as usize,
+                },
+                global_backup_opt,
+                Arc::clone(&client),
+                Arc::clone(&store),
+            )
+            .run(),
+        )
+        .unwrap();
+
+    let global_restore_opt: GlobalRestoreOptions = GlobalRestoreOpt {
+        dry_run: false,
+        db_dir: Some(tgt_db_dir.path().to_path_buf()),
+        target_version: Some(target_version),
+        trusted_waypoints: TrustedWaypointOpt::default(),
+        rocksdb_opt: RocksdbOpt::default(),
+        concurrent_downloads: ConcurrentDownloadsOpt::default(),
+        replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+        enable_state_indices: false,
+    }
+    .try_into()
+    .unwrap();
+
+    rt.block_on(
+        StateSnapshotRestoreController::new(
+            StateSnapshotRestoreOpt {
+                manifest_handle: state_snapshot_manifest,
+                version: snapshot_version,
+                validate_modules: false,
+                restore_mode: StateSnapshotRestoreMode::Default,
+            },
+            global_restore_opt.clone(),
+            Arc::clone(&store),
+            None, /* epoch_history */
+        )
+        .run(),
+    )
+    .unwrap();
+
+    // Build EpochHistory inline from `blocks` instead of going through
+    // EpochEndingRestoreController; this is what feeds the new splitting
+    // logic inside `save_kv_split_at_epoch_ends`.
+    let epoch_history = Arc::new(EpochHistory {
+        epoch_endings: blocks
+            .iter()
+            .filter_map(|(_, li)| {
+                let li = li.ledger_info();
+                li.ends_epoch().then(|| li.clone())
+            })
+            .collect(),
+        trusted_waypoints: Arc::new(HashMap::new()),
+    });
+
+    rt.block_on(
+        TransactionRestoreBatchController::new(
+            global_restore_opt,
+            Arc::clone(&store),
+            vec![txn_manifest],
+            Some(0), // skip frozen-subtree confirmation (snapshot phase already done)
+            Some((snapshot_version + 1, true)), // KV-only replay from snapshot_version + 1
+            Some(Arc::clone(&epoch_history)),
+            VerifyExecutionMode::verify_all(),
+            None,
+        )
+        .run(),
+    )
+    .unwrap();
+
+    // AptosDB opens with `skip_usage = true`, so `get_state_storage_usage`
+    // returns `Untracked` rather than `Err` when the VersionData row is
+    // missing — `is_untracked()` is the actual "missing" signal.
+    let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
+    let assert_tracked = |v: Version| {
+        let usage = tgt_db.get_state_storage_usage(Some(v)).unwrap();
+        assert!(!usage.is_untracked(), "VersionData missing at version {v}");
+    };
+
+    assert_tracked(snapshot_version);
+    let mut covered = 0;
+    for &(_, v) in &epoch_endings {
+        if v > snapshot_version && v <= target_version {
+            assert_tracked(v);
+            covered += 1;
+        }
+    }
+    assert!(covered > 0, "no epoch endings fall inside the replay range");
 
     rt.shutdown_timeout(Duration::from_secs(1));
 }
