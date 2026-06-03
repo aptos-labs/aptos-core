@@ -16,7 +16,10 @@ fn initial_aptos_version() {
     let resolver = executor.get_state_view().as_move_resolver();
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
-    assert_eq!(AptosVersion::fetch_config(&resolver).unwrap(), version);
+    assert_eq!(
+        AptosVersion::fetch_config(&resolver).unwrap().unwrap(),
+        version
+    );
     let account = executor.new_account_at(CORE_CODE_ADDRESS);
     let txn_0 = account
         .transaction()
@@ -35,7 +38,7 @@ fn initial_aptos_version() {
 
     let resolver = executor.get_state_view().as_move_resolver();
     assert_eq!(
-        AptosVersion::fetch_config(&resolver).unwrap(),
+        AptosVersion::fetch_config(&resolver).unwrap().unwrap(),
         AptosVersion {
             major: version.major + 1
         }
@@ -47,7 +50,10 @@ fn drop_txn_after_reconfiguration() {
     let mut executor = FakeExecutor::from_head_genesis();
     let resolver = executor.get_state_view().as_move_resolver();
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
-    assert_eq!(AptosVersion::fetch_config(&resolver).unwrap(), version);
+    assert_eq!(
+        AptosVersion::fetch_config(&resolver).unwrap().unwrap(),
+        version
+    );
 
     let txn = executor
         .new_account_at(CORE_CODE_ADDRESS)

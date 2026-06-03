@@ -47,6 +47,8 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
         .latest_state_checkpoint_view()
         .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
     Ok(ChainIdResource::fetch_config(&db_state_view)
+        .ok()
+        .flatten()
         .expect("[aptos-node] missing chain ID resource")
         .chain_id())
 }

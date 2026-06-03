@@ -294,6 +294,8 @@ impl EventSubscriptionService {
                 ))
             })?;
         let epoch = ConfigurationResource::fetch_config(&db_state_view)
+            .ok()
+            .flatten()
             .ok_or_else(|| {
                 Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
             })?

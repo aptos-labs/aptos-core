@@ -209,7 +209,7 @@ fn genesis_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFr
     let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
     // Bootstrapping from an empty DB is the common case, so the parent state usually has no
     // `Features` resource. Hard-fork genesis is the case where parent-state features exist.
-    match Features::fetch_config(state_view) {
+    match Features::fetch_config(state_view).ok().flatten() {
         Some(features) => base.with_features(&features),
         None => {
             info!(

@@ -183,12 +183,14 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    ConfigurationResource::fetch_config(&db_state_view).unwrap()
+    ConfigurationResource::fetch_config(&db_state_view)
+        .unwrap()
+        .unwrap()
 }
 
 fn get_features(db: &DbReaderWriter) -> Features {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    Features::fetch_config(&db_state_view).unwrap()
+    Features::fetch_config(&db_state_view).unwrap().unwrap()
 }
 
 fn assert_committed_write_set_version(db: &DbReaderWriter, version: u64, expected_v1: bool) {

@@ -80,7 +80,7 @@ pub mod transaction_chunk;
 fn chunk_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFromOnchain {
     // State sync executor shouldn't have block gas limit.
     let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
-    match Features::fetch_config(state_view) {
+    match Features::fetch_config(state_view).ok().flatten() {
         Some(features) => base.with_features(&features),
         None => {
             info!(

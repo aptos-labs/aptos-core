@@ -543,9 +543,9 @@ impl Parser {
             write_set: last_write_set,
         };
 
-        let validator_set = ValidatorSet::fetch_config(&write_set_view)
+        let validator_set = ValidatorSet::fetch_config(&write_set_view)?
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = ConfigurationResource::fetch_config(&write_set_view)
+        let configuration = ConfigurationResource::fetch_config(&write_set_view)?
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
         Ok(EpochState::new(

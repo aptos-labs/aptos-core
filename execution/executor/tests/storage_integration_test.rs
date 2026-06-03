@@ -94,6 +94,7 @@ fn test_reconfiguration() {
     assert_eq!(
         ValidatorSet::fetch_config(&db_state_view)
             .unwrap()
+            .unwrap()
             .payload()
             .next()
             .unwrap()
@@ -176,7 +177,10 @@ fn test_reconfiguration() {
         .unwrap();
 
     assert_eq!(
-        AptosVersion::fetch_config(&db_state_view).unwrap().major,
+        AptosVersion::fetch_config(&db_state_view)
+            .unwrap()
+            .unwrap()
+            .major,
         42
     );
 }
