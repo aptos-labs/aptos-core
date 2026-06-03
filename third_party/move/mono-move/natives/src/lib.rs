@@ -8,12 +8,22 @@
 
 // Re-exported so the `natives!` macro can name it via `$crate::NativeFunction`
 // without callers having to add `mono-move-core` to their imports.
+use mono_move_core::native::NativeContextFamily;
 pub use mono_move_core::native::NativeFunction;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
+pub mod signer;
 pub mod test_natives;
 
+pub use signer::make_all_signer_natives;
 pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
+
+/// All natives shipped with the production MonoMove VM. Additional native
+/// modules are concatenated here as they are implemented.
+pub fn make_all_production_natives<F: NativeContextFamily>(
+) -> Vec<(AccountAddress, Identifier, Identifier, NativeFunction<F>)> {
+    make_all_signer_natives::<F>()
+}
 
 /// Parses a fully-qualified function name (e.g. "0x1::natives::u64_add")
 /// into its component parts. Panics on malformed input.

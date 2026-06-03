@@ -59,6 +59,7 @@ fn local_ctx_with<'r>(
 const DST: FO = FO(0);
 const ADDR: FO = FO(8);
 const TMP: FO = FO(40);
+const SIGNER_REF: FO = FO(56);
 
 fn make_program(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> Function {
     Function {
@@ -66,8 +67,8 @@ fn make_program(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> Function {
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
-        param_and_local_sizes_sum: 56,
-        extended_frame_size: 80,
+        param_and_local_sizes_sum: 72,
+        extended_frame_size: 96,
         zero_frame: true,
         frame_layout,
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -216,8 +217,12 @@ fn rollback_of_move_from_then_move_to_restores_to_deleted() {
                 dst: TMP,
                 descriptor_id: desc_id,
             },
+            MicroOp::SlotBorrow {
+                dst: SIGNER_REF,
+                local: ADDR,
+            },
             MicroOp::MoveTo {
-                addr: ADDR,
+                signer_ref: SIGNER_REF,
                 ty: resource_ty(),
                 src: TMP,
             },
