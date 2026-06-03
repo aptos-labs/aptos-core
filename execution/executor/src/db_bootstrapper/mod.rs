@@ -23,7 +23,7 @@ use aptos_types::{
     },
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ConfigurationResource,
+    on_chain_config::{ConfigurationResource, Features, OnChainConfig},
     state_store::{state_key::StateKey, StateViewId, TStateView},
     timestamp::TimestampResource,
     transaction::{AuxiliaryInfo, AuxiliaryInfoTrait, Transaction},
@@ -126,6 +126,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         Arc::clone(&db.reader),
         ledger_summary.state.latest().clone(),
     )?;
+    let onchain_config = genesis_onchain_config(&base_state_view);
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -141,7 +142,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         vec![AuxiliaryInfo::new_empty()],
         &ledger_summary.state,
         base_state_view,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        onchain_config,
         TransactionSliceMetadata::unknown(),
     )?;
     ensure!(
@@ -202,6 +203,20 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         &committer.output.ledger_info_opt, committer.waypoint,
     );
     Ok(committer)
+}
+
+fn genesis_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFromOnchain {
+    let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
+    match Features::fetch_config(state_view) {
+        Some(features) => base.with_features(&features),
+        None => {
+            info!(
+                next_version = state_view.next_version(),
+                "No `Features` resource in parent state; genesis executes with no on-chain features applied."
+            );
+            base
+        },
+    }
 }
 
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
