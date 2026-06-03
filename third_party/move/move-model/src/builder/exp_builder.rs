@@ -1770,16 +1770,18 @@ impl ExpTranslator<'_, '_, '_> {
                 Self::translate_lambda_capture_kind(*capture_kind),
                 spec_opt.as_deref(),
             ),
-            EA::Exp_::Quant(kind, ranges, triggers, condition, body) => self.translate_quant(
-                &loc,
-                *kind,
-                ranges,
-                triggers,
-                condition,
-                body,
-                expected_type,
-                context,
-            ),
+            EA::Exp_::Quant(kind, ranges, triggers, weight, condition, body) => self
+                .translate_quant(
+                    &loc,
+                    *kind,
+                    ranges,
+                    triggers,
+                    *weight,
+                    condition,
+                    body,
+                    expected_type,
+                    context,
+                ),
             EA::Exp_::BinopExp(l, op, r) => {
                 let args = vec![l.as_ref(), r.as_ref()];
                 let QualifiedSymbol {
@@ -5922,6 +5924,7 @@ impl ExpTranslator<'_, '_, '_> {
         kind: PA::QuantKind,
         ranges: &EA::LValueWithRangeList,
         triggers: &[Vec<EA::Exp>],
+        weight: Option<u32>,
         condition: &Option<Box<EA::Exp>>,
         body: &EA::Exp,
         expected_type: &Type,
@@ -6023,6 +6026,9 @@ impl ExpTranslator<'_, '_, '_> {
         };
         self.check_type(loc, &quant_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&quant_ty, loc);
+        if let Some(w) = weight {
+            self.env().set_quant_weight(id, w);
+        }
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
     }
 

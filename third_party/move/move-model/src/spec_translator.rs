@@ -799,7 +799,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                 let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
                 self.expand_lemma_apply(loc, *qid, &args, &path_cond);
             },
-            Proof::ForallApply(loc, binds, pats, qid, args) => {
+            Proof::ForallApply(loc, binds, pats, qid, args, weight) => {
                 let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
                 let pats: Vec<Vec<Exp>> = pats
                     .iter()
@@ -810,7 +810,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                             .collect()
                     })
                     .collect();
-                self.expand_forall_lemma_apply(loc, binds, &pats, *qid, &args, &path_cond);
+                self.expand_forall_lemma_apply(loc, binds, &pats, *qid, &args, *weight, &path_cond);
             },
             Proof::Calc(loc, steps) => {
                 let env = self.builder.global_env();
@@ -921,6 +921,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         patterns: &[Vec<Exp>],
         qid: QualifiedId<crate::ast::LemmaId>,
         args: &[Exp],
+        weight: Option<u32>,
         path_cond: &Option<Exp>,
     ) {
         // Clone lemma data upfront to avoid borrow conflict.
@@ -980,6 +981,9 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
 
         // Build forall expression.
         let quant_node_id = env.new_node(loc.clone(), BOOL_TYPE.clone());
+        if let Some(w) = weight {
+            env.set_quant_weight(quant_node_id, w);
+        }
         let quant_exp = ExpData::Quant(
             quant_node_id,
             QuantKind::Forall,
