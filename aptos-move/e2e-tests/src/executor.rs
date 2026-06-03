@@ -512,8 +512,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let aptos_version =
-                AptosVersion::fetch_config(&self.state_store).map_or(0, |v| v.major);
+            let aptos_version = AptosVersion::fetch_config(&self.state_store)
+                .unwrap()
+                .map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
@@ -602,7 +603,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         balance: u64,
         seq_num: u64,
     ) -> AccountData {
-        let features = Features::fetch_config(&self.state_store).unwrap_or_default();
+        let features = Features::fetch_config(&self.state_store)
+            .unwrap()
+            .unwrap_or_default();
         let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         let use_concurrent_balance =
             features.is_enabled(FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE);
@@ -1226,6 +1229,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let validator_set = ValidatorSet::fetch_config(&self.state_store)
+            .unwrap()
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
@@ -1240,6 +1244,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         mut txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let validator_set = ValidatorSet::fetch_config(&self.state_store)
+            .unwrap()
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
@@ -1298,6 +1303,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         self.block_time = time_microseconds;
 
         let validator_set = ValidatorSet::fetch_config(&self.state_store)
+            .unwrap()
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
