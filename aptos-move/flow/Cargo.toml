@@ -19,6 +19,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-cli = { workspace = true }
 aptos-move-debugger = { workspace = true }
@@ -26,6 +27,8 @@ aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
+aptos-vm-types = { workspace = true }
+async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
