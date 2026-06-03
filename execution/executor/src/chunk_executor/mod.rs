@@ -77,10 +77,10 @@ pub mod transaction_chunk;
 /// When the `Features` resource is absent in the parent state — pre-genesis
 /// replay, or test setups whose genesis doesn't write it — fall back to
 /// `new_no_block_limit()`'s defaults, matching `db_bootstrapper`.
-fn chunk_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFromOnchain {
+fn chunk_onchain_config(state_view: &CachedStateView) -> Result<BlockExecutorConfigFromOnchain> {
     // State sync executor shouldn't have block gas limit.
     let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
-    match Features::fetch_config(state_view) {
+    Ok(match Features::fetch_config(state_view)? {
         Some(features) => base.with_features(&features),
         None => {
             info!(
@@ -89,7 +89,7 @@ fn chunk_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFrom
             );
             base
         },
-    }
+    })
 }
 
 pub struct ChunkExecutor<V> {
@@ -649,7 +649,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .take((end_version - begin_version) as usize)
             .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
             .collect::<Vec<_>>();
-        let onchain_config = chunk_onchain_config(&state_view);
+        let onchain_config = chunk_onchain_config(&state_view)?;
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),

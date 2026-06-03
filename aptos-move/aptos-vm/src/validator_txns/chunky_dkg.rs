@@ -106,19 +106,25 @@ impl AptosVM {
             signature,
         } = certified_transcript;
 
-        let config_resource = ConfigurationResource::fetch_config(resolver).ok_or(
-            ExecutionFailure::Expected(ExpectedFailure::MissingResourceConfiguration),
-        )?;
+        let config_resource = ConfigurationResource::fetch_config(resolver)
+            .ok()
+            .flatten()
+            .ok_or(ExecutionFailure::Expected(
+                ExpectedFailure::MissingResourceConfiguration,
+            ))?;
         if metadata.epoch != config_resource.epoch() {
             return Err(ExecutionFailure::Expected(ExpectedFailure::EpochNotCurrent));
         }
 
-        let validator_set = ValidatorSet::fetch_config(resolver).ok_or(
+        let validator_set = ValidatorSet::fetch_config(resolver).ok().flatten().ok_or(
             ExecutionFailure::Expected(ExpectedFailure::MissingResourceValidatorSet),
         )?;
-        let chunky_dkg_state = ChunkyDKGState::fetch_config(resolver).ok_or(
-            ExecutionFailure::Expected(ExpectedFailure::MissingResourceChunkyDKGState),
-        )?;
+        let chunky_dkg_state = ChunkyDKGState::fetch_config(resolver)
+            .ok()
+            .flatten()
+            .ok_or(ExecutionFailure::Expected(
+                ExpectedFailure::MissingResourceChunkyDKGState,
+            ))?;
 
         let _in_progress_session_state =
             chunky_dkg_state
