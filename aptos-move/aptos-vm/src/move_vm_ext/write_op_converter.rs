@@ -63,7 +63,8 @@ impl<'r> WriteOpConverter<'r> {
     ) -> Self {
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
-            if let Some(current_time) = CurrentTimeMicroseconds::fetch_config(remote) {
+            if let Some(current_time) = CurrentTimeMicroseconds::fetch_config(remote).ok().flatten()
+            {
                 // The deposit on the metadata is a placeholder (0), it will be updated later when
                 // storage fee is charged.
                 new_slot_metadata = Some(StateValueMetadata::placeholder(&current_time));

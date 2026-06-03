@@ -249,7 +249,10 @@ impl IoPricing {
 
         match feature_version {
             0 => V1(IoPricingV1::new(gas_params)),
-            1..=9 => match StorageGasSchedule::fetch_config(config_storage) {
+            1..=9 => match StorageGasSchedule::fetch_config(config_storage)
+                .ok()
+                .flatten()
+            {
                 None => V1(IoPricingV1::new(gas_params)),
                 Some(schedule) => V2(IoPricingV2::new_with_storage_curves(
                     feature_version,

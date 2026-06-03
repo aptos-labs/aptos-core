@@ -328,7 +328,7 @@ fn force_end_epoch(state_view: &impl SimulationStateStore) -> Result<()> {
     let module_storage = state_view.as_aptos_code_storage(&env);
 
     let gas_schedule =
-        GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
+        GasScheduleV2::fetch_config(&state_view)?.context("failed to fetch gas schedule v2")?;
     let gas_feature_version = gas_schedule.feature_version;
 
     let change_set_configs =
@@ -432,10 +432,10 @@ pub async fn simulate_multistep_proposal(
 
         // Fetch the on-chain configs that are needed for the simulation.
         let chain_id =
-            ChainIdResource::fetch_config(&state_view).context("failed to fetch chain id")?;
+            ChainIdResource::fetch_config(&state_view)?.context("failed to fetch chain id")?;
 
         let gas_schedule =
-            GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
+            GasScheduleV2::fetch_config(&state_view)?.context("failed to fetch gas schedule v2")?;
         let gas_feature_version = gas_schedule.feature_version;
         let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
             &gas_schedule.into_btree_map(),

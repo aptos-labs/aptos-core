@@ -168,7 +168,7 @@ impl Context {
 
     pub fn feature_enabled(&self, feature: FeatureFlag) -> Result<bool> {
         let state_view = self.latest_state_view()?;
-        let features = Features::fetch_config(&state_view)
+        let features = Features::fetch_config(&state_view)?
             .ok_or_else(|| anyhow::anyhow!("Failed to fetch features from state view"))?;
         Ok(features.is_enabled(feature))
     }
@@ -1455,8 +1455,10 @@ impl Context {
                 })?;
 
             let gas_schedule_params = {
-                let may_be_params =
-                    GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
+                let may_be_params = GasScheduleV2::fetch_config(&state_view)
+                    .ok()
+                    .flatten()
+                    .and_then(|gas_schedule| {
                         let feature_version = gas_schedule.feature_version;
                         let gas_schedule = gas_schedule.into_btree_map();
                         AptosGasParameters::from_on_chain_gas_schedule(
@@ -1468,6 +1470,8 @@ impl Context {
                 match may_be_params {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&state_view)
+                        .ok()
+                        .flatten()
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.into_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
@@ -1525,6 +1529,8 @@ impl Context {
                 })?;
 
             let execution_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
+                .ok()
+                .flatten()
                 .unwrap_or_else(OnChainExecutionConfig::default_if_missing);
 
             // Update the cache

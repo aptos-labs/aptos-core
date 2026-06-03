@@ -79,7 +79,7 @@ impl StorageGasParameters {
 struct DummyConfigStorage;
 
 impl ConfigStorage for DummyConfigStorage {
-    fn fetch_config_bytes(&self, _state_key: &StateKey) -> Option<Bytes> {
+    fn fetch_config_bytes(&self, _state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
         unreachable!("Not supposed to be called from latest() / tests.")
     }
 }
