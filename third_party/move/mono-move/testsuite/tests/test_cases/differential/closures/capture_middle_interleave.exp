@@ -1,0 +1,88 @@
+=== stackless ===
+// module 0x66::capture_middle_interleave
+
+fun three_rets(): u64 * u64 * u64 {
+  slots: params(0), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_u64 10
+    1: r1 := ld_u64 20
+    2: r2 := ld_u64 30
+    3: ret [r0, r1, r2]
+}
+
+fun g(r0, r1, r2): u64 {
+  slots: params(3), locals(0), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+  code:
+  L0:
+    0: r3 := mul r0, #1000000
+    1: r4 := mul r1, #1000
+    2: r4 := add r3, r4
+    3: r4 := add r4, r2
+    4: ret [r4]
+}
+
+fun caller(): u64 {
+  slots: params(0), locals(1), temps(3), xfer(3)
+    r0: |u64, u64|u64
+    r1: u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r1 := ld_u64 7
+    1: r0 := pack_closure g, 10, [r1]
+    2: [r1, r2, r3] := call three_rets, []
+    3: [r2] := call_closure [|u64, u64|u64], [r1, r2, r0]
+    4: ret [r2]
+}
+=== micro-ops ===
+// module 0x66::capture_middle_interleave
+
+fun three_rets() {
+  frame_data_size: 32
+  code:
+    0: Charge #8
+    1: StoreImm8 [0] <- #10
+    2: StoreImm8 [8] <- #20
+    3: StoreImm8 [16] <- #30
+    4: Return
+}
+
+fun g() {
+  frame_data_size: 40
+  code:
+    0: Charge #18
+    1: MulU64Imm [24] <- [0] * #1000000
+    2: MulU64Imm [32] <- [8] * #1000
+    3: AddU64 [32] <- [24] + [32]
+    4: AddU64 [32] <- [32] + [16]
+    5: Move8 [0] <- [32]
+    6: Return
+}
+
+fun caller() {
+  frame_data_size: 32
+  code:
+    0: Charge #59
+    1: StoreImm8 [8] <- #7
+    2: PackClosure [0] <- func_ref=Unresolved(g), mask=10, captured_desc=0, captured=[[8](8)]
+    3: CallIndirect 0x66::capture_middle_interleave::three_rets
+    4: Move8 [8] <- [56]
+    5: Move8 [16] <- [64]
+    6: Move8 [24] <- [72]
+    7: CallClosure closure=[0], provided_args=[[8](8), [16](8)]
+    8: Move8 [16] <- [56]
+    9: Move8 [0] <- [16]
+    10: Return
+  safe_point_layouts:
+    2: []
+}

@@ -11,9 +11,9 @@
 //! publish time.
 
 use mono_move_core::{
-    native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider,
-    FrameOffset, Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp,
-    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    captured_values_size, native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, IntBinaryOp, MicroOp,
+    ObjectDescriptorInner, PackClosureOp, ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -756,13 +756,37 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         match (op.captured_data_descriptor_id, op.captured.is_empty()) {
             (None, true) => {},
             (Some(id), false) => {
-                self.check_descriptor_variant(
-                    pc,
-                    "PackClosure",
-                    id,
-                    |inner| matches!(inner, ObjectDescriptorInner::CapturedData { .. }),
-                    "a CapturedData",
-                );
+                // Pointer-free captures use the reserved `Trivial` slot;
+                // pointer-bearing ones use a `CapturedData` descriptor whose
+                // heap-pointer offsets must lie within the values region so GC
+                // traces stay in bounds. One lookup validates both.
+                match self.provider.descriptor(id).map(|d| d.inner()) {
+                    None => self.err(
+                        Some(pc),
+                        format!("PackClosure: unknown descriptor_id {}", id),
+                    ),
+                    Some(ObjectDescriptorInner::Trivial) => {},
+                    Some(ObjectDescriptorInner::CapturedData { pointer_offsets }) => {
+                        for &off in pointer_offsets {
+                            if off as u64 + 8 > op.values_size as u64 {
+                                self.err(
+                                    Some(pc),
+                                    format!(
+                                        "PackClosure: captured_data pointer offset {} out of bounds of values_size {}",
+                                        off, op.values_size
+                                    ),
+                                );
+                            }
+                        }
+                    },
+                    Some(_) => self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: descriptor_id {} is not a Trivial or CapturedData",
+                            id
+                        ),
+                    ),
+                }
             },
             (Some(id), true) => {
                 self.err(
@@ -823,8 +847,12 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                         ),
                     );
                 }
-                // Each captured slot's size must match the corresponding
-                // callee parameter's size. The captured list is in
+                // Each captured slot's size AND alignment must match the
+                // corresponding callee parameter's: the runtime writes captured
+                // values using the slot's `(size, align)` but reads them back at
+                // the callee parameter's natural-aligned offset, so a mismatch
+                // (even with equal sizes) desyncs the write and read layouts and
+                // can read past the values region. The captured list is in
                 // mask-bit-set order through the param list.
                 let mut k = 0usize;
                 for (i, param_slot) in callee.param_slots.iter().enumerate() {
@@ -839,49 +867,39 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                                     ),
                                 );
                             }
+                            if slot.align != param_slot.align {
+                                self.err(
+                                    Some(pc),
+                                    format!(
+                                        "PackClosure: captured[{}].align {} != callee param_slots[{}].align {}",
+                                        k, slot.align, i, param_slot.align,
+                                    ),
+                                );
+                            }
                         }
                         k += 1;
                     }
                 }
             },
+            ClosureFuncRef::Unresolved(_) => {
+                // Symbolic target: the callee isn't materialized here, so the
+                // callee-dependent checks (param count, mask range, captured
+                // layout bounds, provided-arg sizes) are deferred to call time
+                // against the resolved callee. The mask/captured-count agreement
+                // checked above still applies.
+            },
         }
-        // The captured-data descriptor's values region must be exactly
-        // the materialized captured values — no padding, no extras.
-        // Together with the descriptor self-soundness pass, this is
-        // sufficient to ensure the runtime's fixed-offset writes stay in
-        // bounds.
-        let Some(id) = op.captured_data_descriptor_id else {
-            // The `None` case is already validated by the (None, _) arms of the
-            // match above.
-            return;
-        };
-        let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
-        let Some(desc) = self.provider.descriptor(id) else {
+        // `values_size` must equal the natural-aligned captured layout size:
+        // the runtime writes captured values at those fixed offsets, so a
+        // smaller size would let writes run out of bounds.
+        let expected_values_size =
+            captured_values_size(op.captured.iter().map(|slot| (slot.size, slot.align)));
+        if op.values_size != expected_values_size {
             self.err(
                 Some(pc),
                 format!(
-                    "PackClosure: captured_data descriptor {} not found",
-                    id.as_u32()
-                ),
-            );
-            return;
-        };
-        let ObjectDescriptorInner::CapturedData { size: actual, .. } = desc.inner() else {
-            self.err(
-                Some(pc),
-                format!(
-                    "PackClosure: captured_data descriptor {} is not a CapturedData descriptor",
-                    id.as_u32()
-                ),
-            );
-            return;
-        };
-        if *actual != expected_values_size {
-            self.err(
-                Some(pc),
-                format!(
-                    "PackClosure: captured_data values size {} != expected {}",
-                    actual, expected_values_size
+                    "PackClosure: values_size {} != captured layout size {}",
+                    op.values_size, expected_values_size
                 ),
             );
         }

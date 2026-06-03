@@ -106,6 +106,25 @@ pub(crate) mod macros {
     }
     pub(crate) use alloc_vec;
 
+    /// Forwards to [`super::alloc_captured_data`]. Arguments: (`$ctx`, `$fp`,
+    /// `$values_size`, `$descriptor_id`).
+    macro_rules! alloc_captured_data {
+        ($ctx:ident, $fp:expr, $values_size:expr, $descriptor_id:expr $(,)?) => {
+            $crate::heap::alloc_captured_data(
+                &mut $ctx.heap,
+                $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
+                &$ctx.pinned_roots,
+                $fp,
+                $ctx.current_func,
+                $ctx.pc,
+                $values_size,
+                $descriptor_id,
+            )
+        };
+    }
+    pub(crate) use alloc_captured_data;
+
     /// Forwards to [`super::grow_vec_ref`]. Arguments: (`$ctx`, `$fp`,
     /// `$vec_ref_offset`, `$elem_size`, `$required_cap_in_elems`).
     macro_rules! grow_vec_ref {
@@ -348,6 +367,32 @@ fn heap_alloc(
     }
 }
 
+/// Reserve `total_size` bytes (object header + payload) on the heap, running a
+/// GC and retrying once on out-of-memory. Shared tail of the `alloc_*` entry
+/// points below, which differ only in how `total_size` is computed.
+fn alloc_sized<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    pinned_roots: &PinnedRoots,
+    fp: *mut u8,
+    current_func: NonNull<Function>,
+    pc: usize,
+    total_size: usize,
+    descriptor_id: DescriptorId,
+) -> RuntimeResult<*mut u8> {
+    alloc_or_gc(
+        heap,
+        provider,
+        rws,
+        pinned_roots,
+        fp,
+        current_func,
+        pc,
+        |h| heap_alloc(h, total_size, descriptor_id),
+    )
+}
+
 /// Allocate a new vector object on the heap.
 ///
 /// `capacity_in_elems` is the number of elements the vector can hold
@@ -370,7 +415,8 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
         .ok_or(RuntimeError::VecAllocSizeOverflow)?;
-    alloc_or_gc(
+    // `length` defaults to 0 via heap_alloc's zero-init.
+    alloc_sized(
         heap,
         provider,
         rws,
@@ -378,9 +424,9 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         fp,
         current_func,
         pc,
-        |h| heap_alloc(h, total_size, descriptor_id),
+        total_size,
+        descriptor_id,
     )
-    // `length` defaults to 0 via heap_alloc's zero-init.
 }
 
 /// Allocate a new zeroed heap object (struct or enum). Size comes from the
@@ -405,18 +451,18 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
         ObjectDescriptorInner::Struct { size, .. } => *size as usize,
         ObjectDescriptorInner::Enum { size, .. } => *size as usize,
         ObjectDescriptorInner::Closure => CLOSURE_DATA_SIZE,
-        ObjectDescriptorInner::CapturedData { size, .. } => {
-            // Add the 8-byte tag+padding prefix to the values-region size.
-            CAPTURED_DATA_VALUES_OFFSET + *size as usize
-        },
-        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => {
+        // These descriptors carry no intrinsic size, so their objects are
+        // allocated through explicit-size entry points, not this path.
+        ObjectDescriptorInner::Trivial
+        | ObjectDescriptorInner::Vector { .. }
+        | ObjectDescriptorInner::CapturedData { .. } => {
             invariant_violation!(NonAllocatableDescriptor {
                 descriptor_id: descriptor_id.as_u32(),
             });
         },
     };
     let total_size = OBJECT_HEADER_SIZE + payload_size;
-    alloc_or_gc(
+    alloc_sized(
         heap,
         provider,
         rws,
@@ -424,7 +470,37 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
         fp,
         current_func,
         pc,
-        |h| heap_alloc(h, total_size, descriptor_id),
+        total_size,
+        descriptor_id,
+    )
+}
+
+/// Allocate a closure's captured-data object. The values-region `values_size`
+/// is a parameter, not read from the descriptor, so layouts sharing a trace
+/// shape share one `descriptor_id`: `Trivial` when pointer-free, else a
+/// `CapturedData` descriptor.
+pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    pinned_roots: &PinnedRoots,
+    fp: *mut u8,
+    current_func: NonNull<Function>,
+    pc: usize,
+    values_size: u32,
+    descriptor_id: DescriptorId,
+) -> RuntimeResult<*mut u8> {
+    let total_size = OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + values_size as usize;
+    alloc_sized(
+        heap,
+        provider,
+        rws,
+        pinned_roots,
+        fp,
+        current_func,
+        pc,
+        total_size,
+        descriptor_id,
     )
 }
 
@@ -849,15 +925,21 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
                 write_ptr(obj_ptr, off, new_ptr);
             }
         },
-        ObjectDescriptorInner::CapturedData {
-            pointer_offsets, ..
-        } => {
+        ObjectDescriptorInner::CapturedData { pointer_offsets } => {
             if pointer_offsets.is_empty() {
                 return Ok(());
             }
             unsafe {
                 for &off in pointer_offsets {
                     let abs_off = CAPTURED_DATA_VALUES_OFFSET + off as usize;
+                    // Shared across objects of different `values_size`
+                    // (offset-shape dedup), so `off` isn't bounded by this
+                    // object's size; the layout guarantees `values_size >=
+                    // off + 8`. Assert it for this object.
+                    debug_assert!(
+                        abs_off + 8 <= read_obj_size(obj_ptr) as usize - OBJECT_HEADER_SIZE,
+                        "captured-data pointer offset {off} exceeds object payload"
+                    );
                     let old_ptr = read_ptr(obj_ptr, abs_off);
                     if let Some(new_ptr) = scanner.relocate(old_ptr) {
                         write_ptr(obj_ptr, abs_off, new_ptr);

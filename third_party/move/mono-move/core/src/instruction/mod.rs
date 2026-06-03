@@ -114,10 +114,10 @@
 //!   heap pointers.
 
 use crate::{
-    align::MAX_ALIGN,
-    interner::{InternedIdentifier, InternedModuleId},
+    align::{align_up, MAX_ALIGN},
+    interner::{view_function_ref, InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{FrameSlot, NativeABI, NativeIdx},
-    types::{display_type, display_type_list, InternedType, InternedTypeList},
+    types::{display_type, display_type_list, view_name, InternedType, InternedTypeList},
     FunctionPtr,
 };
 use move_core_types::int256::U256;
@@ -185,41 +185,45 @@ impl std::fmt::Display for DescriptorId {
     }
 }
 
-/// A sized view into a frame slot: its byte offset and width.
-//
-// TODO: reconcile with `SlotInfo` (same shape, different provenance).
-// Also: add alignment information once the layout admits non-8-byte
-// fields, otherwise callers that pack `SizedSlot`s back-to-back (e.g.
-// captured data) will produce mis-aligned fields.
+/// Sized frame slot: a region of the frame with a byte offset (relative to
+/// frame pointer), size (in bytes), and alignment (in bytes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SizedSlot {
     pub offset: FrameOffset,
     pub size: u32,
+    pub align: u32,
 }
 
 /// Reference to the target function of a closure.
 ///
-/// Conceptually an enum. The concrete in-memory representation of this enum
-/// (tag size, padding, payload layout) inside closure heap objects is given
-/// by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
+/// Its in-memory representation inside a closure heap object (tag, padding,
+/// payload) is given by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
 #[derive(Clone)]
 pub enum ClosureFuncRef {
     /// Local function, already monomorphized and materialized.
     Resolved(FunctionPtr),
-    // `Unresolved { ... }` — cross-module form, TBD. Resolved lazily at call
-    // time. Its payload will mirror whatever representation cross-module
-    // calls end up using.
+    /// Function named symbolically by its `(module, name, type args)` identity,
+    /// resolved to a pointer lazily at call time.
+    Unresolved(InternedFunctionRef),
 }
 
 impl fmt::Display for ClosureFuncRef {
+    // SAFETY: the `Resolved` arm's `as_ref_unchecked` and `Unresolved` arm's
+    // `view_*` helpers are sound only because display happens while the guard
+    // keeps the arena and function pointers alive. TODO: have a safe display
+    // impl that takes the guard.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ClosureFuncRef::Resolved(ptr) => {
-                // SAFETY: Micro-ops are currently displayed only during execution
-                // when the guard is held.
-                // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
                 write!(f, "Resolved({})", func.name())
+            },
+            ClosureFuncRef::Unresolved(func_ref) => {
+                write!(
+                    f,
+                    "Unresolved({})",
+                    view_name(view_function_ref(*func_ref).func_name)
+                )
             },
         }
     }
@@ -237,13 +241,19 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
-    /// Descriptor for the allocated `ClosureCapturedData` (Materialized)
-    /// object. `Some` iff this closure captures at least one value;
-    /// otherwise `None` and no captured-data object is allocated.
+    /// GC trace descriptor for the allocated `ClosureCapturedData`
+    /// (Materialized) object. `Some` iff this closure captures at least one
+    /// value; otherwise `None` and no captured-data object is allocated. A
+    /// pointer-free capture uses the reserved `TRIVIAL_DESCRIPTOR_ID` (trace
+    /// nothing); a pointer-bearing capture uses a `CapturedData` descriptor
+    /// listing the heap-pointer offsets.
     ///
     /// The closure object's own descriptor is implicit: it is always the
     /// reserved `CLOSURE_DESCRIPTOR_ID` slot in the descriptor table.
     pub captured_data_descriptor_id: Option<DescriptorId>,
+    /// Byte width of the captured values region: the natural-aligned layout of
+    /// `captured`. `0` for a non-capturing closure.
+    pub values_size: u32,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -1640,13 +1650,15 @@ pub const FUNC_REF_PAYLOAD_OFFSET: usize = 8;
 
 /// `ClosureFuncRef::Resolved` tag value.
 pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
-// Future: `FUNC_REF_TAG_UNRESOLVED: u8 = 1`
+/// `ClosureFuncRef::Unresolved` tag value. Payload is a thin
+/// `InternedFunctionRef` pointer resolved lazily at call time.
+pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 
 // ---------------------------------------------------------------------------
 // ClosureCapturedData object layout (Materialized)
 // ---------------------------------------------------------------------------
 //
-//   Data region: [tag(1)] [padding(7)] [captured values packed in param order]
+//   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [captured values @ 8, packed in param order]
 //
 // Offsets below are relative to the data start (the object pointer). The
 // 8-byte header lives at `obj_ptr - 8`.
@@ -1659,12 +1671,41 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
 pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
 
+/// Byte offset of the exact captured values-region size (`u32`) within the
+/// captured-data object's prefix.
+pub const CAPTURED_DATA_VALUES_SIZE_OFFSET: usize = 4;
+
 /// Byte offset where captured values begin (after tag + padding).
 pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
 
 /// `ClosureCapturedData::Materialized` tag value.
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
 // Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
+
+/// Places the next captured value of `(size, align)` after `cursor` bytes at its
+/// natural alignment, returning `(value_offset, next_cursor)`. The values region
+/// is 8-aligned and pointer-bearing types are ≥ 8-aligned, so natural alignment
+/// keeps every captured pointer 8-aligned for the GC.
+///
+/// Single source of truth for the captured-data layout: all producers and
+/// consumers must use it so written offsets, pointer offsets, and read offsets
+/// agree.
+pub fn next_captured_value_offset(cursor: usize, size: usize, align: usize) -> (usize, usize) {
+    let offset = align_up(cursor, align);
+    (offset, offset + size)
+}
+
+/// Total byte width of a captured-data values region holding `slots` (each a
+/// `(size, align)` pair) laid out via [`next_captured_value_offset`]. The
+/// size-only companion to that helper, for callers that need the region size
+/// without the per-value offsets.
+pub fn captured_values_size(slots: impl IntoIterator<Item = (u32, u32)>) -> u32 {
+    let mut cursor = 0usize;
+    for (size, align) in slots {
+        (_, cursor) = next_captured_value_offset(cursor, size as usize, align as usize);
+    }
+    cursor as u32
+}
 
 impl MicroOp {
     /// Returns `true` if this op can trigger GC in the current frame.

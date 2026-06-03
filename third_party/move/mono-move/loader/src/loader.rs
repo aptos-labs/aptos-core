@@ -259,8 +259,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             },
         };
         let mut loading_ctx = LoweringContext::new(self, read_set);
-        let vec_descriptors = try_discover_types_for_lowering_in_function(
+        let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
+            self.guard,
             module.ir(),
             func_ir,
             ty_args,
@@ -287,7 +288,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             func_ir,
             ty_args,
             self.guard,
-            vec_descriptors,
+            descriptors,
             self.natives,
         )
         .map_err(LoaderError::Specializer)?
@@ -540,7 +541,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // Per-function lowering re-walks types and rebuilds its own
         // descriptor map; only the side-effecting publish-to-guard
         // matters here.
-        let _ = try_discover_types_for_lowering_in_module(&mut walker, module.ir())
+        let _ = try_discover_types_for_lowering_in_module(&mut walker, self.guard, module.ir())
             .map_err(LoaderError::Specializer)?;
 
         // Set the mandatory set for the module. Because of concurrency, it is
@@ -779,5 +780,16 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
 
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
         self.loader.guard.vec_descriptor_for(elem_ty)
+    }
+
+    fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_captured_data_descriptor(values_size, pointer_offsets))
     }
 }

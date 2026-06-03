@@ -11,14 +11,15 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
+        macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         pinned_roots::PinnedRoots,
         AllocationError, Heap,
     },
     invariant_violation,
     memory::{
-        read_account_address, read_bool, read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8,
-        vec_elem_ptr, write_bool, write_fat_ptr, write_ptr, write_u64, write_u8, MemoryRegion,
+        read_account_address, read_bool, read_descriptor, read_fat_ptr, read_obj_size, read_ptr,
+        read_u32, read_u64, read_u8, vec_elem_ptr, write_bool, write_fat_ptr, write_ptr, write_u32,
+        write_u64, write_u8, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
@@ -28,14 +29,17 @@ use crate::{
     ExecutionContext,
 };
 use mono_move_core::{
+    captured_values_size,
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
+    next_captured_value_offset,
     storage::resource_provider::StorageKey,
     CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
-    PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
+    MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
@@ -1626,21 +1630,39 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
 
             // SAFETY: the verifier guarantees `captured_data_descriptor_id`
-            // is `Some(CapturedData)` whenever `captured` is non-empty.
+            // is `Some` whenever `captured` is non-empty. The values-region
+            // size comes from the op, not the descriptor (see `PackClosureOp`).
             let captured_desc_id = op
                 .captured_data_descriptor_id
                 .expect("verifier ensures Some when captured is non-empty");
-            let captured_data = alloc_obj!(self, fp, captured_desc_id)?;
+            let captured_data = alloc_captured_data!(self, fp, op.values_size, captured_desc_id)?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
+            // Persist the exact values-region size so `CallClosure` can validate
+            // a lazily-resolved callee's captured layout against it; the header
+            // records only the alignment-rounded allocation size.
+            //
+            // TODO: persisting only the total lets `CallClosure` check totals but
+            // not the per-capture `(size, align)` breakdown. Persist that layout
+            // here to enable element-wise validation of an `Unresolved` callee.
+            write_u32(
+                captured_data,
+                CAPTURED_DATA_VALUES_SIZE_OFFSET,
+                op.values_size,
+            );
 
-            let mut captured_offset = CAPTURED_DATA_VALUES_OFFSET;
+            // Captured values are laid out at their natural alignment within
+            // the values region (see `next_captured_value_offset`), matching the
+            // descriptor's pointer offsets and the call-site read layout.
+            let mut cursor = 0usize;
             for slot in &op.captured {
+                let (offset, next) =
+                    next_captured_value_offset(cursor, slot.size as usize, slot.align as usize);
                 std::ptr::copy_nonoverlapping(
                     fp.add(slot.offset.into()),
-                    captured_data.add(captured_offset),
+                    captured_data.add(CAPTURED_DATA_VALUES_OFFSET + offset),
                     slot.size as usize,
                 );
-                captured_offset += slot.size as usize;
+                cursor = next;
             }
 
             let closure = pin.get().as_ptr();
@@ -1651,8 +1673,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         }
     }
 
-    /// Write the `func_ref` enum (Resolved only in v0) and the mask into
-    /// a freshly allocated closure heap object.
+    /// Write the `func_ref` enum and the mask into a freshly allocated closure
+    /// heap object.
     #[inline]
     unsafe fn write_closure_func_ref_and_mask(&self, closure: *mut u8, op: &PackClosureOp) {
         unsafe {
@@ -1664,6 +1686,15 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         closure,
                         CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
                         func_ptr.as_non_null().as_ptr() as *const u8,
+                    );
+                },
+                ClosureFuncRef::Unresolved(func_ref) => {
+                    *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
+                        FUNC_REF_TAG_UNRESOLVED;
+                    write_ptr(
+                        closure,
+                        CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+                        func_ref.as_raw_ptr() as *const u8,
                     );
                 },
             }
@@ -1679,8 +1710,10 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     /// argument lands at its parameter's natural-aligned offset), then
     /// performs the standard call protocol.
     ///
-    /// Only supports `ClosureFuncRef::Resolved` + Materialized captured
-    /// data for v0; other cases are errors.
+    /// Handles both `ClosureFuncRef::Resolved` and `Unresolved` targets — the
+    /// latter resolved lazily via the loader on first call, then memoized into
+    /// the closure object as `Resolved` so repeat calls take the fast path.
+    /// Captured data must be Materialized; other tags are errors.
     ///
     /// # Safety
     ///
@@ -1705,23 +1738,103 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             if closure.is_null() {
                 invariant_violation!(NullClosure);
             }
-
-            // Decode `ClosureFuncRef`. v0 supports only Resolved.
-            let func_tag = *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET);
-            if func_tag != FUNC_REF_TAG_RESOLVED {
-                todo!(
-                    "CallClosure: unsupported func_ref tag {} (only Resolved supported in v0)",
-                    func_tag
-                );
+            // Guard the func-pointer cast below against a non-closure pointer.
+            let descriptor_id = read_descriptor(closure);
+            if descriptor_id != CLOSURE_DESCRIPTOR_ID.0 {
+                invariant_violation!(ClosureSrcNotClosure { descriptor_id });
             }
-            let callee_raw = read_ptr(closure, CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET)
-                as *const Function;
-            if callee_raw.is_null() {
+
+            // Decode `ClosureFuncRef`: `Resolved` carries a baked-in function
+            // pointer; `Unresolved` carries a symbolic `(module, name, ty_args)`
+            // identity resolved lazily.
+            let func_tag = *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET);
+            let payload = read_ptr(closure, CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET);
+            if payload.is_null() {
                 invariant_violation!(NullFuncRefInClosure);
             }
-            let callee = &*callee_raw;
+            let (callee, resolved_now): (&Function, bool) = match func_tag {
+                FUNC_REF_TAG_RESOLVED => (&*(payload as *const Function), false),
+                FUNC_REF_TAG_UNRESOLVED => {
+                    let func_ref = &*(payload as *const FunctionRef);
+                    let func_ptr = self
+                        .exec_ctx
+                        .load_function(func_ref.module_id, func_ref.func_name, func_ref.ty_args)
+                        .map_err(RuntimeError::Loader)?;
+                    (func_ptr.as_ref_unchecked(), true)
+                },
+                other => invariant_violation!(InvalidClosureFuncRefTag { tag: other }),
+            };
 
+            // Re-read `closure` from its frame slot (a GC root): if resolution
+            // relocated the heap, the slot holds the moved object while the
+            // local `closure` above would dangle. A `Resolved` closure re-reads
+            // the same pointer.
+            let closure = read_ptr(fp, op.closure_src);
             let mask = read_u64(closure, CLOSURE_MASK_OFFSET);
+            let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
+
+            // Callee-dependent validation runs once, on the first resolution of
+            // an `Unresolved` closure; we then memoize the resolved pointer into
+            // the closure object (flipping it to `Resolved`) so later calls of
+            // the same closure value skip both the loader and these checks. An
+            // already-`Resolved` closure was validated earlier — by the verifier
+            // at pack time, or by this block on a prior call — and its captured
+            // data is immutable, so re-validation is unnecessary.
+            if resolved_now {
+                let num_params = callee.param_slots.len();
+                if num_params > 64 {
+                    invariant_violation!(TooManyClosureParams { num_params });
+                }
+                // The mask must not reference parameters the resolved callee
+                // lacks, or the captured-read cursor below would desync.
+                if num_params < 64 && (mask >> num_params) != 0 {
+                    invariant_violation!(ClosureMaskExceedsParams { mask, num_params });
+                }
+                if mask != 0 {
+                    if captured_data.is_null() {
+                        invariant_violation!(NullCapturedData);
+                    }
+                    let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
+                    if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
+                        todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported now)", cap_tag);
+                    }
+                    // The resolved callee's captured `values_size` must equal the
+                    // one the object was packed with (persisted exactly, not the
+                    // alignment-rounded header), rejecting signature skew before
+                    // the copy loop reads the bytes at the callee's offsets.
+                    //
+                    // TODO: this compares only the *total* values_size, so a
+                    // same-total but different per-capture `(size, align)` layout
+                    // (a cross-module skew) still passes and is read at the wrong
+                    // per-value offsets. The `Resolved` path is fully covered by
+                    // the verifier's per-slot size+align check; closing it for
+                    // `Unresolved` targets needs the packed per-capture layout
+                    // persisted in the object to compare element-wise here.
+                    let expected = captured_values_size(
+                        callee
+                            .param_slots
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| (mask >> i) & 1 != 0)
+                            .map(|(_, pslot)| (pslot.size, pslot.align)),
+                    );
+                    let packed = read_u32(captured_data, CAPTURED_DATA_VALUES_SIZE_OFFSET);
+                    if expected != packed {
+                        invariant_violation!(ClosureCapturedLayoutMismatch { expected, packed });
+                    }
+                }
+                // Memoize: bake the resolved function pointer into the closure
+                // and flip the tag to `Resolved`. The func-ref payload is not
+                // GC-traced and `FunctionPtr` is a stable leaked address, so this
+                // survives heap relocation exactly like a closure packed as
+                // `Resolved`.
+                write_ptr(
+                    closure,
+                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+                    callee as *const Function as *mut u8,
+                );
+                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = FUNC_REF_TAG_RESOLVED;
+            }
 
             // Walk the callee's parameters, interleaving captured values
             // (from the captured-data object, packed sequentially in
@@ -1738,32 +1851,22 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             // any copies (every iteration is a no-op move-in-place),
             // and unifies closure call codegen with direct call codegen.
             // See George's pseudocode in PR #19519 review thread.
-            if callee.param_slots.len() > 64 {
-                invariant_violation!(TooManyClosureParams {
-                    num_params: callee.param_slots.len(),
-                });
-            }
 
             // Stack-overflow check up front: `call_unchecked` skips the
             // check, so we do it here before writing the callee's
             // parameters at `new_fp`.
             let new_fp = self.check_stack_for_call(func, fp, callee.extended_frame_size)?;
 
-            // Only validate captured-data when the closure actually has
-            // captures. Non-capturing closures leave `captured_data_ptr`
-            // null (see `exec_pack_closure`).
-            let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
-            if mask != 0 {
-                if captured_data.is_null() {
-                    invariant_violation!(NullCapturedData);
-                }
-                let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
-                if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
-                    todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported in v0)", cap_tag);
-                }
-            }
-
-            let mut captured_value_offset = CAPTURED_DATA_VALUES_OFFSET;
+            // Captured values are read from the values region at their natural
+            // alignment — the same layout `exec_pack_closure` wrote and the
+            // descriptor records (see `next_captured_value_offset`).
+            //
+            // Interleaving is safe: captured writes land at/above `new_fp`,
+            // while provided-arg sources are always below it — the destacker
+            // never leaves a closure call's provided args in the callee
+            // region. The ranges are disjoint, so a captured write cannot
+            // clobber a provided source read on a later iteration.
+            let mut cursor = 0usize;
             let mut provided_idx = 0usize;
             for (i, pslot) in callee.param_slots.iter().enumerate() {
                 let param_size = pslot.size;
@@ -1771,12 +1874,17 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 let dst = new_fp.add(pslot.offset.0 as usize);
                 let is_captured = (mask >> i) & 1 != 0;
                 if is_captured {
+                    let (offset, next) = next_captured_value_offset(
+                        cursor,
+                        param_size as usize,
+                        pslot.align as usize,
+                    );
                     std::ptr::copy_nonoverlapping(
-                        captured_data.add(captured_value_offset),
+                        captured_data.add(CAPTURED_DATA_VALUES_OFFSET + offset),
                         dst,
                         param_size as usize,
                     );
-                    captured_value_offset += param_size as usize;
+                    cursor = next;
                 } else {
                     let Some(slot) = op.provided_args.get(provided_idx) else {
                         invariant_violation!(NotEnoughProvidedArgs);
@@ -1789,12 +1897,10 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                             param_size,
                         });
                     }
-                    // Use `copy` (not `copy_nonoverlapping`): a provided
-                    // arg's source slot may lie in the caller's reserved
-                    // callee-arg region, which is the same memory as the
-                    // callee's parameter region at `new_fp`. The
-                    // overlap is also routine under the planned
-                    // pre-write-then-patch redesign in the TODO above.
+                    // `copy`, not `copy_nonoverlapping`: a provided source
+                    // (below `new_fp`) never overlaps its callee-region
+                    // destination today, but the planned pre-write-then-patch
+                    // redesign copies in place and needs memmove semantics.
                     std::ptr::copy(fp.add(slot.offset.into()), dst, slot.size as usize);
                     provided_idx += 1;
                 }

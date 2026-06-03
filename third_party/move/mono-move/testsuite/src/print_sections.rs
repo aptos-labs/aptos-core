@@ -116,12 +116,20 @@ fn lower_functions(
             let name = module_ir.module.identifier_at(func_ir.name_idx).to_string();
             let result = try_discover_types_for_lowering_in_function(
                 &mut loader_ctx,
+                guard,
                 module_ir,
                 func_ir,
                 EMPTY_TYPE_LIST,
             )
-            .and_then(|vd| {
-                try_lower_function(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vd, &NoNatives)
+            .and_then(|descriptors| {
+                try_lower_function(
+                    module_ir,
+                    func_ir,
+                    EMPTY_TYPE_LIST,
+                    guard,
+                    descriptors,
+                    &NoNatives,
+                )
             });
             (name, result)
         })
@@ -232,5 +240,15 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
 
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
         self.guard.vec_descriptor_for(elem_ty)
+    }
+
+    fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> Result<DescriptorId> {
+        Ok(self
+            .guard
+            .publish_captured_data_descriptor(values_size, pointer_offsets))
     }
 }
