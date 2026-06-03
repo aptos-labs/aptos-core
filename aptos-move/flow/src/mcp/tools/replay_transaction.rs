@@ -883,14 +883,13 @@ mod tests {
     #[test]
     fn require_user_transaction_rejects_genesis() {
         // GenesisTransaction needs a WriteSetPayload; use the empty `Direct` form.
-        let txn = Transaction::GenesisTransaction(
-            aptos_types::transaction::WriteSetPayload::Direct(
+        let txn =
+            Transaction::GenesisTransaction(aptos_types::transaction::WriteSetPayload::Direct(
                 aptos_types::transaction::ChangeSet::new(
                     aptos_types::write_set::WriteSet::default(),
                     vec![],
                 ),
-            ),
-        );
+            ));
         let err = require_user_transaction(txn, 0).unwrap_err();
         assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
         assert!(
