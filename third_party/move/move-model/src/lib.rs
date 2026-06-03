@@ -82,6 +82,7 @@ pub fn run_model_builder_in_compiler_mode(
     language_version: LanguageVersion,
     compile_test_code: bool,
     compile_verify_code: bool,
+    compile_debug_assert: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -98,6 +99,7 @@ pub fn run_model_builder_in_compiler_mode(
         ModelBuilderOptions {
             language_version,
             compile_for_testing: compile_test_code,
+            compile_debug_assert,
         },
         Flags::model_compilation()
             .set_skip_attribute_checks(skip_attribute_checks)

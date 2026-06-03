@@ -101,6 +101,11 @@ pub struct Options {
     #[clap(skip)]
     pub compile_verify_code: bool,
 
+    /// Whether `debug_assert!` macros expand to their active (aborting) form.
+    /// Independent of `compile_test_code`.
+    #[clap(skip)]
+    pub compile_debug_assert: bool,
+
     /// External checks to be performed.
     #[clap(skip)]
     pub external_checks: Vec<Arc<dyn ExternalChecks>>,
@@ -200,6 +205,13 @@ impl Options {
     pub fn set_compile_verify_code(self, value: bool) -> Self {
         Self {
             compile_verify_code: value,
+            ..self
+        }
+    }
+
+    pub fn set_compile_debug_assert(self, value: bool) -> Self {
+        Self {
+            compile_debug_assert: value,
             ..self
         }
     }

@@ -864,6 +864,7 @@ impl CliTestFramework {
             compute_coverage: false,
             dump_state: false,
             fail_fast: false,
+            debug_assert: true,
             env: Default::default(),
         }
         .execute()

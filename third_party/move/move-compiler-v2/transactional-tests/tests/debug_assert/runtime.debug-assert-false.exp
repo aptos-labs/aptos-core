@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-6:  publish [module 0x66::m {]
+task 1 lines 8-8:  run 0x66::m::run
