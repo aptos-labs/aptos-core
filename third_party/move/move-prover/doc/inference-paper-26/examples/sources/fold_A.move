@@ -2,11 +2,13 @@ module 0x42::runner {
     use std::vector;
 
     spec module {
-      pragma verify = false; // TODO: investigate flakiness
+      pragma verify = true; // TODO: investigate flakiness
     }
 
-    // [inferred] Recursive helper: accumulator after applying f to the first k elements of v
-    spec fun spec_fold(v: vector<u64>, f: |u64,u64|u64, acc: u64, k: u64): u64 {
+    // [inferred] Recursive helper: accumulator after applying f to the first k elements of v.
+    // `[weight = 20]` throttles the recursive defining axiom so its matching loop does
+    // not starve other quantifiers under whole-module verification.
+    spec fun spec_fold(v: vector<u64>, f: |u64,u64|u64, acc: u64, k: u64): u64 [weight = 20] {
         if (k == 0) { acc }
         else { result_of<f>(spec_fold(v, f, acc, k - 1), v[k - 1]) }
     }

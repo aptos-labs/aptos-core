@@ -1230,7 +1230,7 @@ fn exp_ends_with_rbrace(exp: &Exp) -> bool {
         | Exp_::Pack(_, _, _)
         | Exp_::Vector(_, _, _)
         | Exp_::Lambda(_, _, _, _)
-        | Exp_::Quant(_, _, _, _, _)
+        | Exp_::Quant(_, _, _, _, _, _)
         | Exp_::Behavior(_, _, _)
         | Exp_::StateLabeled(_, _, _)
         | Exp_::ExpList(_)
@@ -2826,6 +2826,7 @@ fn parse_quant(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
             },
             vec![],
             None,
+            None,
             Box::new(body),
         ));
     }
@@ -2874,6 +2875,48 @@ fn parse_quant(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
         Vec::new()
     };
 
+    // Optional `[weight = N]` between triggers and the `where`/`:`.
+    let weight = if context.tokens.peek() == Tok::LBracket {
+        let bracket_loc = current_token_loc(context.tokens);
+        consume_token(context.tokens, Tok::LBracket)?;
+        consume_identifier(context.tokens, "weight")?;
+        let end_loc = context.tokens.previous_end_loc();
+        let attr_loc = make_loc(
+            context.tokens.file_hash(),
+            bracket_loc.start() as usize,
+            end_loc,
+        );
+        require_language_version(
+            context,
+            attr_loc,
+            LanguageVersion::V2_4,
+            "`[weight = N]` annotation on quantifier expressions",
+        );
+        consume_token(context.tokens, Tok::Equal)?;
+        let n_text = context.tokens.content().to_string();
+        let n: u32 = n_text.parse().map_err(|_| {
+            Box::new(diag!(
+                Syntax::UnexpectedToken,
+                (
+                    make_loc(
+                        context.tokens.file_hash(),
+                        context.tokens.start_loc(),
+                        context.tokens.start_loc() + n_text.len(),
+                    ),
+                    format!(
+                        "invalid weight `{}`: expected a non-negative integer",
+                        n_text
+                    ),
+                ),
+            ))
+        })?;
+        consume_token(context.tokens, Tok::NumValue)?;
+        consume_token(context.tokens, Tok::RBracket)?;
+        Some(n)
+    } else {
+        None
+    };
+
     let condition = match context.tokens.peek() {
         Tok::Identifier if context.tokens.content() == "where" => {
             context.tokens.advance()?;
@@ -2888,6 +2931,7 @@ fn parse_quant(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
         spanned_kind,
         binds_with_range_list,
         triggers,
+        weight,
         condition,
         Box::new(body),
     ))
@@ -4556,6 +4600,49 @@ fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
     consume_token(context.tokens, Tok::Colon)?;
     let return_type = parse_type(context)?;
 
+    // Optional `[weight = N]` after the return type; only consumed by recursive
+    // spec funs (the Boogie backend attaches it to the defining axiom).
+    let weight = if context.tokens.peek() == Tok::LBracket {
+        let bracket_loc = current_token_loc(context.tokens);
+        consume_token(context.tokens, Tok::LBracket)?;
+        consume_identifier(context.tokens, "weight")?;
+        let end_loc = context.tokens.previous_end_loc();
+        let attr_loc = make_loc(
+            context.tokens.file_hash(),
+            bracket_loc.start() as usize,
+            end_loc,
+        );
+        require_language_version(
+            context,
+            attr_loc,
+            LanguageVersion::V2_4,
+            "`[weight = N]` annotation on spec functions",
+        );
+        consume_token(context.tokens, Tok::Equal)?;
+        let n_text = context.tokens.content().to_string();
+        let n: u32 = n_text.parse().map_err(|_| {
+            Box::new(diag!(
+                Syntax::UnexpectedToken,
+                (
+                    make_loc(
+                        context.tokens.file_hash(),
+                        context.tokens.start_loc(),
+                        context.tokens.start_loc() + n_text.len(),
+                    ),
+                    format!(
+                        "invalid weight `{}`: expected a non-negative integer",
+                        n_text
+                    ),
+                ),
+            ))
+        })?;
+        consume_token(context.tokens, Tok::NumValue)?;
+        consume_token(context.tokens, Tok::RBracket)?;
+        Some(n)
+    } else {
+        None
+    };
+
     // Parse optional modifies/reads before body
     let (modifies, reads) = parse_spec_fun_modifies_reads(context)?;
 
@@ -4592,6 +4679,7 @@ fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
             name,
             modifies,
             reads,
+            weight,
             body,
         },
     ))
@@ -5183,6 +5271,47 @@ fn parse_proof_stmt(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
                 } else {
                     vec![]
                 };
+                // Optional `[weight = N]` between triggers and `apply`.
+                let weight = if context.tokens.peek() == Tok::LBracket {
+                    let bracket_loc = current_token_loc(context.tokens);
+                    consume_token(context.tokens, Tok::LBracket)?;
+                    consume_identifier(context.tokens, "weight")?;
+                    let end_loc = context.tokens.previous_end_loc();
+                    let attr_loc = make_loc(
+                        context.tokens.file_hash(),
+                        bracket_loc.start() as usize,
+                        end_loc,
+                    );
+                    require_language_version(
+                        context,
+                        attr_loc,
+                        LanguageVersion::V2_4,
+                        "`[weight = N]` annotation on `forall ... apply`",
+                    );
+                    consume_token(context.tokens, Tok::Equal)?;
+                    let n_text = context.tokens.content().to_string();
+                    let n: u32 = n_text.parse().map_err(|_| {
+                        Box::new(diag!(
+                            Syntax::UnexpectedToken,
+                            (
+                                make_loc(
+                                    context.tokens.file_hash(),
+                                    context.tokens.start_loc(),
+                                    context.tokens.start_loc() + n_text.len(),
+                                ),
+                                format!(
+                                    "invalid weight `{}`: expected a non-negative integer",
+                                    n_text
+                                ),
+                            ),
+                        ))
+                    })?;
+                    consume_token(context.tokens, Tok::NumValue)?;
+                    consume_token(context.tokens, Tok::RBracket)?;
+                    Some(n)
+                } else {
+                    None
+                };
                 // "apply" lemma(args);
                 consume_identifier(context.tokens, "apply")?;
                 let lemma = parse_name_access_chain(context, false, || "a lemma name")?;
@@ -5199,6 +5328,7 @@ fn parse_proof_stmt(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
                     patterns,
                     lemma,
                     args,
+                    weight,
                 }
             },
             "calc" => {
