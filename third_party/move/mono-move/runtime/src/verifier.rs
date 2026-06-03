@@ -11,9 +11,9 @@
 //! publish time.
 
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider,
+    FrameOffset, Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp,
+    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -82,8 +82,7 @@ struct FunctionVerifier<'a, P: DescriptorProvider + ?Sized> {
 
 impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     fn verify(&mut self) {
-        let code_guard = self.func.code.load();
-        let code = code_guard.as_slice();
+        let code = self.func.code.get();
 
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_point_layouts = self.func.safe_point_layouts.entries();
@@ -233,6 +232,14 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, dst);
             },
 
+            MicroOp::StoreImm16 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+
+            MicroOp::StoreImm32 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 32);
+            },
+
             MicroOp::StoreRandomU64 { dst } => {
                 self.check_frame_access_8(pc, dst);
             },
@@ -364,6 +371,13 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), op.dst, size);
             },
 
+            MicroOp::IntCast(op) => {
+                // Note: the Move bytecode permits casting from one integer type to self, effectively a no-op.
+                // Therefore we must NOT ban it here.
+                self.check_frame_access(Some(pc), op.src, op.from.byte_width() as u32);
+                self.check_frame_access(Some(pc), op.dst, op.to.byte_width() as u32);
+            },
+
             MicroOp::Move { dst, src, size } => {
                 self.check_nonzero_size(pc, size);
                 self.check_frame_access(Some(pc), src, size);
@@ -435,6 +449,10 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
+
+            MicroOp::CallNative { ref abi, .. } => {
+                self.check_native_abi(pc, abi);
+            },
 
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {
@@ -545,6 +563,37 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), src, size);
             },
 
+            MicroOp::DeriveRefOffsetImm {
+                dst_ref, src_ref, ..
+            } => {
+                self.check_frame_access(Some(pc), src_ref, 16);
+                self.check_frame_access(Some(pc), dst_ref, 16);
+            },
+
+            MicroOp::ReadRefOffset {
+                dst,
+                ref_ptr,
+                offset,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), ref_ptr, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), dst, size);
+            },
+
+            MicroOp::WriteRefOffset {
+                ref_ptr,
+                offset,
+                src,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), ref_ptr, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), src, size);
+            },
+
             // ----- Heap object instructions -----
             MicroOp::HeapNew { dst, descriptor_id } => {
                 self.check_frame_access_8(pc, dst);
@@ -594,6 +643,25 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
             MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
+
+            MicroOp::Exists { addr, ty: _, dst } | MicroOp::MoveFrom { addr, ty: _, dst } => {
+                // Exists writes a bool (currently widened to 8 bytes); MoveFrom
+                // writes an 8-byte owned heap pointer.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access_8(pc, dst);
+            },
+            MicroOp::BorrowGlobal { addr, ty: _, dst }
+            | MicroOp::BorrowGlobalMut { addr, ty: _, dst } => {
+                // Both produce a reference, i.e. a 16-byte fat pointer.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+            MicroOp::MoveTo { addr, ty: _, src } => {
+                // TODO(correctness):
+                //   Move use signer reference, so we need 16 bytes if we no longer use address.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access_8(pc, src);
+            },
         }
     }
 
@@ -815,6 +883,27 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         self.check_frame_access(Some(pc), offset, 1);
     }
 
+    /// Verify the native's slot region fits within the caller's extended frame.
+    fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
+        let callee_base = self.func.frame_size();
+        let end = match callee_base.checked_add(abi.total_frame_size() as usize) {
+            Some(e) => e,
+            None => {
+                self.err(Some(pc), "native slot region overflows usize");
+                return;
+            },
+        };
+        if end > self.func.extended_frame_size {
+            self.err(
+                Some(pc),
+                format!(
+                    "native slot region [{}, {}) exceeds extended_frame_size {}",
+                    callee_base, end, self.func.extended_frame_size,
+                ),
+            );
+        }
+    }
+
     /// Verify an [`IntBinaryOp`]: dst and lhs are slots of width
     /// `op.rhs.byte_width()`; if rhs is a slot arm, its slot is checked too.
     fn check_int_binop_frame_access(&mut self, pc: usize, op: &IntBinaryOp) {
@@ -854,8 +943,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        // TODO: avoid reloading code.
-        let code_len = self.func.code.load().len();
+        let code_len = self.func.code.get().len();
         if (target.0 as usize) >= code_len {
             self.err(
                 Some(pc),
@@ -870,6 +958,17 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(Some(pc), "size must be > 0");
+        }
+    }
+
+    /// Requires `offset + size` to fit in `u32`, so the access window
+    /// `[offset, offset + size)` cannot wrap.
+    fn check_ref_offset_size_no_overflow(&mut self, pc: usize, offset: u32, size: u32) {
+        if offset.checked_add(size).is_none() {
+            self.err(
+                Some(pc),
+                format!("offset {} + size {} overflows u32", offset, size),
+            );
         }
     }
 }

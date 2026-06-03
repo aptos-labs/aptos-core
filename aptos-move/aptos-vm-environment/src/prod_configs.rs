@@ -320,9 +320,13 @@ impl RandomnessConfig {
     /// Returns randomness config based on the current state.
     pub fn fetch(state_view: &impl StateView) -> Self {
         let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(state_view)
+            .ok()
+            .flatten()
             .unwrap_or_else(RequiredGasDeposit::default_if_missing)
             .gas_amount;
         let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(state_view)
+            .ok()
+            .flatten()
             .unwrap_or_else(AllowCustomMaxGasFlag::default_if_missing)
             .value;
         Self {

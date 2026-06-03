@@ -20,7 +20,7 @@ mod micro_op {
 
     fn run(n: u64) -> Vec<u64> {
         let values = shuffled_range(n, 42);
-        let (functions, descriptors) = micro_op_merge_sort();
+        let (functions, descriptors) = micro_op_merge_sort(false);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });

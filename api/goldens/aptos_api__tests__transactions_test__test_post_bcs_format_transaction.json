@@ -18,5 +18,6 @@
     "signature": "0x553ac0e85dbf583e87ac181b5a10d741573bdb4596d77a1c49a3e22a15bb393646eadf4cd57359d899781cb9683bbb8c24405108cd1ffade92cd95260f199d0f",
     "type": "ed25519_signature"
   },
-  "replay_protection_nonce": null
+  "replay_protection_nonce": null,
+  "txn_limits_request": null
 }

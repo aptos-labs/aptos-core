@@ -20,7 +20,10 @@ use aptos_rest_client::{
     error::{AptosErrorResponse, RestError},
     Client,
 };
-use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{fungible_store::FungibleStoreResource, AccountResource},
+};
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -126,18 +129,18 @@ async fn get_balances(
     if account.is_base_account() {
         balances =
             get_base_balances(&rest_client, owner_address, version, currencies_to_lookup).await?;
-    } else if pool_address.is_some() {
+    } else if let Some(currency) = account.secondary_store_currency() {
+        if currencies_to_lookup.contains(currency) {
+            balances =
+                get_secondary_store_balance(&rest_client, owner_address, version, currency).await?;
+        }
+    } else if let Some(pool_address) = pool_address {
         // Lookup the delegation pool, if it's provided in the account information
         // Filter appropriately, must have native coin
         if currencies_to_lookup.contains(&native_coin()) {
-            (balances, lockup_expiration) = get_delegation_info(
-                &rest_client,
-                &account,
-                owner_address,
-                pool_address.unwrap(),
-                version,
-            )
-            .await?;
+            (balances, lockup_expiration) =
+                get_delegation_info(&rest_client, &account, owner_address, pool_address, version)
+                    .await?;
         }
     } else {
         // Retrieve staking information (if it applies)
@@ -157,6 +160,88 @@ async fn get_balances(
         balances,
         lockup_expiration,
     ))
+}
+
+async fn get_secondary_store_balance(
+    rest_client: &Client,
+    store_address: AccountAddress,
+    version: u64,
+    currency: &Currency,
+) -> ApiResult<Vec<Amount>> {
+    match rest_client
+        .get_account_resource_at_version_bcs(
+            store_address,
+            "0x1::fungible_asset::FungibleStore",
+            version,
+        )
+        .await
+    {
+        Ok(response) => {
+            let store: FungibleStoreResource = response.into_inner();
+            Ok(vec![secondary_store_amount(&store, currency)?])
+        },
+        Err(RestError::Api(AptosErrorResponse {
+            error:
+                AptosError {
+                    error_code: AptosErrorCode::AccountNotFound,
+                    ..
+                },
+            ..
+        }))
+        | Err(RestError::Api(AptosErrorResponse {
+            error:
+                AptosError {
+                    error_code: AptosErrorCode::ResourceNotFound,
+                    ..
+                },
+            ..
+        })) => Ok(vec![Amount {
+            value: 0.to_string(),
+            currency: currency.clone(),
+        }]),
+        Err(err) => Err(ApiError::InternalError(Some(format!(
+            "Failed to retrieve secondary store balance: {}",
+            err
+        )))),
+    }
+}
+
+fn secondary_store_amount(store: &FungibleStoreResource, currency: &Currency) -> ApiResult<Amount> {
+    let expected_metadata = currency_fa_metadata_address(currency)?.ok_or_else(|| {
+        ApiError::InvalidInput(Some(format!(
+            "Currency {} does not identify a fungible asset metadata address",
+            currency.symbol
+        )))
+    })?;
+
+    if store.metadata() != expected_metadata {
+        return Err(ApiError::InvalidInput(Some(format!(
+            "Secondary store metadata {} does not match requested currency metadata {}",
+            store.metadata(),
+            expected_metadata
+        ))));
+    }
+
+    Ok(Amount {
+        value: store.balance().to_string(),
+        currency: currency.clone(),
+    })
+}
+
+fn currency_fa_metadata_address(currency: &Currency) -> ApiResult<Option<AccountAddress>> {
+    if let Some(metadata) = currency.metadata.as_ref() {
+        if let Some(fa_address) = metadata.fa_address.as_ref() {
+            return AccountAddress::from_str(fa_address)
+                .map(Some)
+                .map_err(|err| ApiError::InvalidInput(Some(err.to_string())));
+        }
+    }
+
+    if currency == &native_coin() {
+        Ok(Some(AccountAddress::TEN))
+    } else {
+        Ok(None)
+    }
 }
 
 async fn get_sequence_number(
@@ -402,4 +487,57 @@ pub async fn view<T: DeserializeOwned>(
         )
         .await?
         .into_inner())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::CurrencyMetadata;
+
+    #[test]
+    fn test_secondary_store_amount_for_native_coin() {
+        let store = FungibleStoreResource::new(AccountAddress::TEN, 50_000_000, false);
+        let amount = secondary_store_amount(&store, &native_coin()).unwrap();
+
+        assert_eq!(amount.value, "50000000");
+        assert_eq!(amount.currency, native_coin());
+    }
+
+    #[test]
+    fn test_secondary_store_amount_preserves_fa_currency() {
+        let metadata_address =
+            AccountAddress::from_str("0x12341234123412341234123412341234").unwrap();
+        let currency = Currency {
+            symbol: "FUN".to_string(),
+            decimals: 2,
+            metadata: Some(CurrencyMetadata {
+                move_type: None,
+                fa_address: Some(metadata_address.to_string()),
+            }),
+        };
+        let store = FungibleStoreResource::new(metadata_address, 123, false);
+        let amount = secondary_store_amount(&store, &currency).unwrap();
+
+        assert_eq!(amount.value, "123");
+        assert_eq!(amount.currency, currency);
+    }
+
+    #[test]
+    fn test_secondary_store_amount_rejects_mismatched_currency() {
+        let store_metadata =
+            AccountAddress::from_str("0x12341234123412341234123412341234").unwrap();
+        let requested_metadata =
+            AccountAddress::from_str("0x56785678567856785678567856785678").unwrap();
+        let currency = Currency {
+            symbol: "FUN".to_string(),
+            decimals: 2,
+            metadata: Some(CurrencyMetadata {
+                move_type: None,
+                fa_address: Some(requested_metadata.to_string()),
+            }),
+        };
+        let store = FungibleStoreResource::new(store_metadata, 123, false);
+
+        assert!(secondary_store_amount(&store, &currency).is_err());
+    }
 }

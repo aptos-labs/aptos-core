@@ -323,7 +323,7 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
     sha3_256: &mut Sha3_256,
     state_view: &impl StateView,
 ) -> Option<T> {
-    let (config, bytes) = T::fetch_config_and_bytes(state_view)?;
+    let (config, bytes) = T::fetch_config_and_bytes(state_view).ok().flatten()?;
     sha3_256.update(&bytes);
     Some(config)
 }

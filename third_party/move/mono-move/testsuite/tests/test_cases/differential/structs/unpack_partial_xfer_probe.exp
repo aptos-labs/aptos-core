@@ -1,0 +1,68 @@
+=== stackless ===
+// module 0x66::unpack_partial_xfer_probe
+
+fun pair_provider(): Pair {
+  slots: params(0), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: 0x66::unpack_partial_xfer_probe::Pair
+  code:
+  L0:
+    0: r0 := ld_u64 10
+    1: r1 := ld_u64 20
+    2: r2 := pack 0x66::unpack_partial_xfer_probe::Pair, [r0, r1]
+    3: ret [r2]
+}
+
+fun id(r0): u64 {
+  slots: params(1), locals(0), temps(0)
+    r0: u64
+  code:
+  L0:
+    0: ret [r0]
+}
+
+fun trigger(): u64 {
+  slots: params(0), locals(0), temps(1), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call pair_provider, []
+    1: [r0, x0] := unpack 0x66::unpack_partial_xfer_probe::Pair, x0
+    2: [x0] := call id, [x0]
+    3: r0 := add r0, x0
+    4: ret [r0]
+}
+=== micro-ops ===
+// module 0x66::unpack_partial_xfer_probe
+
+fun pair_provider() {
+  frame_data_size: 32
+  code:
+    0: Charge #60
+    1: StoreImm8 [0] <- #10
+    2: StoreImm8 [8] <- #20
+    3: Move8 [24] <- [8]
+    4: Move8 [16] <- [0]
+    5: Move(16) [0] <- [16]
+    6: Return
+}
+
+fun id() {
+  frame_data_size: 8
+  code:
+    0: Charge #2
+    1: Return
+}
+
+fun trigger() {
+  frame_data_size: 8
+  code:
+    0: Charge #29
+    1: CallIndirect 0x66::unpack_partial_xfer_probe::pair_provider
+    2: Move8 [0] <- [32]
+    3: Move8 [32] <- [40]
+    4: CallIndirect 0x66::unpack_partial_xfer_probe::id
+    5: AddU64 [0] <- [0] + [32]
+    6: Return
+}

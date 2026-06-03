@@ -3,8 +3,12 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError};
+use mono_move_core::{
+    native::VMInternalError, ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError,
+};
 use mono_move_gas::GasExhaustedError;
+use mono_move_loader::LoaderError;
+use move_core_types::account_address::AccountAddress;
 use std::fmt;
 use thiserror::Error;
 
@@ -15,9 +19,8 @@ pub enum RuntimeError {
     #[error(transparent)]
     GasExhausted(#[from] GasExhaustedError),
 
-    // TODO: replace with a typed loader error once the loader has one.
     #[error(transparent)]
-    Loader(anyhow::Error),
+    Loader(#[from] LoaderError),
 
     #[error("{op}.{ty}: overflow")]
     ArithmeticOverflow { op: ArithOp, ty: IntTy },
@@ -45,11 +48,23 @@ pub enum RuntimeError {
     #[error("Negate.{ty}: Negate of MIN overflows")]
     NegateMinOverflow { ty: IntTy },
 
+    #[error("Cast.{from}->{to}: value out of range for {to}")]
+    CastOutOfRange { from: IntTy, to: IntTy },
+
     #[error("VecPopBack on empty vector")]
     PopFromEmptyVector,
 
     #[error("{op} index out of bounds: idx={idx} len={len}")]
     VectorIndexOutOfBounds { op: VecOp, idx: u64, len: u64 },
+
+    #[error("{op}: resource does not exist at {addr}")]
+    ResourceDoesNotExist {
+        op: GlobalStorageOp,
+        addr: AccountAddress,
+    },
+
+    #[error("MoveTo: resource already exists at {addr}")]
+    ResourceAlreadyExists { addr: AccountAddress },
 
     #[error("stack overflow")]
     StackOverflow,
@@ -72,6 +87,12 @@ pub enum RuntimeError {
 
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
+
+    #[error("resource provider: {0}")]
+    ResourceProvider(#[from] ResourceProviderError),
+
+    #[error(transparent)]
+    VMInternal(#[from] VMInternalError),
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -80,8 +101,7 @@ impl IntoExecutionError for RuntimeError {
         match self {
             GasExhausted(_) => ExecutionErrorKind::OutOfGas,
 
-            // TODO: delegate to the loader's typed error once it has one.
-            Loader(_) => ExecutionErrorKind::Placeholder,
+            Loader(e) => e.kind(),
 
             ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
@@ -90,9 +110,12 @@ impl IntoExecutionError for RuntimeError {
             | ArithmeticUnderOverflow { .. }
             | DivisionByZeroOrOverflow { .. }
             | NegateMinOverflow { .. }
+            | CastOutOfRange { .. }
             | PopFromEmptyVector
             | VectorIndexOutOfBounds { .. }
-            | InvalidAbortMessage => ExecutionErrorKind::InvalidOperation,
+            | InvalidAbortMessage
+            | ResourceDoesNotExist { .. }
+            | ResourceAlreadyExists { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -101,6 +124,8 @@ impl IntoExecutionError for RuntimeError {
             | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            ResourceProvider(e) => e.kind(),
+            VMInternal(e) => e.kind(),
         }
     }
 }
@@ -170,6 +195,23 @@ impl fmt::Display for VecOp {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalStorageOp {
+    BorrowGlobal,
+    BorrowGlobalMut,
+    MoveFrom,
+}
+
+impl fmt::Display for GlobalStorageOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GlobalStorageOp::BorrowGlobal => write!(f, "BorrowGlobal"),
+            GlobalStorageOp::BorrowGlobalMut => write!(f, "BorrowGlobalMut"),
+            GlobalStorageOp::MoveFrom => write!(f, "MoveFrom"),
+        }
+    }
+}
+
 /// Conditions that should never occur if the compiler, verifier, and
 /// runtime maintain their invariants. Surfaced rather than panicked so
 /// callers can produce a clean per-transaction outcome and alert
@@ -227,6 +269,21 @@ pub enum RuntimeInvariantViolation {
         "CallClosure: {provided} provided_args but only {consumed} non-captured params consumed"
     )]
     ClosureArgsCountMismatch { provided: usize, consumed: usize },
+
+    #[error("resource provider: {0}")]
+    ResourceProviderInvariant(String),
+
+    #[error("rollback({requested}): only {available} checkpoint(s) on the stack")]
+    RollbackUnderflow { requested: usize, available: usize },
+
+    #[error("enum tag {tag} out of range for {variant_count} variants")]
+    EnumTagOutOfRange { tag: u64, variant_count: usize },
+
+    #[error("MoveTo: null source pointer")]
+    MoveToNullSource,
+
+    #[error("CallNative: native_idx {idx} out of bounds in registry of size {registry_size}")]
+    NativeIdxOutOfBounds { idx: u32, registry_size: usize },
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

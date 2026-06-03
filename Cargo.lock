@@ -8762,6 +8762,8 @@ name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-aggregator",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
@@ -8770,6 +8772,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-move-e2e-test-harness",
+ "aptos-mvhashmap",
  "aptos-package-builder",
  "aptos-rest-client",
  "aptos-sdk",
@@ -8787,6 +8790,8 @@ dependencies = [
  "move-coverage",
  "move-model",
  "move-package",
+ "move-vm-runtime",
+ "move-vm-types",
  "once_cell",
  "proptest",
  "rstest",
@@ -8795,6 +8800,7 @@ dependencies = [
  "test-case",
  "thousands",
  "tokio",
+ "triomphe",
 ]
 
 [[package]]
@@ -12766,7 +12772,7 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arc-swap",
+ "bytes",
  "mono-move-alloc",
  "mono-move-gas",
  "move-binary-format",
@@ -12805,15 +12811,22 @@ name = "mono-move-loader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes",
  "mono-move-core",
  "mono-move-gas",
  "mono-move-global-context",
  "mono-move-testsuite",
- "move-binary-format",
  "move-core-types",
  "shared-dsa",
  "specializer",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mono-move-natives"
+version = "0.1.0"
+dependencies = [
+ "mono-move-core",
+ "move-core-types",
 ]
 
 [[package]]
@@ -12855,7 +12868,10 @@ dependencies = [
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
+ "mono-move-loader",
  "move-core-types",
+ "num-bigint 0.3.3",
+ "paste",
  "proptest",
  "rand 0.7.3",
  "thiserror 1.0.69",
@@ -12875,6 +12891,7 @@ dependencies = [
  "mono-move-gas",
  "mono-move-global-context",
  "mono-move-loader",
+ "mono-move-natives",
  "mono-move-runtime",
  "move-asm",
  "move-binary-format",
@@ -12886,6 +12903,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "smallvec",
  "specializer",
  "tempfile",
  "walkdir",
@@ -18424,6 +18442,7 @@ name = "specializer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "mono-move-core",
  "mono-move-gas",
  "move-binary-format",

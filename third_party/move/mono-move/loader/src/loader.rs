@@ -18,14 +18,16 @@
 //! then inserted into cache.
 
 use crate::{
-    module_provider::ModuleProvider,
+    error::{LoaderError, LoaderResult},
+    invariant_violation,
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
-use anyhow::{anyhow, bail};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    native::NativeResolver,
+    types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
+    ModuleProvider,
 };
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{
@@ -94,21 +96,26 @@ pub struct Loader<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
     module_provider: &'guard dyn ModuleProvider,
     policy: LoadingPolicy,
+    natives: &'guard dyn NativeResolver,
 }
 
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// Creates a new loader. The provided [`ModuleProvider`] processes cache
     /// misses: fetch code from storage, deserialize and verify. Policy
-    /// dictates how the code is loaded.
+    /// dictates how the code is loaded. The [`NativeResolver`] resolves
+    /// native call sites during specialization; pass [`NoNatives`] when
+    /// no natives are registered.
     pub fn new_with_policy(
         guard: &'guard ExecutionGuard<'ctx>,
         module_provider: &'guard dyn ModuleProvider,
         policy: LoadingPolicy,
+        natives: &'guard dyn NativeResolver,
     ) -> Self {
         Self {
             guard,
             module_provider,
             policy,
+            natives,
         }
     }
 
@@ -129,7 +136,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
-    ) -> anyhow::Result<&'guard LoadedModule> {
+    ) -> LoaderResult<&'guard LoadedModule> {
         match &self.policy {
             LoadingPolicy::Lazy(lowering) => {
                 use LoweringPolicy::*;
@@ -142,6 +149,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
     }
 
+    // TODO: Revisit the handling of native functions here.
+    //
+    // Need to make sure:
+    // 1. A registered native function impl does not shadow a Move-body function with the same name.
+    // 2. A missing native function impl only triggers an error when it's actually being called, not
+    //    during load time.
     pub fn load_function(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
@@ -149,7 +162,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<FunctionPtr> {
+    ) -> LoaderResult<FunctionPtr> {
         let id = self.guard.arena_ref_for_module_id(module_id);
 
         let module = match read_set.get(id) {
@@ -160,16 +173,22 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                     module
                 },
                 ModuleState::Unmetered => {
-                    bail!("All modules in the read-set must be metered");
+                    invariant_violation!(ReadSetEntryNotMetered);
                 },
             },
-            Some(ModuleRead::Pending) => bail!("All modules in the read-set must be loaded"),
+            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
             None => self.load_module(read_set, gas_meter, id)?,
         };
 
         // Non-generic call.
         if ty_args.is_empty() {
-            let slot = module.get_function_slot(func_name)?;
+            let slot = module.get_function_slot(func_name).ok_or_else(|| {
+                LoaderError::FunctionNotFound {
+                    address: *id.address(),
+                    module: id.name().to_string(),
+                    name: view_name(func_name).to_string(),
+                }
+            })?;
             if let Some(loaded) = slot.get() {
                 self.charge_non_read_set_slots(
                     read_set,
@@ -190,10 +209,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 // because it lost the race: safe to free.
                 unsafe { loser.function.free_unchecked() };
             }
-            return slot
-                .get()
-                .ok_or_else(|| anyhow!("Function slot has just been set"))
-                .map(|f| f.function);
+            let Some(f) = slot.get() else {
+                invariant_violation!(FunctionSlotEmptyAfterSet);
+            };
+            return Ok(f.function);
         }
 
         // Otherwise this function is generic. Need to lookup in a separate
@@ -226,15 +245,27 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         module: &LoadedModule,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<(Function, Arc<[LoadedModuleSlot]>)> {
-        let func_ir = module.get_function_ir(func_name)?;
+    ) -> LoaderResult<(Function, Arc<[LoadedModuleSlot]>)> {
+        let func_ir = match module.get_function_ir(func_name) {
+            Some(Some(ir)) => ir,
+            Some(None) => return Err(LoaderError::FunctionIrMissing),
+            None => {
+                let id = self.guard.arena_ref_for_module_id(module.id());
+                return Err(LoaderError::FunctionNotFound {
+                    address: *id.address(),
+                    module: id.name().to_string(),
+                    name: view_name(func_name).to_string(),
+                });
+            },
+        };
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let vec_descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
             module.ir(),
             func_ir,
             ty_args,
-        )?;
+        )
+        .map_err(LoaderError::Specializer)?;
 
         let parent_ms_ids = module
             .mandatory_dependencies()
@@ -248,20 +279,30 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let function_ms = Arc::<[LoadedModuleSlot]>::from(loading_ctx.discovered);
 
         self.record_loaded_and_charge_slots(read_set, gas_meter, &function_ms, |_, _| {
-            bail!("All modules are in the read-set");
+            invariant_violation!(UnexpectedReadSetMiss);
         })?;
 
-        let function =
-            match try_lower_function(module.ir(), func_ir, ty_args, self.guard, vec_descriptors)? {
-                LoweringOutcome::Built(f) => f,
-                // TODO: drop this arm — together with the `LoweringOutcome`
-                // enum and the corresponding `BuildContextOutcome::Skipped`
-                // paths in the specializer — once `try_build_context`
-                // handles nominal types and partial concretization. At that
-                // point `try_lower_function` is total and can go back to
-                // returning `Result<Function>` directly.
-                LoweringOutcome::Skipped(reason) => bail!("Failed to lower function: {}", reason),
-            };
+        let function = match try_lower_function(
+            module.ir(),
+            func_ir,
+            ty_args,
+            self.guard,
+            vec_descriptors,
+            self.natives,
+        )
+        .map_err(LoaderError::Specializer)?
+        {
+            LoweringOutcome::Built(f) => f,
+            // TODO: drop this arm — together with the `LoweringOutcome`
+            // enum and the corresponding `BuildContextOutcome::Skipped`
+            // paths in the specializer — once `try_build_context`
+            // handles nominal types and partial concretization. At that
+            // point `try_lower_function` is total and can go back to
+            // returning `Result<Function>` directly.
+            LoweringOutcome::Skipped(reason) => {
+                return Err(LoaderError::LoweringSkipped { reason })
+            },
+        };
         Ok((function, function_ms))
     }
 }
@@ -278,7 +319,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
-    ) -> anyhow::Result<&'guard LoadedModule> {
+    ) -> LoaderResult<&'guard LoadedModule> {
         read_set.record_pending_loading(id)?;
         let module = match self.guard.get_module(id) {
             Some(module) => module,
@@ -300,7 +341,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
-    ) -> anyhow::Result<&'guard LoadedModule> {
+    ) -> LoaderResult<&'guard LoadedModule> {
         let package = match self.guard.get_module(id) {
             Some(module) => module.mandatory_dependencies().clone(),
             None => self.build_mandatory_dependencies_for_id(id)?,
@@ -345,11 +386,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         if let Some(ModuleRead::Loaded { module, state }) = read_set.get(id) {
             if !matches!(state, ModuleState::ReadyForLowering) {
-                bail!("Target module is not metered and ready");
+                invariant_violation!(TargetModuleNotReady);
             }
             Ok(module)
         } else {
-            bail!("Target module is not loaded")
+            invariant_violation!(TargetModuleNotLoaded)
         }
     }
 
@@ -358,13 +399,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn build_mandatory_dependencies_for_id(
         &self,
         id: ArenaRef<'guard, ModuleId>,
-    ) -> anyhow::Result<ModuleMandatoryDependencies> {
+    ) -> LoaderResult<ModuleMandatoryDependencies> {
         match &self.policy {
             LoadingPolicy::Lazy(_) => Ok(ModuleMandatoryDependencies::lazy_unset()),
             LoadingPolicy::Package => {
                 let module_names = self
                     .module_provider
-                    .get_same_package_modules(id.address(), id.name())?;
+                    .get_same_package_modules(id.address(), id.name())
+                    .map_err(LoaderError::ModuleProvider)?;
                 let package_slots = module_names
                     .into_iter()
                     .map(|module_name| {
@@ -387,7 +429,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
-    ) -> anyhow::Result<&'guard LoadedModule> {
+    ) -> LoaderResult<&'guard LoadedModule> {
         let module = match self.guard.get_module(id) {
             None => {
                 read_set.record_pending_loading(id)?;
@@ -397,7 +439,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 module
             },
             Some(module) => {
-                if module.mandatory_dependencies().as_lazy()?.get().is_some() {
+                let Some(deps) = module.mandatory_dependencies().as_lazy() else {
+                    invariant_violation!(MandatoryDepsNotLazy);
+                };
+                if deps.get().is_some() {
                     // Mandatory set is already cached - only need to charge gas.
                     self.charge_mandatory_set_for_eager_lowering(read_set, gas_meter, id, module)?;
                     return Ok(module);
@@ -425,14 +470,17 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
-    ) -> anyhow::Result<()> {
+    ) -> LoaderResult<()> {
         match &self.policy {
             LoadingPolicy::Lazy(LoweringPolicy::Lazy) => {
                 // Nothing extra to charge, safe to mark ready for lowering.
                 read_set.mark_ready_for_lowering(id)?;
             },
             LoadingPolicy::Lazy(LoweringPolicy::Eager) => {
-                if module.mandatory_dependencies().as_lazy()?.get().is_some() {
+                let Some(deps) = module.mandatory_dependencies().as_lazy() else {
+                    invariant_violation!(MandatoryDepsNotLazy);
+                };
+                if deps.get().is_some() {
                     self.charge_mandatory_set_for_eager_lowering(read_set, gas_meter, id, module)?;
                 } else {
                     self.compute_mandatory_set_for_eager_lowering(read_set, gas_meter, id, module)?;
@@ -456,12 +504,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
-    ) -> anyhow::Result<()> {
-        let slots = module
-            .mandatory_dependencies()
-            .as_lazy()?
-            .get()
-            .ok_or_else(|| anyhow!("Mandatory dependencies must be set"))?;
+    ) -> LoaderResult<()> {
+        let Some(deps) = module.mandatory_dependencies().as_lazy() else {
+            invariant_violation!(MandatoryDepsNotLazy);
+        };
+        let Some(slots) = deps.get() else {
+            invariant_violation!(MandatoryDepsNotSet);
+        };
         self.charge_non_read_set_slots(read_set, gas_meter, slots)?;
         read_set.mark_ready_for_lowering(id)?;
         Ok(())
@@ -482,7 +531,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
-    ) -> anyhow::Result<()> {
+    ) -> LoaderResult<()> {
         let mut walker = LoweringContext::new(self, read_set);
         let self_slot = self.guard.get_or_create_module_slot(id);
         walker.discovered_seen.insert(module.id());
@@ -491,25 +540,24 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // Per-function lowering re-walks types and rebuilds its own
         // descriptor map; only the side-effecting publish-to-guard
         // matters here.
-        let _ = try_discover_types_for_lowering_in_module(&mut walker, module.ir())?;
+        let _ = try_discover_types_for_lowering_in_module(&mut walker, module.ir())
+            .map_err(LoaderError::Specializer)?;
 
         // Set the mandatory set for the module. Because of concurrency, it is
         // possible that other thread sets it at before, so we need to reload
         // it.
-        let _ = module
-            .mandatory_dependencies()
-            .as_lazy()?
-            .set(walker.discovered.into());
-        let ms = module
-            .mandatory_dependencies()
-            .as_lazy()?
-            .get()
-            .ok_or_else(|| anyhow!("Mandatory dependencies must be set"))?;
+        let Some(deps) = module.mandatory_dependencies().as_lazy() else {
+            invariant_violation!(MandatoryDepsNotLazy);
+        };
+        let _ = deps.set(walker.discovered.into());
+        let Some(ms) = deps.get() else {
+            invariant_violation!(MandatoryDepsNotSet);
+        };
 
         // For all modules in mandatory set, charge gas. This charging also
         // includes self. Once done, we need to mark it as ready for lowering.
         self.record_loaded_and_charge_slots(read_set, gas_meter, ms, |_, _| {
-            bail!("All modules must be present in the read-set")
+            invariant_violation!(UnexpectedReadSetMiss)
         })?;
         read_set.mark_ready_for_lowering(id)?;
         Ok(())
@@ -520,20 +568,30 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn get_verified_module_from_storage(
         &self,
         id: ArenaRef<'guard, ModuleId>,
-    ) -> anyhow::Result<(ModuleIR, u64)> {
+    ) -> LoaderResult<(ModuleIR, u64)> {
         let bytes = self
             .module_provider
-            .get_module_bytes(id.address(), id.name())?
-            .ok_or_else(|| anyhow!("Linker error"))?;
+            .get_module_bytes(id.address(), id.name())
+            .map_err(LoaderError::ModuleProvider)?
+            .ok_or_else(|| LoaderError::ModuleNotFound {
+                address: *id.address(),
+                name: id.name().to_string(),
+            })?;
         // TODO: placeholder cost model — byte length of the module. Replace
         // with a proper cost function (bucketed by size, verifier cost, etc.).
         let cost = bytes.len() as u64;
-        let compiled_module = self.module_provider.deserialize_module(&bytes)?;
-        self.module_provider.verify_module(&compiled_module)?;
+        let compiled_module = self
+            .module_provider
+            .deserialize_module(&bytes)
+            .map_err(LoaderError::Deserialization)?;
+        self.module_provider
+            .verify_module(&compiled_module)
+            .map_err(LoaderError::Verification)?;
         // TODO:
         //   This can run verification twice because destack runs it and we verified before.
         //   Destack should take a hook so we can add more things to verify.
-        let module_ir = specializer::destack(compiled_module, self.guard)?;
+        let module_ir =
+            specializer::destack(compiled_module, self.guard).map_err(LoaderError::Specializer)?;
         Ok((module_ir, cost))
     }
 
@@ -550,10 +608,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         id: ArenaRef<'guard, ModuleId>,
         deps: ModuleMandatoryDependencies,
-    ) -> anyhow::Result<&'guard LoadedModule> {
+    ) -> LoaderResult<&'guard LoadedModule> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
         self.guard
             .insert_module(LoadedModule::new(module_ir, cost, deps))
+            .map_err(LoaderError::GlobalContext)
     }
 
     /// Records all modules in the slots in the read-set and charges its cost
@@ -564,9 +623,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut impl GasMeter,
         slots: &[LoadedModuleSlot],
         mut on_read_set_miss: F,
-    ) -> anyhow::Result<()>
+    ) -> LoaderResult<()>
     where
-        F: FnMut(&mut ModuleReadSet<'guard>, &ModuleSlot) -> anyhow::Result<&'guard LoadedModule>,
+        F: FnMut(&mut ModuleReadSet<'guard>, &ModuleSlot) -> LoaderResult<&'guard LoadedModule>,
     {
         let mut loading_cost = 0u64;
         for slot in slots.iter().map(|s| self.module_slot(s)) {
@@ -579,7 +638,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                         read_set.mark_metered(id)?;
                     },
                 },
-                Some(ModuleRead::Pending) => bail!("All modules have to be loaded"),
+                Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
                 None => {
                     let module = on_read_set_miss(read_set, slot)?;
                     loading_cost = loading_cost.saturating_add(module.cost());
@@ -597,7 +656,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         slots: &[LoadedModuleSlot],
-    ) -> anyhow::Result<()> {
+    ) -> LoaderResult<()> {
         self.record_loaded_and_charge_slots(read_set, gas_meter, slots, |read_set, slot| {
             let id = self.guard.arena_ref_for_module_id(slot.id());
             read_set.record_pending_loading(id)?;
@@ -652,7 +711,12 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         // Every module needs to be in the read-set.
         let module = match self.read_set.get(id) {
             Some(ModuleRead::Loaded { module, .. }) => module,
-            Some(ModuleRead::Pending) => bail!("All modules have to be loaded or not present"),
+            Some(ModuleRead::Pending) => {
+                // TODO: should be `invariant_violation!(ReadSetEntryNotLoaded)`.
+                // The specializer needs a typed error first, without creating
+                // a circular dependency with `LoaderError`.
+                anyhow::bail!("All modules have to be loaded or not present")
+            },
             None => {
                 self.read_set.record_pending_loading(id)?;
                 let module = match self.loader.guard.get_module(id) {

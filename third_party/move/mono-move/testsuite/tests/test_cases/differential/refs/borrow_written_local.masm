@@ -1,0 +1,30 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::locals_soundness
+
+fun local_across_blocks(flag: bool, x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    move_loc flag
+    br_true l1
+    ld_u64 0
+    ret
+l1: move_loc y
+    ret
+
+fun borrow_written_local(x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    borrow_loc y
+    read_ref
+    ret
+
+// RUN: execute 0x66::locals_soundness::borrow_written_local --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::locals_soundness::borrow_written_local --args 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::locals_soundness::borrow_written_local --args 18446744073709551615
+// CHECK: results: 18446744073709551615

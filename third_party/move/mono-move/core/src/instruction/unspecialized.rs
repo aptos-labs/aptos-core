@@ -324,3 +324,16 @@ pub struct IntNegateOp {
     pub dst: FrameOffset,
     pub src: FrameOffset,
 }
+
+/// Universal cast operation, supporting all integer pairs — including
+/// self-casts.
+///
+/// Abort semantics follow one universal rule: the cast succeeds iff the
+/// source value fits in the target type's range, and aborts otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IntCastOp {
+    pub from: IntTy,
+    pub to: IntTy,
+    pub dst: FrameOffset,
+    pub src: FrameOffset,
+}

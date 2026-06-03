@@ -513,6 +513,44 @@ fn display_instr(
             )
         },
 
+        // --- Fused inline-struct field access ---
+        Instr::ImmBorrowLocField(d, idx, local) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "imm_borrow_loc_field {}, {}",
+                field_name(module, *idx),
+                slot_name(*local)
+            )
+        },
+        Instr::MutBorrowLocField(d, idx, local) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "mut_borrow_loc_field {}, {}",
+                field_name(module, *idx),
+                slot_name(*local)
+            )
+        },
+        Instr::ReadLocalField(d, idx, local) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "read_local_field {}, {}",
+                field_name(module, *idx),
+                slot_name(*local)
+            )
+        },
+        Instr::WriteLocalField(idx, local, v) => {
+            write!(
+                f,
+                "write_local_field {}, {}, {}",
+                field_name(module, *idx),
+                slot_name(*local),
+                slot_name(*v)
+            )
+        },
+
         // --- Globals ---
         Instr::Exists(d, ty, a) => {
             write_dst(f, *d)?;

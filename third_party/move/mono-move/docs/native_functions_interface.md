@@ -16,7 +16,7 @@ Immediate milestone: **prototype that can run a Decibel transaction end-to-end**
 
 - **Specializer is totally ignorant of native bodies.** It reads only the function handles declared in `CompiledModule`. For a `native`-marked handle it emits a generic call site — no callee monomorphization, type args passed at runtime. It never inspects the Rust impl.
 - **Linking is lazy** — natives bind to call sites at first invocation, not at module load. Matches existing VM behavior; modules that declare unimplemented natives still load.
-- Natives register with the runtime as `(addr, module, name) → NativeImpl`. `NativeImpl` = Rust fn pointer + declared ABI.
+- Natives register with the runtime as `(addr, module, name) → NativeImpl`. `NativeImpl` is the Rust fn pointer; the ABI (arg/return slot layout) is derived from the Move declaration at the call site, not declared on the Rust side.
 - At dispatch the `Function` struct is either a Move body or a native body. Call/return path is uniform per [`stack_and_calling_convention.md`](stack_and_calling_convention.md).
 - **Selective monomorphization** (specializing a generic native per type-arg) is **out of scope for now**. It's the one place the specializer would need richer per-native knowledge.
 
@@ -29,10 +29,10 @@ Immediate milestone: **prototype that can run a Decibel transaction end-to-end**
 ```rust
 trait NativeContext { /* methods listed below */ }
 
-fn my_native<C: NativeContext>(ctx: &mut C) -> NativeResult { ... }
+fn my_native<C: NativeContext>(ctx: &mut C) -> Result<NativeStatus, VMInternalError> { ... }
 ```
 
-Each VM instance commits to one concrete `C` (`ProductionContext`, `TestContext`, etc.). The function table holds `type NativeFunction<C> = Box<dyn Fn(&mut C) -> NativeResult>` with `C` fixed, so every context call statically dispatches.
+Each VM instance commits to one concrete `C` (`ProductionContext`, `TestContext`, etc.). The function table holds `type NativeFunction<C> = Box<dyn Fn(&mut C) -> Result<NativeStatus, VMInternalError>>` with `C` fixed, so every context call statically dispatches.
 
 Because the native is a `Fn` closure, it can carry its own captured state — useful for small per-native config or constants. For anything that needs to persist across calls or be shared between natives, use the extension system (§6) instead.
 
@@ -61,22 +61,25 @@ Context APIs (tentative):
 
 ```rust
 ctx.num_args() -> usize
-ctx.arg<T: VMValue>(i: usize) -> T
+unsafe fn arg<T: VMValue>(&self, i: usize) -> Result<T, VMInternalError>
 
 ctx.num_returns() -> usize
-ctx.set_return<T: VMValue>(i: usize, val: T)
+unsafe fn set_return<T: VMValue>(&mut self, i: usize, val: T) -> Result<(), VMInternalError>
 ```
 
 `VMValue` is implemented for primitives (`u8`, `u64`, `bool`, `AccountAddress`, ...) and for VM type wrappers around common heap data structures (struct pointer, vector, reference). Adding support for a new ABI-passable type is one `impl VMValue for ...` away.
 
-The `i` is a positional index, not a raw frame offset — the context resolves it against the native's declared ABI on each call. The indirection is for safety: natives can't walk into the wrong slot. If the lookup ever becomes a hot-path concern, an unsafe `arg_at_offset` escape hatch is possible.
+The `i` is a positional index, not a raw frame offset — the context resolves it against the call site's ABI on each call. Type matching between `T` and the slot's Move type is *not* checked (hence `unsafe`). 
 
-- **Static ABI cross-check at module load.** Rust natives declare their ABI at registration; the loader compares against the `native fun` declaration in `CompiledModule` and fails the load on mismatch. Catches Rust/Move drift at deploy time. Deliberate exception to lazy linking (§1).
+If the lookup ever becomes a hot-path concern, an `arg_at_offset` escape hatch is possible.
+
+After the first successful `set_return`, further `arg` calls error out to prevent data transmutation and (eventually) GC tracing violations.
+
+- **Module-load cross-check (TBD).** At callee-module load time, reconcile the natives registry with the module's `native fun` declarations: reject the load if a registered impl shadows a non-native definition, and install an "unresolved native" sentinel for a `native fun` with no registered impl so the error surfaces only on call (matching V1 VM).
 
 **Open questions:**
 
 - **Aliasing across repeated `arg` calls.** `arg::<VectorPtr>(0)` called twice returns two wrappers pointing at the same heap chunk — aliased, not copied. Resolution TBD.
-- **Runtime safety checks on each access.** Bounds and type checks against the ABI descriptor: debug-only, always-on, or none? Tradeoff is per-access cost vs. depth of per-native audit.
 
 ---
 
@@ -227,14 +230,17 @@ ctx.emit_event(ty: InternedType, value: ValuePtr) -> Result<(), _>
 
 All errors are transaction-aborting — execution state is discarded on failure, so natives don't need to clean up the frame or restore state. On success, the native must have written the correct number of return values at the expected offsets; the interpreter proceeds unconditionally.
 
-**Status: TBD.** Two open questions:
+Errors split into two channels:
 
-1. **`Result<(), NativeError>` vs. flat enum** (`NativeResult { Success, Abort, OutOfGas, ... }`). Flat avoids the `Result` discriminant on the success path.
-2. **Embed the VM's internal error type, or stay parallel?** Embedding makes propagation from sub-systems trivial; parallel keeps the native ABI decoupled.
+- **VM-internal** (`VMInternalError`): not meant to be inspected by the native — bubbles back to the VM via `?` and folds into `RuntimeError`.
+- **Native-visible**: the native handles them explicitly via its own error type.
 
-Variants needed regardless: user abort with code, out-of-gas / limit-exceeded, propagated sub-system error, invariant violation.
+More practically, the native context methods should follow these patterns: 
+- A method that produces only the former returns `Result<NativeStatus, VMInternalError>`
+- A method that produces both returns `Result<Result<NativeStatus, CustomError>, VMInternalError>`
+  - One with only native-visible errors can return simplified form `Result<NativeStatus, CustomError>`.
 
-Lands once the broader VM error story in [`error_design.md`](error_design.md) settles.
+See [`error_design.md`](error_design.md) for the broader VM error story.
 
 ---
 

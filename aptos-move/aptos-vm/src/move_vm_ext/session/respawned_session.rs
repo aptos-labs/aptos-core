@@ -98,7 +98,10 @@ impl<'r> RespawnedSession<'r> {
         }
         let mut change_set = self.into_heads().executor_view.change_set;
         change_set
-            .squash_additional_change_set(additional_change_set)
+            .squash_additional_change_set(
+                additional_change_set,
+                change_set_configs.strict_delayed_field_squash(),
+            )
             .map_err(|_err| {
                 VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,

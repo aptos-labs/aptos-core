@@ -37,6 +37,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -68,11 +70,13 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::IntShl(_)
             | MicroOp::IntShr(_)
             | MicroOp::IntNegate(_)
+            | MicroOp::IntCast(_)
             | MicroOp::Return
             | MicroOp::Abort { .. }
             | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
+            | MicroOp::CallNative { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -84,6 +88,9 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
@@ -94,7 +101,12 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::ForceGC
             | MicroOp::PackClosure(_)
-            | MicroOp::CallClosure(_) => None,
+            | MicroOp::CallClosure(_)
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
+            | MicroOp::MoveTo { .. } => None,
         }
     }
 }
@@ -150,6 +162,8 @@ impl RemapTargets for MicroOp {
                 rhs,
             },
             op @ (MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -181,11 +195,13 @@ impl RemapTargets for MicroOp {
             | MicroOp::IntShl(_)
             | MicroOp::IntShr(_)
             | MicroOp::IntNegate(_)
+            | MicroOp::IntCast(_)
             | MicroOp::Return
             | MicroOp::Abort { .. }
             | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
+            | MicroOp::CallNative { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -197,6 +213,9 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
@@ -207,7 +226,12 @@ impl RemapTargets for MicroOp {
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::ForceGC
             | MicroOp::PackClosure(_)
-            | MicroOp::CallClosure(_)) => op,
+            | MicroOp::CallClosure(_)
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
+            | MicroOp::MoveTo { .. }) => op,
         }
     }
 }
@@ -226,6 +250,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
         InstrCost::constant(match instr {
             // --- Data movement ---
             MicroOp::StoreImm8 { .. } => 2,
+            MicroOp::StoreImm16 { .. } => 3,
+            MicroOp::StoreImm32 { .. } => 4,
             MicroOp::Move8 { .. } => 2,
             MicroOp::Move { size, .. } => 2 + 3 * *size as u64,
 
@@ -261,10 +287,12 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             | MicroOp::IntBitXor(_)
             | MicroOp::IntShl(_)
             | MicroOp::IntShr(_)
-            | MicroOp::IntNegate(_) => 5,
+            | MicroOp::IntNegate(_)
+            | MicroOp::IntCast(_) => 5,
 
             // --- Control flow ---
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => 10,
+            MicroOp::CallNative { .. } => 10,
             MicroOp::Return => 2,
             MicroOp::Abort { .. } => 2,
             MicroOp::AbortMsg { .. } => 5,
@@ -291,6 +319,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::VecBorrow { .. } => 3,
             MicroOp::HeapBorrow { .. } => 2,
             MicroOp::ReadRef { size, .. } | MicroOp::WriteRef { size, .. } => 2 + 3 * *size as u64,
+            MicroOp::DeriveRefOffsetImm { .. } => 2,
+            MicroOp::ReadRefOffset { size, .. } | MicroOp::WriteRefOffset { size, .. } => {
+                2 + 3 * *size as u64
+            },
 
             // --- Heap object operations ---
             MicroOp::HeapNew { .. } => 8,
@@ -311,6 +343,12 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Closures ---
             MicroOp::PackClosure(_) => 20,
             MicroOp::CallClosure(_) => 15,
+
+            MicroOp::Exists { .. } => 10,
+            MicroOp::BorrowGlobal { .. } => 10,
+            MicroOp::BorrowGlobalMut { .. } => 20,
+            MicroOp::MoveFrom { .. } => 20,
+            MicroOp::MoveTo { .. } => 20,
         })
     }
 }

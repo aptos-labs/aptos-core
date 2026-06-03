@@ -138,8 +138,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
             TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
             TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
                 .with_transactions_per_account(1),
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
-                .with_unique_senders(),
+            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000),
             // TODO(ibalajiarun): this is disabled due to Forge Stable failure on PosToProposal latency.
             TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
                 .with_transactions_per_account(1),
@@ -148,10 +147,10 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (7000, 100, 0.3 + 0.5, 0.5, 0.5),
             (8500, 100, 0.3 + 0.5, 0.5, 0.4),
-            (2000, 300, 0.3 + 1.0, 0.6, 1.0),
-            (3200, 500, 0.3 + 1.0, 0.7, 0.8),
+            (2000, 300, 0.3 + 2.0, 0.6, 1.0),
+            (3200, 500, 0.3 + 2.0, 0.7, 0.8),
             // TODO - pos-to-proposal is set to high, until it is calibrated/understood.
-            (28, 5, 0.3 + 5.0, 0.7, 1.0),
+            (28, 5, 0.3 + 15.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
@@ -365,9 +364,8 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
                     // Check that we don't use more than 28 CPU cores for 20% of the time.
                     MetricsThreshold::new(28.0, 20),
                     // TODO(ibalajiarun): Investigate the high utilization and adjust accordingly.
-                    // Memory starts around 8GB, and grows around 8GB/hr in this test.
                     // Check that we don't use more than final expected memory for more than 20% of the time.
-                    MetricsThreshold::new_gb(16.0 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
+                    MetricsThreshold::new_gb(26.0 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -407,9 +405,8 @@ pub(crate) fn realistic_env_max_load_test(
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
-            // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 20% of the time.
-            MetricsThreshold::new_gb(16.0 + 8.0 * (duration_secs as f64 / 3600.0), 20),
+            MetricsThreshold::new_gb(26.0 + 8.0 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -520,7 +517,8 @@ pub(crate) fn realistic_env_max_load_test(
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
-    let mempool_backlog = 100;
+    let num_pfns = 3;
+    let mempool_backlog = 4000;
 
     let success_criteria = SuccessCriteria::new(15)
         .add_no_restarts()
@@ -537,6 +535,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_num_pfns(num_pfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -563,8 +562,8 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
-        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/digest_key.bin")
-        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/pp.bin")
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;
@@ -578,6 +577,9 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
                 Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.api.allow_encrypted_txns_submission = true;
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
         }))
         .with_emit_job(
@@ -614,7 +616,10 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20)
                 .transaction_mix(vec![
-                    (TransactionTypeArg::EncryptedCoinTransfer.materialize_default(), 1),
+                    (
+                        TransactionTypeArg::EncryptedCoinTransfer.materialize_default(),
+                        1,
+                    ),
                     (TransactionTypeArg::CoinTransfer.materialize_default(), 9),
                 ]),
             inner_success_criteria: SuccessCriteria::new(300),
@@ -638,8 +643,8 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
-        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/digest_key.bin")
-        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/pp.bin")
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;

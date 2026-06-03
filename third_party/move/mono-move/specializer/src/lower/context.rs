@@ -8,21 +8,23 @@
 
 use crate::{
     lower::{
-        gc_layout::{derive_frame_layout, type_pointer_offsets},
+        gc_layout::{derive_frame_layout, gc_layout_supports, type_pointer_offsets},
         translate::lower_function,
     },
-    stackless_exec_ir::{FunctionIR, Instr, ModuleIR},
+    stackless_exec_ir::{instr_utils::nominal_type_in_instr, FunctionIR, Instr, ModuleIR},
 };
 use anyhow::{bail, Result};
 use mono_move_core::{
     align_up_u32,
     interner::{InternedIdentifier, InternedModuleId},
+    native::{NativeIdx, NativeName, NativeResolver},
     types::{
         view_type, view_type_list, Alignment, FieldLayout, InternedType, InternedTypeList, Size,
         Type, EMPTY_TYPE_LIST,
     },
     Code, CodeOffset, DescriptorId, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner,
-    MicroOpGasSchedule, SafePointEntry, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    MicroOpGasSchedule, PreparedModule, SafePointEntry, SortedSafePointEntries,
+    FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
@@ -95,12 +97,17 @@ pub struct CallSiteInfo {
     pub ret_slots: Vec<TypedSlot>,
     /// Empty for non-generic calls.
     pub ty_args: InternedTypeList,
+    /// `Some(idx)` when the callee resolves to a registered native.
+    pub native_idx: Option<NativeIdx>,
 }
 
 /// Frame layout for one function.
 /// [TODO]: a few raw-`u32` fields remain (sizes/alignments); migrate
 /// them to dedicated newtypes for consistency with `FrameOffset`.
-pub struct LoweringContext {
+pub struct LoweringContext<'a> {
+    /// Module the function lives in; gives lowering access to the
+    /// constant pool and other module-level metadata.
+    pub module: &'a PreparedModule,
     pub home_slots: Vec<SlotInfo>,
     /// End offset of the home-slot region; feeds `callee_base`.
     pub frame_data_size: u32,
@@ -125,7 +132,7 @@ pub struct LoweringContext {
     pub vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
 }
 
-impl LoweringContext {
+impl LoweringContext<'_> {
     /// `DescriptorId` published for `vec_ty` (the vector type itself,
     /// not its element type), or `None` if no entry exists.
     pub fn vec_descriptor_id(&self, vec_ty: InternedType) -> Option<DescriptorId> {
@@ -141,8 +148,8 @@ impl LoweringContext {
 /// internal-invariant violations stay on the `Err` path because they
 /// indicate a real bug. `Skipped` is reserved for "this function is
 /// out of scope for the current lowering, on purpose."
-pub enum BuildContextOutcome {
-    Built(LoweringContext),
+pub enum BuildContextOutcome<'a> {
+    Built(LoweringContext<'a>),
     Skipped(&'static str),
 }
 
@@ -157,13 +164,6 @@ pub enum LoweringOutcome {
     Skipped(&'static str),
 }
 
-/// Returns `true` if any of `types` is a [`Type::Nominal`].
-fn contains_nominal(types: &[InternedType]) -> bool {
-    types
-        .iter()
-        .any(|&ty| matches!(view_type(ty), Type::Nominal { .. }))
-}
-
 /// Try to build a [`LoweringContext`] for a monomorphic function.
 ///
 /// Returns:
@@ -174,13 +174,14 @@ fn contains_nominal(types: &[InternedType]) -> bool {
 ///   "not all types are concrete", "nominal type not yet supported").
 /// - `Err(_)` for unsupported alignments and other internal-invariant
 ///   failures.
-pub fn try_build_context(
-    module_ir: &ModuleIR,
+pub fn try_build_context<'a>(
+    module_ir: &'a ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
     vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
-) -> Result<BuildContextOutcome> {
+    natives: &dyn NativeResolver,
+) -> Result<BuildContextOutcome<'a>> {
     // 1. Compute home slot layout with natural alignment padding.
     //
     // Slots are laid out linearly in declaration order, padding each to
@@ -200,16 +201,15 @@ pub fn try_build_context(
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
     let home_types = view_type_list(home_list);
-    // Concrete Nominals (post-substitution) are out of scope for the
-    // current GC-layout pass.
-    if contains_nominal(home_types) {
-        return Ok(BuildContextOutcome::Skipped(
-            "nominal type not yet supported",
-        ));
-    }
     let Some(home_slots) = layout_slots(0, home_types) else {
         return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
     };
+    // Catches sized nominals (e.g. enums) whose GC layout isn't walkable.
+    if home_types.iter().any(|&ty| !gc_layout_supports(ty)) {
+        return Ok(BuildContextOutcome::Skipped(
+            "nominal type not yet supported by gc_layout",
+        ));
+    }
     check_supported_alignment(&home_slots, |s| s.align, "home slot")?;
     // `frame_data_size` must be `MIN_SLOT_ALIGN`-aligned so that
     // `callee_base = frame_data_size + FRAME_METADATA_SIZE` is also
@@ -226,14 +226,14 @@ pub fn try_build_context(
         interner.type_list_of(module_ir.module.interned_types_at(own_handle.return_));
     let own_ret_list = interner.subst_type_list(own_ret_list, ty_args)?;
     let own_ret_types = view_type_list(own_ret_list);
-    if contains_nominal(own_ret_types) {
-        return Ok(BuildContextOutcome::Skipped(
-            "nominal type not yet supported",
-        ));
-    }
     let Some(return_slots) = layout_slots(0, own_ret_types) else {
         return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
     };
+    if own_ret_types.iter().any(|&ty| !gc_layout_supports(ty)) {
+        return Ok(BuildContextOutcome::Skipped(
+            "nominal type not yet supported by gc_layout",
+        ));
+    }
     check_supported_alignment(&return_slots, |s| s.align, "return slot")?;
 
     // The return values are written at offsets [0, ret_size) of the function's
@@ -303,33 +303,48 @@ pub fn try_build_context(
 
         let param_types = view_type_list(param_list);
         let ret_types = view_type_list(ret_list);
-        if contains_nominal(param_types) || contains_nominal(ret_types) {
-            return Ok(BuildContextOutcome::Skipped(
-                "nominal type not yet supported",
-            ));
-        }
         let Some(arg_slots) = layout_typed_slots_contiguously(callee_base, param_types) else {
             return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
         };
         let Some(ret_slots) = layout_typed_slots_contiguously(callee_base, ret_types) else {
             return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
         };
+        if param_types
+            .iter()
+            .chain(ret_types.iter())
+            .any(|&ty| !gc_layout_supports(ty))
+        {
+            return Ok(BuildContextOutcome::Skipped(
+                "nominal type not yet supported by gc_layout",
+            ));
+        }
         check_supported_alignment(&arg_slots, |s| s.slot.align, "callee arg")?;
         check_supported_alignment(&ret_slots, |s| s.slot.align, "callee ret")?;
 
         let callee_handle = module_ir.module.function_handle_at(handle_idx);
         let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
         let callee_func_name = module_ir.module.interned_identifier_at(callee_handle.name);
+        // TODO: The native registry is trusted unconditionally here.
+        //
+        // Consider cross-checking against the callee module's `is_native` flag
+        // against the callee module's `is_native` flag so a registered impl cannot
+        // shadow a Move-body function with the same qualified name.
+        let native_idx = natives.resolve(&NativeName {
+            module: callee_module_id,
+            function: callee_func_name,
+        });
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
             arg_slots,
             ret_slots,
             ty_args: call_ty_args,
+            native_idx,
         });
     }
 
     Ok(BuildContextOutcome::Built(LoweringContext {
+        module: &module_ir.module,
         home_slots,
         frame_data_size,
         call_sites,
@@ -449,8 +464,16 @@ pub fn try_lower_function(
     ty_args: InternedTypeList,
     interner: &impl Interner,
     vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+    natives: &dyn NativeResolver,
 ) -> Result<LoweringOutcome> {
-    let ctx = match try_build_context(module_ir, func_ir, ty_args, interner, vec_descriptors)? {
+    let ctx = match try_build_context(
+        module_ir,
+        func_ir,
+        ty_args,
+        interner,
+        vec_descriptors,
+        natives,
+    )? {
         BuildContextOutcome::Built(c) => c,
         BuildContextOutcome::Skipped(reason) => return Ok(LoweringOutcome::Skipped(reason)),
     };
@@ -574,25 +597,32 @@ fn try_discover_types_for_lowering_in_function_impl(
         discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
     }
     for instr in func_ir.instrs() {
+        // Calls: walk param + return signature lists.
         let (params, returns) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
-                (sig.params, sig.returns)
+                (Some(sig.params), Some(sig.returns))
             },
             Instr::CallGeneric(_, idx, _) => {
                 let sig = module_ir.module.function_instantiation_signature_at(*idx);
-                (sig.params, sig.returns)
+                (Some(sig.params), Some(sig.returns))
             },
-            // TODO: Home slots and callee params/returns are not exhaustive.
-            //       Instructions can reference types whose layouts lowering
-            //       needs.
-            _ => continue,
+            _ => (None, None),
         };
-
-        for &ty in view_type_list(params) {
-            discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+        if let Some(params) = params {
+            for &ty in view_type_list(params) {
+                discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+            }
         }
-        for &ty in view_type_list(returns) {
+        if let Some(returns) = returns {
+            for &ty in view_type_list(returns) {
+                discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+            }
+        }
+
+        // Catch nominal types an instruction references directly but
+        // that aren't reached by the home/call walks above.
+        if let Some(ty) = nominal_type_in_instr(&module_ir.module, instr) {
             discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
         }
     }

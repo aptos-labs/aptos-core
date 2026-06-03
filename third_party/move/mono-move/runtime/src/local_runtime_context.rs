@@ -4,13 +4,16 @@
 //! Minimal [`ExecutionContext`] + [`DescriptorProvider`] impl for tests
 //! and benchmarks that don't go through the full loader stack.
 
+use crate::{ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::ProductionNativeRegistry,
     types::InternedTypeList,
-    DescriptorId, DescriptorProvider, ExecutionContext, FunctionPtr, LocalExecutionContext,
-    ObjectDescriptor, ObjectDescriptorTable,
+    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ObjectDescriptorTable,
+    ResourceProvider,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
+use mono_move_loader::LoaderResult;
 
 /// Combines a [`LocalExecutionContext`] with an owned
 /// [`ObjectDescriptorTable`]. Used by tests and benches that need vector/object
@@ -21,12 +24,12 @@ use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 //
 // TODO: migrate to a real impl and remove this (mirrors the TODO on
 // `LocalExecutionContext` in `mono_move_core`).
-pub struct LocalRuntimeContext<G: GasMeter = NoOpGasMeter> {
-    inner: LocalExecutionContext<G>,
+pub struct LocalRuntimeContext<'r, G: GasMeter = NoOpGasMeter> {
+    inner: LocalExecutionContext<'r, G>,
     descriptors: ObjectDescriptorTable,
 }
 
-impl LocalRuntimeContext<NoOpGasMeter> {
+impl LocalRuntimeContext<'static, NoOpGasMeter> {
     /// No gas accounting, no descriptors. Suitable for tests that exercise only
     /// descriptor-less micro-ops.
     pub fn unmetered() -> Self {
@@ -45,7 +48,23 @@ impl LocalRuntimeContext<NoOpGasMeter> {
     }
 }
 
-impl LocalRuntimeContext<SimpleGasMeter> {
+impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
+    /// General constructor: the gas meter, the resource provider, and
+    /// the descriptor table. Used by tests that exercise global storage
+    /// (which need a non-trivial resource provider).
+    pub fn new(
+        gas_meter: G,
+        resource_provider: &'r dyn ResourceProvider,
+        descriptors: ObjectDescriptorTable,
+    ) -> Self {
+        Self {
+            inner: LocalExecutionContext::new(gas_meter, resource_provider),
+            descriptors,
+        }
+    }
+}
+
+impl LocalRuntimeContext<'static, SimpleGasMeter> {
     /// [`SimpleGasMeter`] with `u64::MAX` budget and the supplied
     /// descriptor table.
     pub fn with_max_budget(descriptors: ObjectDescriptorTable) -> Self {
@@ -71,9 +90,28 @@ impl LocalRuntimeContext<SimpleGasMeter> {
     }
 }
 
-impl<G: GasMeter> ExecutionContext for LocalRuntimeContext<G> {
-    fn gas_meter(&mut self) -> &mut impl GasMeter {
+impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
+    /// Install a populated native registry. Replaces the empty default
+    /// installed by the constructors above.
+    pub fn with_natives(mut self, natives: ProductionNativeRegistry<G>) -> Self {
+        self.inner = self.inner.with_natives(natives);
+        self
+    }
+}
+
+impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
+    type GasMeter = G;
+
+    fn gas_meter(&mut self) -> &mut G {
         self.inner.gas_meter()
+    }
+
+    fn natives(&self) -> &ProductionNativeRegistry<G> {
+        self.inner.natives()
+    }
+
+    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
+        self.inner.natives_and_gas_meter()
     }
 
     fn load_function(
@@ -81,12 +119,16 @@ impl<G: GasMeter> ExecutionContext for LocalRuntimeContext<G> {
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<FunctionPtr> {
+    ) -> LoaderResult<FunctionPtr> {
         self.inner.load_function(module_id, name, ty_args)
+    }
+
+    fn resource_provider(&self) -> &dyn ResourceProvider {
+        self.inner.resource_provider()
     }
 }
 
-impl<G: GasMeter> DescriptorProvider for LocalRuntimeContext<G> {
+impl<'r, G: GasMeter> DescriptorProvider for LocalRuntimeContext<'r, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.descriptors.descriptor(id)
     }

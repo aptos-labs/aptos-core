@@ -7,6 +7,7 @@
 //! closure (excluding M itself). Lowering itself stays per-call in
 //! `load_function`.
 
+use mono_move_core::native::NoNatives;
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -50,6 +51,7 @@ fn load_eager_preloads_struct_closure() {
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Eager),
+        &NoNatives,
     );
 
     let id_a = guard.intern_module_id(&ModuleId::new(
@@ -126,6 +128,7 @@ fn load_eager_primitive_only_module_includes_self() {
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Eager),
+        &NoNatives,
     );
 
     let id_p = guard.intern_module_id(&ModuleId::new(
@@ -158,6 +161,7 @@ fn load_eager_cache_hit_reproduces_state() {
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Eager),
+        &NoNatives,
     );
 
     let id_a = guard.intern_module_id(&ModuleId::new(

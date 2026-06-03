@@ -22,7 +22,7 @@ mod micro_op {
     use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 
     fn run_u64() -> u64 {
-        let (functions, descriptors) = micro_op_u64_loop();
+        let (functions, descriptors) = micro_op_u64_loop(false);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
@@ -32,7 +32,7 @@ mod micro_op {
     }
 
     fn run_i64() -> i64 {
-        let (functions, descriptors) = micro_op_i64_loop();
+        let (functions, descriptors) = micro_op_i64_loop(false);
         let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });

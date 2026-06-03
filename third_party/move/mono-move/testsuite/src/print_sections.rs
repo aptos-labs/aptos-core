@@ -18,6 +18,7 @@ use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::NoNatives,
     types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Interner,
 };
@@ -119,7 +120,9 @@ fn lower_functions(
                 func_ir,
                 EMPTY_TYPE_LIST,
             )
-            .and_then(|vd| try_lower_function(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vd));
+            .and_then(|vd| {
+                try_lower_function(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vd, &NoNatives)
+            });
             (name, result)
         })
         .collect()

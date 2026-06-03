@@ -83,13 +83,18 @@ fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
 fn get_current_time_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
-    CurrentTimeMicroseconds::fetch_config(resolver).ok_or_else(|| {
-        value_deserialization_error!("could not fetch CurrentTimeMicroseconds on-chain config")
-    })
+    CurrentTimeMicroseconds::fetch_config(resolver)
+        .ok()
+        .flatten()
+        .ok_or_else(|| {
+            value_deserialization_error!("could not fetch CurrentTimeMicroseconds on-chain config")
+        })
 }
 
 fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
     PatchedJWKs::fetch_config(resolver)
+        .ok()
+        .flatten()
         .ok_or_else(|| value_deserialization_error!("could not deserialize PatchedJWKs"))
 }
 

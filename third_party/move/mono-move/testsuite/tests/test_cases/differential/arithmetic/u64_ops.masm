@@ -1,0 +1,148 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun add_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun complex_arith(x: u64): u64
+    local tmp: u64
+    copy_loc x
+    ld_u64 2
+    mul
+    st_loc tmp
+    copy_loc tmp
+    ld_u64 1
+    add
+    ret
+
+fun sub_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    sub
+    ret
+
+fun sub_imm(x: u64): u64
+    copy_loc x
+    ld_u64 5
+    sub
+    ret
+
+fun div_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    div
+    ret
+
+fun mod_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    mod
+    ret
+
+fun bit_and(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    bit_and
+    ret
+
+fun bit_or(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    bit_or
+    ret
+
+fun bit_xor(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    xor
+    ret
+
+fun shl_values(a: u64, b: u8): u64
+    copy_loc a
+    copy_loc b
+    shl
+    ret
+
+fun shr_values(a: u64, b: u8): u64
+    copy_loc a
+    copy_loc b
+    shr
+    ret
+
+fun mul_imm(x: u64): u64
+    copy_loc x
+    ld_u64 7
+    mul
+    ret
+
+fun div_imm(x: u64): u64
+    copy_loc x
+    ld_u64 3
+    div
+    ret
+
+fun mod_imm(x: u64): u64
+    copy_loc x
+    ld_u64 10
+    mod
+    ret
+
+fun shl_imm(x: u64): u64
+    copy_loc x
+    ld_u8 4
+    shl
+    ret
+
+fun shr_imm(x: u64): u64
+    copy_loc x
+    ld_u8 2
+    shr
+    ret
+
+// RUN: execute 0x66::test::add_values --args 2, 3
+// CHECK: results: 5
+
+// RUN: execute 0x66::test::add_values --args 0, 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::test::complex_arith --args 10
+// CHECK: results: 21
+
+// RUN: execute 0x66::test::sub_values --args 10, 3
+// CHECK: results: 7
+
+// RUN: execute 0x66::test::sub_imm --args 20
+// CHECK: results: 15
+
+// RUN: execute 0x66::test::div_values --args 20, 5
+// CHECK: results: 4
+
+// RUN: execute 0x66::test::mod_values --args 20, 7
+// CHECK: results: 6
+
+// RUN: execute 0x66::test::bit_and --args 12, 10
+// CHECK: results: 8
+
+// RUN: execute 0x66::test::bit_or --args 12, 10
+// CHECK: results: 14
+
+// RUN: execute 0x66::test::bit_xor --args 12, 10
+// CHECK: results: 6
+
+// RUN: execute 0x66::test::mul_imm --args 6
+// CHECK: results: 42
+
+// RUN: execute 0x66::test::div_imm --args 10
+// CHECK: results: 3
+
+// RUN: execute 0x66::test::mod_imm --args 23
+// CHECK: results: 3
+
+// RUN: execute 0x66::test::shl_imm --args 1
+// CHECK: results: 16
+
+// RUN: execute 0x66::test::shr_imm --args 64
+// CHECK: results: 16

@@ -5,7 +5,6 @@
 //! with the lowered monomorphic functions and generic function instantiations.
 
 use crate::context::ExecutionGuard;
-use anyhow::{anyhow, bail};
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
@@ -97,11 +96,11 @@ impl ModuleMandatoryDependencies {
     }
 
     /// Returns the cell for lazy mandatory dependencies.
-    pub fn as_lazy(&self) -> anyhow::Result<&OnceLock<Arc<[LoadedModuleSlot]>>> {
-        let Self::Lazy(cell) = self else {
-            bail!("Mandatory dependencies must always be lazy");
-        };
-        Ok(cell)
+    pub fn as_lazy(&self) -> Option<&OnceLock<Arc<[LoadedModuleSlot]>>> {
+        match self {
+            Self::Lazy(cell) => Some(cell),
+            Self::Package(_) => None,
+        }
     }
 
     /// Returns empty mandatory dependencies for lazy module loads. This does
@@ -219,37 +218,21 @@ impl LoadedModule {
         self.cost
     }
 
-    /// Returns the monomorphized function pointer for the given name. If the
-    /// function has not been monomorphized, returns [`None`].
-    pub fn get_function_ptr(
-        &self,
-        name: InternedIdentifier,
-    ) -> anyhow::Result<Option<FunctionPtr>> {
-        Ok(self.get_function_slot(name)?.get().map(|f| f.function))
-    }
-
     /// Returns the function slot for the given name where monomorphized code
-    /// may or may not be installed.
-    pub fn get_function_slot(
-        &self,
-        name: InternedIdentifier,
-    ) -> anyhow::Result<&OnceLock<FunctionSlot>> {
-        self.functions
-            .get(&name)
-            .ok_or_else(|| anyhow!("Linker error: function not found"))
+    /// may or may not be installed, or `None` if the function is not found.
+    pub fn get_function_slot(&self, name: InternedIdentifier) -> Option<&OnceLock<FunctionSlot>> {
+        self.functions.get(&name)
     }
 
     /// Returns the polymorphic IR for the function with the given name.
-    pub fn get_function_ir(&self, name: InternedIdentifier) -> anyhow::Result<&FunctionIR> {
-        let idx = *self
-            .function_indices
-            .get(&name)
-            .ok_or_else(|| anyhow!("Linker error: function not found"))?;
-        self.ir
-            .functions
-            .get(idx)
-            .and_then(|slot| slot.as_ref())
-            .ok_or_else(|| anyhow!("Linker error: function IR missing"))
+    ///
+    /// The two-level [`Option`] distinguishes three cases:
+    /// - [`None`]: the function is not defined in this module.
+    /// - [`Some(None)`]: the function is a native (no IR).
+    /// - [`Some(Some(ir))`]: the IR is available.
+    pub fn get_function_ir(&self, name: InternedIdentifier) -> Option<Option<&FunctionIR>> {
+        let idx = *self.function_indices.get(&name)?;
+        Some(self.ir.functions.get(idx).and_then(|slot| slot.as_ref()))
     }
 
     /// Returns the function and its mandatory dependencies for the given
