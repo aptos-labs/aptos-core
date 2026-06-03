@@ -116,6 +116,7 @@ where
         };
 
         let validator_set = ValidatorSet::fetch_config(&InMemoryStateStore::from_head_genesis())
+            .unwrap()
             .expect("Unable to retrieve the validator set from storage");
 
         Self {

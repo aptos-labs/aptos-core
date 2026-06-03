@@ -126,7 +126,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         Arc::clone(&db.reader),
         ledger_summary.state.latest().clone(),
     )?;
-    let onchain_config = genesis_onchain_config(&base_state_view);
+    let onchain_config = genesis_onchain_config(&base_state_view)?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -205,11 +205,11 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     Ok(committer)
 }
 
-fn genesis_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFromOnchain {
+fn genesis_onchain_config(state_view: &CachedStateView) -> Result<BlockExecutorConfigFromOnchain> {
     let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
     // Bootstrapping from an empty DB is the common case, so the parent state usually has no
     // `Features` resource. Hard-fork genesis is the case where parent-state features exist.
-    match Features::fetch_config(state_view) {
+    Ok(match Features::fetch_config(state_view)? {
         Some(features) => base.with_features(&features),
         None => {
             info!(
@@ -218,7 +218,7 @@ fn genesis_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFr
             );
             base
         },
-    }
+    })
 }
 
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {

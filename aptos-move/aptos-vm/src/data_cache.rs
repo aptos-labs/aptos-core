@@ -251,10 +251,8 @@ impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
 }
 
 impl<E: ExecutorView> ConfigStorage for StorageAdapter<'_, E> {
-    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
-        self.executor_view
-            .get_resource_bytes(state_key, None)
-            .ok()?
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
+        Ok(self.executor_view.get_resource_bytes(state_key, None)?)
     }
 }
 
@@ -265,7 +263,10 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<'_, S> {
-        let features = Features::fetch_config(self).unwrap_or_default();
+        let features = Features::fetch_config(self)
+            .ok()
+            .flatten()
+            .unwrap_or_default();
         let gas_feature_version = get_gas_feature_version(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
