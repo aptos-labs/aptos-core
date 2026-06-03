@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::CryptoHash, HashValue, PrivateKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::BlockExecutor,
@@ -25,14 +25,14 @@ use aptos_types::{
         NewBlockEvent, ObjectGroupResource, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     },
     contract_event::ContractEvent,
-    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
+    on_chain_config::{ConfigurationResource, FeatureFlag, Features, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, MoveResourceExt},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
@@ -186,6 +186,34 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     ConfigurationResource::fetch_config(&db_state_view).unwrap()
 }
 
+fn get_features(db: &DbReaderWriter) -> Features {
+    let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
+    Features::fetch_config(&db_state_view).unwrap()
+}
+
+fn assert_committed_write_set_version(db: &DbReaderWriter, version: u64, expected_v1: bool) {
+    let ledger_version = db.reader.expect_synced_version();
+    let outputs = db
+        .reader
+        .get_transaction_outputs(version, 1, ledger_version)
+        .unwrap();
+    let output_list = outputs.get_output_list_with_proof();
+
+    assert_eq!(output_list.first_transaction_output_version, Some(version));
+    assert_eq!(output_list.transactions_and_outputs.len(), 1);
+    assert_eq!(output_list.proof.transaction_infos.len(), 1);
+
+    let write_set = output_list.transactions_and_outputs[0].1.write_set();
+    let txn_info = &output_list.proof.transaction_infos[0];
+    assert_eq!(CryptoHash::hash(write_set), txn_info.state_change_hash());
+
+    match (expected_v1, write_set) {
+        (false, WriteSet::V0(_)) | (true, WriteSet::V1(_)) => {},
+        (false, WriteSet::V1(_)) => panic!("expected WriteSetV0 at version {}", version),
+        (true, WriteSet::V0(_)) => panic!("expected WriteSetV1 at version {}", version),
+    }
+}
+
 #[test]
 #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_new_genesis() {
@@ -196,6 +224,8 @@ fn test_new_genesis() {
     let tmp_dir = TempPath::new();
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVMBlockExecutor>(&db, &genesis_txn).unwrap();
+    assert_committed_write_set_version(&db, 0, false);
+    assert!(get_features(&db).is_enabled(FeatureFlag::HOTNESS_IN_EPILOGUE));
     let signer = ValidatorSigner::new(
         genesis.1[0].data.owner_address,
         Arc::new(genesis.1[0].consensus_key.clone()),
@@ -284,6 +314,7 @@ fn test_new_genesis() {
             .is_some()
     );
     assert_eq!(waypoint.version(), 6);
+    assert_committed_write_set_version(&db, waypoint.version(), true);
 
     // Client bootable from waypoint.
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
