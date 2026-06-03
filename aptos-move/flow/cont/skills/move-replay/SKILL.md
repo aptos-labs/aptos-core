@@ -27,7 +27,7 @@ Use the `{{ tool(name="move_replay_transaction") }}` MCP tool. Do not invoke the
 - **`node_api_key`** (`string`) — Bearer token sent as `Authorization: Bearer <key>` to the node. Use this when the public endpoint is rate-limited.
 - **`trace`** (`bool`, default `false`) — When `true`, record a structured trace of debugger state-view requests (one `state_view { version, with_overrides }` entry per call) into the response. Off by default; tracing adds overhead. Only state-view requests are intercepted — the wrapper does not introspect Move bytecode execution itself.
 - **`trace_storage_reads`** (`bool`, default `false`) — When `true`, additionally record one `storage_read` entry per state-view read. Off by default because a single replay typically issues hundreds of reads, which crowd out the higher-signal events. Only consulted when `trace` is `true`.
-- **`max_trace_events`** (`usize`, default `500`) — Trace truncation limit. Only consulted when `trace` is `true`. Raise it only if `truncated > 0` in the response.
+- **`max_trace_events`** (`usize`, default `500`) — Trace truncation limit. Only consulted when `trace` is `true`. Must be between `1` and the server-side cap of `100_000` (inclusive); requests outside that range fail fast with an `invalid_params` error. Raise it only if `truncated > 0` in the response.
 - **`redact_storage_keys`** (`bool`, default `true`) — When `true`, storage-read trace entries omit the `Debug`-formatted `StateKey`. Only consulted when both `trace` and `trace_storage_reads` are `true`. Disable only when the key contents themselves are needed for debugging.
 
 ### Constraints

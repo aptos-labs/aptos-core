@@ -3320,6 +3320,7 @@ version = "1.0.4"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
+ "aptos-crypto",
  "aptos-framework",
  "aptos-gas-profiling",
  "aptos-gas-schedule",

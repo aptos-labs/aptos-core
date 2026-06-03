@@ -58,6 +58,7 @@ url = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]
+aptos-crypto = { workspace = true }
 aptos-package-builder = { workspace = true }
 move-core-types = { workspace = true }
 move-prover-test-utils = { workspace = true }

@@ -101,6 +101,33 @@ fn default_redact() -> bool {
     true
 }
 
+/// Server-side ceiling on `max_trace_events`. Generous enough for the
+/// documented "raise it to a few thousand when capturing storage reads"
+/// workflow, low enough that a malicious or buggy caller cannot drive
+/// unbounded recorder growth. Each entry is at most a few hundred bytes,
+/// so 100k entries bounds the recorder at ~tens of MB.
+const MAX_TRACE_EVENTS_CAP: usize = 100_000;
+
+/// Validate the user-supplied capture knobs. Only called when `trace` is
+/// enabled; the other fields are unused otherwise and would needlessly
+/// reject valid requests that left their defaults in place.
+fn validate_capture_opts(max_trace_events: usize) -> Result<(), String> {
+    if max_trace_events == 0 {
+        return Err(
+            "max_trace_events must be >= 1 when trace is enabled: a value of 0 would \
+             drop the guaranteed `state_view` event"
+                .to_string(),
+        );
+    }
+    if max_trace_events > MAX_TRACE_EVENTS_CAP {
+        return Err(format!(
+            "max_trace_events ({}) exceeds the server-side cap of {}",
+            max_trace_events, MAX_TRACE_EVENTS_CAP,
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 struct ReplayResponse {
     /// true = Keep(Success), false = Keep(any failure), null = Discard/Retry.
@@ -406,6 +433,9 @@ impl FlowSession {
         let base_url = parse_network(&params.network).map_err(mcp_invalid)?;
         let pkg_paths = validate_package_paths(&params.local_package_paths).map_err(mcp_invalid)?;
         let named = validate_named_addresses(&params.named_addresses).map_err(mcp_invalid)?;
+        if params.trace {
+            validate_capture_opts(params.max_trace_events).map_err(mcp_invalid)?;
+        }
 
         // Build the debugger eagerly: we need it for both the async fetch
         // below and the blocking VM run inside `spawn_blocking`.
@@ -784,6 +814,89 @@ mod tests {
             names.iter().any(|n| n == "move_replay_transaction"),
             "expected move_replay_transaction in {:?}",
             names
+        );
+    }
+
+    #[test]
+    fn validate_capture_opts_rejects_zero() {
+        let err = validate_capture_opts(0).unwrap_err();
+        assert!(
+            err.contains("max_trace_events must be >= 1"),
+            "got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn validate_capture_opts_rejects_above_cap() {
+        let err = validate_capture_opts(MAX_TRACE_EVENTS_CAP + 1).unwrap_err();
+        assert!(err.contains("exceeds the server-side cap"), "got: {}", err);
+    }
+
+    #[test]
+    fn validate_capture_opts_accepts_one_and_cap_and_default() {
+        validate_capture_opts(1).expect("1 is the minimum allowed");
+        validate_capture_opts(default_max_trace_events()).expect("default must be valid");
+        validate_capture_opts(MAX_TRACE_EVENTS_CAP).expect("cap is inclusive");
+    }
+
+    #[test]
+    fn require_user_transaction_accepts_user_variant() {
+        let raw = aptos_types::transaction::RawTransaction::new(
+            AccountAddress::ONE,
+            0,
+            aptos_types::transaction::TransactionPayload::Script(
+                aptos_types::transaction::Script::new(vec![], vec![], vec![]),
+            ),
+            0,
+            0,
+            0,
+            aptos_types::chain_id::ChainId::test(),
+        );
+        let signed = SignedTransaction::new(
+            raw,
+            aptos_crypto::ed25519::Ed25519PublicKey::try_from(&[0u8; 32][..]).unwrap(),
+            aptos_crypto::ed25519::Ed25519Signature::try_from(&[0u8; 64][..]).unwrap(),
+        );
+        let txn = Transaction::UserTransaction(signed.clone());
+        let got = require_user_transaction(txn, 42).expect("user txn should pass through");
+        assert_eq!(got.sender(), signed.sender());
+    }
+
+    #[test]
+    fn require_user_transaction_rejects_state_checkpoint() {
+        let txn = Transaction::StateCheckpoint(aptos_crypto::HashValue::zero());
+        let err = require_user_transaction(txn, 7).unwrap_err();
+        assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert!(
+            err.message.contains("StateCheckpoint"),
+            "expected variant name in message: {}",
+            err.message
+        );
+        assert!(
+            err.message.contains("version 7"),
+            "expected version in message: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn require_user_transaction_rejects_genesis() {
+        // GenesisTransaction needs a WriteSetPayload; use the empty `Direct` form.
+        let txn = Transaction::GenesisTransaction(
+            aptos_types::transaction::WriteSetPayload::Direct(
+                aptos_types::transaction::ChangeSet::new(
+                    aptos_types::write_set::WriteSet::default(),
+                    vec![],
+                ),
+            ),
+        );
+        let err = require_user_transaction(txn, 0).unwrap_err();
+        assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert!(
+            err.message.contains("Genesis"),
+            "expected variant name in message: {}",
+            err.message
         );
     }
 
