@@ -5,6 +5,7 @@
 //! Loaded representation for runtime types.
 
 use crate::limit::Limiter;
+use fxhash::FxHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     ability::AbilitySet,
@@ -18,7 +19,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{cmp::Ordering, convert::TryInto, ops::Deref, rc::Rc};
+use std::{cmp::Ordering, convert::TryInto, ops::Deref, rc::Rc, sync::Arc};
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct WrappedAbilitySet(pub AbilitySet);
@@ -565,27 +566,42 @@ impl FatType {
     }
 }
 
+/// Caches each struct instantiation's `Arc<MoveStructLayout>`, keyed by `Rc<FatStructType>` pointer
+/// identity. The annotator shares one `Rc` per instantiation, so reusing the cached `Arc` keeps the
+/// conversion proportional to the source DAG instead of expanding it into a tree.
+type LayoutMemo = FxHashMap<*const FatStructType, Arc<MoveStructLayout>>;
+
 impl TryInto<MoveStructLayout> for &FatStructType {
     type Error = PartialVMError;
 
     fn try_into(self) -> Result<MoveStructLayout, Self::Error> {
+        self.to_struct_layout(&mut LayoutMemo::default())
+    }
+}
+
+impl FatStructType {
+    /// Lowers this struct into a [`MoveStructLayout`], reusing already-built instantiations via `memo`
+    /// so the result stays proportional to the source DAG.
+    pub(crate) fn to_struct_layout(
+        &self,
+        memo: &mut LayoutMemo,
+    ) -> PartialVMResult<MoveStructLayout> {
         Ok(match &self.layout {
-            FatStructLayout::Singleton(fields) => MoveStructLayout::new(into_types(fields.iter())?),
+            FatStructLayout::Singleton(fields) => MoveStructLayout::new(into_types(fields, memo)?),
             FatStructLayout::Variants(variants) => MoveStructLayout::new_variants(
                 variants
                     .iter()
-                    .map(|fields| into_types(fields.iter()))
+                    .map(|fields| into_types(fields, memo))
                     .collect::<PartialVMResult<_>>()?,
             ),
         })
     }
 }
 
-fn into_types<'a>(
-    types: impl Iterator<Item = &'a FatType>,
-) -> PartialVMResult<Vec<MoveTypeLayout>> {
+fn into_types(types: &[FatType], memo: &mut LayoutMemo) -> PartialVMResult<Vec<MoveTypeLayout>> {
     types
-        .map(|ty| ty.try_into())
+        .iter()
+        .map(|ty| ty.to_type_layout(memo))
         .collect::<PartialVMResult<Vec<_>>>()
 }
 
@@ -593,11 +609,14 @@ impl TryInto<MoveTypeLayout> for &FatType {
     type Error = PartialVMError;
 
     fn try_into(self) -> Result<MoveTypeLayout, Self::Error> {
-        let slice_into = |tys: &[FatType]| {
-            tys.iter()
-                .map(|ty| ty.try_into())
-                .collect::<PartialVMResult<Vec<MoveTypeLayout>>>()
-        };
+        self.to_type_layout(&mut LayoutMemo::default())
+    }
+}
+
+impl FatType {
+    /// Lowers this type into a [`MoveTypeLayout`], reusing already-built instantiations via `memo`
+    /// so the result stays proportional to the source DAG.
+    pub(crate) fn to_type_layout(&self, memo: &mut LayoutMemo) -> PartialVMResult<MoveTypeLayout> {
         Ok(match self {
             FatType::Address => MoveTypeLayout::Address,
             FatType::U8 => MoveTypeLayout::U8,
@@ -613,16 +632,27 @@ impl TryInto<MoveTypeLayout> for &FatType {
             FatType::I128 => MoveTypeLayout::I128,
             FatType::I256 => MoveTypeLayout::I256,
             FatType::Bool => MoveTypeLayout::Bool,
-            FatType::Vector(v) => MoveTypeLayout::Vector(Box::new(v.as_ref().try_into()?)),
-            FatType::Struct(s) => MoveTypeLayout::new_struct(s.as_ref().try_into()?),
+            FatType::Vector(v) => MoveTypeLayout::Vector(Box::new(v.to_type_layout(memo)?)),
+            FatType::Struct(s) => {
+                let key = Rc::as_ptr(&s.rc);
+                let layout = match memo.get(&key) {
+                    Some(layout) => layout.clone(),
+                    None => {
+                        let layout = Arc::new(s.to_struct_layout(memo)?);
+                        memo.insert(key, layout.clone());
+                        layout
+                    },
+                };
+                MoveTypeLayout::Struct(layout)
+            },
             FatType::Function(_) => MoveTypeLayout::Function,
             FatType::Runtime(tys) => {
-                MoveTypeLayout::new_struct(MoveStructLayout::Runtime(slice_into(tys)?))
+                MoveTypeLayout::new_struct(MoveStructLayout::Runtime(into_types(tys, memo)?))
             },
             FatType::RuntimeVariants(vars) => {
                 MoveTypeLayout::new_struct(MoveStructLayout::RuntimeVariants(
                     vars.iter()
-                        .map(|tys| slice_into(tys))
+                        .map(|tys| into_types(tys, memo))
                         .collect::<Result<Vec<_>, _>>()?,
                 ))
             },

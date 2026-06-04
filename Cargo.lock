@@ -8779,6 +8779,7 @@ dependencies = [
  "aptos-move-e2e-test-harness",
  "aptos-mvhashmap",
  "aptos-package-builder",
+ "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-simulation",
@@ -8791,6 +8792,7 @@ dependencies = [
  "hex",
  "memory-stats",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-core-types",
  "move-coverage",
  "move-model",
@@ -13491,6 +13493,7 @@ name = "move-resource-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "fxhash",
  "hex",
  "move-binary-format",
  "move-bytecode-utils",
