@@ -24,6 +24,7 @@ use aptos_sdk::types::on_chain_config::{
     OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
 };
 use aptos_testcases::{
+    chunky_dkg_quorum_loss_test::ChunkyDkgQuorumLossTest,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
@@ -63,6 +64,9 @@ pub(crate) fn get_realistic_env_test(
         },
         "realistic_env_chunky_dkg_epoch_change" => {
             realistic_env_chunky_dkg_epoch_change_test(duration)
+        },
+        "realistic_env_chunky_dkg_quorum_loss" => {
+            realistic_env_chunky_dkg_quorum_loss_test(duration)
         },
         _ => return None, // The test name does not match a realistic-env test
     };
@@ -718,6 +722,100 @@ pub(crate) fn realistic_env_chunky_dkg_epoch_change_test(duration: Duration) -> 
         .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
         .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus.quorum_store.enable_batch_v2_tx = true;
+            config.consensus.quorum_store.enable_batch_v2_rx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config.consensus_observer.enable_v2_message_sending = true;
+            config.consensus.digest_key_blob_path =
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
+            config.consensus.public_parameters_blob_path =
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus_observer.observer_enabled = true;
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 200 })
+                .encrypt_transactions(true)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
+        .with_num_pfns(num_pfns)
+}
+
+/// Stresses Chunky DKG and encrypted-transaction load by dropping the working quorum *while a DKG
+/// is in flight*, so the epoch transition itself stalls. 20 validators + 1 PFN, 200 TPS of
+/// encrypted transfers, epoch change every 5 minutes. Each cycle waits until chunky DKG is in
+/// progress, then blackholes a fixed set of 7 validators (> f = 6, so quorum is actually lost) at
+/// the network layer for ~4 minutes; the in-flight DKG cannot aggregate and the epoch transition
+/// stalls until connectivity is restored, after which the DKG must resume and the chain catch up.
+pub(crate) fn realistic_env_chunky_dkg_quorum_loss_test(duration: Duration) -> ForgeConfig {
+    let num_validators = 20;
+    let num_vfns = 0;
+    let num_pfns = 1;
+
+    // With 20 validators, f = 6, so blackholing 7 removes the working quorum.
+    let quorum_loss_test = ChunkyDkgQuorumLossTest {
+        num_blackholed: 7,
+        quorum_loss_secs: 240.0,
+    };
+
+    // The chain intentionally halts for ~4 minutes mid-DKG during each quorum-loss phase, so
+    // progress checks are relaxed accordingly and we verify recovery (catch-up) rather than
+    // continuous progress. No latency thresholds: transactions submitted during a halt commit
+    // minutes later.
+    let success_criteria = SuccessCriteria::new(10)
+        .add_no_restarts()
+        .add_wait_for_catchup_s((duration.as_secs() / 5).max(180))
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 420.0,
+            max_epoch_no_progress_secs: 420.0,
+            max_non_epoch_round_gap: 100,
+            max_epoch_round_gap: 100,
+        })
+        .allow_errors();
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(wrap_with_realistic_env(num_validators, quorum_loss_test))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["randomness_config_override"] =
+                serde_yaml::to_value(OnChainRandomnessConfig::default_enabled())
+                    .expect("must serialize");
+            helm_values["chain"]["chunky_dkg_config_override"] =
+                serde_yaml::to_value(OnChainChunkyDKGConfig::default_enabled())
+                    .expect("must serialize");
+            let mut features = Features::default();
+            features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
+        }))
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Required so the test can toggle the network::send/recv failpoints that blackhole
+            // validators during the quorum-loss phases.
+            config.api.failpoints_enabled = true;
             config.base.enable_validator_pfn_connections = true;
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;

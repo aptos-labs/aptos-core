@@ -3482,6 +3482,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "criterion",
+ "fail",
  "futures",
  "futures-util",
  "hex",
