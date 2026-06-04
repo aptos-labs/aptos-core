@@ -1,0 +1,179 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun i128_lt(l0: i128, l1: i128): u64
+    move_loc l0
+    move_loc l1
+    lt
+    br_false l0
+    ld_u64 1
+    // @5
+    ret
+l0: ld_u64 2
+    ret
+
+// Function definition at index 1
+fun i64_ge(l0: i64, l1: i64): u64
+    move_loc l0
+    move_loc l1
+    ge
+    br_false l0
+    ld_u64 1
+    // @5
+    ret
+l0: ld_u64 2
+    ret
+
+// Function definition at index 2
+fun i64_lt(l0: i64, l1: i64): u64
+    move_loc l0
+    move_loc l1
+    lt
+    br_false l0
+    ld_u64 1
+    // @5
+    ret
+l0: ld_u64 2
+    ret
+
+// Function definition at index 3
+fun i8_lt(l0: i8, l1: i8): u64
+    move_loc l0
+    move_loc l1
+    lt
+    br_false l0
+    ld_u64 1
+    // @5
+    ret
+l0: ld_u64 2
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun i128_lt(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: i128
+    r1: i128
+    r2: u64
+  code:
+  L2:
+    0: br_ge L0, r0, r1
+  L1:
+    1: r2 := ld_u64 1
+    2: ret [r2]
+  L0:
+    3: r2 := ld_u64 2
+    4: ret [r2]
+}
+
+fun i64_ge(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: i64
+    r1: i64
+    r2: u64
+  code:
+  L2:
+    0: br_lt L0, r0, r1
+  L1:
+    1: r2 := ld_u64 1
+    2: ret [r2]
+  L0:
+    3: r2 := ld_u64 2
+    4: ret [r2]
+}
+
+fun i64_lt(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: i64
+    r1: i64
+    r2: u64
+  code:
+  L2:
+    0: br_ge L0, r0, r1
+  L1:
+    1: r2 := ld_u64 1
+    2: ret [r2]
+  L0:
+    3: r2 := ld_u64 2
+    4: ret [r2]
+}
+
+fun i8_lt(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: i8
+    r1: i8
+    r2: u64
+  code:
+  L2:
+    0: br_ge L0, r0, r1
+  L1:
+    1: r2 := ld_u64 1
+    2: ret [r2]
+  L0:
+    3: r2 := ld_u64 2
+    4: ret [r2]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun i128_lt() {
+  frame_data_size: 40
+  code:
+    0: Charge #3
+    1: JumpIntCmp @6 [0] >= i128 [16]
+    2: Charge #6
+    3: StoreImm8 [32] <- #1
+    4: Move8 [0] <- [32]
+    5: Return
+    6: Charge #6
+    7: StoreImm8 [32] <- #2
+    8: Move8 [0] <- [32]
+    9: Return
+}
+
+fun i64_ge() {
+  frame_data_size: 24
+  code:
+    0: Charge #3
+    1: JumpIntCmp @6 [0] < i64 [8]
+    2: Charge #6
+    3: StoreImm8 [16] <- #1
+    4: Move8 [0] <- [16]
+    5: Return
+    6: Charge #6
+    7: StoreImm8 [16] <- #2
+    8: Move8 [0] <- [16]
+    9: Return
+}
+
+fun i64_lt() {
+  frame_data_size: 24
+  code:
+    0: Charge #3
+    1: JumpIntCmp @6 [0] >= i64 [8]
+    2: Charge #6
+    3: StoreImm8 [16] <- #1
+    4: Move8 [0] <- [16]
+    5: Return
+    6: Charge #6
+    7: StoreImm8 [16] <- #2
+    8: Move8 [0] <- [16]
+    9: Return
+}
+
+fun i8_lt() {
+  frame_data_size: 16
+  code:
+    0: Charge #3
+    1: JumpIntCmp @6 [0] >= i8 [1]
+    2: Charge #6
+    3: StoreImm8 [8] <- #1
+    4: Move8 [0] <- [8]
+    5: Return
+    6: Charge #6
+    7: StoreImm8 [8] <- #2
+    8: Move8 [0] <- [8]
+    9: Return
+}

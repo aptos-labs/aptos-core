@@ -21,8 +21,8 @@ fn minimal_func() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: false,
@@ -57,8 +57,8 @@ fn valid_with_arithmetic_and_jumps() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 16,
         extended_frame_size: 40,
         zero_frame: false,
@@ -84,8 +84,8 @@ fn valid_with_vec_and_pointer_slots() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
@@ -112,10 +112,10 @@ fn frame_bounds_store_u64() {
             },
             Return,
         ]),
-        param_sizes: vec![],
+        param_slots: vec![],
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
-        param_sizes_sum: 0,
+        param_region_size: 0,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -144,8 +144,8 @@ fn frame_bounds_mov() {
         ]),
         param_and_local_sizes_sum: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -175,8 +175,8 @@ fn frame_bounds_fat_ptr_write() {
         ]),
         param_and_local_sizes_sum: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -194,10 +194,10 @@ fn frame_bounds_extended_frame_too_small() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![Return]),
-        param_sizes: vec![],
+        param_slots: vec![],
         param_and_local_sizes_sum: 8,
         extended_frame_size: 16, // param_and_local_sizes_sum 8 + 24 = 32 > 16
-        param_sizes_sum: 0,
+        param_region_size: 0,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -218,8 +218,8 @@ fn pointer_slots_offset_out_of_bounds() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: true,
@@ -238,8 +238,8 @@ fn pointer_slots_overlaps_metadata() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 40,
         zero_frame: true,
@@ -259,8 +259,8 @@ fn param_and_local_sizes_sum_misaligned() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 1, // not a multiple of 8
         extended_frame_size: 32,
         zero_frame: false,
@@ -277,17 +277,19 @@ fn args_size_exceeds_data_size() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![MicroOp::Return]),
-        param_sizes: vec![],
+        param_slots: vec![],
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
-        param_sizes_sum: 16, // > param_and_local_sizes_sum 8
+        param_region_size: 16, // > param_and_local_sizes_sum 8
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
-    assert!(errors.iter().any(|e| e.message.contains("param_sizes_sum")));
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("param_region_size")));
 }
 
 // ---------------------------------------------------------------------------
@@ -303,8 +305,8 @@ fn invalid_jump_target() {
             Jump { target: CO(5) }, // only 2 instructions -> 5 >= 2
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: false,
@@ -332,8 +334,8 @@ fn invalid_conditional_jump_target() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: false,
@@ -373,8 +375,8 @@ fn invalid_descriptor_id() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
@@ -403,8 +405,8 @@ fn zero_size_mov() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: false,
@@ -440,8 +442,8 @@ fn zero_elem_size_vec_push() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
@@ -462,8 +464,8 @@ fn empty_code() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: false,
@@ -480,8 +482,8 @@ fn zero_frame_size() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 0,
         extended_frame_size: 0,
         zero_frame: false,
@@ -505,8 +507,8 @@ fn func_with_single_op(op: MicroOp) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![op, MicroOp::Return]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: false,
@@ -618,8 +620,8 @@ fn multiple_errors_collected() {
             Jump { target: CO(99) }, // invalid target
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: false,
@@ -665,8 +667,8 @@ fn vec_pushback_must_target_vector_descriptor() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
@@ -692,8 +694,8 @@ fn heap_new_rejects_vector_descriptor() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
         zero_frame: true,

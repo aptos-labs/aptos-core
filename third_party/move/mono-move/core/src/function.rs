@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
+use crate::instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE};
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
 use std::{fmt, ptr::NonNull};
 
@@ -123,8 +123,8 @@ impl SortedSafePointEntries {
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. param_sizes_sum)                                  parameters (written by caller as arguments)
-///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
+///   [0 .. param_region_size)                                  parameters (written by caller as arguments)
+///   [param_region_size .. param_and_local_sizes_sum)          locals
 ///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
 ///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots
 /// ```
@@ -134,25 +134,10 @@ impl SortedSafePointEntries {
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub code: Code,
-    /// Byte size of each parameter, in declaration order.
-    ///
-    /// Used by `CallClosure` (together with the closure's `ClosureMask`) to
-    /// compute each parameter's offset in the callee's parameter region and
-    /// to advance through the packed captured values. The sum of these sizes
-    /// must equal `param_sizes_sum`.
-    //
-    // TODO: this only captures sizes, not alignment. Once the layout admits
-    // non-8-byte fields, the closure-call interleaver will need per-param
-    // alignment (either encoded alongside `size` here, or as a sibling
-    // `param_alignments` slice).
-    pub param_sizes: Vec<u32>,
-    /// Size of the parameter region at the start of the frame.
-    /// The caller writes the corresponding arguments into this region
-    /// before the call instruction; when `zero_frame` is true, the runtime
-    /// zeroes everything beyond the parameter region
-    /// (`param_sizes_sum..extended_frame_size`) at frame creation to
-    /// ensure pointer slots start as null.
-    pub param_sizes_sum: usize,
+    /// Per-parameter (aligned) frame slot, in declaration order.
+    pub param_slots: Vec<SizedSlot>,
+    /// Byte size of the parameter region (includes padding in between parameters).
+    pub param_region_size: usize,
     /// Size of the parameters + locals region. Frame metadata is stored
     /// immediately after this region at offset `param_and_local_sizes_sum`.
     pub param_and_local_sizes_sum: usize,
@@ -163,7 +148,7 @@ pub struct Function {
     /// (sized to fit the largest callee's arguments or return values).
     pub extended_frame_size: usize,
     /// Whether the runtime must zero-initialize the region beyond
-    /// parameters (`param_sizes_sum..extended_frame_size`) when a new
+    /// parameters (`param_region_size..extended_frame_size`) when a new
     /// frame is created. This is required when `frame_layout` has
     /// pointer slots so the GC sees null instead of garbage. Functions
     /// with no heap pointer slots in `frame_layout` (beyond parameters)
@@ -185,7 +170,7 @@ pub struct Function {
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a
+    ///   runtime zeroes `param_region_size..extended_frame_size` when a
     ///   frame is created, so all non-parameter pointer slots
     ///   (including the callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be

@@ -51,7 +51,14 @@ fun test_read_and_add(r0): u64 {
 === micro-ops ===
 // module 0x66::field_ref_fusion
 
-fun read_field_val(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun read_field_val() {
+  frame_data_size: 24
+  code:
+    0: Charge #12
+    1: Move(1) [16] <- [8]
+    2: Move(1) [0] <- [16]
+    3: Return
+}
 
 fun read_and_add() {
   frame_data_size: 24

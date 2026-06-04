@@ -1,0 +1,79 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x1::test
+
+fun and_(a: bool, b: bool): bool
+    copy_loc a
+    copy_loc b
+    and
+    ret
+
+fun or_(a: bool, b: bool): bool
+    copy_loc a
+    copy_loc b
+    or
+    ret
+
+// `a && true == a` (fold to move).
+fun and_true(a: bool): bool
+    copy_loc a
+    ld_true
+    and
+    ret
+
+// `a && false == false` (fold to constant store).
+fun and_false(a: bool): bool
+    copy_loc a
+    ld_false
+    and
+    ret
+
+// `a || true == true` (fold to constant store).
+fun or_true(a: bool): bool
+    copy_loc a
+    ld_true
+    or
+    ret
+
+// `a || false == a` (fold to move).
+fun or_false(a: bool): bool
+    copy_loc a
+    ld_false
+    or
+    ret
+
+// `and_` / `or_` — full truth tables.
+// RUN: execute 0x1::test::and_ --args true, true
+// CHECK: results: true
+// RUN: execute 0x1::test::and_ --args true, false
+// CHECK: results: false
+// RUN: execute 0x1::test::and_ --args false, true
+// CHECK: results: false
+// RUN: execute 0x1::test::and_ --args false, false
+// CHECK: results: false
+
+// RUN: execute 0x1::test::or_ --args true, true
+// CHECK: results: true
+// RUN: execute 0x1::test::or_ --args false, false
+// CHECK: results: false
+// RUN: execute 0x1::test::or_ --args true, false
+// CHECK: results: true
+// RUN: execute 0x1::test::or_ --args false, true
+// CHECK: results: true
+
+// Constant-fold forms — both operand values for each.
+// RUN: execute 0x1::test::and_true --args true
+// CHECK: results: true
+// RUN: execute 0x1::test::and_true --args false
+// CHECK: results: false
+// RUN: execute 0x1::test::and_false --args true
+// CHECK: results: false
+// RUN: execute 0x1::test::and_false --args false
+// CHECK: results: false
+// RUN: execute 0x1::test::or_true --args true
+// CHECK: results: true
+// RUN: execute 0x1::test::or_true --args false
+// CHECK: results: true
+// RUN: execute 0x1::test::or_false --args true
+// CHECK: results: true
+// RUN: execute 0x1::test::or_false --args false
+// CHECK: results: false

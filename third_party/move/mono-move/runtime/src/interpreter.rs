@@ -17,8 +17,8 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_fat_ptr,
-        write_ptr, write_u64, MemoryRegion,
+        read_bool, read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr,
+        write_bool, write_fat_ptr, write_ptr, write_u64, write_u8, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
@@ -30,9 +30,9 @@ use crate::{
 use mono_move_core::{
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     storage::resource_provider::StorageKey,
-    CallClosureOp, ClosureFuncRef, DescriptorId, DescriptorProvider, FrameOffset, Function,
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
-    ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, DescriptorProvider, FrameOffset,
+    Function, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
+    PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -176,9 +176,9 @@ impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
         if func.zero_frame {
             unsafe {
                 std::ptr::write_bytes(
-                    self.frame_ptr.add(func.param_sizes_sum),
+                    self.frame_ptr.add(func.param_region_size),
                     0,
-                    func.extended_frame_size - func.param_sizes_sum,
+                    func.extended_frame_size - func.param_region_size,
                 );
             }
         }
@@ -727,6 +727,32 @@ unsafe fn exec_int_cast(fp: *mut u8, op: &IntCastOp) -> RuntimeResult<()> {
     }
 }
 
+/// Reads `lhs` at `rhs`'s concrete type and returns `op(lhs, rhs)`; the
+/// comparison is signed iff that type is signed.
+///
+/// # Safety
+/// See [`exec_int_add`].
+#[inline(never)]
+unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOperand) -> bool {
+    unsafe {
+        macro_rules! exec {
+            ($ty:ty, $_sign:tt, $rhs:expr) => {{
+                let lhs_val: $ty = read_int::<$ty>(fp, lhs);
+                let rhs_val: $ty = $rhs;
+                match op {
+                    CmpKind::Lt => lhs_val < rhs_val,
+                    CmpKind::Le => lhs_val <= rhs_val,
+                    CmpKind::Gt => lhs_val > rhs_val,
+                    CmpKind::Ge => lhs_val >= rhs_val,
+                    CmpKind::Eq => lhs_val == rhs_val,
+                    CmpKind::Neq => lhs_val != rhs_val,
+                }
+            }};
+        }
+        dispatch_int_operand!(fp, rhs, exec)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Interpreter loop
 // ---------------------------------------------------------------------------
@@ -795,6 +821,37 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::JumpNotZeroU64 { target, src } => {
                     self.pc = if read_u64(fp, src) != 0 {
                         target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpNotZeroByte { target, src } => {
+                    // Read as `u8` only to test against zero; the byte's sign is
+                    // irrelevant.
+                    self.pc = if read_u8(fp, src) != 0 {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpZeroByte { target, src } => {
+                    // Read as `u8` only to test against zero; the byte's sign is
+                    // irrelevant.
+                    self.pc = if read_u8(fp, src) == 0 {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpIntCmp(ref op) => {
+                    self.pc = if int_cmp_bool(fp, op.lhs, op.op, &op.rhs) {
+                        op.target.into()
                     } else {
                         self.pc + 1
                     };
@@ -922,6 +979,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 // ----- Arithmetic -----
+                MicroOp::StoreImm1 { dst, imm } => write_u8(fp, dst, imm),
                 MicroOp::StoreImm8 { dst, ref imm } => write_int::<[u8; 8]>(fp, dst, *imm),
                 MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
                 MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
@@ -1399,8 +1457,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         self.exec_ctx.resource_provider(),
                         StorageKey::Resource(address, ty),
                     )?;
-                    // TODO(correctness): temporary hack to avoid boolean writes.
-                    write_u64(fp, dst, if exists { 1 } else { 0 });
+                    write_bool(fp, dst, exists);
                 },
 
                 MicroOp::BorrowGlobal { addr, ty, dst } => {
@@ -1461,6 +1518,21 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         StorageKey::Resource(address, ty),
                         ptr,
                     )?;
+                },
+                MicroOp::IntCmp(ref op) => {
+                    let result = int_cmp_bool(fp, op.lhs, op.op, &op.rhs);
+                    write_u8(fp, op.dst, result as u8);
+                },
+                MicroOp::BoolNot { dst, src } => write_bool(fp, dst, !read_bool(fp, src)),
+                MicroOp::BoolAnd { dst, lhs, rhs } => {
+                    let left = read_bool(fp, lhs);
+                    let right = read_bool(fp, rhs);
+                    write_bool(fp, dst, left && right)
+                },
+                MicroOp::BoolOr { dst, lhs, rhs } => {
+                    let left = read_bool(fp, lhs);
+                    let right = read_bool(fp, rhs);
+                    write_bool(fp, dst, left || right)
                 },
             }
         }
@@ -1606,7 +1678,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     ///
     /// Reads the closure at `op.closure_src`, interleaves its captured
     /// values with the provided arguments into the callee's parameter
-    /// region using the mask and the callee's `param_sizes`, then
+    /// region using the mask and the callee's `param_slots` (each
+    /// argument lands at its parameter's natural-aligned offset), then
     /// performs the standard call protocol.
     ///
     /// Only supports `ClosureFuncRef::Resolved` + Materialized captured
@@ -1618,10 +1691,11 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     /// - `fp` is the current frame pointer.
     /// - `op.closure_src` holds a non-null heap pointer to a valid closure
     ///   object.
-    /// - The callee's `param_sizes` list has one entry per declared
-    ///   parameter and sums to `callee.param_sizes_sum`.
+    /// - The callee's `param_slots` list has one (offset, size) entry per
+    ///   declared parameter; the last entry's `offset + size` equals
+    ///   `callee.param_region_size`.
     /// - The captured values in the captured-data object are packed in
-    ///   param order and their sizes match the corresponding `param_sizes`
+    ///   param order and their sizes match the corresponding `param_slots`
     ///   entries (enforced by `PackClosure`).
     unsafe fn exec_call_closure(
         &mut self,
@@ -1667,9 +1741,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             // any copies (every iteration is a no-op move-in-place),
             // and unifies closure call codegen with direct call codegen.
             // See George's pseudocode in PR #19519 review thread.
-            if callee.param_sizes.len() > 64 {
+            if callee.param_slots.len() > 64 {
                 invariant_violation!(TooManyClosureParams {
-                    num_params: callee.param_sizes.len(),
+                    num_params: callee.param_slots.len(),
                 });
             }
 
@@ -1694,13 +1768,15 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
             let mut captured_value_offset = CAPTURED_DATA_VALUES_OFFSET;
             let mut provided_idx = 0usize;
-            let mut param_offset_in_callee = 0usize;
-            for (i, &param_size) in callee.param_sizes.iter().enumerate() {
+            for (i, pslot) in callee.param_slots.iter().enumerate() {
+                let param_size = pslot.size;
+                // Destination is the parameter's aligned offset in the callee frame.
+                let dst = new_fp.add(pslot.offset.0 as usize);
                 let is_captured = (mask >> i) & 1 != 0;
                 if is_captured {
                     std::ptr::copy_nonoverlapping(
                         captured_data.add(captured_value_offset),
-                        new_fp.add(param_offset_in_callee),
+                        dst,
                         param_size as usize,
                     );
                     captured_value_offset += param_size as usize;
@@ -1722,14 +1798,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     // callee's parameter region at `new_fp`. The
                     // overlap is also routine under the planned
                     // pre-write-then-patch redesign in the TODO above.
-                    std::ptr::copy(
-                        fp.add(slot.offset.into()),
-                        new_fp.add(param_offset_in_callee),
-                        slot.size as usize,
-                    );
+                    std::ptr::copy(fp.add(slot.offset.into()), dst, slot.size as usize);
                     provided_idx += 1;
                 }
-                param_offset_in_callee += param_size as usize;
             }
             let provided = op.provided_args.len();
             if provided_idx != provided {
@@ -1811,11 +1882,11 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
-            // The parameter region (0..param_sizes_sum) was already
+            // The parameter region (0..param_region_size) was already
             // written by the caller as call arguments.
             if callee.zero_frame {
-                let zero_size = callee.extended_frame_size - callee.param_sizes_sum;
-                std::ptr::write_bytes(new_fp.add(callee.param_sizes_sum), 0, zero_size);
+                let zero_size = callee.extended_frame_size - callee.param_region_size;
+                std::ptr::write_bytes(new_fp.add(callee.param_region_size), 0, zero_size);
             }
             self.write_frame_metadata(caller, fp);
             self.frame_ptr = new_fp;

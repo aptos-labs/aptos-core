@@ -107,13 +107,13 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 ),
             );
         }
-        // param_sizes_sum must fit within the data region.
-        if self.func.param_sizes_sum > self.func.param_and_local_sizes_sum {
+        // param_region_size must fit within the data region.
+        if self.func.param_region_size > self.func.param_and_local_sizes_sum {
             self.err(
                 None,
                 format!(
-                    "param_sizes_sum ({}) must be <= param_and_local_sizes_sum ({})",
-                    self.func.param_sizes_sum, self.func.param_and_local_sizes_sum
+                    "param_region_size ({}) must be <= param_and_local_sizes_sum ({})",
+                    self.func.param_region_size, self.func.param_and_local_sizes_sum
                 ),
             );
         }
@@ -238,6 +238,10 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             MicroOp::StoreImm32 { dst, imm: _ } => {
                 self.check_frame_access(Some(pc), dst, 32);
+            },
+
+            MicroOp::StoreImm1 { dst, imm: _ } => {
+                self.check_frame_access_1(pc, dst);
             },
 
             MicroOp::StoreRandomU64 { dst } => {
@@ -378,6 +382,29 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), op.dst, op.to.byte_width() as u32);
             },
 
+            // Comparison: `lhs` (and `rhs` slot, if any) are `rhs.byte_width()`
+            // wide; `dst` is a 1-byte boolean. Both signed and unsigned
+            // operands are valid.
+            MicroOp::IntCmp(ref op) => {
+                let size = op.rhs.byte_width() as u32;
+                self.check_frame_access(Some(pc), op.lhs, size);
+                if let Some(rhs_off) = op.rhs.slot_offset() {
+                    self.check_frame_access(Some(pc), rhs_off, size);
+                }
+                self.check_frame_access_1(pc, op.dst);
+            },
+
+            // Boolean logic: all operands are 1-byte `0`/`1` values.
+            MicroOp::BoolNot { dst, src } => {
+                self.check_frame_access_1(pc, src);
+                self.check_frame_access_1(pc, dst);
+            },
+            MicroOp::BoolAnd { dst, lhs, rhs } | MicroOp::BoolOr { dst, lhs, rhs } => {
+                self.check_frame_access_1(pc, lhs);
+                self.check_frame_access_1(pc, rhs);
+                self.check_frame_access_1(pc, dst);
+            },
+
             MicroOp::Move { dst, src, size } => {
                 self.check_nonzero_size(pc, size);
                 self.check_frame_access(Some(pc), src, size);
@@ -391,6 +418,22 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             MicroOp::JumpNotZeroU64 { target, src } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
+            },
+
+            MicroOp::JumpNotZeroByte { target, src } | MicroOp::JumpZeroByte { target, src } => {
+                self.check_frame_access_1(pc, src);
+                self.check_jump(pc, target);
+            },
+
+            // `lhs` and the `rhs` slot (if any) are `rhs.byte_width()` wide;
+            // either signedness is allowed.
+            MicroOp::JumpIntCmp(ref op) => {
+                let size = op.rhs.byte_width() as u32;
+                self.check_frame_access(Some(pc), op.lhs, size);
+                if let Some(rhs_off) = op.rhs.slot_offset() {
+                    self.check_frame_access(Some(pc), rhs_off, size);
+                }
+                self.check_jump(pc, op.target);
             },
 
             MicroOp::JumpGreaterEqualU64Imm {
@@ -735,7 +778,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         match &op.func_ref {
             ClosureFuncRef::Resolved(func_ptr) => {
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
-                let param_count = callee.param_sizes.len();
+                let param_count = callee.param_slots.len();
                 if param_count > 64 {
                     self.err(
                         Some(pc),
@@ -758,15 +801,15 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 // callee parameter's size. The captured list is in
                 // mask-bit-set order through the param list.
                 let mut k = 0usize;
-                for (i, &param_size) in callee.param_sizes.iter().enumerate() {
+                for (i, param_slot) in callee.param_slots.iter().enumerate() {
                     if (op.mask >> i) & 1 != 0 {
                         if let Some(slot) = op.captured.get(k) {
-                            if slot.size != param_size {
+                            if slot.size != param_slot.size {
                                 self.err(
                                     Some(pc),
                                     format!(
-                                        "PackClosure: captured[{}].size {} != callee param_sizes[{}] {}",
-                                        k, slot.size, i, param_size,
+                                        "PackClosure: captured[{}].size {} != callee param_slots[{}].size {}",
+                                        k, slot.size, i, param_slot.size,
                                     ),
                                 );
                             }

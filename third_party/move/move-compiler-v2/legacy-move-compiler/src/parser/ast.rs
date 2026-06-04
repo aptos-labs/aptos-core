@@ -404,12 +404,14 @@ pub enum Proof_ {
     Assume(Vec<PragmaProperty>, Exp),
     /// `apply lemma(args);` — instantiate a lemma.
     Apply(NameAccessChain, Vec<Exp>),
-    /// `forall bindings [triggers] apply lemma(args);` — quantified lemma instantiation.
+    /// `forall bindings [triggers] [weight = N] apply lemma(args);` — quantified lemma
+    /// instantiation. Optional `weight` forwards to SMT-LIB `:weight N` on the quantifier.
     ForallApply {
         bindings: BindWithRangeList,
         patterns: Vec<Vec<Exp>>,
         lemma: NameAccessChain,
         args: Vec<Exp>,
+        weight: Option<u32>,
     },
     /// `calc(e1 relop e2 relop ... en);` — calculational proof chain.
     Calc(Vec<(Exp, Option<BinOp>)>),
@@ -436,6 +438,11 @@ pub enum SpecBlockMember_ {
         signature: FunctionSignature,
         modifies: Vec<Exp>,
         reads: Vec<Type>,
+        /// Optional `:weight N` on the spec function's defining axiom. Surfaced via
+        /// `spec fun NAME(...): T [weight = N] { body }`. Used by the backend to
+        /// throttle SMT instantiation of the (often matching-loop-prone) recursive
+        /// definition.
+        weight: Option<u32>,
         body: FunctionBody,
     },
     /// Declares which resources a function-typed parameter may modify.
@@ -811,11 +818,14 @@ pub enum Exp_ {
     Block(Sequence),
     // | x1 [: t1], ..., xn [: tn] | e [ spec ]
     Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind, Option<Box<Exp>>),
-    // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
+    // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [[weight = N]] [where cond]: en.
+    // The optional `[weight = N]` annotation surfaces SMT-LIB's `:weight N` attribute
+    // on the emitted quantifier so users can throttle E-matching of fragile axioms.
     Quant(
         QuantKind,
         BindWithRangeList,
         Vec<Vec<Exp>>,
+        Option<u32>,
         Option<Box<Exp>>,
         Box<Exp>,
     ),
@@ -1602,6 +1612,7 @@ impl AstDebug for SpecBlockMember_ {
                 name,
                 modifies,
                 reads,
+                weight,
                 body,
             } => {
                 if *uninterpreted {
@@ -1612,6 +1623,9 @@ impl AstDebug for SpecBlockMember_ {
                 w.write("fun ");
                 w.write(format!("{}", name));
                 signature.ast_debug(w);
+                if let Some(n) = weight {
+                    w.write(format!(" [weight = {}]", n));
+                }
                 if !modifies.is_empty() {
                     w.write(" modifies ");
                     w.list(modifies, ", ", |w, e| {
@@ -1836,6 +1850,7 @@ impl AstDebug for Proof_ {
                 patterns,
                 lemma,
                 args,
+                weight,
             } => {
                 w.write("forall ");
                 w.list(&bindings.value, ", ", |w, sp!(_, (bind, range))| {
@@ -1851,6 +1866,9 @@ impl AstDebug for Proof_ {
                         true
                     });
                     w.write("}");
+                }
+                if let Some(w_val) = weight {
+                    w.write(format!(" [weight = {}]", w_val));
                 }
                 w.write(" apply ");
                 lemma.ast_debug(w);
@@ -2271,11 +2289,14 @@ impl AstDebug for Exp_ {
                     w.write("}");
                 }
             },
-            E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
+            E::Quant(kind, sp!(_, rs), trs, weight, c_opt, e) => {
                 kind.ast_debug(w);
                 w.write(" ");
                 rs.ast_debug(w);
                 trs.ast_debug(w);
+                if let Some(n) = weight {
+                    w.write(format!(" [weight = {}]", n));
+                }
                 if let Some(c) = c_opt {
                     w.write(" where ");
                     c.ast_debug(w);

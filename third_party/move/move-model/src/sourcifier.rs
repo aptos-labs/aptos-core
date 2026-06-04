@@ -1628,7 +1628,7 @@ impl<'a> Sourcifier<'a> {
                 }
                 emitln!(self.writer, ");");
             },
-            Proof::ForallApply(_, binds, patterns, lemma_qid, args) => {
+            Proof::ForallApply(_, binds, patterns, lemma_qid, args, weight) => {
                 let env = exp_sourcifier.env();
                 let module_env = env.get_module(lemma_qid.module_id);
                 let lemma = module_env.get_lemma(lemma_qid.id);
@@ -1660,6 +1660,9 @@ impl<'a> Sourcifier<'a> {
                         sep = "; ";
                     }
                     emit!(self.writer, "]");
+                }
+                if let Some(w) = weight {
+                    emit!(self.writer, " [weight = {}]", w);
                 }
                 emit!(self.writer, " apply {}(", lemma_name);
                 comma = "";
