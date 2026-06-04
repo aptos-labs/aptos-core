@@ -513,12 +513,8 @@ pub(crate) fn realistic_env_max_load_test(
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
-<<<<<<< HEAD
-    let mempool_backlog = 100;
-=======
     let num_pfns = 3;
     let mempool_backlog = 1600;
->>>>>>> 007ce213f0 ([consensus] Isolate decryption crypto on per-stage rayon pools (#19973))
 
     let success_criteria = SuccessCriteria::new(15)
         .add_no_restarts()
