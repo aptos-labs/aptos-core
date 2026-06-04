@@ -699,10 +699,14 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), addr, 32);
                 self.check_frame_access(Some(pc), dst, 16);
             },
-            MicroOp::MoveTo { addr, ty: _, src } => {
-                // TODO(correctness):
-                //   Move use signer reference, so we need 16 bytes if we no longer use address.
-                self.check_frame_access(Some(pc), addr, 32);
+            MicroOp::MoveTo {
+                signer_ref,
+                ty: _,
+                src,
+            } => {
+                // `signer_ref` is a 16-byte `&signer` fat pointer; `src` is an
+                // 8-byte owned heap pointer to the resource value.
+                self.check_frame_access(Some(pc), signer_ref, 16);
                 self.check_frame_access_8(pc, src);
             },
         }

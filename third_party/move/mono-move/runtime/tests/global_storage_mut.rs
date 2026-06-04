@@ -80,6 +80,7 @@ fn make_program_with_tmp(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> F
 const DST: FO = FO(0);
 const ADDR: FO = FO(8);
 const TMP: FO = FO(40);
+const SIGNER_REF: FO = FO(48);
 
 // ---------------------------------------------------------------------------
 // BorrowGlobalMut
@@ -179,8 +180,12 @@ fn move_to_publishes_resource_and_exists_is_true() {
                 dst: TMP,
                 descriptor_id: desc_id,
             },
+            MicroOp::SlotBorrow {
+                dst: SIGNER_REF,
+                local: ADDR,
+            },
             MicroOp::MoveTo {
-                addr: ADDR,
+                signer_ref: SIGNER_REF,
                 ty: resource_ty(),
                 src: TMP,
             },
@@ -193,8 +198,8 @@ fn move_to_publishes_resource_and_exists_is_true() {
         ]),
         param_slots: vec![],
         param_region_size: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 64,
+        extended_frame_size: 88,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![TMP]),
         safe_point_layouts: SortedSafePointEntries::empty(),
@@ -221,8 +226,12 @@ fn move_to_aborts_when_already_present() {
                 dst: TMP,
                 descriptor_id: desc_id,
             },
+            MicroOp::SlotBorrow {
+                dst: SIGNER_REF,
+                local: ADDR,
+            },
             MicroOp::MoveTo {
-                addr: ADDR,
+                signer_ref: SIGNER_REF,
                 ty: resource_ty(),
                 src: TMP,
             },
@@ -230,8 +239,8 @@ fn move_to_aborts_when_already_present() {
         ]),
         param_slots: vec![],
         param_region_size: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
+        param_and_local_sizes_sum: 64,
+        extended_frame_size: 88,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![TMP]),
         safe_point_layouts: SortedSafePointEntries::empty(),

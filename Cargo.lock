@@ -12886,6 +12886,9 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-gas-schedule",
+ "aptos-types",
+ "aptos-vm",
  "bytes",
  "codespan-reporting",
  "datatest-stable",

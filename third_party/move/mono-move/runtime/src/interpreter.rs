@@ -17,8 +17,8 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_bool, read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr,
-        write_bool, write_fat_ptr, write_ptr, write_u64, write_u8, MemoryRegion,
+        read_account_address, read_bool, read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8,
+        vec_elem_ptr, write_bool, write_fat_ptr, write_ptr, write_u64, write_u8, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
@@ -38,10 +38,7 @@ use mono_move_core::{
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
-use move_core_types::{
-    account_address::AccountAddress,
-    int256::{I256, U256},
-};
+use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 
@@ -395,18 +392,6 @@ unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: 
             ptr.write_unaligned(val)
         }
     }
-}
-
-/// Read a 32-byte [`AccountAddress`] from a frame slot.
-///
-/// # Safety
-///
-/// `[fp + offset, fp + offset + 32]` must lie within the current
-/// frame's accessible region.
-#[inline(always)]
-unsafe fn read_address(fp: *const u8, offset: FrameOffset) -> AccountAddress {
-    let ptr = unsafe { fp.add(offset.into()) as *const AccountAddress };
-    unsafe { ptr.read() }
 }
 
 /// [`U256`]'s `Shl`/`Shr` trait impls require `Self` as the rhs.
@@ -1452,7 +1437,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::IntCast(ref op) => exec_int_cast(fp, op)?,
 
                 MicroOp::Exists { addr, ty, dst } => {
-                    let address = read_address(fp, addr);
+                    let address = read_account_address(fp, addr);
                     let exists = self.read_write_set.exists(
                         self.exec_ctx.resource_provider(),
                         StorageKey::Resource(address, ty),
@@ -1461,7 +1446,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 MicroOp::BorrowGlobal { addr, ty, dst } => {
-                    let address = read_address(fp, addr);
+                    let address = read_account_address(fp, addr);
                     let ptr = self.read_write_set.borrow_global(
                         self.exec_ctx.resource_provider(),
                         StorageKey::Resource(address, ty),
@@ -1472,7 +1457,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 MicroOp::BorrowGlobalMut { addr, ty, dst } => {
-                    let address = read_address(fp, addr);
+                    let address = read_account_address(fp, addr);
                     let key = StorageKey::Resource(address, ty);
                     let ptr = match self
                         .read_write_set
@@ -1491,7 +1476,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 MicroOp::MoveFrom { addr, ty, dst } => {
-                    let address = read_address(fp, addr);
+                    let address = read_account_address(fp, addr);
                     let key = StorageKey::Resource(address, ty);
                     let entry_ptr = self
                         .read_write_set
@@ -1507,8 +1492,14 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     write_ptr(fp, dst, ptr.as_ptr());
                 },
 
-                MicroOp::MoveTo { addr, ty, src } => {
-                    let address = read_address(fp, addr);
+                MicroOp::MoveTo {
+                    signer_ref,
+                    ty,
+                    src,
+                } => {
+                    // Dereference the `&signer` to obtain the 32-byte publishing address
+                    let (base, offset) = read_fat_ptr(fp, signer_ref);
+                    let address = read_account_address(base, offset as usize);
                     let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
                         invariant_violation!(MoveToNullSource);
                     };

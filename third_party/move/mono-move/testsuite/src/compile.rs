@@ -43,15 +43,30 @@ pub fn compile(source: &str, kind: SourceKind) -> Result<Vec<CompiledModule>> {
 ///
 /// The full Move stdlib is injected as dependencies.
 pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
-    let options = Options {
+    run_compiler(Options {
         sources: vec![path.to_string_lossy().into_owned()],
         dependencies: move_stdlib::move_stdlib_files(),
         named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
-    };
+    })
+}
 
+/// Compile the Move stdlib into its modules, so they can be published into a
+/// test's storage.
+pub fn compile_move_stdlib() -> Result<Vec<CompiledModule>> {
+    run_compiler(Options {
+        sources: move_stdlib::move_stdlib_files(),
+        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
+        language_version: Some(LanguageVersion::latest_stable()),
+        ..Options::default()
+    })
+}
+
+/// Run the v2 compiler and collect the produced modules (scripts dropped).
+fn run_compiler(options: Options) -> Result<Vec<CompiledModule>> {
     let mut errors = Buffer::no_color();
     let result = {
         let mut emitter = options.error_emitter(&mut errors);

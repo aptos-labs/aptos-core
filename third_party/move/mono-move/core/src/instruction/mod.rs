@@ -977,12 +977,10 @@ pub enum MicroOp {
     },
 
     /// Move the owned value in the source slot `src` into global storage as a
-    /// resource of type `ty` at the address in `addr`. `src` holds an 8-byte
-    /// owned heap pointer. Aborts if the resource already exists.
+    /// resource of type `ty`, published under the address of the signer referenced
+    /// by the `signer_ref`.
     MoveTo {
-        // TODO(correctness):
-        //   Move requires this to be a signer, using address for simplicity for now.
-        addr: FrameOffset,
+        signer_ref: FrameOffset,
         ty: InternedType,
         src: FrameOffset,
     },
@@ -1528,10 +1526,14 @@ impl fmt::Display for MicroOp {
                 display_type(f, *ty)?;
                 write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
             },
-            MicroOp::MoveTo { addr, ty, src } => {
+            MicroOp::MoveTo {
+                signer_ref,
+                ty,
+                src,
+            } => {
                 write!(f, "MoveTo<")?;
                 display_type(f, *ty)?;
-                write!(f, "> addr=[{}], src=[{}]", addr.0, src.0)
+                write!(f, "> signer=[{}], src=[{}]", signer_ref.0, src.0)
             },
         }
     }
