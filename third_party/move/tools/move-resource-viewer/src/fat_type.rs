@@ -18,40 +18,15 @@ use move_core_types::{
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{cmp::Ordering, convert::TryInto, ops::Deref, rc::Rc, sync::Arc};
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub(crate) struct WrappedAbilitySet(pub AbilitySet);
-
-impl Serialize for WrappedAbilitySet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.into_u8().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for WrappedAbilitySet {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let byte = u8::deserialize(deserializer)?;
-        Ok(WrappedAbilitySet(AbilitySet::from_u8(byte).ok_or_else(
-            || serde::de::Error::custom(format!("Invalid ability set: {:X}", byte)),
-        )?))
-    }
-}
-
 /// VM representation of a struct type in Move.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct FatStructType {
     pub address: AccountAddress,
     pub module: Identifier,
     pub name: Identifier,
-    pub abilities: WrappedAbilitySet,
+    pub abilities: AbilitySet,
     pub ty_args: Vec<FatType>,
     pub layout: FatStructLayout,
     // Whether this struct transitively contains 0x1::table::Table types. This
@@ -60,13 +35,13 @@ pub(crate) struct FatStructType {
     pub contains_tables: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum FatStructLayout {
     Singleton(Vec<FatType>),
     Variants(Vec<Vec<FatType>>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct FatFunctionType {
     pub args: Vec<FatType>,
     pub results: Vec<FatType>,
@@ -74,7 +49,7 @@ pub(crate) struct FatFunctionType {
 }
 
 // INVARIANT: this type need to stay crate local. See discussion at `FatStructRef`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum FatType {
     Bool,
     U8,
@@ -114,8 +89,7 @@ pub(crate) enum FatType {
 /// would need to be concerned for `ptr(rc1) != ptr(rc2)`
 /// not representing structural disequality. But it is
 /// only (?) a cache miss.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone)]
 pub(crate) struct FatStructRef {
     rc: Rc<FatStructType>,
 }
