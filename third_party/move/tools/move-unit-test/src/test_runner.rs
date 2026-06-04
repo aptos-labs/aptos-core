@@ -302,6 +302,7 @@ impl SharedTestingConfig {
     fn execute_via_move_vm<F: UnitTestFactory>(
         &self,
         test_plan: &ModuleTestPlan,
+        case_name: &str,
         function_name: &str,
         test_info: &TestCase,
         factory: &Mutex<F>,
@@ -363,7 +364,7 @@ impl SharedTestingConfig {
             }
         }
 
-        let test_run_info = TestRunInfo::new(function_name.to_string(), now.elapsed());
+        let test_run_info = TestRunInfo::new(case_name.to_string(), now.elapsed());
 
         let result = data_cache
             .into_effects(&module_storage)
@@ -396,16 +397,17 @@ impl SharedTestingConfig {
     ) -> Result<TestStatistics> {
         let mut stats = TestStatistics::new();
 
-        for (function_name, test_info) in &test_plan.tests {
-            let (cs_result, ext_result, exec_result, test_run_info) =
-                self.execute_via_move_vm(test_plan, function_name, test_info, factory);
+        for (case_name, test_info) in &test_plan.tests {
+            let (cs_result, ext_result, exec_result, test_run_info) = self.execute_via_move_vm(
+                test_plan,
+                case_name,
+                &test_info.function_name,
+                test_info,
+                factory,
+            );
 
             if self.record_writeset {
-                stats.test_output(
-                    function_name.to_string(),
-                    test_plan,
-                    format!("{:?}", cs_result),
-                );
+                stats.test_output(case_name.to_string(), test_plan, format!("{:?}", cs_result));
             }
 
             let save_session_state = || {
@@ -436,13 +438,13 @@ impl SharedTestingConfig {
                     assert!(err.major_status() != StatusCode::EXECUTED);
                     match test_info.expected_failure.as_ref() {
                         Some(ExpectedFailure::Expected) => {
-                            output.pass(function_name);
+                            output.pass(case_name);
                             stats.test_success(test_run_info, test_plan);
                         },
                         Some(ExpectedFailure::ExpectedWithError(expected_err))
                             if expected_err == &actual_err =>
                         {
-                            output.pass(function_name);
+                            output.pass(case_name);
                             stats.test_success(test_run_info, test_plan);
                         },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(code))
@@ -450,12 +452,12 @@ impl SharedTestingConfig {
                                 && actual_err.1.is_some()
                                 && actual_err.1.unwrap() == *code =>
                         {
-                            output.pass(function_name);
+                            output.pass(case_name);
                             stats.test_success(test_run_info, test_plan);
                         },
                         // incorrect cases
                         Some(ExpectedFailure::ExpectedWithError(expected_err)) => {
-                            output.fail(function_name);
+                            output.fail(case_name);
                             stats.test_failure(
                                 TestFailure::new(
                                     FailureReason::wrong_error(expected_err.clone(), actual_err),
@@ -470,7 +472,7 @@ impl SharedTestingConfig {
                             }
                         },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(expected_code)) => {
-                            output.fail(function_name);
+                            output.fail(case_name);
                             stats.test_failure(
                                 TestFailure::new(
                                     FailureReason::wrong_abort_deprecated(
@@ -489,7 +491,7 @@ impl SharedTestingConfig {
                         },
                         None if err.major_status() == StatusCode::OUT_OF_GAS => {
                             // Ran out of ticks, report a test timeout and log a test failure
-                            output.timeout(function_name);
+                            output.timeout(case_name);
                             stats.test_failure(
                                 TestFailure::new(
                                     FailureReason::timeout(),
@@ -504,7 +506,7 @@ impl SharedTestingConfig {
                             }
                         },
                         None => {
-                            output.fail(function_name);
+                            output.fail(case_name);
                             stats.test_failure(
                                 TestFailure::new(
                                     FailureReason::unexpected_error(actual_err),
@@ -523,7 +525,7 @@ impl SharedTestingConfig {
                 Ok(_) => {
                     // Expected the test to fail, but it executed
                     if test_info.expected_failure.is_some() {
-                        output.fail(function_name);
+                        output.fail(case_name);
                         stats.test_failure(
                             TestFailure::new(
                                 FailureReason::no_error(),
@@ -538,7 +540,7 @@ impl SharedTestingConfig {
                         }
                     } else {
                         // Expected the test to execute fully and it did
-                        output.pass(function_name);
+                        output.pass(case_name);
                         stats.test_success(test_run_info, test_plan);
                     }
                 },

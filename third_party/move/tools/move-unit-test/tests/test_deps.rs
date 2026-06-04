@@ -7,9 +7,21 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     value::MoveValue,
 };
-use move_unit_test::{self, UnitTestingConfig};
+use move_unit_test::{self, test_reporter::UnitTestFactoryWithCostTable, UnitTestingConfig};
 use std::{fs, path::PathBuf};
 use tempfile::tempdir;
+
+const TWO_ROW_SOURCE: &str = r#"
+    address 0x1 {
+    module M {
+        #[test(addr = @0x1)]
+        #[test(addr = @0x2)]
+        fun foo(addr: signer) {
+            let _ = addr;
+        }
+    }
+    }
+"#;
 
 fn build_test_plan_from_source(source: &str) -> legacy_move_compiler::unit_test::TestPlan {
     let temp = tempdir().unwrap();
@@ -21,6 +33,29 @@ fn build_test_plan_from_source(source: &str) -> legacy_move_compiler::unit_test:
     config.source_files = vec![source_path.to_string_lossy().into_owned()];
     config.dep_files = move_stdlib::move_stdlib_files();
     config.build_test_plan().unwrap()
+}
+
+fn run_source(source: &str, filter: Option<&str>, report_statistics: bool) -> String {
+    let plan = build_test_plan_from_source(source);
+    let config = UnitTestingConfig {
+        filter: filter.map(str::to_string),
+        num_threads: 1,
+        report_statistics,
+        ..UnitTestingConfig::default()
+    };
+    let (output, ok) = config
+        .run_and_report_unit_tests(
+            plan,
+            None,
+            None,
+            Vec::new(),
+            UnitTestFactoryWithCostTable::new(None, None),
+            false,
+            false,
+        )
+        .unwrap();
+    assert!(ok);
+    String::from_utf8(output).unwrap()
 }
 
 // Make sure the compiled bytecode for dependencies is included, but the tests in them are not run.
@@ -104,4 +139,30 @@ fn single_row_keeps_unsuffixed_case_and_function_identity() {
 
     assert_eq!(module.tests.len(), 1);
     assert_eq!(test_case.function_name, "single");
+}
+
+#[test]
+fn parametric_case_filter_selects_one_row() {
+    let output = run_source(TWO_ROW_SOURCE, Some("foo@row1"), false);
+    assert!(output.contains("::foo@row1"));
+    assert!(!output.contains("::foo@row0"));
+    assert!(output.contains("Total tests: 1; passed: 1; failed: 0"));
+}
+
+#[test]
+fn parametric_row_prefix_filter_selects_all_rows() {
+    let output = run_source(TWO_ROW_SOURCE, Some("foo@row"), false);
+    assert!(output.contains("::foo@row0"));
+    assert!(output.contains("::foo@row1"));
+    assert!(output.contains("Total tests: 2; passed: 2; failed: 0"));
+}
+
+#[test]
+fn parametric_statistics_use_case_identity() {
+    let output = run_source(TWO_ROW_SOURCE, None, true);
+    let statistics = output.split("Test Statistics:").nth(1).unwrap();
+
+    assert!(statistics.contains("::foo@row0"));
+    assert!(statistics.contains("::foo@row1"));
+    assert_eq!(statistics.matches("::foo@row").count(), 2);
 }
