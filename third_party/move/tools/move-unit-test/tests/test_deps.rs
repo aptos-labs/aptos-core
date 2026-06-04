@@ -5,9 +5,23 @@
 
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    value::MoveValue,
 };
 use move_unit_test::{self, UnitTestingConfig};
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
+use tempfile::tempdir;
+
+fn build_test_plan_from_source(source: &str) -> legacy_move_compiler::unit_test::TestPlan {
+    let temp = tempdir().unwrap();
+    let source_path = temp.path().join("case_identity.move");
+    fs::write(&source_path, source).unwrap();
+
+    let mut config =
+        UnitTestingConfig::default().with_named_addresses(move_stdlib::move_stdlib_named_addresses());
+    config.source_files = vec![source_path.to_string_lossy().into_owned()];
+    config.dep_files = move_stdlib::move_stdlib_files();
+    config.build_test_plan().unwrap()
+}
 
 // Make sure the compiled bytecode for dependencies is included, but the tests in them are not run.
 #[test]
@@ -33,4 +47,64 @@ fn test_deps_arent_tested() {
     );
     assert!(mod_id == expected_mod_id);
     assert!(iter.next().is_none());
+}
+
+#[test]
+fn parametric_rows_separate_case_and_function_identity_in_source_order() {
+    let source = r#"
+        address 0x1 {
+        module M {
+            #[test(addr = @0x0)]
+            #[test(addr = @0x1)]
+            #[test(addr = @0x2)]
+            #[test(addr = @0x3)]
+            #[test(addr = @0x4)]
+            #[test(addr = @0x5)]
+            #[test(addr = @0x6)]
+            #[test(addr = @0x7)]
+            #[test(addr = @0x8)]
+            #[test(addr = @0x9)]
+            #[test(addr = @0xa)]
+            fun ordered(addr: signer) {
+                let _ = addr;
+            }
+        }
+        }
+    "#;
+
+    let plan = build_test_plan_from_source(source);
+    let module = plan.module_tests.values().next().unwrap();
+
+    assert_eq!(module.tests.len(), 11);
+    for index in 0..11 {
+        let test_case = module.tests.get(&format!("ordered@row{index}")).unwrap();
+        assert_eq!(test_case.function_name, "ordered");
+        assert_eq!(
+            test_case.arguments,
+            vec![MoveValue::Address(
+                AccountAddress::from_hex_literal(&format!("0x{index:x}")).unwrap()
+            )]
+        );
+    }
+}
+
+#[test]
+fn single_row_keeps_unsuffixed_case_and_function_identity() {
+    let source = r#"
+        address 0x1 {
+        module M {
+            #[test(addr = @0x1)]
+            fun single(addr: signer) {
+                let _ = addr;
+            }
+        }
+        }
+    "#;
+
+    let plan = build_test_plan_from_source(source);
+    let module = plan.module_tests.values().next().unwrap();
+    let test_case = module.tests.get("single").unwrap();
+
+    assert_eq!(module.tests.len(), 1);
+    assert_eq!(test_case.function_name, "single");
 }
