@@ -1463,6 +1463,9 @@ fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
 }
 
 /// Map an IR [`CmpOp`] to the micro-op [`CmpKind`].
+///
+/// TODO: `CmpOp` and `CmpKind` have identical variants; consider unifying on a
+/// single shared type in core to drop this mapping.
 fn cmp_kind(op: CmpOp) -> CmpKind {
     match op {
         CmpOp::Lt => CmpKind::Lt,
@@ -1478,12 +1481,30 @@ fn cmp_kind(op: CmpOp) -> CmpKind {
 /// [`int_operand_from_slot`]. `bool` (1 byte) and `address` (32 bytes) are
 /// flat values with only `==`/`!=` (no ordering), and comparing their bit
 /// patterns is exactly value equality, so they reuse the integer compare ops
-/// at the matching width. Other operand types have no comparison lowering yet.
+/// at the matching width.
 fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
     match ty {
         Type::Bool => Ok(IntOperand::SlotU8(off)),
         Type::Address => Ok(IntOperand::SlotU256(off)),
-        _ => int_operand_from_slot(ty, off),
+        Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256 => int_operand_from_slot(ty, off),
+        Type::Signer
+        | Type::ImmutRef { .. }
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => bail!("operand type has no comparison lowering"),
     }
 }
 
@@ -1492,7 +1513,18 @@ fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
 fn cmp_operand_from_imm(imm: &ImmValue) -> Result<IntOperand> {
     match imm {
         ImmValue::Bool(b) => Ok(IntOperand::ImmU8(*b as u8)),
-        _ => int_operand_from_imm(imm),
+        ImmValue::U8(_)
+        | ImmValue::U16(_)
+        | ImmValue::U32(_)
+        | ImmValue::U64(_)
+        | ImmValue::U128(_)
+        | ImmValue::U256(_)
+        | ImmValue::I8(_)
+        | ImmValue::I16(_)
+        | ImmValue::I32(_)
+        | ImmValue::I64(_)
+        | ImmValue::I128(_)
+        | ImmValue::I256(_) => int_operand_from_imm(imm),
     }
 }
 

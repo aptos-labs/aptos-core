@@ -5,9 +5,7 @@ module 0x1::test {
         !b
     }
 
-    // `&&` / `||` are short-circuiting in Move: they compile to branches on
-    // the 1-byte boolean (JumpZeroByte / JumpNotZeroByte), not to the eager
-    // BoolAnd / BoolOr micro-ops.
+    // `&&` / `||` are short-circuiting in Move: they compile to branches.
     fun both(a: bool, b: bool): bool {
         a && b
     }

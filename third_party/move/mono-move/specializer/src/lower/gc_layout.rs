@@ -47,7 +47,7 @@ pub fn derive_frame_layout(
         .home_slots
         .iter()
         .take(func_ir.num_params as usize)
-        .last()
+        .next_back()
         .map(|s| s.offset.0 + s.size)
         .unwrap_or(0);
     // Is any pointer slot beyond the parameter region?

@@ -17,8 +17,8 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_fat_ptr,
-        write_ptr, write_u64, write_u8, MemoryRegion,
+        read_bool, read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr,
+        write_bool, write_fat_ptr, write_ptr, write_u64, write_u8, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
@@ -1457,8 +1457,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         self.exec_ctx.resource_provider(),
                         StorageKey::Resource(address, ty),
                     )?;
-                    // TODO(correctness): temporary hack to avoid boolean writes.
-                    write_u64(fp, dst, if exists { 1 } else { 0 });
+                    write_bool(fp, dst, exists);
                 },
 
                 MicroOp::BorrowGlobal { addr, ty, dst } => {
@@ -1524,13 +1523,16 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let result = int_cmp_bool(fp, op.lhs, op.op, &op.rhs);
                     write_u8(fp, op.dst, result as u8);
                 },
-                // Boolean slots should always hold `0` or `1`, so `^ 1` negates.
-                MicroOp::BoolNot { dst, src } => write_u8(fp, dst, read_u8(fp, src) ^ 1),
+                MicroOp::BoolNot { dst, src } => write_bool(fp, dst, !read_bool(fp, src)),
                 MicroOp::BoolAnd { dst, lhs, rhs } => {
-                    write_u8(fp, dst, read_u8(fp, lhs) & read_u8(fp, rhs))
+                    let left = read_bool(fp, lhs);
+                    let right = read_bool(fp, rhs);
+                    write_bool(fp, dst, left && right)
                 },
                 MicroOp::BoolOr { dst, lhs, rhs } => {
-                    write_u8(fp, dst, read_u8(fp, lhs) | read_u8(fp, rhs))
+                    let left = read_bool(fp, lhs);
+                    let right = read_bool(fp, rhs);
+                    write_bool(fp, dst, left || right)
                 },
             }
         }

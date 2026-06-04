@@ -338,9 +338,15 @@ pub struct IntCastOp {
     pub src: FrameOffset,
 }
 
-/// Comparison relation for [`super::MicroOp::IntCmp`].
-/// Ordering relations apply to signed and unsigned operands alike.
-/// Equality relations apply to any width.
+/// Comparison relation for [`super::MicroOp::IntCmp`]. `CmpKind` itself
+/// carries no type or width: the operands determine both, so one variant is
+/// reused across every type it applies to.
+///
+/// - Ordering variants (`Lt`/`Le`/`Gt`/`Ge`) apply to integer operands only;
+///   the operand's type decides whether the comparison is signed or unsigned.
+/// - Equality variants (`Eq`/`Neq`) apply to any flat value of any width —
+///   every integer width plus `bool` (1 byte) and `address` (32 bytes) —
+///   since they just compare bit patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CmpKind {
     Lt,

@@ -278,8 +278,7 @@ pub enum MicroOp {
     /// little-endian (LE) byte representation of the value:
     /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
     /// two's-complement) for signed. The 2/4-byte primitives (`u16`/`u32`/
-    /// `i16`/`i32`) are widened to 8 bytes by the lowerer; 1-byte types
-    /// (`u8`/`i8`/`bool`) use [`MicroOp::StoreImm1`] instead.
+    /// `i16`/`i32`) are widened to 8 bytes by the lowerer.
     StoreImm8 {
         dst: FrameOffset,
         imm: [u8; 8],
@@ -500,6 +499,10 @@ pub enum MicroOp {
 
     //======================================================================
     // Comparison & boolean logic (1-byte boolean results)
+    //======================================================================
+    // Invariant: every boolean slot read or written here holds exactly
+    // `0` (false) or `1` (true). Out-of-range values (2, 3, ...) are not
+    // valid booleans and are never produced by these ops.
     //======================================================================
     /// `dst = (lhs <op> rhs)`, writing a 1-byte boolean. See [`IntCmpOp`].
     IntCmp(IntCmpOp),
@@ -928,9 +931,8 @@ pub enum MicroOp {
     // address and `ty` the resource type. Reads and writes are tracked in the
     // per-transaction read-write set.
     //======================================================================
-    /// Write a boolean into the destination slot `dst`: whether a resource of
-    /// type `ty` exists at the address in `addr`. The boolean is currently
-    /// widened to 8 bytes.
+    /// Write a 1-byte boolean into the destination slot `dst`: whether a
+    /// resource of type `ty` exists at the address in `addr`.
     Exists {
         dst: FrameOffset,
         addr: FrameOffset,
