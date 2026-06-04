@@ -169,16 +169,16 @@ fn build_test_info(
     let mut out = Vec::with_capacity(row_count);
     for row in rows {
         let arguments = build_row_arguments(env, row.test_attr, &function, &fn_id_loc);
-        let test_name = if single_row {
+        let case_name = if single_row {
             fn_name_str.to_string()
         } else {
-            format!("{}#{}", fn_name_str, row.index)
+            format!("{}@row{}", fn_name_str, row.index)
         };
         let expected_failure = row
             .expected_failure_attr
             .and_then(|attr| parse_failure_attribute(env, current_module, attr));
-        out.push((test_name.clone(), TestCase {
-            function_name: test_name,
+        out.push((case_name, TestCase {
+            function_name: fn_name_str.to_string(),
             arguments,
             expected_failure,
         }));
@@ -264,6 +264,8 @@ fn build_test_rows<'a>(
     fn_id_loc: &Loc,
 ) -> Option<Vec<TestRow<'a>>> {
     let single_row = test_attrs.len() == 1;
+    let mut test_attrs = test_attrs.to_vec();
+    test_attrs.sort_by_key(|test| test.bracket_group_id());
     let mut rows = Vec::with_capacity(test_attrs.len());
     let mut has_error = false;
 
@@ -304,7 +306,7 @@ fn build_test_rows<'a>(
         }
     }
 
-    for (index, test_attr) in test_attrs.iter().copied().enumerate() {
+    for (index, test_attr) in test_attrs.into_iter().enumerate() {
         let same_bracket = failure_attrs
             .iter()
             .copied()

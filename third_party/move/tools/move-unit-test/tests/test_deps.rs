@@ -16,8 +16,8 @@ fn build_test_plan_from_source(source: &str) -> legacy_move_compiler::unit_test:
     let source_path = temp.path().join("case_identity.move");
     fs::write(&source_path, source).unwrap();
 
-    let mut config =
-        UnitTestingConfig::default().with_named_addresses(move_stdlib::move_stdlib_named_addresses());
+    let mut config = UnitTestingConfig::default()
+        .with_named_addresses(move_stdlib::move_stdlib_named_addresses());
     config.source_files = vec![source_path.to_string_lossy().into_owned()];
     config.dep_files = move_stdlib::move_stdlib_files();
     config.build_test_plan().unwrap()
@@ -79,12 +79,9 @@ fn parametric_rows_separate_case_and_function_identity_in_source_order() {
     for index in 0..11 {
         let test_case = module.tests.get(&format!("ordered@row{index}")).unwrap();
         assert_eq!(test_case.function_name, "ordered");
-        assert_eq!(
-            test_case.arguments,
-            vec![MoveValue::Address(
-                AccountAddress::from_hex_literal(&format!("0x{index:x}")).unwrap()
-            )]
-        );
+        assert_eq!(test_case.arguments, vec![MoveValue::Signer(
+            AccountAddress::from_hex_literal(&format!("0x{index:x}")).unwrap()
+        )]);
     }
 }
 
