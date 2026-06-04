@@ -30,12 +30,38 @@ use aptos_types::{
     },
     validator_txn::ValidatorTransaction,
 };
+use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
 use tokio::sync::oneshot;
+
+/// Dedicated rayon pools for each decryption pipeline stage. Splitting the
+/// stages prevents the latency-critical digest from queuing behind the
+/// throughput-heavy stages (eval_proofs ~80ms p90, prepare_ct, decrypt) under
+/// load. Sharing one pool across all four stages saturated it on a 100v forge
+/// run, pushing digest p90 back near the global-pool baseline; per-stage pools
+/// fix that by giving each stage its own thread budget.
+fn build_pool(name: &'static str, num_threads: usize) -> rayon::ThreadPool {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .thread_name(move |i| format!("{name}-{i}"))
+        .build()
+        .unwrap_or_else(|e| panic!("Failed to build {name} thread pool: {e}"))
+}
+
+/// Latency-critical, small (n=64 mult-tree + 65-pt MSM). 4 threads is enough.
+static DIGEST_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| build_pool("decryption-digest", 4));
+/// Heaviest stage (O(n^2 log n) FK-style proofs); benefits from more threads.
+static EVAL_PROOFS_POOL: Lazy<rayon::ThreadPool> =
+    Lazy::new(|| build_pool("decryption-eval-proofs", 16));
+/// Per-ciphertext pairings; parallel over ciphertexts.
+static PREPARE_CT_POOL: Lazy<rayon::ThreadPool> =
+    Lazy::new(|| build_pool("decryption-prepare-ct", 16));
+/// Final per-ciphertext decrypt pass.
+static DECRYPT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| build_pool("decryption-decrypt", 16));
 
 impl PipelineBuilder {
     /// Precondition: Block is materialized and the transactions are available locally
@@ -347,8 +373,10 @@ async fn decrypt_validator_path(
     let (txn_ciphertexts, digest, proofs_promise) = tokio::task::spawn_blocking(move || {
         monitor!(
             "decryption_digest",
-            FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)
-                .map(|(digest, proofs_promise)| (txn_ciphertexts, digest, proofs_promise))
+            DIGEST_POOL.install(|| {
+                FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)
+                    .map(|(digest, proofs_promise)| (txn_ciphertexts, digest, proofs_promise))
+            })
         )
     })
     .await
@@ -386,7 +414,8 @@ async fn decrypt_validator_path(
     let proofs = monitor!(
         "decryption_eval_proofs",
         tokio::task::spawn_blocking(move || {
-            FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
+            EVAL_PROOFS_POOL
+                .install(|| FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key))
         })
         .await
         .map_err(|e| anyhow!("proof computation panicked: {e}"))?
@@ -400,17 +429,19 @@ async fn decrypt_validator_path(
         tokio::task::spawn_blocking(move || {
             monitor!(
                 "decryption_prepare_ct",
-                txn_ciphertexts
-                    .into_par_iter()
-                    .map(|ciphertext| {
-                        let prepared_or_err =
-                            FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
-                        let id: Id = prepared_or_err
-                            .as_ref()
-                            .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
-                        (id, prepared_or_err)
-                    })
-                    .collect::<Vec<_>>()
+                PREPARE_CT_POOL.install(|| {
+                    txn_ciphertexts
+                        .into_par_iter()
+                        .map(|ciphertext| {
+                            let prepared_or_err =
+                                FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
+                            let id: Id = prepared_or_err
+                                .as_ref()
+                                .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+                            (id, prepared_or_err)
+                        })
+                        .collect::<Vec<_>>()
+                })
             )
         })
     };
@@ -476,7 +507,8 @@ async fn decrypt_validator_path(
     let num_failed_decryptions = AtomicUsize::new(0);
     let decrypted_txns: Vec<_> = monitor!(
         "decryption_decrypt",
-        encrypted_txns
+        DECRYPT_POOL.install(|| {
+            encrypted_txns
             .into_par_iter()
             .zip(prepared_cts.into_par_iter())
             .map(|(mut txn, (id, prepared_ciphertext_or_error))| {
@@ -536,6 +568,7 @@ async fn decrypt_validator_path(
                 }
             })
             .collect()
+        })
     );
 
     let num_failed = num_failed_decryptions.into_inner();
