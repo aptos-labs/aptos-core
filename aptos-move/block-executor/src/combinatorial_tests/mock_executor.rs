@@ -900,6 +900,15 @@ where
         HashSet::new()
     }
 
+    fn hotness_reads(&self) -> std::collections::BTreeSet<K> {
+        // Hotness observation is not exercised by the mock executor tests.
+        std::collections::BTreeSet::new()
+    }
+
+    fn hotness_writes(&self) -> std::collections::BTreeSet<K> {
+        std::collections::BTreeSet::new()
+    }
+
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }

@@ -500,7 +500,7 @@ fn walk_spec_exp(exp: &Exp, ctx: &SpecContext, diags: &mut Diagnostics) {
         },
         Exp_::Block(seq) => walk_spec_sequence(seq, ctx, diags),
         Exp_::Spec(spec_block) => walk_spec_block(spec_block, diags),
-        Exp_::Quant(_, binds, triggers, where_cond, body) => {
+        Exp_::Quant(_, binds, triggers, _, where_cond, body) => {
             for bind in &binds.value {
                 walk_spec_exp(&bind.value.1, ctx, diags);
             }

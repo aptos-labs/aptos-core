@@ -13,7 +13,7 @@ use crate::{
     },
     stackless_exec_ir::{instr_utils::nominal_type_in_instr, FunctionIR, Instr, ModuleIR},
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use mono_move_core::{
     align_up_u32,
     interner::{InternedIdentifier, InternedModuleId},
@@ -23,40 +23,35 @@ use mono_move_core::{
         Type, EMPTY_TYPE_LIST,
     },
     Code, CodeOffset, DescriptorId, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner,
-    MicroOpGasSchedule, PreparedModule, SafePointEntry, SortedSafePointEntries,
-    FRAME_METADATA_SIZE,
+    MicroOpGasSchedule, PreparedModule, SafePointEntry, SizedSlot, SortedSafePointEntries,
+    FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
-/// Minimum slot alignment supported by the current micro-op set.
-///
-/// Micro-ops like `StoreImm8`, `Move8`, `AddU64`, etc. read/write a fixed
-/// 8 bytes regardless of the IR-level type's actual size, so any slot whose
-/// alignment is less than 8 (`u8`/`u16`/`u32`/`bool`) would be silently
-/// overrun by adjacent-slot data. The same constraint also keeps
-/// `args_and_locals_size` 8-aligned, which keeps `callee_base = caller's
-/// args_and_locals_size + FRAME_METADATA_SIZE` 8-aligned and the metadata
-/// `write_u64`s well-defined. Until we have proper small-type micro-ops,
-/// the lowering refuses to handle slots with `align < MIN_SLOT_ALIGN`.
-const MIN_SLOT_ALIGN: u32 = 8;
+/// Alignment the frame's data region (params + locals + scratch) is rounded to.
+const FRAME_ALIGN: u32 = MAX_ALIGN as u32;
 
-fn check_supported_alignment<T>(
-    slots: &[T],
-    align_of: impl Fn(&T) -> u32,
-    context: &str,
-) -> Result<()> {
-    if let Some(bad_align) = slots.iter().map(align_of).find(|&a| a < MIN_SLOT_ALIGN) {
-        bail!(
-            "{}: slot align {} < {} not yet supported (u64-aligned types only)",
-            context,
-            bad_align,
-            MIN_SLOT_ALIGN
-        );
-    }
-    Ok(())
+/// Largest value alignment: alignment is capped at 8 even for values wider
+/// than 8 bytes.
+const FULL_WORD_ALIGN: u32 = 8;
+
+/// Whether the lowering can load/store a slot of this alignment
+/// width-correctly: currently only 1-byte and full-word (8-byte) alignments.
+fn slot_align_supported(align: u32) -> bool {
+    align == 1 || align >= FULL_WORD_ALIGN
 }
+
+/// `true` iff every slot's alignment is currently lowerable. See
+/// [`slot_align_supported`].
+fn slot_aligns_supported<T>(slots: &[T], align_of: impl Fn(&T) -> u32) -> bool {
+    slots.iter().map(align_of).all(slot_align_supported)
+}
+
+/// Reason string used when a function is skipped for using a slot of an
+/// alignment the lowering cannot yet handle.
+const UNSUPPORTED_ALIGN_SKIP: &str = "slot alignment 2/4 (e.g. u16/u32) not yet supported";
 
 /// Returns the (size, alignment) of a concrete interned type, or None if the
 /// type is not concrete (e.g., contains type parameters or unresolved structs).
@@ -144,10 +139,9 @@ impl LoweringContext<'_> {
 /// context was built, or the function is intentionally skipped with a
 /// human-readable reason for display in the snapshot baseline.
 ///
-/// Distinct from the `Err` return: alignment failures and other
-/// internal-invariant violations stay on the `Err` path because they
-/// indicate a real bug. `Skipped` is reserved for "this function is
-/// out of scope for the current lowering, on purpose."
+/// Distinct from the `Err` return: internal-invariant violations stay on
+/// the `Err` path because they indicate a real bug. `Skipped` is reserved
+/// for "this function is out of scope for the current lowering, on purpose".
 pub enum BuildContextOutcome<'a> {
     Built(LoweringContext<'a>),
     Skipped(&'static str),
@@ -170,10 +164,8 @@ pub enum LoweringOutcome {
 ///
 /// - `Ok(Built(ctx))` on success.
 /// - `Ok(Skipped(reason))` if any type can't be handled — the reason
-///   is a short label shown in the snapshot baseline (e.g.
-///   "not all types are concrete", "nominal type not yet supported").
-/// - `Err(_)` for unsupported alignments and other internal-invariant
-///   failures.
+///   is a short label shown in the snapshot baseline.
+/// - `Err(_)` for internal-invariant failures (real bugs).
 pub fn try_build_context<'a>(
     module_ir: &'a ModuleIR,
     func_ir: &FunctionIR,
@@ -210,14 +202,16 @@ pub fn try_build_context<'a>(
             "nominal type not yet supported by gc_layout",
         ));
     }
-    check_supported_alignment(&home_slots, |s| s.align, "home slot")?;
-    // `frame_data_size` must be `MIN_SLOT_ALIGN`-aligned so that
+    if !slot_aligns_supported(&home_slots, |s| s.align) {
+        return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
+    }
+    // `frame_data_size` must be `FRAME_ALIGN`-aligned so that
     // `callee_base = frame_data_size + FRAME_METADATA_SIZE` is also
     // aligned (the runtime writes saved pc/fp/func_id as `u64`s
     // starting at `frame_data_size`).
     let mut frame_data_size = align_up_u32(
         home_slots.last().map(|s| s.offset.0 + s.size).unwrap_or(0),
-        MIN_SLOT_ALIGN,
+        FRAME_ALIGN,
     );
 
     // 2. Build `return_slots` from this function's own signature.
@@ -234,7 +228,9 @@ pub fn try_build_context<'a>(
             "nominal type not yet supported by gc_layout",
         ));
     }
-    check_supported_alignment(&return_slots, |s| s.align, "return slot")?;
+    if !slot_aligns_supported(&return_slots, |s| s.align) {
+        return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
+    }
 
     // The return values are written at offsets [0, ret_size) of the function's
     // own frame. They share storage with the args/locals region (the calling
@@ -247,7 +243,7 @@ pub fn try_build_context<'a>(
             .last()
             .map(|s| s.offset.0 + s.size)
             .unwrap_or(0),
-        MIN_SLOT_ALIGN,
+        FRAME_ALIGN,
     );
     if ret_end > frame_data_size {
         frame_data_size = ret_end;
@@ -272,8 +268,8 @@ pub fn try_build_context<'a>(
     //    return values in the bytecode verifier.
     let max_value_width: u32 = return_slots.iter().map(|s| s.size).max().unwrap_or(0);
     let scratch = if return_slots.len() >= 2 && max_value_width > 0 {
-        let offset = align_up_u32(frame_data_size, MIN_SLOT_ALIGN);
-        let size = align_up_u32(max_value_width, MIN_SLOT_ALIGN);
+        let offset = align_up_u32(frame_data_size, FRAME_ALIGN);
+        let size = align_up_u32(max_value_width, FRAME_ALIGN);
         frame_data_size = offset + size;
         Some(FrameOffset(offset))
     } else {
@@ -318,8 +314,11 @@ pub fn try_build_context<'a>(
                 "nominal type not yet supported by gc_layout",
             ));
         }
-        check_supported_alignment(&arg_slots, |s| s.slot.align, "callee arg")?;
-        check_supported_alignment(&ret_slots, |s| s.slot.align, "callee ret")?;
+        if !slot_aligns_supported(&arg_slots, |s| s.slot.align)
+            || !slot_aligns_supported(&ret_slots, |s| s.slot.align)
+        {
+            return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
+        }
 
         let callee_handle = module_ir.module.function_handle_at(handle_idx);
         let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
@@ -496,9 +495,13 @@ pub fn try_lower_function(
     // net for now.
     safe_points.sort_by_key(|e| e.code_offset.0);
 
-    let param_sizes = ctx.home_slots[..func_ir.num_params as usize]
+    // Per-parameter (offset, size), in declaration order.
+    let param_slots = ctx.home_slots[..func_ir.num_params as usize]
         .iter()
-        .map(|s| s.size)
+        .map(|s| SizedSlot {
+            offset: s.offset,
+            size: s.size,
+        })
         .collect::<Vec<_>>();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
     let extended_frame_size = ctx
@@ -520,8 +523,8 @@ pub fn try_lower_function(
     Ok(LoweringOutcome::Built(Function {
         name,
         code: Code::from_vec(code),
-        param_sizes,
-        param_sizes_sum: derived.param_sizes_sum as usize,
+        param_slots,
+        param_region_size: derived.param_region_size as usize,
         param_and_local_sizes_sum,
         extended_frame_size,
         zero_frame: derived.zero_frame,

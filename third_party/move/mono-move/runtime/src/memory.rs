@@ -67,6 +67,38 @@ pub unsafe fn read_u8(base: *const u8, byte_offset: impl Into<usize>) -> u8 {
 }
 
 /// # Safety
+/// `base.add(byte_offset)` must be valid and writable for a `u8`.
+#[inline(always)]
+pub unsafe fn write_u8(base: *mut u8, byte_offset: impl Into<usize>, val: u8) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { base.add(byte_offset.into()).write(val) }
+}
+
+/// Read a boolean slot. The slot invariant is that it holds exactly `0` or
+/// `1`; the `debug_assert` catches any violation in debug builds.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid and point to an initialized boolean
+/// byte.
+#[inline(always)]
+pub unsafe fn read_bool(base: *const u8, byte_offset: impl Into<usize>) -> bool {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    let byte = unsafe { read_u8(base, byte_offset) };
+    debug_assert!(byte <= 1, "boolean slot holds non-boolean byte {byte}");
+    byte != 0
+}
+
+/// Write a boolean slot as the canonical `0`/`1` byte.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid and writable for a boolean byte.
+#[inline(always)]
+pub unsafe fn write_bool(base: *mut u8, byte_offset: impl Into<usize>, val: bool) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { write_u8(base, byte_offset, val as u8) }
+}
+
+/// # Safety
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u64`.
 #[inline(always)]
 pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {

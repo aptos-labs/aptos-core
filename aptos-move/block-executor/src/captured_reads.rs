@@ -1247,6 +1247,15 @@ where
 
         ret
     }
+
+    /// Module reads as concrete state keys, for hot-state accumulation. The VM-boundary recorder
+    /// cannot observe module loads (they are served by the code/module cache), so module hotness is
+    /// sourced here, where reads are tracked regardless of cache hit.
+    pub(crate) fn module_read_keys(&self) -> impl Iterator<Item = T::Key> + '_ {
+        self.module_reads
+            .keys()
+            .map(|key| T::Key::from_address_and_module_name(key.address(), key.name()))
+    }
 }
 
 #[derive(Derivative)]
@@ -1291,6 +1300,14 @@ where
         }
 
         ret
+    }
+
+    /// Module reads as concrete state keys, for hot-state accumulation. See the parallel
+    /// `CapturedReads::module_read_keys` for why module hotness is sourced from here.
+    pub(crate) fn module_read_keys(&self) -> impl Iterator<Item = T::Key> + '_ {
+        self.module_reads
+            .iter()
+            .map(|key| T::Key::from_address_and_module_name(key.address(), key.name()))
     }
 }
 

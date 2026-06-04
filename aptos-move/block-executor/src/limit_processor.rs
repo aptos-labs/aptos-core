@@ -4,7 +4,7 @@
 use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
-use aptos_logger::{info, warn};
+use aptos_logger::info;
 use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     fee_statement::FeeStatement,
@@ -14,6 +14,7 @@ use aptos_types::{
         BlockExecutableTransaction as Transaction,
     },
 };
+use aptos_vm_types::hotness_summary::TxnHotnessSummary;
 use claims::{assert_le, assert_none};
 use once_cell::sync::Lazy;
 use std::{collections::BTreeSet, env, time::Instant};
@@ -42,11 +43,13 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     pub fn new(
         block_gas_limit_type: BlockGasLimitType,
         block_gas_limit_override: Option<u64>,
+        hotness_in_epilogue: bool,
         init_size: usize,
     ) -> Self {
-        let hot_state_op_accumulator = block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-            .then(BlockHotStateOpAccumulator::new);
+        // Hotness accumulation is gated solely on `hotness_in_epilogue` (the feature that decides
+        // whether hotness is persisted in the block epilogue), independent of conflict accounting
+        // (`conflict_penalty_window`) or `add_block_limit_outcome_onchain`.
+        let hot_state_op_accumulator = hotness_in_epilogue.then(BlockHotStateOpAccumulator::new);
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -69,11 +72,14 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         fee_statement: FeeStatement,
         txn_read_write_summary: Option<ReadWriteSummary<T>>,
         approx_output_size: Option<u64>,
+        txn_hotness_summary: Option<TxnHotnessSummary<T::Key>>,
     ) {
         self.accumulated_fee_statement
             .add_fee_statement(&fee_statement);
         self.txn_fee_statements.push(fee_statement);
 
+        // Conflict accounting: driven by Block-STM's conflict-oriented `ReadWriteSummary` and gated
+        // on `conflict_penalty_window`. This is intentionally unchanged by the hotness migration.
         let conflict_multiplier = if let Some(conflict_overlap_length) =
             self.block_gas_limit_type.conflict_penalty_window()
         {
@@ -91,15 +97,27 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
-            }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
             assert_none!(txn_read_write_summary);
             1
         };
+
+        // Hotness accumulation: driven by the deterministic VM-boundary access summary and gated on
+        // `hotness_in_epilogue` (i.e. whether `hot_state_op_accumulator` was instantiated), fully
+        // decoupled from conflict accounting above.
+        if let Some(accumulator) = &mut self.hot_state_op_accumulator {
+            let txn_hotness_summary = txn_hotness_summary.expect(
+                "txn_hotness_summary needs to be computed if hotness accumulation is enabled",
+            );
+            accumulator.add_transaction(
+                txn_hotness_summary.keys_written(),
+                txn_hotness_summary.keys_read(),
+            );
+        } else {
+            assert_none!(txn_hotness_summary);
+        }
 
         // When the accumulated execution and io gas of the committed txns exceeds
         // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
@@ -304,10 +322,8 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 
     fn get_keys_to_make_hot(&self) -> BTreeSet<T::Key> {
-        if self.hot_state_op_accumulator.is_none() {
-            warn!("BlockHotStateOpAccumulator is not set.");
-        }
-
+        // `None` is the normal state when `hotness_in_epilogue` is disabled; in that case the
+        // epilogue is V1 and carries no persisted hotness, so an empty set is expected.
         self.hot_state_op_accumulator
             .as_ref()
             .map(|x| x.get_keys_to_make_hot())
@@ -346,9 +362,9 @@ mod test {
 
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, 10);
+        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, false, 10);
         // Assert passing none here doesn't panic.
-        processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, None, None);
         assert!(!processor.should_end_block_parallel());
     }
 
@@ -370,13 +386,13 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, false, 10);
 
-        processor.accumulate_fee_statement(execution_fee(10), None, None);
+        processor.accumulate_fee_statement(execution_fee(10), None, None, None);
         assert!(!processor.should_end_block_parallel());
-        processor.accumulate_fee_statement(execution_fee(50), None, None);
+        processor.accumulate_fee_statement(execution_fee(50), None, None, None);
         assert!(!processor.should_end_block_parallel());
-        processor.accumulate_fee_statement(execution_fee(40), None, None);
+        processor.accumulate_fee_statement(execution_fee(40), None, None, None);
         assert!(processor.should_end_block_parallel());
     }
 
@@ -396,12 +412,12 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), 10);
+        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), false, 10);
 
-        processor.accumulate_fee_statement(execution_fee(60), None, None);
+        processor.accumulate_fee_statement(execution_fee(60), None, None, None);
         assert!(!processor.should_end_block_parallel());
         // After 110 raw gas, the clamped (=100) onchain cap must trigger early halt.
-        processor.accumulate_fee_statement(execution_fee(50), None, None);
+        processor.accumulate_fee_statement(execution_fee(50), None, None, None);
         assert!(processor.should_end_block_parallel());
     }
 
@@ -420,11 +436,11 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, Some(50), 10);
+        let mut processor = TestProcessor::new(block_gas_limit, Some(50), false, 10);
 
-        processor.accumulate_fee_statement(execution_fee(20), None, None);
+        processor.accumulate_fee_statement(execution_fee(20), None, None, None);
         assert!(!processor.should_end_block_parallel());
-        processor.accumulate_fee_statement(execution_fee(40), None, None);
+        processor.accumulate_fee_statement(execution_fee(40), None, None, None);
         assert!(processor.should_end_block_parallel());
     }
 
@@ -432,11 +448,11 @@ mod test {
     fn test_override_when_onchain_is_no_limit() {
         // When the onchain config has no cap, the override applies as given:
         // there is no protocol cap to enforce, and Byzantine-amplification is moot.
-        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), 10);
+        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), false, 10);
 
-        processor.accumulate_fee_statement(execution_fee(20), None, None);
+        processor.accumulate_fee_statement(execution_fee(20), None, None, None);
         assert!(!processor.should_end_block_parallel());
-        processor.accumulate_fee_statement(execution_fee(40), None, None);
+        processor.accumulate_fee_statement(execution_fee(40), None, None, None);
         assert!(processor.should_end_block_parallel());
     }
 
@@ -454,15 +470,15 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, false, 10);
 
-        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10), None);
         assert_eq!(processor.accumulated_approx_output_size, 10);
         assert!(!processor.should_end_block_parallel());
-        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(50));
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(50), None);
         assert_eq!(processor.accumulated_approx_output_size, 60);
         assert!(!processor.should_end_block_parallel());
-        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(40));
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(40), None);
         assert_eq!(processor.accumulated_approx_output_size, 100);
         assert!(processor.should_end_block_parallel());
     }
@@ -492,7 +508,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, false, 10);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -500,6 +516,7 @@ mod test {
                 to_map(&[InputOutputKey::Resource(1)]),
                 to_map(&[InputOutputKey::Resource(1)]),
             )),
+            None,
             None,
         );
         assert_eq!(1, processor.compute_conflict_multiplier(8));
@@ -512,6 +529,7 @@ mod test {
                 to_map(&[InputOutputKey::Group(1, 1)]),
             )),
             None,
+            None,
         );
         assert_eq!(2, processor.compute_conflict_multiplier(8));
         assert_eq!(processor.accumulated_effective_block_gas, 30);
@@ -523,6 +541,7 @@ mod test {
                 to_map(&[InputOutputKey::Group(2, 1)]),
             )),
             None,
+            None,
         );
         assert_eq!(1, processor.compute_conflict_multiplier(8));
         assert_eq!(processor.accumulated_effective_block_gas, 40);
@@ -533,6 +552,7 @@ mod test {
                 to_map(&[InputOutputKey::Group(2, 2)]),
                 to_map(&[InputOutputKey::Group(2, 2)]),
             )),
+            None,
             None,
         );
         assert_eq!(2, processor.compute_conflict_multiplier(8));
@@ -554,7 +574,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, false, 10);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(
@@ -563,6 +583,7 @@ mod test {
                 to_map(&[InputOutputKey::Group(2, 1)]),
                 to_map(&[InputOutputKey::Group(2, 1)]),
             )),
+            None,
             None,
         );
         assert_eq!(1, processor.compute_conflict_multiplier(8));
@@ -574,6 +595,7 @@ mod test {
                 to_map(&[InputOutputKey::Group(2, 2)]),
                 to_map(&[InputOutputKey::Group(2, 2)]),
             )),
+            None,
             None,
         );
         assert_eq!(1, processor.compute_conflict_multiplier(8));

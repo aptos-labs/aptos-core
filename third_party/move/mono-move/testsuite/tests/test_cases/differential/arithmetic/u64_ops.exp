@@ -256,9 +256,23 @@ fun bit_xor() {
     3: Return
 }
 
-fun shl_values(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun shl_values() {
+  frame_data_size: 24
+  code:
+    0: Charge #7
+    1: ShlU64 [16] <- [0] << [8]
+    2: Move8 [0] <- [16]
+    3: Return
+}
 
-fun shr_values(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun shr_values() {
+  frame_data_size: 24
+  code:
+    0: Charge #7
+    1: ShrU64 [16] <- [0] >> [8]
+    2: Move8 [0] <- [16]
+    3: Return
+}
 
 fun mul_imm() {
   frame_data_size: 16

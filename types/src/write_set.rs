@@ -736,9 +736,10 @@ impl WriteSet {
                 |a, b| a.0.cmp(b.0),
             )
             .map(|entry| {
-                // It seems like it's possible to have a key that is both in `value` and `hotness`
-                // (possibly due to inaccurate read write summary). If this happens we discard the
-                // hotness change, since the recently written keys will be made hot anyway.
+                // A key should not normally appear in both `value` and `hotness`: the block
+                // accumulator drops written keys from the promotion set, and the epilogue removes
+                // its own writes too. This dedup remains as a safety net — if it ever happens we
+                // discard the hotness change, since a written key is made hot by the write anyway.
                 match entry {
                     EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
                     EitherOrBoth::Both(e, _) => e,

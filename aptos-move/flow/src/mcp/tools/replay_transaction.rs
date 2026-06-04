@@ -4,9 +4,12 @@
 //! Replay a committed on-chain Aptos transaction locally, optionally with
 //! local Move package module overrides.
 
-use super::super::{
-    common::{mcp_err, tool_error},
-    session::{into_call_tool_result, FlowSession},
+use super::{
+    super::{
+        common::{mcp_err, mcp_invalid, tool_error},
+        session::{into_call_tool_result, FlowSession},
+    },
+    replay_tracing::{CaptureOpts, TraceCapture, TraceRecorder, TracingDebugger},
 };
 use aptos_cli_common::format_txn_status;
 use aptos_framework::{BuildOptions, BuiltPackage};
@@ -67,6 +70,62 @@ struct MoveReplayTransactionParams {
     /// Optional: API key sent as `Authorization: Bearer <key>`.
     #[serde(default)]
     node_api_key: Option<String>,
+    /// When true, capture a structured trace into the response. Adds
+    /// exactly one `state_view { version, with_overrides }` entry per
+    /// replay (whichever path the simulator took). Off by default; the
+    /// wrapper costs one extra indirection on every storage read.
+    #[serde(default)]
+    trace: bool,
+    /// When true, additionally record one `storage_read` entry per
+    /// state-view read. Off by default because a single replay typically
+    /// issues hundreds of reads, which crowd out the single `state_view`
+    /// event. Only consulted when `trace` is true.
+    #[serde(default)]
+    trace_storage_reads: bool,
+    /// Maximum number of trace entries before truncation. Defaults to 500.
+    /// Only consulted when `trace` is true.
+    #[serde(default = "default_max_trace_events")]
+    max_trace_events: usize,
+    /// When true, `storage_read` trace entries omit the `Debug`-formatted
+    /// `StateKey`. Defaults to true. Only consulted when both `trace` and
+    /// `trace_storage_reads` are true.
+    #[serde(default = "default_redact")]
+    redact_storage_keys: bool,
+}
+
+fn default_max_trace_events() -> usize {
+    500
+}
+
+fn default_redact() -> bool {
+    true
+}
+
+/// Server-side ceiling on `max_trace_events`. Generous enough for the
+/// documented "raise it to a few thousand when capturing storage reads"
+/// workflow, low enough that a malicious or buggy caller cannot drive
+/// unbounded recorder growth. Each entry is at most a few hundred bytes,
+/// so 100k entries bounds the recorder at ~tens of MB.
+const MAX_TRACE_EVENTS_CAP: usize = 100_000;
+
+/// Validate the user-supplied capture knobs. Only called when `trace` is
+/// enabled; the other fields are unused otherwise and would needlessly
+/// reject valid requests that left their defaults in place.
+fn validate_capture_opts(max_trace_events: usize) -> Result<(), String> {
+    if max_trace_events == 0 {
+        return Err(
+            "max_trace_events must be >= 1 when trace is enabled: a value of 0 would \
+             drop the guaranteed `state_view` event"
+                .to_string(),
+        );
+    }
+    if max_trace_events > MAX_TRACE_EVENTS_CAP {
+        return Err(format!(
+            "max_trace_events ({}) exceeds the server-side cap of {}",
+            max_trace_events, MAX_TRACE_EVENTS_CAP,
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
@@ -90,11 +149,14 @@ struct ReplayResponse {
     gas_unit_price: u64,
     /// True when local_package_paths was non-empty (replay diverged from on-chain).
     local_override_in_use: bool,
+    /// Captured trace entries; only present when the request set `trace: true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trace: Option<TraceCapture>,
 }
 
 #[derive(Debug, serde::Serialize, schemars::JsonSchema, PartialEq, Eq)]
 struct AbortDetails {
-    /// "0xADDR::module_name" or "script".
+    /// `"0xADDR::module_name"` for module aborts, `"script"` for the script variant.
     location: String,
     /// Raw abort code from the Move source.
     code: u64,
@@ -108,7 +170,7 @@ struct AbortDetails {
 
 #[derive(Debug, serde::Serialize, schemars::JsonSchema, PartialEq, Eq)]
 struct ExecutionFailureDetails {
-    /// "0xADDR::module_name" or "script".
+    /// Same format as [`AbortDetails::location`].
     location: String,
     /// Function index within the module.
     function: u16,
@@ -116,8 +178,6 @@ struct ExecutionFailureDetails {
     code_offset: u16,
 }
 
-/// Format an `AbortLocation` as `"0xADDR::module_name"` (for `Module` variants) or
-/// `"script"` (for the `Script` variant).
 fn format_abort_location(loc: &AbortLocation) -> String {
     match loc {
         AbortLocation::Module(m) => format!("{}::{}", m.address().to_hex_literal(), m.name()),
@@ -212,21 +272,23 @@ fn validate_named_addresses(
         .collect()
 }
 
+/// Construct an `AptosDebugger` against the given parsed REST endpoint.
+/// Returns it as an `Arc<dyn MoveDebugger>` so the orchestrator can both
+/// hand a clone to the [`TracingDebugger`] wrapper and call the inner
+/// debugger directly for post-execution materialization.
 fn build_debugger(
-    network: &str,
+    base_url: AptosBaseUrl,
     node_api_key: Option<&str>,
-) -> Result<Box<dyn MoveDebugger>, String> {
-    let base_url = parse_network(network)?;
+) -> Result<Arc<dyn MoveDebugger>, rmcp::ErrorData> {
     let mut builder = Client::builder(base_url);
     if let Some(key) = node_api_key {
         builder = builder
             .api_key(key)
-            .map_err(|e| format!("invalid node_api_key: {}", e))?;
+            .map_err(|e| mcp_invalid(format!("invalid node_api_key: {}", e)))?;
     }
-    let client = builder.build();
-    let debugger = AptosDebugger::rest_client(client)
-        .map_err(|e| format!("failed to construct debugger: {}", e))?;
-    Ok(Box::new(debugger))
+    let debugger = AptosDebugger::rest_client(builder.build())
+        .map_err(|e| mcp_err(format!("failed to construct debugger: {}", e)))?;
+    Ok(Arc::new(debugger))
 }
 
 /// Compile each local Move package and collect the resulting modules into a
@@ -322,6 +384,7 @@ fn build_response(
     txn_output: TransactionOutput,
     vm_status: &VMStatus,
     local_override_in_use: bool,
+    trace: Option<TraceCapture>,
 ) -> ReplayResponse {
     let status = txn_output.status();
     let exec_status_opt = match status {
@@ -341,13 +404,14 @@ fn build_response(
         vm_status: format_txn_status(status, vm_status),
         abort,
         execution_failure,
-        transaction_hash: format!("{}", txn.committed_hash()),
+        transaction_hash: txn.committed_hash().to_string(),
         version,
         sender: txn.sender().to_hex_literal(),
         sequence_number,
         gas_used: txn_output.gas_used(),
         gas_unit_price: txn.gas_unit_price(),
         local_override_in_use,
+        trace,
     }
 }
 
@@ -363,14 +427,19 @@ impl FlowSession {
             params.local_package_paths.len()
         );
 
-        // Validate inputs up front so errors are clear and cheap.
-        parse_network(&params.network).map_err(mcp_err)?;
-        let pkg_paths = validate_package_paths(&params.local_package_paths).map_err(mcp_err)?;
-        let named = validate_named_addresses(&params.named_addresses).map_err(mcp_err)?;
+        // Validate user-supplied inputs up front. These are categorized as
+        // `invalid_params` so the MCP client can distinguish them from
+        // runtime failures further down.
+        let base_url = parse_network(&params.network).map_err(mcp_invalid)?;
+        let pkg_paths = validate_package_paths(&params.local_package_paths).map_err(mcp_invalid)?;
+        let named = validate_named_addresses(&params.named_addresses).map_err(mcp_invalid)?;
+        if params.trace {
+            validate_capture_opts(params.max_trace_events).map_err(mcp_invalid)?;
+        }
 
-        // Build the debugger up here so connection errors surface before we touch the VM.
-        let debugger =
-            build_debugger(&params.network, params.node_api_key.as_deref()).map_err(mcp_err)?;
+        // Build the debugger eagerly: we need it for both the async fetch
+        // below and the blocking VM run inside `spawn_blocking`.
+        let debugger = build_debugger(base_url, params.node_api_key.as_deref())?;
 
         // Fetch the transaction (async, network I/O).
         let txn_id = params.txn_id;
@@ -379,42 +448,47 @@ impl FlowSession {
             .await
             .map_err(|e| mcp_err(format!("failed to fetch transaction {}: {}", txn_id, e)))?;
 
-        // Reject system transactions: only user transactions are supported here.
-        let user_txn = match txn {
-            Transaction::UserTransaction(t) => t,
-            other => {
-                let variant = match other {
-                    Transaction::GenesisTransaction(_) => "Genesis",
-                    Transaction::BlockMetadata(_) => "BlockMetadata",
-                    Transaction::BlockMetadataExt(_) => "BlockMetadataExt",
-                    Transaction::BlockEpilogue(_) => "BlockEpilogue",
-                    Transaction::StateCheckpoint(_) => "StateCheckpoint",
-                    Transaction::ValidatorTransaction(_) => "ValidatorTransaction",
-                    Transaction::UserTransaction(_) => unreachable!(),
-                };
-                return Err(mcp_err(format!(
-                    "transaction at version {} is a {} transaction; only user transactions are supported. \
-                     Use `aptos move replay` directly for system transactions.",
-                    txn_id, variant
-                )));
-            },
-        };
+        let user_txn = require_user_transaction(txn, txn_id)?;
         let hash = user_txn.committed_hash();
 
         let local_override_in_use = !pkg_paths.is_empty();
         let tool_timeout = self.tool_timeout();
 
-        // Offload VM execution (and any local-package compilation) to a blocking thread.
+        // Build a recorder iff tracing was requested. The wrapper around
+        // the debugger holds a clone of this `Arc`; we drop the wrapper
+        // before `into_capture` so `Arc::try_unwrap` is guaranteed to
+        // succeed.
+        let recorder = params.trace.then(|| {
+            TraceRecorder::new(CaptureOpts {
+                max_events: params.max_trace_events,
+                record_storage_reads: params.trace_storage_reads,
+                redact_storage_keys: params.redact_storage_keys,
+            })
+        });
+
+        // Offload VM execution (and any local-package compilation) to a
+        // blocking thread.
         let result = tokio::time::timeout(
             tool_timeout,
             tokio::task::spawn_blocking(move || -> Result<ReplayResponse, String> {
+                // The wrapper, if any, holds an `Arc` clone of the inner
+                // debugger. The bare `inner` Arc lets the materialization
+                // step bypass the wrapper so it does not pollute the trace.
+                let wrapper: Option<TracingDebugger> = recorder
+                    .clone()
+                    .map(|rec| TracingDebugger::new(Arc::clone(&debugger), rec));
+                let vm_debugger: &dyn MoveDebugger = match &wrapper {
+                    Some(w) => w,
+                    None => debugger.as_ref(),
+                };
+
                 let (vm_status, vm_output) = if local_override_in_use {
                     let (overrides, locator) = build_local_overrides(&pkg_paths, &named)?;
                     let overrides = Arc::new(overrides);
                     let locator: Arc<dyn move_vm_runtime::source_locator::SourceLocator> =
                         Arc::new(locator);
                     aptos_move_cli::local_simulation::run_transaction_with_local_overrides(
-                        debugger.as_ref(),
+                        vm_debugger,
                         txn_id,
                         user_txn.clone(),
                         aux_info,
@@ -424,7 +498,7 @@ impl FlowSession {
                     .map_err(|e| format!("VM execution failed: {}", e))?
                 } else {
                     aptos_move_cli::local_simulation::run_transaction_using_debugger(
-                        debugger.as_ref(),
+                        vm_debugger,
                         txn_id,
                         user_txn.clone(),
                         hash,
@@ -433,12 +507,41 @@ impl FlowSession {
                     .map_err(|e| format!("VM execution failed: {}", e))?
                 };
 
+                // Drop the wrapper so `into_capture` below has the sole
+                // `Arc<TraceRecorder>` clone. Materialization uses the
+                // unwrapped `debugger` directly, so dropping the wrapper
+                // first does not affect it.
+                drop(wrapper);
+
                 // Materialize the VMOutput so we can read gas + status.
+                // Use the unwrapped `debugger` so this call does not
+                // pollute the trace with an extra state-view event.
                 let state_view = debugger.state_view_at_version(txn_id);
                 let resolver = state_view.as_move_resolver();
-                let txn_output = vm_output
-                    .try_materialize_into_transaction_output(&resolver)
-                    .map_err(|e| format!("failed to materialize transaction output: {}", e))?;
+                let materialize_result =
+                    vm_output.try_materialize_into_transaction_output(&resolver);
+
+                // Drain the trace after materialization. Doing it here lets
+                // us either embed it in the success response or append it to
+                // the error message — losing trace data on materialization
+                // failure would leave the caller blind to the reads that
+                // preceded it.
+                let trace = recorder.map(TraceRecorder::into_capture);
+
+                let txn_output = match materialize_result {
+                    Ok(o) => o,
+                    Err(e) => {
+                        let trace_suffix = trace
+                            .as_ref()
+                            .and_then(|t| serde_json::to_string(t).ok())
+                            .map(|s| format!(" — captured trace: {}", s))
+                            .unwrap_or_default();
+                        return Err(format!(
+                            "failed to materialize transaction output: {}{}",
+                            e, trace_suffix,
+                        ));
+                    },
+                };
 
                 Ok(build_response(
                     &user_txn,
@@ -446,24 +549,50 @@ impl FlowSession {
                     txn_output,
                     &vm_status,
                     local_override_in_use,
+                    trace,
                 ))
             }),
         )
-        .await;
+        .await
+        .map_err(|_| {
+            mcp_err(format!(
+                "tool timeout ({}s exceeded)",
+                tool_timeout.as_secs()
+            ))
+        })?;
 
-        let response = match result {
-            Err(_) => {
-                return Err(mcp_err(format!(
-                    "tool timeout ({}s exceeded)",
-                    tool_timeout.as_secs()
-                )));
-            },
-            Ok(join_result) => join_result
-                .map_err(|e| mcp_err(format!("replay task error: {}", e)))?
-                .map_err(mcp_err)?,
-        };
+        let response = result
+            .map_err(|e| mcp_err(format!("replay task error: {}", e)))?
+            .map_err(mcp_err)?;
 
         Ok(into_call_tool_result(&response))
+    }
+}
+
+/// Unwrap a fetched `Transaction` into the `UserTransaction` variant, or
+/// surface a structured `invalid_params` error naming the rejected variant.
+fn require_user_transaction(
+    txn: Transaction,
+    txn_id: u64,
+) -> Result<SignedTransaction, rmcp::ErrorData> {
+    match txn {
+        Transaction::UserTransaction(t) => Ok(t),
+        other => {
+            let variant = match other {
+                Transaction::GenesisTransaction(_) => "Genesis",
+                Transaction::BlockMetadata(_) => "BlockMetadata",
+                Transaction::BlockMetadataExt(_) => "BlockMetadataExt",
+                Transaction::BlockEpilogue(_) => "BlockEpilogue",
+                Transaction::StateCheckpoint(_) => "StateCheckpoint",
+                Transaction::ValidatorTransaction(_) => "ValidatorTransaction",
+                Transaction::UserTransaction(_) => unreachable!(),
+            };
+            Err(mcp_invalid(format!(
+                "transaction at version {} is a {} transaction; only user transactions are supported. \
+                 Use `aptos move replay` directly for system transactions.",
+                txn_id, variant,
+            )))
+        },
     }
 }
 
@@ -685,6 +814,88 @@ mod tests {
             names.iter().any(|n| n == "move_replay_transaction"),
             "expected move_replay_transaction in {:?}",
             names
+        );
+    }
+
+    #[test]
+    fn validate_capture_opts_rejects_zero() {
+        let err = validate_capture_opts(0).unwrap_err();
+        assert!(
+            err.contains("max_trace_events must be >= 1"),
+            "got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn validate_capture_opts_rejects_above_cap() {
+        let err = validate_capture_opts(MAX_TRACE_EVENTS_CAP + 1).unwrap_err();
+        assert!(err.contains("exceeds the server-side cap"), "got: {}", err);
+    }
+
+    #[test]
+    fn validate_capture_opts_accepts_one_and_cap_and_default() {
+        validate_capture_opts(1).expect("1 is the minimum allowed");
+        validate_capture_opts(default_max_trace_events()).expect("default must be valid");
+        validate_capture_opts(MAX_TRACE_EVENTS_CAP).expect("cap is inclusive");
+    }
+
+    #[test]
+    fn require_user_transaction_accepts_user_variant() {
+        let raw = aptos_types::transaction::RawTransaction::new(
+            AccountAddress::ONE,
+            0,
+            aptos_types::transaction::TransactionPayload::Script(
+                aptos_types::transaction::Script::new(vec![], vec![], vec![]),
+            ),
+            0,
+            0,
+            0,
+            aptos_types::chain_id::ChainId::test(),
+        );
+        let signed = SignedTransaction::new(
+            raw,
+            aptos_crypto::ed25519::Ed25519PublicKey::try_from(&[0u8; 32][..]).unwrap(),
+            aptos_crypto::ed25519::Ed25519Signature::try_from(&[0u8; 64][..]).unwrap(),
+        );
+        let txn = Transaction::UserTransaction(signed.clone());
+        let got = require_user_transaction(txn, 42).expect("user txn should pass through");
+        assert_eq!(got.sender(), signed.sender());
+    }
+
+    #[test]
+    fn require_user_transaction_rejects_state_checkpoint() {
+        let txn = Transaction::StateCheckpoint(aptos_crypto::HashValue::zero());
+        let err = require_user_transaction(txn, 7).unwrap_err();
+        assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert!(
+            err.message.contains("StateCheckpoint"),
+            "expected variant name in message: {}",
+            err.message
+        );
+        assert!(
+            err.message.contains("version 7"),
+            "expected version in message: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn require_user_transaction_rejects_genesis() {
+        // GenesisTransaction needs a WriteSetPayload; use the empty `Direct` form.
+        let txn =
+            Transaction::GenesisTransaction(aptos_types::transaction::WriteSetPayload::Direct(
+                aptos_types::transaction::ChangeSet::new(
+                    aptos_types::write_set::WriteSet::default(),
+                    vec![],
+                ),
+            ));
+        let err = require_user_transaction(txn, 0).unwrap_err();
+        assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert!(
+            err.message.contains("Genesis"),
+            "expected variant name in message: {}",
+            err.message
         );
     }
 

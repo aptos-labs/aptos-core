@@ -29,7 +29,7 @@ use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt::Debug,
 };
 use triomphe::Arc as TriompheArc;
@@ -186,6 +186,17 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     fn output_approx_size(&self) -> u64;
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<Txn::Key, Txn::Tag>>;
+
+    /// Hot-state reads observed at the VM resolver boundary, as concrete state keys. Deterministic,
+    /// and (unlike `get_read_summary`, which feeds conflict accounting) includes metadata/exists/size
+    /// reads, since hot-state KV can accelerate those access paths too. Empty unless hotness
+    /// observation is enabled for the block. Module reads are unioned in separately by the caller.
+    fn hotness_reads(&self) -> BTreeSet<Txn::Key>;
+
+    /// Concrete write-set keys for hot-state purposes: resource writes, resource-group writes
+    /// collapsed to the group key, aggregator-v1 writes, and module writes; delayed-field ids are
+    /// excluded. Derived from the final output so it cannot drift from the actual write set.
+    fn hotness_writes(&self) -> BTreeSet<Txn::Key>;
 }
 
 pub trait AfterMaterializationOutput<Txn: Transaction> {

@@ -98,8 +98,8 @@ mod micro_op {
         let merge_sort_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("merge_sort"),
             code: Code::from_vec(vec![]),
-            param_sizes: vec![],
-            param_sizes_sum: 8,
+            param_slots: vec![],
+            param_region_size: 8,
             param_and_local_sizes_sum: ms_param_and_local_sizes_sum as usize,
             extended_frame_size: (ms_callee_hi + 8) as usize,
             zero_frame: true,
@@ -129,8 +129,8 @@ mod micro_op {
         let merge_sort_range_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("merge_sort_range"),
             code: Code::from_vec(vec![]),
-            param_sizes: vec![],
-            param_sizes_sum: 24,
+            param_slots: vec![],
+            param_region_size: 24,
             param_and_local_sizes_sum: msr_param_and_local_sizes_sum as usize,
             extended_frame_size: (msr_callee_3 + 8) as usize,
             zero_frame: true,
@@ -164,8 +164,8 @@ mod micro_op {
         let merge_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("merge"),
             code: Code::from_vec(vec![]),
-            param_sizes: vec![],
-            param_sizes_sum: 32,
+            param_slots: vec![],
+            param_region_size: 32,
             param_and_local_sizes_sum: 120,
             extended_frame_size: 144,
             zero_frame: true,

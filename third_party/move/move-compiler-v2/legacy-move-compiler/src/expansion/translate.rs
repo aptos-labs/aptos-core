@@ -1745,6 +1745,7 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
             signature,
             modifies,
             reads,
+            weight,
             body,
         } => {
             let (old_aliases, signature) = function_signature(context, signature);
@@ -1758,6 +1759,7 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
                 signature,
                 modifies,
                 reads,
+                weight,
                 body,
             }
         },
@@ -1927,6 +1929,7 @@ fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proo
             patterns,
             lemma,
             args,
+            weight,
         } => {
             let ebindings = bind_with_range_list(context, bindings);
             let epatterns = patterns
@@ -1941,6 +1944,7 @@ fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proo
                     patterns: epatterns,
                     lemma: elemma,
                     args: eargs,
+                    weight,
                 },
                 _ => E::Proof_::Block(vec![]), // error already reported
             }
@@ -2395,7 +2399,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 },
             }
         },
-        PE::Quant(k, prs, ptrs, pc, pe) => {
+        PE::Quant(k, prs, ptrs, pweight, pc, pe) => {
             if !context.in_spec_context {
                 context.env.add_diag(diag!(
                     Syntax::SpecContextRestricted,
@@ -2411,7 +2415,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 let rc = pc.map(|c| Box::new(exp_(context, *c)));
                 let re = exp_(context, *pe);
                 match rs_opt {
-                    Some(rs) => EE::Quant(k, rs, rtrs, rc, Box::new(re)),
+                    Some(rs) => EE::Quant(k, rs, rtrs, pweight, rc, Box::new(re)),
                     None => {
                         assert!(context.env.has_errors());
                         EE::UnresolvedError
@@ -3292,7 +3296,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
                 unbound_names_exp(unbound, spec);
             }
         },
-        EE::Quant(_, rs, trs, cr_opt, er) => {
+        EE::Quant(_, rs, trs, _, cr_opt, er) => {
             unbound_names_exp(unbound, er);
             if let Some(cr) = cr_opt {
                 unbound_names_exp(unbound, cr);

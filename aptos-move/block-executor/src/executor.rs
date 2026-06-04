@@ -58,7 +58,10 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
-use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
+use aptos_vm_types::{
+    change_set::randomly_check_layout_matches, hotness_summary::TxnHotnessSummary,
+    resolver::ResourceGroupSize,
+};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -545,6 +548,7 @@ where
             read_set,
             execution_result,
             &config.onchain.block_gas_limit_type,
+            config.onchain.hotness_in_epilogue(),
             txn.user_txn_bytes_len() as u64,
         )?;
 
@@ -755,6 +759,7 @@ where
             read_set,
             execution_result,
             &config.onchain.block_gas_limit_type,
+            config.onchain.hotness_in_epilogue(),
             txn.user_txn_bytes_len() as u64,
         )?;
         if let Some(scheduler) = maybe_scheduler {
@@ -1808,6 +1813,7 @@ where
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            self.config.onchain.hotness_in_epilogue(),
             num_txns,
         ));
         let block_epilogue_txn_idx = ExplicitSyncWrapper::new(None);
@@ -2002,6 +2008,7 @@ where
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            self.config.onchain.hotness_in_epilogue(),
             num_txns + 1,
         ));
         let shared_maybe_error = AtomicBool::new(false);
@@ -2335,6 +2342,7 @@ where
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            self.config.onchain.hotness_in_epilogue(),
             num_txns + 1,
         );
 
@@ -2432,10 +2440,20 @@ where
                             )
                         });
 
+                    // Hotness summary: VM-boundary reads (incl. metadata/exists/size) unioned with
+                    // module reads (which the recorder cannot observe), and writes derived from the
+                    // final output. Gated on `hotness_in_epilogue`, independent of conflicts.
+                    let hotness_summary = self.config.onchain.hotness_in_epilogue().then(|| {
+                        let mut reads = output_before_guard.hotness_reads();
+                        reads.extend(sequential_reads.module_read_keys());
+                        TxnHotnessSummary::new(reads, output_before_guard.hotness_writes())
+                    });
+
                     block_limit_processor.accumulate_fee_statement(
                         output_before_guard.fee_statement(),
                         read_write_summary,
                         approx_output_size,
+                        hotness_summary,
                     );
                     if idx < num_txns {
                         // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns

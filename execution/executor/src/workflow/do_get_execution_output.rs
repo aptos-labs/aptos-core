@@ -145,28 +145,12 @@ impl DoGetExecutionOutput {
             auxiliary_infos.push(block_epilogue_aux_info);
         }
 
-        // Manually create hotness write sets for block epilogue transaction(s), based on the block
-        // end info saved. Note that even if we are re-executing transactions during a state sync,
-        // the block end info is not re-computed and has to come from the previous execution.
-        //
-        // If the input transactions are from a normal block, the last one should be the epilogue.
-        // If they are from a chunk (i.e. we are re-executing transactions during state sync), then
-        // there could be zero or more block epilogue transactions, and we need to handle all of
-        // them.
-        //
-        // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
-        // but we need to figure out how to properly construct `VMOutput` from block end info.
-        for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
-            if let Transaction::BlockEpilogue(payload) = transaction {
-                assert!(output.status().is_kept(), "Block epilogue must be kept");
-                output.add_hotness(
-                    payload
-                        .try_get_keys_to_make_hot()
-                        .cloned()
-                        .unwrap_or_default(),
-                );
-            }
-        }
+        // Hotness write sets for block-epilogue transactions are now produced by the VM
+        // (`AptosVM::process_block_epilogue` via the block executor task), so no executor-side
+        // patching is needed here: the epilogue output already carries its `MakeHot` ops. This
+        // holds for normal blocks, chunk re-execution during state sync, and the V2 payload's
+        // persisted `to_make_hot`. We only still need to upgrade the write-set encoding to V1 so
+        // the hotness ops are carried in the persisted format.
         if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
@@ -200,6 +184,9 @@ impl DoGetExecutionOutput {
             state_view_arc.clone(),
             onchain_config,
         )?;
+        // TODO(HotState): sharded execution does not run through the block executor task's
+        // VM-boundary read recorder, so it may not accumulate or persist hot-state promotions
+        // correctly. This path is not production-relevant; it is only kept compiling/non-panicking.
         if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }

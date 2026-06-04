@@ -720,8 +720,9 @@ impl<'env> BoogieTranslator<'env> {
                 }
                 emit!(
                     self.writer,
-                    "p{}: {}",
+                    "p{}_v{}: {}",
                     pos,
+                    idx,
                     boogie_type(self.env, captured_ty, false)
                 )
             }
@@ -780,6 +781,13 @@ impl<'env> BoogieTranslator<'env> {
             "function $IsValid'{}'(x: {}): bool {{ true }}",
             boogie_type_suffix(self.env, fun_type, false),
             fun_ty_boogie_name
+        );
+        emitln!(
+            self.writer,
+            "function {{:inline}} $IsEqual'{}'(v1: {}, v2: {}): bool {{ v1 == v2 }}",
+            boogie_type_suffix(self.env, fun_type, false),
+            fun_ty_boogie_name,
+            fun_ty_boogie_name,
         );
 
         // Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.
@@ -974,7 +982,7 @@ impl<'env> BoogieTranslator<'env> {
             let fun_env = &self.env.get_function(info.fun.to_qualified_id());
             let fun_name = boogie_function_name(fun_env, &info.fun.inst, &[]);
             let args = (0..info.mask.captured_count())
-                .map(|pos| format!("fun->p{}", pos))
+                .map(|pos| format!("fun->p{}_v{}", pos, idx))
                 .chain((0..params.len()).map(|pos| format!("p{}", pos)))
                 .join(", ");
             let call_prefix = if result_str.is_empty() {
@@ -990,6 +998,7 @@ impl<'env> BoogieTranslator<'env> {
             if fun_env.is_opaque() || !has_inline {
                 self.emit_opaque_closure_body(
                     info,
+                    idx,
                     fun_env,
                     &params,
                     results,
@@ -1253,6 +1262,7 @@ impl<'env> BoogieTranslator<'env> {
     fn emit_opaque_closure_body(
         &self,
         info: &ClosureInfo,
+        variant_idx: usize,
         fun_env: &FunctionEnv,
         params: &[Type],
         results: &Type,
@@ -1262,7 +1272,7 @@ impl<'env> BoogieTranslator<'env> {
         // Build args for ALL callee params by interleaving captured and non-captured
         // using ClosureMask::compose.
         let captured_args: Vec<String> = (0..info.mask.captured_count())
-            .map(|pos| format!("fun->p{}", pos))
+            .map(|pos| format!("fun->p{}_v{}", pos, variant_idx))
             .collect();
         let callee_param_tys = fun_env.get_parameter_types();
         let non_captured_args: Vec<String> = callee_param_tys

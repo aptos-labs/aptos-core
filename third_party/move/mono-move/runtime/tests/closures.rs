@@ -74,8 +74,11 @@ fn make_identity() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("identity"),
         code: Code::from_vec(vec![Return]),
-        param_sizes: vec![8u32],
-        param_sizes_sum: 8,
+        param_slots: vec![SizedSlot {
+            offset: FO(0),
+            size: 8,
+        }],
+        param_region_size: 8,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 8 + FRAME_METADATA_SIZE,
         zero_frame: false,
@@ -104,13 +107,133 @@ fn make_add_u64() -> Function {
             },
             Return,
         ]),
-        param_sizes: vec![8u32, 8u32],
-        param_sizes_sum: 16,
+        param_slots: vec![
+            SizedSlot {
+                offset: FO(0),
+                size: 8,
+            },
+            SizedSlot {
+                offset: FO(8),
+                size: 8,
+            },
+        ],
+        param_region_size: 16,
         param_and_local_sizes_sum: 16,
         extended_frame_size: 16 + FRAME_METADATA_SIZE,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
+    }
+}
+
+/// Callee: `bool_then_u64(flag: bool, x: u64) -> u64`. Returns `x`, which lives
+/// at the natural-aligned offset 8 (after the 1-byte `flag` + padding) — its
+/// `param_slots` therefore record offsets 0 and 8, and `param_region_size` is 16
+/// (the region end), not the dense size sum 9. A closure that placed the `u64`
+/// argument densely (at offset 1) would make this callee read garbage.
+fn make_bool_then_u64() -> Function {
+    use MicroOp::*;
+    Function {
+        name: GlobalArenaPtr::from_static("bool_then_u64"),
+        // Return `x` (offset 8) by copying it to the return slot (offset 0).
+        code: Code::from_vec(vec![
+            Move8 {
+                dst: FO(0),
+                src: FO(8),
+            },
+            Return,
+        ]),
+        param_slots: vec![
+            SizedSlot {
+                offset: FO(0),
+                size: 1,
+            },
+            SizedSlot {
+                offset: FO(8),
+                size: 8,
+            },
+        ],
+        param_region_size: 16,
+        param_and_local_sizes_sum: 16,
+        extended_frame_size: 16 + FRAME_METADATA_SIZE,
+        zero_frame: false,
+        frame_layout: FrameLayoutInfo::empty(),
+        safe_point_layouts: SortedSafePointEntries::empty(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Regression: closure over a padded-parameter callee
+// ---------------------------------------------------------------------------
+//
+// The callee is `(bool, u64)`, so its `u64` parameter sits at offset 8, not at
+// the dense offset 1. The closure captures the `bool` (position 0) and provides
+// the `u64` (position 1). `CallClosure` must place the provided `u64` at the
+// parameter's actual offset (8); placing it densely (at offset 1) would leave
+// the callee reading garbage at offset 8.
+
+#[test]
+fn closure_over_padded_params_places_args_by_offset() {
+    use MicroOp::*;
+
+    let result = FO(0);
+    let closure = FO(8);
+    let flag = FO(16);
+    let x = FO(24);
+    let args_and_locals: usize = 32;
+    let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
+
+    let mut table = ObjectDescriptorTable::new();
+    // One captured 1-byte bool.
+    let desc_captured_bool = table.push(ObjectDescriptor::new_captured_data(1, vec![]).unwrap());
+
+    let target_ptr = FunctionPtr::new(Box::new(make_bool_then_u64()));
+    let function_ptrs = vec![target_ptr];
+
+    let main = Function {
+        name: GlobalArenaPtr::from_static("main"),
+        code: Code::from_vec(vec![
+            StoreImm1 { dst: flag, imm: 1 },
+            StoreImm8 {
+                dst: x,
+                imm: 0xDEAD_BEEF_CAFE_F00Du64.to_le_bytes(),
+            },
+            MicroOp::PackClosure(Box::new(PackClosureOp {
+                dst: closure,
+                func_ref: ClosureFuncRef::Resolved(target_ptr),
+                mask: 0b01, // capture position 0 (the bool)
+                captured_data_descriptor_id: Some(desc_captured_bool),
+                captured: vec![SizedSlot {
+                    offset: flag,
+                    size: 1,
+                }],
+            })),
+            MicroOp::CallClosure(Box::new(CallClosureOp {
+                closure_src: closure,
+                // Provide the u64 (position 1).
+                provided_args: vec![SizedSlot { offset: x, size: 8 }],
+            })),
+            Move8 {
+                dst: result,
+                src: callee_arg0,
+            },
+            Return,
+        ]),
+        param_slots: vec![],
+        param_region_size: 0,
+        param_and_local_sizes_sum: args_and_locals,
+        extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![closure]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
+    };
+
+    let result = run_main_and_get_u64_result(&main, table);
+    assert_eq!(result, 0xDEAD_BEEF_CAFE_F00D);
+
+    for ptr in function_ptrs {
+        // SAFETY: interpreter dropped; no live references remain.
+        unsafe { ptr.free_unchecked() };
     }
 }
 
@@ -196,12 +319,25 @@ fn make_vector_map() -> Function {
             // pc 9:
             Return,
         ]),
-        param_sizes: vec![8u32, 8u32, 8u32],
-        param_sizes_sum: 24,
+        param_slots: vec![
+            SizedSlot {
+                offset: FO(0),
+                size: 8,
+            },
+            SizedSlot {
+                offset: FO(8),
+                size: 8,
+            },
+            SizedSlot {
+                offset: FO(16),
+                size: 8,
+            },
+        ],
+        param_region_size: 24,
         param_and_local_sizes_sum: args_and_locals,
         // Needs room for the closure's callee arg region. `exec_call_closure`
         // writes *all* of the callee's parameters (captured + provided) into
-        // this region, so we reserve for the full `param_sizes_sum` of the underlying
+        // this region, so we reserve for the full `param_region_size` of the underlying
         // function. The closure here wraps `add_u64`, whose two u64 params
         // require 16 bytes total.
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
@@ -273,8 +409,8 @@ fn identity_no_captures() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 8,
         zero_frame: true,
@@ -351,8 +487,8 @@ fn add_captured_a_provided_b() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
@@ -422,8 +558,8 @@ fn add_provided_a_captured_b() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
@@ -496,8 +632,8 @@ fn add_all_captured() {
             },
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
@@ -681,8 +817,8 @@ fn vector_map_add_captured() {
             // pc 21: Return
             Return,
         ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 24,
         zero_frame: true,

@@ -24,7 +24,10 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -41,6 +44,17 @@ pub struct VMOutput {
     /// empty, and users have to set it manually after execution.
     #[derivative(PartialEq = "ignore", Debug = "ignore")]
     trace: Trace,
+    /// State keys observed as hotness reads at the VM resolver boundary (value, metadata, exists,
+    /// size, resource-group, and aggregator-v1 reads, collapsed to concrete state keys). This is
+    /// feed-only metadata for the block hot-state accumulator and is NOT persisted in the output's
+    /// write set, so it is excluded from equality/debug (like `trace`).
+    #[derivative(PartialEq = "ignore", Debug = "ignore")]
+    hotness_reads: BTreeSet<StateKey>,
+    /// Keys to be promoted to hot state via this output's write set (`BaseStateOp::MakeHot`). Only
+    /// populated for block-epilogue outputs; for all other transactions value writes already make
+    /// keys hot, so this stays empty. Applied in `into_transaction_output` via `WriteSet`.
+    #[derivative(PartialEq = "ignore", Debug = "ignore")]
+    hotness_promotion: BTreeSet<StateKey>,
 }
 
 impl VMOutput {
@@ -56,6 +70,8 @@ impl VMOutput {
             fee_statement,
             status,
             trace: Trace::empty(),
+            hotness_reads: BTreeSet::new(),
+            hotness_promotion: BTreeSet::new(),
         }
     }
 
@@ -66,6 +82,8 @@ impl VMOutput {
             fee_statement: FeeStatement::zero(),
             status,
             trace: Trace::empty(),
+            hotness_reads: BTreeSet::new(),
+            hotness_promotion: BTreeSet::new(),
         }
     }
 
@@ -119,6 +137,30 @@ impl VMOutput {
     /// Extracts the trace from the output, for subsequent replay.
     pub fn take_trace(&mut self) -> Trace {
         mem::take(&mut self.trace)
+    }
+
+    /// State keys observed as hotness reads at the VM resolver boundary. Used to feed the block
+    /// hot-state accumulator; not persisted in the write set.
+    pub fn hotness_reads(&self) -> &BTreeSet<StateKey> {
+        &self.hotness_reads
+    }
+
+    /// Records the resolver-boundary hotness reads for this output. Should be called once, right
+    /// after VM execution, before the output is consumed by the block executor.
+    pub fn set_hotness_reads(&mut self, hotness_reads: BTreeSet<StateKey>) {
+        self.hotness_reads = hotness_reads;
+    }
+
+    /// Keys promoted to hot state via this output's write set. Empty for all but block-epilogue
+    /// outputs.
+    pub fn hotness_promotion(&self) -> &BTreeSet<StateKey> {
+        &self.hotness_promotion
+    }
+
+    /// Sets the hot-state promotion set persisted in this output's write set (block epilogue only).
+    /// Applied in `into_transaction_output`.
+    pub fn set_hotness_promotion(&mut self, hotness_promotion: BTreeSet<StateKey>) {
+        self.hotness_promotion = hotness_promotion;
     }
 
     pub fn materialized_size(&self) -> u64 {
@@ -195,6 +237,8 @@ impl VMOutput {
             fee_statement,
             status,
             trace,
+            hotness_reads: _,
+            hotness_promotion,
         } = self;
 
         // INVARIANT:
@@ -206,9 +250,17 @@ impl VMOutput {
             ));
         }
 
-        let (write_set, events) = change_set
+        let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+
+        // Attach the hot-state promotion set (block epilogue only) as `MakeHot` ops in the write
+        // set, so state sync / transaction-output replay can reproduce hotness from the persisted
+        // output without re-deriving it from the original block transactions.
+        if !hotness_promotion.is_empty() {
+            write_set.add_hotness(hotness_promotion);
+        }
+
         Ok(TransactionOutput::new(
             write_set,
             events,

@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::test
 
 fun identity<T>(x: T): T
@@ -13,3 +14,9 @@ fun call_bool(): bool
     ld_true
     call identity<bool>
     ret
+
+// RUN: execute 0x66::test::call_u64
+// CHECK: results: 10
+
+// RUN: execute 0x66::test::call_bool
+// CHECK: results: true
