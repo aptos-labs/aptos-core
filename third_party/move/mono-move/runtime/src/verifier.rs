@@ -402,6 +402,16 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_1(pc, op.dst);
             },
 
+            MicroOp::ValueCmp(ref op) => {
+                // TODO: We should check frame access based on the size from the type?
+                self.check_frame_access_1(pc, op.dst);
+            },
+            MicroOp::ValueRefCmp(ref op) => {
+                self.check_frame_access(Some(pc), op.lhs, 16);
+                self.check_frame_access(Some(pc), op.rhs, 16);
+                self.check_frame_access_1(pc, op.dst);
+            },
+
             // Boolean logic: all operands are 1-byte `0`/`1` values.
             MicroOp::BoolNot { dst, src } => {
                 self.check_frame_access_1(pc, src);
@@ -441,6 +451,16 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 if let Some(rhs_off) = op.rhs.slot_offset() {
                     self.check_frame_access(Some(pc), rhs_off, size);
                 }
+                self.check_jump(pc, op.target);
+            },
+
+            MicroOp::JumpValueCmp(ref op) => {
+                // TODO: We should check frame access based on the size from the type?
+                self.check_jump(pc, op.target);
+            },
+            MicroOp::JumpValueRefCmp(ref op) => {
+                self.check_frame_access(Some(pc), op.lhs, 16);
+                self.check_frame_access(Some(pc), op.rhs, 16);
                 self.check_jump(pc, op.target);
             },
 

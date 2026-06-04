@@ -130,7 +130,7 @@ mod unspecialized;
 pub use gas::MicroOpGasSchedule;
 pub use unspecialized::{
     CmpKind, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    JumpIntCmpOp, ShiftOperand,
+    JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, ShiftOperand, ValueCmpOp, ValueRefCmpOp,
 };
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
@@ -532,6 +532,15 @@ pub enum MicroOp {
     /// `dst = (lhs <op> rhs)`, writing a 1-byte boolean. See [`IntCmpOp`].
     IntCmp(IntCmpOp),
 
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality over inline
+    /// values. `lhs`/`rhs` hold the values directly. See [`ValueCmpOp`].
+    ValueCmp(ValueCmpOp),
+
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality where `lhs`/`rhs`
+    /// hold references (16-byte fat pointers) read through to the operand
+    /// values. See [`ValueRefCmpOp`].
+    ValueRefCmp(ValueRefCmpOp),
+
     /// `dst = !src`, both `dst` and `src` are 1-byte booleans.
     BoolNot {
         dst: FrameOffset,
@@ -633,6 +642,15 @@ pub enum MicroOp {
     /// Unspecialized fused compare-and-branch: jump to `target` if
     /// `op(lhs, rhs)` holds, dispatching on the operand type.
     JumpIntCmp(JumpIntCmpOp),
+
+    /// Fused structural-equality compare-and-branch: jump to `target` if
+    /// `lhs == rhs` (or `!=`) over inline values. See [`JumpValueCmpOp`].
+    JumpValueCmp(JumpValueCmpOp),
+
+    /// Fused structural-equality compare-and-branch where `lhs`/`rhs` hold
+    /// references (16-byte fat pointers) read through to the operand values.
+    /// See [`JumpValueRefCmpOp`].
+    JumpValueRefCmp(JumpValueRefCmpOp),
 
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.
     JumpGreaterEqualU64Imm {
@@ -1207,6 +1225,24 @@ impl fmt::Display for MicroOp {
                 "IntCmp [{}] <- [{}] {} {}",
                 op.dst.0, op.lhs.0, op.op, op.rhs
             ),
+            MicroOp::ValueCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "ValueCmp [{}] <- [{}] {} [{}] : ",
+                    op.dst.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
+            MicroOp::ValueRefCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "ValueRefCmp [{}] <- *[{}] {} *[{}] : ",
+                    op.dst.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
             MicroOp::BoolNot { dst, src } => {
                 write!(f, "BoolNot [{}] <- ![{}]", dst.0, src.0)
             },
@@ -1294,6 +1330,24 @@ impl fmt::Display for MicroOp {
                 "JumpIntCmp @{} [{}] {} {}",
                 op.target.0, op.lhs.0, op.op, op.rhs
             ),
+            MicroOp::JumpValueCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "JumpValueCmp @{} [{}] {} [{}] : ",
+                    op.target.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
+            MicroOp::JumpValueRefCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "JumpValueRefCmp @{} *[{}] {} *[{}] : ",
+                    op.target.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
             MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
                 write!(
                     f,
@@ -1768,6 +1822,8 @@ impl MicroOp {
             | MicroOp::JumpNotZeroByte { .. }
             | MicroOp::JumpZeroByte { .. }
             | MicroOp::JumpIntCmp(_)
+            | MicroOp::JumpValueCmp(_)
+            | MicroOp::JumpValueRefCmp(_)
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
             | MicroOp::JumpGreaterU64Imm { .. }
@@ -1814,6 +1870,8 @@ impl MicroOp {
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::MoveTo { .. }
             | MicroOp::IntCmp(_)
+            | MicroOp::ValueCmp(_)
+            | MicroOp::ValueRefCmp(_)
             | MicroOp::BoolNot { .. }
             | MicroOp::BoolAnd { .. }
             | MicroOp::BoolOr { .. } => false,

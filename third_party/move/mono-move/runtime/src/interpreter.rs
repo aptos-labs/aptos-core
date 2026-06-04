@@ -26,8 +26,7 @@ use crate::{
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
         VEC_LENGTH_OFFSET,
     },
-    value_utils::deserialize,
-    ExecutionContext,
+    value_utils, ExecutionContext,
 };
 use mono_move_core::{
     captured_values_size,
@@ -852,6 +851,38 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     return Ok(StepResult::Continue);
                 },
 
+                MicroOp::JumpValueCmp(ref op) => {
+                    // Operands are values held inline at their slots.
+                    let a = fp.add(op.lhs.into());
+                    let b = fp.add(op.rhs.into());
+                    let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
+                    self.pc = if eq ^ op.negate {
+                        op.target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpValueRefCmp(ref op) => {
+                    // Operands are references; read through the fat pointers to
+                    // obtain the operand data pointers.
+                    let (lb, lo) = read_fat_ptr(fp, op.lhs);
+                    let (rb, ro) = read_fat_ptr(fp, op.rhs);
+                    let eq = value_utils::equals(
+                        self.exec_ctx,
+                        lb.add(lo as usize),
+                        rb.add(ro as usize),
+                        op.ty,
+                    )?;
+                    self.pc = if eq ^ op.negate {
+                        op.target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
                 MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
                     self.pc = if read_u64(fp, src) >= imm {
                         target.into()
@@ -1500,6 +1531,26 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let result = int_cmp_bool(fp, op.lhs, op.op, &op.rhs);
                     write_u8(fp, op.dst, result as u8);
                 },
+                MicroOp::ValueCmp(ref op) => {
+                    // Operands are values held inline at their slots.
+                    let a = fp.add(op.lhs.into());
+                    let b = fp.add(op.rhs.into());
+                    let eq = value_utils::equals(&*self.exec_ctx, a, b, op.ty)?;
+                    write_bool(fp, op.dst, eq ^ op.negate);
+                },
+                MicroOp::ValueRefCmp(ref op) => {
+                    // Operands are references; read through the fat pointers to
+                    // obtain the operand data pointers.
+                    let (lb, lo) = read_fat_ptr(fp, op.lhs);
+                    let (rb, ro) = read_fat_ptr(fp, op.rhs);
+                    let eq = value_utils::equals(
+                        &*self.exec_ctx,
+                        lb.add(lo as usize),
+                        rb.add(ro as usize),
+                        op.ty,
+                    )?;
+                    write_bool(fp, op.dst, eq ^ op.negate);
+                },
                 MicroOp::BoolNot { dst, src } => write_bool(fp, dst, !read_bool(fp, src)),
                 MicroOp::BoolAnd { dst, lhs, rhs } => {
                     let left = read_bool(fp, lhs);
@@ -1533,7 +1584,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         // and is writable (no aliasing to the heap).
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
-            if let Err(err) = deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst) {
+            if let Err(err) = value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+            {
                 match err {
                     AllocationError::RuntimeError(err) => return Err(err),
                     AllocationError::OutOfHeapMemory { .. } => {
@@ -1542,7 +1594,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         // path runs. Needs a `ForceGC` native to drive it
                         // deterministically in the differential suite.
                         gc_collect!(self)?;
-                        deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+                        value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
                             .map_err(AllocationError::into_runtime_error)?;
                     },
                 }
