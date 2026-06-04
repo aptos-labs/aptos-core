@@ -40,7 +40,10 @@ use mono_move_core::{
     IntOperand, IntShiftOp, IntTy, MicroOp, ShiftOperand, SortedSafePointEntries,
     FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+use mono_move_runtime::{InterpreterContext, ObjectDescriptorTable};
+
+mod common;
+use common::test_txn_ctx_max_budget;
 use move_core_types::int256::{I256, U256};
 use num_bigint::{BigInt, Sign};
 use proptest::{prelude::*, strategy::BoxedStrategy};
@@ -211,7 +214,7 @@ fn run_wide(
     dst_size: usize,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let func = make_func(op);
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget_no_descriptors();
+    let mut exec_ctx = test_txn_ctx_max_budget(ObjectDescriptorTable::new());
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     if !lhs_bytes.is_empty() {
         ctx.set_root_arg(SLOT_LHS, lhs_bytes);

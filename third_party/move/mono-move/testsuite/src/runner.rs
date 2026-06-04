@@ -7,7 +7,6 @@
 use crate::{
     compile::{compile, SourceKind},
     matcher::check_output,
-    module_provider::InMemoryModuleProvider,
     parser::{PrintSection, Step},
     print_sections,
 };
@@ -15,13 +14,13 @@ use anyhow::{anyhow, bail};
 use mono_move_core::{
     native::{NativeName, ProductionContextFamily, ProductionNativeRegistry},
     types::EMPTY_TYPE_LIST,
-    Interner,
+    InMemoryModuleProvider, Interner,
 };
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::make_all_test_natives;
-use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus, TransactionContext};
+use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
@@ -255,7 +254,7 @@ fn execute_function_v2(
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
         &natives,
     );
-    let mut txn_ctx = TransactionContext::new(
+    let mut txn_ctx = ExecutionContext::new(
         loader,
         SimpleGasMeter::new(u64::MAX),
         &mono_move_core::NO_RESOURCE_PROVIDER,

@@ -8,11 +8,15 @@ const KEY_RANGE: u64 = 2500;
 const SEED: u64 = 42;
 
 fn bench_bst(c: &mut Criterion) {
+    use mono_move_gas::NoOpGasMeter;
     use mono_move_programs::{
         bst::{generate_ops, micro_op_bst, move_bytecode_bst, move_stdlib_vector, native_run_ops},
         testing,
     };
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{
+        testing::{test_txn_ctx, test_txn_ctx_max_budget},
+        InterpreterContext,
+    };
 
     let ops = generate_ops(N_OPS, KEY_RANGE, SEED);
 
@@ -29,7 +33,7 @@ fn bench_bst(c: &mut Criterion) {
 
         // plain (no gas instrumentation)
         let (functions, descriptors) = micro_op_bst(false);
-        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
+        let mut exec_ctx = test_txn_ctx(descriptors, NoOpGasMeter);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
@@ -46,7 +50,7 @@ fn bench_bst(c: &mut Criterion) {
 
         // with gas instrumentation
         let (functions_gas, descriptors_gas) = micro_op_bst(true);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {

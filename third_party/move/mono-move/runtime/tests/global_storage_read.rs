@@ -5,11 +5,11 @@
 //! `BorrowGlobal`, `BorrowGlobalMut`, `MoveFrom`). Each test builds a
 //! one-function program that invokes exactly one global-storage
 //! MicroOp, pre-populates an in-memory [`ResourceProvider`], wraps it
-//! in [`LocalExecutionContext`], and inspects the root frame.
+//! in a `ExecutionContext`, and inspects the root frame.
 
 mod common;
 
-use common::InMemoryResources;
+use common::{test_txn_ctx_max_budget, test_txn_ctx_with_resources, InMemoryResources};
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
@@ -19,7 +19,7 @@ use mono_move_core::{
 use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
     error::{GlobalStorageOp, RuntimeError},
-    InterpreterContext, LocalRuntimeContext,
+    ExecutionContext, InterpreterContext,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -52,8 +52,8 @@ fn make_resource(value: u64) -> [u8; 8] {
 fn local_ctx_with<'r>(
     resources: &'r InMemoryResources,
     descriptors: ObjectDescriptorTable,
-) -> LocalRuntimeContext<'r, SimpleGasMeter> {
-    LocalRuntimeContext::new(SimpleGasMeter::new(u64::MAX), resources, descriptors)
+) -> ExecutionContext<'r, 'static, SimpleGasMeter> {
+    test_txn_ctx_with_resources(descriptors, SimpleGasMeter::new(u64::MAX), resources)
 }
 
 /// Slot layout: result at 0 (8B), addr at 8 (32B). Locals total 40
@@ -92,7 +92,7 @@ fn exists_returns_false_for_absent() {
         MicroOp::Return,
     ]);
 
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(1).into_bytes());
     ctx.run().unwrap();
@@ -210,7 +210,7 @@ fn borrow_global_aborts_on_missing() {
         MicroOp::Return,
     ]);
 
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(9).into_bytes());
     assert!(matches!(
@@ -238,7 +238,7 @@ fn borrow_global_mut_aborts_on_missing() {
         MicroOp::Return,
     ]);
 
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(9).into_bytes());
     assert!(matches!(
@@ -266,7 +266,7 @@ fn move_from_aborts_on_missing() {
         MicroOp::Return,
     ]);
 
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(9).into_bytes());
     assert!(matches!(

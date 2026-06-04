@@ -8,9 +8,12 @@ use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
+
+mod common;
+use common::test_txn_ctx_max_budget;
 
 // ---------------------------------------------------------------------------
 // Test 1: struct_inline — inline struct on the stack (no new instructions)
@@ -43,7 +46,7 @@ fn struct_inline() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
     let descriptors = ObjectDescriptorTable::new();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -86,7 +89,7 @@ fn struct_inline_borrow() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
     let descriptors = ObjectDescriptorTable::new();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -131,7 +134,7 @@ fn struct_heap_basic() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -177,7 +180,7 @@ fn struct_heap_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -240,7 +243,7 @@ fn struct_with_vector_field() {
         frame_layout: FrameLayoutInfo::new(vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -301,7 +304,7 @@ fn struct_borrow_field() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -353,7 +356,7 @@ fn struct_borrow_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 

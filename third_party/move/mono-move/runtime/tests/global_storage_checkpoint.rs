@@ -9,7 +9,7 @@
 
 mod common;
 
-use common::InMemoryResources;
+use common::{test_txn_ctx_max_budget, test_txn_ctx_with_resources, InMemoryResources};
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
@@ -19,7 +19,7 @@ use mono_move_core::{
 use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    InterpreterContext, LocalRuntimeContext,
+    ExecutionContext, InterpreterContext,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -52,8 +52,8 @@ fn make_resource(value: u64) -> [u8; 8] {
 fn local_ctx_with<'r>(
     resources: &'r InMemoryResources,
     descriptors: ObjectDescriptorTable,
-) -> LocalRuntimeContext<'r, SimpleGasMeter> {
-    LocalRuntimeContext::new(SimpleGasMeter::new(u64::MAX), resources, descriptors)
+) -> ExecutionContext<'r, 'static, SimpleGasMeter> {
+    test_txn_ctx_with_resources(descriptors, SimpleGasMeter::new(u64::MAX), resources)
 }
 
 const DST: FO = FO(0);
@@ -86,7 +86,7 @@ fn trivial_program() -> Function {
 fn checkpoint_advances_epoch_and_records_stack() {
     let descriptors = ObjectDescriptorTable::new();
     let func = trivial_program();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
 
     assert_eq!(ctx.current_epoch(), 0);
@@ -105,7 +105,7 @@ fn checkpoint_advances_epoch_and_records_stack() {
 fn rollback_zero_is_noop() {
     let descriptors = ObjectDescriptorTable::new();
     let func = trivial_program();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
 
     ctx.checkpoint();
@@ -118,7 +118,7 @@ fn rollback_zero_is_noop() {
 fn rollback_more_than_stack_depth_aborts() {
     let descriptors = ObjectDescriptorTable::new();
     let func = trivial_program();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
 
     ctx.checkpoint();

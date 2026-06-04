@@ -9,11 +9,10 @@ use crate::{
         ArithOp, RuntimeError, RuntimeInvariantViolation, RuntimeResult, RuntimeStatus, Signedness,
         VecOp,
     },
-    global_storage::{EntryPtr, ResourceReadWriteSet},
+    global_storage::EntryPtr,
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        pinned_roots::PinnedRoots,
-        AllocationError, Heap,
+        AllocationError,
     },
     invariant_violation,
     memory::{
@@ -21,39 +20,40 @@ use crate::{
         write_bool, write_fat_ptr, write_ptr, write_u64, write_u8, MemoryRegion,
     },
     types::{
-        StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
+        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
     ExecutionContext,
 };
 use mono_move_core::{
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     storage::resource_provider::StorageKey,
-    CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
-    PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, FrameOffset, Function, IntBinaryOp,
+    IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::{
     account_address::AccountAddress,
     int256::{I256, U256},
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::Rng;
 use std::ptr::{null, NonNull};
 
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
 
-/// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
-    /// Per-transaction context (function resolution, gas counters,
-    /// descriptor table, etc.).
-    pub(crate) exec_ctx: &'a mut T,
+/// Interpreter session: a per-run cursor (pc, current function, frame
+/// pointer) over a reusable stack, driving execution against a borrowed
+/// [`ExecutionContext`] that owns the heap and per-transaction state.
+pub struct InterpreterContext<'a, 'guard, 'ctx, G: GasMeter> {
+    /// Per-transaction context (function resolution, gas counters, heap,
+    /// global-storage state, descriptor table, etc.).
+    pub(crate) exec_ctx: &'a mut ExecutionContext<'guard, 'ctx, G>,
 
     pub(crate) pc: usize,
     /// Pointer to the currently executing function.
@@ -64,25 +64,10 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
     pub(crate) frame_ptr: *mut u8,
 
     pub(crate) stack: MemoryRegion,
-    pub(crate) heap: Heap,
-    /// Auxiliary GC root set for temporarily-live heap pointers that are
-    /// not yet stored in any frame slot (e.g. between two allocations in a
-    /// fused micro-op, or in native functions).
-    pub(crate) pinned_roots: PinnedRoots,
-    /// Per-transaction global-storage state: working map of cached
-    /// reads / pending writes, linear journal for rollback, and
-    /// checkpoint stack.
-    pub(crate) read_write_set: ResourceReadWriteSet,
-    rng: StdRng,
 }
 
-impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
-    pub fn new(exec_ctx: &'a mut T, entry: &Function) -> Self {
-        Self::with_heap_size(exec_ctx, entry, DEFAULT_HEAP_SIZE)
-    }
-
-    /// Create a new context with a custom heap size (for testing GC pressure).
-    pub fn with_heap_size(exec_ctx: &'a mut T, entry: &Function, heap_size: usize) -> Self {
+impl<'a, 'guard, 'ctx, G: GasMeter> InterpreterContext<'a, 'guard, 'ctx, G> {
+    pub fn new(exec_ctx: &'a mut ExecutionContext<'guard, 'ctx, G>, entry: &Function) -> Self {
         let verification_errors = crate::verifier::verify_function(entry, exec_ctx);
         assert!(
             verification_errors.is_empty(),
@@ -110,44 +95,35 @@ impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
             current_func: NonNull::from(entry),
             frame_ptr,
             stack,
-            heap: Heap::new(heap_size),
-            pinned_roots: PinnedRoots::new(),
-            read_write_set: ResourceReadWriteSet::new(),
-            rng: StdRng::seed_from_u64(0),
         }
     }
 
     pub fn set_rng_seed(&mut self, seed: u64) {
-        self.rng = StdRng::seed_from_u64(seed);
+        self.exec_ctx.set_rng_seed(seed);
     }
 
     pub fn gc_count(&self) -> usize {
-        self.heap.gc_count
+        self.exec_ctx.gc_count()
     }
 
-    /// TODO: move to execution context
     pub fn checkpoint(&mut self) {
-        self.read_write_set.checkpoint();
+        self.exec_ctx.checkpoint();
     }
 
-    /// TODO: move to execution context
     pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
-        self.read_write_set.rollback(n)
+        self.exec_ctx.rollback(n)
     }
 
-    /// TODO: move to execution context
     pub fn checkpoint_depth(&self) -> usize {
-        self.read_write_set.checkpoint_depth()
+        self.exec_ctx.checkpoint_depth()
     }
 
-    /// TODO: move to execution context
     pub fn current_epoch(&self) -> u64 {
-        self.read_write_set.current_epoch()
+        self.exec_ctx.current_epoch()
     }
 
-    /// TODO: move to execution context
     pub fn journal_len(&self) -> usize {
-        self.read_write_set.journal_len()
+        self.exec_ctx.journal_len()
     }
 
     /// Reset the context to call a different function, preserving the heap.
@@ -757,7 +733,7 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
+impl<'guard, 'ctx, G: GasMeter> InterpreterContext<'_, 'guard, 'ctx, G> {
     #[inline(always)]
     pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -1120,7 +1096,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 MicroOp::StoreRandomU64 { dst } => {
-                    let val: u64 = self.rng.r#gen();
+                    let val: u64 = self.exec_ctx.rng.r#gen();
                     write_u64(fp, dst, val);
                 },
 
@@ -1453,19 +1429,21 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
                 MicroOp::Exists { addr, ty, dst } => {
                     let address = read_address(fp, addr);
-                    let exists = self.read_write_set.exists(
-                        self.exec_ctx.resource_provider(),
-                        StorageKey::Resource(address, ty),
-                    )?;
+                    let rp = self.exec_ctx.resource_provider();
+                    let exists = self
+                        .exec_ctx
+                        .read_write_set
+                        .exists(rp, StorageKey::Resource(address, ty))?;
                     write_bool(fp, dst, exists);
                 },
 
                 MicroOp::BorrowGlobal { addr, ty, dst } => {
                     let address = read_address(fp, addr);
-                    let ptr = self.read_write_set.borrow_global(
-                        self.exec_ctx.resource_provider(),
-                        StorageKey::Resource(address, ty),
-                    )?;
+                    let rp = self.exec_ctx.resource_provider();
+                    let ptr = self
+                        .exec_ctx
+                        .read_write_set
+                        .borrow_global(rp, StorageKey::Resource(address, ty))?;
                     // A reference is a 16-byte fat pointer; the borrow points
                     // at the start of the resource, so the offset half is 0.
                     write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
@@ -1474,14 +1452,18 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::BorrowGlobalMut { addr, ty, dst } => {
                     let address = read_address(fp, addr);
                     let key = StorageKey::Resource(address, ty);
+                    let rp = self.exec_ctx.resource_provider();
                     let ptr = match self
+                        .exec_ctx
                         .read_write_set
-                        .try_borrow_global_mut(self.exec_ctx.resource_provider(), key)?
+                        .try_borrow_global_mut(rp, key)?
                     {
                         EntryPtr::Writable(ptr) => ptr,
                         EntryPtr::NonWritable(ptr) => {
                             let ptr = self.deep_copy(ptr)?;
-                            self.read_write_set.commit_borrow_global_mut(key, ptr);
+                            self.exec_ctx
+                                .read_write_set
+                                .commit_borrow_global_mut(key, ptr);
                             ptr
                         },
                     };
@@ -1493,14 +1475,13 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::MoveFrom { addr, ty, dst } => {
                     let address = read_address(fp, addr);
                     let key = StorageKey::Resource(address, ty);
-                    let entry_ptr = self
-                        .read_write_set
-                        .try_move_from(self.exec_ctx.resource_provider(), key)?;
+                    let rp = self.exec_ctx.resource_provider();
+                    let entry_ptr = self.exec_ctx.read_write_set.try_move_from(rp, key)?;
                     let ptr = match entry_ptr {
                         EntryPtr::Writable(ptr) => ptr,
                         EntryPtr::NonWritable(ptr) => {
                             let ptr = self.deep_copy(ptr)?;
-                            self.read_write_set.commit_move_from(key);
+                            self.exec_ctx.read_write_set.commit_move_from(key);
                             ptr
                         },
                     };
@@ -1513,8 +1494,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         invariant_violation!(MoveToNullSource);
                     };
 
-                    self.read_write_set.move_to(
-                        self.exec_ctx.resource_provider(),
+                    let rp = self.exec_ctx.resource_provider();
+                    self.exec_ctx.read_write_set.move_to(
+                        rp,
                         StorageKey::Resource(address, ty),
                         ptr,
                     )?;
@@ -1550,10 +1532,14 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
-        let root_guard = self.pinned_roots.pin(root);
+        // `guard` is a `'guard`-lifetime reference, decoupled from the borrow
+        // of `self.exec_ctx`, so it can serve descriptor lookups while the
+        // heap (a sibling field) is mutably borrowed.
+        let guard = self.exec_ctx.guard();
+        let root_guard = self.exec_ctx.pinned_roots.pin(root);
         // SAFETY: `root_guard.get()` returns the caller-supplied root, which
         // by this function's contract points to a live object.
-        match unsafe { self.heap.try_deep_copy(self.exec_ctx, root_guard.get()) } {
+        match unsafe { self.exec_ctx.heap.try_deep_copy(guard, root_guard.get()) } {
             Ok(ptr) => Ok(ptr),
             Err(AllocationError::RuntimeError(err)) => Err(err),
             Err(AllocationError::OutOfHeapMemory { .. }) => {
@@ -1563,8 +1549,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 // SAFETY: the pin keeps the root live across GC; the relocated
                 // pointer still points to the same live object.
                 unsafe {
-                    self.heap
-                        .try_deep_copy(self.exec_ctx, root_guard.get())
+                    self.exec_ctx
+                        .heap
+                        .try_deep_copy(guard, root_guard.get())
                         .map_err(AllocationError::into_runtime_error)
                 }
             },
@@ -1624,7 +1611,10 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             // allocation and lets GC update the pinned slot in-place if
             // the object is relocated.
             let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
-            let pin = self.pinned_roots.pin(NonNull::new_unchecked(closure_ptr));
+            let pin = self
+                .exec_ctx
+                .pinned_roots
+                .pin(NonNull::new_unchecked(closure_ptr));
 
             self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
 

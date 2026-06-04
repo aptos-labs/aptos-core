@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! End-to-end test for cross-module dispatch through [`TransactionContext`].
+//! End-to-end test for cross-module dispatch through [`ExecutionContext`].
 //!
 //! Compiles two Move modules from source, wires an [`InMemoryModuleProvider`]
 //! to a [`Loader`], and runs the entry function in the interpreter. The
@@ -13,7 +13,7 @@ use mono_move_core::{native::ProductionNativeRegistry, types::EMPTY_TYPE_LIST};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_runtime::{ExecutionContext, InterpreterContext, TransactionContext};
+use mono_move_runtime::{ExecutionContext, InterpreterContext};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -44,8 +44,8 @@ fn call_indirect_triggers_lazy_module_load() {
         &natives,
     );
 
-    // -- Wrap into a TransactionContext ---------------------------
-    let mut txn_ctx = TransactionContext::new(
+    // -- Wrap into a ExecutionContext ---------------------------
+    let mut txn_ctx = ExecutionContext::new(
         loader,
         SimpleGasMeter::new(u64::MAX),
         &mono_move_core::NO_RESOURCE_PROVIDER,

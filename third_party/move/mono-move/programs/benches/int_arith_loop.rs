@@ -26,6 +26,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 const ITERS: u64 = 1_000;
 
 fn bench_int_arith_loop(c: &mut Criterion) {
+    use mono_move_gas::NoOpGasMeter;
     use mono_move_programs::{
         int_arith_loop::{
             micro_op_i64_loop, micro_op_u64_loop, move_bytecode_int_arith_loop, native_i64_loop,
@@ -33,7 +34,10 @@ fn bench_int_arith_loop(c: &mut Criterion) {
         },
         testing,
     };
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{
+        testing::{test_txn_ctx, test_txn_ctx_max_budget},
+        InterpreterContext,
+    };
 
     let mut group = c.benchmark_group("int_arith_loop");
     group
@@ -51,7 +55,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
     // -- micro_op u64 (specialized fast path) ------------------------------
     {
         let (functions, descriptors) = micro_op_u64_loop(false);
-        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
+        let mut exec_ctx = test_txn_ctx(descriptors, NoOpGasMeter);
         // TODO: use `criterion::Bencher::iter_custom` to start/stop the timer
         // around the run, so context construction is excluded from the
         // measurement.
@@ -70,7 +74,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
     // -- micro_op i64 (unspecialized tag-dispatched) -----------------------
     {
         let (functions, descriptors) = micro_op_i64_loop(false);
-        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
+        let mut exec_ctx = test_txn_ctx(descriptors, NoOpGasMeter);
         // TODO: use `criterion::Bencher::iter_custom` to start/stop the timer
         // around the run, so context construction is excluded from the
         // measurement.
@@ -89,7 +93,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
     // -- micro_op u64 with gas instrumentation -----------------------------
     {
         let (functions_gas, descriptors) = micro_op_u64_loop(true);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
         group.bench_function("micro_op/u64/gas", |b| {
             b.iter(|| {
                 let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
@@ -105,7 +109,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
     // -- micro_op i64 with gas instrumentation -----------------------------
     {
         let (functions_gas, descriptors) = micro_op_i64_loop(true);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
         group.bench_function("micro_op/i64/gas", |b| {
             b.iter(|| {
                 let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {

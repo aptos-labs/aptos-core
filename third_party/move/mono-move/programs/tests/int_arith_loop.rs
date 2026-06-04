@@ -19,11 +19,11 @@ mod micro_op {
     use mono_move_programs::int_arith_loop::{
         micro_op_i64_loop, micro_op_u64_loop, native_i64_loop, native_u64_loop, TEST_ITERS,
     };
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{testing::test_txn_ctx_max_budget, InterpreterContext};
 
     fn run_u64() -> u64 {
         let (functions, descriptors) = micro_op_u64_loop(false);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         ctx.set_root_arg(0, &TEST_ITERS.to_le_bytes());
@@ -33,7 +33,7 @@ mod micro_op {
 
     fn run_i64() -> i64 {
         let (functions, descriptors) = micro_op_i64_loop(false);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         ctx.set_root_arg(0, &TEST_ITERS.to_le_bytes());

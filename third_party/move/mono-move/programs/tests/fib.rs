@@ -13,11 +13,11 @@ fn native() {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use mono_move_programs::fib::{micro_op_fib, FIB_CASES};
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{testing::test_txn_ctx_max_budget, InterpreterContext};
 
     fn run(n: u64) -> u64 {
         let (functions, descriptors) = micro_op_fib(false);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         ctx.set_root_arg(0, &n.to_le_bytes());

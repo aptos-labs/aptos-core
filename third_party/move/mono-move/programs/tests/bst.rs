@@ -121,25 +121,21 @@ fn native_insert_remove_sequence() {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use mono_move_core::Function;
+    use mono_move_gas::GasMeter;
     use mono_move_programs::bst::{
         generate_ops, micro_op_bst, native_run_ops_with_results, FN_GET, FN_INSERT, FN_NEW,
         FN_REMOVE,
     };
-    use mono_move_runtime::{
-        DescriptorProvider, ExecutionContext, InterpreterContext, LocalRuntimeContext,
-    };
+    use mono_move_runtime::{testing::test_txn_ctx_max_budget, InterpreterContext};
 
-    fn bst_new<T: ExecutionContext + DescriptorProvider>(
-        ctx: &mut InterpreterContext<'_, T>,
-        func: &Function,
-    ) -> u64 {
+    fn bst_new<G: GasMeter>(ctx: &mut InterpreterContext<'_, '_, '_, G>, func: &Function) -> u64 {
         ctx.invoke(func);
         ctx.run().unwrap();
         ctx.root_heap_ptr(0) as u64
     }
 
-    fn bst_insert<T: ExecutionContext + DescriptorProvider>(
-        ctx: &mut InterpreterContext<'_, T>,
+    fn bst_insert<G: GasMeter>(
+        ctx: &mut InterpreterContext<'_, '_, '_, G>,
         func: &Function,
         bst: u64,
         key: u64,
@@ -152,8 +148,8 @@ mod micro_op {
         ctx.run().unwrap();
     }
 
-    fn bst_get<T: ExecutionContext + DescriptorProvider>(
-        ctx: &mut InterpreterContext<'_, T>,
+    fn bst_get<G: GasMeter>(
+        ctx: &mut InterpreterContext<'_, '_, '_, G>,
         func: &Function,
         bst: u64,
         key: u64,
@@ -167,8 +163,8 @@ mod micro_op {
         (found, value)
     }
 
-    fn bst_remove<T: ExecutionContext + DescriptorProvider>(
-        ctx: &mut InterpreterContext<'_, T>,
+    fn bst_remove<G: GasMeter>(
+        ctx: &mut InterpreterContext<'_, '_, '_, G>,
         func: &Function,
         bst: u64,
         key: u64,
@@ -187,7 +183,7 @@ mod micro_op {
         let fn_insert = unsafe { functions[FN_INSERT].as_ref_unchecked() };
         let fn_get = unsafe { functions[FN_GET].as_ref_unchecked() };
         let fn_remove = unsafe { functions[FN_REMOVE].as_ref_unchecked() };
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
         let mut ctx = InterpreterContext::new(&mut exec_ctx, fn_new);
         let bst = bst_new(&mut ctx, fn_new);
         let mut results = Vec::new();

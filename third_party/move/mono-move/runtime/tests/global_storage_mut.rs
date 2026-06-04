@@ -7,7 +7,7 @@
 
 mod common;
 
-use common::InMemoryResources;
+use common::{test_txn_ctx_max_budget, test_txn_ctx_with_resources, InMemoryResources};
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
@@ -15,7 +15,7 @@ use mono_move_core::{
     ObjectDescriptorTable, SortedSafePointEntries,
 };
 use mono_move_gas::SimpleGasMeter;
-use mono_move_runtime::{error::RuntimeError, InterpreterContext, LocalRuntimeContext};
+use mono_move_runtime::{error::RuntimeError, ExecutionContext, InterpreterContext};
 use move_core_types::account_address::AccountAddress;
 
 // ---------------------------------------------------------------------------
@@ -52,8 +52,8 @@ fn make_resource(value: u64) -> [u8; 8] {
 fn local_ctx_with<'r>(
     resources: &'r InMemoryResources,
     descriptors: ObjectDescriptorTable,
-) -> LocalRuntimeContext<'r, SimpleGasMeter> {
-    LocalRuntimeContext::new(SimpleGasMeter::new(u64::MAX), resources, descriptors)
+) -> ExecutionContext<'r, 'static, SimpleGasMeter> {
+    test_txn_ctx_with_resources(descriptors, SimpleGasMeter::new(u64::MAX), resources)
 }
 
 /// Frame layout for the mutation tests:
@@ -170,7 +170,7 @@ fn borrow_global_mut_same_epoch_no_extra_copy() {
 #[test]
 fn move_to_publishes_resource_and_exists_is_true() {
     let (descriptors, desc_id) = fresh_descriptors();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
 
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),

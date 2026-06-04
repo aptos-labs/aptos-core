@@ -5,7 +5,6 @@
 
 pub mod compile;
 pub mod matcher;
-pub mod module_provider;
 pub mod parser;
 pub mod print_sections;
 pub mod runner;
@@ -14,4 +13,4 @@ pub mod v1_test_natives;
 pub use compile::{
     assemble_masm_source, compile, compile_move_path, compile_move_source, SourceKind,
 };
-pub use module_provider::InMemoryModuleProvider;
+pub use mono_move_core::InMemoryModuleProvider;

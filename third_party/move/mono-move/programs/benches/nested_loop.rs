@@ -6,11 +6,15 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 const N: u64 = 1000;
 
 fn bench_nested_loop(c: &mut Criterion) {
+    use mono_move_gas::NoOpGasMeter;
     use mono_move_programs::{
         nested_loop::{micro_op_nested_loop, move_bytecode_nested_loop, native_nested_loop},
         testing,
     };
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{
+        testing::{test_txn_ctx, test_txn_ctx_max_budget},
+        InterpreterContext,
+    };
 
     // -- native & micro_op -------------------------------------------------
     {
@@ -25,7 +29,7 @@ fn bench_nested_loop(c: &mut Criterion) {
 
         // plain (no gas instrumentation)
         let (functions, descriptors) = micro_op_nested_loop(false);
-        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
+        let mut exec_ctx = test_txn_ctx(descriptors, NoOpGasMeter);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
@@ -40,7 +44,7 @@ fn bench_nested_loop(c: &mut Criterion) {
 
         // with gas instrumentation
         let (functions_gas, descriptors_gas) = micro_op_nested_loop(true);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {

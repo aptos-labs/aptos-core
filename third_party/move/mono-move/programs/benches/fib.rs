@@ -6,11 +6,15 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 const N: u64 = 25;
 
 fn bench_fib(c: &mut Criterion) {
+    use mono_move_gas::NoOpGasMeter;
     use mono_move_programs::{
         fib::{micro_op_fib, move_bytecode_fib, native_fib},
         testing,
     };
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{
+        testing::{test_txn_ctx, test_txn_ctx_max_budget},
+        InterpreterContext,
+    };
 
     // -- native & micro_op (fast) -----------------------------------------
     {
@@ -25,7 +29,7 @@ fn bench_fib(c: &mut Criterion) {
 
         // plain (no gas instrumentation)
         let (functions, descriptors) = micro_op_fib(false);
-        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
+        let mut exec_ctx = test_txn_ctx(descriptors, NoOpGasMeter);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
@@ -40,7 +44,7 @@ fn bench_fib(c: &mut Criterion) {
 
         // with gas instrumentation
         let (functions_gas, descriptors_gas) = micro_op_fib(true);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {

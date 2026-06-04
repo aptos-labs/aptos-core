@@ -6,11 +6,15 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 const N: u64 = 1_000_000;
 
 fn bench_match_sum(c: &mut Criterion) {
+    use mono_move_gas::NoOpGasMeter;
     use mono_move_programs::{
         match_sum::{micro_op_match_sum, move_bytecode_match_sum, native_match_sum},
         testing,
     };
-    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{
+        testing::{test_txn_ctx, test_txn_ctx_max_budget},
+        InterpreterContext,
+    };
 
     // -- native & micro_op -------------------------------------------------
     {
@@ -25,7 +29,7 @@ fn bench_match_sum(c: &mut Criterion) {
 
         // plain (no gas instrumentation)
         let (functions, descriptors) = micro_op_match_sum(false);
-        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
+        let mut exec_ctx = test_txn_ctx(descriptors, NoOpGasMeter);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
@@ -40,7 +44,7 @@ fn bench_match_sum(c: &mut Criterion) {
 
         // with gas instrumentation
         let (functions_gas, descriptors_gas) = micro_op_match_sum(true);
-        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
+        let mut exec_ctx = test_txn_ctx_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {

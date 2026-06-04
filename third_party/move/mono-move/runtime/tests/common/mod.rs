@@ -7,7 +7,7 @@
 //! per-binary dead-code analysis flags the rest. Suppress the
 //! noise here since the warning is uninformative — every helper is
 //! used by *some* test binary.
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
 
 use mono_move_core::{
     align::{checked_align_max, MAX_ALIGN},
@@ -106,3 +106,10 @@ impl ResourceProvider for InMemoryResources {
         })
     }
 }
+
+// Re-export the shared execution-context harness so storage tests can keep
+// importing it via `common`.
+pub use mono_move_runtime::testing::{
+    test_txn_ctx, test_txn_ctx_max_budget, test_txn_ctx_max_budget_with_heap_size,
+    test_txn_ctx_with_resources, test_txn_ctx_with_resources_and_heap_size,
+};

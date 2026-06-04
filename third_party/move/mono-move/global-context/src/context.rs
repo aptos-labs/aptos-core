@@ -55,7 +55,7 @@ use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
     types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, Interner, ModuleId,
-    ObjectDescriptor,
+    ObjectDescriptor, ObjectDescriptorTable,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -610,6 +610,24 @@ impl<'ctx> ExecutionGuard<'ctx> {
                 });
                 assigned_id
             })
+    }
+
+    /// Replaces the descriptor table wholesale with the entries of a
+    /// pre-built [`ObjectDescriptorTable`]. The table's id scheme matches the
+    /// guard's (reserved `Trivial`/`Closure` at ids `0`/`1`, user entries from
+    /// `2`), so installed descriptors keep their ids.
+    ///
+    /// Test-only: production publishes descriptors incrementally through
+    /// [`Self::publish_vec_descriptor`]. This bypasses the `vector_by_elem`
+    /// idempotency cache, so do not mix it with `publish_vec_descriptor` on
+    /// the same guard.
+    pub fn install_descriptors_for_test(&self, descriptors: ObjectDescriptorTable) {
+        let table: Vec<Arc<ObjectDescriptor>> = descriptors
+            .into_descriptors()
+            .into_iter()
+            .map(Arc::new)
+            .collect();
+        self.ctx.descriptors.table.store(Arc::new(table));
     }
 
     /// Looks up a type previously interned from a signature token of `module`.

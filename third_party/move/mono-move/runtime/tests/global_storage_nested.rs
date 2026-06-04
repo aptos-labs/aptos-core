@@ -19,7 +19,9 @@
 
 mod common;
 
-use common::InMemoryResources;
+use common::{
+    test_txn_ctx_with_resources, test_txn_ctx_with_resources_and_heap_size, InMemoryResources,
+};
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
@@ -28,7 +30,7 @@ use mono_move_core::{
 };
 use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, ExecutionContext, InterpreterContext, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -51,8 +53,21 @@ fn addr(byte: u8) -> AccountAddress {
 fn local_ctx_with<'r>(
     resources: &'r InMemoryResources,
     descriptors: ObjectDescriptorTable,
-) -> LocalRuntimeContext<'r, SimpleGasMeter> {
-    LocalRuntimeContext::new(SimpleGasMeter::new(u64::MAX), resources, descriptors)
+) -> ExecutionContext<'r, 'static, SimpleGasMeter> {
+    test_txn_ctx_with_resources(descriptors, SimpleGasMeter::new(u64::MAX), resources)
+}
+
+fn local_ctx_with_heap_size<'r>(
+    resources: &'r InMemoryResources,
+    descriptors: ObjectDescriptorTable,
+    heap_size: usize,
+) -> ExecutionContext<'r, 'static, SimpleGasMeter> {
+    test_txn_ctx_with_resources_and_heap_size(
+        descriptors,
+        SimpleGasMeter::new(u64::MAX),
+        resources,
+        heap_size,
+    )
 }
 
 /// Frame layout: 32B addr at 8, 16B tmp at 40 (a mutable borrow writes a
@@ -289,8 +304,8 @@ fn deep_copy_survives_gc_mid_walk() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let mut exec_ctx = local_ctx_with(&resources, descriptors);
-    let mut ctx = InterpreterContext::with_heap_size(&mut exec_ctx, &func, 32);
+    let mut exec_ctx = local_ctx_with_heap_size(&resources, descriptors, 32);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(7).into_bytes());
     ctx.run().unwrap();
 
@@ -377,8 +392,8 @@ fn move_from_deep_copies_external_resource_survives_gc_mid_walk() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let mut exec_ctx = local_ctx_with(&resources, descriptors);
-    let mut ctx = InterpreterContext::with_heap_size(&mut exec_ctx, &func, 32);
+    let mut exec_ctx = local_ctx_with_heap_size(&resources, descriptors, 32);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(8).into_bytes());
     ctx.run().unwrap();
 

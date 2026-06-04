@@ -259,6 +259,14 @@ impl ObjectDescriptorTable {
     pub fn len(&self) -> usize {
         self.descriptors.len()
     }
+
+    /// Consumes the table, returning its entries in id order (reserved
+    /// entries at ids `0` and `1`, user entries from
+    /// [`RESERVED_DESCRIPTOR_COUNT`] onward). Used to bulk-install a
+    /// pre-built table into another descriptor store.
+    pub fn into_descriptors(self) -> Vec<ObjectDescriptor> {
+        self.descriptors
+    }
 }
 
 impl Default for ObjectDescriptorTable {

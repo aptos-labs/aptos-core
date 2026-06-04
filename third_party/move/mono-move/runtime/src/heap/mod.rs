@@ -39,10 +39,11 @@ use std::ptr::NonNull;
 
 /// Call-site sugar for the allocation and GC free functions in this module.
 ///
-/// Each macro forwards to an eponymous free function, unpacking the fields
-/// of an `InterpreterContext` binding (`heap`, `descriptors`,
-/// `pinned_roots`, `current_func`, `pc`, `frame_ptr`) as individual
-/// arguments.
+/// Each macro forwards to an eponymous free function, unpacking the heap and
+/// per-transaction state owned by the `InterpreterContext`'s borrowed
+/// `exec_ctx` (`heap`, `read_write_set`, `pinned_roots`) plus the descriptor
+/// provider and the cursor fields (`current_func`, `pc`, `frame_ptr`) as
+/// individual arguments.
 ///
 /// ```ignore
 /// let ptr = heap::macros::alloc_obj!(self, fp, desc_id)?;
@@ -50,13 +51,14 @@ use std::ptr::NonNull;
 ///
 /// # Why macros and not methods
 ///
-/// Rust lacks partial-borrow syntax: a method on `InterpreterContext` that
-/// mutates `heap` would borrow `self` as `&mut`, conflicting with any
-/// outstanding borrow of an unrelated field (e.g. a `PinGuard` that holds
-/// `&self.pinned_roots`). Spelling out the individual field borrows at the
-/// call site lets the compiler see that the borrows are disjoint. The
-/// macro hides that boilerplate while preserving the field-level borrow
-/// granularity.
+/// Rust lacks partial-borrow syntax: a method that mutates the heap would
+/// borrow the whole `exec_ctx` as `&mut`, conflicting with any outstanding
+/// borrow of a sibling field (e.g. a `PinGuard` holding
+/// `&exec_ctx.pinned_roots`). Spelling out the individual field borrows at
+/// the call site lets the compiler see they are disjoint. The descriptor
+/// provider is bound from `exec_ctx.guard()` first: it returns a
+/// `'guard`-lifetime reference decoupled from the `exec_ctx` borrow, so it
+/// can coexist with the `&mut` heap borrow.
 ///
 /// The macros live in a submodule so their `macro_rules!` names don't
 /// collide with the free functions in the value namespace of this module
@@ -65,18 +67,19 @@ pub(crate) mod macros {
     /// Forwards to [`super::alloc_obj`]. Arguments: (`$ctx`, `$fp`,
     /// `$descriptor_id`).
     macro_rules! alloc_obj {
-        ($ctx:ident, $fp:expr, $descriptor_id:expr $(,)?) => {
+        ($ctx:ident, $fp:expr, $descriptor_id:expr $(,)?) => {{
+            let guard = $ctx.exec_ctx.guard();
             $crate::heap::alloc_obj(
-                &mut $ctx.heap,
-                $ctx.exec_ctx,
-                &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &mut $ctx.exec_ctx.heap,
+                guard,
+                &mut $ctx.exec_ctx.read_write_set,
+                &$ctx.exec_ctx.pinned_roots,
                 $fp,
                 $ctx.current_func,
                 $ctx.pc,
                 $descriptor_id,
             )
-        };
+        }};
     }
     pub(crate) use alloc_obj;
 
@@ -89,12 +92,13 @@ pub(crate) mod macros {
             $descriptor_id:expr,
             $elem_size:expr,
             $capacity_in_elems:expr $(,)?
-        ) => {
+        ) => {{
+            let guard = $ctx.exec_ctx.guard();
             $crate::heap::alloc_vec(
-                &mut $ctx.heap,
-                $ctx.exec_ctx,
-                &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &mut $ctx.exec_ctx.heap,
+                guard,
+                &mut $ctx.exec_ctx.read_write_set,
+                &$ctx.exec_ctx.pinned_roots,
                 $fp,
                 $ctx.current_func,
                 $ctx.pc,
@@ -102,7 +106,7 @@ pub(crate) mod macros {
                 $elem_size,
                 $capacity_in_elems,
             )
-        };
+        }};
     }
     pub(crate) use alloc_vec;
 
@@ -115,12 +119,13 @@ pub(crate) mod macros {
             $vec_ref_offset:expr,
             $elem_size:expr,
             $required_cap_in_elems:expr $(,)?
-        ) => {
+        ) => {{
+            let guard = $ctx.exec_ctx.guard();
             $crate::heap::grow_vec_ref(
-                &mut $ctx.heap,
-                $ctx.exec_ctx,
-                &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &mut $ctx.exec_ctx.heap,
+                guard,
+                &mut $ctx.exec_ctx.read_write_set,
+                &$ctx.exec_ctx.pinned_roots,
                 $ctx.current_func,
                 $ctx.pc,
                 $fp,
@@ -128,23 +133,24 @@ pub(crate) mod macros {
                 $elem_size,
                 $required_cap_in_elems,
             )
-        };
+        }};
     }
     pub(crate) use grow_vec_ref;
 
     /// Forwards to [`super::gc_collect`]. Arguments: (`$ctx`,).
     macro_rules! gc_collect {
-        ($ctx:ident $(,)?) => {
+        ($ctx:ident $(,)?) => {{
+            let guard = $ctx.exec_ctx.guard();
             $crate::heap::gc_collect(
-                &mut $ctx.heap,
-                $ctx.exec_ctx,
-                &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &mut $ctx.exec_ctx.heap,
+                guard,
+                &mut $ctx.exec_ctx.read_write_set,
+                &$ctx.exec_ctx.pinned_roots,
                 $ctx.frame_ptr,
                 $ctx.current_func,
                 $ctx.pc,
             )
-        };
+        }};
     }
     pub(crate) use gc_collect;
 }

@@ -27,9 +27,12 @@ use mono_move_core::{
     SortedSafePointEntries,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
+
+mod common;
+use common::test_txn_ctx_max_budget_with_heap_size;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 // ---------------------------------------------------------------------------
@@ -284,12 +287,9 @@ fn gc_stress() {
     let expected = simulate(n, max_len, seed);
 
     let (functions, descriptors) = make_gc_stress_program(n, max_len);
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::with_heap_size(
-        &mut exec_ctx,
-        unsafe { functions[0].as_ref_unchecked() },
-        8 * 1024,
-    );
+    let mut exec_ctx = test_txn_ctx_max_budget_with_heap_size(descriptors, 8 * 1024);
+    let mut ctx =
+        InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
     ctx.set_rng_seed(seed);
     ctx.run().unwrap();
 

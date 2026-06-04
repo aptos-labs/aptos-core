@@ -7,9 +7,7 @@ use mono_move_core::{native::ProductionNativeRegistry, types::EMPTY_TYPE_LIST};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
-use mono_move_runtime::{
-    ExecutionContext, InterpreterContext, LocalRuntimeContext, RuntimeError, TransactionContext,
-};
+use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeError};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -57,7 +55,12 @@ module 0x1::test {
     // SAFETY: `fib` is held alive by the executable cache via `guard`.
     let fib = unsafe { fib.as_ref_unchecked() };
 
-    let mut exec_ctx = LocalRuntimeContext::with_budget(10);
+    let mut exec_ctx = ExecutionContext::new(
+        loader,
+        SimpleGasMeter::new(10),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+        &natives,
+    );
     let mut interpreter = InterpreterContext::new(&mut exec_ctx, fib);
     interpreter.set_root_arg(0, &10u64.to_le_bytes());
     let err = interpreter.run().unwrap_err();
@@ -86,7 +89,7 @@ fn test_out_of_gas_during_load() {
         &natives,
     );
     // 1 gas unit — far below the byte-length cost of any real module.
-    let mut txn_ctx = TransactionContext::new(
+    let mut txn_ctx = ExecutionContext::new(
         loader,
         SimpleGasMeter::new(1),
         &mono_move_core::NO_RESOURCE_PROVIDER,

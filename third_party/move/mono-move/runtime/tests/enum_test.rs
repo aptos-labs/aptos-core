@@ -9,9 +9,12 @@ use mono_move_core::{
     SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
+
+mod common;
+use common::test_txn_ctx_max_budget;
 
 // ---------------------------------------------------------------------------
 // Test 1: enum_basic
@@ -55,7 +58,7 @@ fn enum_basic() {
         frame_layout: FrameLayoutInfo::new(vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -109,7 +112,7 @@ fn enum_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -171,7 +174,7 @@ fn enum_gc_traces_refs() {
         frame_layout: FrameLayoutInfo::new(vec![FO(val), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -236,7 +239,7 @@ fn enum_pattern_match() {
         frame_layout: FrameLayoutInfo::new(vec![FO(op)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -285,7 +288,7 @@ fn enum_variant_switch() {
         frame_layout: FrameLayoutInfo::new(vec![FO(e)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -336,7 +339,7 @@ fn enum_borrow_field() {
         frame_layout: FrameLayoutInfo::new(vec![FO(e), FO(r#ref), FO(e_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -393,7 +396,7 @@ fn enum_gc_variant_switching() {
         frame_layout: FrameLayoutInfo::new(vec![FO(ctr), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -452,7 +455,7 @@ fn enum_in_struct() {
         frame_layout: FrameLayoutInfo::new(vec![FO(wrapper), FO(payload)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
@@ -522,7 +525,7 @@ fn enum_in_vector() {
         frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(e), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 

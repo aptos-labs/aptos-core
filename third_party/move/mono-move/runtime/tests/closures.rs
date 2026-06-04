@@ -17,9 +17,10 @@ use mono_move_core::{
     FrameOffset as FO, Function, FunctionPtr, MicroOp, PackClosureOp, SizedSlot,
     SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{
-    InterpreterContext, LocalRuntimeContext, ObjectDescriptor, ObjectDescriptorTable,
-};
+use mono_move_runtime::{InterpreterContext, ObjectDescriptor, ObjectDescriptorTable};
+
+mod common;
+use common::test_txn_ctx_max_budget;
 
 // ---------------------------------------------------------------------------
 // Descriptors (shared — these describe object *shapes*, not test state)
@@ -349,7 +350,7 @@ fn make_vector_map() -> Function {
 }
 
 fn run_main_and_get_u64_result(main: &Function, descriptors: ObjectDescriptorTable) -> u64 {
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut exec_ctx = test_txn_ctx_max_budget(descriptors);
     let mut ctx = InterpreterContext::new(&mut exec_ctx, main);
     ctx.run().unwrap();
     ctx.root_result()
