@@ -57,11 +57,9 @@ use crate::{
     heap::RootScanner,
     invariant_violation,
 };
+use hashbrown::{hash_map::RawEntryMut, HashMap};
 use mono_move_core::{storage::resource_provider::StorageKey, ResourceProvider, StorageRead};
-use std::{
-    collections::{hash_map, HashMap},
-    ptr::NonNull,
-};
+use std::ptr::NonNull;
 
 /// Counter incremented by every checkpoint. Used to tell whether a pending
 /// write was made in the current checkpoint (and so is directly writable) or
@@ -207,7 +205,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn exists(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &StorageKey,
     ) -> RuntimeResult<bool> {
         Ok(get_or_create_resource_entry(&mut self.entries, provider, key)?.exists())
     }
@@ -217,7 +215,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn borrow_global(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &StorageKey,
     ) -> RuntimeResult<NonNull<u8>> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr()
@@ -237,7 +235,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn try_borrow_global_mut(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &StorageKey,
     ) -> RuntimeResult<EntryPtr> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr_mut(self.current_epoch)
@@ -257,10 +255,10 @@ impl ResourceReadWriteSet {
     ///
     /// [`Self::try_borrow_global_mut`] ensures that entry exists in the map.
     /// If this condition is violated, panics.
-    pub(crate) fn commit_borrow_global_mut(&mut self, key: StorageKey, ptr: NonNull<u8>) {
+    pub(crate) fn commit_borrow_global_mut(&mut self, key: &StorageKey, ptr: NonNull<u8>) {
         let entry = self
             .entries
-            .get_mut(&key)
+            .get_mut(key)
             .expect("Entry must exist after mutable borrow attempt");
         let old_write = std::mem::replace(&mut entry.write, StorageWrite::LocalHeap {
             ptr,
@@ -279,7 +277,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn move_to(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &StorageKey,
         ptr: NonNull<u8>,
     ) -> RuntimeResult<()> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
@@ -306,7 +304,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn try_move_from(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &StorageKey,
     ) -> RuntimeResult<EntryPtr> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
         let ptr = entry.as_ptr_mut(self.current_epoch).ok_or_else(|| {
@@ -336,10 +334,10 @@ impl ResourceReadWriteSet {
     ///
     /// [`Self::try_move_from`] ensures that entry exists in the map.
     /// If this condition is violated, panics.
-    pub(crate) fn commit_move_from(&mut self, key: StorageKey) {
+    pub(crate) fn commit_move_from(&mut self, key: &StorageKey) {
         let entry = self
             .entries
-            .get_mut(&key)
+            .get_mut(key)
             .expect("Entry must exist after move_from attempt");
         let old_write = std::mem::replace(&mut entry.write, StorageWrite::Deleted {
             epoch: self.current_epoch,
@@ -435,9 +433,12 @@ impl ResourceReadWriteSet {
     /// the old one) if:
     ///   - previous write does not exist, or
     ///   - previous write was made in a different (older) epoch.
-    fn record_write_to_journal(&mut self, key: StorageKey, write: StorageWrite) {
+    fn record_write_to_journal(&mut self, key: &StorageKey, write: StorageWrite) {
         if !write.is_at_epoch(self.current_epoch) {
-            self.journal.push(JournalEntry { key, write });
+            self.journal.push(JournalEntry {
+                key: key.clone(),
+                write,
+            });
         }
     }
 }
@@ -447,13 +448,18 @@ impl ResourceReadWriteSet {
 fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<StorageKey, Entry>,
     provider: &dyn ResourceProvider,
-    key: StorageKey,
+    key: &StorageKey,
 ) -> RuntimeResult<&'a mut Entry> {
-    match entries.entry(key) {
-        hash_map::Entry::Occupied(entry) => Ok(entry.into_mut()),
-        hash_map::Entry::Vacant(entry) => Ok(entry.insert(Entry {
-            read: provider.get_resource(key)?,
-            write: StorageWrite::NotModified,
-        })),
+    match entries.raw_entry_mut().from_key(key) {
+        RawEntryMut::Occupied(entry) => Ok(entry.into_mut()),
+        RawEntryMut::Vacant(entry) => {
+            let read = provider.get_resource(key)?;
+            Ok(entry
+                .insert(key.clone(), Entry {
+                    read,
+                    write: StorageWrite::NotModified,
+                })
+                .1)
+        },
     }
 }

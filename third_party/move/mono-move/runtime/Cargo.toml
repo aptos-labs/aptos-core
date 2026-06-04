@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 bcs = { workspace = true }
+hashbrown = { workspace = true }
 mono-move-alloc = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }

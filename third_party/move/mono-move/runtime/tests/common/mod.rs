@@ -106,8 +106,8 @@ impl InMemoryResources {
 }
 
 impl ResourceProvider for InMemoryResources {
-    fn get_resource(&self, key: StorageKey) -> Result<StorageRead, ResourceProviderError> {
-        Ok(match self.entries.borrow().get(&key) {
+    fn get_resource(&self, key: &StorageKey) -> Result<StorageRead, ResourceProviderError> {
+        Ok(match self.entries.borrow().get(key) {
             Some(&ptr) => {
                 // SAFETY: pointer came from `install_anchor`, which
                 // returned the data-region start of a live anchored

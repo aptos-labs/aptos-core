@@ -15,24 +15,38 @@ use thiserror::Error;
 pub type Version = u64;
 
 /// Key to (in-memory) global storage.
-///
-/// A key embeds an [`InternedType`], which is a pointer into the global type
-/// arena. The key is therefore only valid while that arena is alive (for the
-/// duration of execution, bounded by the execution guard). Keys must not be
-/// stored past arena reset, nor compared across two different arenas: equality
-/// and hashing rely on the interned pointer identity.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum StorageKey {
     /// Every resource can be identified in storage by the address where it is
     /// published and its struct/enum type.
+    ///
+    /// A key embeds an [`InternedType`], which is a pointer into the global
+    /// type arena. The key is therefore only valid while that arena is alive
+    /// (for the duration of execution, bounded by the execution guard). Keys
+    /// must not be stored past arena reset, nor compared across two different
+    /// arenas: equality and hashing rely on the interned pointer identity.
     Resource(AccountAddress, InternedType),
-    // TODO: Can add tables and other extensions here.
+    /// A table item, identified by its table handle and the serialized bytes of
+    /// its key.
+    TableItem {
+        handle: AccountAddress,
+        // TODO(perf): consider interning these keys later.
+        key: Box<[u8]>,
+    },
 }
 
 impl StorageKey {
+    /// Builds a table item key from its handle and the serialized key bytes.
+    pub fn table_item(handle: AccountAddress, key: Box<[u8]>) -> Self {
+        StorageKey::TableItem { handle, key }
+    }
+
+    /// Returns the address a key is anchored at: the publishing address for a
+    /// resource, or the table handle for a table item.
     pub fn address(&self) -> AccountAddress {
         match self {
             StorageKey::Resource(addr, _) => *addr,
+            StorageKey::TableItem { handle, .. } => *handle,
         }
     }
 }
@@ -84,14 +98,14 @@ pub trait ResourceProvider {
     /// Returns [`StorageRead::DoesNotExist`] if the resource does not exist.
     /// Returns a [`ResourceProviderError`] if the backend cannot satisfy the
     /// read.
-    fn get_resource(&self, key: StorageKey) -> Result<StorageRead, ResourceProviderError>;
+    fn get_resource(&self, key: &StorageKey) -> Result<StorageRead, ResourceProviderError>;
 }
 
 /// Empty storage with no resources.
 pub struct NoResourceProvider;
 
 impl ResourceProvider for NoResourceProvider {
-    fn get_resource(&self, _key: StorageKey) -> Result<StorageRead, ResourceProviderError> {
+    fn get_resource(&self, _key: &StorageKey) -> Result<StorageRead, ResourceProviderError> {
         Ok(StorageRead::DoesNotExist)
     }
 }
