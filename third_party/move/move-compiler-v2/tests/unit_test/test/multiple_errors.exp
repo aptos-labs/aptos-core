@@ -1,17 +1,69 @@
 
 Diagnostics:
-error: duplicate declaration, item, or annotation
-   ┌─ tests/unit_test/test/multiple_errors.move:27:7
+error: Unsupported attribute value
+   ┌─ tests/unit_test/test/multiple_errors.move:19:12
+   │
+19 │     #[test(_a=Foo)]
+   │            ^^^^^^
+   │            │
+   │            Assigned in this attribute
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/multiple_errors.move:20:16
+   │
+19 │     #[test(_a=Foo)]
+   │       ------------ Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
+20 │     public fun b(_a: signer) { }
+   │                ^ -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/multiple_errors.move:28:16
    │
 26 │     #[test(_a=@0x1)]
-   │       ---- Attribute previously given here
+   │       ------------- Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
 27 │     #[test(_b=@0x2)]
-   │       ^^^^^^^^^^^^^ Duplicate attribute 'test' attached to the same item
+28 │     public fun d(_a: signer, _b: signer) { }
+   │                ^             -- Corresponding to this parameter
 
-error: duplicate declaration, item, or annotation
-   ┌─ tests/unit_test/test/multiple_errors.move:42:7
+error: unable to generate test
+   ┌─ tests/unit_test/test/multiple_errors.move:28:16
    │
-41 │     #[expected_failure]
-   │       ---------------- Attribute previously given here
+27 │     #[test(_b=@0x2)]
+   │       ------------- Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
+28 │     public fun d(_a: signer, _b: signer) { }
+   │                ^ -- Corresponding to this parameter
+
+error: invalid usage of known attribute
+   ┌─ tests/unit_test/test/multiple_errors.move:33:16
+   │
+31 │     #[test(_a=@0x1)]
+   │       ------------- Previously annotated here
+32 │     #[test_only]
+   │       --------- Function annotated as both #[test(...)] and #[test_only]. You need to declare it as either one or the other
+33 │     public fun e(_a: signer, _b: signer) { }
+   │                ^
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/multiple_errors.move:33:16
+   │
+31 │     #[test(_a=@0x1)]
+   │       ------------- Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
+32 │     #[test_only]
+33 │     public fun e(_a: signer, _b: signer) { }
+   │                ^             -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/multiple_errors.move:37:16
+   │
+36 │     #[test(_a=@0x1)]
+   │       ------------- Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
+37 │     public fun f(_a: signer, _b: signer) { }
+   │                ^             -- Corresponding to this parameter
+
+error: Multiple top-level #[expected_failure] attributes on a test function
+   ┌─ tests/unit_test/test/multiple_errors.move:43:16
+   │
 42 │     #[expected_failure]
-   │       ^^^^^^^^^^^^^^^^ Duplicate attribute 'expected_failure' attached to the same item
+   │       ---------------- Second top-level occurrence here
+43 │     public fun g(_a: signer, _b: signer) { }
+   │                ^

@@ -22,7 +22,7 @@ module M {
     #[test(_a=@0x1, _b=@0x2)]
     public fun c(_a: signer, _b: signer) { }
 
-    // failure: double annotation
+    // failure: each parametric row omits one required argument
     #[test(_a=@0x1)]
     #[test(_b=@0x2)]
     public fun d(_a: signer, _b: signer) { }
@@ -32,11 +32,11 @@ module M {
     #[test_only]
     public fun e(_a: signer, _b: signer) { }
 
-    // failure: invalid number of signer arguments
+    // failure: missing required signer argument
     #[test(_a=@0x1)]
     public fun f(_a: signer, _b: signer) { }
 
-    // failure: double annotation
+    // failure: multiple top-level expected_failure annotations
     #[test(_a=@0x1)]
     #[expected_failure]
     #[expected_failure]
