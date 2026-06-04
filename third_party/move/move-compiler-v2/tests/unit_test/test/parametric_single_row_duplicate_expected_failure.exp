@@ -1,0 +1,2 @@
+Diagnostics:
+error: Multiple #[expected_failure] attributes on a single-row test function

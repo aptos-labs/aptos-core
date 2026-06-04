@@ -1,0 +1,2 @@
+Diagnostics:
+error: top-level expected_failure is not allowed on a parametric multi-row test
