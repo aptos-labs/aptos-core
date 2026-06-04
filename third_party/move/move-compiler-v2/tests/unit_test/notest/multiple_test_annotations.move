@@ -1,5 +1,4 @@
-// cannot have multiple #[test] attributes. Only one test attribute is allowed,
-// and all signer arguments need to be assigned in that attribute.
+// Test-planner row validation is ignored when test code is disabled.
 address 0x1 {
 module M {
     #[test(_a=@0x1)]
