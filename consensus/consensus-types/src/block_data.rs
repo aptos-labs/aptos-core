@@ -86,8 +86,8 @@ pub struct BlockData {
     ///   3. If a block of transactions B has a QC with timestamp T, an honest validator
     ///      will not serve such a block to other validators until its own clock >= timestamp T.
     ///   4. Current: an honest validator is not issuing blocks with a timestamp in the
-    ///       future. Currently we consider a block is malicious if it was issued more
-    ///       that 5 minutes in the future.
+    ///      future. Currently we consider a block is malicious if it was issued more
+    ///      that 5 minutes in the future.
     timestamp_usecs: u64,
     /// Contains the quorum certified ancestor and whether the quorum certified ancestor was
     /// voted on successfully

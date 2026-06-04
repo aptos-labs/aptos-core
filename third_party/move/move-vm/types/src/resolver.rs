@@ -17,11 +17,9 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 /// Storage backends should return
 ///   - Ok(Some(..)) if the data exists
 ///   - Ok(None)     if the data does not exist
-///   - Err(..)      only when something really wrong happens, for example
-///                    - invariants are broken and observable from the storage side
-///                      (this is not currently possible as ModuleId and StructTag
-///                       are always structurally valid)
-///                    - storage encounters internal error
+///   - Err(..)      only when something really wrong happens, for example when invariants are
+///     broken and observable from the storage side (this is not currently possible as ModuleId and
+///     StructTag are always structurally valid), or storage encounters internal error
 pub trait ResourceResolver {
     fn get_resource_bytes_with_metadata_and_layout(
         &self,

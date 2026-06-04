@@ -1643,18 +1643,17 @@ async fn test_multivalidator_staking_reward_impl() {
 
     // Enable the STAKE_REWARD_USING_TREASURY feature after GGP has sufficient balance
     println!("Enabling stake_reward_using_treasury feature...");
-    let enable_feature_script = format!(
-        r#"
-    script {{
+    let enable_feature_script = r#"
+    script {
         use aptos_framework::aptos_governance;
         use std::features;
-        fun main(core_resources: &signer) {{
+        fun main(core_resources: &signer) {
             let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             features::change_feature_flags_for_next_epoch(&framework_signer, vector[224], vector[]);
-        }}
-    }}
+        }
+    }
     "#
-    );
+    .to_string();
 
     cli.run_script(0, &enable_feature_script)
         .await
@@ -2033,7 +2032,7 @@ async fn test_governed_gas_pool_depletion_failsafe_impl() {
     const BASE_STAKE: u64 = 100_000_000; // 1 APT
 
     // Spin up 4 validators with varying stake amounts to simulate a realistic network
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(|_, conf, _| {
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;

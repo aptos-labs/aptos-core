@@ -151,6 +151,7 @@ pub enum FeatureFlag {
     DistributeTransactionFee,
     GovernedGasPool,
     SteakRewardUsingTreasury,
+    ExtractAbortInfoExactMatch,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -399,6 +400,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
             FeatureFlag::GovernedGasPool => AptosFeatureFlag::GOVERNED_GAS_POOL,
             FeatureFlag::SteakRewardUsingTreasury => AptosFeatureFlag::STAKE_REWARD_USING_TREASURY,
+            FeatureFlag::ExtractAbortInfoExactMatch => {
+                AptosFeatureFlag::EXTRACT_ABORT_INFO_EXACT_MATCH
+            },
         }
     }
 }
@@ -574,6 +578,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
             AptosFeatureFlag::GOVERNED_GAS_POOL => FeatureFlag::GovernedGasPool,
             AptosFeatureFlag::STAKE_REWARD_USING_TREASURY => FeatureFlag::SteakRewardUsingTreasury,
+            AptosFeatureFlag::EXTRACT_ABORT_INFO_EXACT_MATCH => {
+                FeatureFlag::ExtractAbortInfoExactMatch
+            },
         }
     }
 }

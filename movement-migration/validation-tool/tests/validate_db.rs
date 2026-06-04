@@ -23,8 +23,8 @@ async fn validate_node_aptos_db() -> Result<(), anyhow::Error> {
     let movement_db = temp_dir_old.path();
     let movement_aptos_db = temp_dir_new.path();
 
-    extract_tar_archive(&archive_path, movement_db)?;
-    extract_tar_archive(&archive_path, movement_aptos_db)?;
+    extract_tar_archive(archive_path, movement_db)?;
+    extract_tar_archive(archive_path, movement_aptos_db)?;
 
     let mut movement_db = movement_db.to_path_buf();
     movement_db.push(".maptos");

@@ -3,6 +3,14 @@ processed 5 tasks
 task 2 'run'. lines 32-32:
 Events:
 {
+    type:    0x1::fungible_asset::Withdraw
+    data:    "8fa793b2930c0b9158c16a41f496e34b567b3128a59f48ee5c73f5ab896661e9d07e010000000000"
+}
+{
+    type:    0x1::fungible_asset::Deposit
+    data:    "0975b461453e8c36ba66937eaf7f874f7d6a9b26d65e89389304bd1bfee94809d07e010000000000"
+}
+{
     type:    0x1::transaction_fee::FeeStatement
     data:    "620000000000000004000000000000000100000000000000386c0100000000000000000000000000"
 }mutable inputs after call: local#0: 0
@@ -10,6 +18,14 @@ return values: 0
 
 task 3 'run'. lines 34-34:
 Events:
+{
+    type:    0x1::fungible_asset::Withdraw
+    data:    "8fa793b2930c0b9158c16a41f496e34b567b3128a59f48ee5c73f5ab896661e98813000000000000"
+}
+{
+    type:    0x1::fungible_asset::Deposit
+    data:    "0975b461453e8c36ba66937eaf7f874f7d6a9b26d65e89389304bd1bfee948098813000000000000"
+}
 {
     type:    0x1::transaction_fee::FeeStatement
     data:    "05000000000000000300000000000000020000000000000018010000000000000000000000000000"

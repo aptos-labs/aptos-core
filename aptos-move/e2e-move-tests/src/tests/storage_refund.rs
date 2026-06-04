@@ -13,6 +13,8 @@ use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
 
 #[test]
+// TODO: Re-enable once storage refunds are supported again.
+#[ignore = "storage refund is currently disabled"]
 fn test_refunds() {
     let mut h = MoveHarness::new_with_features(
         vec![

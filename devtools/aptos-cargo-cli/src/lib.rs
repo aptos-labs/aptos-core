@@ -462,10 +462,12 @@ fn run_targeted_unit_tests(
     mut direct_args: Vec<String>,
     push_through_args: Vec<String>,
 ) -> anyhow::Result<()> {
-    // Add each package to the arguments
+    // Add each package to the arguments using full package specifications to avoid ambiguity
     for package in packages_to_test {
         direct_args.push("-p".into());
-        direct_args.push(get_package_name_from_path(&package));
+        // Use full package specification instead of just the name to resolve ambiguity
+        // when multiple packages with the same name exist (e.g., workspace vs git dependency)
+        direct_args.push(package);
     }
 
     // Create the command to run the unit tests

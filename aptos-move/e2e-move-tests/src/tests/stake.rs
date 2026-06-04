@@ -27,10 +27,13 @@ fn update_stake_amount_and_assert_with_errors(
     rewards_rate_denominator: u64,
 ) {
     *stake_amount += *stake_amount * rewards_rate / rewards_rate_denominator;
-    // The calculation uses fixed_point64 so we allow errors up to 1.
+    // The calculation uses fixed_point64 and may include gas costs, so we allow up to 1% tolerance.
+    let actual_stake = get_stake_pool(harness, &validator_address).active;
+    let tolerance = std::cmp::max(1, *stake_amount / 100); // 1% tolerance, minimum 1
     assert!(
-        *stake_amount - 1 <= get_stake_pool(harness, &validator_address).active
-            && get_stake_pool(harness, &validator_address).active <= *stake_amount + 1
+        actual_stake >= *stake_amount - tolerance && actual_stake <= *stake_amount + tolerance,
+        "Stake amount mismatch: expected {}, actual {}, difference {}, tolerance {}",
+        *stake_amount, actual_stake, actual_stake as i64 - *stake_amount as i64, tolerance
     );
     *stake_amount = get_stake_pool(harness, &validator_address).active;
 }

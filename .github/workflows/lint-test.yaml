@@ -256,7 +256,7 @@ jobs:
       - uses: ./.github/actions/rust-ci-image-setup
       - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
         env:
-          RUST_MIN_STACK: 4297152
+          RUST_MIN_STACK: 33554432
 
   # Run the consensus only smoke test
   rust-consensus-only-smoke-test:

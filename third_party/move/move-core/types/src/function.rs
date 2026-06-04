@@ -160,7 +160,8 @@ impl ClosureMask {
     /// all arguments such that:
     ///   - if argument is captured, an entry from the vector is added to the final vector,
     ///   - if argument is not captured, "_" is added to the final vector.
-    /// The last element of a vector is "..", indicating possibly mor non-captured arguments (it is
+    ///
+    /// The last element of a vector is "..", indicating possibly more non-captured arguments (it is
     /// not possible to deduce if there are any because the mask is simply 0).
     ///
     /// In case there is any error, a vector of a single dummy value is returned.

@@ -31,6 +31,7 @@ use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
+    ledger_info::set_waypoint_version,
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
@@ -292,7 +293,7 @@ async fn create_validator_driver(
         .state_sync_driver
         .enable_auto_bootstrapping = true;
 
-    create_driver_for_tests(node_config, Waypoint::default(), event_key_subscriptions).await
+    create_driver_for_tests_with_waypoint(node_config, event_key_subscriptions).await
 }
 
 /// Creates a state sync driver for a full node
@@ -311,7 +312,44 @@ async fn create_full_node_driver(
     let mut node_config = NodeConfig::default();
     node_config.base.role = RoleType::FullNode;
 
-    create_driver_for_tests(node_config, Waypoint::default(), event_key_subscriptions).await
+    create_driver_for_tests_with_waypoint(node_config, event_key_subscriptions).await
+}
+
+/// Creates a state sync driver using the given node config with proper waypoint from genesis
+async fn create_driver_for_tests_with_waypoint(
+    node_config: NodeConfig,
+    event_key_subscriptions: Option<Vec<EventKey>>,
+) -> (
+    DriverFactory,
+    UnboundedSender<CommitNotification>,
+    ConsensusNotifier,
+    MempoolNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
+    EventNotificationListener,
+    StorageServiceNotificationListener,
+    TimeService,
+) {
+    // Initialize the logger for tests
+    aptos_logger::Logger::init_for_testing();
+
+    // Create test aptos database
+    let db_path = aptos_temppath::TempPath::new();
+    db_path.create_as_dir().unwrap();
+    let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
+
+    // Bootstrap the genesis transaction
+    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
+    bootstrap_genesis::<AptosVMBlockExecutor>(&db_rw, &genesis_txn).unwrap();
+
+    // Get the actual waypoint from the bootstrapped database
+    let genesis_ledger_info = db_rw.reader.get_latest_ledger_info().unwrap();
+    let waypoint = Waypoint::new_any(genesis_ledger_info.ledger_info());
+
+    // Set the global waypoint version for event notifications
+    set_waypoint_version(waypoint.version());
+
+    create_driver_for_tests(node_config, waypoint, event_key_subscriptions).await
 }
 
 /// Creates a state sync driver using the given node config and waypoint

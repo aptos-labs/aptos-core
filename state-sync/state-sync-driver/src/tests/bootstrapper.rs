@@ -15,7 +15,7 @@ use crate::{
             create_epoch_ending_ledger_info_for_epoch, create_full_node_driver_configuration,
             create_global_summary, create_global_summary_with_version,
             create_output_list_with_proof, create_random_epoch_ending_ledger_info,
-            create_transaction_list_with_proof,
+            create_random_u64, create_transaction_list_with_proof,
         },
     },
     utils::OutputFallbackHandler,
@@ -24,6 +24,7 @@ use aptos_config::config::BootstrappingMode;
 use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_time_service::TimeService;
@@ -32,7 +33,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use claims::{assert_matches, assert_none, assert_ok};
-use futures::{channel::oneshot, FutureExt, SinkExt};
+use futures::{channel::{mpsc, oneshot}, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};
 use std::{sync::Arc, time::Duration};
 
@@ -904,7 +905,7 @@ async fn test_fetch_epoch_ending_ledger_infos_timeout() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "Failed to verify the waypoint: Waypoint value mismatch")]
+#[should_panic(expected = "Waypoint verification failed: Waypoint value mismatch")]
 async fn test_fetch_epoch_ending_ledger_infos_waypoint_mismatch() {
     // Create a driver configuration
     let mut driver_configuration = create_full_node_driver_configuration();
@@ -917,11 +918,19 @@ async fn test_fetch_epoch_ending_ledger_infos_waypoint_mismatch() {
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
-    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
+    let data_stream_id = create_random_u64();
+    let (mut notification_sender, notification_receiver) = mpsc::channel(100);
+    let data_stream_listener = DataStreamListener::new(data_stream_id, notification_receiver);
     mock_streaming_client
         .expect_get_all_epoch_ending_ledger_infos()
         .with(eq(1))
         .return_once(move |_| Ok(data_stream_listener));
+
+    // Expect terminate_stream_with_feedback to be called when waypoint verification fails
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     // Create the bootstrapper
     let (mut bootstrapper, _) =

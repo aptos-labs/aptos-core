@@ -61,8 +61,7 @@ impl GlobalStorageIncludes {
             .iter()
             .map_err(|e| ValidationError::Internal(e.into()))?;
 
-        let mut count = 0;
-        for movement_state_key in movement_global_state_keys {
+        for (count, movement_state_key) in movement_global_state_keys.enumerate() {
             debug!(
                 "processing movement_state_key {}: {:?}",
                 count, movement_state_key
@@ -117,24 +116,21 @@ impl GlobalStorageIncludes {
                 None => {
                     debug!("Value from a previous version has been removed at the latest ledger version");
 
-                    match maptos_state_view
+                    if maptos_state_view
                         .get_state_value(&movement_state_key)
                         .map_err(|e| ValidationError::Internal(e.into()))?
+                        .is_some()
                     {
-                        Some(_) => {
-                            return Err(ValidationError::Unsatisfied(
-                                format!(
-                                    "Movement Aptos is unexpectedly not missing a value for {:?}",
-                                    movement_state_key
-                                )
-                                .into(),
-                            ));
-                        },
-                        None => {},
+                        return Err(ValidationError::Unsatisfied(
+                            format!(
+                                "Movement Aptos is unexpectedly not missing a value for {:?}",
+                                movement_state_key
+                            )
+                            .into(),
+                        ));
                     }
                 },
             }
-            count += 1;
         }
 
         Ok(())

@@ -1856,10 +1856,10 @@ impl Value {
     }
 
     pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
-            Value::address(x),
-            Value::address(perm_storage_address),
-        ]))
+        Self::struct_(Struct::pack_variant(
+            PERMISSIONED_SIGNER_VARIANT,
+            vec![Value::address(x), Value::address(perm_storage_address)],
+        ))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
@@ -4246,6 +4246,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
 
 struct VectorElementVisitor<'c, 'l>(DeserializationSeed<'c, &'l MoveTypeLayout>);
 
+#[allow(clippy::needless_lifetimes)] // TODO(prover-cleanup): revisit serde Visitor lifetime elision.
 impl<'d, 'c, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l> {
     type Value = Vec<ValueImpl>;
 
@@ -4270,6 +4271,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l> {
 
 struct StructFieldVisitor<'c, 'l>(&'c ValueSerDeContext<'c>, &'l [MoveTypeLayout]);
 
+#[allow(clippy::needless_lifetimes)] // TODO(prover-cleanup): revisit serde Visitor lifetime elision.
 impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l> {
     type Value = Vec<Value>;
 
@@ -4298,6 +4300,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l> {
 
 struct StructVariantVisitor<'c, 'l>(&'c ValueSerDeContext<'c>, &'l [Vec<MoveTypeLayout>]);
 
+#[allow(clippy::needless_lifetimes)] // TODO(prover-cleanup): revisit serde Visitor lifetime elision.
 impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
     type Value = Vec<Value>;
 
@@ -4955,7 +4958,7 @@ fn try_get_variant_field_layouts<'a>(
 }
 
 fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
-    if max_depth.map_or(false, |max_depth| depth > max_depth) {
+    if max_depth.is_some_and(|max_depth| depth > max_depth) {
         return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
     }
     Ok(())

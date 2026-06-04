@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::RwLock;
-use aptos_logger::{aptos_logger::AptosData, Writer};
+use aptos_logger::{aptos_logger::AptosData, Filter, LevelFilter, Writer};
 use std::sync::Arc;
 use tracing::Level;
 
@@ -40,11 +40,12 @@ fn verify_tracing_kvs() {
     // set up the logger
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
-    AptosData::builder()
+    let logger = AptosData::builder()
         .is_async(false)
         .tokio_console_port(None)
         .printer(Box::new(writer.write_to_stderr(false)))
         .build();
+    logger.set_local_filter(Filter::builder().filter_level(LevelFilter::Info).build());
 
     assert_eq!(logs.read().len(), 0);
 

@@ -96,7 +96,9 @@ pub fn create_full_node_driver_configuration() -> DriverConfiguration {
     let config = StateSyncDriverConfig::default();
     let consensus_observer_config = ConsensusObserverConfig::default();
     let role = RoleType::FullNode;
-    let waypoint = Waypoint::default();
+    // Use a proper genesis waypoint instead of default
+    let genesis_ledger_info = create_epoch_ending_ledger_info();
+    let waypoint = Waypoint::new_any(genesis_ledger_info.ledger_info());
 
     DriverConfiguration {
         config,
@@ -185,7 +187,7 @@ pub fn create_epoch_state(epoch: u64) -> EpochState {
 }
 
 /// Returns a random u64
-fn create_random_u64() -> u64 {
+pub fn create_random_u64() -> u64 {
     let mut rng = OsRng;
     rng.gen()
 }

@@ -111,7 +111,7 @@ impl GlobalFeatureCheck {
                 })?
                 .into_inner();
 
-            let maptos_active = maptos_active.get(0).ok_or_else(|| {
+            let maptos_active = maptos_active.first().ok_or_else(|| {
                 ValidationError::Internal(
                     format!(
                         "failed to get Movement feature flag {}: response is empty",

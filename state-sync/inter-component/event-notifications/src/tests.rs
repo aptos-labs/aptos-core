@@ -17,6 +17,7 @@ use aptos_types::{
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     contract_event::ContractEvent,
     event::EventKey,
+    ledger_info::set_waypoint_version,
     on_chain_config,
     on_chain_config::OnChainConfig,
     transaction::{Transaction, Version, WriteSetPayload},
@@ -562,12 +563,15 @@ fn create_database() -> Arc<RwLock<DbReaderWriter>> {
     assert_ok!(db_path.create_as_dir());
     let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
-    // Bootstrap the genesis transaction
+    // Bootstrap the genesis transaction and capture the waypoint
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    assert_ok!(bootstrap_genesis::<AptosVMBlockExecutor>(
+    let waypoint = assert_ok!(bootstrap_genesis::<AptosVMBlockExecutor>(
         &db_rw,
         &genesis_txn
     ));
+
+    // Initialize the global waypoint version
+    set_waypoint_version(waypoint.version());
 
     Arc::new(RwLock::new(db_rw))
 }

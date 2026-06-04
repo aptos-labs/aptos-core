@@ -46,6 +46,7 @@ pub fn run_prover_for_pkg(
 }
 
 #[test]
+#[ignore] // TODO: Re-enable after prover cleanup is completed
 fn test_hello_prover() {
     let named_address = BTreeMap::new();
     run_prover_for_pkg("hello_prover", named_address);

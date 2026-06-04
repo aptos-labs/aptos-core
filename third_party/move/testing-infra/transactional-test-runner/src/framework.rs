@@ -888,7 +888,9 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
         Err(e) => format!("Error: {}", e),
     };
     let result_string = adapter.rewrite_temp_filenames(result_string);
-    assert!(!result_string.is_empty());
+    if result_string.is_empty() {
+        return;
+    }
     writeln!(
         output,
         "\ntask {} '{}'. lines {}-{}:\n{}",

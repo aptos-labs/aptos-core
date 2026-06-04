@@ -18,4 +18,4 @@ pauser = "0xdafe"
 denylister = "0xcade"
 
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
+AptosFramework = { local = "../../../framework/aptos-framework" }

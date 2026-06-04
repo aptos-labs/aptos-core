@@ -830,8 +830,8 @@ mod tests {
         debug, error, info,
         logger::Logger,
         telemetry_log_writer::TelemetryLog,
-        trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
-        Schema, Value, Visitor, Writer,
+        trace, warn, AptosDataBuilder, Event, Filter, Key, KeyValue, Level, LevelFilter,
+        LoggerFilterUpdater, Metadata, Schema, Value, Visitor, Writer,
     };
     use chrono::{DateTime, Utc};
     use futures::StreamExt;
@@ -1098,7 +1098,10 @@ mod tests {
             .custom_format(text_format)
             .printer(Box::new(mock_writer))
             .is_async(true)
+            .enable_telemetry_flush(false)
             .build_logger();
+        logger.set_local_filter(Filter::builder().filter_level(LevelFilter::Debug).build());
+        logger.set_telemetry_filter(Filter::builder().filter_level(LevelFilter::Debug).build());
 
         (logger, logs, rx)
     }

@@ -1402,9 +1402,9 @@ fn load_ability_set(
             AbilitySetPosition::FunctionTypeParameters
             | AbilitySetPosition::StructTypeParameters => {
                 let set = match DeprecatedKind::from_u8(byte)? {
-                    DeprecatedKind::ALL => AbilitySet::EMPTY,
-                    DeprecatedKind::COPYABLE => AbilitySet::EMPTY | Ability::Copy | Ability::Drop,
-                    DeprecatedKind::RESOURCE => AbilitySet::EMPTY | Ability::Key,
+                    DeprecatedKind::All => AbilitySet::EMPTY,
+                    DeprecatedKind::Copyable => AbilitySet::EMPTY | Ability::Copy | Ability::Drop,
+                    DeprecatedKind::Resource => AbilitySet::EMPTY | Ability::Key,
                 };
                 Ok(match pos {
                     AbilitySetPosition::StructHandle => unreachable!(),
@@ -2015,17 +2015,17 @@ impl DeprecatedNominalResourceFlag {
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 enum DeprecatedKind {
-    ALL = 0x1,
-    COPYABLE = 0x2,
-    RESOURCE = 0x3,
+    All = 0x1,
+    Copyable = 0x2,
+    Resource = 0x3,
 }
 
 impl DeprecatedKind {
     fn from_u8(value: u8) -> BinaryLoaderResult<DeprecatedKind> {
         match value {
-            0x1 => Ok(DeprecatedKind::ALL),
-            0x2 => Ok(DeprecatedKind::COPYABLE),
-            0x3 => Ok(DeprecatedKind::RESOURCE),
+            0x1 => Ok(DeprecatedKind::All),
+            0x2 => Ok(DeprecatedKind::Copyable),
+            0x3 => Ok(DeprecatedKind::Resource),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_ABILITY)),
         }
     }

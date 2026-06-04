@@ -84,7 +84,6 @@ impl QuorumCert {
     /// - the map of signatures is empty because genesis block is implicitly agreed.
     // TODO(l1-migration): This is for recovery when we lost consensu DB data
     // We create this virual block and don't want to add 1 since it is not epoch_ending block
-
     pub fn certificate_for_genesis_from_ledger_info(
         ledger_info: &LedgerInfo,
         genesis_id: HashValue,
@@ -98,27 +97,15 @@ impl QuorumCert {
             ledger_info.epoch()
         };
 
-        let ancestor = if ledger_info.ends_epoch() {
-            BlockInfo::new(
-                ancestor_epoch,
-                0,
-                genesis_id,
-                ledger_info.transaction_accumulator_hash(),
-                ledger_info.version(),
-                ledger_info.timestamp_usecs(),
-                None,
-            )
-        } else {
-            BlockInfo::new(
-                ancestor_epoch,
-                0,
-                genesis_id,
-                ledger_info.transaction_accumulator_hash(),
-                ledger_info.version(),
-                ledger_info.timestamp_usecs(),
-                None,
-            )
-        };
+        let ancestor = BlockInfo::new(
+            ancestor_epoch,
+            0,
+            genesis_id,
+            ledger_info.transaction_accumulator_hash(),
+            ledger_info.version(),
+            ledger_info.timestamp_usecs(),
+            None,
+        );
 
         let vote_data = VoteData::new(ancestor.clone(), ancestor.clone());
         let li = LedgerInfo::new(ancestor, vote_data.hash());

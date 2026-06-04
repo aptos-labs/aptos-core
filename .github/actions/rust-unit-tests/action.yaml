@@ -57,7 +57,7 @@ runs:
       shell: bash
       env:
         NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
-        RUST_MIN_STACK: "4297152"
+        RUST_MIN_STACK: "33554432"
         MVP_TEST_ON_CI: "true"
 
     - name: Upload results
