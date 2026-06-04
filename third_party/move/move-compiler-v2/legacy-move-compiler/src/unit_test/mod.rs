@@ -44,7 +44,8 @@ pub struct ModuleTestPlan {
 
 #[derive(Debug, Clone)]
 pub struct TestCase {
-    pub test_name: TestName,
+    /// Original Move function name used for VM execution.
+    pub function_name: TestName,
     pub arguments: Vec<MoveValue>,
     pub expected_failure: Option<ExpectedFailure>,
 }

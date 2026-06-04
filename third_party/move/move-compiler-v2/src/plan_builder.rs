@@ -178,7 +178,7 @@ fn build_test_info(
             .expected_failure_attr
             .and_then(|attr| parse_failure_attribute(env, current_module, attr));
         out.push((test_name.clone(), TestCase {
-            test_name,
+            function_name: test_name,
             arguments,
             expected_failure,
         }));
