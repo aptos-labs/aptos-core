@@ -4,10 +4,12 @@
 //! Minimal [`ExecutionContext`] + [`DescriptorProvider`] impl for tests
 //! and benchmarks that don't go through the full loader stack.
 
-use crate::{error::RuntimeResult, ExecutionContext, LocalExecutionContext};
+use crate::{
+    error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext,
+    LocalExecutionContext,
+};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::ProductionNativeRegistry,
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
     ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout, ValueLayoutTable,
@@ -116,8 +118,15 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
         self.inner.natives()
     }
 
-    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
-        self.inner.natives_and_gas_meter()
+    fn natives_descriptors_and_gas_meter(
+        &mut self,
+    ) -> (
+        &ProductionNativeRegistry<G>,
+        &dyn DescriptorProvider,
+        &mut G,
+    ) {
+        let (natives, _, gas_meter) = self.inner.natives_descriptors_and_gas_meter();
+        (natives, &self.descriptors, gas_meter)
     }
 
     fn load_function(

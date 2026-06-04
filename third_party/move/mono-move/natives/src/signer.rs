@@ -14,9 +14,7 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 ///
 /// No-op. A `signer` has the same 32-byte layout as its `address`, so no conversion
 /// needs to be done.
-pub fn native_create_signer<C: NativeContext>(
-    _ctx: &mut C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_create_signer<C: NativeContext>(_ctx: &C) -> Result<NativeStatus, VMInternalError> {
     Ok(NativeStatus::Success)
 }
 
@@ -24,9 +22,7 @@ pub fn native_create_signer<C: NativeContext>(
 ///
 /// No-op. A `signer` has the same 32-byte layout as its `address`, so no change to
 /// the reference as well.
-pub fn native_borrow_address<C: NativeContext>(
-    _ctx: &mut C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_borrow_address<C: NativeContext>(_ctx: &C) -> Result<NativeStatus, VMInternalError> {
     Ok(NativeStatus::Success)
 }
 
@@ -34,7 +30,7 @@ pub fn native_borrow_address<C: NativeContext>(
 ///
 /// Always returns `false` as we do not support permissioned signers for now.
 pub fn native_is_permissioned_signer<C: NativeContext>(
-    ctx: &mut C,
+    ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: `bool` matches the Move-level `bool` return at slot 0.
     unsafe { ctx.set_return(0, false) }?;

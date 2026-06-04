@@ -9,11 +9,13 @@
 //! `CallIndirect` at runtime lazily loads it through the transaction
 //! context.
 
-use mono_move_core::{native::ProductionNativeRegistry, types::EMPTY_TYPE_LIST};
+use mono_move_core::types::EMPTY_TYPE_LIST;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_runtime::{ExecutionContext, InterpreterContext, TransactionContext};
+use mono_move_runtime::{
+    ExecutionContext, InterpreterContext, ProductionNativeRegistry, TransactionContext,
+};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 

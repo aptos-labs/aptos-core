@@ -12,7 +12,6 @@ use crate::{
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        pinned_roots::PinnedRoots,
         AllocationError, Heap,
     },
     invariant_violation,
@@ -21,6 +20,7 @@ use crate::{
         read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr, write_bool, write_fat_ptr,
         write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
     },
+    native_context::ProductionNativeContext,
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
@@ -30,9 +30,10 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
+    native::{NativeABI, NativeIdx, NativeStatus, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
+    types::{view_type_list, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
@@ -69,7 +70,7 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + Lay
     /// Auxiliary GC root set for temporarily-live heap pointers that are
     /// not yet stored in any frame slot (e.g. between two allocations in a
     /// fused micro-op, or in native functions).
-    pub(crate) pinned_roots: PinnedRoots,
+    pub(crate) root_pool: RootPool,
     /// Per-transaction global-storage state: working map of cached
     /// reads / pending writes, linear journal for rollback, and
     /// checkpoint stack.
@@ -112,7 +113,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
-            pinned_roots: PinnedRoots::new(),
+            root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
         }
@@ -195,14 +196,30 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
     }
 
-    /// Read `size` raw bytes from the root frame at the given byte offset.
-    pub fn root_result_bytes(&self, offset: u32, size: u32) -> &[u8] {
+    /// Read `size` raw bytes from the root frame at the given byte offset. For
+    /// tests inspecting an entry/native function's raw return slots.
+    pub fn root_result_bytes_for_test(&self, offset: u32, size: u32) -> &[u8] {
         unsafe {
             let base = self
                 .stack
                 .as_ptr()
                 .add(FRAME_METADATA_SIZE + offset as usize);
             std::slice::from_raw_parts(base, size as usize)
+        }
+    }
+
+    /// Reads a heap `vector<u8>` (or a `String`, same slot layout) from the root
+    /// result slot at `offset`; empty if the pointer is null. For tests.
+    pub fn root_result_byte_vector_for_test(&self, offset: u32) -> Vec<u8> {
+        // SAFETY: the slot holds a live pointer to a heap vector<u8>; the heap
+        // is still owned by this context, so the read stays in bounds.
+        unsafe {
+            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
+            if ptr.is_null() {
+                return vec![];
+            }
+            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
+            std::slice::from_raw_parts(ptr.add(VEC_DATA_OFFSET), len).to_vec()
         }
     }
 
@@ -825,10 +842,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
                 MicroOp::CallNative {
                     native_idx,
+                    ty_args,
                     ref abi,
-                    ..
                 } => {
-                    return self.exec_call_native(func, fp, native_idx, abi);
+                    return self.exec_call_native(func, fp, native_idx, ty_args, abi);
                 },
 
                 MicroOp::JumpNotZeroU64 {
@@ -1689,21 +1706,25 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
-        let root_guard = self.pinned_roots.pin(root);
-        // SAFETY: `root_guard.get()` returns the caller-supplied root, which
-        // by this function's contract points to a live object.
-        match unsafe { self.heap.try_deep_copy(self.exec_ctx, root_guard.get()) } {
+        // SAFETY: by this function's contract `root` points to a live object.
+        let root_guard = unsafe { self.root_pool.root_object(root.as_ptr()) };
+        // SAFETY: `root_guard.ptr()` is the rooted (possibly relocated) pointer
+        // to that live object, so it is non-null.
+        match unsafe {
+            self.heap
+                .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(root_guard.ptr()))
+        } {
             Ok(ptr) => Ok(ptr),
             Err(AllocationError::RuntimeError(err)) => Err(err),
             Err(AllocationError::OutOfHeapMemory { .. }) => {
                 gc_collect!(self)?;
-                // Re-read the root pointer from the pin, as its address have
-                // been changed by the GC.
-                // SAFETY: the pin keeps the root live across GC; the relocated
-                // pointer still points to the same live object.
+                // Re-read the root pointer from the handle, as its address may
+                // have been changed by the GC.
+                // SAFETY: the handle keeps the root live across GC; the relocated
+                // pointer still points to the same live object, so it is non-null.
                 unsafe {
                     self.heap
-                        .try_deep_copy(self.exec_ctx, root_guard.get())
+                        .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(root_guard.ptr()))
                         .map_err(AllocationError::into_runtime_error)
                 }
             },
@@ -1721,17 +1742,17 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// and `captured_data_ptr` is left null.
     ///
     /// For capturing closures, two allocations happen. The closure object
-    /// is pinned via [`PinnedRoots`] immediately after its own allocation
-    /// and stays pinned across the captured-data allocation, so any GC
+    /// is rooted in the [`RootPool`] immediately after its own allocation
+    /// and stays rooted across the captured-data allocation, so any GC
     /// triggered by the second allocation preserves the closure (even
     /// before it's written to `op.dst`) and relocates our local pointer.
     ///
-    // TODO: swap the generic `PinnedRoots` machinery here for a
+    // TODO: swap the generic [`RootPool`] machinery here for a
     // `Heap::reserve(n)` API that pre-secures headroom for both
     // allocations so the second `alloc_obj` can never trigger GC.
-    // `PinnedRoots` is still justified for native functions but is
-    // overkill for the 2-allocation case here and costs us a guard
-    // construction / pointer reload.
+    // The pool is still justified for native functions but is overkill for
+    // the 2-allocation case here and costs us a handle construction /
+    // pointer reload.
     ///
     /// # Safety
     ///
@@ -1754,18 +1775,19 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 return Ok(());
             }
 
-            // Capturing path: allocate the closure object, pin it, then
+            // Capturing path: allocate the closure object, root it, then
             // allocate and populate the captured-data object.
             //
             // The closure has a null `captured_data_ptr` between the two
             // allocations — safe for GC to see (null heap pointers are
-            // skipped). Pinning keeps the closure live across the second
-            // allocation and lets GC update the pinned slot in-place if
+            // skipped). Rooting keeps the closure live across the second
+            // allocation and lets GC update the rooted slot in-place if
             // the object is relocated.
             let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
-            let pin = self.pinned_roots.pin(NonNull::new_unchecked(closure_ptr));
+            // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
+            let closure_root = self.root_pool.root_object(closure_ptr);
 
-            self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
+            self.write_closure_func_ref_and_mask(closure_root.ptr(), op);
 
             // SAFETY: the verifier guarantees `captured_data_descriptor_id`
             // is `Some` whenever `captured` is non-empty. The values-region
@@ -1803,7 +1825,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 cursor = next;
             }
 
-            let closure = pin.get().as_ptr();
+            let closure = closure_root.ptr();
             write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, captured_data);
             write_ptr(fp, op.dst, closure);
 
@@ -2173,6 +2195,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         caller: &Function,
         fp: *mut u8,
         native_idx: NativeIdx,
+        ty_args: InternedTypeList,
         abi: &NativeABI,
     ) -> RuntimeResult<StepResult> {
         // Check if we have enough space on the stack to allocate the native's frame.
@@ -2197,15 +2220,29 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = self.frame_ptr;
         self.frame_ptr = new_fp;
         let result = {
-            let (registry, gas_meter) = self.exec_ctx.natives_and_gas_meter();
+            let (registry, provider, gas_meter) = self.exec_ctx.natives_descriptors_and_gas_meter();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
                     idx: native_idx.0,
                     registry_size: registry.len(),
                 })
             })?;
-            let mut ctx = ProductionNativeContext::new(new_fp, abi, gas_meter);
-            func(&mut ctx)
+            // TODO: eventually pass the interpreter context itself rather than
+            // unpacking `gas_meter` / `heap` / `read_write_set` (and giving
+            // access to the loader + global context). Need to first work out
+            // whether that's sound under the context's interior-mutability model
+            // — clearer once everything (rws → table natives, gas → all) is
+            // wired up.
+            let ctx = ProductionNativeContext::new(
+                new_fp,
+                abi,
+                view_type_list(ty_args),
+                gas_meter,
+                provider,
+                &mut self.heap,
+                &mut self.read_write_set,
+            );
+            func(&ctx)
         };
         self.frame_ptr = saved_fp;
 

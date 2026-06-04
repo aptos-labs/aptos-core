@@ -22,7 +22,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     int256::{I256, U256},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::StatusCode,
 };
@@ -33,7 +33,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
     AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
-    RuntimeEnvironment,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
@@ -200,10 +200,11 @@ fn execute_function_v1(
             PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
         })
         .collect::<Vec<_>>();
+    let runtime_env = module_storage.runtime_environment();
     let return_kinds = function
         .return_tys()
         .iter()
-        .map(|ty| PrimitiveKind::from_type(ty).expect("Only primitive return types are supported"))
+        .map(|ty| PrimitiveKind::from_return_type(ty, runtime_env))
         .collect::<Vec<_>>();
     let serialized_args = param_kinds
         .iter()
@@ -226,7 +227,15 @@ fn execute_function_v1(
                 .return_values
                 .iter()
                 .zip(return_kinds.iter())
-                .map(|((bytes, _layout), kind)| kind.format_bytes(bytes))
+                .map(|((bytes, _layout), kind)| match kind {
+                    PrimitiveKind::Utf8String => {
+                        render_utf8(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+                    },
+                    PrimitiveKind::ByteVector => {
+                        render_bytes(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+                    },
+                    _ => kind.format_bytes(bytes),
+                })
                 .collect::<Vec<_>>();
             Output {
                 display: format!("results: {}", vals.join(", ")),
@@ -286,8 +295,21 @@ fn execute_function_v2(
                     let mut vals = Vec::with_capacity(return_kinds.len());
                     for kind in return_kinds {
                         ret_off = mono_move_core::align_up_u32(ret_off, kind.align());
-                        let bytes = interpreter.root_result_bytes(ret_off, kind.size());
-                        vals.push(kind.format_bytes(bytes));
+                        match kind {
+                            PrimitiveKind::Utf8String => {
+                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
+                                vals.push(render_utf8(&content));
+                            },
+                            PrimitiveKind::ByteVector => {
+                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
+                                vals.push(render_bytes(&content));
+                            },
+                            _ => {
+                                let bytes =
+                                    interpreter.root_result_bytes_for_test(ret_off, kind.size());
+                                vals.push(kind.format_bytes(bytes));
+                            },
+                        }
                         ret_off += kind.size();
                     }
                     vals
@@ -328,6 +350,12 @@ enum PrimitiveKind {
     I128,
     I256,
     Address,
+    /// A `String` return value (return-only). Rendered as a UTF-8 string by
+    /// reading the heap `vector<u8>` (V2) or decoding the BCS bytes (V1).
+    Utf8String,
+    /// A `vector<u8>` return value (return-only). Rendered as a `0x…` hex dump
+    /// of its bytes, read from the heap (V2) or the BCS return (V1).
+    ByteVector,
 }
 
 impl PrimitiveKind {
@@ -351,12 +379,38 @@ impl PrimitiveKind {
         })
     }
 
+    /// Like [`Self::from_type`] but also recognizes a `0x1::string::String`
+    /// return as [`PrimitiveKind::Utf8String`]. Used for return values, which
+    /// (unlike arguments) may be a `String`.
+    fn from_return_type(ty: &Type, env: &RuntimeEnvironment) -> Self {
+        if let Some(kind) = Self::from_type(ty) {
+            return kind;
+        }
+        // `vector<u8>` renders as a hex byte dump (distinct from `String`).
+        if let Type::Vector(elem) = ty
+            && matches!(&**elem, Type::U8)
+        {
+            return PrimitiveKind::ByteVector;
+        }
+        if let Ok(TypeTag::Struct(s)) = env.ty_to_ty_tag(ty)
+            && s.address == AccountAddress::ONE
+            && s.module.as_str() == "string"
+            && s.name.as_str() == "String"
+        {
+            return PrimitiveKind::Utf8String;
+        }
+        panic!("Only primitive, vector<u8>, and String return types are supported");
+    }
+
     fn size(self) -> u32 {
         match self {
             PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64 | PrimitiveKind::I64 => 8,
+            PrimitiveKind::U64
+            | PrimitiveKind::I64
+            | PrimitiveKind::Utf8String
+            | PrimitiveKind::ByteVector => 8,
             PrimitiveKind::U128 | PrimitiveKind::I128 => 16,
             PrimitiveKind::U256 | PrimitiveKind::I256 | PrimitiveKind::Address => 32,
         }
@@ -367,7 +421,10 @@ impl PrimitiveKind {
             PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64 | PrimitiveKind::I64 => 8,
+            PrimitiveKind::U64
+            | PrimitiveKind::I64
+            | PrimitiveKind::Utf8String
+            | PrimitiveKind::ByteVector => 8,
             // Wide integers and addresses are 8-byte aligned in the
             // frame even though their size is larger.
             PrimitiveKind::U128
@@ -396,6 +453,9 @@ impl PrimitiveKind {
             PrimitiveKind::Address => {
                 let addr = AccountAddress::from_hex_literal(s).expect("invalid address literal");
                 MoveValue::Address(addr)
+            },
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!("String / vector<u8> are return-only kinds")
             },
         }
     }
@@ -463,6 +523,9 @@ impl PrimitiveKind {
                 .expect("invalid address literal")
                 .into_bytes()
                 .to_vec(),
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!("String / vector<u8> are return-only kinds")
+            },
         }
     }
 
@@ -487,8 +550,29 @@ impl PrimitiveKind {
                 let arr: [u8; AccountAddress::LENGTH] = bytes[..32].try_into().unwrap();
                 AccountAddress::new(arr).to_hex_literal()
             },
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!(
+                    "String / vector<u8> returns are rendered from the heap, not format_bytes"
+                )
+            },
         }
     }
+}
+
+/// Renders raw UTF-8 bytes as a quoted string for cross-VM comparison.
+fn render_utf8(bytes: &[u8]) -> String {
+    format!("{:?}", String::from_utf8_lossy(bytes))
+}
+
+/// Renders raw bytes as a `0x…` hex string for cross-VM comparison.
+fn render_bytes(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut s = String::with_capacity(2 + bytes.len() * 2);
+    s.push_str("0x");
+    for b in bytes {
+        write!(s, "{b:02x}").unwrap();
+    }
+    s
 }
 
 /// Parse a boolean argument literal. Only `true`/`false` are accepted; the

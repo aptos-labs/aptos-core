@@ -43,7 +43,7 @@ pub trait NativeContextFamily {
 /// Without this, we cannot store native functions in a registry, which would
 /// otherwise mandate a fixed lifetime.
 pub type NativeFunction<F> = Box<
-    dyn for<'a> Fn(&mut <F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
+    dyn for<'a> Fn(&<F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
         + Send
         + Sync,
 >;

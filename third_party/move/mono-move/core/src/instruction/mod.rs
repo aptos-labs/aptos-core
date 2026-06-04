@@ -1777,6 +1777,20 @@ pub const ENUM_TAG_OFFSET: usize = 0;
 /// Offset where enum variant field data begins (after the tag).
 pub const ENUM_DATA_OFFSET: usize = 8;
 
+/// Offset of the `length` field within a vector object's data region.
+/// Vectors put the length at the very start of the data region; element 0
+/// begins at [`VEC_DATA_OFFSET`].
+pub const VEC_LENGTH_OFFSET: usize = 0;
+
+/// Offset where vector element data begins (after the `length` field).
+/// Capacity is not stored; it is derived from the header's `size_in_bytes`
+/// field: `capacity = (size_in_bytes - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size`.
+pub const VEC_DATA_OFFSET: usize = 8;
+
+// Element 0 must land on a `MAX_ALIGN`-aligned offset so any element type
+// (whose alignment is ≤ `MAX_ALIGN`) is naturally aligned.
+const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
+
 // ---------------------------------------------------------------------------
 // Closure object layout
 // ---------------------------------------------------------------------------
