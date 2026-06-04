@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::test
 
 struct S has drop+copy
@@ -14,3 +15,6 @@ fun pack_and_unpack(): u64
     unpack S
     pop
     ret
+
+// RUN: execute 0x66::test::pack_and_unpack
+// CHECK: results: 3

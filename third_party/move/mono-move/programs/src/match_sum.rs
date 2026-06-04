@@ -139,8 +139,8 @@ mod micro_op {
         let func_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("match_sum"),
             code: Code::from_vec(maybe_instrument(code, with_gas_metering)),
-            param_sizes: vec![],
-            param_sizes_sum: 8,
+            param_slots: vec![],
+            param_region_size: 8,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: param_and_local_sizes_sum as usize
                 + mono_move_core::FRAME_METADATA_SIZE,

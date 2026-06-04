@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun pack_and_unpack(): u64 {
@@ -13,8 +14,19 @@ fun pack_and_unpack(): u64 {
     3: [r1, r2] := unpack 0x66::test::S, r0
     4: ret [r1]
 }
-
 === micro-ops ===
 // module 0x66::test
 
-fun pack_and_unpack(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun pack_and_unpack() {
+  frame_data_size: 32
+  code:
+    0: Charge #22
+    1: StoreImm8 [16] <- #3
+    2: StoreImm1 [24] <- #2
+    3: Move(1) [8] <- [24]
+    4: Move8 [0] <- [16]
+    5: Move(1) [24] <- [8]
+    6: Move8 [16] <- [0]
+    7: Move8 [0] <- [16]
+    8: Return
+}

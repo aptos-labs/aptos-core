@@ -1,0 +1,104 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun beq(l0: bool, l1: bool): bool
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+// Function definition at index 1
+fun bneq(l0: bool, l1: bool): bool
+    move_loc l0
+    move_loc l1
+    neq
+    ret
+
+// Function definition at index 2
+fun bsel(l0: bool, l1: bool): u64
+    move_loc l0
+    move_loc l1
+    eq
+    br_false l0
+    ld_u64 10
+    // @5
+    ret
+l0: ld_u64 20
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun beq(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: bool
+    r1: bool
+    r2: bool
+  code:
+  L0:
+    0: r2 := eq r0, r1
+    1: ret [r2]
+}
+
+fun bneq(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: bool
+    r1: bool
+    r2: bool
+  code:
+  L0:
+    0: r2 := neq r0, r1
+    1: ret [r2]
+}
+
+fun bsel(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: bool
+    r1: bool
+    r2: u64
+  code:
+  L2:
+    0: br_neq L0, r0, r1
+  L1:
+    1: r2 := ld_u64 10
+    2: ret [r2]
+  L0:
+    3: r2 := ld_u64 20
+    4: ret [r2]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun beq() {
+  frame_data_size: 8
+  code:
+    0: Charge #10
+    1: IntCmp [2] <- [0] == u8 [1]
+    2: Move(1) [0] <- [2]
+    3: Return
+}
+
+fun bneq() {
+  frame_data_size: 8
+  code:
+    0: Charge #10
+    1: IntCmp [2] <- [0] != u8 [1]
+    2: Move(1) [0] <- [2]
+    3: Return
+}
+
+fun bsel() {
+  frame_data_size: 16
+  code:
+    0: Charge #3
+    1: JumpIntCmp @6 [0] != u8 [1]
+    2: Charge #6
+    3: StoreImm8 [8] <- #10
+    4: Move8 [0] <- [8]
+    5: Return
+    6: Charge #6
+    7: StoreImm8 [8] <- #20
+    8: Move8 [0] <- [8]
+    9: Return
+}

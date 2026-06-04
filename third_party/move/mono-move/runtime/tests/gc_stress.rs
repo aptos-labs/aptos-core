@@ -127,8 +127,8 @@ fn make_gc_stress_program(
     let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(make_entry_code),
-        param_sizes: vec![],
-        param_sizes_sum: 8,
+        param_slots: vec![],
+        param_region_size: 8,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
         zero_frame: true,
@@ -234,8 +234,8 @@ fn make_gc_stress_program(
     let main_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 64,
         extended_frame_size: 128,
         zero_frame: true,

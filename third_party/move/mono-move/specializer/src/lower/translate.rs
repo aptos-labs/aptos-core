@@ -16,8 +16,9 @@ use anyhow::{bail, Context, Result};
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
-    CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, SafePointEntry, ShiftOperand, FRAME_METADATA_SIZE,
+    CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp,
+    IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, MicroOp, SafePointEntry,
+    ShiftOperand, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::FieldHandleIndex;
 use move_core_types::account_address::AccountAddress;
@@ -224,14 +225,6 @@ impl<'a> LoweringState<'a> {
         )
     }
 
-    /// Returns true if the type is exactly 8 bytes wide. Used to gate the
-    /// u64-shaped micro-ops (`AddU64`, `JumpLessU64`, etc.), which read and
-    /// write 8 bytes unconditionally and so cannot be reused for narrower
-    /// types without overrunning into adjacent slots.
-    fn is_u64_sized(ty: &Type) -> bool {
-        matches!(ty.size_and_align(), Some((8, _)))
-    }
-
     /// Emit one byte-copy from `src` to `dst_offset`. Caller is
     /// responsible for ensuring no other concurrent move clobbers the
     /// source bytes.
@@ -254,6 +247,39 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
+    /// Emit a standalone comparison writing a 1-byte boolean to `dst`.
+    fn emit_int_cmp(
+        &mut self,
+        cmp: CmpOp,
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: IntOperand,
+    ) -> Result<()> {
+        self.emit(MicroOp::IntCmp(IntCmpOp {
+            op: cmp_kind(cmp),
+            dst,
+            lhs,
+            rhs,
+        }))
+    }
+
+    /// Emit a fused compare-and-branch to the (encoded) `target`. The caller
+    /// is responsible for pushing the branch-fixup index first.
+    fn emit_jump_int_cmp(
+        &mut self,
+        target: CodeOffset,
+        cmp: CmpOp,
+        lhs: FrameOffset,
+        rhs: IntOperand,
+    ) -> Result<()> {
+        self.emit(MicroOp::JumpIntCmp(JumpIntCmpOp {
+            target,
+            op: cmp_kind(cmp),
+            lhs,
+            rhs,
+        }))
+    }
+
     /// Lower one IR instruction.
     fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> Result<()> {
         match instr {
@@ -267,29 +293,28 @@ impl<'a> LoweringState<'a> {
             },
             Instr::LdTrue(dst) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm1 {
                     dst: dst_info.offset,
-                    // TODO: revisit sizing of boolean slots.
-                    imm: 1u64.to_le_bytes(),
+                    imm: 1,
                 })?;
             },
             Instr::LdFalse(dst) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm1 {
                     dst: dst_info.offset,
-                    // TODO: revisit sizing of boolean slots.
-                    imm: 0u64.to_le_bytes(),
+                    imm: 0,
+                })?;
+            },
+            // 1-byte integers store directly into their 1-byte slot.
+            Instr::LdU8(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm1 {
+                    dst: dst_info.offset,
+                    imm: *v,
                 })?;
             },
             // Narrow unsigned loads zero-extend into an 8-byte slot.
             // TODO: drop the widening once sub-8-byte stores land.
-            Instr::LdU8(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
-                    dst: dst_info.offset,
-                    imm: (*v as u64).to_le_bytes(),
-                })?;
-            },
             Instr::LdU16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
@@ -304,16 +329,17 @@ impl<'a> LoweringState<'a> {
                     imm: (*v as u64).to_le_bytes(),
                 })?;
             },
+            // 1-byte integers store directly into their 1-byte slot.
+            Instr::LdI8(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm1 {
+                    dst: dst_info.offset,
+                    imm: *v as u8,
+                })?;
+            },
             // Narrow signed loads sign-extend first, then bit-cast for the
             // LE byte representation.
             // TODO: drop the widening once sub-8-byte stores land.
-            Instr::LdI8(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
-                    dst: dst_info.offset,
-                    imm: (*v as i64 as u64).to_le_bytes(),
-                })?;
-            },
             Instr::LdI16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
@@ -494,11 +520,14 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                             })?;
                         },
-                        // Comparison-to-register and logical and/or are not
-                        // yet lowered for any integer width.
-                        BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
-                            bail!("BinaryOp {:?} not yet lowered", op)
+                        // Comparison produces a 1-byte boolean.
+                        BinaryOp::Cmp(cmp) => {
+                            let rhs = cmp_operand_from_slot(lhs_ty, rhs)?;
+                            self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
                         },
+                        // Logical and/or on 1-byte booleans.
+                        BinaryOp::And => self.emit(MicroOp::BoolAnd { dst, lhs, rhs })?,
+                        BinaryOp::Or => self.emit(MicroOp::BoolOr { dst, lhs, rhs })?,
                     }
                 }
             },
@@ -633,8 +662,27 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                             })?;
                         },
-                        BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
-                            bail!("BinaryOpImm {:?} not yet lowered", op)
+                        // Comparison against an immediate producing a 1-byte boolean.
+                        BinaryOp::Cmp(cmp) => {
+                            let rhs = cmp_operand_from_imm(imm)?;
+                            self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
+                        },
+                        // Logical and/or against a constant bool, with identity
+                        // `true` for `&&` and `false` for `||`: the identity
+                        // yields `src`, the other value yields the constant `!identity`.
+                        BinaryOp::And | BinaryOp::Or => {
+                            let ImmValue::Bool(b) = imm else {
+                                bail!("BinaryOpImm {:?}: imm must be bool", op);
+                            };
+                            let identity = matches!(op, BinaryOp::And);
+                            if *b == identity {
+                                self.emit_single_move(dst, src_info)?;
+                            } else {
+                                self.emit(MicroOp::StoreImm1 {
+                                    dst,
+                                    imm: (!identity) as u8,
+                                })?;
+                            }
                         },
                     }
                 }
@@ -670,6 +718,14 @@ impl<'a> LoweringState<'a> {
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit_single_move(dst_info.offset, src_info)?;
+            },
+            Instr::UnaryOp(dst, UnaryOp::Not, src) => {
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::BoolNot {
+                    dst: dst_info.offset,
+                    src: src_info.offset,
+                })?;
             },
 
             // --- References ---
@@ -722,9 +778,7 @@ impl<'a> LoweringState<'a> {
                 let cond_info = self.slot(*cond)?;
                 let idx = self.out_buf.len();
                 self.branch_fixups.push(idx);
-                // [TODO]: we are representing booleans as 0/1 in u64 slots here.
-                // This needs to be updated with a more compact boolean representation.
-                self.emit(MicroOp::JumpNotZeroU64 {
+                self.emit(MicroOp::JumpNotZeroByte {
                     target: CodeOffset(encode_label(*l)),
                     src: cond_info.offset,
                 })?;
@@ -733,93 +787,96 @@ impl<'a> LoweringState<'a> {
                 let cond_info = self.slot(*cond)?;
                 let idx = self.out_buf.len();
                 self.branch_fixups.push(idx);
-                // [TODO]: we are representing booleans as 0/1 in u64 slots here.
-                // This needs to be updated with a more compact boolean representation.
-                self.emit(MicroOp::JumpLessU64Imm {
+                self.emit(MicroOp::JumpZeroByte {
                     target: CodeOffset(encode_label(*l)),
                     src: cond_info.offset,
-                    imm: 1,
                 })?;
             },
 
             // --- Fused compare+branch ---
             Instr::BrCmp(Label(l), op, lhs, rhs) => {
                 let lhs_ty = self.slot_type(*lhs)?;
-                if Self::is_u64_sized(lhs_ty) {
-                    let lhs_info = self.slot(*lhs)?;
-                    let rhs_info = self.slot(*rhs)?;
-                    let idx = self.out_buf.len();
-                    self.branch_fixups.push(idx);
-                    match op {
-                        CmpOp::Lt => self.emit(MicroOp::JumpLessU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: lhs_info.offset,
-                            rhs: rhs_info.offset,
-                        })?,
-                        CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: lhs_info.offset,
-                            rhs: rhs_info.offset,
-                        })?,
-                        // x > y ↔ y < x
-                        CmpOp::Gt => self.emit(MicroOp::JumpLessU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: rhs_info.offset,
-                            rhs: lhs_info.offset,
-                        })?,
-                        // x <= y ↔ y >= x
-                        CmpOp::Le => self.emit(MicroOp::JumpGreaterEqualU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: rhs_info.offset,
-                            rhs: lhs_info.offset,
-                        })?,
-                        CmpOp::Neq => self.emit(MicroOp::JumpNotEqualU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: lhs_info.offset,
-                            rhs: rhs_info.offset,
-                        })?,
-                        CmpOp::Eq => {
-                            bail!("BrCmp Eq for u64-sized type not yet lowered")
-                        },
-                    }
-                } else {
-                    bail!("BrCmp for non-u64 type not yet lowered");
+                let lhs_off = self.slot(*lhs)?.offset;
+                let rhs_off = self.slot(*rhs)?.offset;
+                let target = CodeOffset(encode_label(*l));
+                let idx = self.out_buf.len();
+                self.branch_fixups.push(idx);
+                // Fast path: unsigned `u64` ordering / not-equal use the
+                // specialized jumps. Everything else goes through the general
+                // `JumpIntCmp`, which dispatches on the operand type.
+                match (lhs_ty.is_u64(), op) {
+                    (true, CmpOp::Lt) => self.emit(MicroOp::JumpLessU64 {
+                        target,
+                        lhs: lhs_off,
+                        rhs: rhs_off,
+                    })?,
+                    (true, CmpOp::Ge) => self.emit(MicroOp::JumpGreaterEqualU64 {
+                        target,
+                        lhs: lhs_off,
+                        rhs: rhs_off,
+                    })?,
+                    // x > y ↔ y < x
+                    (true, CmpOp::Gt) => self.emit(MicroOp::JumpLessU64 {
+                        target,
+                        lhs: rhs_off,
+                        rhs: lhs_off,
+                    })?,
+                    // x <= y ↔ y >= x
+                    (true, CmpOp::Le) => self.emit(MicroOp::JumpGreaterEqualU64 {
+                        target,
+                        lhs: rhs_off,
+                        rhs: lhs_off,
+                    })?,
+                    (true, CmpOp::Neq) => self.emit(MicroOp::JumpNotEqualU64 {
+                        target,
+                        lhs: lhs_off,
+                        rhs: rhs_off,
+                    })?,
+                    _ => {
+                        let rhs_op = cmp_operand_from_slot(lhs_ty, rhs_off)?;
+                        self.emit_jump_int_cmp(target, *op, lhs_off, rhs_op)?;
+                    },
                 }
             },
             Instr::BrCmpImm(Label(l), op, src, imm) => {
                 let src_ty = self.slot_type(*src)?;
-                if Self::is_u64_sized(src_ty) {
-                    let src_info = self.slot(*src)?;
+                let src_off = self.slot(*src)?.offset;
+                let target = CodeOffset(encode_label(*l));
+                let idx = self.out_buf.len();
+                self.branch_fixups.push(idx);
+                if src_ty.is_u64() {
+                    // Fast path: specialized unsigned `u64` ordering jumps.
+                    // Note: equality has no specialized imm jump, so it uses
+                    // the general `JumpIntCmp`.
                     let v = imm_to_u64(imm)?;
-                    let idx = self.out_buf.len();
-                    self.branch_fixups.push(idx);
                     match op {
                         CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
                         })?,
                         CmpOp::Lt => self.emit(MicroOp::JumpLessU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
                         })?,
                         CmpOp::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
                         })?,
                         CmpOp::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
                         })?,
                         CmpOp::Eq | CmpOp::Neq => {
-                            bail!("BrCmpImm {:?} for u64-sized type not yet lowered", op)
+                            self.emit_jump_int_cmp(target, *op, src_off, IntOperand::ImmU64(v))?
                         },
                     }
                 } else {
-                    bail!("BrCmpImm for non-u64 type not yet lowered");
+                    let rhs_op = cmp_operand_from_imm(imm)?;
+                    self.emit_jump_int_cmp(target, *op, src_off, rhs_op)?;
                 }
             },
 
@@ -1318,6 +1375,8 @@ impl<'a> LoweringState<'a> {
             let encoded = match &self.out_buf[idx] {
                 MicroOp::Jump { target }
                 | MicroOp::JumpNotZeroU64 { target, .. }
+                | MicroOp::JumpNotZeroByte { target, .. }
+                | MicroOp::JumpZeroByte { target, .. }
                 | MicroOp::JumpGreaterEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64Imm { target, .. }
                 | MicroOp::JumpGreaterU64Imm { target, .. }
@@ -1325,6 +1384,7 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpLessU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0,
+                MicroOp::JumpIntCmp(op) => op.target.0,
                 other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             };
             let label = decode_label(encoded);
@@ -1332,6 +1392,8 @@ impl<'a> LoweringState<'a> {
             match &mut self.out_buf[idx] {
                 MicroOp::Jump { target }
                 | MicroOp::JumpNotZeroU64 { target, .. }
+                | MicroOp::JumpNotZeroByte { target, .. }
+                | MicroOp::JumpZeroByte { target, .. }
                 | MicroOp::JumpGreaterEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64Imm { target, .. }
                 | MicroOp::JumpGreaterU64Imm { target, .. }
@@ -1339,7 +1401,8 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpLessU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0 = resolved,
-                _ => unreachable!(),
+                MicroOp::JumpIntCmp(op) => op.target.0 = resolved,
+                other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             }
         }
         Ok(())
@@ -1397,6 +1460,72 @@ fn shift_imm_u8(imm: &ImmValue) -> Result<u8> {
 fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
     let int_ty = IntTy::from_type(ty).ok_or_else(|| anyhow::anyhow!("expected an integer type"))?;
     Ok(IntOperand::slot(int_ty, off))
+}
+
+/// Map an IR [`CmpOp`] to the micro-op [`CmpKind`].
+///
+/// TODO: `CmpOp` and `CmpKind` have identical variants; consider unifying on a
+/// single shared type in core to drop this mapping.
+fn cmp_kind(op: CmpOp) -> CmpKind {
+    match op {
+        CmpOp::Lt => CmpKind::Lt,
+        CmpOp::Le => CmpKind::Le,
+        CmpOp::Gt => CmpKind::Gt,
+        CmpOp::Ge => CmpKind::Ge,
+        CmpOp::Eq => CmpKind::Eq,
+        CmpOp::Neq => CmpKind::Neq,
+    }
+}
+
+/// Build an [`IntOperand`] for a comparison operand. Integer types delegate to
+/// [`int_operand_from_slot`]. `bool` (1 byte) and `address` (32 bytes) are
+/// flat values with only `==`/`!=` (no ordering), and comparing their bit
+/// patterns is exactly value equality, so they reuse the integer compare ops
+/// at the matching width.
+fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
+    match ty {
+        Type::Bool => Ok(IntOperand::SlotU8(off)),
+        Type::Address => Ok(IntOperand::SlotU256(off)),
+        Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256 => int_operand_from_slot(ty, off),
+        Type::Signer
+        | Type::ImmutRef { .. }
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => bail!("operand type has no comparison lowering"),
+    }
+}
+
+/// Immediate counterpart of [`cmp_operand_from_slot`]: a bool immediate
+/// compares as the 1-byte value `0`/`1`.
+fn cmp_operand_from_imm(imm: &ImmValue) -> Result<IntOperand> {
+    match imm {
+        ImmValue::Bool(b) => Ok(IntOperand::ImmU8(*b as u8)),
+        ImmValue::U8(_)
+        | ImmValue::U16(_)
+        | ImmValue::U32(_)
+        | ImmValue::U64(_)
+        | ImmValue::U128(_)
+        | ImmValue::U256(_)
+        | ImmValue::I8(_)
+        | ImmValue::I16(_)
+        | ImmValue::I32(_)
+        | ImmValue::I64(_)
+        | ImmValue::I128(_)
+        | ImmValue::I256(_) => int_operand_from_imm(imm),
+    }
 }
 
 /// Build an [`IntOperand`] imm arm matching `imm`. The destacker emits an

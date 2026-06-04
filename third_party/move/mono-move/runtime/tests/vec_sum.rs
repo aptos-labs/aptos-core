@@ -52,8 +52,8 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
