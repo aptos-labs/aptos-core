@@ -704,9 +704,9 @@ fn add_unique_attribute(
         E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::Test)) => {
             Some("$test_row_")
         },
-        E::AttributeName_::Known(KnownAttribute::Testing(
-            TestingAttribute::ExpectedFailure,
-        )) => Some("$expected_failure_"),
+        E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::ExpectedFailure)) => {
+            Some("$expected_failure_")
+        },
         _ => None,
     };
     if let Some(prefix) = synthetic_prefix {

@@ -43,9 +43,7 @@ fn parse_lint_skip_attribute(
             BTreeSet::new()
         },
         Attribute::Apply {
-            node_id: id,
-            attrs,
-            ..
+            node_id: id, attrs, ..
         } => {
             if attrs.is_empty() {
                 env.error(

@@ -23,9 +23,9 @@ use crate::{
     intrinsics::process_intrinsic_declaration,
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
-        self, BracketGroupId, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData,
-        FunctionKind, FunctionLoc, Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId,
-        NodeId, Parameter, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
+        self, BracketGroupId, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind,
+        FunctionLoc, Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId,
+        Parameter, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
         TypeParameterKind, UserId,
     },
     pragmas::{

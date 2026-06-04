@@ -177,14 +177,11 @@ fn build_test_info(
         let expected_failure = row
             .expected_failure_attr
             .and_then(|attr| parse_failure_attribute(env, current_module, attr));
-        out.push((
-            test_name.clone(),
-            TestCase {
-                test_name,
-                arguments,
-                expected_failure,
-            },
-        ));
+        out.push((test_name.clone(), TestCase {
+            test_name,
+            arguments,
+            expected_failure,
+        }));
     }
 
     if row_count > 1 && function.get_parameters_ref().is_empty() {
@@ -338,7 +335,11 @@ fn build_test_rows<'a>(
         });
     }
 
-    if has_error { None } else { Some(rows) }
+    if has_error {
+        None
+    } else {
+        Some(rows)
+    }
 }
 
 //***************************************************************************
