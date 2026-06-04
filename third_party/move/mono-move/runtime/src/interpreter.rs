@@ -366,6 +366,10 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
 /// Read a `T`-sized value from `base + byte_offset`. Aligned access for
 /// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
 ///
+/// TODO: this reads with native endianness, but `StoreImm*` writes immediates
+/// as little-endian bytes. Consistent on LE hosts (all current targets); force
+/// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
+///
 /// # Safety
 /// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
 /// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
