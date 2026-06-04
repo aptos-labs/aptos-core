@@ -2828,9 +2828,10 @@ impl AptosVM {
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        // TODO(HotState): generate an output according to the block end info in the
-        //   transaction. (maybe resort to the move resolver, but for simplicity I would
-        //   just include the full slot in both the transaction and the output).
+        // Hot-state promotion for the epilogue output (the `to_make_hot` set from the payload, plus
+        // the epilogue's own reads for V2) is attached to this `VMOutput` by the block executor task
+        // wrapper (`block_executor::vm_wrapper`), which has access to the VM-boundary read recorder.
+        // From there `VMOutput::into_transaction_output` writes them into the output's write set.
         Ok((VMStatus::Executed, output))
     }
 

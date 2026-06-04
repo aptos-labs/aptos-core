@@ -285,8 +285,11 @@ impl<'kv> StateUpdateRefs<'kv> {
                     // key before. This is unlikely, but if it does happen (e.g. if the write
                     // summary used to compute MakeHot is missing keys), we must discard the
                     // hotness op to avoid overwriting the value write op.
-                    // TODO(HotState): also double check this logic for state sync later. For now
-                    // we do not output hotness ops for state sync.
+                    //
+                    // Hotness ops ARE output during state sync now: they are persisted in the block
+                    // epilogue's write set (`BlockEpiloguePayload::V2`), so transaction-output replay
+                    // reproduces them from the persisted output and transaction-input chunk
+                    // re-execution recomputes them from the VM-owned epilogue output.
                     match dedupped.entry(k) {
                         Entry::Occupied(mut entry) => {
                             let prev_op = &entry.get().state_op;

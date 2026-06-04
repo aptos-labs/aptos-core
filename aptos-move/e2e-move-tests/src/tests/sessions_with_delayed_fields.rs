@@ -300,6 +300,14 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
         HashSet::new()
     }
+
+    fn hotness_reads(&self) -> std::collections::BTreeSet<StateKey> {
+        std::collections::BTreeSet::new()
+    }
+
+    fn hotness_writes(&self) -> std::collections::BTreeSet<StateKey> {
+        std::collections::BTreeSet::new()
+    }
 }
 
 impl AfterMaterializationOutput<TestTransaction> for &TestOutput {

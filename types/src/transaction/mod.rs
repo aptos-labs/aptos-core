@@ -2214,10 +2214,6 @@ impl TransactionOutput {
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
     }
-
-    pub fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) {
-        self.write_set.add_hotness(hotness);
-    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the

@@ -22,6 +22,7 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
     write_set::WriteOp,
 };
+use aptos_vm_types::hotness_summary::TxnHotnessSummary;
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
@@ -115,6 +116,7 @@ enum OutputStatusKind {
 struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T>> {
     output: Option<O>,
     maybe_read_write_summary: Option<ReadWriteSummary<T>>,
+    maybe_hotness_summary: Option<TxnHotnessSummary<T::Key>>,
     maybe_approx_output_size: Option<u64>,
     output_status_kind: OutputStatusKind,
 }
@@ -124,6 +126,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
         Self {
             output: None,
             maybe_read_write_summary: None,
+            maybe_hotness_summary: None,
             maybe_approx_output_size: None,
             output_status_kind,
         }
@@ -133,6 +136,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
         output: ExecutionStatus<O, E>,
         read_set: &TxnInput<T>,
         block_gas_limit_type: &BlockGasLimitType,
+        hotness_in_epilogue: bool,
         user_txn_bytes_len: u64,
     ) -> Result<Self, PanicError> {
         let is_skip_rest = matches!(output, ExecutionStatus::SkipRest(_));
@@ -158,12 +162,22 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
                             output_before_guard.get_write_summary(),
                         )
                     });
+
+                // Hotness summary: VM-boundary reads (incl. metadata/exists/size) unioned with
+                // module reads (which the recorder cannot observe), and writes derived from the
+                // final output. Gated on `hotness_in_epilogue`, independent of conflicts.
+                let maybe_hotness_summary = hotness_in_epilogue.then(|| {
+                    let mut reads = output_before_guard.hotness_reads();
+                    reads.extend(read_set.module_read_keys());
+                    TxnHotnessSummary::new(reads, output_before_guard.hotness_writes())
+                });
                 drop(output_before_guard);
 
                 Self {
                     output: Some(output),
                     maybe_approx_output_size,
                     maybe_read_write_summary,
+                    maybe_hotness_summary,
                     output_status_kind: if is_skip_rest {
                         OutputStatusKind::SkipRest
                     } else {
@@ -244,6 +258,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         input: TxnInput<T>,
         output: ExecutionStatus<O, E>,
         block_gas_limit_type: &BlockGasLimitType,
+        hotness_in_epilogue: bool,
         user_txn_bytes_len: u64,
     ) -> Result<(), PanicError> {
         self.speculative_failures[txn_idx as usize].store(false, Ordering::Relaxed);
@@ -251,6 +266,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             output,
             &input,
             block_gas_limit_type,
+            hotness_in_epilogue,
             user_txn_bytes_len,
         )?;
         *self.inputs[txn_idx as usize].lock() = Some(Arc::new(input));
@@ -313,6 +329,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         let maybe_read_write_summary = output_wrapper.maybe_read_write_summary.take();
+        let maybe_hotness_summary = output_wrapper.maybe_hotness_summary.take();
 
         // Transaction cannot be committed with below statuses, as:
         // - Speculative error must have failed validation.
@@ -350,6 +367,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             fee_statement,
             maybe_read_write_summary,
             output_wrapper.maybe_approx_output_size,
+            maybe_hotness_summary,
         );
 
         if txn_idx < num_txns - 1

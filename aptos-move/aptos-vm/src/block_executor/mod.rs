@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub(crate) mod hotness_recorder;
 pub(crate) mod vm_wrapper;
 
 use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS};
@@ -47,7 +48,7 @@ use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,
 };
 use triomphe::Arc as TriompheArc;
@@ -154,6 +155,20 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         }
 
         writes
+    }
+
+    fn hotness_reads(&self) -> BTreeSet<StateKey> {
+        self.guard.hotness_reads().clone()
+    }
+
+    fn hotness_writes(&self) -> BTreeSet<StateKey> {
+        // Group writes collapse to the group `StateKey` (it is the key in the write set), module
+        // and aggregator-v1 writes are included, and delayed-field changes are excluded since they
+        // are not concrete writes.
+        self.guard
+            .concrete_write_set_iter()
+            .map(|(key, _)| key.clone())
+            .collect()
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
