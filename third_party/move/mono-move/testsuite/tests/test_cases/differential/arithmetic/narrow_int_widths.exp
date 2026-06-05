@@ -1,0 +1,407 @@
+=== stackless ===
+// module 0x1::test
+
+fun add_i16(r0, r1): i16 {
+  slots: params(2), locals(0), temps(1)
+    r0: i16
+    r1: i16
+    r2: i16
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun add_u16(r0, r1): u16 {
+  slots: params(2), locals(0), temps(1)
+    r0: u16
+    r1: u16
+    r2: u16
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun add_u16_imm(r0): u16 {
+  slots: params(1), locals(0), temps(1)
+    r0: u16
+    r1: u16
+  code:
+  L0:
+    0: r1 := add r0, #1000u16
+    1: ret [r1]
+}
+
+fun and_u16(r0, r1): u16 {
+  slots: params(2), locals(0), temps(1)
+    r0: u16
+    r1: u16
+    r2: u16
+  code:
+  L0:
+    0: r2 := bit_and r0, r1
+    1: ret [r2]
+}
+
+fun c_i16(): i16 {
+  slots: params(0), locals(0), temps(1)
+    r0: i16
+  code:
+  L0:
+    0: r0 := ld_i16 12345
+    1: ret [r0]
+}
+
+fun c_i32(): i32 {
+  slots: params(0), locals(0), temps(1)
+    r0: i32
+  code:
+  L0:
+    0: r0 := ld_i32 2000000000
+    1: ret [r0]
+}
+
+fun c_u16(): u16 {
+  slots: params(0), locals(0), temps(1)
+    r0: u16
+  code:
+  L0:
+    0: r0 := ld_u16 40000
+    1: ret [r0]
+}
+
+fun c_u32(): u32 {
+  slots: params(0), locals(0), temps(1)
+    r0: u32
+  code:
+  L0:
+    0: r0 := ld_u32 3000000000
+    1: ret [r0]
+}
+
+fun div_u32(r0, r1): u32 {
+  slots: params(2), locals(0), temps(1)
+    r0: u32
+    r1: u32
+    r2: u32
+  code:
+  L0:
+    0: r2 := div r0, r1
+    1: ret [r2]
+}
+
+fun eq_u32(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: u32
+    r1: u32
+    r2: bool
+  code:
+  L0:
+    0: r2 := eq r0, r1
+    1: ret [r2]
+}
+
+fun lt_i16(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: i16
+    r1: i16
+    r2: bool
+  code:
+  L0:
+    0: r2 := lt r0, r1
+    1: ret [r2]
+}
+
+fun lt_u16(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: u16
+    r1: u16
+    r2: bool
+  code:
+  L0:
+    0: r2 := lt r0, r1
+    1: ret [r2]
+}
+
+fun mul_i32(r0, r1): i32 {
+  slots: params(2), locals(0), temps(1)
+    r0: i32
+    r1: i32
+    r2: i32
+  code:
+  L0:
+    0: r2 := mul r0, r1
+    1: ret [r2]
+}
+
+fun mul_u16(r0, r1): u16 {
+  slots: params(2), locals(0), temps(1)
+    r0: u16
+    r1: u16
+    r2: u16
+  code:
+  L0:
+    0: r2 := mul r0, r1
+    1: ret [r2]
+}
+
+fun mul_u32_imm(r0): u32 {
+  slots: params(1), locals(0), temps(1)
+    r0: u32
+    r1: u32
+  code:
+  L0:
+    0: r1 := mul r0, #7u32
+    1: ret [r1]
+}
+
+fun neg_i16(r0): i16 {
+  slots: params(1), locals(0), temps(1)
+    r0: i16
+    r1: i16
+  code:
+  L0:
+    0: r1 := negate r0
+    1: ret [r1]
+}
+
+fun neg_i32(r0): i32 {
+  slots: params(1), locals(0), temps(1)
+    r0: i32
+    r1: i32
+  code:
+  L0:
+    0: r1 := negate r0
+    1: ret [r1]
+}
+
+fun shl_u16_imm(r0): u16 {
+  slots: params(1), locals(0), temps(1)
+    r0: u16
+    r1: u16
+  code:
+  L0:
+    0: r1 := shl r0, #3u8
+    1: ret [r1]
+}
+
+fun shr_u32_var(r0, r1): u32 {
+  slots: params(2), locals(0), temps(1)
+    r0: u32
+    r1: u8
+    r2: u32
+  code:
+  L0:
+    0: r2 := shr r0, r1
+    1: ret [r2]
+}
+
+fun sub_i32(r0, r1): i32 {
+  slots: params(2), locals(0), temps(1)
+    r0: i32
+    r1: i32
+    r2: i32
+  code:
+  L0:
+    0: r2 := sub r0, r1
+    1: ret [r2]
+}
+
+fun xor_u32(r0, r1): u32 {
+  slots: params(2), locals(0), temps(1)
+    r0: u32
+    r1: u32
+    r2: u32
+  code:
+  L0:
+    0: r2 := bit_xor r0, r1
+    1: ret [r2]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun add_i16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntAdd [4] <- [0] + i16 [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
+
+fun add_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntAdd [4] <- [0] + u16 [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
+
+fun add_u16_imm() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntAdd [2] <- [0] + u16 #1000
+    2: Move(2) [0] <- [2]
+    3: Return
+}
+
+fun and_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntBitAnd [4] <- [0] & u16 [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
+
+fun c_i16() {
+  frame_data_size: 8
+  code:
+    0: Charge #4
+    1: StoreImm2 [0] <- #12345
+    2: Return
+}
+
+fun c_i32() {
+  frame_data_size: 8
+  code:
+    0: Charge #4
+    1: StoreImm4 [0] <- #2000000000
+    2: Return
+}
+
+fun c_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #4
+    1: StoreImm2 [0] <- #40000
+    2: Return
+}
+
+fun c_u32() {
+  frame_data_size: 8
+  code:
+    0: Charge #4
+    1: StoreImm4 [0] <- #3000000000
+    2: Return
+}
+
+fun div_u32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntDiv [8] <- [0] / u32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
+
+fun eq_u32() {
+  frame_data_size: 16
+  code:
+    0: Charge #10
+    1: IntCmp [8] <- [0] == u32 [4]
+    2: Move(1) [0] <- [8]
+    3: Return
+}
+
+fun lt_i16() {
+  frame_data_size: 8
+  code:
+    0: Charge #10
+    1: IntCmp [4] <- [0] < i16 [2]
+    2: Move(1) [0] <- [4]
+    3: Return
+}
+
+fun lt_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #10
+    1: IntCmp [4] <- [0] < u16 [2]
+    2: Move(1) [0] <- [4]
+    3: Return
+}
+
+fun mul_i32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntMul [8] <- [0] * i32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
+
+fun mul_u16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntMul [4] <- [0] * u16 [2]
+    2: Move(2) [0] <- [4]
+    3: Return
+}
+
+fun mul_u32_imm() {
+  frame_data_size: 8
+  code:
+    0: Charge #21
+    1: IntMul [4] <- [0] * u32 #7
+    2: Move(4) [0] <- [4]
+    3: Return
+}
+
+fun neg_i16() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntNegate.i16 [2] <- -[0]
+    2: Move(2) [0] <- [2]
+    3: Return
+}
+
+fun neg_i32() {
+  frame_data_size: 8
+  code:
+    0: Charge #21
+    1: IntNegate.i32 [4] <- -[0]
+    2: Move(4) [0] <- [4]
+    3: Return
+}
+
+fun shl_u16_imm() {
+  frame_data_size: 8
+  code:
+    0: Charge #15
+    1: IntShl.u16 [2] <- [0] << #3
+    2: Move(2) [0] <- [2]
+    3: Return
+}
+
+fun shr_u32_var() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntShr.u32 [8] <- [0] >> [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
+
+fun sub_i32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntSub [8] <- [0] - i32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}
+
+fun xor_u32() {
+  frame_data_size: 16
+  code:
+    0: Charge #21
+    1: IntBitXor [8] <- [0] ^ u32 [4]
+    2: Move(4) [0] <- [8]
+    3: Return
+}

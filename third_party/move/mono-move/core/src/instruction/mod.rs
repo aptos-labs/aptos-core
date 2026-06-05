@@ -274,6 +274,27 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
+    /// Store an immediate byte (1 byte) at the `dst` frame slot.
+    /// Can be used for various 1-byte values (`bool`, `u8`, `i8`).
+    StoreImm1 {
+        dst: FrameOffset,
+        imm: u8,
+    },
+
+    /// Store 2 immediate bytes into the destination slot. Same LE convention
+    /// as `StoreImm8`: `u16.to_le_bytes()` / `i16.to_le_bytes()`.
+    StoreImm2 {
+        dst: FrameOffset,
+        imm: [u8; 2],
+    },
+
+    /// Store 4 immediate bytes into the destination slot. Same LE convention
+    /// as `StoreImm8`: `u32.to_le_bytes()` / `i32.to_le_bytes()`.
+    StoreImm4 {
+        dst: FrameOffset,
+        imm: [u8; 4],
+    },
+
     /// Store 8 immediate bytes into the destination slot. `imm` is the
     /// little-endian (LE) byte representation of the value:
     /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
@@ -303,13 +324,6 @@ pub enum MicroOp {
     StoreImm32 {
         dst: FrameOffset,
         imm: Box<[u8; 32]>,
-    },
-
-    /// Store an immediate byte (1 byte) at the `dst` frame slot.
-    /// Can be used for various 1-byte values (`bool`, `u8`, `i8`).
-    StoreImm1 {
-        dst: FrameOffset,
-        imm: u8,
     },
 
     /// Copy 8 bytes from `src` to `dst`.
@@ -1039,6 +1053,15 @@ pub enum MicroOp {
 impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            MicroOp::StoreImm1 { dst, imm } => {
+                write!(f, "StoreImm1 [{}] <- #{}", dst.0, imm)
+            },
+            MicroOp::StoreImm2 { dst, imm } => {
+                write!(f, "StoreImm2 [{}] <- #{}", dst.0, u16::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm4 { dst, imm } => {
+                write!(f, "StoreImm4 [{}] <- #{}", dst.0, u32::from_le_bytes(*imm))
+            },
             MicroOp::StoreImm8 { dst, imm } => {
                 write!(f, "StoreImm8 [{}] <- #{}", dst.0, u64::from_le_bytes(*imm))
             },
@@ -1057,9 +1080,6 @@ impl fmt::Display for MicroOp {
                     dst.0,
                     U256::from_le_bytes(**imm)
                 )
-            },
-            MicroOp::StoreImm1 { dst, imm } => {
-                write!(f, "StoreImm1 [{}] <- #{}", dst.0, imm)
             },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
@@ -1659,10 +1679,12 @@ impl MicroOp {
             | MicroOp::ForceGC => true,
 
             // Non-allocating.
-            MicroOp::StoreImm8 { .. }
+            MicroOp::StoreImm1 { .. }
+            | MicroOp::StoreImm2 { .. }
+            | MicroOp::StoreImm4 { .. }
+            | MicroOp::StoreImm8 { .. }
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
-            | MicroOp::StoreImm1 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }

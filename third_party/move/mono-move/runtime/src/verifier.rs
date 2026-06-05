@@ -228,6 +228,18 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
     fn verify_instruction(&mut self, pc: usize, instr: &MicroOp) {
         match *instr {
+            MicroOp::StoreImm1 { dst, imm: _ } => {
+                self.check_frame_access_1(pc, dst);
+            },
+
+            MicroOp::StoreImm2 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 2);
+            },
+
+            MicroOp::StoreImm4 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 4);
+            },
+
             MicroOp::StoreImm8 { dst, imm: _ } => {
                 self.check_frame_access_8(pc, dst);
             },
@@ -238,10 +250,6 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             MicroOp::StoreImm32 { dst, imm: _ } => {
                 self.check_frame_access(Some(pc), dst, 32);
-            },
-
-            MicroOp::StoreImm1 { dst, imm: _ } => {
-                self.check_frame_access_1(pc, dst);
             },
 
             MicroOp::StoreRandomU64 { dst } => {
@@ -585,7 +593,21 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             MicroOp::SlotBorrow { dst, local } => {
-                self.check_frame_access_8(pc, local);
+                // Forms a fat pointer to `local` without dereferencing it, so only
+                // the base offset is checked: `local` must lie in the data region
+                // [0, param_and_local_sizes_sum), not metadata or the callee region.
+                // The op carries no size, so the borrowed value's full extent
+                // (`local + size`) is not bounds-checked here: a base in-region
+                // whose value extends past the region end is not rejected.
+                if local.0 as usize >= self.func.param_and_local_sizes_sum {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "SlotBorrow local {} is outside the data region [0, {})",
+                            local.0, self.func.param_and_local_sizes_sum
+                        ),
+                    );
+                }
                 self.check_frame_access(Some(pc), dst, 16);
             },
 
