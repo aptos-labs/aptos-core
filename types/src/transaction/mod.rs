@@ -1187,6 +1187,28 @@ impl TransactionPayload {
         })
     }
 
+    pub fn upgrade_payload_with_txn_limits_request(self, txn_limits_request: UserTxnLimitsRequest) -> Self {
+        let executable = self
+            .executable()
+            .expect("ModuleBundle variant is deprecated");
+        let extra_config = match self.extra_config() {
+            TransactionExtraConfig::V1 { multisig_address, replay_protection_nonce } => TransactionExtraConfig::V2 {
+                multisig_address,
+                replay_protection_nonce,
+                txn_limits_request: Some(txn_limits_request),
+            },
+            TransactionExtraConfig::V2 { multisig_address, replay_protection_nonce, .. } => TransactionExtraConfig::V2 {
+                multisig_address,
+                replay_protection_nonce,
+                txn_limits_request: Some(txn_limits_request),
+            }
+        };
+        TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable,
+            extra_config,
+        })
+    }
+
     pub fn is_encrypted_variant(&self) -> bool {
         matches!(self, Self::EncryptedPayload(_))
     }
