@@ -350,7 +350,9 @@ fn reject_proposal_with_forged_genesis_qc() {
         ),
     );
     forged_qc
-        .verify(&generate_validator_verifier(&[node.signer.clone()]))
+        .verify(&generate_validator_verifier(std::slice::from_ref(
+            &node.signer,
+        )))
         .unwrap();
 
     timed_block_on(&runtime, async {
