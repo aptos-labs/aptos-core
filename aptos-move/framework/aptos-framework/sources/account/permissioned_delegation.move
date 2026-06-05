@@ -27,6 +27,7 @@ module aptos_framework::permissioned_delegation {
     const EINVALID_SIGNATURE: u64 = 4;
     const EDELEGATION_EXISTENCE: u64 = 5;
     const ERATE_LIMITED: u64 = 6;
+    const EMALFORMED_DATA: u64 = 7;
 
     enum AccountDelegation has store {
         V1 { handle: StorablePermissionedHandle, rate_limiter: Option<rate_limiter::RateLimiter> }
@@ -116,6 +117,9 @@ module aptos_framework::permissioned_delegation {
         let signature = new_signature_from_bytes(
             bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x))
         );
+        // Reject trailing bytes after the signature to enforce a canonical
+        // authenticator encoding and prevent griefing via padded payloads.
+        assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(EMALFORMED_DATA));
         assert!(
             ed25519::signature_verify_strict(
                 &signature,
@@ -208,5 +212,30 @@ module aptos_framework::permissioned_delegation {
         authenticate(account, auth_data);
         authenticate(account_copy, auth_data);
         remove_permissioned_handle(&account_copy_2, key);
+    }
+
+    #[test(account = @0xcafe, account_copy = @0xcafe)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
+    fun test_authenticate_rejects_trailing_bytes(account: signer, account_copy: signer) acquires RegisteredDelegations {
+        let aptos_framework = create_signer_for_test(@aptos_framework);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        let (sk, vpk) = generate_keys();
+        let signature = sign_arbitrary_bytes(&sk, vector[1, 2, 3]);
+        let pubkey_bytes = validated_public_key_to_bytes(&vpk);
+        let key = DelegationKey::Ed25519PublicKey(public_key_into_unvalidated(vpk));
+        let sig_bundle = SignatureBundle {
+            pubkey: new_unvalidated_public_key_from_bytes(pubkey_bytes),
+            signature,
+        };
+        let authenticator = bcs::to_bytes(&sig_bundle);
+        // Append trailing bytes after the valid (pubkey, signature) pair to simulate griefing.
+        authenticator.push_back(0xDE);
+        authenticator.push_back(0xAD);
+        authenticator.push_back(0xBE);
+        authenticator.push_back(0xEF);
+        let auth_data = auth_data::create_auth_data(vector[1, 2, 3], authenticator);
+        add_permissioned_handle(&account, key, option::none(), 60);
+        // Should abort with error::invalid_argument(EMALFORMED_DATA) = 0x10007.
+        authenticate(account_copy, auth_data);
     }
 }

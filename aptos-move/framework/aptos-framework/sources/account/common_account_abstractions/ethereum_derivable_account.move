@@ -44,6 +44,10 @@ module aptos_framework::ethereum_derivable_account {
     const EADDR_MISMATCH: u64 = 4;
     /// Unexpected v value.
     const EUNEXPECTED_V: u64 = 5;
+    /// Malformed data with trailing bytes.
+    const EMALFORMED_DATA: u64 = 6;
+    /// Ethereum address is missing the "0x" prefix.
+    const EINVALID_ETH_ADDR_PREFIX: u64 = 7;
 
     enum SIWEAbstractSignature has drop {
         /// Deprecated, use MessageV2 instead
@@ -76,6 +80,7 @@ module aptos_framework::ethereum_derivable_account {
         let stream = bcs_stream::new(*abstract_public_key);
         let ethereum_address = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
         let domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+        assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
         SIWEAbstractPublicKey { ethereum_address, domain }
     }
 
@@ -87,11 +92,13 @@ module aptos_framework::ethereum_derivable_account {
         if (signature_type == 0x00) {
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
             SIWEAbstractSignature::MessageV1 { issued_at: string::utf8(issued_at), signature }
         } else if (signature_type == 0x01) {
             let scheme = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
             SIWEAbstractSignature::MessageV2 { scheme: string::utf8(scheme), issued_at: string::utf8(issued_at), signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
@@ -196,8 +203,13 @@ module aptos_framework::ethereum_derivable_account {
         let kexHash = aptos_hash::keccak256(public_key_without_prefix);
         // 3. Slice the last 20 bytes (this is the Ethereum address)
         let recovered_addr = kexHash.slice(12, 32);
-        // 4. Remove the 0x prefix from the utf8 account address
-        let ethereum_address_without_prefix = abstract_public_key.ethereum_address.slice(2, abstract_public_key.ethereum_address.length());
+        // 4. Remove the 0x prefix from the utf8 account address, after asserting it's actually there
+        let ethereum_address = &abstract_public_key.ethereum_address;
+        assert!(
+            ethereum_address.length() >= 2 && ethereum_address[0] == 0x30 && ethereum_address[1] == 0x78,
+            EINVALID_ETH_ADDR_PREFIX
+        );
+        let ethereum_address_without_prefix = ethereum_address.slice(2, ethereum_address.length());
 
         let account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
         // Verify that the recovered address matches the domain account identity
@@ -373,5 +385,62 @@ module aptos_framework::ethereum_derivable_account {
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EMALFORMED_DATA)]
+    fun test_deserialize_abstract_signature_with_trailing_bytes() {
+        let signature_bytes = vector[
+            249, 247, 194, 250, 31, 233, 100, 234, 109, 142, 6, 193, 203, 33, 147, 199,
+            236, 117, 69, 119, 252, 219, 150, 143, 28, 112, 33, 9, 95, 53, 0, 69,
+            123, 17, 207, 53, 69, 203, 213, 208, 13, 98, 225, 170, 28, 183, 181, 53,
+            58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
+            28
+        ];
+        let abstract_signature = create_raw_signature(utf8(b"https"), utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
+        // Append trailing bytes to simulate griefing attack
+        abstract_signature.push_back(0xDE);
+        abstract_signature.push_back(0xAD);
+        abstract_signature.push_back(0xBE);
+        abstract_signature.push_back(0xEF);
+        // This should fail with EMALFORMED_DATA due to trailing bytes
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test(framework = @0x1)]
+    #[expected_failure(abort_code = EINVALID_ETH_ADDR_PREFIX)]
+    fun test_authenticate_auth_data_missing_eth_addr_prefix(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+
+        let digest = x"705f1f57dd8399bf134e649981af43b5c42e59f985c4e4335ab70ce3f96bcd27";
+        let signature = vector[
+            162, 57, 230, 98, 9, 139, 202, 15, 110, 61, 237, 54, 252, 234, 202, 13,
+            181, 196, 174, 19, 226, 50, 151, 63, 137, 229, 144, 15, 4, 56, 1, 122,
+            42, 51, 191, 43, 162, 155, 55, 227, 62, 164, 247, 18, 154, 68, 59, 82,
+            108, 124, 83, 72, 224, 158, 79, 20, 123, 172, 105, 71, 12, 114, 208, 246, 27
+        ];
+        let abstract_signature = create_raw_signature(utf8(b"https"), utf8(b"2025-05-02T16:17:10.714Z"), signature);
+        // Same address as test_authenticate_auth_data but missing the "0x" prefix
+        let ethereum_address = b"C7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
+        let domain = b"localhost:3001";
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        authenticate_auth_data(auth_data, &entry_function_name);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EMALFORMED_DATA)]
+    fun test_deserialize_abstract_public_key_with_trailing_bytes() {
+        let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
+        let domain = b"localhost:3001";
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
+        // Append trailing bytes to simulate griefing attack
+        abstract_public_key.push_back(0xDE);
+        abstract_public_key.push_back(0xAD);
+        abstract_public_key.push_back(0xBE);
+        abstract_public_key.push_back(0xEF);
+        // This should fail with EMALFORMED_DATA due to trailing bytes
+        deserialize_abstract_public_key(&abstract_public_key);
     }
 }
