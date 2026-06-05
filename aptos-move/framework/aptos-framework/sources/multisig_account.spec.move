@@ -163,6 +163,23 @@ spec aptos_framework::multisig_account {
     /// Implementation: The function assert_multisig_account_exists validates the existence of MultisigAccount under the
     /// account.
     /// Enforcement: Audited that it aborts if the MultisigAccount doesn't exist on the account.
+    ///
+    /// No.: 18
+    /// Requirement: The number of owners of any multi-signature account must never exceed MAX_OWNERS. This bound is
+    /// enforced both at creation time and on every mutation of the owner set.
+    /// Criticality: High
+    /// Implementation: create_with_owners_internal asserts the cap before publishing the MultisigAccount resource.
+    /// update_owner_schema asserts the cap after applying add/remove operations, so swaps, additions, and removals
+    /// can never leave the account in a state with more than MAX_OWNERS owners.
+    /// Enforcement: Formally verified at the creation site: create_with_owners_internal and
+    /// create_with_owners_and_timelock have prover aborts_if specs that fire when len(owners) > MAX_OWNERS, and
+    /// create_with_owners_internal additionally ensures len(multisig.owners) <= MAX_OWNERS post-state. The
+    /// post-mutation cap in update_owner_schema is enforced by the runtime assert! and audited; a corresponding
+    /// post-state prover ensures clause is omitted because the function's two sequential mutating loops exceed
+    /// the per-function verification timeout. Also covered by unit tests
+    /// test_create_with_exactly_max_owners_succeeds, test_create_with_more_than_max_owners_should_fail,
+    /// test_add_owners_up_to_max_succeeds, test_add_owners_exceeding_max_should_fail, and
+    /// test_swap_owners_at_max_succeeds.
     /// </high-level-req>
 
     spec module {
@@ -337,6 +354,8 @@ spec aptos_framework::multisig_account {
         aborts_if option::is_some(override_threshold) && option::is_none(timelock_period);
         // num_signatures_required must be in range once the creator joins the owner set.
         aborts_if num_signatures_required == 0 || num_signatures_required > total_owners;
+        // Owner cap: after the creator is appended, the total owner count must fit MAX_OWNERS.
+        aborts_if total_owners > MAX_OWNERS;
         // Timelock period, when configured, must be within valid range.
         aborts_if option::is_some(timelock_period) &&
             (option::spec_borrow(timelock_period) < MIN_TIMELOCK_PERIOD ||
@@ -464,14 +483,40 @@ spec aptos_framework::multisig_account {
         pragma aborts_if_is_partial;
         // num_signatures_required must be in [1, len(owners)].
         aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);
+        // Owner cap: cannot publish a MultisigAccount with more than MAX_OWNERS owners.
+        aborts_if len(owners) > MAX_OWNERS;
         // After creation, MultisigAccount resource exists.
         ensures exists<MultisigAccount>(signer::address_of(multisig_account));
         let post multisig = global<MultisigAccount>(signer::address_of(multisig_account));
         // num_signatures_required is set correctly.
         ensures multisig.num_signatures_required == num_signatures_required;
+        // The published owner set matches the (validated) input owners vector.
+        ensures multisig.owners == owners;
+        // The owner cap holds for the published account.
+        ensures len(multisig.owners) <= MAX_OWNERS;
         // Sequence numbers are initialized correctly.
         ensures multisig.last_executed_sequence_number == 0;
         ensures multisig.next_sequence_number == 1;
+    }
+
+    /// `update_owner_schema` is the single mutation point for `MultisigAccount.owners` and
+    /// `MultisigAccount.num_signatures_required`. The explicit `assert!` near the bottom of the
+    /// function (`num_owners <= MAX_OWNERS`) is the runtime witness for the owner cap; this spec
+    /// only documents the cheap pre-state aborts to keep prover verification time bounded —
+    /// reasoning about the post-state requires analyzing two sequential mutating loops
+    /// (append + swap_remove) which currently exceeds the per-function timeout.
+    spec update_owner_schema(
+        multisig_address: address,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        optional_new_num_signatures_required: Option<u64>,
+    ) {
+        pragma aborts_if_is_partial;
+        // The multisig account must exist.
+        aborts_if !exists<MultisigAccount>(multisig_address);
+        // If a new num_signatures_required is provided, it must be > 0.
+        aborts_if option::is_some(optional_new_num_signatures_required) &&
+            option::spec_borrow(optional_new_num_signatures_required) == 0;
     }
 
     spec remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): (u64, u64) {

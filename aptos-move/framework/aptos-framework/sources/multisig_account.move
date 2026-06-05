@@ -110,9 +110,14 @@ module aptos_framework::multisig_account {
     const ETIMELOCK_DOES_NOT_EXIST: u64 = 24;
     /// Feature flag for multisig timelock is not enabled.
     const ETIMELOCK_NOT_ENABLED: u64 = 25;
+    /// The number of owners has exceeded the maximum allowed.
+    const EMAX_OWNERS_EXCEEDED: u64 = 26;
 
 
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
+
+    /// Maximum number of owners allowed for an on-chain multisig account.
+    const MAX_OWNERS: u64 = 16;
 
     const MAX_PENDING_TRANSACTIONS: u64 = 20;
 
@@ -877,6 +882,13 @@ module aptos_framework::multisig_account {
         );
 
         let multisig_address = address_of(multisig_account);
+
+        // We can't have over the number of owners
+        assert!(
+            owners.length() <= MAX_OWNERS,
+            error::invalid_argument(EMAX_OWNERS_EXCEEDED),
+        );
+
         validate_owners(&owners, multisig_address);
         move_to(multisig_account, MultisigAccount {
             owners,
@@ -1503,13 +1515,14 @@ module aptos_framework::multisig_account {
         multisig_account_seed
     }
 
+    /// Validate that the owners are valid: no duplicates, no self-ownership, and within limits.
     fun validate_owners(owners: &vector<address>, multisig_account: address) {
-        let distinct_owners: vector<address> = vector[];
+        // Use an OrderedMap for efficient duplicate detection
+        let distinct_owners: OrderedMap<address, bool> = ordered_map::new();
         owners.for_each_ref(|owner| {
             assert!(owner != &multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));
-            let (found, _) = distinct_owners.index_of(owner);
-            assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));
-            distinct_owners.push_back(*owner);
+            let found = distinct_owners.upsert(*owner, true);
+            assert!(found.is_none(), error::invalid_argument(EDUPLICATE_OWNER));
         });
     }
 
@@ -1626,6 +1639,7 @@ module aptos_framework::multisig_account {
                 );
             }
         };
+
         // If new signature count provided, try to update count.
         if (optional_new_num_signatures_required.is_some()) {
             let new_num_signatures_required =
@@ -1649,11 +1663,16 @@ module aptos_framework::multisig_account {
                 );
             }
         };
+
         // Verify number of owners.
         let num_owners = multisig_account_ref_mut.owners.length();
         assert!(
             num_owners >= multisig_account_ref_mut.num_signatures_required,
             error::invalid_state(ENOT_ENOUGH_OWNERS)
+        );
+        assert!(
+            num_owners <= MAX_OWNERS,
+            error::invalid_argument(EMAX_OWNERS_EXCEEDED)
         );
 
         // If a timelock is configured, adjust and validate the override threshold
@@ -1694,6 +1713,7 @@ module aptos_framework::multisig_account {
     use aptos_framework::aptos_coin;
     #[test_only]
     use aptos_framework::coin::{destroy_mint_cap, destroy_burn_cap};
+    use aptos_framework::ordered_map::{Self, OrderedMap};
 
     #[test_only]
     const PAYLOAD: vector<u8> = vector[1, 2, 3];
@@ -1735,6 +1755,29 @@ module aptos_framework::multisig_account {
         let (burn, mint) = aptos_coin::initialize_for_test(framework_signer);
         destroy_mint_cap(mint);
         destroy_burn_cap(burn);
+    }
+
+    #[test_only]
+    fun make_test_address(i: u8): address {
+        // Produce a distinct, non-conflicting 32-byte address by tagging the last two bytes.
+        let bytes = vector[
+            0u8, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0xab, i,
+        ];
+        from_bcs::to_address(bytes)
+    }
+
+    #[test_only]
+    fun make_test_addresses(count: u8): vector<address> {
+        let result = vector[];
+        let i: u8 = 1;
+        while (i <= count) {
+            result.push_back(make_test_address(i));
+            i += 1;
+        };
+        result
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -1907,6 +1950,71 @@ module aptos_framework::multisig_account {
             vector[],
             vector[],
         );
+    }
+
+    #[test(owner = @0x123)]
+    fun test_create_with_exactly_max_owners_succeeds(owner: &signer) {
+        // 15 additional + creator = 16 (MAX_OWNERS). Boundary at the limit.
+        setup();
+        let owner_addr = address_of(owner);
+        create_account(owner_addr);
+        create_with_owners(owner, make_test_addresses(15), 1, vector[], vector[]);
+        let multisig_account = get_next_multisig_account_address(owner_addr);
+        assert_multisig_account_exists(multisig_account);
+        assert!(owners(multisig_account).length() == 16, 0);
+    }
+
+    #[test(owner = @0x123)]
+    #[expected_failure(abort_code = 0x1001A, location = Self)]
+    fun test_create_with_more_than_max_owners_should_fail(owner: &signer) {
+        // 16 additional + creator = 17 (> MAX_OWNERS).
+        setup();
+        let owner_addr = address_of(owner);
+        create_account(owner_addr);
+        create_with_owners(owner, make_test_addresses(16), 1, vector[], vector[]);
+    }
+
+    #[test(owner = @0x123)]
+    fun test_add_owners_up_to_max_succeeds(owner: &signer) {
+        // Start with 1 owner, add 15 more → exactly MAX_OWNERS.
+        setup();
+        let owner_addr = address_of(owner);
+        create_account(owner_addr);
+        create(owner, 1, vector[], vector[]);
+        let multisig_account = get_next_multisig_account_address(owner_addr);
+        let multisig_signer = &create_signer(multisig_account);
+        add_owners(multisig_signer, make_test_addresses(15));
+        assert!(owners(multisig_account).length() == 16, 0);
+    }
+
+    #[test(owner = @0x123)]
+    #[expected_failure(abort_code = 0x1001A, location = Self)]
+    fun test_add_owners_exceeding_max_should_fail(owner: &signer) {
+        // Start with 1 owner, attempt to add 16 more → total 17 > MAX_OWNERS.
+        setup();
+        let owner_addr = address_of(owner);
+        create_account(owner_addr);
+        create(owner, 1, vector[], vector[]);
+        let multisig_account = get_next_multisig_account_address(owner_addr);
+        let multisig_signer = &create_signer(multisig_account);
+        add_owners(multisig_signer, make_test_addresses(16));
+    }
+
+    #[test(owner = @0x123)]
+    fun test_swap_owners_at_max_succeeds(owner: &signer) {
+        // An account already at MAX_OWNERS must still allow swaps that don't grow the set.
+        setup();
+        let owner_addr = address_of(owner);
+        create_account(owner_addr);
+        create_with_owners(owner, make_test_addresses(15), 1, vector[], vector[]);
+        let multisig_account = get_next_multisig_account_address(owner_addr);
+        let multisig_signer = &create_signer(multisig_account);
+        swap_owners(
+            multisig_signer,
+            vector[make_test_address(100)],
+            vector[make_test_address(1)],
+        );
+        assert!(owners(multisig_account).length() == 16, 0);
     }
 
     #[test]
