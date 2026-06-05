@@ -53,16 +53,7 @@ pub struct AnnotatedMoveStruct {
     pub value: Vec<(Identifier, AnnotatedMoveValue)>,
 }
 
-/// Used to represent raw struct data, without struct name and field names. This stems
-/// from closure capture values for which only the serialization layout is known.
-#[derive(Clone, Debug)]
-pub struct RawMoveStruct {
-    pub variant_info: Option<u16>,
-    pub field_values: Vec<AnnotatedMoveValue>,
-}
-
-/// Used to represent an annotated closure. The `captured` values will have only
-/// `RawMoveStruct` information and are not fully decorated.
+/// Used to represent an annotated closure.
 #[derive(Clone, Debug)]
 pub struct AnnotatedMoveClosure {
     pub module_id: ModuleId,
@@ -92,7 +83,6 @@ pub enum AnnotatedMoveValue {
     U256(int256::U256),
     // NOTE: Added in v8
     Closure(AnnotatedMoveClosure),
-    RawStruct(RawMoveStruct),
     // NOTE: Added in bytecode version v9, do not reorder!
     I8(i8),
     I16(i16),
@@ -205,10 +195,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let types: Vec<&FatType> = param_tys
             .iter()
             .filter(|t| match t {
-                FatType::Signer
-                | FatType::Function(_)
-                | FatType::Runtime(_)
-                | FatType::RuntimeVariants(_) => false,
+                FatType::Signer | FatType::Function(_) => false,
                 FatType::Reference(inner) => !matches!(&**inner, FatType::Signer),
                 FatType::Bool
                 | FatType::U8
@@ -815,38 +802,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         }
     }
 
-    fn annotate_raw_struct(
-        &self,
-        move_struct: &MoveStruct,
-        ty: &FatType,
-        limit: &mut Limiter,
-    ) -> anyhow::Result<RawMoveStruct> {
-        let annotate_values = |values: &[MoveValue], tys: &[FatType], limit: &mut Limiter| {
-            values
-                .iter()
-                .zip(tys)
-                .map(|(v, ty)| self.annotate_value(v, ty, limit))
-                .collect::<anyhow::Result<Vec<_>>>()
-        };
-        match (move_struct, ty) {
-            (MoveStruct::Runtime(values), FatType::Runtime(tys)) if values.len() == tys.len() => {
-                Ok(RawMoveStruct {
-                    variant_info: None,
-                    field_values: annotate_values(values, tys, limit)?,
-                })
-            },
-            (MoveStruct::RuntimeVariant(tag, values), FatType::RuntimeVariants(vars))
-                if (*tag as usize) < vars.len() && values.len() == vars[*tag as usize].len() =>
-            {
-                Ok(RawMoveStruct {
-                    variant_info: Some(*tag),
-                    field_values: annotate_values(values, &vars[*tag as usize], limit)?,
-                })
-            },
-            _ => bail!("type and value mismatch: inconsistent raw struct information"),
-        }
-    }
-
     fn annotate_closure(
         &self,
         move_closure: &MoveClosure,
@@ -860,13 +815,22 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             mask,
             captured,
         } = move_closure;
+
+        // Resolve the captured argument types on-demand from the function signature.
+        // This gives fully named annotations (real struct and field names) instead of
+        // the raw, nameless layouts stored with the closure, at the cost of requiring
+        // the defining module to be loadable at the read version.
+        let captured_tys = self.resolve_captured_types(module_id, fun_id, ty_args, *mask, limit)?;
+        anyhow::ensure!(
+            captured.len() == captured_tys.len(),
+            "captured value/type count mismatch: {} values, {} types",
+            captured.len(),
+            captured_tys.len(),
+        );
         let captured = captured
             .iter()
-            .map(|(layout, value)| {
-                let fat_type = FatType::from_runtime_layout(layout, limit)
-                    .map_err(|e| anyhow!("failed to annotate captured value: {}", e))?;
-                self.annotate_value(value, &fat_type, limit)
-            })
+            .zip(&captured_tys)
+            .map(|((_layout, value), ty)| self.annotate_value(value, ty, limit))
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(AnnotatedMoveClosure {
             module_id: module_id.clone(),
@@ -875,6 +839,90 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             mask: *mask,
             captured,
         })
+    }
+
+    /// Resolves the types of a closure's captured arguments from the function
+    /// signature: the captured parameters are selected by the closure mask, then the
+    /// closure's type arguments are substituted in. The resulting types are fully
+    /// named (carry struct and field names), unlike the closure's stored layouts.
+    fn resolve_captured_types(
+        &self,
+        module_id: &ModuleId,
+        fun_id: &IdentStr,
+        ty_args: &[TypeTag],
+        mask: ClosureMask,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        if mask.captured_count() == 0 {
+            return Ok(vec![]);
+        }
+        let captured_tys = self.resolve_captured_parameter_types(module_id, fun_id, mask, limit)?;
+
+        let ty_args = ty_args
+            .iter()
+            .map(|ty| self.resolve_type_impl(ty, limit))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        captured_tys
+            .into_iter()
+            .map(|ty| {
+                if ty_args.is_empty() {
+                    Ok(ty)
+                } else {
+                    ty.subst(&ty_args, &self.struct_substitutor(), limit)
+                        .map_err(anyhow::Error::from)
+                }
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+    }
+
+    /// Resolves only the captured parameter types of a function, selected by the
+    /// closure mask. Only the captured parameters are resolved: non-captured ones may
+    /// be references (which cannot be captured), and resolving those would fail.
+    fn resolve_captured_parameter_types(
+        &self,
+        module_id: &ModuleId,
+        fun_id: &IdentStr,
+        mask: ClosureMask,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        let module = self.view_existing_module(module_id)?;
+        let module = module.borrow();
+
+        // Pseudo-cost for loading + scanning this module's function table. Bounds the
+        // amplification where a vector of small closures forces repeated module loads
+        // and O(functions) scans; the captured data itself is already size-bounded.
+        limit.charge(10 * module.function_defs.len())?;
+
+        for def in module.function_defs.iter() {
+            let fhandle = module.function_handle_at(def.function);
+            let fhandle_view = FunctionHandleView::new(module, fhandle);
+            if fhandle_view.name() == fun_id {
+                let captured_tokens = mask.extract(&fhandle_view.parameters().0, true);
+                // A well-formed closure only sets mask bits for real parameters.
+                // `extract` ignores bits past the parameter list, so without this
+                // check a mask claiming more captured args than the function has
+                // would (in the V2 format) silently decode fewer captured values
+                // than the mask implies.
+                anyhow::ensure!(
+                    captured_tokens.len() == mask.captured_count() as usize,
+                    "closure mask captures {} arguments but `{}` has only {} capturable parameters",
+                    mask.captured_count(),
+                    fun_id,
+                    captured_tokens.len(),
+                );
+                return captured_tokens
+                    .into_iter()
+                    .map(|tok| {
+                        self.resolve_signature(BinaryIndexedView::Module(module), tok, limit)
+                    })
+                    .collect();
+            }
+        }
+        Err(anyhow!(
+            "Function {:?} not found in {:?}",
+            fun_id,
+            module_id
+        ))
     }
 
     fn annotate_value(
@@ -916,9 +964,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
                 AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit)?)
-            },
-            (MoveValue::Struct(s), FatType::Runtime(_) | FatType::RuntimeVariants(_)) => {
-                AnnotatedMoveValue::RawStruct(self.annotate_raw_struct(s, ty, limit)?)
             },
             (MoveValue::Closure(c), FatType::Function(ty)) => {
                 AnnotatedMoveValue::Closure(self.annotate_closure(c, ty, limit)?)
@@ -1007,21 +1052,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     Ok(())
                 }
             },
-            (FatType::Runtime(tys), MoveValue::Struct(MoveStruct::Runtime(vals))) => {
-                for (ty, val) in tys.iter().zip(vals) {
-                    self.collect_table_info_from_value(ty, val, limit, infos)?
-                }
-                Ok(())
-            },
-            (
-                FatType::RuntimeVariants(vars),
-                MoveValue::Struct(MoveStruct::RuntimeVariant(tag, vals)),
-            ) if (tag as usize) < vars.len() => {
-                for (ty, val) in vars[tag as usize].iter().zip(vals) {
-                    self.collect_table_info_from_value(ty, val, limit, infos)?
-                }
-                Ok(())
-            },
 
             // Every other combo cannot harbor tables.
             (FatType::Bool, _)
@@ -1038,8 +1068,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             | (FatType::Reference(_), _)
             | (FatType::MutableReference(_), _)
             | (FatType::TyParam(_), _)
-            | (FatType::Runtime(_), _)
-            | (FatType::RuntimeVariants(_), _)
             | (FatType::Function(_), _)
             | (FatType::I8, _)
             | (FatType::I16, _)
@@ -1111,7 +1139,6 @@ fn pretty_print_value(
         },
         AnnotatedMoveValue::Bytes(v) => write!(f, "{}", hex::encode(v)),
         AnnotatedMoveValue::Struct(s) => pretty_print_struct(f, s, indent),
-        AnnotatedMoveValue::RawStruct(s) => pretty_print_raw_struct(f, s, indent),
         AnnotatedMoveValue::Closure(c) => pretty_print_closure(f, c, indent),
     }
 }
@@ -1134,27 +1161,6 @@ fn pretty_print_struct(
         writeln!(f)?;
     }
     write_indent(f, indent)?;
-    write!(f, "}}")
-}
-
-fn pretty_print_raw_struct(
-    f: &mut Formatter,
-    value: &RawMoveStruct,
-    indent: u64,
-) -> std::fmt::Result {
-    let RawMoveStruct {
-        variant_info,
-        field_values: value,
-    } = value;
-    if let Some(var) = variant_info {
-        write!(f, "#{}", var)?
-    }
-    writeln!(f, "{{")?;
-    for elem in value {
-        write_indent(f, indent + 4)?;
-        pretty_print_value(f, elem, indent + 4)?;
-        writeln!(f)?
-    }
     write!(f, "}}")
 }
 
@@ -1232,22 +1238,6 @@ impl serde::Serialize for AnnotatedMoveStruct {
         }
         for (f, v) in &self.value {
             s.serialize_entry(f, v)?
-        }
-        s.end()
-    }
-}
-
-impl serde::Serialize for RawMoveStruct {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut s;
-        if let Some(tag) = &self.variant_info {
-            s = serializer.serialize_map(Some(self.field_values.len() + 1))?;
-            s.serialize_entry("$variant_tag", tag)?;
-        } else {
-            s = serializer.serialize_map(Some(self.field_values.len()))?;
-        }
-        for (i, v) in self.field_values.iter().enumerate() {
-            s.serialize_entry(&i, v)?
         }
         s.end()
     }
@@ -1360,7 +1350,6 @@ impl serde::Serialize for AnnotatedMoveValue {
                 }
             },
             Struct(s) => s.serialize(serializer),
-            RawStruct(s) => s.serialize(serializer),
             Closure(c) => c.serialize(serializer),
         }
     }
