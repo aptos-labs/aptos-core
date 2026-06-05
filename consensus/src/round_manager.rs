@@ -1242,6 +1242,31 @@ impl RoundManager {
             proposal,
         );
 
+        // A round-0 parent QC is the epoch's genesis certificate. `QuorumCert::verify`
+        // accepts it without signatures (it is implicitly agreed upon), so it only checks
+        // self-consistency and does not bind the certified BlockInfo to any real state.
+        // Bind it here to the genesis QC we derived locally from the previous epoch's final
+        // LedgerInfo (identical on every honest node), so a malicious proposer cannot smuggle
+        // an attacker-chosen genesis BlockInfo (fake executed_state_id / version) into the
+        // SafetyRules voting path.
+        let parent_qc = proposal.quorum_cert();
+        if parent_qc.certified_block().round() == 0 {
+            let local_genesis = self
+                .block_store
+                .get_quorum_cert_for_block(parent_qc.certified_block().id());
+            // Comparing the certified BlockInfo is sufficient: it carries executed_state_id and
+            // version (the fields the attacker forges, and the only part of the round-0 QC that
+            // flows into the signed vote LedgerInfo). The QC itself is signatureless by
+            // construction (QuorumCert::verify requires zero voters for round 0), so nothing else
+            // in the QC is security-relevant here.
+            ensure!(
+                local_genesis.map(|qc| qc.certified_block().clone())
+                    == Some(parent_qc.certified_block().clone()),
+                "[RoundManager] Proposal {} carries a round-0 QC whose certified block does not match the local genesis",
+                proposal.id(),
+            );
+        }
+
         // If the proposal contains any inline transactions that need to be denied
         // (e.g., due to filtering) drop the message and do not vote for the block.
         if let Err(error) = self
