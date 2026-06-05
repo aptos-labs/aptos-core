@@ -15,4 +15,8 @@ pub struct ModelBuilderOptions {
     /// Whether to compiler for testing. This will be reflected in the builtin constant
     /// `__COMPILE_FOR_TESTING__`.
     pub compile_for_testing: bool,
+
+    /// Whether `debug_assert!` macros expand to their active form. Independent of
+    /// `compile_for_testing`; when false they expand to `()` without evaluating args.
+    pub compile_debug_assert: bool,
 }

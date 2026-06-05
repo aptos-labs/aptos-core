@@ -1,0 +1,48 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    public fun check_active(b: bool) {
+        if b {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+    public fun check_args_not_evaluated() {
+        {
+          let flag: bool = false;
+          {
+            let dummy: bool = true;
+            if And(dummy, m::touched(Borrow(Mutable)(flag));
+            flag) {
+              Tuple()
+            } else {
+              Abort(14566554180833181696)
+            };
+            Tuple()
+          }
+        }
+    }
+    private fun touched(b: &mut bool) {
+        b = true;
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    public fun check_active(b: bool) {
+        if (b) () else abort 14566554180833181696;
+    }
+    public fun check_args_not_evaluated() {
+        let flag = false;
+        let dummy = true;
+        if (dummy && {
+            touched(&mut flag);
+            flag
+        }) () else abort 14566554180833181696;
+    }
+    fun touched(b: &mut bool) {
+        *b = true;
+    }
+}

@@ -5,6 +5,9 @@
 //! - `assert!`
 //! - `assert_eq!`
 //! - `assert_ne!`
+//! - `debug_assert!`
+//! - `debug_assert_eq!`
+//! - `debug_assert_ne!`
 //!
 //! These macros are expanded to the input AST before type checking.
 //!
@@ -21,13 +24,21 @@
 //! - `assert_eq!(left, right, fmt, arg1, ..., argN)` - aborts with formatted message (1 ≤ N ≤ 4)
 //! - `assert_ne!` supports the same forms as `assert_eq!`
 //!
+//! ## `debug_assert!`, `debug_assert_eq!`, `debug_assert_ne!` macros
+//! Same forms as their non-`debug_` counterparts, but active only when debug
+//! assertions are enabled (on by default, off with `--no-debug-assert`). When off
+//! they expand to `()` without evaluating their arguments. Independent of `#[test]`.
+//!
 //! ## Version requirements
 //! - `assert!(cond)` requires Move 2
 //! - `assert!(cond, fmt, arg1, ..., argN)` requires Move 2.4
 //! - `assert_eq!` and `assert_ne!` require Move 2.4
+//! - `debug_assert!`, `debug_assert_eq!`, `debug_assert_ne!` require Move 2.5
 
 use crate::{
     builder::exp_builder::ExpTranslator,
+    metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_DEBUG_ASSERT,
+    options::ModelBuilderOptions,
     well_known::{
         INTO_BYTES_FUNCTION_NAME, STRING_MODULE, STRING_UTILS_MODULE, UNSPECIFIED_ABORT_CODE,
         UTF8_FUNCTION_NAME,
@@ -56,15 +67,6 @@ enum AssertKind {
     Ne,
 }
 
-impl Display for AssertKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AssertKind::Eq => write!(f, "assert_eq!"),
-            AssertKind::Ne => write!(f, "assert_ne!"),
-        }
-    }
-}
-
 impl From<AssertKind> for BinOp_ {
     fn from(kind: AssertKind) -> Self {
         match kind {
@@ -74,13 +76,68 @@ impl From<AssertKind> for BinOp_ {
     }
 }
 
+#[derive(Copy, Clone)]
+enum AssertMacro {
+    Assert,
+    DebugAssert,
+    AssertEq,
+    DebugAssertEq,
+    AssertNe,
+    DebugAssertNe,
+}
+
+impl AssertMacro {
+    /// Returns the comparison operator for `assert_eq!`-shaped variants.
+    /// Panics for `Assert`/`DebugAssert`, which are not comparison macros.
+    fn comparison_kind(self) -> AssertKind {
+        match self {
+            AssertMacro::AssertEq | AssertMacro::DebugAssertEq => AssertKind::Eq,
+            AssertMacro::AssertNe | AssertMacro::DebugAssertNe => AssertKind::Ne,
+            AssertMacro::Assert | AssertMacro::DebugAssert => {
+                unreachable!("comparison_kind called on non-comparison macro")
+            },
+        }
+    }
+}
+
+impl Display for AssertMacro {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            AssertMacro::Assert => "assert!",
+            AssertMacro::DebugAssert => "debug_assert!",
+            AssertMacro::AssertEq => "assert_eq!",
+            AssertMacro::DebugAssertEq => "debug_assert_eq!",
+            AssertMacro::AssertNe => "assert_ne!",
+            AssertMacro::DebugAssertNe => "debug_assert_ne!",
+        };
+        f.write_str(s)
+    }
+}
+
 impl ExpTranslator<'_, '_, '_> {
     pub fn expand_macro(&self, loc: Loc, name: &str, args: &Spanned<Vec<Exp>>) -> Exp {
         // Currently, there are only built-in macros, and no user definable ones.
         let expansion_ = match name {
-            "assert" => self.expand_assert(loc, args),
-            "assert_eq" => self.expand_assert_eq(loc, args),
-            "assert_ne" => self.expand_assert_ne(loc, args),
+            "assert" => self.expand_assert(loc, args, AssertMacro::Assert),
+            "assert_eq" => {
+                self.check_language_version(
+                    &self.to_loc(&loc),
+                    &format!("`{}` macro", AssertMacro::AssertEq),
+                    LanguageVersion::V2_4,
+                );
+                self.expand_assert_cmp(loc, args, AssertMacro::AssertEq)
+            },
+            "assert_ne" => {
+                self.check_language_version(
+                    &self.to_loc(&loc),
+                    &format!("`{}` macro", AssertMacro::AssertNe),
+                    LanguageVersion::V2_4,
+                );
+                self.expand_assert_cmp(loc, args, AssertMacro::AssertNe)
+            },
+            "debug_assert" => self.expand_debug_macro(loc, args, AssertMacro::DebugAssert),
+            "debug_assert_eq" => self.expand_debug_macro(loc, args, AssertMacro::DebugAssertEq),
+            "debug_assert_ne" => self.expand_debug_macro(loc, args, AssertMacro::DebugAssertNe),
             _ => {
                 self.error(&self.to_loc(&loc), &format!("unknown macro `{}`", name));
                 Exp_::UnresolvedError
@@ -131,11 +188,11 @@ impl ExpTranslator<'_, '_, '_> {
     ///     abort string_utils::format<N>(&fmt, arg1, ..., argN).into_bytes()
     /// }
     /// ```
-    fn expand_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
+    fn expand_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>, kind: AssertMacro) -> Exp_ {
         if args.value.is_empty() {
             self.error(
                 &self.to_loc(&args.loc),
-                "Macro `assert!` must have at least one argument",
+                &format!("Macro `{}` must have at least one argument", kind),
             );
             return Exp_::UnresolvedError;
         }
@@ -148,7 +205,7 @@ impl ExpTranslator<'_, '_, '_> {
                 // assert!(cond)
                 self.check_language_version(
                     &self.to_loc(&loc),
-                    "single-argument `assert!` macro",
+                    &format!("single-argument `{}` macro", kind),
                     LanguageVersion::V2_0,
                 );
                 sp(
@@ -167,7 +224,7 @@ impl ExpTranslator<'_, '_, '_> {
                 // assert!(cond, fmt, arg1, ..., argN)
                 self.check_language_version(
                     &self.to_loc(&loc),
-                    "`assert!` macro with string formatting",
+                    &format!("`{}` macro with string formatting", kind),
                     LanguageVersion::V2_4,
                 );
                 self.check_format_string(&rest[0], n - 1);
@@ -180,7 +237,8 @@ impl ExpTranslator<'_, '_, '_> {
                 self.error(
                     &self.to_loc(&args.loc),
                     &format!(
-                        "Macro `assert!` cannot take more than {} arguments",
+                        "Macro `{}` cannot take more than {} arguments",
+                        kind,
                         MAX_FORMAT_ARGS + 1
                     ),
                 );
@@ -195,8 +253,40 @@ impl ExpTranslator<'_, '_, '_> {
         )
     }
 
-    /// The macro `assert_eq!` has the following forms:
-    ///
+    /// Shared entry point for `debug_assert*!`.
+    /// When debug assertions are disabled the entire call collapses to `()`.
+    fn expand_debug_macro(
+        &self,
+        loc: Loc,
+        args: &Spanned<Vec<Exp>>,
+        macro_kind: AssertMacro,
+    ) -> Exp_ {
+        self.check_language_version(
+            &self.to_loc(&loc),
+            &format!("`{}` macro", macro_kind),
+            LANGUAGE_VERSION_FOR_DEBUG_ASSERT,
+        );
+        let debug_assert_active = self
+            .env()
+            .get_extension::<ModelBuilderOptions>()
+            .is_some_and(|opts| opts.compile_debug_assert);
+        if !debug_assert_active {
+            return Exp_::Unit { trailing: false };
+        }
+        match macro_kind {
+            AssertMacro::DebugAssert => self.expand_assert(loc, args, macro_kind),
+            AssertMacro::DebugAssertEq | AssertMacro::DebugAssertNe => {
+                self.expand_assert_cmp(loc, args, macro_kind)
+            },
+            AssertMacro::Assert | AssertMacro::AssertEq | AssertMacro::AssertNe => {
+                unreachable!(
+                    "expand_debug_macro called with non-debug variant: {}",
+                    macro_kind
+                )
+            },
+        }
+    }
+
     /// Two arguments:
     /// ```move
     /// assert_eq!(left, right)
@@ -238,26 +328,18 @@ impl ExpTranslator<'_, '_, '_> {
     ///     abort string_utils::format3(<assertion_failed_message>, string_utils::format<N>(&fmt, arg1, ..., argN), $left, $right).into_bytes()
     /// }
     /// ```
-    fn expand_assert_eq(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
-        self.expand_assert_inner(loc, args, AssertKind::Eq)
-    }
-
-    /// Same as `assert_eq!` but uses `!=` instead of `==`.
-    fn expand_assert_ne(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
-        self.expand_assert_inner(loc, args, AssertKind::Ne)
-    }
-
-    fn expand_assert_inner(&self, loc: Loc, args: &Spanned<Vec<Exp>>, kind: AssertKind) -> Exp_ {
-        self.check_language_version(
-            &self.to_loc(&loc),
-            &format!("`{}` macro", kind),
-            LanguageVersion::V2_4,
-        );
+    fn expand_assert_cmp(
+        &self,
+        loc: Loc,
+        args: &Spanned<Vec<Exp>>,
+        macro_kind: AssertMacro,
+    ) -> Exp_ {
+        let kind = macro_kind.comparison_kind();
 
         if args.value.len() < 2 {
             self.error(
                 &self.to_loc(&args.loc),
-                &format!("Macro `{}` must have at least two arguments", kind),
+                &format!("Macro `{}` must have at least two arguments", macro_kind),
             );
             return Exp_::UnresolvedError;
         }
@@ -312,7 +394,7 @@ impl ExpTranslator<'_, '_, '_> {
                     &self.to_loc(&args.loc),
                     &format!(
                         "Macro `{}` cannot take more than {} arguments",
-                        kind,
+                        macro_kind,
                         MAX_FORMAT_ARGS + 2,
                     ),
                 );

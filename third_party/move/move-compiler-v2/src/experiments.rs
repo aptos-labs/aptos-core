@@ -298,6 +298,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::COMPILE_DEBUG_ASSERT.to_string(),
+            description: "Compile debug assertions. If set, `debug_assert!` macros \
+            expand to their active (aborting) form, otherwise they expand to `()`."
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string(),
             description: "Set of optimizations that are safe to perform on the framework, but are disabled otherwise".to_string(),
             default: Given(false),
@@ -321,6 +328,7 @@ impl Experiment {
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
     pub const CMP_REWRITE: &'static str = "cmp-rewrite";
+    pub const COMPILE_DEBUG_ASSERT: &'static str = "compile-debug-assert";
     pub const COMPILE_FOR_TESTING: &'static str = "compile-for-testing";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";

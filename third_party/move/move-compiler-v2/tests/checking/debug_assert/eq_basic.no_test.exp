@@ -1,0 +1,33 @@
+// -- Model dump before first bytecode pipeline
+module 0x1::string_utils {
+    use std::string::{String};
+    public fun format2<T0,T1>(_fmt: &vector<u8>,_a: T0,_b: T1): string::String {
+        Abort(0)
+    }
+} // end 0x1::string_utils
+module 0x42::m {
+    public fun check_eq<T>(left: T,right: T) {
+        Tuple();
+        Tuple()
+    }
+    public fun check_ne<T>(left: T,right: T) {
+        Tuple();
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x1::string_utils {
+    use std::string;
+    public fun format2<T0: drop, T1: drop>(_fmt: &vector<u8>, _a: T0, _b: T1): string::String {
+        abort 0
+    }
+}
+module 0x42::m {
+    public fun check_eq<T: copy + drop>(left: T, right: T) {
+        ();
+    }
+    public fun check_ne<T: copy + drop>(left: T, right: T) {
+        ();
+    }
+}
