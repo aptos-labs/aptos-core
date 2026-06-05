@@ -12848,26 +12848,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mono-move-programs"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "legacy-move-compiler",
- "mono-move-alloc",
- "mono-move-core",
- "mono-move-gas",
- "mono-move-runtime",
- "move-binary-format",
- "move-compiler-v2",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "rand 0.7.3",
- "tempfile",
-]
-
-[[package]]
 name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
@@ -12894,6 +12874,7 @@ dependencies = [
  "aptos-vm",
  "bytes",
  "codespan-reporting",
+ "criterion",
  "datatest-stable",
  "legacy-move-compiler",
  "libtest-mimic",

@@ -41,6 +41,7 @@ specializer = { workspace = true }
 tempfile = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
 walkdir = { workspace = true }
@@ -51,4 +52,28 @@ harness = false
 
 [[test]]
 name = "snapshot"
+harness = false
+
+[[bench]]
+name = "fib"
+harness = false
+
+[[bench]]
+name = "nested_loop"
+harness = false
+
+[[bench]]
+name = "merge_sort"
+harness = false
+
+[[bench]]
+name = "bst"
+harness = false
+
+[[bench]]
+name = "match_sum"
+harness = false
+
+[[bench]]
+name = "int_arith_loop"
 harness = false

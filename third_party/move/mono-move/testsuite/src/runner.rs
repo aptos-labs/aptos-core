@@ -6,6 +6,7 @@
 
 use crate::{
     compile::{compile, compile_move_stdlib, SourceKind},
+    engine::RunResult,
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
     parser::{PrintSection, Step},
@@ -15,16 +16,7 @@ use anyhow::{anyhow, bail};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use aptos_vm::natives::aptos_natives;
-use mono_move_core::{
-    native::{NativeName, ProductionContextFamily, ProductionNativeRegistry},
-    types::EMPTY_TYPE_LIST,
-    Interner,
-};
-use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_natives::{make_all_production_natives, make_all_test_natives};
-use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus, TransactionContext};
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
@@ -270,93 +262,50 @@ fn execute_function_v2(
     arg_kinds: &[PrimitiveKind],
     return_kinds: &[PrimitiveKind],
 ) -> Output {
-    // Construct a per-transaction context.
-    let mut natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
-    natives
-        .register_all(
-            make_all_test_natives::<ProductionContextFamily<SimpleGasMeter>>()
-                .into_iter()
-                .chain(make_all_production_natives::<
-                    ProductionContextFamily<SimpleGasMeter>,
-                >())
-                .map(|(addr, module, function, func)| {
-                    let name = NativeName {
-                        module: guard.module_id_of(&addr, &module),
-                        function: guard.identifier_of(&function),
-                    };
-                    (name, func)
-                }),
-        )
-        .expect("natives have unique qualified names");
-    let loader = Loader::new_with_policy(
+    // Run through the shared pipeline engine. Argument placement and result
+    // reading mirror mono-move's frame slot layout.
+    let outcome = crate::engine::with_mono_function(
         guard,
         module_provider,
-        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &natives,
-    );
-    let mut txn_ctx = TransactionContext::new(
-        loader,
-        SimpleGasMeter::new(u64::MAX),
-        &mono_move_core::NO_RESOURCE_PROVIDER,
-        &natives,
-    );
-
-    // Resolve the entry function via load_function so the entry module is
-    // lazily loaded into the read-set and gas is charged for the load.
-    let id = guard
-        .intern_address_name(address, module_name)
-        .into_global_arena_ptr();
-    let function_name = guard
-        .intern_identifier(function_name)
-        .into_global_arena_ptr();
-
-    // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard`
-    // is held, the global executable cache cannot enter the maintenance
-    // phase, so no arena reset can happen for the duration of this step.
-    let function = match txn_ctx.load_function(id, function_name, EMPTY_TYPE_LIST) {
-        Ok(p) => unsafe { p.as_ref_unchecked() },
-        Err(err) => {
-            return Output {
-                display: format!("error: {}", err),
-            };
+        *address,
+        module_name,
+        function_name,
+        |runner| {
+            runner.run(
+                |interpreter| {
+                    let mut offset: u32 = 0;
+                    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+                        offset = mono_move_core::align_up_u32(offset, kind.align());
+                        let bytes = kind.parse_to_bytes(arg);
+                        interpreter.set_root_arg(offset, &bytes);
+                        offset += kind.size();
+                    }
+                },
+                |interpreter| {
+                    let mut ret_off: u32 = 0;
+                    let mut vals = Vec::with_capacity(return_kinds.len());
+                    for kind in return_kinds {
+                        ret_off = mono_move_core::align_up_u32(ret_off, kind.align());
+                        let bytes = interpreter.root_result_bytes(ret_off, kind.size());
+                        vals.push(kind.format_bytes(bytes));
+                        ret_off += kind.size();
+                    }
+                    vals
+                },
+            )
         },
+    );
+
+    let display = match outcome {
+        Err(err) => format!("error: {}", err),
+        Ok(RunResult::Error(err)) => format!("error: {}", err),
+        Ok(RunResult::Aborted { code, message }) => match message {
+            Some(m) => format!("aborted: code {} ({})", code, m),
+            None => format!("aborted: code {}", code),
+        },
+        Ok(RunResult::Success(vals)) => format!("results: {}", vals.join(", ")),
     };
-
-    let mut interpreter = InterpreterContext::new(&mut txn_ctx, function);
-
-    let mut offset: u32 = 0;
-    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-        offset = align_up(offset, kind.align());
-        let bytes = kind.parse_to_bytes(arg);
-        interpreter.set_root_arg(offset, &bytes);
-        offset += kind.size();
-    }
-
-    match interpreter.run() {
-        Err(err) => Output {
-            display: format!("error: {}", err),
-        },
-        Ok(RuntimeStatus::Aborted { code, message }) => {
-            let display = match message {
-                Some(m) => format!("aborted: code {} ({})", code, m),
-                None => format!("aborted: code {}", code),
-            };
-            Output { display }
-        },
-        Ok(RuntimeStatus::Success) => {
-            let mut ret_off: u32 = 0;
-            let mut vals = Vec::with_capacity(return_kinds.len());
-            for kind in return_kinds {
-                ret_off = align_up(ret_off, kind.align());
-                let bytes = interpreter.root_result_bytes(ret_off, kind.size());
-                vals.push(kind.format_bytes(bytes));
-                ret_off += kind.size();
-            }
-            Output {
-                display: format!("results: {}", vals.join(", ")),
-            }
-        },
-    }
+    Output { display }
 }
 
 /// Kind supported as an argument or return value in differential tests
@@ -540,10 +489,6 @@ impl PrimitiveKind {
             },
         }
     }
-}
-
-fn align_up(offset: u32, align: u32) -> u32 {
-    (offset + align - 1) & !(align - 1)
 }
 
 /// Parse a boolean argument literal. Only `true`/`false` are accepted; the
