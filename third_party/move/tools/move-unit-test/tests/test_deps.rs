@@ -158,6 +158,14 @@ fn parametric_row_prefix_filter_selects_all_rows() {
 }
 
 #[test]
+fn plain_function_name_filter_selects_all_rows() {
+    let output = run_source(TWO_ROW_SOURCE, Some("foo"), false);
+    assert!(output.contains("::foo@row0"));
+    assert!(output.contains("::foo@row1"));
+    assert!(output.contains("Total tests: 2; passed: 2; failed: 0"));
+}
+
+#[test]
 fn parametric_statistics_use_case_identity() {
     let output = run_source(TWO_ROW_SOURCE, None, true);
     let statistics = output.split("Test Statistics:").nth(1).unwrap();
