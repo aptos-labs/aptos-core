@@ -255,6 +255,9 @@ pub enum RuntimeInvariantViolation {
     #[error("type has no published layout")]
     ValueLayoutNotFound,
 
+    #[error("constant at pool index {idx} could not be resolved from the module read set")]
+    ConstantNotFound { idx: u16 },
+
     #[error("unreachable: {0}")]
     Unreachable(String),
 

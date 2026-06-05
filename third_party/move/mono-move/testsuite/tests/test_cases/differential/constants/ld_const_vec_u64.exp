@@ -1,0 +1,135 @@
+=== stackless ===
+// module 0x1::test
+
+fun nums_first(): u64 {
+  slots: params(0), locals(1), temps(3)
+    r0: vector<u64>
+    r1: &vector<u64>
+    r2: u64
+    r3: &u64
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := ld_u64 0
+    3: r3 := vec_imm_borrow u64, r1, r2
+    4: r2 := read_ref r3
+    5: ret [r2]
+}
+
+fun nums_last(): u64 {
+  slots: params(0), locals(1), temps(3)
+    r0: vector<u64>
+    r1: &vector<u64>
+    r2: u64
+    r3: &u64
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := ld_u64 2
+    3: r3 := vec_imm_borrow u64, r1, r2
+    4: r2 := read_ref r3
+    5: ret [r2]
+}
+
+fun nums_len(): u64 {
+  slots: params(0), locals(1), temps(2)
+    r0: vector<u64>
+    r1: &vector<u64>
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := vec_len u64, r1
+    3: ret [r2]
+}
+
+fun nums_modification(): u64 {
+  slots: params(0), locals(2), temps(4)
+    r0: vector<u64>
+    r1: &mut u64
+    r2: &mut vector<u64>
+    r3: u64
+    r4: &vector<u64>
+    r5: &u64
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r2 := mut_borrow_loc r0
+    2: r3 := ld_u64 0
+    3: r1 := vec_mut_borrow u64, r2, r3
+    4: r3 := ld_u64 400
+    5: write_ref r1, r3
+    6: r4 := imm_borrow_loc r0
+    7: r3 := ld_u64 0
+    8: r5 := vec_imm_borrow u64, r4, r3
+    9: r3 := read_ref r5
+    10: ret [r3]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun nums_first() {
+  frame_data_size: 48
+  code:
+    0: Charge #47
+    1: StoreImmVec [0] <- const[0]
+    2: SlotBorrow [8] <- &[0]
+    3: StoreImm8 [24] <- #0
+    4: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    5: ReadRef [24] <- *[32] (size=8)
+    6: Move8 [0] <- [24]
+    7: Return
+  safe_point_layouts:
+    1: []
+}
+
+fun nums_last() {
+  frame_data_size: 48
+  code:
+    0: Charge #47
+    1: StoreImmVec [0] <- const[0]
+    2: SlotBorrow [8] <- &[0]
+    3: StoreImm8 [24] <- #2
+    4: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    5: ReadRef [24] <- *[32] (size=8)
+    6: Move8 [0] <- [24]
+    7: Return
+  safe_point_layouts:
+    1: []
+}
+
+fun nums_len() {
+  frame_data_size: 32
+  code:
+    0: Charge #18
+    1: StoreImmVec [0] <- const[0]
+    2: SlotBorrow [8] <- &[0]
+    3: VecLen [24] <- vec_len([8])
+    4: Move8 [0] <- [24]
+    5: Return
+  safe_point_layouts:
+    1: []
+}
+
+fun nums_modification() {
+  frame_data_size: 80
+  code:
+    0: Charge #82
+    1: StoreImmVec [0] <- const[0]
+    2: SlotBorrow [24] <- &[0]
+    3: StoreImm8 [40] <- #0
+    4: VecBorrow [8] <- &[24][[40]] (elem_size=8)
+    5: StoreImm8 [40] <- #400
+    6: WriteRef *[8] <- [40] (size=8)
+    7: SlotBorrow [48] <- &[0]
+    8: StoreImm8 [40] <- #0
+    9: VecBorrow [64] <- &[48][[40]] (elem_size=8)
+    10: ReadRef [40] <- *[64] (size=8)
+    11: Move8 [0] <- [40]
+    12: Return
+  safe_point_layouts:
+    1: []
+}

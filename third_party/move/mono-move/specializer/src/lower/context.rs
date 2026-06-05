@@ -676,6 +676,7 @@ pub fn try_lower_function(
 
     Ok(LoweringOutcome::Built(Function {
         name,
+        module_id: module_ir.module.id(),
         code: Code::from_vec(code),
         param_slots,
         param_region_size: derived.param_region_size as usize,
@@ -800,6 +801,14 @@ fn try_discover_types_for_lowering_in_function_impl(
             let layout =
                 discover_captured_data_descriptor(ctx, interner, module_ir, *fhi, *mask, ty_args)?;
             descriptors.closure_captured.push(layout);
+        }
+
+        // A constant references its own type, which `nominal_type_in_instr`
+        // does not surface. Discover it so the runtime layout (and any nested
+        // vector descriptors) that `StoreImmVec` resolves are published.
+        if let Instr::LdConst(_, idx) = instr {
+            let ty = module_ir.module.interned_constant_type_at(*idx);
+            discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
         }
     }
 

@@ -1,0 +1,60 @@
+=== stackless ===
+// module 0x1::test
+
+fun len(): u64 {
+  slots: params(0), locals(1), temps(2)
+    r0: vector<address>
+    r1: &vector<address>
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := vec_len address, r1
+    3: ret [r2]
+}
+
+fun addr(r0): address {
+  slots: params(1), locals(1), temps(3)
+    r0: u64
+    r1: vector<address>
+    r2: &vector<address>
+    r3: &address
+    r4: address
+  code:
+  L0:
+    0: r1 := ld_const #0
+    1: r2 := imm_borrow_loc r1
+    2: r3 := vec_imm_borrow address, r2, r0
+    3: r4 := read_ref r3
+    4: ret [r4]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun len() {
+  frame_data_size: 32
+  code:
+    0: Charge #18
+    1: StoreImmVec [0] <- const[0]
+    2: SlotBorrow [8] <- &[0]
+    3: VecLen [24] <- vec_len([8])
+    4: Move8 [0] <- [24]
+    5: Return
+  safe_point_layouts:
+    1: []
+}
+
+fun addr() {
+  frame_data_size: 80
+  code:
+    0: Charge #213
+    1: StoreImmVec [8] <- const[0]
+    2: SlotBorrow [16] <- &[8]
+    3: VecBorrow [32] <- &[16][[0]] (elem_size=32)
+    4: ReadRef [48] <- *[32] (size=32)
+    5: Move(32) [0] <- [48]
+    6: Return
+  safe_point_layouts:
+    1: []
+}

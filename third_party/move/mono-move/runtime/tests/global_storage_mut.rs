@@ -66,6 +66,7 @@ fn local_ctx_with<'r>(
 fn make_program_with_tmp(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -130,6 +131,7 @@ fn borrow_global_mut_same_epoch_no_extra_copy() {
     let result_b: FO = FO(56);
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::BorrowGlobalMut {
                 addr: ADDR,
@@ -175,6 +177,7 @@ fn move_to_publishes_resource_and_exists_is_true() {
 
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::HeapNew {
                 dst: TMP,
@@ -221,6 +224,7 @@ fn move_to_aborts_when_already_present() {
 
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::HeapNew {
                 dst: TMP,
@@ -301,6 +305,7 @@ fn gc_traces_and_relocates_local_heap_writes() {
 
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::BorrowGlobalMut {
                 addr: ADDR,
@@ -361,6 +366,7 @@ fn distinct_keys_track_independently() {
     let dst_b: FO = FO(56);
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::BorrowGlobalMut {
                 addr: ADDR,

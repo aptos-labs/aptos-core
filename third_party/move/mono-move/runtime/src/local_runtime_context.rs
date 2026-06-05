@@ -9,8 +9,8 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
     types::{InternedType, InternedTypeList},
-    DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider, ObjectDescriptor,
-    ObjectDescriptorTable, ResourceProvider, ValueLayout, ValueLayoutTable,
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
+    ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout, ValueLayoutTable,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -127,6 +127,14 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
         ty_args: InternedTypeList,
     ) -> LoaderResult<FunctionPtr> {
         self.inner.load_function(module_id, name, ty_args)
+    }
+
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> Option<(InternedType, &[u8])> {
+        self.inner.load_constant(module_id, idx)
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

@@ -8,8 +8,8 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::{NativeRegistry, ProductionNativeRegistry},
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
-    types::InternedTypeList,
-    FunctionPtr,
+    types::{InternedType, InternedTypeList},
+    ConstantPoolIndex, FunctionPtr,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -44,6 +44,16 @@ pub trait ExecutionContext {
         name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> LoaderResult<FunctionPtr>;
+
+    /// Resolve a constant from `module_id`'s constant pool, returning its
+    /// interned type and BCS bytes. The module is expected to be in the
+    /// read set already (the calling function was loaded from it). Returns
+    /// [`None`] if the module cannot be found.
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> Option<(InternedType, &[u8])>;
 
     /// Access the resource provider to fetch resource from storage on read-set
     /// cache miss.
@@ -130,6 +140,14 @@ impl<'r, G: GasMeter> ExecutionContext for LocalExecutionContext<'r, G> {
         _ty_args: InternedTypeList,
     ) -> LoaderResult<FunctionPtr> {
         panic!("LocalExecutionContext: load_function not supported")
+    }
+
+    fn load_constant(
+        &self,
+        _module_id: InternedModuleId,
+        _idx: ConstantPoolIndex,
+    ) -> Option<(InternedType, &[u8])> {
+        None
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

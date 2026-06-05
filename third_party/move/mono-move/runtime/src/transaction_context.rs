@@ -11,11 +11,11 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
     types::{InternedType, InternedTypeList},
-    DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider, ObjectDescriptor,
-    ResourceProvider, ValueLayout,
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
+    ObjectDescriptor, ResourceProvider, ValueLayout,
 };
 use mono_move_gas::GasMeter;
-use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderResult, ModuleRead, ModuleReadSet};
 
 /// Per-transaction execution context. Maintains per-transaction state
 /// (gas meter, read-set of loaded modules) and serves the interpreter's
@@ -89,6 +89,24 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
             name,
             ty_args,
         )
+    }
+
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> Option<(InternedType, &[u8])> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        match self.read_set.get(arena_ref)? {
+            ModuleRead::Loaded { module, .. } => {
+                let module = &module.ir().module;
+                Some((
+                    module.interned_constant_type_at(idx),
+                    module.constant_data_at(idx),
+                ))
+            },
+            ModuleRead::Pending => None,
+        }
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

@@ -21,6 +21,8 @@
 //! At the end, walks the VM's outer vector via heap pointers and compares
 //! element-by-element against a pure-Rust simulation using the same seed.
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, MicroOp,
@@ -126,6 +128,7 @@ fn make_gc_stress_program(
     ];
     let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(make_entry_code),
         param_slots: vec![],
         param_region_size: 8,
@@ -233,6 +236,7 @@ fn make_gc_stress_program(
     ];
     let main_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,

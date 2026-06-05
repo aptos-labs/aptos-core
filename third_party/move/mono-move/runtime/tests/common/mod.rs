@@ -19,6 +19,19 @@ use mono_move_runtime::write_object_header;
 use move_core_types::account_address::AccountAddress;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
 
+/// Builds an interned module id for hand-built test functions.
+#[macro_export]
+macro_rules! program_module_id {
+    ($name:literal) => {{
+        static MODULE_ID: ::mono_move_core::interner::ModuleId =
+            ::mono_move_core::interner::ModuleId::new(
+                ::move_core_types::account_address::AccountAddress::ONE,
+                ::mono_move_alloc::GlobalArenaPtr::from_static($name),
+            );
+        ::mono_move_alloc::GlobalArenaPtr::from_static(&MODULE_ID)
+    }};
+}
+
 /// In-memory [`ResourceProvider`] for tests. Owns the resource
 /// bytes in `Box<[u64]>` buffers (giving `MAX_ALIGN` alignment and
 /// stable addresses); `install_global` writes a leading object

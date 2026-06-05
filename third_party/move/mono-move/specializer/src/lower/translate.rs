@@ -423,9 +423,9 @@ impl<'a> LoweringState<'a> {
             },
             Instr::LdConst(dst, idx) => {
                 let ty = view_type(self.ctx.module.interned_constant_type_at(*idx));
-                let bytes = self.ctx.module.constant_data_at(*idx);
                 match ty {
                     Type::Address => {
+                        let bytes = self.ctx.module.constant_data_at(*idx);
                         let addr = bcs::from_bytes::<AccountAddress>(bytes)
                             .context("LdConst<address>: malformed constant data")?;
                         let dst_info = self.def_slot(*dst)?;
@@ -434,9 +434,16 @@ impl<'a> LoweringState<'a> {
                             imm: Box::new(addr.into_bytes()),
                         })?;
                     },
+                    Type::Vector { .. } => {
+                        let dst_info = self.def_slot(*dst)?;
+                        self.emit(MicroOp::StoreImmVec {
+                            dst: dst_info.offset,
+                            idx: *idx,
+                        })?;
+                    },
                     _ => bail!(
                         "LdConst at constant pool index {} not yet lowered \
-                         (only address constants are supported)",
+                         (only address and vector constants are supported)",
                         idx.0,
                     ),
                 }
