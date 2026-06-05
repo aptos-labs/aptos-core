@@ -150,19 +150,19 @@ fn parametric_case_filter_selects_one_row() {
 }
 
 #[test]
-fn parametric_row_prefix_filter_selects_all_rows() {
-    let output = run_source(TWO_ROW_SOURCE, Some("foo@row"), false);
+fn plain_function_name_filter_selects_all_rows() {
+    let output = run_source(TWO_ROW_SOURCE, Some("foo"), false);
     assert!(output.contains("::foo@row0"));
     assert!(output.contains("::foo@row1"));
     assert!(output.contains("Total tests: 2; passed: 2; failed: 0"));
 }
 
 #[test]
-fn plain_function_name_filter_selects_all_rows() {
-    let output = run_source(TWO_ROW_SOURCE, Some("foo"), false);
-    assert!(output.contains("::foo@row0"));
-    assert!(output.contains("::foo@row1"));
-    assert!(output.contains("Total tests: 2; passed: 2; failed: 0"));
+fn partial_row_suffix_filter_matches_nothing() {
+    let output = run_source(TWO_ROW_SOURCE, Some("foo@row"), false);
+    assert!(!output.contains("::foo@row0"));
+    assert!(!output.contains("::foo@row1"));
+    assert!(output.contains("Total tests: 0"));
 }
 
 #[test]
