@@ -38,6 +38,12 @@ use std::{collections::BTreeMap, path::PathBuf};
 /// profile. If you wish to rotate to a ledger wallet, specify the new
 /// derivation path or index accordingly.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Rotate to a new private key and save it as a new profile
+  $ aptos account rotate-key --new-private-key 0x<new_key> --save-to-profile rotated
+
+  # Rotate without saving a new profile, skipping confirmation prompts
+  $ aptos account rotate-key --new-private-key-file new_key.txt --skip-saving-profile --assume-yes")]
 pub struct RotateKey {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
@@ -331,6 +337,12 @@ impl CliCommand<RotateSummary> for RotateKey {
 /// If the account is rotated, it will provide the address accordingly.  If the account was not
 /// rotated, it will provide the derived address only if the account exists onchain.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Look up the on-chain address for the current profile's key
+  $ aptos account lookup-address
+
+  # Look up the on-chain address for a specific public key
+  $ aptos account lookup-address --public-key 0x<public_key>")]
 pub struct LookupAddress {
     #[clap(flatten)]
     pub(crate) encoding_options: EncodingOptions,

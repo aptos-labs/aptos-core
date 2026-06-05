@@ -18,6 +18,12 @@ pub const DEFAULT_FUNDED_COINS: u64 = 100_000_000;
 /// call to create an account.  This will create an account with no coins, and
 /// any coins will have to transferred afterwards.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Create an account at a given address, paying with the default profile
+  $ aptos account create --account 0xc0ffee
+
+  # Create an account without any interactive confirmation prompts (for scripts/agents)
+  $ aptos account create --account 0xc0ffee --assume-yes")]
 pub struct CreateAccount {
     /// Address of the new account
     #[clap(long, value_parser = crate::common::types::load_account_arg)]

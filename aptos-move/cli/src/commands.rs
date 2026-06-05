@@ -297,6 +297,12 @@ pub enum Template {
 /// This will create a directory for a Move package and a corresponding
 /// `Move.toml` file.
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Create a new package named 'hello_blockchain' in the current directory
+  $ aptos move init --name hello_blockchain
+
+  # Create a package with named addresses
+  $ aptos move init --name my_dapp --named-addresses alice=0x1234,module_owner=_")]
 pub struct InitPackage {
     /// Name of the new Move package
     #[clap(long)]
@@ -389,6 +395,12 @@ impl CliCommand<()> for InitPackage {
 
 /// Compiles a package and returns the associated ModuleIds
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Compile the package in the current directory
+  $ aptos move compile
+
+  # Compile a package in another directory with named addresses
+  $ aptos move compile --package-dir ./my_dapp --named-addresses alice=0xc0ffee")]
 pub struct CompilePackage {
     /// Save the package metadata in the package's build directory
     ///
@@ -519,6 +531,12 @@ pub struct CompileScriptOutput {
 /// This will run Move unit tests against a package with debug mode
 /// turned on.  Note, that move code warnings currently block tests from running.
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Run all unit tests in the current package
+  $ aptos move test
+
+  # Run only tests whose name matches a filter
+  $ aptos move test --filter transfer")]
 pub struct TestPackage {
     /// A filter string to determine which unit tests to run
     #[clap(long, short)]
@@ -802,6 +820,12 @@ pub struct IncludedArtifactsArgs {
 
 /// Publishes the modules in a Move package to the Aptos blockchain
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Publish the package in the current directory using the default profile
+  $ aptos move publish --named-addresses alice=0xc0ffee
+
+  # Publish non-interactively without confirmation prompts (for scripts/agents)
+  $ aptos move publish --named-addresses alice=0xc0ffee --assume-yes")]
 pub struct PublishPackage {
     #[clap(flatten)]
     pub override_size_check_option: OverrideSizeCheckOption,
@@ -2259,6 +2283,12 @@ impl CliCommand<&'static str> for CleanPackage {
 
 /// Run a Move function
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Call an entry function with typed arguments
+  $ aptos move run --function-id 0x1::aptos_account::transfer --args address:0xc0ffee u64:1000
+
+  # Call an entry function non-interactively (for scripts/agents)
+  $ aptos move run --function-id 0xc0ffee::message::set_message --args string:hello --assume-yes")]
 pub struct RunFunction {
     #[clap(flatten)]
     pub entry_function_args: EntryFunctionArguments,
@@ -2392,6 +2422,9 @@ mod simulate_flag_tests {
 
 /// Run a view function
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Read on-chain state via a view function
+  $ aptos move view --function-id 0x1::coin::balance --type-args 0x1::aptos_coin::AptosCoin --args address:0xc0ffee")]
 pub struct ViewFunction {
     #[clap(flatten)]
     pub(crate) entry_function_args: EntryFunctionArguments,
@@ -2441,6 +2474,12 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 
 /// Run a Move script
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Compile and run a Move script, passing typed arguments
+  $ aptos move run-script --script-path sources/my_script.move --args u64:1000
+
+  # Run a script non-interactively (for scripts/agents)
+  $ aptos move run-script --script-path sources/my_script.move --assume-yes")]
 pub struct RunScript {
     #[clap(flatten)]
     pub txn_options: TransactionOptions,

@@ -24,7 +24,12 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-/// Prompts for confirmation until a yes or no is given explicitly
+/// Prompts for confirmation until a yes or no is given explicitly.
+///
+/// Returns `false` (the safe "no" answer) if stdin reaches EOF or errors. This
+/// prevents the prompt from looping forever when stdin is closed or redirected
+/// from `/dev/null`, which is the common case for non-interactive/automated
+/// callers such as coding agents and CI.
 pub fn prompt_yes(prompt: &str) -> bool {
     let mut result: Result<bool, ()> = Err(());
 
@@ -32,8 +37,13 @@ pub fn prompt_yes(prompt: &str) -> bool {
     while result.is_err() {
         println!("{} [yes/no] >", prompt);
         let mut input = String::new();
-        if std::io::stdin().read_line(&mut input).is_err() {
-            continue;
+        match std::io::stdin().read_line(&mut input) {
+            // `Ok(0)` means EOF: stdin is closed and no further input can be
+            // read. Returning here avoids an infinite loop.
+            Ok(0) => return false,
+            // A read error is also unrecoverable for prompting purposes.
+            Err(_) => return false,
+            Ok(_) => {},
         }
         result = match input.trim().to_lowercase().as_str() {
             "yes" | "y" => Ok(true),
@@ -42,6 +52,42 @@ pub fn prompt_yes(prompt: &str) -> bool {
         };
     }
     result.unwrap()
+}
+
+/// Environment variable that forces the CLI into non-interactive mode.
+///
+/// When set to a truthy value (`1`, `true`, or `yes`, case-insensitive), the CLI
+/// will never block waiting for interactive input. Confirmation prompts and
+/// free-form prompts must instead be answered up front via flags (for example
+/// `--assume-yes`/`--assume-no`, or `--network`/`--private-key` for `aptos init`),
+/// otherwise the command fails fast with an actionable error.
+///
+/// This is intended for automated callers such as coding agents and CI.
+pub const NON_INTERACTIVE_ENV_VAR: &str = "APTOS_NON_INTERACTIVE";
+
+/// Returns true if [`NON_INTERACTIVE_ENV_VAR`] is set to a truthy value.
+pub fn non_interactive_env_set() -> bool {
+    match std::env::var(NON_INTERACTIVE_ENV_VAR) {
+        Ok(value) => matches!(value.trim().to_lowercase().as_str(), "1" | "true" | "yes"),
+        Err(_) => false,
+    }
+}
+
+/// Returns true if stdin is connected to an interactive terminal (TTY).
+pub fn stdin_is_interactive() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdin().is_terminal()
+}
+
+/// Returns true if the CLI should avoid interactive prompts entirely.
+///
+/// This is the case when [`NON_INTERACTIVE_ENV_VAR`] has been set explicitly, or
+/// when stdin is not a TTY (e.g. it is closed, piped, or redirected from
+/// `/dev/null`), which is the typical situation for coding agents and CI. In
+/// these situations a prompt cannot be answered, so callers should fail fast
+/// with an actionable error rather than block.
+pub fn is_non_interactive() -> bool {
+    non_interactive_env_set() || !stdin_is_interactive()
 }
 
 /// Reads a line from input
@@ -159,13 +205,29 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
         return Ok(());
     }
 
-    let is_yes = if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
-        response
-    } else {
-        prompt_yes(prompt)
-    };
+    // An explicit global default response (if any) is honored before prompting.
+    if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
+        return if response {
+            Ok(())
+        } else {
+            Err(CliError::AbortedError)
+        };
+    }
 
-    if is_yes {
+    // No answer has been provided. If we're running non-interactively (either the
+    // env var is set, or stdin is not a TTY), we cannot ask the user, so fail fast
+    // with an actionable error rather than block on a prompt that can't be answered.
+    if is_non_interactive() {
+        return Err(CliError::CommandArgumentError(format!(
+            "Cannot prompt for confirmation in a non-interactive session: \"{}\". \
+             Re-run with `--assume-yes` to confirm or `--assume-no` to decline \
+             (or configure a default with `aptos config set-global-config \
+             --default-prompt-response yes`).",
+            prompt
+        )));
+    }
+
+    if prompt_yes(prompt) {
         Ok(())
     } else {
         Err(CliError::AbortedError)
