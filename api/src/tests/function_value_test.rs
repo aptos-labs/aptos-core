@@ -133,7 +133,7 @@ async fn test_function_values_with_captured_struct() {
         response["data"],
         json!({
             "f": {
-                "__captured__": [ {"_0": "1"} ],
+                "__captured__": [ {"value": "1", "extra": "2"} ],
                 "__fun_name__": &expected_name,
                 "__mask__": "1",
             }

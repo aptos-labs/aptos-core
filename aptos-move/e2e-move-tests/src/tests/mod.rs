@@ -30,6 +30,7 @@ mod function_caches;
 mod function_value_depth;
 mod function_value_layout_dag;
 mod function_values;
+mod function_values_annotated_captured_args;
 mod fungible_asset;
 mod fv_as_table_keys;
 mod gas;
