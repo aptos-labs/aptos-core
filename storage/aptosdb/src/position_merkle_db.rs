@@ -5,16 +5,18 @@
 
 use crate::{
     db_options::gen_position_merkle_cfds,
+    position_db::PositionDb,
     sharded_jmt_merkle_db::{LeafNode, Node as ShardedNode, ShardedJmtMerkleDb},
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{Cache, Env, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
-    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -120,6 +122,47 @@ impl PositionMerkleDb {
                 .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id))?;
         }
         Ok(())
+    }
+
+    pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
+        let tree = aptos_jellyfish_merkle::JellyfishMerkleTree::new(&self.inner);
+        match tree.get_root_hash_option(version) {
+            Ok(Some(h)) => Ok(h),
+            Ok(None) => Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            Err(e) => Err(AptosDbError::Other(format!(
+                "position_merkle_db get_root_hash: {e}"
+            ))),
+        }
+    }
+
+    /// JMT-walk + KV-CF value join: yields `(StateKey, StateValue)` for every
+    /// live position leaf at `version` from JMT index `start_idx`.
+    pub fn iter_active_leaves_with_values(
+        self: &Arc<Self>,
+        position_db: Arc<PositionDb>,
+        version: Version,
+        start_idx: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
+        crate::state_value_chunk::jmt_leaves_with_values(
+            Arc::clone(self),
+            version,
+            start_idx,
+            move |key, leaf_version| position_db.expect_value_by_version(key, leaf_version),
+        )
+    }
+
+    /// Bounded variant of [`Self::iter_active_leaves_with_values`] — at most
+    /// `chunk_size` leaves from `first_index`.
+    pub fn iter_active_leaves_chunk(
+        self: &Arc<Self>,
+        position_db: Arc<PositionDb>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
+        Ok(self
+            .iter_active_leaves_with_values(position_db, version, first_index)?
+            .take(chunk_size))
     }
 
     #[cfg(any(test, feature = "fuzzing"))]

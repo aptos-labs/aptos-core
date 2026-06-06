@@ -40,6 +40,7 @@ pub mod position_metrics;
 pub(crate) mod position_pruner;
 pub(crate) mod position_snapshot_committer;
 pub mod position_state_store;
+pub mod position_state_sync;
 mod pruner;
 mod sharded_jmt_merkle_db;
 mod sharded_kv_db;
@@ -52,5 +53,6 @@ pub use native_state_committer::{MerkleLeafUpdate, NativeMerkleLeafUpdates, Nati
 mod state_kv_db;
 mod state_merkle_db;
 mod state_store;
+mod state_value_chunk;
 mod transaction_store;
 mod versioned_node_cache;

@@ -6,6 +6,7 @@ use crate::{
     data_stream::{DataStreamId, DataStreamListener},
     error::Error,
 };
+use aptos_storage_interface::StateKind;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use async_trait::async_trait;
 use futures::{
@@ -33,15 +34,16 @@ pub type Epoch = u64;
 /// is the responsibility of the client to terminate the stream using this API.
 #[async_trait]
 pub trait DataStreamingClient {
-    /// Fetches the state values at the specified version. If `start_index`
-    /// is specified, the state values will be fetched starting at the
-    /// `start_index` (inclusive). Otherwise, the start index will 0.
+    /// Fetches the state values (of the given kind) at the specified version. If
+    /// `start_index` is specified, the state values will be fetched starting at
+    /// the `start_index` (inclusive). Otherwise, the start index will 0.
     /// The specified version must be an epoch ending version, otherwise an
     /// error will be returned. State proofs are at the same version.
     async fn get_all_state_values(
         &self,
         version: Version,
         start_index: Option<u64>,
+        state_kind: StateKind,
     ) -> Result<DataStreamListener, Error>;
 
     /// Fetches all epoch ending ledger infos starting at `start_epoch`
@@ -208,11 +210,12 @@ pub struct GetAllEpochEndingLedgerInfosRequest {
     pub start_epoch: Epoch,
 }
 
-/// A client request for fetching all states at a specified version.
+/// A client request for fetching all states (of the given kind) at a version.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GetAllStatesRequest {
     pub version: Version,
     pub start_index: u64,
+    pub state_kind: StateKind,
 }
 
 /// A client request for fetching all transactions with proofs.
@@ -338,11 +341,13 @@ impl DataStreamingClient for StreamingServiceClient {
         &self,
         version: u64,
         start_index: Option<u64>,
+        state_kind: StateKind,
     ) -> Result<DataStreamListener, Error> {
         let start_index = start_index.unwrap_or(0);
         let client_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version,
             start_index,
+            state_kind,
         });
         self.send_request_and_await_response(client_request).await
     }

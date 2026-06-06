@@ -808,6 +808,7 @@ mod streaming_service_tests {
         let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version: MIN_ADVERTISED_STATES,
             start_index: 0,
+            state_kind: aptos_storage_interface::StateKind::MainState,
         });
         create_request_message_and_receiver(stream_request)
     }
