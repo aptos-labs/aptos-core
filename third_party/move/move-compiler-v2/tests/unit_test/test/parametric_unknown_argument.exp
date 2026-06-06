@@ -1,2 +1,9 @@
+
 Diagnostics:
 error: unknown test parameter assignment
+  ┌─ tests/unit_test/test/parametric_unknown_argument.move:5:9
+  │
+4 │     #[test(real = @0x1, typo = @0x2)]
+  │                         ----------- No parameter named `typo`
+5 │     fun unknown_argument(real: signer) {
+  │         ^^^^^^^^^^^^^^^^

@@ -1,2 +1,9 @@
+
 Diagnostics:
 error: unknown test parameter assignment
+  ┌─ tests/unit_test/test/parametric_invalid_row_rejects_siblings.move:6:9
+  │
+5 │     #[test(typo = @0x2)]
+  │            ----------- No parameter named `typo`
+6 │     fun invalid_row_rejects_siblings(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

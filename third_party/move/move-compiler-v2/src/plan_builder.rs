@@ -287,6 +287,35 @@ fn build_row_arguments(
 ) -> Vec<MoveValue> {
     let test_attribute_loc = env.get_node_loc(test_attribute.node_id());
     let test_annotation_params = parse_test_attribute(env, test_attribute, 0);
+
+    // Collect valid parameter names from the function.
+    let param_names: std::collections::BTreeSet<Symbol> = function
+        .get_parameters_ref()
+        .iter()
+        .map(|Parameter(var, _, _)| *var)
+        .collect();
+
+    // Check for unknown assignments (names not in the function parameter list).
+    let mut has_unknown = false;
+    if let Attribute::Apply { attrs: inner_attrs, .. } = test_attribute {
+        for inner in inner_attrs {
+            if let Attribute::Assign { name, node_id, .. } = inner {
+                if !param_names.contains(name) {
+                    let loc = env.get_node_loc(*node_id);
+                    env.error_with_labels(
+                        fn_id_loc,
+                        "unknown test parameter assignment",
+                        vec![(loc, format!("No parameter named `{}`", env.symbol_pool().string(*name)))],
+                    );
+                    has_unknown = true;
+                }
+            }
+        }
+    }
+    if has_unknown {
+        return Vec::new();
+    }
+
     let mut arguments = Vec::new();
     for param in function.get_parameters_ref() {
         let Parameter(var, ty, var_loc) = &param;
