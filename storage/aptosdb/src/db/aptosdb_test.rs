@@ -29,7 +29,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, Order};
+use aptos_storage_interface::{DbReader, Order, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -461,10 +461,13 @@ proptest! {
         let state_checkpoint_version =
             db.get_latest_state_checkpoint_version().unwrap().unwrap();
         let state_leaf_count =
-            db.get_state_item_count(state_checkpoint_version).unwrap();
+            db.get_state_item_count(state_checkpoint_version, StateKind::MainState).unwrap();
         let state_value_chunk_with_proof = db
             .get_state_value_chunk_with_proof(
-                state_checkpoint_version, 0, state_leaf_count,
+                state_checkpoint_version,
+                0,
+                state_leaf_count,
+                StateKind::MainState,
             )
             .unwrap();
         prop_assert_eq!(state_value_chunk_with_proof.first_index, 0);

@@ -4,7 +4,7 @@
 use crate::{error::Error, metrics};
 use aptos_config::config::StorageServiceConfig;
 use aptos_logger::{debug, warn};
-use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
+use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult, StateKind};
 use aptos_storage_service_types::{
     requests::{GetTransactionDataWithProofRequest, TransactionDataRequestType},
     responses::{
@@ -99,9 +99,12 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
     ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
-    /// Returns the number of states in the state tree at the specified version.
-    fn get_number_of_states(&self, version: u64)
-        -> aptos_storage_service_types::Result<u64, Error>;
+    /// Returns the number of states (of the given kind) at the specified version.
+    fn get_number_of_states(
+        &self,
+        version: u64,
+        kind: StateKind,
+    ) -> aptos_storage_service_types::Result<u64, Error>;
 
     /// Returns a chunk holding a list of state values starting at the
     /// specified `start_index` and ending at `end_index` (inclusive). In
@@ -112,6 +115,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         version: u64,
         start_index: u64,
         end_index: u64,
+        kind: StateKind,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error>;
 }
 
@@ -904,6 +908,7 @@ impl StorageReader {
         end_index: u64,
         max_response_size: u64,
         use_size_and_time_aware_chunking: bool,
+        kind: StateKind,
     ) -> Result<StateValueChunkWithProof, Error> {
         // Calculate the number of state values to fetch
         let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
@@ -918,6 +923,7 @@ impl StorageReader {
                 end_index,
                 num_state_values_to_fetch,
                 max_response_size,
+                kind,
             );
         }
 
@@ -926,6 +932,7 @@ impl StorageReader {
             version,
             start_index as usize,
             num_state_values_to_fetch as usize,
+            kind,
         )?;
 
         // Initialize the fetched state values
@@ -977,6 +984,7 @@ impl StorageReader {
             version,
             start_index as usize,
             state_values,
+            kind,
         )?;
 
         // Update the data truncation metrics
@@ -995,12 +1003,14 @@ impl StorageReader {
         end_index: u64,
         mut num_state_values_to_fetch: u64,
         max_response_size: u64,
+        kind: StateKind,
     ) -> Result<StateValueChunkWithProof, Error> {
         while num_state_values_to_fetch >= 1 {
             let state_value_chunk_with_proof = self.storage.get_state_value_chunk_with_proof(
                 version,
                 start_index as usize,
                 num_state_values_to_fetch as usize,
+                kind,
             )?;
             if num_state_values_to_fetch == 1 {
                 return Ok(state_value_chunk_with_proof); // We cannot return less than a single item
@@ -1194,8 +1204,9 @@ impl StorageReaderInterface for StorageReader {
     fn get_number_of_states(
         &self,
         version: u64,
+        kind: StateKind,
     ) -> aptos_storage_service_types::Result<u64, Error> {
-        let number_of_states = self.storage.get_state_item_count(version)?;
+        let number_of_states = self.storage.get_state_item_count(version, kind)?;
         Ok(number_of_states as u64)
     }
 
@@ -1204,6 +1215,7 @@ impl StorageReaderInterface for StorageReader {
         version: u64,
         start_index: u64,
         end_index: u64,
+        kind: StateKind,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error> {
         self.get_state_value_chunk_with_proof_by_size(
             version,
@@ -1211,6 +1223,7 @@ impl StorageReaderInterface for StorageReader {
             end_index,
             self.config.max_network_chunk_bytes,
             self.config.enable_size_and_time_aware_chunking,
+            kind,
         )
     }
 }
@@ -1285,13 +1298,14 @@ impl DbReader for TimedStorageReader {
             ledger_version: Version,
         ) -> StorageResult<TransactionOutputListWithProofV2>;
 
-        fn get_state_item_count(&self, version: Version) -> StorageResult<usize>;
+        fn get_state_item_count(&self, version: Version, kind: StateKind) -> StorageResult<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,
             version: Version,
             start_idx: usize,
             chunk_size: usize,
+            kind: StateKind,
         ) -> StorageResult<StateValueChunkWithProof>;
 
         fn get_epoch_ending_ledger_info_iterator(
@@ -1336,6 +1350,7 @@ impl DbReader for TimedStorageReader {
             version: Version,
             first_index: usize,
             chunk_size: usize,
+            kind: StateKind,
         ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(StateKey, StateValue)>> + '_>>;
 
         fn get_state_value_chunk_proof(
@@ -1343,6 +1358,7 @@ impl DbReader for TimedStorageReader {
             version: Version,
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
+            kind: StateKind,
         ) -> StorageResult<StateValueChunkWithProof>;
 
         fn get_persisted_auxiliary_info_iterator(

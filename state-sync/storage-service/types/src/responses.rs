@@ -6,12 +6,12 @@ use crate::{
         DataRequest::{
             GetEpochEndingLedgerInfos, GetNewTransactionDataWithProof,
             GetNewTransactionOutputsWithProof, GetNewTransactionsOrOutputsWithProof,
-            GetNewTransactionsWithProof, GetNumberOfStatesAtVersion, GetServerProtocolVersion,
-            GetStateValuesWithProof, GetStorageServerSummary, GetTransactionDataWithProof,
-            GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof,
-            GetTransactionsWithProof, SubscribeTransactionDataWithProof,
-            SubscribeTransactionOutputsWithProof, SubscribeTransactionsOrOutputsWithProof,
-            SubscribeTransactionsWithProof,
+            GetNewTransactionsWithProof, GetNumberOfStatesAtVersion, GetNumberOfStatesAtVersionV2,
+            GetServerProtocolVersion, GetStateValuesWithProof, GetStateValuesWithProofV2,
+            GetStorageServerSummary, GetTransactionDataWithProof, GetTransactionOutputsWithProof,
+            GetTransactionsOrOutputsWithProof, GetTransactionsWithProof,
+            SubscribeTransactionDataWithProof, SubscribeTransactionOutputsWithProof,
+            SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
         },
         TransactionDataRequestType,
     },
@@ -26,7 +26,7 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{state_value::StateValueChunkWithProof, StateKind},
     transaction::{
         TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, Version,
@@ -158,6 +158,25 @@ pub enum DataResponse {
     // TODO: eventually we should deprecate all the old response types.
     TransactionDataWithProof(TransactionDataWithProofResponse),
     NewTransactionDataWithProof(NewTransactionDataWithProofResponse),
+
+    // Appended at the end to preserve BCS variant indices (wire compatibility).
+    // V2 state responses carry the `StateKind`, so one variant serves any snapshot kind.
+    StateValueChunkWithProofV2(StateValueChunkWithProofResponseV2),
+    NumberOfStatesAtVersionV2(NumberOfStatesResponseV2),
+}
+
+/// A state value chunk response (of the given kind) with a proof.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StateValueChunkWithProofResponseV2 {
+    pub state_value_chunk_with_proof: StateValueChunkWithProof,
+    pub state_kind: StateKind,
+}
+
+/// A response holding the number of state values (of the given kind) at a version.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct NumberOfStatesResponseV2 {
+    pub number_of_states: u64,
+    pub state_kind: StateKind,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -193,6 +212,10 @@ impl DataResponse {
             Self::NumberOfStatesAtVersion(_) => Self::get_number_of_states_at_version_label(),
             Self::ServerProtocolVersion(_) => Self::get_server_protocol_version_label(),
             Self::StateValueChunkWithProof(_) => Self::get_state_value_chunk_with_proof_label(),
+            Self::StateValueChunkWithProofV2(_) => {
+                Self::get_state_value_chunk_with_proof_v2_label()
+            },
+            Self::NumberOfStatesAtVersionV2(_) => Self::get_number_of_states_at_version_v2_label(),
             Self::StorageServerSummary(_) => Self::get_storage_server_summary_label(),
             Self::TransactionOutputsWithProof(_) => {
                 Self::get_transaction_outputs_with_proof_label()
@@ -257,6 +280,16 @@ impl DataResponse {
     /// Returns a label for the state value chunk with proof response
     pub fn get_state_value_chunk_with_proof_label() -> &'static str {
         "state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the v2 state value chunk with proof response
+    pub fn get_state_value_chunk_with_proof_v2_label() -> &'static str {
+        "state_value_chunk_with_proof_v2"
+    }
+
+    /// Returns a label for the v2 number of states at version response
+    pub fn get_number_of_states_at_version_v2_label() -> &'static str {
+        "number_of_states_at_version_v2"
     }
 
     /// Returns a label for the storage server summary response
@@ -332,6 +365,36 @@ impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
             DataResponse::StateValueChunkWithProof(inner) => Ok(inner),
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected state_value_chunk_with_proof, found {}",
+                data_response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for StateValueChunkWithProofResponseV2 {
+    type Error = crate::responses::Error;
+
+    fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::StateValueChunkWithProofV2(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
+                "expected state_value_chunk_with_proof_v2, found {}",
+                data_response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for NumberOfStatesResponseV2 {
+    type Error = crate::responses::Error;
+
+    fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::NumberOfStatesAtVersionV2(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
+                "expected number_of_states_at_version_v2, found {}",
                 data_response.get_label()
             ))),
         }
@@ -720,26 +783,18 @@ impl DataSummary {
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
+            // All snapshot kinds are synced at the same versions, so they share
+            // the same advertised range.
             GetNumberOfStatesAtVersion(version) => self
                 .states
                 .map(|range| range.contains(*version))
                 .unwrap_or(false),
-            GetStateValuesWithProof(request) => {
-                let proof_version = request.version;
-
-                let can_serve_states = self
-                    .states
-                    .map(|range| range.contains(request.version))
-                    .unwrap_or(false);
-
-                let can_create_proof = self
-                    .synced_ledger_info
-                    .as_ref()
-                    .map(|li| li.ledger_info().version() >= proof_version)
-                    .unwrap_or(false);
-
-                can_serve_states && can_create_proof
-            },
+            GetNumberOfStatesAtVersionV2(request) => self
+                .states
+                .map(|range| range.contains(request.version))
+                .unwrap_or(false),
+            GetStateValuesWithProof(request) => self.can_service_state_values(request.version),
+            GetStateValuesWithProofV2(request) => self.can_service_state_values(request.version),
             GetTransactionOutputsWithProof(request) => self
                 .can_service_transaction_outputs_with_proof(
                     request.start_version,
@@ -827,6 +882,16 @@ impl DataSummary {
         self.transactions
             .map(|range| range.superset_of(desired_range))
             .unwrap_or(false)
+    }
+
+    /// Returns true iff the peer can service a state value chunk (of any kind)
+    /// at `version`. All snapshot kinds share the same advertised range.
+    fn can_service_state_values(&self, version: u64) -> bool {
+        let can_serve_states = self
+            .states
+            .map(|range| range.contains(version))
+            .unwrap_or(false);
+        can_serve_states && self.can_create_proof(version)
     }
 
     /// Returns true iff the peer can service the transaction outputs and proof

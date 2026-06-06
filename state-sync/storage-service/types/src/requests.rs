@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::COMPRESSION_SUFFIX_LABEL;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::StateKind, transaction::Version};
 use serde::{Deserialize, Serialize};
 
 /// A storage service request.
@@ -53,6 +53,16 @@ pub enum DataRequest {
     GetTransactionDataWithProof(GetTransactionDataWithProofRequest), // Fetches transaction data with a proof
     GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest), // Optimistically fetches new transaction data with a proof
     SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest), // Subscribes to transaction data with a proof
+
+    // Appended at the end to preserve BCS variant indices (wire compatibility).
+    // V2 state requests carry the `StateKind`, so one variant serves any snapshot kind.
+    // Only native-position uses these today; main state stays on the V1 variants
+    // above for backward compatibility with already-deployed peers.
+    // TODO(grao): once V2 is supported fleet-wide, migrate main state to these
+    // (behind a config flag, like `enable_transaction_data_v2`) and deprecate the
+    // V1 `GetStateValuesWithProof` / `GetNumberOfStatesAtVersion` variants.
+    GetStateValuesWithProofV2(StateValuesWithProofRequestV2), // Fetches a list of states (of the given kind) with a proof
+    GetNumberOfStatesAtVersionV2(NumberOfStatesRequestV2), // Fetches the number of states (of the given kind) at the specified version
 }
 
 impl DataRequest {
@@ -65,6 +75,8 @@ impl DataRequest {
             Self::GetNumberOfStatesAtVersion(_) => "get_number_of_states_at_version",
             Self::GetServerProtocolVersion => "get_server_protocol_version",
             Self::GetStateValuesWithProof(_) => "get_state_values_with_proof",
+            Self::GetStateValuesWithProofV2(_) => "get_state_values_with_proof_v2",
+            Self::GetNumberOfStatesAtVersionV2(_) => "get_number_of_states_at_version_v2",
             Self::GetStorageServerSummary => "get_storage_server_summary",
             Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
@@ -345,6 +357,24 @@ pub struct StateValuesWithProofRequest {
     pub version: u64,     // The version to fetch the state values at
     pub start_index: u64, // The index to start fetching state values (inclusive)
     pub end_index: u64,   // The index to stop fetching state values (inclusive)
+}
+
+/// A storage service request for fetching a list of state values (of the given
+/// kind) at a specified version.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct StateValuesWithProofRequestV2 {
+    pub version: u64,          // The version to fetch the state values at
+    pub start_index: u64,      // The index to start fetching state values (inclusive)
+    pub end_index: u64,        // The index to stop fetching state values (inclusive)
+    pub state_kind: StateKind, // Which snapshot store to fetch from
+}
+
+/// A storage service request for fetching the number of state values (of the
+/// given kind) at a specified version.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct NumberOfStatesRequestV2 {
+    pub version: u64,          // The version to fetch the number of states at
+    pub state_kind: StateKind, // Which snapshot store to count
 }
 
 /// A storage service request for fetching a transaction output list with a

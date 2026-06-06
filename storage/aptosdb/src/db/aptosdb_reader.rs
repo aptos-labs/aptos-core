@@ -18,7 +18,7 @@ use aptos_storage_interface::{
     state_store::{
         state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     },
-    AptosDbError, BlockHeight, DbReader, LedgerSummary, Result, MAX_REQUEST_LIMIT,
+    AptosDbError, BlockHeight, DbReader, LedgerSummary, Result, StateKind, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -845,13 +845,35 @@ impl DbReader for AptosDB {
             .map_err(Into::into)
     }
 
-    fn get_state_item_count(&self, version: Version) -> Result<usize> {
-        gauged_api("get_state_item_count", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
-            self.ledger_db
-                .metadata_db()
-                .get_usage(version)
-                .map(|usage| usage.items())
+    fn get_state_item_count(&self, version: Version, kind: StateKind) -> Result<usize> {
+        gauged_api("get_state_item_count", || match kind {
+            StateKind::MainState => {
+                self.error_if_state_merkle_pruned("State merkle", version)?;
+                self.ledger_db
+                    .metadata_db()
+                    .get_usage(version)
+                    .map(|usage| usage.items())
+            },
+            StateKind::Position => {
+                self.error_if_position_pruned("Native-position state merkle", version)?;
+                let position = self.position.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-position subsystem is not enabled".into())
+                })?;
+                // Position snapshots are sparse; resolve to the latest at or
+                // before `version`. `None` means no snapshot yet => empty.
+                match position
+                    .merkle_db
+                    .latest_snapshot_version_at_or_before(version)?
+                {
+                    Some(snapshot_version) => {
+                        crate::position_state_sync::get_position_state_item_count(
+                            &position.merkle_db,
+                            snapshot_version,
+                        )
+                    },
+                    None => Ok(0),
+                }
+            },
         })
     }
 
@@ -860,11 +882,36 @@ impl DbReader for AptosDB {
         version: Version,
         first_index: usize,
         chunk_size: usize,
+        kind: StateKind,
     ) -> Result<StateValueChunkWithProof> {
-        gauged_api("get_state_value_chunk_with_proof", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
-            self.state_store
-                .get_value_chunk_with_proof(version, first_index, chunk_size)
+        gauged_api("get_state_value_chunk_with_proof", || match kind {
+            StateKind::MainState => {
+                self.error_if_state_merkle_pruned("State merkle", version)?;
+                self.state_store
+                    .get_value_chunk_with_proof(version, first_index, chunk_size)
+            },
+            StateKind::Position => {
+                self.error_if_position_pruned("Native-position state merkle", version)?;
+                let position = self.position.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-position subsystem is not enabled".into())
+                })?;
+                let snapshot_version = position
+                    .merkle_db
+                    .latest_snapshot_version_at_or_before(version)?
+                    .ok_or_else(|| {
+                        AptosDbError::Other(format!(
+                            "no native-position snapshot at or before version {version}"
+                        ))
+                    })?;
+                let position_db = Arc::clone(&position.kv_db);
+                crate::state_value_chunk::value_chunk_with_proof(
+                    Arc::clone(&position.merkle_db),
+                    snapshot_version,
+                    first_index,
+                    chunk_size,
+                    move |key, version| position_db.expect_value_by_version(key, version),
+                )
+            },
         })
     }
 
@@ -873,16 +920,45 @@ impl DbReader for AptosDB {
         version: Version,
         first_index: usize,
         chunk_size: usize,
+        kind: StateKind,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
-        gauged_api("get_state_value_chunk_iter", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
-            let state_value_chunk_iter =
-                self.state_store
-                    .get_value_chunk_iter(version, first_index, chunk_size)?;
-            Ok(Box::new(state_value_chunk_iter)
-                as Box<
-                    dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_,
-                >)
+        gauged_api("get_state_value_chunk_iter", || match kind {
+            StateKind::MainState => {
+                self.error_if_state_merkle_pruned("State merkle", version)?;
+                let state_value_chunk_iter =
+                    self.state_store
+                        .get_value_chunk_iter(version, first_index, chunk_size)?;
+                Ok(Box::new(state_value_chunk_iter)
+                    as Box<
+                        dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_,
+                    >)
+            },
+            StateKind::Position => {
+                self.error_if_position_pruned("Native-position state merkle", version)?;
+                let position = self.position.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-position subsystem is not enabled".into())
+                })?;
+                match position
+                    .merkle_db
+                    .latest_snapshot_version_at_or_before(version)?
+                {
+                    Some(snapshot_version) => {
+                        let iter = position.merkle_db.iter_active_leaves_chunk(
+                            position.kv_db.clone(),
+                            snapshot_version,
+                            first_index,
+                            chunk_size,
+                        )?;
+                        Ok(Box::new(iter)
+                            as Box<
+                                dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_,
+                            >)
+                    },
+                    // No snapshot at or before `version` => empty position state.
+                    None => Ok(Box::new(std::iter::empty())
+                        as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>),
+                }
+            },
         })
     }
 
@@ -891,11 +967,34 @@ impl DbReader for AptosDB {
         version: Version,
         first_index: usize,
         state_key_values: Vec<(StateKey, StateValue)>,
+        kind: StateKind,
     ) -> Result<StateValueChunkWithProof> {
-        gauged_api("get_state_value_chunk_proof", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
-            self.state_store
-                .get_value_chunk_proof(version, first_index, state_key_values)
+        gauged_api("get_state_value_chunk_proof", || match kind {
+            StateKind::MainState => {
+                self.error_if_state_merkle_pruned("State merkle", version)?;
+                self.state_store
+                    .get_value_chunk_proof(version, first_index, state_key_values)
+            },
+            StateKind::Position => {
+                self.error_if_position_pruned("Native-position state merkle", version)?;
+                let position = self.position.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-position subsystem is not enabled".into())
+                })?;
+                let snapshot_version = position
+                    .merkle_db
+                    .latest_snapshot_version_at_or_before(version)?
+                    .ok_or_else(|| {
+                        AptosDbError::Other(format!(
+                            "no native-position snapshot at or before version {version}"
+                        ))
+                    })?;
+                crate::state_value_chunk::build_value_chunk_proof(
+                    position.merkle_db.as_ref(),
+                    snapshot_version,
+                    first_index,
+                    state_key_values,
+                )
+            },
         })
     }
 

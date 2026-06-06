@@ -13,6 +13,7 @@ use crate::{
     utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::BootstrappingMode;
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
@@ -20,7 +21,7 @@ use aptos_data_streaming_service::{
     streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_logger::{prelude::*, sample::SampleRate};
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, StateKind};
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
@@ -35,6 +36,11 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 // Useful bootstrapper constants
 const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
 pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the genesis transaction
+
+// The snapshot stores synced during fast sync. They are peers (independent
+// stores at the same version); this is just the drive order, and the fast sync
+// is finalized once all of them are written.
+const FAST_SYNC_SNAPSHOT_KINDS: [StateKind; 2] = [StateKind::MainState, StateKind::Position];
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -254,6 +260,10 @@ pub(crate) struct StateValueSyncer {
 
     // The transaction output (inc. info and proof) for the version we're syncing
     transaction_output_to_sync: Option<TransactionOutputListWithProofV2>,
+
+    // Whether a data stream has been requested for this kind at the current
+    // target (distinguishes "not yet streamed" from "streamed, empty tree").
+    stream_requested: bool,
 }
 
 impl StateValueSyncer {
@@ -263,6 +273,7 @@ impl StateValueSyncer {
             ledger_info_to_sync: None,
             next_state_index_to_process: 0,
             transaction_output_to_sync: None,
+            stream_requested: false,
         }
     }
 
@@ -311,6 +322,9 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The component used to sync state values (if downloading states)
     state_value_syncer: StateValueSyncer,
 
+    // The component used to sync native-position state values
+    position_value_syncer: StateValueSyncer,
+
     // The client through which to stream data from the Aptos network
     streaming_client: StreamingClient,
 
@@ -345,6 +359,7 @@ impl<
 
         Self {
             state_value_syncer: StateValueSyncer::new(),
+            position_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
             bootstrap_notifier_channel: None,
             bootstrapped: false,
@@ -518,34 +533,17 @@ impl<
         highest_known_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         if highest_synced_version == GENESIS_TRANSACTION_VERSION {
-            // We're syncing a new node. Check the progress and fetch any missing data
-            if let Some(target) = self.metadata_storage.previous_snapshot_sync_target()? {
-                if self.metadata_storage.is_snapshot_sync_complete(&target)? {
-                    // Fast syncing to the target is complete. Verify that the
-                    // highest synced version matches the target.
-                    if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION {
-                        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-                            "The fast sync to genesis is complete! Target: {:?}",
-                            target
-                        )));
-                        self.bootstrapping_complete().await
-                    } else {
-                        Err(Error::UnexpectedError(format!(
-                            "The snapshot sync for the target was marked as complete but \
-                        the highest synced version is genesis! Something has gone wrong! \
-                        Target snapshot sync: {:?}",
-                            target
-                        )))
-                    }
-                } else {
-                    // Continue snapshot syncing to the target
-                    self.fetch_missing_state_values(target, true).await
-                }
-            } else {
-                // No snapshot sync has started. Start a new sync for the highest known ledger info.
-                self.fetch_missing_state_values(highest_known_ledger_info, false)
-                    .await
-            }
+            // We're fast syncing a new node. Resume against the already-pinned
+            // target if a snapshot sync has started, otherwise target the highest
+            // known ledger info. (All snapshot kinds sync to the same target.)
+            let target = match self
+                .metadata_storage
+                .previous_snapshot_sync_target(StateKind::MainState)?
+            {
+                Some(target) => target,
+                None => highest_known_ledger_info,
+            };
+            self.drive_snapshot_stages(target).await
         } else {
             // This node has already synced some state. Ensure the node is not too far behind.
             let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
@@ -604,10 +602,11 @@ impl<
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
-                DataPayload::StateValuesWithProof(state_value_chunk_with_proof) => {
+                DataPayload::StateValuesWithProof(state_kind, state_value_chunk_with_proof) => {
                     self.process_state_values_payload(
                         data_notification.notification_id,
                         state_value_chunk_with_proof,
+                        state_kind,
                     )
                     .await?;
                 },
@@ -659,71 +658,75 @@ impl<
         Ok(())
     }
 
-    /// Fetches state values (as required to bootstrap the node)
-    async fn fetch_missing_state_values(
+    /// Pins the target ledger info on the syncer for the given snapshot kind and
+    /// verifies it never changes across stream resets.
+    fn pin_ledger_info_to_sync(
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
-        existing_snapshot_progress: bool,
+        kind: StateKind,
     ) -> Result<(), Error> {
-        // Initialize the target ledger info and verify it never changes
-        if let Some(ledger_info_to_sync) = &self.state_value_syncer.ledger_info_to_sync {
+        if let Some(ledger_info_to_sync) = &self.state_value_syncer(kind).ledger_info_to_sync {
             if ledger_info_to_sync != &target_ledger_info {
                 return Err(Error::UnexpectedError(format!(
-                    "Mismatch in ledger info to sync! Given target: {:?}, stored target: {:?}",
-                    target_ledger_info, ledger_info_to_sync
+                    "Mismatch in {:?} ledger info to sync! Given target: {:?}, stored target: {:?}",
+                    kind, target_ledger_info, ledger_info_to_sync
                 )));
             }
         } else {
             info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-                "Setting the target ledger info for fast sync! Target: {:?}",
-                target_ledger_info
+                "Setting the target ledger info for {:?} fast sync! Target: {:?}",
+                kind, target_ledger_info
             )));
-
-            self.state_value_syncer
-                .set_ledger_info_to_sync(target_ledger_info.clone());
+            self.state_value_syncer_mut(kind)
+                .set_ledger_info_to_sync(target_ledger_info);
         }
+        Ok(())
+    }
 
-        // Fetch the data that we're missing
+    /// Streams the state values (of the given kind) for the snapshot at the
+    /// target. The target transaction output is fetched up front by the caller
+    /// (`drive_snapshot_stages`), so this is uniform across snapshot kinds.
+    async fn fetch_missing_state_values(
+        &mut self,
+        target_ledger_info: LedgerInfoWithSignatures,
+        existing_snapshot_progress: bool,
+        kind: StateKind,
+    ) -> Result<(), Error> {
+        // Initialize the target ledger info and verify it never changes
+        self.pin_ledger_info_to_sync(target_ledger_info.clone(), kind)?;
         let target_ledger_info_version = target_ledger_info.ledger_info().version();
-        let data_stream = if self.state_value_syncer.transaction_output_to_sync.is_none() {
-            // Fetch the transaction info first, before the states
-            self.streaming_client
-                .get_all_transaction_outputs(
-                    target_ledger_info_version,
-                    target_ledger_info_version,
-                    target_ledger_info_version,
-                )
-                .await?
-        } else {
-            // Identify the next state index to fetch
-            let next_state_index_to_process = if existing_snapshot_progress {
-                // The state snapshot receiver requires that after each reboot we
-                // rewrite the last persisted index (again!). This is a limitation
-                // of how the snapshot is persisted (i.e., in-memory sibling freezing).
-                // Thus, on each stream reset, we overlap every chunk by a single item.
-                self
-                    .metadata_storage
-                    .get_last_persisted_state_value_index(&target_ledger_info)
-                    .map_err(|error| {
-                        Error::StorageError(format!(
-                            "Failed to get the last persisted state value index at version {:?}! Error: {:?}",
-                            target_ledger_info_version, error
-                        ))
-                    })?
-            } else {
-                0 // We need to start the snapshot sync from index 0
-            };
 
-            // Fetch the missing state values
-            self.state_value_syncer
-                .update_next_state_index_to_process(next_state_index_to_process);
-            self.streaming_client
-                .get_all_state_values(
-                    target_ledger_info_version,
-                    Some(next_state_index_to_process),
-                )
-                .await?
+        // Identify the next state index to fetch
+        let next_state_index_to_process = if existing_snapshot_progress {
+            // The state snapshot receiver requires that after each reboot we
+            // rewrite the last persisted index (again!). This is a limitation
+            // of how the snapshot is persisted (i.e., in-memory sibling freezing).
+            // Thus, on each stream reset, we overlap every chunk by a single item.
+            self
+                .metadata_storage
+                .get_last_persisted_index(&target_ledger_info, kind)
+                .map_err(|error| {
+                    Error::StorageError(format!(
+                        "Failed to get the last persisted {:?} value index at version {:?}! Error: {:?}",
+                        kind, target_ledger_info_version, error
+                    ))
+                })?
+        } else {
+            0 // We need to start the snapshot sync from index 0
         };
+
+        // Fetch the missing state values
+        self.state_value_syncer_mut(kind)
+            .update_next_state_index_to_process(next_state_index_to_process);
+        self.state_value_syncer_mut(kind).stream_requested = true;
+        let data_stream = self
+            .streaming_client
+            .get_all_state_values(
+                target_ledger_info_version,
+                Some(next_state_index_to_process),
+                kind,
+            )
+            .await?;
         self.active_data_stream = Some(data_stream);
 
         Ok(())
@@ -914,23 +917,22 @@ impl<
         }
     }
 
-    /// Verifies the start and end indices in the given state value chunk
-    async fn verify_states_values_indices(
+    /// Verifies the start and end indices in the given state value chunk. The
+    /// `label` ("state" / "position") only flavors error messages.
+    async fn verify_state_value_chunk_indices(
         &mut self,
         notification_id: NotificationId,
+        expected_start_index: u64,
+        kind: StateKind,
         state_value_chunk_with_proof: &StateValueChunkWithProof,
     ) -> Result<(), Error> {
         // Verify the payload start index is valid
-        let expected_start_index = self.state_value_syncer.next_state_index_to_process;
         if expected_start_index != state_value_chunk_with_proof.first_index {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
             return Err(Error::VerificationError(format!(
-                "The start index of the state values was invalid! Expected: {:?}, received: {:?}",
-                expected_start_index, state_value_chunk_with_proof.first_index
+                "The start index of the {:?} values was invalid! Expected: {:?}, received: {:?}",
+                kind, expected_start_index, state_value_chunk_with_proof.first_index
             )));
         }
 
@@ -940,72 +942,48 @@ impl<
             .checked_sub(state_value_chunk_with_proof.first_index)
             .and_then(|version| version.checked_add(1)) // expected_num_state_values = last_index - first_index + 1
             .ok_or_else(|| {
-                Error::IntegerOverflow("The expected number of state values has overflown!".into())
+                Error::IntegerOverflow(format!(
+                    "The expected number of {:?} values has overflown!",
+                    kind
+                ))
             })?;
         let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
         if expected_num_state_values != num_state_values {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
             return Err(Error::VerificationError(format!(
-                "The expected number of state values was invalid! Expected: {:?}, received: {:?}",
-                expected_num_state_values, num_state_values,
+                "The expected number of {:?} values was invalid! Expected: {:?}, received: {:?}",
+                kind, expected_num_state_values, num_state_values,
             )));
         }
 
         Ok(())
     }
 
-    /// Process a single state value chunk with proof payload
-    async fn process_state_values_payload(
-        &mut self,
-        notification_id: NotificationId,
-        state_value_chunk_with_proof: StateValueChunkWithProof,
-    ) -> Result<(), Error> {
-        // Verify that we're expecting state value payloads
-        let bootstrapping_mode = self.get_bootstrapping_mode();
-        if self.should_fetch_epoch_ending_ledger_infos() || !bootstrapping_mode.is_fast_sync() {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
-            return Err(Error::InvalidPayload(
-                "Received an unexpected state values payload!".into(),
-            ));
+    /// Returns the state value syncer for the given snapshot kind.
+    fn state_value_syncer(&self, kind: StateKind) -> &StateValueSyncer {
+        match kind {
+            StateKind::MainState => &self.state_value_syncer,
+            StateKind::Position => &self.position_value_syncer,
         }
+    }
 
-        // Fetch the target ledger info and transaction info for bootstrapping
-        let ledger_info_to_sync = self.get_ledger_info_to_sync()?;
+    /// Returns the mutable state value syncer for the given snapshot kind.
+    fn state_value_syncer_mut(&mut self, kind: StateKind) -> &mut StateValueSyncer {
+        match kind {
+            StateKind::MainState => &mut self.state_value_syncer,
+            StateKind::Position => &mut self.position_value_syncer,
+        }
+    }
+
+    /// The expected snapshot root for the given kind at the target version, read
+    /// from the target transaction info: main state's state checkpoint hash, or
+    /// the committed position state root (guaranteed present once the position
+    /// stage runs, per `snapshot_kind_applies_to_target`). All kinds share the
+    /// target version, so this is taken from the target output, not a storage read.
+    fn expected_snapshot_root(&mut self, kind: StateKind) -> Result<HashValue, Error> {
         let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
-
-        // Initialize the state value synchronizer (if not already done)
-        if !self.state_value_syncer.initialized_state_snapshot_receiver {
-            // Fetch all verified epoch change proofs
-            let version_to_sync = ledger_info_to_sync.ledger_info().version();
-            let epoch_change_proofs = if version_to_sync == GENESIS_TRANSACTION_VERSION {
-                vec![ledger_info_to_sync.clone()] // Sync to genesis
-            } else {
-                self.verified_epoch_states.all_epoch_ending_ledger_infos() // Sync beyond genesis
-            };
-
-            // Initialize the state value synchronizer
-            let _join_handle = self.storage_synchronizer.initialize_state_synchronizer(
-                epoch_change_proofs,
-                ledger_info_to_sync,
-                transaction_output_to_sync.clone(),
-            )?;
-            self.state_value_syncer.initialized_state_snapshot_receiver = true;
-        }
-
-        // Verify the state values payload start and end indices
-        self.verify_states_values_indices(notification_id, &state_value_chunk_with_proof)
-            .await?;
-
-        // Verify the chunk root hash matches the expected root hash
-        let first_transaction_info = transaction_output_to_sync
+        let target_transaction_info = transaction_output_to_sync
             .get_output_list_with_proof()
             .proof
             .transaction_infos
@@ -1013,21 +991,101 @@ impl<
             .ok_or_else(|| {
                 Error::UnexpectedError("Target transaction info does not exist!".into())
             })?;
-        let expected_root_hash = first_transaction_info
-            .ensure_state_checkpoint_hash()
-            .map_err(|error| {
-                Error::UnexpectedError(format!("State checkpoint must exist! Error: {:?}", error))
-            })?;
-        if state_value_chunk_with_proof.root_hash != expected_root_hash {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
+        match kind {
+            StateKind::MainState => target_transaction_info
+                .ensure_state_checkpoint_hash()
+                .map_err(|error| {
+                    Error::UnexpectedError(format!(
+                        "State checkpoint must exist! Error: {:?}",
+                        error
+                    ))
+                }),
+            StateKind::Position => target_transaction_info
+                .position_state_checkpoint_hash()
+                .ok_or_else(|| Error::UnexpectedError("Missing position state root!".into())),
+        }
+    }
+
+    /// Verifies the chunk's root hash against the expected snapshot root for the
+    /// kind. Resets the stream and errors on a mismatch.
+    async fn verify_state_value_chunk_root(
+        &mut self,
+        notification_id: NotificationId,
+        kind: StateKind,
+        state_value_chunk_with_proof: &StateValueChunkWithProof,
+    ) -> Result<HashValue, Error> {
+        let expected_root_hash = self.expected_snapshot_root(kind)?;
+        let chunk_root_hash = state_value_chunk_with_proof.root_hash;
+        if chunk_root_hash != expected_root_hash {
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
             return Err(Error::VerificationError(format!(
-                "The states chunk with proof root hash: {:?} didn't match the expected hash: {:?}!",
-                state_value_chunk_with_proof.root_hash, expected_root_hash,
+                "The {:?} states chunk root hash: {:?} didn't match the expected hash: {:?}!",
+                kind, chunk_root_hash, expected_root_hash,
             )));
+        }
+        Ok(expected_root_hash)
+    }
+
+    /// Process a single state value chunk with proof payload (of the given kind).
+    async fn process_state_values_payload(
+        &mut self,
+        notification_id: NotificationId,
+        state_value_chunk_with_proof: StateValueChunkWithProof,
+        kind: StateKind,
+    ) -> Result<(), Error> {
+        // Verify that we're expecting state value payloads
+        if self.should_fetch_epoch_ending_ledger_infos()
+            || !self.get_bootstrapping_mode().is_fast_sync()
+        {
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
+            return Err(Error::InvalidPayload(format!(
+                "Received an unexpected {:?} state values payload!",
+                kind
+            )));
+        }
+
+        // Fetch the pinned target ledger info for this snapshot kind
+        let ledger_info_to_sync = self
+            .state_value_syncer(kind)
+            .ledger_info_to_sync
+            .clone()
+            .ok_or_else(|| {
+                Error::UnexpectedError(format!("The {:?} ledger info to sync is missing!", kind))
+            })?;
+
+        // Verify the chunk root hash against the expected root before initializing the
+        // receiver, so a bad first chunk doesn't latch a receiver bound to the
+        // wrong root.
+        let expected_root_hash = self
+            .verify_state_value_chunk_root(notification_id, kind, &state_value_chunk_with_proof)
+            .await?;
+
+        // Verify the state values payload start and end indices
+        let expected_start_index = self.state_value_syncer(kind).next_state_index_to_process;
+        self.verify_state_value_chunk_indices(
+            notification_id,
+            expected_start_index,
+            kind,
+            &state_value_chunk_with_proof,
+        )
+        .await?;
+
+        // Initialize the state snapshot synchronizer (if not already done). The
+        // whole-fast-sync finalize (accumulator + commit) is performed later,
+        // once all snapshots are written, via `finalize_fast_sync`.
+        if !self
+            .state_value_syncer(kind)
+            .initialized_state_snapshot_receiver
+        {
+            let _join_handle = self.storage_synchronizer.initialize_snapshot_synchronizer(
+                ledger_info_to_sync,
+                expected_root_hash,
+                kind,
+            )?;
+            self.state_value_syncer_mut(kind)
+                .initialized_state_snapshot_receiver = true;
         }
 
         // Process the state values chunk and proof
@@ -1037,19 +1095,17 @@ impl<
             .save_state_values(notification_id, state_value_chunk_with_proof)
             .await
         {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
             return Err(Error::InvalidPayload(format!(
-                "The states chunk with proof was invalid! Error: {:?}",
-                error,
+                "The {:?} states chunk with proof was invalid! Error: {:?}",
+                kind, error,
             )));
         }
 
         // Update the next state value index to process
-        self.state_value_syncer.next_state_index_to_process =
+        self.state_value_syncer_mut(kind)
+            .next_state_index_to_process =
             last_state_value_index.checked_add(1).ok_or_else(|| {
                 Error::IntegerOverflow(
                     "The next state value index to process has overflown!".into(),
@@ -1057,6 +1113,144 @@ impl<
             })?;
 
         Ok(())
+    }
+
+    /// Whether the given snapshot kind participates in the fast sync to this
+    /// target. Main state always does. Native-position only participates once the
+    /// target's `TransactionInfo` commits a position state root: until the
+    /// executor sets it there is no authenticated position state to sync, so the
+    /// stage is skipped rather than trusting an unproved peer-supplied root.
+    /// Requires the target transaction output to already be fetched.
+    fn snapshot_kind_applies_to_target(&mut self, kind: StateKind) -> Result<bool, Error> {
+        match kind {
+            StateKind::MainState => Ok(true),
+            StateKind::Position => {
+                let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
+                let target_transaction_info = transaction_output_to_sync
+                    .get_output_list_with_proof()
+                    .proof
+                    .transaction_infos
+                    .first()
+                    .ok_or_else(|| {
+                        Error::UnexpectedError("Target transaction info does not exist!".into())
+                    })?;
+                Ok(target_transaction_info
+                    .position_state_checkpoint_hash()
+                    .is_some())
+            },
+        }
+    }
+
+    /// Drives the fast-sync snapshots to the target: fetches the target output
+    /// once up front (needed for each kind's root check and the finalize), streams
+    /// each not-yet-written applicable kind, then finalizes once all are written.
+    /// The kinds are peers driven one at a time only because the bootstrapper runs
+    /// a single data stream, not because of any ordering dependency.
+    async fn drive_snapshot_stages(
+        &mut self,
+        target_ledger_info: LedgerInfoWithSignatures,
+    ) -> Result<(), Error> {
+        // Pin the target (read by the output-verification path) and fetch the
+        // target transaction output first, re-fetching it on resume.
+        self.pin_ledger_info_to_sync(target_ledger_info.clone(), StateKind::MainState)?;
+        if self.state_value_syncer.transaction_output_to_sync.is_none() {
+            let version = target_ledger_info.ledger_info().version();
+            let data_stream = self
+                .streaming_client
+                .get_all_transaction_outputs(version, version, version)
+                .await?;
+            self.active_data_stream = Some(data_stream);
+            return Ok(());
+        }
+
+        // Drive the next applicable snapshot kind that isn't written yet.
+        for kind in FAST_SYNC_SNAPSHOT_KINDS {
+            if !self.snapshot_kind_applies_to_target(kind)? {
+                continue;
+            }
+            match self.metadata_storage.previous_snapshot_sync_target(kind)? {
+                Some(previous_target) if previous_target == target_ledger_info => {
+                    // This kind has started syncing to the target.
+                    if self
+                        .metadata_storage
+                        .is_snapshot_sync_complete(&target_ledger_info, kind)?
+                    {
+                        continue; // Already written; move on to the next kind.
+                    }
+                    return self
+                        .fetch_missing_state_values(target_ledger_info, true, kind)
+                        .await;
+                },
+                Some(stale_target) => {
+                    // Progress exists for a different target. All kinds sync to
+                    // the same target, so this is an inconsistent metadata state
+                    // (the per-kind `update_last_persisted_index` would reject the
+                    // mismatch and wedge the stage). Surface it clearly instead.
+                    return Err(Error::UnexpectedError(format!(
+                        "The {:?} snapshot progress targets a different ledger info than the \
+                         current fast-sync target! Stored: {:?}, target: {:?}",
+                        kind, stale_target, target_ledger_info,
+                    )));
+                },
+                None => {
+                    // No progress recorded. If the stream was already requested and
+                    // returned no state values, the tree is empty: verify emptiness
+                    // against the committed root (not the unproved peer count) rather
+                    // than re-streaming. Otherwise, start streaming.
+                    let stream_requested = self.state_value_syncer(kind).stream_requested;
+                    let receiver_initialized = self
+                        .state_value_syncer(kind)
+                        .initialized_state_snapshot_receiver;
+                    if stream_requested && !receiver_initialized {
+                        if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
+                            self.metadata_storage.update_last_persisted_index(
+                                &target_ledger_info,
+                                0,
+                                true,
+                                kind,
+                            )?;
+                            continue;
+                        }
+                        return Err(Error::UnexpectedError(format!(
+                            "The {:?} snapshot stream ended without any state values, but the \
+                             committed snapshot root is not the empty-tree placeholder! Target: {:?}",
+                            kind, target_ledger_info,
+                        )));
+                    }
+                    return self
+                        .fetch_missing_state_values(target_ledger_info, false, kind)
+                        .await;
+                },
+            }
+        }
+
+        // All snapshots are written; finalize the whole fast sync.
+        self.finalize_fast_sync_and_complete(target_ledger_info)
+            .await
+    }
+
+    /// Finalizes the whole fast-sync once all snapshots are written: bootstraps
+    /// the accumulator, sends the commit notification, and marks bootstrapping
+    /// complete.
+    async fn finalize_fast_sync_and_complete(
+        &mut self,
+        target_ledger_info: LedgerInfoWithSignatures,
+    ) -> Result<(), Error> {
+        let version = target_ledger_info.ledger_info().version();
+        let epoch_change_proofs = if version == GENESIS_TRANSACTION_VERSION {
+            vec![target_ledger_info.clone()] // Synced to genesis
+        } else {
+            self.verified_epoch_states.all_epoch_ending_ledger_infos()
+        };
+        let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
+        self.storage_synchronizer
+            .finalize_fast_sync(
+                epoch_change_proofs,
+                target_ledger_info,
+                transaction_output_to_sync,
+            )
+            .await?;
+        self.bootstrapping_complete().await
     }
 
     /// Process a single epoch ending payload
@@ -1067,11 +1261,8 @@ impl<
     ) -> Result<(), Error> {
         // Verify that we're expecting epoch ending ledger info payloads
         if !self.should_fetch_epoch_ending_ledger_infos() {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected epoch ending payload!".into(),
             ));
@@ -1079,11 +1270,8 @@ impl<
 
         // Verify the payload isn't empty
         if epoch_ending_ledger_infos.is_empty() {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::EmptyPayloadData,
-            )))
-            .await?;
+            self.reset_stream(notification_id, NotificationFeedback::EmptyPayloadData)
+                .await?;
             return Err(Error::VerificationError(
                 "The epoch ending payload was empty!".into(),
             ));
@@ -1096,11 +1284,8 @@ impl<
                 &epoch_ending_ledger_info,
                 &self.driver_configuration.waypoint,
             ) {
-                self.reset_active_stream(Some(NotificationAndFeedback::new(
-                    notification_id,
-                    NotificationFeedback::PayloadProofFailed,
-                )))
-                .await?;
+                self.reset_stream(notification_id, NotificationFeedback::PayloadProofFailed)
+                    .await?;
                 return Err(error);
             }
         }
@@ -1125,10 +1310,10 @@ impl<
             || (bootstrapping_mode.is_fast_sync()
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
+            self.reset_stream(
                 notification_metadata.notification_id,
                 NotificationFeedback::InvalidPayloadData,
-            )))
+            )
             .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected transaction or output payload!".into(),
@@ -1186,10 +1371,10 @@ impl<
                     )
                     .await?
                 } else {
-                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    self.reset_stream(
                         notification_metadata.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )))
+                    )
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transaction outputs with proof!".into(),
@@ -1207,10 +1392,10 @@ impl<
                     )
                     .await?
                 } else {
-                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    self.reset_stream(
                         notification_metadata.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )))
+                    )
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
@@ -1238,10 +1423,10 @@ impl<
                     )
                     .await?
                 } else {
-                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    self.reset_stream(
                         notification_metadata.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )))
+                    )
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions or outputs with proof!".into(),
@@ -1300,10 +1485,10 @@ impl<
                             .set_transaction_output_to_sync(transaction_outputs_with_proof);
                     },
                     Err(error) => {
-                        self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        self.reset_stream(
                             notification_id,
                             NotificationFeedback::PayloadProofFailed,
-                        )))
+                        )
                         .await?;
                         return Err(Error::VerificationError(format!(
                             "Transaction outputs with proof is invalid! Error: {:?}",
@@ -1312,20 +1497,17 @@ impl<
                     },
                 }
             } else {
-                self.reset_active_stream(Some(NotificationAndFeedback::new(
-                    notification_id,
-                    NotificationFeedback::InvalidPayloadData,
-                )))
-                .await?;
+                self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                    .await?;
                 return Err(Error::InvalidPayload(
                     "Payload does not contain a single transaction info!".into(),
                 ));
             }
         } else {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
+            self.reset_stream(
                 notification_id,
                 NotificationFeedback::PayloadTypeIsIncorrect,
-            )))
+            )
             .await?;
             return Err(Error::InvalidPayload(
                 "Did not receive transaction outputs with proof!".into(),
@@ -1344,11 +1526,8 @@ impl<
     ) -> Result<Version, Error> {
         if let Some(payload_start_version) = payload_start_version {
             if payload_start_version != expected_start_version {
-                self.reset_active_stream(Some(NotificationAndFeedback::new(
-                    notification_id,
-                    NotificationFeedback::InvalidPayloadData,
-                )))
-                .await?;
+                self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                    .await?;
                 Err(Error::VerificationError(format!(
                     "The payload start version does not match the expected version! Start: {:?}, expected: {:?}",
                     payload_start_version, expected_start_version
@@ -1357,11 +1536,8 @@ impl<
                 Ok(payload_start_version)
             }
         } else {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::EmptyPayloadData,
-            )))
-            .await?;
+            self.reset_stream(notification_id, NotificationFeedback::EmptyPayloadData)
+                .await?;
             Err(Error::VerificationError(
                 "The playload starting version is missing!".into(),
             ))
@@ -1384,10 +1560,10 @@ impl<
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     transaction_outputs_with_proof.get_num_outputs()
                 } else {
-                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    self.reset_stream(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )))
+                    )
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transaction outputs with proof!".into(),
@@ -1398,10 +1574,10 @@ impl<
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.get_num_transactions()
                 } else {
-                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    self.reset_stream(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )))
+                    )
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
@@ -1414,10 +1590,10 @@ impl<
                 } else if let Some(output_list_with_proof) = transaction_outputs_with_proof {
                     output_list_with_proof.get_num_outputs()
                 } else {
-                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    self.reset_stream(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )))
+                    )
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions or outputs with proof!".into(),
@@ -1535,7 +1711,20 @@ impl<
         Ok(())
     }
 
-    /// Resets the currently active data stream and speculative state
+    /// Resets the active data stream, attaching `feedback` for the given
+    /// notification. A terse wrapper over `reset_active_stream`.
+    async fn reset_stream(
+        &mut self,
+        notification_id: NotificationId,
+        feedback: NotificationFeedback,
+    ) -> Result<(), Error> {
+        self.reset_active_stream(Some(NotificationAndFeedback::new(
+            notification_id,
+            feedback,
+        )))
+        .await
+    }
+
     pub async fn reset_active_stream(
         &mut self,
         notification_and_feedback: Option<NotificationAndFeedback>,

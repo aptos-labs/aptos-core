@@ -4,7 +4,7 @@
 use super::{new_test_context, new_test_context_with_orderless_flags};
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_sdk::{transaction_builder::aptos_stdlib::aptos_token_stdlib, types::LocalAccount};
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, StateKind};
 use move_core_types::account_address::AccountAddress;
 use rstest::rstest;
 use serde::Serialize;
@@ -198,7 +198,10 @@ async fn test_merkle_leaves_with_nft_transfer(
 
     let num_leaves_at_beginning = ctx
         .db
-        .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
+        .get_state_item_count(
+            ctx.db.get_latest_ledger_info_version().unwrap(),
+            StateKind::MainState,
+        )
         .unwrap();
 
     let transfer_to_owner_txn = creator.sign_multi_agent_with_transaction_builder(
@@ -221,7 +224,10 @@ async fn test_merkle_leaves_with_nft_transfer(
     ctx.commit_block(&[transfer_to_owner_txn]).await;
     let num_leaves_after_transfer_nft = ctx
         .db
-        .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
+        .get_state_item_count(
+            ctx.db.get_latest_ledger_info_version().unwrap(),
+            StateKind::MainState,
+        )
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
@@ -248,7 +254,10 @@ async fn test_merkle_leaves_with_nft_transfer(
     ctx.commit_block(&[transfer_to_creator_txn]).await;
     let num_leaves_after_return_nft = ctx
         .db
-        .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
+        .get_state_item_count(
+            ctx.db.get_latest_ledger_info_version().unwrap(),
+            StateKind::MainState,
+        )
         .unwrap();
 
     assert_eq!(
