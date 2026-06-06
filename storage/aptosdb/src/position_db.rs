@@ -12,14 +12,14 @@ use crate::{
     sharded_kv_db::ShardedKvDb,
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env, ReadOptions, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
-    state_store::{state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -259,6 +259,50 @@ impl PositionDb {
             .next()
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    /// Returns the value for `key` recorded at `version`, erroring if the row is
+    /// missing. Mirrors `StateStore::expect_value_by_version` for the position CF.
+    pub fn expect_value_by_version(&self, key: &StateKey, version: Version) -> Result<StateValue> {
+        let key_hash = key.hash();
+        let (_version, value) = self.get_position_value(key_hash, version)?.ok_or_else(|| {
+            AptosDbError::Other(format!(
+                "position_value row missing (state_key_hash={key_hash}, version={version})"
+            ))
+        })?;
+        Ok(value)
+    }
+
+    /// Fans `(state_key_hash, version, value)` writes into per-shard batches.
+    pub(crate) fn shard_position_value_writes(
+        writes: impl IntoIterator<Item = (HashValue, Version, Option<StateValue>)>,
+    ) -> Result<[Option<SchemaBatch>; NUM_NATIVE_VALUE_SHARDS]> {
+        let mut per_shard: [Option<SchemaBatch>; NUM_NATIVE_VALUE_SHARDS] =
+            std::array::from_fn(|_| None);
+        for (state_key_hash, version, maybe_value) in writes {
+            let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+            let batch = per_shard[shard].get_or_insert_with(SchemaBatch::new);
+            batch.put::<PositionValueSchema>(&(state_key_hash, version), &maybe_value)?;
+        }
+        Ok(per_shard)
+    }
+
+    pub fn write_position_batch(
+        &self,
+        version: Version,
+        writes: impl IntoIterator<Item = (HashValue, Option<StateValue>)>,
+    ) -> Result<()> {
+        let per_shard = Self::shard_position_value_writes(
+            writes
+                .into_iter()
+                .map(|(hash, value)| (hash, version, value)),
+        )?;
+        for (shard, maybe_batch) in per_shard.into_iter().enumerate() {
+            if let Some(batch) = maybe_batch {
+                self.shard(shard).write_schemas(batch)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn find_prior_version(

@@ -456,7 +456,13 @@ proptest! {
             // Check db restore calculates usage correctly as well.
             let tmp_dir = TempPath::new();
             let db2 = AptosDB::new_for_test(&tmp_dir);
-            let mut restore = db2.get_state_snapshot_receiver(100, root_hash).unwrap();
+            let mut restore = db2
+                .get_state_snapshot_receiver(
+                    100,
+                    root_hash,
+                    aptos_storage_interface::StateKind::MainState,
+                )
+                .unwrap();
             let proof = if let Some((k, _v)) = snapshot.last() {
                 db.get_backup_handler().get_account_state_range_proof(k.hash(), last_version).unwrap()
             } else {

@@ -1132,6 +1132,7 @@ fn create_missing_state_values_request(
                         version: request.version,
                         start_index,
                         end_index: request.end_index,
+                        state_kind: request.state_kind,
                     },
                 )))
             } else {
@@ -1511,15 +1512,16 @@ async fn get_states_values_with_proof<T: AptosDataClientInterface + Send + Clone
     request: StateValuesWithProofRequest,
     request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
-    let client_response = aptos_data_client.get_state_values_with_proof(
-        request.version,
-        request.start_index,
-        request.end_index,
-        request_timeout_ms,
-    );
-    client_response
-        .await
-        .map(|response| response.map(ResponsePayload::from))
+    let client_response = aptos_data_client
+        .get_state_values_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+            request_timeout_ms,
+            request.state_kind,
+        )
+        .await?;
+    Ok(client_response.map(ResponsePayload::StateValuesWithProof))
 }
 
 async fn get_epoch_ending_ledger_infos<T: AptosDataClientInterface + Send + Clone + 'static>(
@@ -1592,11 +1594,10 @@ async fn get_number_of_states<T: AptosDataClientInterface + Send + Clone + 'stat
     request: NumberOfStatesRequest,
     request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
-    let client_response =
-        aptos_data_client.get_number_of_states(request.version, request_timeout_ms);
-    client_response
-        .await
-        .map(|response| response.map(ResponsePayload::from))
+    let client_response = aptos_data_client
+        .get_number_of_states(request.version, request_timeout_ms, request.state_kind)
+        .await?;
+    Ok(client_response.map(ResponsePayload::NumberOfStates))
 }
 
 async fn get_transaction_outputs_with_proof<
@@ -1730,8 +1731,10 @@ mod test {
     #[tokio::test]
     async fn completed_request_notifies_streaming_service() {
         // Create a data client request
-        let data_client_request =
-            DataClientRequest::NumberOfStates(NumberOfStatesRequest { version: 0 });
+        let data_client_request = DataClientRequest::NumberOfStates(NumberOfStatesRequest {
+            version: 0,
+            state_kind: aptos_storage_interface::StateKind::MainState,
+        });
 
         // Create a mock data client
         let data_client_config = AptosDataClientConfig::default();

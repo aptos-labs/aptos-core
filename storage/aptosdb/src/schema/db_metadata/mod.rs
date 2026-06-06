@@ -80,6 +80,7 @@ pub enum DbMetadataKey {
     PositionStateMerkleShardPrunerProgress(ShardId),
     PositionEpochSnapshotPrunerProgress,
     PositionEpochSnapshotShardPrunerProgress(ShardId),
+    PositionSnapshotKvRestoreProgress(Version),
 }
 
 define_schema!(
