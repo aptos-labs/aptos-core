@@ -1,2 +1,9 @@
+
 Diagnostics:
 error: invalid parametric test row
+  ┌─ tests/unit_test/test/parametric_test_only_row_sibling.move:5:9
+  │
+4 │     #[test(addr = @0x1), test_only]
+  │                          --------- A row bracket may only contain #[test] and #[expected_failure]
+5 │     fun test_only_row_sibling(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^

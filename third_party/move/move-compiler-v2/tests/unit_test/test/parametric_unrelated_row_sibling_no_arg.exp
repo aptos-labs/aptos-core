@@ -1,2 +1,9 @@
+
 Diagnostics:
 error: invalid parametric test row
+  ┌─ tests/unit_test/test/parametric_unrelated_row_sibling_no_arg.move:5:9
+  │
+4 │     #[test, deprecated]
+  │             ---------- A row bracket may only contain #[test] and #[expected_failure]
+5 │     fun unrelated_row_sibling_no_arg() {}
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

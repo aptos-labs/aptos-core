@@ -111,6 +111,62 @@ fn construct_module_test_plan(
     }
 }
 
+fn validate_row_brackets(
+    env: &GlobalEnv,
+    all_attrs: &[Attribute],
+    test_attrs: &[&Attribute],
+    fn_id_loc: &Loc,
+) -> bool {
+    let test_name = env.symbol_pool().make(TestingAttribute::TEST);
+    let expected_failure_name = env.symbol_pool().make(TestingAttribute::EXPECTED_FAILURE);
+
+    let test_bracket_ids: std::collections::BTreeSet<move_model::model::BracketGroupId> =
+        test_attrs.iter().map(|a| a.bracket_group_id()).collect();
+
+    let mut has_error = false;
+    let mut reported_multi_test: std::collections::BTreeSet<move_model::model::BracketGroupId> =
+        std::collections::BTreeSet::new();
+
+    // Check 1: no bracket contains more than one #[test].
+    for test_attr in test_attrs {
+        let bracket_id = test_attr.bracket_group_id();
+        if reported_multi_test.contains(&bracket_id) {
+            continue;
+        }
+        let count = test_attrs
+            .iter()
+            .filter(|a| a.bracket_group_id() == bracket_id)
+            .count();
+        if count > 1 {
+            reported_multi_test.insert(bracket_id);
+            let loc = env.get_node_loc(test_attr.node_id());
+            env.error_with_labels(fn_id_loc, "invalid parametric test row", vec![(
+                loc,
+                "A row bracket must contain exactly one #[test]".to_string(),
+            )]);
+            has_error = true;
+        }
+    }
+
+    // Check 2: no test bracket contains an attribute other than #[test] or #[expected_failure].
+    for attr in all_attrs {
+        let bracket_id = attr.bracket_group_id();
+        if !test_bracket_ids.contains(&bracket_id) {
+            continue;
+        }
+        if attr.name() != test_name && attr.name() != expected_failure_name {
+            let loc = env.get_node_loc(attr.node_id());
+            env.error_with_labels(fn_id_loc, "invalid parametric test row", vec![(
+                loc,
+                "A row bracket may only contain #[test] and #[expected_failure]".to_string(),
+            )]);
+            has_error = true;
+        }
+    }
+
+    has_error
+}
+
 fn build_test_info(
     env: &GlobalEnv,
     current_module: &ModuleName,
@@ -143,22 +199,39 @@ fn build_test_info(
         return Vec::new();
     }
 
-    let test_only_attribute_opt = attrs.iter().find(|a| a.name() == test_only_name);
+    // Compute test bracket IDs before the test_only check.
+    let test_bracket_ids: std::collections::BTreeSet<move_model::model::BracketGroupId> =
+        test_attrs.iter().map(|a| a.bracket_group_id()).collect();
 
-    // A #[test] function cannot also be annotated #[test_only]
+    let test_only_attribute_opt = attrs.iter().find(|a| a.name() == test_only_name);
+    let mut has_top_error = false;
+
+    // A #[test] function cannot also be annotated #[test_only].
+    // Emit the legacy conflict error ONLY when test_only is in a DIFFERENT bracket from all
+    // test attrs.  If test_only shares a bracket with a #[test], validate_row_brackets handles it
+    // as an "invalid parametric test row" unrelated-sibling error.
     if let Some(test_only_attribute) = test_only_attribute_opt {
-        let msg = "Function annotated as both #[test(...)] and #[test_only]. You need to declare \
-                   it as either one or the other";
-        let test_only_id = test_only_attribute.node_id();
-        let test_only_loc = env.get_node_loc(test_only_id);
-        let test_attribute_loc = env.get_node_loc(test_attrs[0].node_id());
-        env.error_with_labels(&fn_id_loc, "invalid usage of known attribute", vec![
-            (test_only_loc, msg.to_string()),
-            (
-                test_attribute_loc.clone(),
-                "Previously annotated here".to_string(),
-            ),
-        ]);
+        if !test_bracket_ids.contains(&test_only_attribute.bracket_group_id()) {
+            let msg = "Function annotated as both #[test(...)] and #[test_only]. You need to \
+                       declare it as either one or the other";
+            let test_only_id = test_only_attribute.node_id();
+            let test_only_loc = env.get_node_loc(test_only_id);
+            let test_attribute_loc = env.get_node_loc(test_attrs[0].node_id());
+            env.error_with_labels(&fn_id_loc, "invalid usage of known attribute", vec![
+                (test_only_loc, msg.to_string()),
+                (
+                    test_attribute_loc.clone(),
+                    "Previously annotated here".to_string(),
+                ),
+            ]);
+            has_top_error = true;
+        }
+    }
+
+    let bracket_error = validate_row_brackets(env, &attrs, &test_attrs, &fn_id_loc);
+
+    if has_top_error || bracket_error {
+        return Vec::new();
     }
 
     let Some(rows) = build_test_rows(env, &test_attrs, &failure_attrs, &fn_id_loc) else {
