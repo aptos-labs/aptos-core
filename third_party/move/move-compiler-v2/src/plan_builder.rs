@@ -270,17 +270,14 @@ fn build_test_rows<'a>(
     let mut has_error = false;
 
     if single_row {
-        let top_level_failures = failure_attrs
-            .iter()
-            .copied()
-            .filter(|failure| failure.bracket_group_id() != test_attrs[0].bracket_group_id())
-            .collect::<Vec<_>>();
-        if top_level_failures.len() > 1 {
-            let loc = env.get_node_loc(top_level_failures[1].node_id());
+        // Count all expected_failure attrs (row-local + top-level combined).
+        // A single-row test must have at most one #[expected_failure] anywhere.
+        if failure_attrs.len() > 1 {
+            let loc = env.get_node_loc(failure_attrs[1].node_id());
             env.error_with_labels(
                 fn_id_loc,
-                "Multiple top-level #[expected_failure] attributes on a test function",
-                vec![(loc, "Second top-level occurrence here".to_string())],
+                "Multiple #[expected_failure] attributes on a single-row test function",
+                vec![(loc, "Second occurrence here".to_string())],
             );
             has_error = true;
         }
@@ -295,7 +292,7 @@ fn build_test_rows<'a>(
                 let loc = env.get_node_loc(failure.node_id());
                 env.error_with_labels(
                     fn_id_loc,
-                    "Orphan #[expected_failure] on a multi-row test function",
+                    "top-level expected_failure is not allowed on a parametric multi-row test — use row-local syntax instead",
                     vec![(
                         loc,
                         "Place this inside the bracket of its #[test(...)] row".to_string(),

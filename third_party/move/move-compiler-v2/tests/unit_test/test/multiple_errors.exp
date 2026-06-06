@@ -60,10 +60,10 @@ error: unable to generate test
 37 │     public fun f(_a: signer, _b: signer) { }
    │                ^             -- Corresponding to this parameter
 
-error: Multiple top-level #[expected_failure] attributes on a test function
+error: Multiple #[expected_failure] attributes on a single-row test function
    ┌─ tests/unit_test/test/multiple_errors.move:43:16
    │
 42 │     #[expected_failure]
-   │       ---------------- Second top-level occurrence here
+   │       ---------------- Second occurrence here
 43 │     public fun g(_a: signer, _b: signer) { }
    │                ^

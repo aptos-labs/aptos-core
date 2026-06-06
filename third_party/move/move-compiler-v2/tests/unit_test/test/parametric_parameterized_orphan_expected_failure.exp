@@ -1,2 +1,9 @@
+
 Diagnostics:
-error: top-level expected_failure is not allowed on a parametric multi-row test
+error: top-level expected_failure is not allowed on a parametric multi-row test — use row-local syntax instead
+  ┌─ tests/unit_test/test/parametric_parameterized_orphan_expected_failure.move:7:9
+  │
+6 │     #[expected_failure(abort_code = 5, location = 0x1::M)]
+  │       --------------------------------------------------- Place this inside the bracket of its #[test(...)] row
+7 │     fun parameterized_orphan_expected_failure(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

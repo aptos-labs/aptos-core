@@ -1,5 +1,6 @@
+
 Diagnostics:
-error: Orphan #[expected_failure] on a multi-row test function
+error: top-level expected_failure is not allowed on a parametric multi-row test — use row-local syntax instead
   ┌─ tests/unit_test/test/parametric_orphan_expected_failure.move:7:9
   │
 6 │     #[expected_failure]

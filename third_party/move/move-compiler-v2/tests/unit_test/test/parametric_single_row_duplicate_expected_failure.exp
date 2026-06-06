@@ -1,2 +1,9 @@
+
 Diagnostics:
 error: Multiple #[expected_failure] attributes on a single-row test function
+  ┌─ tests/unit_test/test/parametric_single_row_duplicate_expected_failure.move:6:9
+  │
+5 │     #[expected_failure]
+  │       ---------------- Second occurrence here
+6 │     fun single_row_duplicate_expected_failure(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
