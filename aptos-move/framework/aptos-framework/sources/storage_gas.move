@@ -436,11 +436,17 @@ module aptos_framework::storage_gas {
         let i = 0;
         while ({
             spec {
-                invariant forall j in 0..i: {
-                    let cur = if (j == 0) { Point { x: 0, y: 0 } } else { points[j - 1] };
-                    let next = if (j == len) { Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { points[j] };
-                    cur.x < next.x && cur.y <= next.y
-                };
+                invariant i <= len + 1;
+                // Two adjacent points (and the sentinel pair around `points`) are strictly
+                // increasing in `x` and non-decreasing in `y`, for every adjacency the loop
+                // has already checked.
+                invariant forall j in 1..i where j < len:
+                    points[j - 1].x < points[j].x && points[j - 1].y <= points[j].y;
+                invariant i > 0 && len > 0 ==>
+                    0 < points[0].x;
+                invariant i > len && len > 0 ==>
+                    points[len - 1].x < BASIS_POINT_DENOMINATION
+                    && points[len - 1].y <= BASIS_POINT_DENOMINATION;
             };
             i <= len
         }) {

@@ -46,8 +46,7 @@ spec aptos_framework::object {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = false;
-        pragma aborts_if_is_partial;
+        pragma verify = true;
     }
 
     spec grant_permission {
@@ -61,7 +60,8 @@ spec aptos_framework::object {
 
     spec exists_at<T: key>(object: address): bool {
         pragma opaque;
-        ensures [abstract] result == spec_exists_at<T>(object);
+        aborts_if false;
+        ensures result == spec_exists_at<T>(object);
     }
 
 
@@ -121,7 +121,6 @@ spec aptos_framework::object {
 
     spec create_object_address(source: &address, seed: vector<u8>): address {
         pragma opaque;
-        pragma aborts_if_is_strict = false;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_object_address(source, seed);
     }
@@ -130,19 +129,18 @@ spec aptos_framework::object {
 
     spec create_user_derived_object_address_impl(source: address, derive_from: address): address {
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract] result == spec_create_user_derived_object_address_impl(source, derive_from);
     }
 
     spec create_user_derived_object_address(source: address, derive_from: address): address {
         pragma opaque;
-        pragma aborts_if_is_strict = false;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_user_derived_object_address(source, derive_from);
     }
 
     spec create_guid_object_address(source: address, creation_num: u64): address {
         pragma opaque;
-        pragma aborts_if_is_strict = false;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_guid_object_address(source, creation_num);
     }
@@ -204,13 +202,24 @@ spec aptos_framework::object {
     }
 
     spec create_object_from_account(creator: &signer): ConstructorRef {
-        aborts_if !exists<account::Account>(signer::address_of(creator));
-        //Guid properties
-        let object_data = global<account::Account>(signer::address_of(creator));
-        aborts_if object_data.guid_creation_num + 1 > MAX_U64;
-        aborts_if object_data.guid_creation_num + 1 >= account::MAX_GUID_CREATION_NUM;
-        let creation_num = object_data.guid_creation_num;
+        use std::features;
+        use std::features::DEFAULT_ACCOUNT_RESOURCE;
         let addr = signer::address_of(creator);
+        let account_exists_pre = exists<account::Account>(addr);
+        let feature_on = features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+
+        aborts_if !account_exists_pre && !feature_on;
+        aborts_if !account_exists_pre && feature_on
+            && (addr == @vm_reserved || addr == @aptos_framework || addr == @aptos_token);
+        aborts_if !account_exists_pre && feature_on
+            && len(bcs::to_bytes(addr)) != 32;
+
+        let creation_num = if (account_exists_pre) {
+            global<account::Account>(addr).guid_creation_num
+        } else {
+            2
+        };
+        aborts_if creation_num + 1 >= account::MAX_GUID_CREATION_NUM;
 
         let guid = guid::GUID {
             id: guid::ID {
@@ -218,7 +227,6 @@ spec aptos_framework::object {
                 addr,
             }
         };
-
         let bytes_spec = bcs::to_bytes(guid);
         let bytes = concat(bytes_spec, vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
         let hash_bytes = hash::sha3_256(bytes);
@@ -226,9 +234,8 @@ spec aptos_framework::object {
         aborts_if exists<ObjectCore>(obj_addr);
         aborts_if !from_bcs::deserializable<address>(hash_bytes);
 
-        ensures global<account::Account>(addr).guid_creation_num == old(
-            global<account::Account>(addr)
-        ).guid_creation_num + 1;
+        ensures exists<account::Account>(addr);
+        ensures global<account::Account>(addr).guid_creation_num == creation_num + 1;
         ensures exists<ObjectCore>(obj_addr);
         ensures global<ObjectCore>(obj_addr) == ObjectCore {
             guid_creation_num: INIT_GUID_CREATION_NUM + 1,

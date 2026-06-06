@@ -51,7 +51,7 @@ spec aptos_framework::voting {
     }
 
     spec register<ProposalType: store>(account: &signer) {
-        // include AbortsIfPermissionedSigner { s: account };
+        include AbortsIfPermissionedSigner { s: account };
         let addr = signer::address_of(account);
 
         // Will abort if there's already a `VotingForum<ProposalType>` under addr

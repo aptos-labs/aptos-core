@@ -15,12 +15,14 @@ spec aptos_framework::governance_proposal {
     /// </high-level-req>
     ///
     spec create_proposal(): GovernanceProposal {
+        pragma opaque;
         aborts_if false;
         /// [high-level-req-1.1]
         ensures result == GovernanceProposal {};
     }
 
     spec create_empty_proposal(): GovernanceProposal {
+        pragma opaque;
         aborts_if false;
         /// [high-level-req-1.2]
         ensures result == GovernanceProposal {};

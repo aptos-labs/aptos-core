@@ -36,44 +36,60 @@ spec aptos_framework::guid {
     }
 
     spec create_id(addr: address, creation_num: u64): ID {
+        pragma opaque;
         /// [high-level-req-2.1]
         aborts_if false;
+        ensures result == ID { creation_num, addr };
     }
 
     spec id(guid: &GUID): ID {
+        pragma opaque;
         /// [high-level-req-2.2]
         aborts_if false;
+        ensures result == guid.id;
     }
 
     spec creator_address(guid: &GUID): address {
+        pragma opaque;
         /// [high-level-req-2.3]
         aborts_if false;
+        ensures result == guid.id.addr;
     }
 
     spec id_creator_address(id: &ID): address {
+        pragma opaque;
         /// [high-level-req-2.4]
         aborts_if false;
+        ensures result == id.addr;
     }
 
     spec creation_num(guid: &GUID): u64 {
+        pragma opaque;
         /// [high-level-req-2.5]
         aborts_if false;
+        ensures result == guid.id.creation_num;
     }
 
     spec id_creation_num(id: &ID): u64 {
+        pragma opaque;
         /// [high-level-req-2.6]
         aborts_if false;
+        ensures result == id.creation_num;
     }
 
     spec eq_id(guid: &GUID, id: &ID): bool {
+        pragma opaque;
         /// [high-level-req-2.7]
         aborts_if false;
+        ensures result == (guid.id == id);
     }
 
     spec create(addr: address, creation_num_ref: &mut u64): GUID {
+        pragma opaque;
         aborts_if creation_num_ref + 1 > MAX_U64;
         /// [high-level-req-1]
         ensures result.id.creation_num == old(creation_num_ref);
+        ensures result.id.addr == addr;
         /// [high-level-req-3]
         ensures creation_num_ref == old(creation_num_ref) + 1;
     }
