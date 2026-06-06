@@ -1,2 +1,15 @@
+
 Diagnostics:
 error: duplicate test parameter assignment
+  ┌─ tests/unit_test/test/parametric_duplicate_argument.move:4:25
+  │
+4 │     #[test(addr = @0x1, addr = @0x2)]
+  │                         ^^^^^^^^^^^
+
+error: unable to generate test
+  ┌─ tests/unit_test/test/parametric_duplicate_argument.move:5:9
+  │
+4 │     #[test(addr = @0x1, addr = @0x2)]
+  │       ------------------------------ Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
+5 │     fun duplicate_argument(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^ ---- Corresponding to this parameter

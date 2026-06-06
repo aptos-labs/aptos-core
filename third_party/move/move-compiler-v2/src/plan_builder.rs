@@ -467,6 +467,21 @@ fn parse_test_attribute(
                 *TestingAttribute::TEST == env.symbol_pool().string(*sym).to_string(),
                 "ICE: We should only be parsing a raw test attribute"
             );
+            // Detect duplicate parameter assignment names before collecting.
+            let mut seen: std::collections::BTreeSet<Symbol> = std::collections::BTreeSet::new();
+            let mut has_dup = false;
+            for inner in vec {
+                if let Attribute::Assign { name, node_id, .. } = inner {
+                    if !seen.insert(*name) {
+                        let loc = env.get_node_loc(*node_id);
+                        env.error(&loc, "duplicate test parameter assignment");
+                        has_dup = true;
+                    }
+                }
+            }
+            if has_dup {
+                return BTreeMap::new();
+            }
             vec.iter()
                 .flat_map(|attr| parse_test_attribute(env, attr, depth + 1))
                 .collect()

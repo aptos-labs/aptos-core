@@ -595,7 +595,7 @@ fn flatten_attributes(
             }
         }
     }
-    unique_attributes(context, attr_position, false, all_attrs)
+    unique_attributes(context, attr_position, false, all_attrs, false)
 }
 
 struct BracketGroupIdGenerator {
@@ -619,6 +619,7 @@ fn unique_attributes(
     attr_position: AttributePosition,
     is_nested: bool,
     attributes: impl IntoIterator<Item = E::Attribute>,
+    allow_unknown_dups: bool,
 ) -> E::Attributes {
     let mut attr_map = UniqueMap::new();
     for attr in attributes {
@@ -687,7 +688,7 @@ fn unique_attributes(
                 E::AttributeName_::Known(known)
             },
         };
-        add_unique_attribute(context, &mut attr_map, nloc, name_, loc, attr);
+        add_unique_attribute(context, &mut attr_map, nloc, name_, loc, attr, allow_unknown_dups);
     }
     attr_map
 }
@@ -699,14 +700,16 @@ fn add_unique_attribute(
     name_: E::AttributeName_,
     attr_loc: Loc,
     attr_: E::Attribute,
+    allow_unknown_dups: bool,
 ) {
-    let synthetic_prefix = match name_ {
+    let synthetic_prefix = match &name_ {
         E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::Test)) => {
             Some("$test_row_")
         },
         E::AttributeName_::Known(KnownAttribute::Testing(TestingAttribute::ExpectedFailure)) => {
             Some("$expected_failure_")
         },
+        E::AttributeName_::Unknown(_) if allow_unknown_dups => Some("$test_arg_"),
         _ => None,
     };
     if let Some(prefix) = synthetic_prefix {
@@ -739,7 +742,8 @@ fn attribute(
                 .into_iter()
                 .map(|a| attribute(context, attr_position, bracket_group_id, a))
                 .collect::<Option<Vec<_>>>()?;
-            EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs))
+            let is_test = n.value.as_str() == TestingAttribute::TEST;
+            EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs, is_test))
         },
     }))
 }
