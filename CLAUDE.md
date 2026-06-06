@@ -39,10 +39,26 @@ cargo +nightly fmt                  # Just formatting
 **RULE: If ANY `.move` file under `aptos-move/framework/` is changed (added, modified, or deleted), you MUST rebuild the cached packages before committing or testing.**
 
 ```bash
-cargo build -p aptos-cached-packages   # REQUIRED after any Move framework change
+scripts/cargo_build_aptos_cached_packages.sh        # regenerates head.mrb + sibling *.rs files + formats
+scripts/cargo_build_aptos_cached_packages.sh --check # CI gate: fails if artifacts would change
 ```
 
+Prefer the script over bare `cargo build -p aptos-cached-packages` — it also regenerates the sibling `*.rs` files and runs formatting in one step.
+
 This regenerates `aptos-move/framework/cached-packages/src/head.mrb`, the binary bundle loaded at genesis/runtime. Skipping this step means node binaries and tests will silently run the OLD framework even though source changed. Always `git status aptos-move/framework/cached-packages/` after rebuilding and commit the regenerated `.mrb`.
+
+### Rebase Conflicts in cached-packages
+
+`head.mrb` is a binary blob — never 3-way merge it. During a rebase, take either side to unblock each conflicting commit:
+
+```bash
+git checkout --ours aptos-move/framework/cached-packages/src/head.mrb
+git checkout --ours aptos-move/framework/cached-packages/src/*.rs
+git add aptos-move/framework/cached-packages/src/
+git rebase --continue
+```
+
+Run the script **once** after `rebase --continue` finishes, then fixup the regenerated artifacts into the framework commit. Full procedure in `.cursor/skills/rebase-framework/SKILL.md`.
 
 ### Development Setup
 ```bash
