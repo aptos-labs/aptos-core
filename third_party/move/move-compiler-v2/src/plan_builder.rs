@@ -297,16 +297,18 @@ fn build_row_arguments(
 
     // Check for unknown assignments (names not in the function parameter list).
     let mut has_unknown = false;
-    if let Attribute::Apply { attrs: inner_attrs, .. } = test_attribute {
+    if let Attribute::Apply {
+        attrs: inner_attrs, ..
+    } = test_attribute
+    {
         for inner in inner_attrs {
             if let Attribute::Assign { name, node_id, .. } = inner {
                 if !param_names.contains(name) {
                     let loc = env.get_node_loc(*node_id);
-                    env.error_with_labels(
-                        fn_id_loc,
-                        "unknown test parameter assignment",
-                        vec![(loc, format!("No parameter named `{}`", env.symbol_pool().string(*name)))],
-                    );
+                    env.error_with_labels(fn_id_loc, "unknown test parameter assignment", vec![(
+                        loc,
+                        format!("No parameter named `{}`", env.symbol_pool().string(*name)),
+                    )]);
                     has_unknown = true;
                 }
             }

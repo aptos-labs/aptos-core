@@ -688,7 +688,15 @@ fn unique_attributes(
                 E::AttributeName_::Known(known)
             },
         };
-        add_unique_attribute(context, &mut attr_map, nloc, name_, loc, attr, allow_unknown_dups);
+        add_unique_attribute(
+            context,
+            &mut attr_map,
+            nloc,
+            name_,
+            loc,
+            attr,
+            allow_unknown_dups,
+        );
     }
     attr_map
 }
@@ -743,7 +751,10 @@ fn attribute(
                 .map(|a| attribute(context, attr_position, bracket_group_id, a))
                 .collect::<Option<Vec<_>>>()?;
             let is_test = n.value.as_str() == TestingAttribute::TEST;
-            EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs, is_test))
+            EA::Parameterized(
+                n,
+                unique_attributes(context, attr_position, true, attrs, is_test),
+            )
         },
     }))
 }
