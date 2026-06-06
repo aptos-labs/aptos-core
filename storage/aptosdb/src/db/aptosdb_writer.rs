@@ -30,7 +30,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
-    StateSnapshotReceiver,
+    StateKind, StateSnapshotReceiver,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_types::transaction::TransactionAuxiliaryData;
@@ -122,10 +122,23 @@ impl DbWriter for AptosDB {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        kind: StateKind,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-        gauged_api("get_state_snapshot_receiver", || {
-            self.state_store
-                .get_snapshot_receiver(version, expected_root_hash)
+        gauged_api("get_state_snapshot_receiver", || match kind {
+            StateKind::MainState => self
+                .state_store
+                .get_snapshot_receiver(version, expected_root_hash),
+            StateKind::Position => {
+                let position = self.position.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-position subsystem is not enabled".into())
+                })?;
+                crate::position_state_sync::get_position_snapshot_receiver(
+                    &position.kv_db,
+                    &position.merkle_db,
+                    version,
+                    expected_root_hash,
+                )
+            },
         })
     }
 

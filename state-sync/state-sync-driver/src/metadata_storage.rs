@@ -13,6 +13,7 @@ use aptos_schemadb::{
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName, Options, DB,
 };
+use aptos_storage_interface::StateKind;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Instant};
@@ -22,32 +23,64 @@ use std::{path::Path, sync::Arc, time::Instant};
 /// of the syncing process, where a failure may cause an inconsistent
 /// state to remain in the database on startup.
 pub trait MetadataStorageInterface {
-    /// Returns true iff a state snapshot was successfully committed for the
-    /// specified target. If no snapshot progress is found, an error is returned.
+    /// Returns true iff a snapshot of the given `kind` was successfully
+    /// committed for the specified target.
+    /// If no snapshot progress is found, an error is returned.
     fn is_snapshot_sync_complete(
         &self,
         target_ledger_info: &LedgerInfoWithSignatures,
+        kind: StateKind,
     ) -> Result<bool, Error>;
 
-    /// Gets the last persisted state value index for the snapshot sync at the
+    /// Gets the last persisted value index for the `kind` snapshot sync at the
     /// specified version. If no snapshot progress is found, an error is returned.
-    fn get_last_persisted_state_value_index(
+    fn get_last_persisted_index(
         &self,
         target_ledger_info: &LedgerInfoWithSignatures,
+        kind: StateKind,
     ) -> Result<u64, Error>;
 
-    /// Returns the target ledger info of any state snapshot sync that has previously
-    /// started. If no snapshot sync started, None is returned.
-    fn previous_snapshot_sync_target(&self) -> Result<Option<LedgerInfoWithSignatures>, Error>;
+    /// Returns the target ledger info of any `kind` snapshot sync that has
+    /// previously started. If no snapshot sync started, None is returned.
+    fn previous_snapshot_sync_target(
+        &self,
+        kind: StateKind,
+    ) -> Result<Option<LedgerInfoWithSignatures>, Error>;
 
-    /// Updates the last persisted state value index for the state snapshot
-    /// sync at the specified target ledger info.
-    fn update_last_persisted_state_value_index(
+    /// Updates the last persisted value index for the `kind` snapshot sync at
+    /// the specified target ledger info.
+    fn update_last_persisted_index(
         &self,
         target_ledger_info: &LedgerInfoWithSignatures,
-        last_persisted_state_value_index: u64,
+        last_persisted_index: u64,
         snapshot_sync_completed: bool,
+        kind: StateKind,
     ) -> Result<(), Error>;
+}
+
+/// The `MetadataKey` for the given snapshot kind's progress row. Each kind is an
+/// independent row carrying a `StateSnapshotProgress`.
+fn snapshot_metadata_key(kind: StateKind) -> MetadataKey {
+    match kind {
+        StateKind::MainState => MetadataKey::StateSnapshotSync,
+        StateKind::Position => MetadataKey::PositionSnapshotSync,
+    }
+}
+
+/// The `MetadataValue` wrapping `progress` for the given snapshot kind.
+fn snapshot_metadata_value(kind: StateKind, progress: StateSnapshotProgress) -> MetadataValue {
+    match kind {
+        StateKind::MainState => MetadataValue::StateSnapshotSync(progress),
+        StateKind::Position => MetadataValue::PositionSnapshotSync(progress),
+    }
+}
+
+/// A short label for the given snapshot kind, used in log/error messages.
+fn snapshot_kind_label(kind: StateKind) -> &'static str {
+    match kind {
+        StateKind::MainState => "state",
+        StateKind::Position => "position",
+    }
 }
 
 /// The name of the state sync db file
@@ -94,9 +127,12 @@ impl PersistentMetadataStorage {
         Self { database }
     }
 
-    /// Returns the existing snapshot sync progress. Returns None if no progress is found.
-    fn get_snapshot_progress(&self) -> Result<Option<StateSnapshotProgress>, Error> {
-        let metadata_key = MetadataKey::StateSnapshotSync;
+    /// Returns the existing snapshot sync progress for `kind`. None if not found.
+    fn get_snapshot_progress(
+        &self,
+        kind: StateKind,
+    ) -> Result<Option<StateSnapshotProgress>, Error> {
+        let metadata_key = snapshot_metadata_key(kind);
         let maybe_metadata_value =
             self.database
                 .get::<MetadataSchema>(&metadata_key)
@@ -106,35 +142,46 @@ impl PersistentMetadataStorage {
                         metadata_key, error
                     ))
                 })?;
-        match maybe_metadata_value {
-            Some(metadata_value) => {
-                let MetadataValue::StateSnapshotSync(snapshot_progress) = metadata_value;
-                Ok(Some(snapshot_progress))
+        // Each kind is stored under its own key, so a value of the other variant
+        // is never expected; treat it (and a missing row) as no progress.
+        let progress = match maybe_metadata_value {
+            None => None,
+            Some(MetadataValue::StateSnapshotSync(progress)) => match kind {
+                StateKind::MainState => Some(progress),
+                StateKind::Position => None,
             },
-            None => Ok(None),
-        }
+            Some(MetadataValue::PositionSnapshotSync(progress)) => match kind {
+                StateKind::Position => Some(progress),
+                StateKind::MainState => None,
+            },
+        };
+        Ok(progress)
     }
 
-    /// Returns the snapshot sync progress recorded for the specified version.
-    /// Returns an error if no progress was found.
+    /// Returns the snapshot sync progress recorded for `kind` at the specified
+    /// target. Returns an error if no progress was found.
     fn get_snapshot_progress_at_target(
         &self,
+        kind: StateKind,
         target_ledger_info: &LedgerInfoWithSignatures,
     ) -> Result<StateSnapshotProgress, Error> {
-        match self.get_snapshot_progress()? {
+        match self.get_snapshot_progress(kind)? {
             Some(snapshot_progress) => {
                 if &snapshot_progress.target_ledger_info != target_ledger_info {
                     Err(Error::UnexpectedError(format!(
-                        "Expected a snapshot progress for target {:?}, but found {:?}!",
-                        target_ledger_info, snapshot_progress.target_ledger_info
+                        "Expected a {} snapshot progress for target {:?}, but found {:?}!",
+                        snapshot_kind_label(kind),
+                        target_ledger_info,
+                        snapshot_progress.target_ledger_info
                     )))
                 } else {
                     Ok(snapshot_progress)
                 }
             },
-            None => Err(Error::StorageError(
-                "No state snapshot progress was found!".into(),
-            )),
+            None => Err(Error::StorageError(format!(
+                "No {} snapshot progress was found!",
+                snapshot_kind_label(kind)
+            ))),
         }
     }
 
@@ -179,51 +226,56 @@ impl PersistentMetadataStorage {
 }
 
 impl MetadataStorageInterface for PersistentMetadataStorage {
-    fn is_snapshot_sync_complete(&self, target: &LedgerInfoWithSignatures) -> Result<bool, Error> {
-        let snapshot_progress = self.get_snapshot_progress_at_target(target)?;
+    fn is_snapshot_sync_complete(
+        &self,
+        target: &LedgerInfoWithSignatures,
+        kind: StateKind,
+    ) -> Result<bool, Error> {
+        let snapshot_progress = self.get_snapshot_progress_at_target(kind, target)?;
         Ok(snapshot_progress.snapshot_sync_completed)
     }
 
-    fn get_last_persisted_state_value_index(
+    fn get_last_persisted_index(
         &self,
         target: &LedgerInfoWithSignatures,
+        kind: StateKind,
     ) -> Result<u64, Error> {
-        let snapshot_progress = self.get_snapshot_progress_at_target(target)?;
+        let snapshot_progress = self.get_snapshot_progress_at_target(kind, target)?;
         Ok(snapshot_progress.last_persisted_state_value_index)
     }
 
-    fn previous_snapshot_sync_target(&self) -> Result<Option<LedgerInfoWithSignatures>, Error> {
+    fn previous_snapshot_sync_target(
+        &self,
+        kind: StateKind,
+    ) -> Result<Option<LedgerInfoWithSignatures>, Error> {
         Ok(self
-            .get_snapshot_progress()?
+            .get_snapshot_progress(kind)?
             .map(|snapshot_progress| snapshot_progress.target_ledger_info))
     }
 
-    fn update_last_persisted_state_value_index(
+    fn update_last_persisted_index(
         &self,
         target_ledger_info: &LedgerInfoWithSignatures,
-        last_persisted_state_value_index: u64,
+        last_persisted_index: u64,
         snapshot_sync_completed: bool,
+        kind: StateKind,
     ) -> Result<(), Error> {
-        // Ensure that if any previous snapshot progress exists, it has the same target
-        if let Some(snapshot_progress) = self.get_snapshot_progress()? {
+        // Ensure any existing progress for this kind is for the same target.
+        if let Some(snapshot_progress) = self.get_snapshot_progress(kind)? {
             if target_ledger_info != &snapshot_progress.target_ledger_info {
-                return Err(Error::StorageError(format!("Failed to update the last persisted state value index! \
+                return Err(Error::StorageError(format!("Failed to update the last persisted {} index! \
                 The given target does not match the previously stored target. Given target: {:?}, stored target: {:?}",
-                    target_ledger_info, snapshot_progress.target_ledger_info
+                    snapshot_kind_label(kind), target_ledger_info, snapshot_progress.target_ledger_info
                 )));
             }
         }
 
-        // Create the key/value pair
-        let metadata_key = MetadataKey::StateSnapshotSync;
-        let metadata_value = MetadataValue::StateSnapshotSync(StateSnapshotProgress {
-            last_persisted_state_value_index,
+        let metadata_value = snapshot_metadata_value(kind, StateSnapshotProgress {
+            last_persisted_state_value_index: last_persisted_index,
             snapshot_sync_completed,
             target_ledger_info: target_ledger_info.clone(),
         });
-
-        // Insert the new key/value pair
-        self.commit_key_value(metadata_key, metadata_value)
+        self.commit_key_value(snapshot_metadata_key(kind), metadata_value)
     }
 }
 
@@ -252,7 +304,8 @@ pub mod database_schema {
     #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
     #[repr(u8)]
     pub enum MetadataKey {
-        StateSnapshotSync, // A state snapshot sync that was started
+        StateSnapshotSync,    // A state snapshot sync that was started
+        PositionSnapshotSync, // A native-position snapshot sync that was started
     }
 
     /// A metadata value that can be inserted into the database
@@ -260,6 +313,7 @@ pub mod database_schema {
     #[repr(u8)]
     pub enum MetadataValue {
         StateSnapshotSync(StateSnapshotProgress), // A state snapshot sync progress marker
+        PositionSnapshotSync(StateSnapshotProgress), // A native-position snapshot sync progress marker
     }
 
     impl KeyCodec<MetadataSchema> for MetadataKey {
