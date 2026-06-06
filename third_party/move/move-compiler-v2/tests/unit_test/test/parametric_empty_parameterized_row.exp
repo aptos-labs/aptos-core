@@ -1,2 +1,9 @@
+
 Diagnostics:
 error: unable to generate test
+  ┌─ tests/unit_test/test/parametric_empty_parameterized_row.move:5:9
+  │
+4 │     #[test]
+  │       ---- Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
+5 │     fun empty_parameterized_row(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^ ---- Corresponding to this parameter
