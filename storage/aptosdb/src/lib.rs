@@ -32,6 +32,7 @@ mod event_store;
 mod ledger_db;
 mod lru_node_cache;
 pub mod native_state_committer;
+pub mod position_backup;
 pub mod position_buffered_state;
 pub mod position_db;
 pub(crate) mod position_merkle_batch_committer;
