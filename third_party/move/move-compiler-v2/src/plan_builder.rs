@@ -286,7 +286,9 @@ fn build_row_arguments(
     fn_id_loc: &Loc,
 ) -> Vec<MoveValue> {
     let test_attribute_loc = env.get_node_loc(test_attribute.node_id());
-    let test_annotation_params = parse_test_attribute(env, test_attribute, 0);
+    let Some(test_annotation_params) = parse_test_attribute(env, test_attribute, 0) else {
+        return Vec::new();
+    };
 
     // Collect valid parameter names from the function.
     let param_names: std::collections::BTreeSet<Symbol> = function
@@ -453,12 +455,12 @@ fn parse_test_attribute(
     env: &GlobalEnv,
     test_attribute: &Attribute,
     depth: usize,
-) -> BTreeMap<Symbol, MoveValue> {
+) -> Option<BTreeMap<Symbol, MoveValue>> {
     match test_attribute {
         Attribute::Apply { node_id: id, .. } if depth > 0 => {
             let aloc = env.get_node_loc(*id);
             env.error(&aloc, "Unexpected nested attribute in test declaration");
-            BTreeMap::new()
+            None
         },
         Attribute::Apply {
             name: sym,
@@ -482,11 +484,16 @@ fn parse_test_attribute(
                 }
             }
             if has_dup {
-                return BTreeMap::new();
+                return None;
             }
-            vec.iter()
-                .flat_map(|attr| parse_test_attribute(env, attr, depth + 1))
-                .collect()
+            let mut combined = BTreeMap::new();
+            for attr in vec {
+                match parse_test_attribute(env, attr, depth + 1) {
+                    None => return None,
+                    Some(partial) => combined.extend(partial),
+                }
+            }
+            Some(combined)
         },
         Attribute::Assign {
             node_id: id,
@@ -497,7 +504,7 @@ fn parse_test_attribute(
             if depth != 1 {
                 let aloc = env.get_node_loc(*id);
                 env.error(&aloc, "Unexpected nested attribute in test declaration");
-                return BTreeMap::new();
+                return None;
             }
 
             let value = match convert_attribute_value_to_move_value(env, val) {
@@ -509,13 +516,13 @@ fn parse_test_attribute(
                         aloc,
                         "Assigned in this attribute".to_string(),
                     )]);
-                    return BTreeMap::new();
+                    return None;
                 },
             };
 
             let mut args = BTreeMap::new();
             args.insert(*sym, value);
-            args
+            Some(args)
         },
     }
 }
