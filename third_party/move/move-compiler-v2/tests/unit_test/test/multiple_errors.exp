@@ -9,14 +9,6 @@ error: Unsupported attribute value
    │            Assigned in this attribute
 
 error: unable to generate test
-   ┌─ tests/unit_test/test/multiple_errors.move:20:16
-   │
-19 │     #[test(_a=Foo)]
-   │       ------------ Missing test parameter assignment in test. Expected a parameter to be assigned in this attribute
-20 │     public fun b(_a: signer) { }
-   │                ^ -- Corresponding to this parameter
-
-error: unable to generate test
    ┌─ tests/unit_test/test/multiple_errors.move:28:16
    │
 26 │     #[test(_a=@0x1)]
