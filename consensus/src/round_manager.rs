@@ -776,6 +776,11 @@ impl RoundManager {
             block_round = proposal_msg.proposal().round(),
             block_hash = proposal_msg.proposal().id(),
             block_parent_hash = proposal_msg.proposal().quorum_cert().certified_block().id(),
+            block_num_txns = proposal_msg
+                .proposal()
+                .payload()
+                .map(|p| p.len())
+                .unwrap_or(0),
         );
 
         let in_correct_round = self
@@ -908,6 +913,7 @@ impl RoundManager {
             block_round = proposal.round(),
             block_hash = proposal.id(),
             block_parent_hash = proposal.quorum_cert().certified_block().id(),
+            block_num_txns = proposal.payload().map(|p| p.len()).unwrap_or(0),
         );
         self.process_proposal(proposal).await
     }
