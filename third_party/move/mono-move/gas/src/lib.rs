@@ -64,6 +64,11 @@ impl SimpleGasMeter {
     pub fn new(budget: u64) -> Self {
         Self { remaining: budget }
     }
+
+    /// Reset the remaining budget.
+    pub fn reset(&mut self, budget: u64) {
+        self.remaining = budget;
+    }
 }
 
 impl GasMeter for SimpleGasMeter {

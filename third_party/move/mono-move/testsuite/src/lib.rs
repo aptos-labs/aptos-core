@@ -4,14 +4,17 @@
 //! Library for the mono-move differential and snapshot test harnesses.
 
 pub mod compile;
+pub mod engine;
 pub mod matcher;
 pub mod module_provider;
 pub mod parser;
 pub mod print_sections;
+pub mod programs;
 pub mod runner;
 pub mod v1_test_natives;
 
 pub use compile::{
     assemble_masm_source, compile, compile_move_path, compile_move_source, SourceKind,
 };
+pub use engine::{with_loaded_mono_function, with_mono_function, MonoRunner, RunResult};
 pub use module_provider::InMemoryModuleProvider;

@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Test and benchmark helpers for running programs against the micro-op
-//! interpreter and the Move VM.
+//! Test and benchmark helpers for running programs against the Move VM.
 
 // ---------------------------------------------------------------------------
 // Move VM helpers
@@ -162,9 +161,6 @@ pub fn with_loaded_move_function_with_deps<R>(
 }
 
 /// Pre-loaded Move function for repeated execution.
-///
-/// Created by [`with_loaded_move_function`]. Only the VM interpreter
-/// runs inside [`run`](Self::run).
 pub struct LoadedMoveFunction<'a> {
     func: LoadedFunction,
     execute_fn: &'a mut dyn FnMut(LoadedFunction, Vec<Vec<u8>>) -> SerializedReturnValues,
