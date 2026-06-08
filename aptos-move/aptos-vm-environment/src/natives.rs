@@ -2,8 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_native_interface::SafeNativeBuilder;
+use aptos_types::account_config::APTOS_TRADING_ADDRESS;
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
-use move_vm_runtime::native_functions::NativeFunctionTable;
+use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use std::collections::HashSet;
 
 /// Builds and returns all Aptos native functions.
@@ -41,6 +42,14 @@ pub fn aptos_natives_with_builder(
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
             builder,
+        ))
+        .chain(make_table_from_iter(
+            APTOS_TRADING_ADDRESS,
+            aptos_position_natives::all_natives(builder)
+                .into_iter()
+                .map(|(func_name, func)| {
+                    ("native_position".to_string(), func_name, func)
+                }),
         ))
         .collect()
 }

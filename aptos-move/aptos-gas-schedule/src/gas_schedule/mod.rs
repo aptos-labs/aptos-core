@@ -9,6 +9,7 @@ mod instr;
 mod macros;
 mod misc;
 mod move_stdlib;
+mod position;
 mod table;
 mod transaction;
 
@@ -16,6 +17,7 @@ pub use aptos_framework::AptosFrameworkGasParameters;
 pub use instr::InstructionGasParameters;
 pub use misc::{AbstractValueSizeGasParameters, MiscGasParameters};
 pub use move_stdlib::MoveStdlibGasParameters;
+pub use position::PositionGasParameters;
 pub use table::TableGasParameters;
 pub use transaction::TransactionGasParameters;
 
@@ -29,6 +31,7 @@ pub mod gas_params {
         use super::*;
         pub use aptos_framework::gas_params as aptos_framework;
         pub use move_stdlib::gas_params as move_stdlib;
+        pub use position::gas_params as position;
         pub use table::gas_params as table;
     }
 }
@@ -142,6 +145,7 @@ pub struct NativeGasParameters {
     pub move_stdlib: MoveStdlibGasParameters,
     pub table: TableGasParameters,
     pub aptos_framework: AptosFrameworkGasParameters,
+    pub position: PositionGasParameters,
 }
 
 impl FromOnChainGasSchedule for NativeGasParameters {
@@ -162,6 +166,10 @@ impl FromOnChainGasSchedule for NativeGasParameters {
                 gas_schedule,
                 feature_version,
             )?,
+            position: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
@@ -174,6 +182,7 @@ impl ToOnChainGasSchedule for NativeGasParameters {
             self.aptos_framework
                 .to_on_chain_gas_schedule(feature_version),
         );
+        entries.extend(self.position.to_on_chain_gas_schedule(feature_version));
         entries
     }
 }
@@ -184,6 +193,7 @@ impl NativeGasParameters {
             move_stdlib: MoveStdlibGasParameters::zeros(),
             table: TableGasParameters::zeros(),
             aptos_framework: AptosFrameworkGasParameters::zeros(),
+            position: PositionGasParameters::zeros(),
         }
     }
 }
@@ -194,6 +204,7 @@ impl InitialGasSchedule for NativeGasParameters {
             move_stdlib: InitialGasSchedule::initial(),
             table: InitialGasSchedule::initial(),
             aptos_framework: InitialGasSchedule::initial(),
+            position: InitialGasSchedule::initial(),
         }
     }
 }

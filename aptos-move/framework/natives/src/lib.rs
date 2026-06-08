@@ -111,6 +111,8 @@ pub fn all_natives(
         "account_abstraction",
         account_abstraction::make_all(builder)
     );
+    // `native_position` natives are registered at `aptos_trading` (0x5)
+    // in `aptos_vm_environment::natives`, not here.
 
     if inject_create_signer_for_gov_sim {
         add_natives_from_module!(

@@ -3823,6 +3823,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-position-natives"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "aptos-types",
+ "better_any",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
+]
+
+[[package]]
 name = "aptos-profiler"
 version = "0.1.0"
 dependencies = [
@@ -5136,6 +5151,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-move-stdlib",
  "aptos-native-interface",
+ "aptos-position-natives",
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
