@@ -1,0 +1,9 @@
+[package]
+name = "ParametricShowcase"
+version = "0.0.0"
+
+[addresses]
+showcase = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
