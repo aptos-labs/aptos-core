@@ -70,10 +70,17 @@ impl Heap {
                     self.try_deep_copy_at_offset(descriptors, new, offset as usize)?;
                 }
             },
-            ObjectDescriptorInner::CapturedData {
-                pointer_offsets, ..
-            } => {
+            ObjectDescriptorInner::CapturedData { pointer_offsets } => {
                 for &offset in pointer_offsets {
+                    // Shared across objects of different `values_size`
+                    // (offset-shape dedup), so an offset isn't bounded by this
+                    // object's size; the layout guarantees `values_size >=
+                    // offset + 8`. Assert it for this object.
+                    debug_assert!(
+                        CAPTURED_DATA_VALUES_OFFSET + offset as usize + 8
+                            <= src_size - OBJECT_HEADER_SIZE,
+                        "captured-data pointer offset {offset} exceeds object payload"
+                    );
                     self.try_deep_copy_at_offset(
                         descriptors,
                         new,

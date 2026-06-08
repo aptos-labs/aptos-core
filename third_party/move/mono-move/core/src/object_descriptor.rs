@@ -77,14 +77,13 @@ pub enum ObjectDescriptorInner {
 
     /// `ClosureCapturedData` (Materialized) object.
     ///
-    /// Data-region layout: `[tag(1) + padding(7)] [values...]`.
-    /// `size` and `pointer_offsets` are interpreted relative to the
-    /// values region (i.e., excluding the tag+padding prefix), so an
-    /// offset of `0` names the first byte of the first captured value.
-    /// The 8-byte tag prefix is added internally by the GC.
+    /// Data-region layout: `[tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [values @ 8]`.
+    /// `pointer_offsets` are relative to the values region (i.e., excluding
+    /// the 8-byte prefix), so an offset of `0` names the first byte of the
+    /// first captured value. The prefix is added internally by the GC.
+    /// Pointer-free captures carry no `CapturedData` descriptor: they share
+    /// `Trivial`.
     CapturedData {
-        /// Byte size of the values region (sum of captured value sizes).
-        size: u32,
         /// Byte offsets within the values region that hold heap pointers.
         pointer_offsets: Vec<u32>,
     },
@@ -164,16 +163,20 @@ impl ObjectDescriptor {
     }
 
     /// Construct a [`CapturedData`](ObjectDescriptorInner::CapturedData)
-    /// descriptor.
+    /// descriptor. `values_size` is the byte width of the values region the
+    /// `pointer_offsets` are validated against.
     ///
-    /// Returns `Err` if `size == 0` or any offset in `pointer_offsets`
-    /// is not 8-byte aligned, runs past `size`, or breaks strict
+    /// Returns `Err` if `values_size == 0` or any offset in `pointer_offsets`
+    /// is not 8-byte aligned, runs past `values_size`, or breaks strict
     /// ordering.
-    pub fn new_captured_data(size: u32, pointer_offsets: Vec<u32>) -> anyhow::Result<Self> {
-        anyhow::ensure!(size > 0, "CapturedData: size must be > 0");
-        check_pointer_offsets("CapturedData::pointer_offsets", &pointer_offsets, size)?;
+    pub fn new_captured_data(values_size: u32, pointer_offsets: Vec<u32>) -> anyhow::Result<Self> {
+        anyhow::ensure!(values_size > 0, "CapturedData: values_size must be > 0");
+        check_pointer_offsets(
+            "CapturedData::pointer_offsets",
+            &pointer_offsets,
+            values_size,
+        )?;
         Ok(Self(ObjectDescriptorInner::CapturedData {
-            size,
             pointer_offsets,
         }))
     }
@@ -387,9 +390,8 @@ mod tests {
 
     #[test]
     fn captured_data_zero_size_errors() {
-        assert!(
-            err_msg(ObjectDescriptor::new_captured_data(0, vec![])).contains("CapturedData: size")
-        );
+        assert!(err_msg(ObjectDescriptor::new_captured_data(0, vec![]))
+            .contains("CapturedData: values_size"));
     }
 
     // ----- Pointer offsets -----

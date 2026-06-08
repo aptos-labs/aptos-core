@@ -245,11 +245,23 @@ pub enum RuntimeInvariantViolation {
     #[error("CallClosure: null closure pointer")]
     NullClosure,
 
+    #[error("CallClosure: closure_src object has descriptor {descriptor_id}, not the closure descriptor")]
+    ClosureSrcNotClosure { descriptor_id: u32 },
+
     #[error("CallClosure: callee has {num_params} params, exceeds 64-bit mask capacity")]
     TooManyClosureParams { num_params: usize },
 
+    #[error("CallClosure: mask {mask:#b} references parameters beyond callee's {num_params}")]
+    ClosureMaskExceedsParams { mask: u64, num_params: usize },
+
+    #[error("CallClosure: packed captured values_size {packed} != resolved callee's captured layout {expected}")]
+    ClosureCapturedLayoutMismatch { expected: u32, packed: u32 },
+
     #[error("CallClosure: null function pointer in closure")]
     NullFuncRefInClosure,
+
+    #[error("CallClosure: unknown func_ref tag {tag}")]
+    InvalidClosureFuncRefTag { tag: u8 },
 
     #[error("CallClosure: null captured_data for closure with captured params")]
     NullCapturedData,
