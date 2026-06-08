@@ -6,12 +6,13 @@
 use crate::{
     ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb},
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
-    pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{
+        leaked_stale_node_cleaner, ColdStateKv, EpochSnapshot, HotStateKv, StateKvPrunerManager,
+        StateMerkle, StateMerklePrunerManager,
+    },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         hot_state_value_by_key_hash::{HotStateEntry, HotStateValueByKeyHashSchema},
-        stale_node_index::StaleNodeIndexSchema,
-        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
         version_data::VersionDataSchema,
@@ -103,12 +104,12 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
 pub(crate) struct StatePruner {
-    pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
-    pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
-    pub hot_state_kv_pruner: Option<StateKvPrunerManager>,
-    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
-    pub state_kv_pruner: StateKvPrunerManager,
+    pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StateMerkle>>,
+    pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<EpochSnapshot>>,
+    pub hot_state_kv_pruner: Option<StateKvPrunerManager<HotStateKv>>,
+    pub state_merkle_pruner: StateMerklePrunerManager<StateMerkle>,
+    pub epoch_snapshot_pruner: StateMerklePrunerManager<EpochSnapshot>,
+    pub state_kv_pruner: StateKvPrunerManager<ColdStateKv>,
 }
 
 impl StatePruner {
@@ -120,22 +121,29 @@ impl StatePruner {
         config: PrunerConfig,
     ) -> Self {
         let hot_state_merkle_pruner = hot_state_merkle_db.as_ref().map(|db| {
-            StateMerklePrunerManager::new(Arc::clone(db), config.state_merkle_pruner_config)
+            StateMerklePrunerManager::<StateMerkle>::new(
+                Arc::clone(db),
+                config.state_merkle_pruner_config,
+            )
         });
         let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
-            StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
+            StateMerklePrunerManager::<EpochSnapshot>::new(
+                db,
+                config.epoch_snapshot_pruner_config.into(),
+            )
         });
-        let hot_state_kv_pruner =
-            hot_state_kv_db.map(|db| StateKvPrunerManager::new(db, config.ledger_pruner_config));
-        let state_merkle_pruner = StateMerklePrunerManager::new(
+        let hot_state_kv_pruner = hot_state_kv_db
+            .map(|db| StateKvPrunerManager::<HotStateKv>::new(db, config.ledger_pruner_config));
+        let state_merkle_pruner = StateMerklePrunerManager::<StateMerkle>::new(
             Arc::clone(&state_merkle_db),
             config.state_merkle_pruner_config,
         );
-        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
+        let epoch_snapshot_pruner = StateMerklePrunerManager::<EpochSnapshot>::new(
             Arc::clone(&state_merkle_db),
             config.epoch_snapshot_pruner_config.into(),
         );
-        let state_kv_pruner = StateKvPrunerManager::new(state_kv_db, config.ledger_pruner_config);
+        let state_kv_pruner =
+            StateKvPrunerManager::<ColdStateKv>::new(state_kv_db, config.ledger_pruner_config);
 
         leaked_stale_node_cleaner::maybe_start_cleaner(
             state_merkle_db,
