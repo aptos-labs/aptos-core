@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 
 const NO_TXN_DELAY: u64 = 30;
+const PENDING_ORDERING_NO_TXN_DELAY: u64 = 10;
 const PENDING_ORDERING_EMPTY_RETRIES: u64 = 1;
 
 /// Client that pulls blocks from Quorum Store
@@ -130,7 +131,12 @@ impl UserPayloadClient for QuorumStoreClient {
                 && (!return_empty || empty_retries < PENDING_ORDERING_EMPTY_RETRIES)
             {
                 empty_retries += 1;
-                sleep(Duration::from_millis(NO_TXN_DELAY)).await;
+                let no_txn_delay = if return_empty {
+                    PENDING_ORDERING_NO_TXN_DELAY
+                } else {
+                    NO_TXN_DELAY
+                };
+                sleep(Duration::from_millis(no_txn_delay)).await;
                 continue;
             }
             break payload;
