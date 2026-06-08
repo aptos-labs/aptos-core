@@ -166,6 +166,7 @@ pub enum FeatureFlag {
     VersionedTransactionValidation,
     StorageSlotNatives,
     AllowFriendEntryVisibilityDowngrade,
+    TradingNative,
     NativePosition,
     HotnessInEpilogue,
     TransactionInfoV1,
@@ -438,6 +439,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AllowFriendEntryVisibilityDowngrade => {
                 AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE
             },
+            FeatureFlag::TradingNative => AptosFeatureFlag::TRADING_NATIVE,
             FeatureFlag::NativePosition => AptosFeatureFlag::NATIVE_POSITION,
             FeatureFlag::HotnessInEpilogue => AptosFeatureFlag::HOTNESS_IN_EPILOGUE,
             FeatureFlag::TransactionInfoV1 => AptosFeatureFlag::TRANSACTION_INFO_V1,
@@ -637,6 +639,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE => {
                 FeatureFlag::AllowFriendEntryVisibilityDowngrade
             },
+            AptosFeatureFlag::TRADING_NATIVE => FeatureFlag::TradingNative,
             AptosFeatureFlag::NATIVE_POSITION => FeatureFlag::NativePosition,
             AptosFeatureFlag::HOTNESS_IN_EPILOGUE => FeatureFlag::HotnessInEpilogue,
             AptosFeatureFlag::TRANSACTION_INFO_V1 => FeatureFlag::TransactionInfoV1,

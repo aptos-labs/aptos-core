@@ -181,6 +181,12 @@ pub enum FeatureFlag {
     /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
     /// modifier itself still cannot be removed. See issue #19650.
     ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// Enables the native-trading subsystem: the
+    /// `TradingNativeCapability` cap + `ExchangeRegistry` auth layer
+    /// shared by every native trading store. Per-store flags (e.g.
+    /// `NATIVE_POSITION`) gate the actual native writes — both flags
+    /// must be on for any trading-native write to take effect.
+    TRADING_NATIVE = 118,
     /// Enables the native position subsystem: new StateKey variant
     /// (TradingNative), the position_db / position_merkle_db storage
     /// layer, composite state root, and the native position Move

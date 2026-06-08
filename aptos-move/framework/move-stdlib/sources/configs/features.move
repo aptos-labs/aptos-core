@@ -865,6 +865,22 @@ module std::features {
         is_enabled(STORAGE_SLOT_NATIVES)
     }
 
+    /// Whether the native-trading subsystem is enabled: the
+    /// `TradingNativeCapability` cap, the `ExchangeRegistry` resource,
+    /// and the `register` / `get_capability` / `deny` / `reenable`
+    /// auth surface. Per-store flags (e.g. `NATIVE_POSITION`) gate
+    /// the actual native writes — both flags must be on for any
+    /// trading-native write to take effect.
+    const TRADING_NATIVE: u64 = 118;
+
+    public fun get_trading_native_feature(): u64 {
+        TRADING_NATIVE
+    }
+
+    public fun is_trading_native_enabled(): bool {
+        is_enabled(TRADING_NATIVE)
+    }
+
     /// Whether the native position subsystem is enabled: new StateKey variants,
     /// position_db / position_merkle_db storage, and the native_position
     /// Move module.  Natives gate on this flag so upgrading validators can't
