@@ -934,6 +934,14 @@ module std::features {
         is_enabled(NATIVE_COLLATERAL)
     }
 
+    /// When enabled, execution computes the trading-native state roots and commits them to
+    /// `TransactionInfoV1`, so they are consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    /// Covers the native-position tree today and is intended to cover the other trading-native
+    /// trees as they are added. Enabling it first commits the (empty-tree) roots to transaction
+    /// info; the actual Move-side writes to those trees are gated by separate flags.
+    /// Lifetime: permanent
+    const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 122;
+
     // ============================================================================================
     // Feature Flag Implementation
 
