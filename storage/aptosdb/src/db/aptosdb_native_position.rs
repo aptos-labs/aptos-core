@@ -240,11 +240,14 @@ impl AptosDB {
             for (key, op) in write_set.native_position_iter() {
                 let maybe_value = op.as_write_op().as_state_value_opt().cloned();
                 let value_hash = maybe_value.as_ref().map(StateValue::hash);
-                pending_leaf_updates.insert(key.hash(), PositionSlot {
-                    state_key: key.clone(),
-                    value_hash,
-                    value: None,
-                });
+                pending_leaf_updates.insert(
+                    key.hash(),
+                    PositionSlot {
+                        state_key: key.clone(),
+                        value_hash,
+                        value: None,
+                    },
+                );
             }
         }
 

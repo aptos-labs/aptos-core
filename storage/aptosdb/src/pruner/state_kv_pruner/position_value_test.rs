@@ -171,12 +171,15 @@ fn position_manager_drives_pruning() {
     commit_at(&db, 0, vec![(key.clone(), upsert(b"v0"))]);
     commit_at(&db, 5, vec![(key.clone(), upsert(b"v5"))]);
 
-    let manager = PositionValuePrunerManager::new(Arc::clone(&db), LedgerPrunerConfig {
-        enable: true,
-        prune_window: 0,
-        batch_size: 1,
-        user_pruning_window_offset: 0,
-    });
+    let manager = PositionValuePrunerManager::new(
+        Arc::clone(&db),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
     manager.wake_and_wait_pruner(5).unwrap();
 
     assert!(!value_exists(&db, hash, 0), "v0 collected by the worker");

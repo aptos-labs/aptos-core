@@ -321,13 +321,15 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
 
     let mut version = 0;
     let mut current_state_values = HashMap::new();
-    let pruner =
-        StateKvPrunerManager::<ColdStateKv>::new(Arc::clone(&db.state_kv_db), LedgerPrunerConfig {
+    let pruner = StateKvPrunerManager::<ColdStateKv>::new(
+        Arc::clone(&db.state_kv_db),
+        LedgerPrunerConfig {
             enable: true,
             prune_window: 0,
             batch_size: 1,
             user_pruning_window_offset: 0,
-        });
+        },
+    );
     for batch in inputs {
         update_store(store, batch.clone().into_iter(), version);
         for (k, v) in batch.iter() {

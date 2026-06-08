@@ -389,11 +389,14 @@ impl AptosDB {
                     .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?
                     .position;
                 for u in merkle_updates {
-                    pending_leaf_updates.insert(u.state_key_hash, PositionSlot {
-                        state_key: u.state_key,
-                        value_hash: u.value_hash,
-                        value: None,
-                    });
+                    pending_leaf_updates.insert(
+                        u.state_key_hash,
+                        PositionSlot {
+                            state_key: u.state_key,
+                            value_hash: u.value_hash,
+                            value: None,
+                        },
+                    );
                 }
             }
 

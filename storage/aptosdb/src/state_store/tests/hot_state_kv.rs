@@ -187,6 +187,29 @@ fn collect_lru_order(shard: &LoadedHotStateShard) -> Vec<(HashValue, Version)> {
     result
 }
 
+fn assert_hot_occupied(
+    shard: &LoadedHotStateShard,
+    key_hash: HashValue,
+    expected_hot_since_version: Version,
+    expected_value_version: Version,
+    expected_value: StateValue,
+) {
+    let slot = shard.map.get(&key_hash).unwrap();
+    match slot.kind() {
+        StateSlotKind::HotOccupied {
+            value_version,
+            value,
+            hot_since_version,
+            ..
+        } => {
+            assert_eq!(*hot_since_version, expected_hot_since_version);
+            assert_eq!(*value_version, expected_value_version);
+            assert_eq!(*value, expected_value);
+        },
+        other => panic!("Expected HotOccupied, got {other:?}"),
+    }
+}
+
 #[test]
 fn test_load_empty_db() {
     let tmp = TempPath::new();
@@ -276,6 +299,37 @@ fn test_load_occupied_and_vacant() {
     let slot_vac = shard_vac.map.get(&CryptoHash::hash(&key_vac)).unwrap();
     assert!(matches!(slot_vac.kind(), StateSlotKind::HotVacant { .. }));
     shard_vac.validate_lru_chain();
+}
+
+#[test]
+fn test_load_total_value_bytes() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key_occ = make_state_key(21);
+    let value = make_state_value(21);
+    put_hot_state_entry(
+        &db,
+        &key_occ,
+        100,
+        Some(HotStateEntry::Occupied {
+            value: value.clone(),
+            value_version: 50,
+        }),
+    );
+
+    let key_vac = make_state_key(22);
+    put_hot_state_entry(&db, &key_vac, 200, Some(HotStateEntry::Vacant));
+
+    let shards = db.load_hot_state_kvs(300).unwrap();
+    let total_value_bytes: usize = shards.iter().map(|shard| shard.total_value_bytes).sum();
+    assert_eq!(total_value_bytes, value.size());
+
+    for shard in &shards {
+        let expected_total_value_bytes: usize =
+            shard.map.iter().map(|entry| entry.value().size()).sum();
+        assert_eq!(shard.total_value_bytes, expected_total_value_bytes);
+    }
 }
 
 #[test]
@@ -370,6 +424,82 @@ fn test_load_multiple_versions_same_key() {
         other => panic!("Expected HotOccupied, got {other:?}"),
     }
     shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_skips_future_entry_and_falls_back_to_older_version() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(9);
+    let key_hash = CryptoHash::hash(&key);
+    put_hot_state_entry(
+        &db,
+        &key,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(91),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry(
+        &db,
+        &key,
+        20,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(92),
+            value_version: 15,
+        }),
+    );
+
+    let shards = db.load_hot_state_kvs(15).unwrap();
+    let shard = &shards[key.get_shard_id()];
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(91));
+    shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_snapshot_boundaries_across_eviction_and_reinsert() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(11);
+    let key_hash = CryptoHash::hash(&key);
+    let shard_id = key.get_shard_id();
+    put_hot_state_entry(
+        &db,
+        &key,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(111),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry(&db, &key, 20, None);
+    put_hot_state_entry(
+        &db,
+        &key,
+        30,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(112),
+            value_version: 25,
+        }),
+    );
+
+    let shards_at_15 = db.load_hot_state_kvs(15).unwrap();
+    let shard_at_15 = &shards_at_15[shard_id];
+    assert_hot_occupied(shard_at_15, key_hash, 10, 5, make_state_value(111));
+    shard_at_15.validate_lru_chain();
+
+    let shards_at_25 = db.load_hot_state_kvs(25).unwrap();
+    let shard_at_25 = &shards_at_25[shard_id];
+    assert!(!shard_at_25.map.contains_key(&key_hash));
+    shard_at_25.validate_lru_chain();
+
+    let shards_at_30 = db.load_hot_state_kvs(30).unwrap();
+    let shard_at_30 = &shards_at_30[shard_id];
+    assert_hot_occupied(shard_at_30, key_hash, 30, 25, make_state_value(112));
+    shard_at_30.validate_lru_chain();
 }
 
 #[test]
@@ -469,6 +599,54 @@ fn test_load_lru_chain_ordering() {
 }
 
 #[test]
+fn test_load_lru_chain_same_version_orders_by_key_hash() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let mut keys_by_shard: Vec<Vec<StateKey>> = (0..NUM_STATE_SHARDS).map(|_| Vec::new()).collect();
+    for seed in 0..=255u8 {
+        let key = make_state_key(seed);
+        keys_by_shard[key.get_shard_id()].push(key);
+    }
+
+    let (shard_id, mut keys) = keys_by_shard
+        .into_iter()
+        .enumerate()
+        .find(|(_, keys)| keys.len() >= 3)
+        .expect("at least one shard should have three keys");
+    keys.truncate(3);
+
+    for key in &keys {
+        put_hot_state_entry(
+            &db,
+            key,
+            100,
+            Some(HotStateEntry::Occupied {
+                value: make_state_value(100),
+                value_version: 50,
+            }),
+        );
+    }
+
+    let shards = db.load_hot_state_kvs(100).unwrap();
+    let shard = &shards[shard_id];
+    shard.validate_lru_chain();
+
+    let actual: Vec<_> = collect_lru_order(shard)
+        .into_iter()
+        .map(|(key_hash, hot_since_version)| {
+            assert_eq!(hot_since_version, 100);
+            key_hash
+        })
+        .collect();
+    let mut expected: Vec<_> = keys.iter().map(|key| CryptoHash::hash(key)).collect();
+    expected.sort();
+    expected.reverse();
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn test_load_cross_shard() {
     let tmp = TempPath::new();
     let db = create_hot_state_kv_db(&tmp);
@@ -512,24 +690,26 @@ fn test_load_write_then_load_roundtrip() {
     let mut shards = empty_hot_state_updates();
 
     // key1: occupied at hot_since_version=100, value_version=50
-    shards[key1.get_shard_id()]
-        .insertions
-        .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+    shards[key1.get_shard_id()].insertions.insert(
+        *key1.crypto_hash_ref(),
+        HotInsertionOp {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
-        });
+        },
+    );
 
     // key2: vacant at hot_since_version=200
-    shards[key2.get_shard_id()]
-        .insertions
-        .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+    shards[key2.get_shard_id()].insertions.insert(
+        *key2.crypto_hash_ref(),
+        HotInsertionOp {
             state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: None,
-        });
+        },
+    );
 
     let hot_state_updates = HotStateUpdates {
         for_last_checkpoint: Some(shards),
@@ -634,32 +814,35 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     let mut shards = empty_hot_state_updates();
 
     // key1: first write (no superseded version) at hot_since_version=100
-    shards[key1.get_shard_id()]
-        .insertions
-        .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+    shards[key1.get_shard_id()].insertions.insert(
+        *key1.crypto_hash_ref(),
+        HotInsertionOp {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
-        });
+        },
+    );
 
     // key2: insertion superseding an old entry at hot_since_version=80
-    shards[key2.get_shard_id()]
-        .insertions
-        .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+    shards[key2.get_shard_id()].insertions.insert(
+        *key2.crypto_hash_ref(),
+        HotInsertionOp {
             state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: Some(80),
-        });
+        },
+    );
 
     // key3: eviction only (key was hot from before at hot_since=150, now evicted at 300).
-    shards[key3.get_shard_id()]
-        .evictions
-        .insert(*key3.crypto_hash_ref(), HotEvictionOp {
+    shards[key3.get_shard_id()].evictions.insert(
+        *key3.crypto_hash_ref(),
+        HotEvictionOp {
             eviction_version: 300,
             superseded_version: Some(150),
-        });
+        },
+    );
 
     let hot_state_updates = HotStateUpdates {
         for_last_checkpoint: Some(shards),
@@ -778,14 +961,15 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
 
     // First batch: write old entry at hot_since=100
     let mut shards = empty_hot_state_updates();
-    shards[key1.get_shard_id()]
-        .insertions
-        .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+    shards[key1.get_shard_id()].insertions.insert(
+        *key1.crypto_hash_ref(),
+        HotInsertionOp {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val_old.clone()), 100),
             value_version: Some(100),
             superseded_version: None,
-        });
+        },
+    );
     let updates1 = HotStateUpdates {
         for_last_checkpoint: Some(shards),
         for_latest: None,
@@ -796,14 +980,15 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
 
     // Second batch: write new entry at hot_since=200 superseding 100
     let mut shards2 = empty_hot_state_updates();
-    shards2[key1.get_shard_id()]
-        .insertions
-        .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+    shards2[key1.get_shard_id()].insertions.insert(
+        *key1.crypto_hash_ref(),
+        HotInsertionOp {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val_new.clone()), 200),
             value_version: Some(200),
             superseded_version: Some(100),
-        });
+        },
+    );
     let updates2 = HotStateUpdates {
         for_last_checkpoint: Some(shards2),
         for_latest: None,

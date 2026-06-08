@@ -722,19 +722,25 @@ mod tests {
     };
 
     fn make_hot_slot(key: &StateKey, version: Version, value: &[u8]) -> StateSlot {
-        StateSlot::new(key.clone(), StateSlotKind::HotOccupied {
-            value_version: version,
-            value: StateValue::new_legacy(value.to_vec().into()),
-            hot_since_version: version,
-            lru_info: LRUEntry::uninitialized(),
-        })
+        StateSlot::new(
+            key.clone(),
+            StateSlotKind::HotOccupied {
+                value_version: version,
+                value: StateValue::new_legacy(value.to_vec().into()),
+                hot_since_version: version,
+                lru_info: LRUEntry::uninitialized(),
+            },
+        )
     }
 
     fn make_hot_vacant(key: &StateKey, version: Version) -> StateSlot {
-        StateSlot::new(key.clone(), StateSlotKind::HotVacant {
-            hot_since_version: version,
-            lru_info: LRUEntry::uninitialized(),
-        })
+        StateSlot::new(
+            key.clone(),
+            StateSlotKind::HotVacant {
+                hot_since_version: version,
+                lru_info: LRUEntry::uninitialized(),
+            },
+        )
     }
 
     /// Create a `StateDelta` for testing `LayeredHotStateView`.
