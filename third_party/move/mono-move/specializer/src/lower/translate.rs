@@ -4,7 +4,7 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use super::{
-    context::{concrete_type_size, CallSiteInfo, LoweringContext, SlotInfo, TypedSlot},
+    context::{concrete_type_size, CallSiteInfo, LoweringContext, TypedSlot},
     gc_layout::type_pointer_offsets,
     parallel_copy,
 };
@@ -16,9 +16,9 @@ use anyhow::{bail, Context, Result};
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
-    CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp,
-    IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, MicroOp, SafePointEntry,
-    ShiftOperand, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp,
+    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, MicroOp,
+    PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::FieldHandleIndex;
 use move_core_types::account_address::AccountAddress;
@@ -76,6 +76,12 @@ struct LoweringState<'a> {
     /// it points at *that* call's `CallSiteInfo`; immediately after the
     /// `CallFunc` op is emitted, it advances by one.
     call_site_cursor: usize,
+    /// Monotonic cursor into `ctx.closure_pack_sites`; advances once per
+    /// lowered `Instr::PackClosure`.
+    closure_pack_cursor: usize,
+    /// Monotonic cursor into `ctx.closure_call_sites`; advances once per
+    /// lowered `Instr::CallClosure`.
+    closure_call_cursor: usize,
     /// Types of the function IR's home (frame-resident) slots, indexed
     /// by Home slot id.
     home_slot_types: &'a [InternedType],
@@ -101,6 +107,8 @@ impl<'a> LoweringState<'a> {
             label_map: vec![None; func_ir.blocks.len()],
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
+            closure_pack_cursor: 0,
+            closure_call_cursor: 0,
             home_slot_types: &func_ir.home_slot_types,
             xfer_bindings: vec![None; num_xfer_positions],
             pending_def_binds: Vec::new(),
@@ -132,7 +140,7 @@ impl<'a> LoweringState<'a> {
             .with_context(|| format!("Xfer({}) read without a prior def in this block", j))
     }
 
-    fn slot(&self, slot: Slot) -> Result<SlotInfo> {
+    fn slot(&self, slot: Slot) -> Result<SizedSlot> {
         Ok(match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => self.xfer_binding(j)?.slot,
@@ -144,7 +152,7 @@ impl<'a> LoweringState<'a> {
     /// `Slot::Xfer(j)`, stages a pending binding from `Xfer(j)` to
     /// the typed slot at arg position `j` of the upcoming call.
     /// Errors for `Slot::Vid`.
-    fn def_slot(&mut self, slot: Slot) -> Result<SlotInfo> {
+    fn def_slot(&mut self, slot: Slot) -> Result<SizedSlot> {
         Ok(match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => {
@@ -155,6 +163,32 @@ impl<'a> LoweringState<'a> {
             },
             Slot::Vid(i) => bail!("Vid({}) in post-allocation IR", i),
         })
+    }
+
+    /// Resolves each `slot` to its [`SizedSlot`] frame layout.
+    fn slots_to_sized_slots(&self, slots: &[Slot]) -> Result<Vec<SizedSlot>> {
+        slots.iter().map(|slot| self.slot(*slot)).collect()
+    }
+
+    /// Place a call's return values; `ret_slots` are their caller-frame
+    /// locations. The call clobbers the whole callee region, so clear all Xfer
+    /// bindings, then re-bind each `Xfer` ret (for GC) and copy each `Home` in.
+    fn bind_call_returns(&mut self, rets: &[Slot], ret_slots: &[TypedSlot]) -> Result<()> {
+        self.xfer_bindings.fill(None);
+        for (k, ret_slot) in rets.iter().enumerate() {
+            match *ret_slot {
+                Slot::Xfer(j) => {
+                    self.xfer_bindings[j as usize] = Some(ret_slots[k]);
+                },
+                Slot::Home(i) => {
+                    let src = ret_slots[k].slot;
+                    let dst = self.ctx.home_slots[i as usize];
+                    self.emit_single_move(dst.offset, src)?;
+                },
+                Slot::Vid(_) => bail!("Vid slot in post-allocation IR"),
+            }
+        }
+        Ok(())
     }
 
     /// Append `op` to the output buffer. For allocating `op`s,
@@ -228,7 +262,7 @@ impl<'a> LoweringState<'a> {
     /// Emit one byte-copy from `src` to `dst_offset`. Caller is
     /// responsible for ensuring no other concurrent move clobbers the
     /// source bytes.
-    fn emit_single_move(&mut self, dst_offset: FrameOffset, src: SlotInfo) -> Result<()> {
+    fn emit_single_move(&mut self, dst_offset: FrameOffset, src: SizedSlot) -> Result<()> {
         if dst_offset == src.offset {
             return Ok(());
         }
@@ -313,20 +347,19 @@ impl<'a> LoweringState<'a> {
                     imm: *v,
                 })?;
             },
-            // Narrow unsigned loads zero-extend into an 8-byte slot.
-            // TODO: drop the widening once sub-8-byte stores land.
+            // 2-/4-byte integers store directly into their 2-/4-byte slot.
             Instr::LdU16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm2 {
                     dst: dst_info.offset,
-                    imm: (*v as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdU32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm4 {
                     dst: dst_info.offset,
-                    imm: (*v as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             // 1-byte integers store directly into their 1-byte slot.
@@ -337,21 +370,20 @@ impl<'a> LoweringState<'a> {
                     imm: *v as u8,
                 })?;
             },
-            // Narrow signed loads sign-extend first, then bit-cast for the
-            // LE byte representation.
-            // TODO: drop the widening once sub-8-byte stores land.
+            // 2-/4-byte signed integers store their two's-complement LE bytes
+            // directly into their 2-/4-byte slot.
             Instr::LdI16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm2 {
                     dst: dst_info.offset,
-                    imm: (*v as i64 as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdI32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm4 {
                     dst: dst_info.offset,
-                    imm: (*v as i64 as u64).to_le_bytes(),
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdI64(dst, v) => {
@@ -1004,7 +1036,7 @@ impl<'a> LoweringState<'a> {
                 let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
                 let local_info = self.slot(*local)?;
                 let dst_info = self.def_slot(*dst)?;
-                let src = SlotInfo {
+                let src = SizedSlot {
                     offset: FrameOffset(local_info.offset.0 + field_offset),
                     size: field_size,
                     align: local_info.align,
@@ -1016,7 +1048,7 @@ impl<'a> LoweringState<'a> {
                 let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
                 let local_info = self.slot(*local)?;
                 let val_info = self.slot(*val)?;
-                let src = SlotInfo {
+                let src = SizedSlot {
                     offset: val_info.offset,
                     size: field_size,
                     align: val_info.align,
@@ -1124,7 +1156,7 @@ impl<'a> LoweringState<'a> {
                     let (size, align) = field_widths[i];
                     self.emit_single_move(
                         FrameOffset(dst_info.offset.0 + fields[i].offset),
-                        SlotInfo {
+                        SizedSlot {
                             offset: arg_infos[i].offset,
                             size,
                             align,
@@ -1149,7 +1181,7 @@ impl<'a> LoweringState<'a> {
                 }
                 let src_info = self.slot(*src)?;
                 // Pre-compute (size, align) per field and resolve each dst's
-                // SlotInfo. We do this in a separate pass so we can build the
+                // SizedSlot. We do this in a separate pass so we can build the
                 // per-copy view the debug assert needs without interleaving
                 // it with the actual emit.
                 let mut field_widths = Vec::with_capacity(fields.len());
@@ -1181,12 +1213,49 @@ impl<'a> LoweringState<'a> {
                 }
                 for i in indices {
                     let (size, align) = field_widths[i];
-                    self.emit_single_move(dst_offsets[i], SlotInfo {
+                    self.emit_single_move(dst_offsets[i], SizedSlot {
                         offset: FrameOffset(src_info.offset.0 + fields[i].offset),
                         size,
                         align,
                     })?;
                 }
+            },
+
+            // --- Closures ---
+            Instr::PackClosure(dst, _fhi, mask, captured) => {
+                // Target identity + captured-data descriptor were resolved in
+                // `try_build_context`; read them positionally.
+                let info = &self.ctx.closure_pack_sites[self.closure_pack_cursor];
+                self.closure_pack_cursor += 1;
+                let dst_off = self.def_slot(*dst)?.offset;
+                // Captured sources, in ascending captured-param order (the
+                // destacker already ordered the IR `captured` list this way).
+                let captured_slots = self.slots_to_sized_slots(captured)?;
+                self.emit(MicroOp::PackClosure(Box::new(PackClosureOp {
+                    dst: dst_off,
+                    func_ref: ClosureFuncRef::Unresolved(info.func_ref),
+                    mask: mask.bits(),
+                    captured_data_descriptor_id: info.captured_data_descriptor_id,
+                    values_size: info.values_size,
+                    captured: captured_slots,
+                })))?;
+            },
+            Instr::PackClosureGeneric(..) => bail!("generic closures not yet lowered"),
+            Instr::CallClosure(rets, _sig_types, all_args) => {
+                let ret_slots = &self.ctx.closure_call_sites[self.closure_call_cursor];
+                self.closure_call_cursor += 1;
+                // The destacker pushes the closure as the last operand;
+                // everything before it is a provided (non-captured) argument.
+                let Some((closure_slot, provided)) = all_args.split_last() else {
+                    bail!("CallClosure has no closure operand");
+                };
+                let closure_src = self.slot(*closure_slot)?.offset;
+                let provided_args = self.slots_to_sized_slots(provided)?;
+                self.emit(MicroOp::CallClosure(Box::new(CallClosureOp {
+                    closure_src,
+                    provided_args,
+                })))?;
+                self.bind_call_returns(rets, ret_slots)?;
             },
 
             // --- Generic and variant field forms: not yet lowered ---
@@ -1345,27 +1414,8 @@ impl<'a> LoweringState<'a> {
         }
         self.call_site_cursor += 1;
 
-        // Clear all Xfer bindings (calls clobber the entire callee
-        // region). The ret loop below re-binds the positions this
-        // call returns to.
-        self.xfer_bindings.fill(None);
-
-        // Place each ret. Xfer rets are recorded in `xfer_bindings`
-        // immediately — `CallIndirect` has already written the
-        // values.
-        for (k, ret_slot) in rets.iter().enumerate() {
-            match *ret_slot {
-                Slot::Xfer(j) => {
-                    self.xfer_bindings[j as usize] = Some(cs.ret_slots[k]);
-                },
-                Slot::Home(i) => {
-                    let src = cs.ret_slots[k].slot;
-                    let dst = self.ctx.home_slots[i as usize];
-                    self.emit_single_move(dst.offset, src)?;
-                },
-                Slot::Vid(_) => bail!("Vid slot in post-allocation IR"),
-            }
-        }
+        // Place each ret (Xfer rets are already written by `CallIndirect`).
+        self.bind_call_returns(rets, &cs.ret_slots)?;
         Ok(())
     }
 

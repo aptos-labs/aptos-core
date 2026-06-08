@@ -37,6 +37,7 @@ pub mod position_db;
 pub(crate) mod position_merkle_batch_committer;
 pub mod position_merkle_db;
 pub mod position_metrics;
+pub(crate) mod position_pruner;
 pub(crate) mod position_snapshot_committer;
 pub mod position_state_store;
 mod pruner;

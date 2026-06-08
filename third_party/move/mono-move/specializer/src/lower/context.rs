@@ -16,8 +16,9 @@ use crate::{
 use anyhow::Result;
 use mono_move_core::{
     align_up_u32,
-    interner::{InternedIdentifier, InternedModuleId},
+    interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{NativeIdx, NativeName, NativeResolver},
+    next_captured_value_offset,
     types::{
         view_type, view_type_list, Alignment, FieldLayout, InternedType, InternedTypeList, Size,
         Type, EMPTY_TYPE_LIST,
@@ -27,31 +28,12 @@ use mono_move_core::{
     FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use mono_move_gas::GasInstrumentor;
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, file_format::FunctionHandleIndex};
+use move_core_types::function::ClosureMask;
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
 const FRAME_ALIGN: u32 = MAX_ALIGN as u32;
-
-/// Largest value alignment: alignment is capped at 8 even for values wider
-/// than 8 bytes.
-const FULL_WORD_ALIGN: u32 = 8;
-
-/// Whether the lowering can load/store a slot of this alignment
-/// width-correctly: currently only 1-byte and full-word (8-byte) alignments.
-fn slot_align_supported(align: u32) -> bool {
-    align == 1 || align >= FULL_WORD_ALIGN
-}
-
-/// `true` iff every slot's alignment is currently lowerable. See
-/// [`slot_align_supported`].
-fn slot_aligns_supported<T>(slots: &[T], align_of: impl Fn(&T) -> u32) -> bool {
-    slots.iter().map(align_of).all(slot_align_supported)
-}
-
-/// Reason string used when a function is skipped for using a slot of an
-/// alignment the lowering cannot yet handle.
-const UNSUPPORTED_ALIGN_SKIP: &str = "slot alignment 2/4 (e.g. u16/u32) not yet supported";
 
 /// Returns the (size, alignment) of a concrete interned type, or None if the
 /// type is not concrete (e.g., contains type parameters or unresolved structs).
@@ -67,19 +49,10 @@ pub fn concrete_type_size(ty: InternedType, label: &str) -> Result<u32> {
     Ok(size)
 }
 
-/// Byte-level location of a typed value in the current function's frame.
-#[derive(Clone, Copy)]
-pub struct SlotInfo {
-    pub offset: FrameOffset,
-    /// Width of the type currently bound to this slot.
-    pub size: u32,
-    pub align: u32,
-}
-
 /// A frame slot paired with the type of its value.
 #[derive(Clone, Copy)]
 pub struct TypedSlot {
-    pub slot: SlotInfo,
+    pub slot: SizedSlot,
     pub ty: InternedType,
 }
 
@@ -96,6 +69,53 @@ pub struct CallSiteInfo {
     pub native_idx: Option<NativeIdx>,
 }
 
+/// Pre-resolved data for one `PackClosure`, consumed in IR order.
+pub struct ClosurePackInfo {
+    /// Symbolic target identity, resolved lazily at call time.
+    pub func_ref: InternedFunctionRef,
+    /// GC trace descriptor for the captured-data object; `None` for a
+    /// non-capturing closure (no captured-data object is allocated).
+    pub captured_data_descriptor_id: Option<DescriptorId>,
+    /// Byte width of the captured-data values region (`0` if non-capturing).
+    pub values_size: u32,
+}
+
+/// Captured-data layout for one capturing `PackClosure`: the GC trace
+/// descriptor (the reserved `Trivial` slot when pointer-free) and the byte
+/// width of the values region, which the allocation needs.
+#[derive(Clone, Copy)]
+pub struct ClosureCapturedInfo {
+    pub descriptor_id: DescriptorId,
+    pub values_size: u32,
+}
+
+/// Per-`PackClosure` outcome of the discovery pass, in IR order. Distinguishes
+/// the three cases the build pass must act on, so it needn't re-derive them
+/// from the mask.
+#[derive(Clone, Copy)]
+pub enum CapturedDataLayout {
+    /// Closure captures nothing; no captured-data object is allocated.
+    NonCapturing,
+    /// Concrete capturing closure with its resolved captured-data layout.
+    Capturing(ClosureCapturedInfo),
+    /// A captured type isn't concrete / GC-walkable yet; lowering must `Skip`.
+    NotDerivable,
+}
+
+/// Descriptors discovered for a function's type/closure set, threaded from the
+/// discovery pass into lowering.
+#[derive(Default)]
+pub struct LoweringDescriptors {
+    /// `vector<T>` element type -> published descriptor id.
+    ///
+    /// TODO: generalize to also hold struct/enum descriptors; use a
+    /// type-generic name.
+    pub vec: UnorderedMap<InternedType, DescriptorId>,
+    /// Captured-data layout per `PackClosure`, in IR order; consumed
+    /// positionally by the build pass.
+    pub closure_captured: Vec<CapturedDataLayout>,
+}
+
 /// Frame layout for one function.
 /// [TODO]: a few raw-`u32` fields remain (sizes/alignments); migrate
 /// them to dedicated newtypes for consistency with `FrameOffset`.
@@ -103,14 +123,14 @@ pub struct LoweringContext<'a> {
     /// Module the function lives in; gives lowering access to the
     /// constant pool and other module-level metadata.
     pub module: &'a PreparedModule,
-    pub home_slots: Vec<SlotInfo>,
+    pub home_slots: Vec<SizedSlot>,
     /// End offset of the home-slot region; feeds `callee_base`.
     pub frame_data_size: u32,
     /// In IR order; indexed by `LoweringState::call_site_cursor`.
     pub call_sites: Vec<CallSiteInfo>,
     /// Where `Instr::Ret` writes before the `Return` micro-op. Laid out
     /// from offset 0 so addresses match the caller's `ret_slots`.
-    pub return_slots: Vec<SlotInfo>,
+    pub return_slots: Vec<SizedSlot>,
     pub num_xfer_positions: u16,
     /// Frame offset of the cycle-breaking scratch slot used by
     /// `parallel_copy::emit_parallel_copy` for `Instr::Ret`.
@@ -125,6 +145,11 @@ pub struct LoweringContext<'a> {
     /// Invariant: contains an entry for every vector type mentioned in
     /// this function.
     pub vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+    /// Per-`PackClosure` resolved data, in IR order.
+    pub closure_pack_sites: Vec<ClosurePackInfo>,
+    /// Per-`CallClosure` return-slot layout (caller-frame addresses laid out
+    /// from `callee_base`).
+    pub closure_call_sites: Vec<Vec<TypedSlot>>,
 }
 
 impl LoweringContext<'_> {
@@ -158,6 +183,18 @@ pub enum LoweringOutcome {
     Skipped(&'static str),
 }
 
+/// Interned `(module_id, func_name)` identity of a function handle.
+fn callee_identity(
+    module: &PreparedModule,
+    handle_idx: FunctionHandleIndex,
+) -> (InternedModuleId, InternedIdentifier) {
+    let handle = module.function_handle_at(handle_idx);
+    (
+        module.module_id_at(handle.module),
+        module.interned_identifier_at(handle.name),
+    )
+}
+
 /// Try to build a [`LoweringContext`] for a monomorphic function.
 ///
 /// Returns:
@@ -171,7 +208,7 @@ pub fn try_build_context<'a>(
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
-    vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+    descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
 ) -> Result<BuildContextOutcome<'a>> {
     // 1. Compute home slot layout with natural alignment padding.
@@ -202,9 +239,6 @@ pub fn try_build_context<'a>(
             "nominal type not yet supported by gc_layout",
         ));
     }
-    if !slot_aligns_supported(&home_slots, |s| s.align) {
-        return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
-    }
     // `frame_data_size` must be `FRAME_ALIGN`-aligned so that
     // `callee_base = frame_data_size + FRAME_METADATA_SIZE` is also
     // aligned (the runtime writes saved pc/fp/func_id as `u64`s
@@ -227,9 +261,6 @@ pub fn try_build_context<'a>(
         return Ok(BuildContextOutcome::Skipped(
             "nominal type not yet supported by gc_layout",
         ));
-    }
-    if !slot_aligns_supported(&return_slots, |s| s.align) {
-        return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
     }
 
     // The return values are written at offsets [0, ret_size) of the function's
@@ -276,10 +307,17 @@ pub fn try_build_context<'a>(
         None
     };
 
-    // 4. Walk `Call`/`CallGeneric` instructions and lay out each callee's
-    //    arg/ret region from `callee_base`.
+    // TODO: we need to revisit the complexity and performance of this function
+    // after support for generic monomorphization is in place.
+    // 4. Lay out every callee-frame region in a single IR-order pass: regular
+    //    calls (`Call`/`CallGeneric`) and closures (`PackClosure`/`CallClosure`)
+    //    are disjoint instruction kinds writing disjoint outputs, so one walk
+    //    serves both.
     let callee_base = frame_data_size + FRAME_METADATA_SIZE as u32;
     let mut call_sites = Vec::new();
+    let mut closure_pack_sites = Vec::new();
+    let mut closure_call_sites: Vec<Vec<TypedSlot>> = Vec::new();
+    let mut closure_pack_idx = 0usize;
     for instr in func_ir.instrs() {
         let (handle_idx, param_list, ret_list, call_ty_args) = match instr {
             Instr::Call(_, idx, _) => {
@@ -294,35 +332,82 @@ pub fn try_build_context<'a>(
                 let call_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
                 (inst.handle, params, returns, call_ty_args)
             },
+            Instr::PackClosure(_, fhi, _, _) => {
+                if !module_ir
+                    .module
+                    .function_handle_at(*fhi)
+                    .type_parameters
+                    .is_empty()
+                {
+                    return Ok(BuildContextOutcome::Skipped(
+                        "generic closure target not yet lowered",
+                    ));
+                }
+                let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, *fhi);
+                // TODO: support native closure targets. `CallClosure` resolves
+                // via `load_function`, which has no IR for natives, so skip them.
+                if natives
+                    .resolve(&NativeName {
+                        module: callee_module_id,
+                        function: callee_func_name,
+                    })
+                    .is_some()
+                {
+                    return Ok(BuildContextOutcome::Skipped(
+                        "native closure target not yet lowered",
+                    ));
+                }
+                let func_ref =
+                    interner.function_ref_of(callee_module_id, callee_func_name, EMPTY_TYPE_LIST);
+                // Captured-data layout resolved positionally.
+                let layout = descriptors.closure_captured[closure_pack_idx];
+                closure_pack_idx += 1;
+                let (captured_data_descriptor_id, values_size) = match layout {
+                    CapturedDataLayout::NonCapturing => (None, 0),
+                    CapturedDataLayout::Capturing(info) => {
+                        (Some(info.descriptor_id), info.values_size)
+                    },
+                    CapturedDataLayout::NotDerivable => {
+                        return Ok(BuildContextOutcome::Skipped(
+                            "captured-data layout not derivable",
+                        ));
+                    },
+                };
+                closure_pack_sites.push(ClosurePackInfo {
+                    func_ref,
+                    captured_data_descriptor_id,
+                    values_size,
+                });
+                continue;
+            },
+            Instr::CallClosure(_, sig_types, _) => {
+                let first = view_type_list(*sig_types)
+                    .first()
+                    .copied()
+                    .ok_or_else(|| anyhow::anyhow!("CallClosure signature is empty"))?;
+                let Type::Function { results, .. } = view_type(first) else {
+                    anyhow::bail!("CallClosure signature must start with a Function type");
+                };
+                let ret_list = interner.subst_type_list(*results, ty_args)?;
+                let ret_slots = match layout_callee_region(callee_base, view_type_list(ret_list)) {
+                    CalleeRegion::Ready(slots) => slots,
+                    CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
+                };
+                closure_call_sites.push(ret_slots);
+                continue;
+            },
             _ => continue,
         };
 
-        let param_types = view_type_list(param_list);
-        let ret_types = view_type_list(ret_list);
-        let Some(arg_slots) = layout_typed_slots_contiguously(callee_base, param_types) else {
-            return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
+        let arg_slots = match layout_callee_region(callee_base, view_type_list(param_list)) {
+            CalleeRegion::Ready(slots) => slots,
+            CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
-        let Some(ret_slots) = layout_typed_slots_contiguously(callee_base, ret_types) else {
-            return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
+        let ret_slots = match layout_callee_region(callee_base, view_type_list(ret_list)) {
+            CalleeRegion::Ready(slots) => slots,
+            CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
-        if param_types
-            .iter()
-            .chain(ret_types.iter())
-            .any(|&ty| !gc_layout_supports(ty))
-        {
-            return Ok(BuildContextOutcome::Skipped(
-                "nominal type not yet supported by gc_layout",
-            ));
-        }
-        if !slot_aligns_supported(&arg_slots, |s| s.slot.align)
-            || !slot_aligns_supported(&ret_slots, |s| s.slot.align)
-        {
-            return Ok(BuildContextOutcome::Skipped(UNSUPPORTED_ALIGN_SKIP));
-        }
-
-        let callee_handle = module_ir.module.function_handle_at(handle_idx);
-        let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
-        let callee_func_name = module_ir.module.interned_identifier_at(callee_handle.name);
+        let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, handle_idx);
         // TODO: The native registry is trusted unconditionally here.
         //
         // Consider cross-checking against the callee module's `is_native` flag
@@ -342,6 +427,14 @@ pub fn try_build_context<'a>(
         });
     }
 
+    // Each `PackClosure` consumes one layout in order, so the cursor must reach
+    // the end of the discovered set.
+    debug_assert_eq!(
+        closure_pack_idx,
+        descriptors.closure_captured.len(),
+        "PackClosure count diverged from discovered captured-data layouts"
+    );
+
     Ok(BuildContextOutcome::Built(LoweringContext {
         module: &module_ir.module,
         home_slots,
@@ -350,7 +443,9 @@ pub fn try_build_context<'a>(
         return_slots,
         num_xfer_positions: func_ir.num_xfer_positions,
         scratch,
-        vec_descriptors,
+        vec_descriptors: descriptors.vec,
+        closure_pack_sites,
+        closure_call_sites,
     }))
 }
 
@@ -365,7 +460,7 @@ fn layout_typed_slots_contiguously(base: u32, types: &[InternedType]) -> Option<
         let (size, align) = type_size_and_align(ty)?;
         offset = align_up_u32(offset, align);
         slots.push(TypedSlot {
-            slot: SlotInfo {
+            slot: SizedSlot {
                 offset: FrameOffset(offset),
                 size,
                 align,
@@ -382,13 +477,32 @@ fn layout_typed_slots_contiguously(base: u32, types: &[InternedType]) -> Option<
 /// doesn't depend on contiguous layout (e.g., home slots, where a
 /// future bin-packer could shrink the frame) could be migrated to a
 /// non-contiguous strategy without affecting arg/ret callers.
-fn layout_slots(base: u32, types: &[InternedType]) -> Option<Vec<SlotInfo>> {
+fn layout_slots(base: u32, types: &[InternedType]) -> Option<Vec<SizedSlot>> {
     Some(
         layout_typed_slots_contiguously(base, types)?
             .into_iter()
             .map(|ts| ts.slot)
             .collect(),
     )
+}
+
+/// Outcome of laying out a callee-frame region: the typed slots, or the
+/// out-of-scope reason lowering must skip with.
+enum CalleeRegion {
+    Ready(Vec<TypedSlot>),
+    Skip(&'static str),
+}
+
+/// Lays out a callee-frame region (args or returns) at `base` and checks it is
+/// lowerable: every type must be concrete and GC-walkable.
+fn layout_callee_region(base: u32, types: &[InternedType]) -> CalleeRegion {
+    let Some(slots) = layout_typed_slots_contiguously(base, types) else {
+        return CalleeRegion::Skip("not all types are concrete");
+    };
+    if types.iter().any(|&ty| !gc_layout_supports(ty)) {
+        return CalleeRegion::Skip("nominal type not yet supported by gc_layout");
+    }
+    CalleeRegion::Ready(slots)
 }
 
 /// Provides context to specializer so it can obtain external information
@@ -440,12 +554,50 @@ pub trait SpecializerContext {
     /// Returns the already-published vector-descriptor id for `elem_ty`,
     /// or `None` if no descriptor has been published yet.
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId>;
+
+    /// GC trace descriptor for a captured-data object with values-region size
+    /// `values_size` and intra-values heap-pointer offsets `pointer_offsets`.
+    /// Pointer-free captures return `TRIVIAL_DESCRIPTOR_ID`; pointer-bearing
+    /// ones reuse-or-create a descriptor keyed on the pointer-offset shape.
+    fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> Result<DescriptorId>;
+}
+
+/// Interned type list of a closure target's captured parameters (the mask-set
+/// subset of its params, in ascending index order), substituted by `ty_args`.
+/// Returns `None` for a non-capturing closure (`mask` empty).
+///
+/// Used by the discovery pass to derive the captured-data layout (values size
+/// and heap-pointer offsets).
+fn captured_types_of(
+    interner: &impl Interner,
+    module_ir: &ModuleIR,
+    function_handle_idx: FunctionHandleIndex,
+    mask: ClosureMask,
+    ty_args: InternedTypeList,
+) -> Result<Option<InternedTypeList>> {
+    if mask.captured_count() == 0 {
+        return Ok(None);
+    }
+    let handle = module_ir.module.function_handle_at(function_handle_idx);
+    let params = interner.type_list_of(module_ir.module.interned_types_at(handle.parameters));
+    let params = interner.subst_type_list(params, ty_args)?;
+    let captured: Vec<InternedType> = view_type_list(params)
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &ty)| mask.is_captured(i).then_some(ty))
+        .collect();
+    Ok(Some(interner.type_list_of(&captured)))
 }
 
 /// Attempts to lower a function.
 ///
-/// `vec_descriptors` must contain an entry for every vector type
-/// mentioned in `func_ir` (see [`LoweringContext::vec_descriptors`]).
+/// `descriptors` must contain an entry for every vector type and every
+/// capturing closure target mentioned in `func_ir` (produced by the discovery
+/// pass; see [`LoweringDescriptors`]).
 ///
 /// Returns:
 ///
@@ -462,17 +614,11 @@ pub fn try_lower_function(
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
-    vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+    descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
 ) -> Result<LoweringOutcome> {
-    let ctx = match try_build_context(
-        module_ir,
-        func_ir,
-        ty_args,
-        interner,
-        vec_descriptors,
-        natives,
-    )? {
+    let ctx = match try_build_context(module_ir, func_ir, ty_args, interner, descriptors, natives)?
+    {
         BuildContextOutcome::Built(c) => c,
         BuildContextOutcome::Skipped(reason) => return Ok(LoweringOutcome::Skipped(reason)),
     };
@@ -495,19 +641,16 @@ pub fn try_lower_function(
     // net for now.
     safe_points.sort_by_key(|e| e.code_offset.0);
 
-    // Per-parameter (offset, size), in declaration order.
-    let param_slots = ctx.home_slots[..func_ir.num_params as usize]
-        .iter()
-        .map(|s| SizedSlot {
-            offset: s.offset,
-            size: s.size,
-        })
-        .collect::<Vec<_>>();
+    // Per-parameter (offset, size, align), in declaration order.
+    let param_slots = ctx.home_slots[..func_ir.num_params as usize].to_vec();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
     let extended_frame_size = ctx
         .call_sites
         .iter()
         .flat_map(|cs| cs.arg_slots.iter().chain(cs.ret_slots.iter()))
+        // Closure calls reserve only a caller-frame return region (the runtime
+        // stages args into the callee frame); include it so reads stay in bounds.
+        .chain(ctx.closure_call_sites.iter().flatten())
         .map(|ts| (ts.slot.offset.0 + ts.slot.size) as usize)
         .max()
         // Leaf function: no callee slots needed beyond metadata.
@@ -546,61 +689,72 @@ pub fn try_lower_function(
 /// unresolved, in which case the corresponding layouts simply aren't published.
 pub fn try_discover_types_for_lowering_in_module(
     ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
     module_ir: &ModuleIR,
-) -> Result<UnorderedMap<InternedType, DescriptorId>> {
+) -> Result<LoweringDescriptors> {
     let mut visited = UnorderedSet::new();
-    let mut vec_descriptors = UnorderedMap::new();
+    let mut descriptors = LoweringDescriptors::default();
     for func_ir in module_ir.functions.iter().filter_map(|f| f.as_ref()) {
         try_discover_types_for_lowering_in_function_impl(
             ctx,
+            interner,
             module_ir,
             func_ir,
             EMPTY_TYPE_LIST,
             &mut visited,
-            &mut vec_descriptors,
+            &mut descriptors,
         )?;
     }
-    Ok(vec_descriptors)
+    Ok(descriptors)
 }
 
 /// Per-function variant of [`try_discover_types_for_lowering_in_module`]. Returns
-/// the vector-descriptor map discovered for this function's type set.
+/// the descriptor maps discovered for this function's type/closure set.
 pub fn try_discover_types_for_lowering_in_function(
     ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
-) -> Result<UnorderedMap<InternedType, DescriptorId>> {
+) -> Result<LoweringDescriptors> {
     let mut visited = UnorderedSet::new();
-    let mut vec_descriptors = UnorderedMap::new();
+    let mut descriptors = LoweringDescriptors::default();
     try_discover_types_for_lowering_in_function_impl(
         ctx,
+        interner,
         module_ir,
         func_ir,
         ty_args,
         &mut visited,
-        &mut vec_descriptors,
+        &mut descriptors,
     )?;
-    Ok(vec_descriptors)
+    Ok(descriptors)
 }
 
 fn try_discover_types_for_lowering_in_function_impl(
     ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
-    vec_descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
+    descriptors: &mut LoweringDescriptors,
 ) -> Result<()> {
     for &ty in func_ir.home_slot_types.iter() {
-        discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+        discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
     }
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     for &ty in module_ir.module.interned_types_at(own_handle.return_) {
-        discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+        discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
     }
     for instr in func_ir.instrs() {
         // Calls: walk param + return signature lists.
+        //
+        // TODO: `CallClosure` signatures are not walked, and
+        // `discover_type_metadata` treats `Type::Function` as terminal, so a
+        // type reached only through a closure signature's args/results misses
+        // its descriptor and skips lowering. Recurse into `Type::Function` and
+        // feed closure-call signatures here.
         let (params, returns) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
@@ -614,23 +768,73 @@ fn try_discover_types_for_lowering_in_function_impl(
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
-                discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+                discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
             }
         }
         if let Some(returns) = returns {
             for &ty in view_type_list(returns) {
-                discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+                discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
             }
         }
 
         // Catch nominal types an instruction references directly but
         // that aren't reached by the home/call walks above.
         if let Some(ty) = nominal_type_in_instr(&module_ir.module, instr) {
-            discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
+            discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+        }
+
+        // `PackClosure`: resolve the captured-data layout and record it
+        // positionally, in IR order, for the build pass.
+        if let Instr::PackClosure(_, fhi, mask, _) = instr {
+            let layout =
+                discover_captured_data_descriptor(ctx, interner, module_ir, *fhi, *mask, ty_args)?;
+            descriptors.closure_captured.push(layout);
         }
     }
 
     Ok(())
+}
+
+/// Resolves the captured-data layout for one `PackClosure`: which of
+/// [`CapturedDataLayout`]'s cases it is and, when capturing, its GC trace
+/// descriptor and values-region size.
+///
+/// Captured values are laid out at their natural alignment (see
+/// [`next_captured_value_offset`]) so heap pointers inside captures stay
+/// 8-aligned for the GC; `values_size` and the descriptor's `pointer_offsets`
+/// reflect that padded layout.
+fn discover_captured_data_descriptor(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    module_ir: &ModuleIR,
+    fhi: FunctionHandleIndex,
+    mask: ClosureMask,
+    ty_args: InternedTypeList,
+) -> Result<CapturedDataLayout> {
+    let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
+        return Ok(CapturedDataLayout::NonCapturing);
+    };
+    let mut cursor = 0usize;
+    let mut pointer_offsets = Vec::new();
+    for &ty in view_type_list(captured_list) {
+        let Some((size, align)) = type_size_and_align(ty) else {
+            return Ok(CapturedDataLayout::NotDerivable);
+        };
+        if !gc_layout_supports(ty) {
+            return Ok(CapturedDataLayout::NotDerivable);
+        }
+        let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
+        for rel in type_pointer_offsets(ty)? {
+            pointer_offsets.push(FrameOffset(offset as u32 + rel));
+        }
+        cursor = next;
+    }
+    let values_size = cursor as u32;
+    let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets)?;
+    Ok(CapturedDataLayout::Capturing(ClosureCapturedInfo {
+        descriptor_id,
+        values_size,
+    }))
 }
 
 /// Recursive post-order DFS that visits every nominal reachable from the given

@@ -222,10 +222,13 @@ impl VersionState {
             let shard_id = k.get_shard_id();
             match op {
                 Op::Write(None) => {
-                    let slot = StateSlot::new(k.clone(), StateSlotKind::HotVacant {
-                        hot_since_version: version,
-                        lru_info: LRUEntry::uninitialized(),
-                    });
+                    let slot = StateSlot::new(
+                        k.clone(),
+                        StateSlotKind::HotVacant {
+                            hot_since_version: version,
+                            lru_info: LRUEntry::uninitialized(),
+                        },
+                    );
                     hot_smt_updates
                         .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
@@ -233,12 +236,15 @@ impl VersionState {
                     state.remove(k);
                 },
                 Op::Write(Some(v)) => {
-                    let slot = StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
-                        value_version: version,
-                        value: v.clone(),
-                        hot_since_version: version,
-                        lru_info: LRUEntry::uninitialized(),
-                    });
+                    let slot = StateSlot::new(
+                        k.clone(),
+                        StateSlotKind::HotOccupied {
+                            value_version: version,
+                            value: v.clone(),
+                            hot_since_version: version,
+                            lru_info: LRUEntry::uninitialized(),
+                        },
+                    );
                     hot_smt_updates
                         .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
@@ -258,18 +264,22 @@ impl VersionState {
                         }
                     } else {
                         let slot = match state.get(k) {
-                            Some((value_version, value)) => {
-                                StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
+                            Some((value_version, value)) => StateSlot::new(
+                                k.clone(),
+                                StateSlotKind::HotOccupied {
                                     value_version: *value_version,
                                     value: value.clone(),
                                     hot_since_version: version,
                                     lru_info: LRUEntry::uninitialized(),
-                                })
-                            },
-                            None => StateSlot::new(k.clone(), StateSlotKind::HotVacant {
-                                hot_since_version: version,
-                                lru_info: LRUEntry::uninitialized(),
-                            }),
+                                },
+                            ),
+                            None => StateSlot::new(
+                                k.clone(),
+                                StateSlotKind::HotVacant {
+                                    hot_since_version: version,
+                                    lru_info: LRUEntry::uninitialized(),
+                                },
+                            ),
                         };
                         hot_value_hash = Some(HotStateValueRef::from_slot(&slot).hash());
                         hot_state[shard_id].put(k.clone(), slot);

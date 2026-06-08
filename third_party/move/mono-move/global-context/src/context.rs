@@ -54,8 +54,8 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
-    types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, Interner, ModuleId,
-    ObjectDescriptor,
+    types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, FunctionRef, Interner,
+    ModuleId, ObjectDescriptor, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -76,7 +76,7 @@ pub use loaded_module::{
 };
 mod module_cache;
 use module_cache::ModuleCache;
-use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
+use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 mod types;
@@ -121,6 +121,16 @@ struct Context {
     module_ids: DashMap<ModuleIdInternerKey, InternedModuleId, ahash::RandomState>,
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
+    // TODO(perf): reconsider whether this indirection earns its keep. The
+    // alternative is to widen the closure's `Unresolved` func_ref payload to
+    // store the 24-byte triple inline, dropping both this map and the
+    // `InternedFunctionRef` arena allocation at the cost of a larger closure
+    // object.
+    function_refs: DashMap<
+        (InternedModuleId, InternedIdentifier, InternedTypeList),
+        InternedFunctionRef,
+        ahash::RandomState,
+    >,
     module_cache: ModuleCache,
     /// Published object descriptors.
     descriptors: Descriptors,
@@ -152,6 +162,10 @@ struct Descriptors {
     /// write-lock once. Future descriptor kinds can share this cache by
     /// keying on the full `InternedType` (e.g. `vector<T>`, `struct<...>`).
     vector_by_elem: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// Captured-data idempotency cache: pointer-offset shape -> id. Captures
+    /// sharing a pointer shape share one descriptor. Pointer-free captures
+    /// bypass this cache for `TRIVIAL_DESCRIPTOR_ID`.
+    captured_data_by_pointer_offsets: DashMap<Vec<u32>, DescriptorId, ahash::RandomState>,
     /// All descriptors (reserved + user) in id order. Replaced atomically
     /// on append via `ArcSwap::rcu` (CAS loop). Readers `load()` without
     /// locking.
@@ -162,6 +176,7 @@ impl Default for Descriptors {
     fn default() -> Self {
         Self {
             vector_by_elem: DashMap::default(),
+            captured_data_by_pointer_offsets: DashMap::default(),
             table: ArcSwap::from_pointee(initial_descriptors()),
         }
     }
@@ -175,9 +190,11 @@ impl Descriptors {
         // compile-time error here.
         let Self {
             vector_by_elem,
+            captured_data_by_pointer_offsets,
             table,
         } = self;
         vector_by_elem.clear();
+        captured_data_by_pointer_offsets.clear();
         table.store(Arc::new(initial_descriptors()));
     }
 }
@@ -279,6 +296,7 @@ impl GlobalContext {
                 module_ids: DashMap::default(),
                 types: DashMap::default(),
                 type_lists: DashMap::default(),
+                function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
                 descriptors: Descriptors::default(),
             },
@@ -595,20 +613,62 @@ impl<'ctx> ExecutionGuard<'ctx> {
                     ObjectDescriptor::new_vector(elem_size, offsets)
                         .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}")),
                 );
-                // `rcu` retries on CAS conflict; the closure runs again,
-                // re-reading `next.len()` so the assigned id always matches
-                // the table state at the successful store.
-                let mut assigned_id = DescriptorId(0);
-                self.ctx.descriptors.table.rcu(|cur| {
-                    let mut next = cur.as_ref().clone();
-                    assigned_id = DescriptorId(
-                        u32::try_from(next.len())
-                            .expect("published descriptor count exceeds u32::MAX"),
-                    );
-                    next.push(desc.clone());
-                    Arc::new(next)
-                });
-                assigned_id
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Appends `desc` to the shared descriptor table and returns its assigned
+    /// [`DescriptorId`]. `rcu` retries on CAS conflict; the closure re-reads
+    /// `next.len()` so the id always matches the table state at the store.
+    fn append_descriptor(&self, desc: Arc<ObjectDescriptor>) -> DescriptorId {
+        let mut assigned_id = DescriptorId(0);
+        self.ctx.descriptors.table.rcu(|cur| {
+            let mut next = cur.as_ref().clone();
+            assigned_id = DescriptorId(
+                u32::try_from(next.len()).expect("published descriptor count exceeds u32::MAX"),
+            );
+            next.push(desc.clone());
+            Arc::new(next)
+        });
+        assigned_id
+    }
+
+    /// Returns the GC trace descriptor for a closure's captured-data object.
+    /// `values_size` is the byte width of the packed values region;
+    /// `pointer_offsets` are intra-values heap-pointer offsets.
+    ///
+    /// A pointer-free capture (no offsets) returns the reserved
+    /// [`TRIVIAL_DESCRIPTOR_ID`]. A pointer-bearing capture materializes (or
+    /// reuses) a `CapturedData` descriptor, idempotent on the pointer-offset
+    /// shape.
+    pub fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        if pointer_offsets.is_empty() {
+            return TRIVIAL_DESCRIPTOR_ID;
+        }
+        let offsets: Vec<u32> = pointer_offsets.iter().map(|o| o.0).collect();
+        if let Some(id) = self
+            .ctx
+            .descriptors
+            .captured_data_by_pointer_offsets
+            .get(&offsets)
+        {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .captured_data_by_pointer_offsets
+            .entry(offsets.clone())
+            .or_insert_with(move || {
+                let desc = Arc::new(
+                    ObjectDescriptor::new_captured_data(values_size, offsets)
+                        .unwrap_or_else(|e| panic!("publish_captured_data_descriptor: {e}")),
+                );
+                self.append_descriptor(desc)
             })
     }
 
@@ -708,6 +768,27 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 
     fn module_id_of(&self, address: &AccountAddress, name: &IdentStr) -> InternedModuleId {
         self.intern_address_name_internal(*address, name)
+    }
+
+    fn function_ref_of(
+        &self,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> InternedFunctionRef {
+        // SAFETY: all three components are canonical (already-interned)
+        // pointers, so the tuple's pointer-based hash/eq is structural. The
+        // map is cleared on arena reset, so stored pointers stay valid.
+        let key = (module_id, func_name, ty_args);
+        if let Some(entry) = self.ctx.function_refs.get(&key) {
+            return *entry.value();
+        }
+        let ptr = self.global_arena.alloc(FunctionRef {
+            module_id,
+            func_name,
+            ty_args,
+        });
+        *self.ctx.function_refs.entry(key).or_insert(ptr)
     }
 
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
@@ -857,6 +938,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             module_ids,
             types,
             type_lists,
+            function_refs,
             module_cache,
             descriptors,
         } = self.ctx;
@@ -865,6 +947,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         module_ids.clear();
         types.clear();
         type_lists.clear();
+        function_refs.clear();
         descriptors.reset();
 
         // SAFETY: We are in maintenance phase, and therefore there are no

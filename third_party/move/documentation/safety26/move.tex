@@ -1,0 +1,36 @@
+\section{Move on Aptos}
+\label{sec:move}
+
+We briefly summarize the aspects of Move on Aptos~\cite{MoveOnAptosBook,blackshear2020resources} that the rest of the paper builds on.
+
+\begin{Itemize}
+    \item \emph{Typing and generics.}
+    Move is strongly statically typed.
+    Generic functions and types are instantiated by substitution at the call site and tracked through the bytecode verifier.
+    The substitution must reach every leaf expression, since accesses to type-indexed global storage (below) need the concrete instantiated type at runtime.
+
+    \item \emph{Abilities.}
+    Each type carries a subset of the four abilities |copy|, |drop|, |store|, and |key|, which gate the corresponding operations.
+    Types without |drop| or |copy| are linear: the compiler refuses to discard or duplicate them, and every value of such a type must be moved, stored, or explicitly destructured.
+
+    \item \emph{Algebraic data types.}
+    Structs are nominal product types; enums are nominal sums whose variants carry payloads.
+    Pattern matching may bind references directly into a variant's fields.
+
+    \item \emph{References.}
+    Immutable (|&T|) and mutable (|&mut T|) references obey a static aliasing discipline comparable to Rust's~\cite{rust,rustbelt}: two live mutable references cannot point to overlapping memory, and references cannot outlive the values they borrow.
+
+    \item \emph{Global storage.}
+    Global state is a map indexed by (resource type, address) pairs.
+    Resources of types with the |key| ability are accessed through |T[addr]|, |&T[addr]|, and |&mut T[addr]|, with the same linear-ownership discipline as for local values.
+
+    \item \emph{Bytecode and bytecode verification.}
+    Move source compiles to a typed bytecode that the Move VM~\cite{OLD_MOVE_LANG} executes.
+    At module-load time, a bytecode verifier checks well-formedness, typing, abilities, and the reference discipline above.
+    The runtime safety checks of this paper run during execution, after the verifier has accepted the bytecode.
+\end{Itemize}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

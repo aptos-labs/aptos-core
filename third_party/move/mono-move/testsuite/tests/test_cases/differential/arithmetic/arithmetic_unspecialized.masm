@@ -1,0 +1,211 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun add_u8(a: u8, b: u8): u8
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun sub_u16(a: u16, b: u16): u16
+    copy_loc a
+    copy_loc b
+    sub
+    ret
+
+fun mul_u32(a: u32, b: u32): u32
+    copy_loc a
+    copy_loc b
+    mul
+    ret
+
+fun div_u128(a: u128, b: u128): u128
+    copy_loc a
+    copy_loc b
+    div
+    ret
+
+fun mod_u256(a: u256, b: u256): u256
+    copy_loc a
+    copy_loc b
+    mod
+    ret
+
+fun add_i8(a: i8, b: i8): i8
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun sub_i16(a: i16, b: i16): i16
+    copy_loc a
+    copy_loc b
+    sub
+    ret
+
+fun mul_i32(a: i32, b: i32): i32
+    copy_loc a
+    copy_loc b
+    mul
+    ret
+
+fun div_i64(a: i64, b: i64): i64
+    copy_loc a
+    copy_loc b
+    div
+    ret
+
+fun mod_i128(a: i128, b: i128): i128
+    copy_loc a
+    copy_loc b
+    mod
+    ret
+
+fun add_i256(a: i256, b: i256): i256
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+// --- Bitwise (unsigned only) ---
+
+fun bit_and_u128(a: u128, b: u128): u128
+    copy_loc a
+    copy_loc b
+    bit_and
+    ret
+
+fun bit_or_u8(a: u8, b: u8): u8
+    copy_loc a
+    copy_loc b
+    bit_or
+    ret
+
+fun bit_xor_u32(a: u32, b: u32): u32
+    copy_loc a
+    copy_loc b
+    xor
+    ret
+
+// --- Shift (unsigned only; rhs is always u8) ---
+
+fun shl_u16(a: u16, s: u8): u16
+    copy_loc a
+    copy_loc s
+    shl
+    ret
+
+fun shr_u256(a: u256, s: u8): u256
+    copy_loc a
+    copy_loc s
+    shr
+    ret
+
+// --- Immediate-operand forms ---
+
+fun add_u8_imm(a: u8): u8
+    copy_loc a
+    ld_u8 7
+    add
+    ret
+
+fun mul_u128_imm(a: u128): u128
+    copy_loc a
+    ld_u128 1000
+    mul
+    ret
+
+fun bit_and_u32_imm(a: u32): u32
+    copy_loc a
+    ld_u32 4095
+    bit_and
+    ret
+
+fun shl_u16_imm(a: u16): u16
+    copy_loc a
+    ld_u8 3
+    shl
+    ret
+
+fun sub_i32_imm(a: i32): i32
+    copy_loc a
+    ld_i32 -10
+    sub
+    ret
+
+// --- Unary negate (signed only) ---
+
+fun negate_i8(a: i8): i8
+    copy_loc a
+    negate
+    ret
+
+fun negate_i64(a: i64): i64
+    copy_loc a
+    negate
+    ret
+
+fun negate_i256(a: i256): i256
+    copy_loc a
+    negate
+    ret
+
+// --- Execution: arithmetic ---
+// RUN: execute 0x66::test::add_u8 --args 100, 55
+// CHECK: results: 155
+// RUN: execute 0x66::test::sub_u16 --args 40000, 15000
+// CHECK: results: 25000
+// RUN: execute 0x66::test::mul_u32 --args 100000, 20000
+// CHECK: results: 2000000000
+// RUN: execute 0x66::test::div_u128 --args 1000000000000, 8
+// CHECK: results: 125000000000
+// RUN: execute 0x66::test::mod_u256 --args 1000000000007, 8
+// CHECK: results: 7
+// RUN: execute 0x66::test::add_i8 --args -50, 20
+// CHECK: results: -30
+// RUN: execute 0x66::test::sub_i16 --args 1000, -500
+// CHECK: results: 1500
+// RUN: execute 0x66::test::mul_i32 --args -30000, 50000
+// CHECK: results: -1500000000
+// Signed division truncates toward zero.
+// RUN: execute 0x66::test::div_i64 --args -100, 4
+// CHECK: results: -25
+// RUN: execute 0x66::test::mod_i128 --args 100, 7
+// CHECK: results: 2
+// RUN: execute 0x66::test::add_i256 --args -1000, 250
+// CHECK: results: -750
+
+// --- Execution: bitwise ---
+// RUN: execute 0x66::test::bit_and_u128 --args 12, 10
+// CHECK: results: 8
+// RUN: execute 0x66::test::bit_or_u8 --args 12, 10
+// CHECK: results: 14
+// RUN: execute 0x66::test::bit_xor_u32 --args 255, 240
+// CHECK: results: 15
+
+// --- Execution: shift ---
+// RUN: execute 0x66::test::shl_u16 --args 5, 3
+// CHECK: results: 40
+// RUN: execute 0x66::test::shr_u256 --args 256, 4
+// CHECK: results: 16
+
+// --- Execution: immediate forms ---
+// RUN: execute 0x66::test::add_u8_imm --args 100
+// CHECK: results: 107
+// RUN: execute 0x66::test::mul_u128_imm --args 1000000
+// CHECK: results: 1000000000
+// RUN: execute 0x66::test::bit_and_u32_imm --args 4097
+// CHECK: results: 1
+// RUN: execute 0x66::test::shl_u16_imm --args 5
+// CHECK: results: 40
+// sub_i32_imm computes a - (-10) = a + 10.
+// RUN: execute 0x66::test::sub_i32_imm --args 5
+// CHECK: results: 15
+
+// --- Execution: negate ---
+// RUN: execute 0x66::test::negate_i8 --args -42
+// CHECK: results: 42
+// RUN: execute 0x66::test::negate_i64 --args 100
+// CHECK: results: -100
+// RUN: execute 0x66::test::negate_i256 --args -1234567
+// CHECK: results: 1234567

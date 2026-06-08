@@ -10,13 +10,16 @@ use crate::{
     },
     position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_merkle_db::PositionMerkleDb,
+    position_pruner::PositionPruner,
     position_state_store::PositionStateStore,
     utils::truncation_helper::{
         get_position_commit_progress, get_position_merkle_commit_progress,
         truncate_position_db_shards, truncate_position_merkle_db,
     },
 };
-use aptos_config::config::{RocksdbConfig, StorageDirPaths};
+use aptos_config::config::{
+    LedgerPrunerConfig, RocksdbConfig, StateMerklePrunerConfig, StorageDirPaths,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
@@ -27,6 +30,12 @@ use std::{collections::HashMap, sync::Arc};
 pub struct PositionBundle {
     pub kv_db: Arc<PositionDb>,
     pub merkle_db: Arc<PositionMerkleDb>,
+    /// Pruner managers (value + merkle), the analog of main state's
+    /// `StatePruner`. `None` in readonly mode. Held as `Arc` so the
+    /// position merkle batch committer shares it; the value pruner is
+    /// driven from `commit_native_position`, the merkle pruners from the
+    /// committer, and all are re-activated on restart from `open_internal`.
+    pub(crate) position_pruner: Option<Arc<PositionPruner>>,
     /// `None` in readonly mode.
     pub(crate) state_store: Option<Arc<PositionStateStore>>,
     /// JMT version the in-memory MapLayer chain is rooted at — the
@@ -56,6 +65,9 @@ impl AptosDB {
         db_paths: &StorageDirPaths,
         kv_config: RocksdbConfig,
         merkle_config: RocksdbConfig,
+        value_pruner_config: LedgerPrunerConfig,
+        state_merkle_pruner_config: StateMerklePrunerConfig,
+        epoch_snapshot_pruner_config: StateMerklePrunerConfig,
         env: &Env,
         block_cache: &Cache,
         readonly: bool,
@@ -92,6 +104,20 @@ impl AptosDB {
         let kv_db = Arc::new(position_db);
         let merkle_db = Arc::new(merkle_db);
 
+        // Pruner managers (value + merkle), grouped like main state's
+        // `StatePruner`. Shared with the merkle batch committer via `Arc`.
+        let position_pruner = if readonly {
+            None
+        } else {
+            Some(Arc::new(PositionPruner::new(
+                Arc::clone(&kv_db),
+                Arc::clone(&merkle_db),
+                value_pruner_config,
+                state_merkle_pruner_config,
+                epoch_snapshot_pruner_config,
+            )))
+        };
+
         let state_store = if readonly {
             None
         } else {
@@ -106,6 +132,11 @@ impl AptosDB {
                 Arc::clone(&merkle_db),
                 Arc::clone(&self.ledger_db),
                 last_snapshot,
+                Arc::clone(
+                    position_pruner
+                        .as_ref()
+                        .expect("position_pruner present in non-readonly mode"),
+                ),
             )))
         };
 
@@ -129,6 +160,7 @@ impl AptosDB {
         self.position = Some(Arc::new(PositionBundle {
             kv_db,
             merkle_db,
+            position_pruner,
             state_store,
             snapshot_version: merkle_progress,
         }));
@@ -208,11 +240,14 @@ impl AptosDB {
             for (key, op) in write_set.native_position_iter() {
                 let maybe_value = op.as_write_op().as_state_value_opt().cloned();
                 let value_hash = maybe_value.as_ref().map(StateValue::hash);
-                pending_leaf_updates.insert(key.hash(), PositionSlot {
-                    state_key: key.clone(),
-                    value_hash,
-                    value: None,
-                });
+                pending_leaf_updates.insert(
+                    key.hash(),
+                    PositionSlot {
+                        state_key: key.clone(),
+                        value_hash,
+                        value: None,
+                    },
+                );
             }
         }
 

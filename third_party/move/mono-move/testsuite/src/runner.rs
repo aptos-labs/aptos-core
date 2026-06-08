@@ -5,13 +5,16 @@
 //! normalized output for comparison.
 
 use crate::{
-    compile::{compile, SourceKind},
+    compile::{compile, compile_move_stdlib, SourceKind},
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
     parser::{PrintSection, Step},
     print_sections,
 };
 use anyhow::{anyhow, bail};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
+use aptos_vm::natives::aptos_natives;
 use mono_move_core::{
     native::{NativeName, ProductionContextFamily, ProductionNativeRegistry},
     types::EMPTY_TYPE_LIST,
@@ -20,8 +23,9 @@ use mono_move_core::{
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_natives::make_all_test_natives;
+use mono_move_natives::{make_all_production_natives, make_all_test_natives};
 use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus, TransactionContext};
+use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
@@ -35,12 +39,13 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
+    native_functions::NativeFunctionTable,
     AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
     RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
-use std::path::Path;
+use std::{path::Path, sync::OnceLock};
 
 /// Execution output from a VM as a normalized display string.
 struct Output {
@@ -55,10 +60,21 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
-    let runtime_env = RuntimeEnvironment::new(crate::v1_test_natives::make_all_v1_test_natives());
+    let runtime_env = RuntimeEnvironment::new(v1_native_table());
     let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_env);
     let mut module_provider = InMemoryModuleProvider::new();
     let mut snapshot = String::new();
+
+    // Publish the Move stdlib into both VMs so tests can call real stdlib
+    // natives.
+    for module in stdlib_modules() {
+        let mut blob = vec![];
+        module
+            .serialize(&mut blob)
+            .expect("stdlib module serializes");
+        storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
+        module_provider.add_module(module);
+    }
 
     for step in steps {
         match step {
@@ -120,6 +136,26 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
     }
 
     Ok(())
+}
+
+/// Native table for the legacy VM. This includes both the real Aptos production
+/// natives and some toy ones for tests.
+fn v1_native_table() -> NativeFunctionTable {
+    let mut table = aptos_natives(
+        LATEST_GAS_FEATURE_VERSION,
+        NativeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
+        TimedFeaturesBuilder::enable_all().build(),
+        Features::default(),
+    );
+    table.extend(crate::v1_test_natives::make_all_v1_test_natives());
+    table
+}
+
+/// The compiled Move stdlib, compiled once and shared across tests.
+fn stdlib_modules() -> &'static [CompiledModule] {
+    static STDLIB: OnceLock<Vec<CompiledModule>> = OnceLock::new();
+    STDLIB.get_or_init(|| compile_move_stdlib().expect("Move stdlib compiles"))
 }
 
 /// Output of V1 execution, plus the parameter and return types so V2 can
@@ -240,6 +276,9 @@ fn execute_function_v2(
         .register_all(
             make_all_test_natives::<ProductionContextFamily<SimpleGasMeter>>()
                 .into_iter()
+                .chain(make_all_production_natives::<
+                    ProductionContextFamily<SimpleGasMeter>,
+                >())
                 .map(|(addr, module, function, func)| {
                     let name = NativeName {
                         module: guard.module_id_of(&addr, &module),
@@ -248,7 +287,7 @@ fn execute_function_v2(
                     (name, func)
                 }),
         )
-        .expect("test natives have unique qualified names");
+        .expect("natives have unique qualified names");
     let loader = Loader::new_with_policy(
         guard,
         module_provider,

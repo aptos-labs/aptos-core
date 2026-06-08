@@ -2453,9 +2453,68 @@ impl SpecTranslator<'_> {
         // (e.g. `e - int2bv(1)` inside a bv spec function has the right Boogie type but its
         // node num_oper may not be Bitwise) and on calls whose result is bv but some parameters
         // are int — in both cases the conversion creates a type error rather than fixing one.
-        for exp in args {
-            maybe_comma();
-            self.translate_exp(exp);
+        //
+        // For a doubled call (`wrap_mut_ref_spec_fun_inputs` has emitted a `(Old(arg), arg)`
+        // pair for every `&mut` parameter) carrying labeled pre/post state, substitute the
+        // bound value-state variable from `value_state_vars` into the corresponding doubled
+        // slot. Mirrors the substitution path in `translate_behavior_via_evaluator` so labeled
+        // spec-function checks compare state S against entry/exit (or one labeled state
+        // against another) rather than collapsing to entry-vs-exit via the `Old(arg)`-routed
+        // function-entry snapshots.
+        let mut_count = fun_decl
+            .params
+            .iter()
+            .filter(|move_model::model::Parameter(_, ty, _)| ty.is_mutable_reference())
+            .count();
+        let is_doubled =
+            fun_decl.uses_old && mut_count > 0 && args.len() == fun_decl.params.len() + mut_count;
+        let value_state_sub = |label_opt: Option<MemoryLabel>| {
+            label_opt.and_then(|label| {
+                self.value_state_vars
+                    .borrow()
+                    .get(&label)
+                    .map(|(v, _)| v.clone())
+            })
+        };
+        let pre_sub = if is_doubled {
+            value_state_sub(range.pre)
+        } else {
+            None
+        };
+        let post_sub = if is_doubled {
+            value_state_sub(range.post)
+        } else {
+            None
+        };
+        if is_doubled {
+            let mut arg_iter = args.iter();
+            for move_model::model::Parameter(_, ty, _) in &fun_decl.params {
+                if ty.is_mutable_reference() {
+                    let pre_arg = arg_iter.next().expect("doubled args missing pre slot");
+                    let post_arg = arg_iter.next().expect("doubled args missing post slot");
+                    maybe_comma();
+                    if let Some(ref var) = pre_sub {
+                        emit!(self.writer, "{}", var);
+                    } else {
+                        self.translate_exp(pre_arg);
+                    }
+                    maybe_comma();
+                    if let Some(ref var) = post_sub {
+                        emit!(self.writer, "{}", var);
+                    } else {
+                        self.translate_exp(post_arg);
+                    }
+                } else {
+                    let arg = arg_iter.next().expect("missing arg for non-mut param");
+                    maybe_comma();
+                    self.translate_exp(arg);
+                }
+            }
+        } else {
+            for exp in args {
+                maybe_comma();
+                self.translate_exp(exp);
+            }
         }
         emit!(self.writer, ")");
     }
@@ -2972,8 +3031,13 @@ impl SpecTranslator<'_> {
     }
 
     /// For a `StateDomain` quantifier variable with name `label_name`, scan `exp` for
-    /// `Behavior(EnsuresOf, range)` operations where `range.pre` or `range.post` maps to
-    /// `label_name` AND the closure has `|&mut T|`-style parameters with no global memory.
+    /// operations whose `range.pre` or `range.post` maps to `label_name` AND whose
+    /// callee has `&mut T`-typed parameters with no global memory. Recognizes two
+    /// such call shapes:
+    /// - `Behavior(EnsuresOf, range)` — `..S |~ ensures_of<f>(...)` for `|&mut T|` closures.
+    /// - `SpecFunction(mid, fid, range)` — `..S |~ user_spec_fun(...)` where the spec
+    ///   function declaration takes `&mut T` parameters and uses `old(...)` (so it has
+    ///   been doubled by `wrap_mut_ref_spec_fun_inputs` in the model-level translator).
     /// Returns `(MemoryLabel, T)` — the label and the value type to use for the state variable.
     fn find_value_state_for_label(
         &self,
@@ -2986,31 +3050,56 @@ impl SpecTranslator<'_> {
             if result.is_some() {
                 return false;
             }
-            if let ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, range), args) = e {
-                let matching_label = range
-                    .pre
-                    .into_iter()
-                    .chain(range.post)
-                    .find(|label| label_names.get(label).copied() == Some(label_name));
-                if let Some(label) = matching_label {
-                    if let Some(fun_arg) = args.first() {
-                        let fun_type = self.env.get_node_type(fun_arg.node_id());
-                        let inst_fun_type = fun_type.instantiate(&self.type_inst);
-                        let (union_used, _) =
-                            compute_evaluator_memory_union(self.env, &inst_fun_type);
-                        if union_used.is_empty() {
-                            // No global memory — check for &mut T params
-                            if let Type::Fun(arg_ty, _, _) = &inst_fun_type {
-                                for ty in arg_ty.clone().flatten() {
-                                    if ty.is_mutable_reference() {
-                                        result = Some((label, ty.skip_reference().clone()));
-                                        return false;
+            match e {
+                ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, range), args) => {
+                    let matching_label = range
+                        .pre
+                        .into_iter()
+                        .chain(range.post)
+                        .find(|label| label_names.get(label).copied() == Some(label_name));
+                    if let Some(label) = matching_label {
+                        if let Some(fun_arg) = args.first() {
+                            let fun_type = self.env.get_node_type(fun_arg.node_id());
+                            let inst_fun_type = fun_type.instantiate(&self.type_inst);
+                            let (union_used, _) =
+                                compute_evaluator_memory_union(self.env, &inst_fun_type);
+                            if union_used.is_empty() {
+                                // No global memory — check for &mut T params
+                                if let Type::Fun(arg_ty, _, _) = &inst_fun_type {
+                                    for ty in arg_ty.clone().flatten() {
+                                        if ty.is_mutable_reference() {
+                                            result = Some((label, ty.skip_reference().clone()));
+                                            return false;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
+                },
+                ExpData::Call(_, Operation::SpecFunction(mid, fid, range), _) => {
+                    let matching_label = range
+                        .pre
+                        .into_iter()
+                        .chain(range.post)
+                        .find(|label| label_names.get(label).copied() == Some(label_name));
+                    if let Some(label) = matching_label {
+                        let module_env = self.env.get_module(*mid);
+                        let decl = module_env.get_spec_fun(*fid);
+                        // Only doubled (uses_old + &mut) spec functions need a value-typed
+                        // state variable — the same condition `wrap_mut_ref_spec_fun_inputs`
+                        // uses to decide whether to emit a `(Old(p), p)` pair.
+                        if decl.uses_old && decl.used_memory.is_empty() {
+                            for move_model::model::Parameter(_, ty, _) in &decl.params {
+                                if ty.is_mutable_reference() {
+                                    result = Some((label, ty.skip_reference().clone()));
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                },
+                _ => {},
             }
             true
         });

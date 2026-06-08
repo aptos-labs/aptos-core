@@ -48,9 +48,11 @@ test-case = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-block-executor = { workspace = true, features = ["testing"] }
 aptos-mvhashmap = { workspace = true }
+aptos-resource-viewer = { workspace = true }
 aptos-vm-types = { workspace = true }
 claims = { workspace = true }
 memory-stats = { workspace = true }
+move-bytecode-utils = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 test-case = { workspace = true }

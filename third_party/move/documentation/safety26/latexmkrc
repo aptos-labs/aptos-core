@@ -1,0 +1,6 @@
+  $pdf_mode       = 1;        # produce PDF via pdflatex
+  $aux_dir        = 'build';  # all .aux/.log/.fls/.fdb_latexmk/.bbl/... land here
+  $out_dir        = '.';      # final main.pdf ends up beside main.tex
+  $bibtex_use     = 2;        # run bibtex when needed
+  $go_mode        = 2;        # always rerun everything, even if "up to date"
+  $clean_ext      = 'synctex.gz synctex.gz(busy) run.xml tex.bak bbl bcf fdb_latexmk run tdo';

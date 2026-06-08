@@ -389,11 +389,14 @@ impl AptosDB {
                     .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?
                     .position;
                 for u in merkle_updates {
-                    pending_leaf_updates.insert(u.state_key_hash, PositionSlot {
-                        state_key: u.state_key,
-                        value_hash: u.value_hash,
-                        value: None,
-                    });
+                    pending_leaf_updates.insert(
+                        u.state_key_hash,
+                        PositionSlot {
+                            state_key: u.state_key,
+                            value_hash: u.value_hash,
+                            value: None,
+                        },
+                    );
                 }
             }
 
@@ -769,6 +772,18 @@ impl AptosDB {
                 .maybe_set_pruner_target_db_version(version);
             if let Some(pruner) = &self.state_store.state_pruner.hot_state_kv_pruner {
                 pruner.maybe_set_pruner_target_db_version(version);
+            }
+            // Activate the native-position value pruner here too, after
+            // the commit is durable — same point as `state_kv_pruner`.
+            // (The merkle pruners are driven when snapshots persist.)
+            if let Some(position_pruner) = self
+                .position
+                .as_ref()
+                .and_then(|bundle| bundle.position_pruner.as_ref())
+            {
+                position_pruner
+                    .value_pruner
+                    .maybe_set_pruner_target_db_version(version);
             }
         }
 

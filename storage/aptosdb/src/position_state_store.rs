@@ -11,6 +11,7 @@ use crate::{
         POSITION_TARGET_ITEMS,
     },
     position_merkle_db::PositionMerkleDb,
+    position_pruner::PositionPruner,
 };
 use aptos_infallible::Mutex;
 use std::sync::Arc;
@@ -23,6 +24,7 @@ impl PositionStateStore {
         merkle_db: Arc<PositionMerkleDb>,
         ledger_db: Arc<LedgerDb>,
         last_snapshot: PositionStateWithSummary,
+        position_pruner: Arc<PositionPruner>,
     ) -> Self {
         let current_state = Arc::new(Mutex::new(
             PositionLedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone()),
@@ -33,6 +35,7 @@ impl PositionStateStore {
             last_snapshot,
             POSITION_TARGET_ITEMS,
             Arc::clone(&current_state),
+            position_pruner,
         );
         Self::from_parts(current_state, buffered_state)
     }

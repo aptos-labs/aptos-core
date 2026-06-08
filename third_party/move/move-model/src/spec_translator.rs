@@ -1124,6 +1124,60 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         .into_exp()
     }
 
+    /// For a two-state spec_fun call (whose declaration emits dual
+    /// `(old_p, p)` Boogie parameters for each `&mut` input), double each
+    /// `&mut` argument into a `(Old(arg), arg)` pair. The `Old` wrapper
+    /// triggers `save_param` during `rewrite_temporary`, so the pre-state
+    /// value is captured via a snapshot temp at function entry — matching
+    /// the mechanism used for `&mut` arguments to behavioral predicates.
+    ///
+    /// Idempotent: detects when args have already been doubled by comparing
+    /// `args.len()` against `decl.params.len()`.
+    fn wrap_mut_ref_spec_fun_inputs(&mut self, exp: &Exp) -> Exp {
+        let env = self.builder.global_env();
+        let ExpData::Call(node_id, Operation::SpecFunction(mid, fid, range), args) = exp.as_ref()
+        else {
+            return exp.clone();
+        };
+        let (uses_old, params) = {
+            let module_env = env.get_module(*mid);
+            let decl = module_env.get_spec_fun(*fid);
+            (decl.uses_old, decl.params.clone())
+        };
+        if !uses_old {
+            return exp.clone();
+        }
+        // Already doubled by a prior pass.
+        if args.len() != params.len() {
+            return exp.clone();
+        }
+        let any_mut = params
+            .iter()
+            .any(|crate::model::Parameter(_, ty, _)| ty.is_mutable_reference());
+        if !any_mut {
+            return exp.clone();
+        }
+        let mut new_args: Vec<Exp> = Vec::with_capacity(args.len() * 2);
+        for (param, arg) in params.iter().zip(args.iter()) {
+            let crate::model::Parameter(_, ty, _) = param;
+            if ty.is_mutable_reference() {
+                let arg_ty = env.get_node_type(arg.node_id());
+                let arg_loc = env.get_node_loc(arg.node_id());
+                let new_id = env.new_node(arg_loc, arg_ty);
+                new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg.clone()]).into_exp());
+                new_args.push(arg.clone());
+            } else {
+                new_args.push(arg.clone());
+            }
+        }
+        ExpData::Call(
+            *node_id,
+            Operation::SpecFunction(*mid, *fid, range.clone()),
+            new_args,
+        )
+        .into_exp()
+    }
+
     /// True if `arg` is a stateful `&mut`-source shape: a ref-typed
     /// expression, `Borrow(Mut, ...)`, `Old(...)` of a stateful inner,
     /// a `Select`/`SelectVariants` rooted in a stateful inner, or a
@@ -1160,6 +1214,16 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         // pre-state through captured temps.
         let exp = if let ExpData::Call(_, Operation::Behavior(_, _), _) = exp.as_ref() {
             self.wrap_mut_ref_bp_inputs(&exp)
+        } else {
+            exp
+        };
+        // For a two-state spec_fun call whose declaration takes `&mut` parameters,
+        // double each `&mut` argument into a `(Old(arg), arg)` pair to match the
+        // dual `(old_p, p)` parameters emitted by the Boogie backend. The `Old`
+        // wrapper triggers `save_param` during descent, capturing the pre-state
+        // value through a snapshot temp.
+        let exp = if let ExpData::Call(_, Operation::SpecFunction(_, _, _), _) = exp.as_ref() {
+            self.wrap_mut_ref_spec_fun_inputs(&exp)
         } else {
             exp
         };
@@ -1221,13 +1285,16 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             _ => {},
         }
+        // Save and restore `in_old` rather than unconditionally clearing it on
+        // exit: when we are already inside an outer `old(...)` (or the wrapper
+        // `wrap_mut_ref_spec_fun_inputs` synthesizes a nested `Old(c)`), the
+        // surrounding context must survive the descent into this node.
+        let prev_in_old = self.in_old;
         if is_old {
             self.in_old = true;
         }
         let exp = self.rewrite_exp_descent(exp);
-        if is_old {
-            self.in_old = false;
-        }
+        self.in_old = prev_in_old;
         exp
     }
 

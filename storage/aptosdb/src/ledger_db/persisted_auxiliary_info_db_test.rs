@@ -53,15 +53,15 @@ pub fn test_iterator() {
         vec![PersistedAuxiliaryInfo::None; 20]
     );
 
-    assert_eq!(get_persisted_auxiliary_info(&db, 100, 20), vec![
-        v1_info;
-        20
-    ]);
+    assert_eq!(
+        get_persisted_auxiliary_info(&db, 100, 20),
+        vec![v1_info; 20]
+    );
 
-    assert_eq!(get_persisted_auxiliary_info(&db, 190, 20), vec![
-        v1_info;
-        10
-    ]);
+    assert_eq!(
+        get_persisted_auxiliary_info(&db, 190, 20),
+        vec![v1_info; 10]
+    );
 
     assert_eq!(get_persisted_auxiliary_info(&db, 200, 20), vec![]);
 }

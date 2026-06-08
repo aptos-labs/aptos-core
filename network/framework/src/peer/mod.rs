@@ -41,6 +41,8 @@ use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
+#[cfg(feature = "failpoints")]
+use fail::fail_point;
 use futures::{
     self,
     channel::oneshot,
@@ -482,6 +484,12 @@ where
         &mut self,
         message: NetworkMessage,
     ) -> Result<(), PeerManagerError> {
+        // Test-only: drop all inbound application messages to simulate a network
+        // blackhole (e.g. forge partition tests). Covers every protocol since this
+        // is the single dispatch point for received DirectSend/RPC messages.
+        #[cfg(feature = "failpoints")]
+        fail_point!("network::recv::any", |_| Ok(()));
+
         match &message {
             NetworkMessage::DirectSendMsg(direct) => {
                 let data_len = direct.raw_msg.len();
@@ -638,6 +646,12 @@ where
         request: PeerRequest,
         write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
     ) {
+        // Test-only: drop all outbound application messages to simulate a network
+        // blackhole (e.g. forge partition tests). Covers every protocol since this
+        // is the single point where outbound messages are queued to the writer.
+        #[cfg(feature = "failpoints")]
+        fail_point!("network::send::any", |_| ());
+
         trace!(
             "Peer {} PeerRequest::{:?}",
             self.remote_peer_id().short_str(),

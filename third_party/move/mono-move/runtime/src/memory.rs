@@ -5,6 +5,7 @@
 
 use crate::VEC_DATA_OFFSET;
 use mono_move_core::{DescriptorId, MAX_ALIGN};
+use move_core_types::account_address::AccountAddress;
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
@@ -187,6 +188,31 @@ pub unsafe fn read_u32(base: *const u8, byte_offset: impl Into<usize>) -> u32 {
 pub unsafe fn write_u32(base: *mut u8, byte_offset: impl Into<usize>, val: u32) {
     // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *mut u32).write(val) }
+}
+
+/// Read a 32-byte [`AccountAddress`] starting at `byte_offset`. Reads aligned
+/// when its alignment is within [`MAX_ALIGN`], otherwise unaligned.
+///
+/// This check shall have no impact on performance as it is easily optimized
+/// away by the compiler.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid and point to an initialized
+/// [`AccountAddress`].
+#[inline(always)]
+pub unsafe fn read_account_address(
+    base: *const u8,
+    byte_offset: impl Into<usize>,
+) -> AccountAddress {
+    let ptr = unsafe { base.add(byte_offset.into()) as *const AccountAddress };
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe {
+        if std::mem::align_of::<AccountAddress>() <= MAX_ALIGN {
+            ptr.read()
+        } else {
+            ptr.read_unaligned()
+        }
+    }
 }
 
 /// Pointer to the `idx`-th element inside a vector's data region.

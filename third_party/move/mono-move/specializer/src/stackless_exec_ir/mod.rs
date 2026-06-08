@@ -24,6 +24,7 @@ use move_core_types::{
 };
 
 /// Named slot operand.
+/// TODO: consider renaming this enum to `NamedSlot`, to contrast with `SizedSlot`.
 ///
 /// - `Home` — frame-local storage: parameters, declared locals, and temporaries
 ///   due to destackification. These map 1:1 to frame slots.
