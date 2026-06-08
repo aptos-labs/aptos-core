@@ -20,7 +20,7 @@ use anyhow::{bail, Result};
 use mono_move_core::{
     align_up_u32,
     interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId},
-    native::{NativeIdx, NativeName, NativeResolver},
+    native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{
         strip_ref, view_type, view_type_list, Alignment, FieldLayout, InternedType,
@@ -388,10 +388,7 @@ pub fn try_build_context<'a>(
                 // TODO: support native closure targets. `CallClosure` resolves
                 // via `load_function`, which has no IR for natives, so skip them.
                 if natives
-                    .resolve(&NativeName {
-                        module: callee_module_id,
-                        function: callee_func_name,
-                    })
+                    .resolve(callee_module_id, callee_func_name, EMPTY_TYPE_LIST)
                     .is_some()
                 {
                     return Ok(BuildContextOutcome::Skipped(
@@ -454,10 +451,7 @@ pub fn try_build_context<'a>(
         // Consider cross-checking against the callee module's `is_native` flag
         // against the callee module's `is_native` flag so a registered impl cannot
         // shadow a Move-body function with the same qualified name.
-        let native_idx = natives.resolve(&NativeName {
-            module: callee_module_id,
-            function: callee_func_name,
-        });
+        let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,

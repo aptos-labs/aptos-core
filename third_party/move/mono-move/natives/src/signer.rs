@@ -6,9 +6,8 @@
 //! MonoMove currently represents a `signer` as a bare 32-byte account address — the
 //! same layout as `address`. Permissioned signers are not supported, for now.
 
-use crate::{natives, NativeFunction};
+use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::native::{NativeContext, NativeContextFamily, NativeStatus, VMInternalError};
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 /// `0x1::create_signer::create_signer(addr: address): signer`
 ///
@@ -38,9 +37,8 @@ pub fn native_is_permissioned_signer<C: NativeContext>(
 }
 
 /// Builds a list of all signer-related natives.
-pub fn make_all_signer_natives<F: NativeContextFamily>(
-) -> Vec<(AccountAddress, Identifier, Identifier, NativeFunction<F>)> {
-    natives![
+pub fn make_all_signer_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    monomorphic_natives![
         ("0x1::signer::borrow_address", native_borrow_address),
         ("0x1::create_signer::create_signer", native_create_signer),
         (
