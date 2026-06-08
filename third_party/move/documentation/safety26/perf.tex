@@ -1,0 +1,13 @@
+\section{Performance}
+\label{sec:perf}
+
+The runtime checks are not free, and we summarize their cost here.
+Measured across representative workloads, type checking together with ability enforcement incurs on average roughly a 20\% slowdown on executing transactions, and reference safety checking incurs on average roughly a 40\% slowdown.
+Both numbers are with synchronous checking; the asynchronous mode of Section~\ref{sec:async} amortizes a significant portion of this cost onto otherwise idle workers and is the default in production.
+
+\TODO{perf}{Expand with the benchmark setup (representative workload, hardware, gas version), per-instruction-class breakdown, and a comparison of sync vs.\ async numbers.}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

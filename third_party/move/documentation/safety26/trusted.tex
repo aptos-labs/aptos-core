@@ -1,0 +1,24 @@
+\section{Trusted Code}
+\label{sec:trusted}
+
+Runtime safety checks are costly.
+The MoveVM supports the concept of \emph{trusted code} which waives those checks.
+Currently, trusted code deployment underlies Aptos Foundation governance, and is only allowed for the Aptos framework, whose deployment needs to be approved by the Aptos operators. We are also investigating models for trusted code based on stake.
+
+The main property of trusted code is that the governance model gives higher confidence in the integrity of the code.
+This does not exclude bugs in the VM, but it does reduce the likelihood of malicious code, that is code explicitly engineered for an exploit.
+
+When executing trusted code, the checks discussed in the previous section are disabled. Since checks like type safety or reference safety collect information during execution, care must be taken to correctly model the transitions from untrusted into trusted code and vice versa. For example, trusted code does not use the type stack, but untrusted code expects the type of a return value from a function call on the type stack, so this information needs to be synthesized when returning from a call to a trusted function into untrusted code.
+
+%\begin{itemize}
+%\item $\CALL trusted$ from untrusted code:
+%the types of the arguments need to be removed from $\theta$ since the callee will not use them.
+%\item $\RET$ from trusted to untrusted code: the types of the return values need to be pushed on the stack, since %the trusted code does not do this but the untrusted expects it.
+%\item $\CALL untrusted$ from trusted code: argument types need to be pushed onto the type stack.
+%\item $\RET$ from untrusted code to trusted code: the return types need to be popped.
+%\end{itemize}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

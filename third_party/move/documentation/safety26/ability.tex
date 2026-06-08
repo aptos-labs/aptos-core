@@ -1,0 +1,30 @@
+\subsection{Ability Safety}
+\label{sec:ability}
+
+The most damaging ability bug is on |copy|.
+A value whose type lacks |copy| is meant to be unique: this is what makes the |Capability| of Section~\ref{sec:type} a single-issue permission, and what makes a |Coin| balance impossible to counterfeit.
+A runtime that produces a fresh value of a no-|copy| type silently duplicates that resource.
+
+\subsubsection{Example}
+
+While we do not know about a historical exploit around abilities, here is a simple imaginary example:
+
+\begin{MoveBox}
+fun clone(c: &Capability): Capability {
+    *c   // ReadRef requires `copy` --- should be rejected.
+}
+\end{MoveBox}
+
+The |Capability| type introduced in Section~\ref{sec:type} does not have the |copy| ability, thus the above code should be rejected. If for some reason the bytecode verifier does not do this, one can craft bytecode which silently creates a copy of the token.
+
+\subsubsection{Performing the Checks}
+
+When executing untrusted code, the VM performs checks for violations of each of the abilities |copy|, |drop|, |key|, and |store|.
+Most of those checks are relatively straightforward and can be directly performed when the corresponding instruction is executed.
+The exception is |drop|, which requires the VM to track which values have not been consumed on function exit.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
