@@ -75,6 +75,22 @@ impl RestoreHandler {
         )
     }
 
+    /// Transaction-backup restore replays only main state; it doesn't
+    /// repopulate the native-position DBs, so a node restored with the feature
+    /// enabled would carry an empty/stale position base and diverge once
+    /// COMPUTE_TRADING_NATIVE_STATE_ROOTS is on. Refuse until native-position
+    /// restore exists. No-op while ENABLE_TRADING_NATIVE is off.
+    fn ensure_native_position_disabled(&self) -> Result<()> {
+        if self.aptosdb.position().is_some() {
+            return Err(aptos_storage_interface::AptosDbError::Other(
+                "native-position transaction-backup restore is not yet supported; \
+                 cannot restore with native position enabled"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn save_transactions(
         &self,
         first_version: Version,
@@ -84,6 +100,7 @@ impl RestoreHandler {
         events: &[Vec<ContractEvent>],
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
+        self.ensure_native_position_disabled()?;
         restore_utils::save_transactions(
             self.state_store.clone(),
             self.ledger_db.clone(),
@@ -111,6 +128,7 @@ impl RestoreHandler {
         events: &[Vec<ContractEvent>],
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
+        self.ensure_native_position_disabled()?;
         restore_utils::save_transactions(
             self.state_store.clone(),
             self.ledger_db.clone(),

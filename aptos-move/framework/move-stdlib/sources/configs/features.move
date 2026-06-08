@@ -889,6 +889,11 @@ module std::features {
     /// Lifetime: permanent
     const TRANSACTION_INFO_V1: u64 = 117;
 
+    /// When enabled, execution computes the native-position state root and commits it to
+    /// `TransactionInfoV1`, so it is consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    /// Lifetime: permanent
+    const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 118;
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -190,6 +190,10 @@ pub enum FeatureFlag {
     /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
     /// state root hash, so it is committed to the ledger accumulator.
     TRANSACTION_INFO_V1 = 117,
+    /// When enabled, execution computes the native-position state root at the
+    /// checkpoint stage and commits it to `TransactionInfoV1`, so it is
+    /// consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    COMPUTE_TRADING_NATIVE_STATE_ROOTS = 118,
 }
 
 impl FeatureFlag {
@@ -538,6 +542,10 @@ impl Features {
 
     pub fn is_transaction_info_v1_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
+    }
+
+    pub fn is_compute_trading_native_state_roots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

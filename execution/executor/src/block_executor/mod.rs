@@ -27,7 +27,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+        state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
@@ -352,11 +353,35 @@ where
                     Err(anyhow::anyhow!("Injected error in block state checkpoint."))
                 });
                 let parent_state_summary = parent_block.output.ensure_result_state_summary()?;
+                let position_persisted = output
+                    .execution_output
+                    .compute_trading_native_state_roots
+                    .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+                    .transpose()?;
+                let parent_position_summary =
+                    parent_block.output.ensure_result_position_state_summary()?;
+                // After restart/reset the root block carries no position
+                // summary; seed from the pre-committed position tip (the
+                // replayed in-memory state), not the persisted snapshot — which
+                // can lag the tip and would drop the replayed writes, producing
+                // a wrong root.
+                let precommitted_position = if parent_position_summary.is_none()
+                    && output.execution_output.compute_trading_native_state_roots
+                {
+                    self.db.reader.get_pre_committed_position_state_summary()?
+                } else {
+                    None
+                };
+                let parent_position_summary =
+                    parent_position_summary.or(precommitted_position.as_ref());
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
                     parent_state_summary,
                     &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
                     None,
+                    None,
+                    parent_position_summary,
+                    position_persisted.as_ref(),
                     None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(

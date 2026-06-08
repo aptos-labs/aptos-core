@@ -37,6 +37,9 @@ impl DoLedgerUpdate {
             state_checkpoint_output
                 .hot_state_checkpoint_hashes
                 .as_deref(),
+            state_checkpoint_output
+                .position_state_checkpoint_hashes
+                .as_deref(),
         );
 
         // Calculate root hash
@@ -54,6 +57,7 @@ impl DoLedgerUpdate {
         to_commit: &TransactionsWithOutput,
         state_checkpoint_hashes: &[Option<HashValue>],
         hot_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
+        position_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
     ) -> (Vec<TransactionInfo>, Vec<HashValue>) {
         let _timer = OTHER_TIMERS.timer_with(&["assemble_transaction_infos"]);
 
@@ -95,6 +99,7 @@ impl DoLedgerUpdate {
                         txn_output.gas_used(),
                         status,
                         auxiliary_info_hash,
+                        position_state_checkpoint_hashes.and_then(|p| p[i]),
                     )
                 } else {
                     TransactionInfo::new(

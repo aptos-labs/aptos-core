@@ -241,7 +241,13 @@ impl AptosDB {
                         .value_pruner
                         .maybe_set_pruner_target_db_version(version);
                 }
-                if let Some(version) = bundle.snapshot_version {
+                // Drive the merkle pruners to the persisted base version
+                // (set after init's seed + replay).
+                if let Some(version) = bundle
+                    .persisted
+                    .as_ref()
+                    .and_then(|persisted| persisted.get().version())
+                {
                     position_pruner
                         .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(version);

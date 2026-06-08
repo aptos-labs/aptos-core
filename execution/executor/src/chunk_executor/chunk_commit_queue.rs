@@ -13,7 +13,10 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
+    state_store::{
+        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
+    },
     DbReader, LedgerSummary,
 };
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
@@ -40,6 +43,9 @@ pub struct ChunkCommitQueue {
     /// Notice that latest_state and latest_txn_accumulator are at different versions.
     latest_state: LedgerState,
     latest_state_summary: LedgerStateSummary,
+    /// Native-position summary chained across chunks (the parent the next
+    /// chunk rebases from). `None` when native position is disabled.
+    latest_position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
@@ -56,6 +62,7 @@ impl ChunkCommitQueue {
         Ok(Self {
             latest_state: state,
             latest_state_summary: state_summary,
+            latest_position_state_summary: db.get_pre_committed_position_state_summary()?,
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
@@ -86,6 +93,7 @@ impl ChunkCommitQueue {
         &mut self,
     ) -> Result<(
         LedgerStateSummary,
+        Option<LedgerWithSummary<PositionStateWithSummary>>,
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {
@@ -98,6 +106,7 @@ impl ChunkCommitQueue {
             .ok_or_else(|| anyhow!("Next chunk to update ledger has already been processed."))?;
         Ok((
             self.latest_state_summary.clone(),
+            self.latest_position_state_summary.clone(),
             self.latest_txn_accumulator.clone(),
             chunk,
         ))
@@ -118,6 +127,11 @@ impl ChunkCommitQueue {
             .output
             .ensure_state_checkpoint_output()?
             .state_summary
+            .clone();
+        self.latest_position_state_summary = chunk
+            .output
+            .ensure_state_checkpoint_output()?
+            .position_state_summary
             .clone();
         self.latest_txn_accumulator = chunk
             .output
