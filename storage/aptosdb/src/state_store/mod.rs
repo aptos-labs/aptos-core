@@ -21,6 +21,7 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
+    state_value_chunk::{build_value_chunk_proof, jmt_leaves_with_values, value_chunk_with_proof},
     utils::{
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
@@ -1411,6 +1412,8 @@ impl StateStore {
         Ok(())
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    #[allow(dead_code)]
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
         self.state_merkle_db.get_root_hash(version)
     }
@@ -1444,10 +1447,14 @@ impl StateStore {
         first_index: usize,
         chunk_size: usize,
     ) -> Result<StateValueChunkWithProof> {
-        let state_key_values: Vec<(StateKey, StateValue)> = self
-            .get_value_chunk_iter(version, first_index, chunk_size)?
-            .collect::<Result<Vec<_>>>()?;
-        self.get_value_chunk_proof(version, first_index, state_key_values)
+        let store = Arc::clone(self);
+        value_chunk_with_proof(
+            Arc::clone(&self.state_merkle_db),
+            version,
+            first_index,
+            chunk_size,
+            move |key, version| store.expect_value_by_version(key, version),
+        )
     }
 
     pub fn get_value_chunk_iter(
@@ -1457,19 +1464,13 @@ impl StateStore {
         chunk_size: usize,
     ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
         let store = Arc::clone(self);
-        let value_chunk_iter = JellyfishMerkleIterator::new_by_index(
+        Ok(jmt_leaves_with_values(
             Arc::clone(&self.state_merkle_db),
             version,
             first_index,
+            move |key, version| store.expect_value_by_version(key, version),
         )?
-        .take(chunk_size)
-        .map(move |res| {
-            res.and_then(|(_, (key, version))| {
-                Ok((key.clone(), store.expect_value_by_version(&key, version)?))
-            })
-        });
-
-        Ok(value_chunk_iter)
+        .take(chunk_size))
     }
 
     pub fn get_value_chunk_proof(
@@ -1478,26 +1479,12 @@ impl StateStore {
         first_index: usize,
         state_key_values: Vec<(StateKey, StateValue)>,
     ) -> Result<StateValueChunkWithProof> {
-        ensure!(
-            !state_key_values.is_empty(),
-            "State chunk starting at {}",
+        build_value_chunk_proof(
+            self.state_merkle_db.as_ref(),
+            version,
             first_index,
-        );
-        let last_index = (state_key_values.len() - 1 + first_index) as u64;
-        let first_key = state_key_values.first().expect("checked to exist").0.hash();
-        let last_key = state_key_values.last().expect("checked to exist").0.hash();
-        let proof = self.get_value_range_proof(last_key, version)?;
-        let root_hash = self.get_root_hash(version)?;
-
-        Ok(StateValueChunkWithProof {
-            first_index: first_index as u64,
-            last_index,
-            first_key,
-            last_key,
-            raw_values: state_key_values,
-            proof,
-            root_hash,
-        })
+            state_key_values,
+        )
     }
 
     // state sync doesn't query for the progress, but keeps its record by itself.
