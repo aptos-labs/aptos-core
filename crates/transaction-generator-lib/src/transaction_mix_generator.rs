@@ -1,6 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{TransactionFeedback, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{
@@ -95,5 +95,12 @@ impl TransactionGeneratorCreator for PhasedTxnMixGeneratorCreator {
             txn_mix_per_phase,
             self.phase.clone(),
         ))
+    }
+
+    fn transaction_feedback(&self) -> Option<Arc<dyn TransactionFeedback>> {
+        self.txn_mix_per_phase_creators
+            .iter()
+            .flat_map(|phase| phase.iter())
+            .find_map(|(creator, _)| creator.transaction_feedback())
     }
 }

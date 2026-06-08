@@ -4798,6 +4798,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-sdk",
+ "aptos-types",
  "async-trait",
  "clap 4.5.60",
  "log",

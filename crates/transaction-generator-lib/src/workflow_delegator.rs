@@ -8,8 +8,8 @@ use crate::{
         CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator,
     },
     publishing::publish_util::Package,
-    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowProgress,
+    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionFeedback,
+    TransactionGenerator, TransactionGeneratorCreator, WorkflowProgress,
 };
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_sdk::{
@@ -405,5 +405,9 @@ impl TransactionGeneratorCreator for WorkflowTxnGeneratorCreator {
                 .collect(),
             self.stage_switch_conditions.clone(),
         ))
+    }
+
+    fn transaction_feedback(&self) -> Option<Arc<dyn TransactionFeedback>> {
+        self.creators.iter().find_map(|c| c.transaction_feedback())
     }
 }

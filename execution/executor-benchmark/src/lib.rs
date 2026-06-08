@@ -46,7 +46,8 @@ use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
 };
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
+    create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionFeedback,
+    TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -264,6 +265,7 @@ enum InitializedBenchmarkWorkload {
         transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
         phase: Arc<AtomicUsize>,
         workload_name: String,
+        transaction_feedback: Option<Arc<dyn TransactionFeedback>>,
     },
     Transfer {
         connected_tx_grps: usize,
@@ -369,6 +371,7 @@ where
                 &PipelineConfig::default(),
                 Arc::clone(&ts),
             );
+            let transaction_feedback = transaction_generator_creator.transaction_feedback();
             // need to initialize all workers and finish with all transactions before we start the timer:
             InitializedBenchmarkWorkload::TransactionMix {
                 transaction_generators: (0..pipeline_config.num_generator_workers)
@@ -376,6 +379,7 @@ where
                     .collect::<Vec<_>>(),
                 phase,
                 workload_name,
+                transaction_feedback,
             }
         },
         BenchmarkWorkload::Transfer {
@@ -391,6 +395,27 @@ where
 
     let start_version = db.reader.expect_synced_version();
 
+    let transaction_feedback = match &initialized_workload {
+        InitializedBenchmarkWorkload::TransactionMix {
+            transaction_feedback,
+            ..
+        } => transaction_feedback.clone(),
+        _ => None,
+    };
+
+    // generate_then_execute is incompatible with TransactionFeedback: feedback requires
+    // execution to run concurrently with generation so that on-chain events can flow back
+    // to the generator before all blocks are pre-generated.
+    let pipeline_config = if transaction_feedback.is_some() && pipeline_config.generate_then_execute
+    {
+        PipelineConfig {
+            generate_then_execute: false,
+            ..pipeline_config
+        }
+    } else {
+        pipeline_config
+    };
+
     // Initialize table_info_service and grpc stream if indexer_grpc is enabled
     let indexer_wrapper = init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
 
@@ -401,6 +426,7 @@ where
         &pipeline_config,
         Some(num_blocks),
         indexer_wrapper,
+        transaction_feedback,
     );
 
     let root_account = Arc::into_inner(root_account).unwrap();
@@ -422,6 +448,7 @@ where
             transaction_generators,
             phase,
             workload_name,
+            transaction_feedback,
         } => {
             let num_blocks_created = generator.run_workload(
                 block_size,
@@ -429,6 +456,7 @@ where
                 transaction_generators,
                 phase,
                 transactions_per_sender,
+                transaction_feedback,
             );
             (num_blocks_created, workload_name)
         },
@@ -507,6 +535,7 @@ where
         pipeline_config,
         None,
         None, // No indexer for init workload
+        None,
     );
 
     let runtime = Runtime::new().unwrap();
@@ -613,6 +642,7 @@ fn add_accounts_impl<V>(
         &pipeline_config,
         Some(1), // Only 1 block
         None,
+        None,
     );
 
     info!("Sending the first block metadata transaction to start a new epoch");
@@ -636,6 +666,7 @@ fn add_accounts_impl<V>(
         &pipeline_config,
         Some(num_new_accounts / block_size * 101 / 100),
         indexer_wrapper,
+        None,
     );
 
     let mut generator = TransactionGenerator::new_with_existing_db(
