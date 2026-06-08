@@ -45,7 +45,7 @@ use aptos_jellyfish_merkle::{
     node_type::{Node, NodeKey},
     TreeUpdateBatch,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
 use aptos_scratchpad::SparseMerkleTree;
@@ -102,6 +102,13 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
+
+// ===== ONE-OFF RECOVERY (delete this, and its use in `sync_commit_progress`, after the node is
+// healthy and the original binary has been redeployed) =====
+// A buggy build persisted a corrupted hot-state snapshot near v33.38M. On restart, roll every DB
+// back to the last state snapshot strictly before this version, discarding the corruption so the
+// node can state-sync forward from a clean checkpoint.
+const RECOVERY_TRUNCATE_BELOW: Version = 33_000_000;
 
 pub(crate) struct StatePruner {
     pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StateMerkle>>,
@@ -546,6 +553,73 @@ impl StateStore {
             info!("No overall commit progress was found!");
             return;
         };
+
+        // ===== ONE-OFF RECOVERY (delete with RECOVERY_TRUNCATE_BELOW once the node is healthy) =====
+        // Lower the synced version to the last checkpoint before the corrupted range. The existing
+        // truncation below then rolls every DB (ledger, cold/hot KV, cold/hot merkle) back to it,
+        // and the node state-syncs forward from a clean checkpoint. The node is stuck at ~33.38M, so
+        // this rollback stays under MAX_COMMIT_PROGRESS_DIFFERENCE and the asserts/paths below hold.
+        let overall_commit_progress = {
+            let cold = find_tree_root_at_or_before(
+                ledger_metadata_db,
+                &state_merkle_db,
+                RECOVERY_TRUNCATE_BELOW - 1,
+            )
+            .expect("DB read failed.")
+            .expect("RECOVERY: no cold-state snapshot before the floor — was it pruned?");
+            // Min with the hot tree's checkpoint so both trees land on a common version.
+            let recovery_target = hot_state_merkle_db.as_deref().map_or(cold, |hot| {
+                let hot_root = find_tree_root_at_or_before(
+                    ledger_metadata_db,
+                    hot,
+                    RECOVERY_TRUNCATE_BELOW - 1,
+                )
+                .expect("DB read failed.")
+                .expect("RECOVERY: no hot-state snapshot before the floor — was it pruned?");
+                std::cmp::min(cold, hot_root)
+            });
+
+            // Abort rather than truncate to the wrong place.
+            assert!(
+                recovery_target < RECOVERY_TRUNCATE_BELOW,
+                "RECOVERY: checkpoint {recovery_target} is not before floor {RECOVERY_TRUNCATE_BELOW}",
+            );
+            assert!(
+                recovery_target <= overall_commit_progress,
+                "RECOVERY: checkpoint {recovery_target} is ahead of committed \
+                 {overall_commit_progress}; refusing to roll forward",
+            );
+
+            if recovery_target < overall_commit_progress {
+                let rollback = overall_commit_progress - recovery_target;
+                assert!(
+                    rollback <= MAX_COMMIT_PROGRESS_DIFFERENCE,
+                    "RECOVERY: rollback of {rollback} versions exceeds \
+                     MAX_COMMIT_PROGRESS_DIFFERENCE ({MAX_COMMIT_PROGRESS_DIFFERENCE}); aborting — \
+                     verify the floor and DB state (bump the constant only if this is intended)",
+                );
+                warn!(
+                    recovery_target = recovery_target,
+                    from = overall_commit_progress,
+                    "RECOVERY: rolling all DBs back to the last checkpoint before {}.",
+                    RECOVERY_TRUNCATE_BELOW,
+                );
+                let mut batch = SchemaBatch::new();
+                batch
+                    .put::<DbMetadataSchema>(
+                        &DbMetadataKey::OverallCommitProgress,
+                        &DbMetadataValue::Version(recovery_target),
+                    )
+                    .expect("RECOVERY: encode progress");
+                ledger_metadata_db
+                    .write_schemas(batch)
+                    .expect("RECOVERY: persist lowered overall commit progress");
+                recovery_target
+            } else {
+                overall_commit_progress
+            }
+        };
+        // ===== END ONE-OFF RECOVERY =====
 
         info!(
             overall_commit_progress = overall_commit_progress,
