@@ -470,9 +470,19 @@ impl StateKvDb {
         Ok(loaded)
     }
 
-    // TODO(HotState): The current implementation does a full scan per shard. This can be
-    // further sped up (e.g. parallel within-shard scan, prefix-seek per key group, or maintaining
-    // a separate index), but is left for later since correctness matters more at this stage.
+    fn next_key_hash(key_hash: HashValue) -> Option<HashValue> {
+        let mut bytes = *key_hash.as_ref();
+        for byte in bytes.iter_mut().rev() {
+            if *byte == u8::MAX {
+                *byte = 0;
+            } else {
+                *byte += 1;
+                return Some(HashValue::new(bytes));
+            }
+        }
+        None
+    }
+
     /// Scans a single shard DB and returns the most recent hot entry per key_hash as of
     /// `snapshot_version`. Entries newer than the snapshot are skipped. Evicted keys are excluded.
     /// The returned entries have uninitialized LRU pointers.
@@ -487,48 +497,40 @@ impl StateKvDb {
         iter.seek_to_first();
 
         let mut entries = Vec::new();
-        let mut current_key_hash: Option<HashValue> = None;
-        let mut found_for_current = false;
 
-        for item in iter {
-            let ((key_hash, hot_since_version), entry_opt) = item?;
-
-            // New key group?
-            if current_key_hash != Some(key_hash) {
-                current_key_hash = Some(key_hash);
-                found_for_current = false;
-            }
-
-            if found_for_current {
-                continue;
-            }
-
+        while let Some(((key_hash, hot_since_version), entry_opt)) = iter.next().transpose()? {
             // Skip entries newer than the snapshot version — they will be replayed.
             if hot_since_version > snapshot_version {
                 continue;
             }
 
             // This is the most recent entry for this key_hash at the snapshot version.
-            found_for_current = true;
-
-            let kind = match entry_opt {
-                None => continue, // Evicted — not hot.
+            if let Some(kind) = match entry_opt {
+                None => None, // Evicted — not hot.
                 Some(HotStateEntry::Occupied {
                     value,
                     value_version,
-                }) => StateSlotKind::HotOccupied {
+                }) => Some(StateSlotKind::HotOccupied {
                     value_version,
                     value,
                     hot_since_version,
                     lru_info: LRUEntry::uninitialized(),
-                },
-                Some(HotStateEntry::Vacant) => StateSlotKind::HotVacant {
+                }),
+                Some(HotStateEntry::Vacant) => Some(StateSlotKind::HotVacant {
                     hot_since_version,
                     lru_info: LRUEntry::uninitialized(),
-                },
-            };
+                }),
+            } {
+                entries.push((key_hash, hot_since_version, kind));
+            }
 
-            entries.push((key_hash, hot_since_version, kind));
+            // Older versions for this key_hash sort immediately after this row.
+            // Jump to the next key group instead of scanning them one by one.
+            if let Some(next_key_hash) = Self::next_key_hash(key_hash) {
+                iter.seek(&(next_key_hash, Version::MAX))?;
+            } else {
+                break;
+            }
         }
 
         Ok(entries)

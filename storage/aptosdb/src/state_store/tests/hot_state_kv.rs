@@ -56,10 +56,19 @@ fn put_hot_state_entry(
     version: Version,
     entry: Option<HotStateEntry>,
 ) {
-    let shard_id = key.get_shard_id();
+    put_hot_state_entry_by_hash(db, CryptoHash::hash(key), version, entry);
+}
+
+fn put_hot_state_entry_by_hash(
+    db: &StateKvDb,
+    key_hash: HashValue,
+    version: Version,
+    entry: Option<HotStateEntry>,
+) {
+    let shard_id = usize::from(key_hash.nibble(0));
     let mut batch = db.db_shard(shard_id).new_native_batch();
     batch
-        .put::<HotStateValueByKeyHashSchema>(&(CryptoHash::hash(key), version), &entry)
+        .put::<HotStateValueByKeyHashSchema>(&(key_hash, version), &entry)
         .unwrap();
     db.db_shard(shard_id).write_schemas(batch).unwrap();
 }
@@ -455,6 +464,38 @@ fn test_load_skips_future_entry_and_falls_back_to_older_version() {
     let shards = db.load_hot_state_kvs(15).unwrap();
     let shard = &shards[key.get_shard_id()];
     assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(91));
+    shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_handles_max_key_hash() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key_hash = HashValue::new([0xff; HashValue::LENGTH]);
+    let shard_id = usize::from(key_hash.nibble(0));
+    put_hot_state_entry_by_hash(
+        &db,
+        key_hash,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(10),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry_by_hash(
+        &db,
+        key_hash,
+        20,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(20),
+            value_version: 15,
+        }),
+    );
+
+    let shards = db.load_hot_state_kvs(15).unwrap();
+    let shard = &shards[shard_id];
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(10));
     shard.validate_lru_chain();
 }
 
