@@ -6,7 +6,7 @@ use crate::{
     monitor,
     quorum_store::{
         batch_generator::BackPressure,
-        batch_proof_queue::BatchProofQueue,
+        batch_proof_queue::{BatchProofQueue, ProofQueueSnapshot},
         counters,
         tracing::{observe_batch, BatchStage},
     },
@@ -133,6 +133,7 @@ impl ProofManager {
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         let GetPayloadCommand::GetPayloadRequest(request) = msg;
+        let proof_queue_snapshot = self.batch_proof_queue.proof_queue_snapshot();
 
         let excluded_batches: HashSet<_> = match request.filter {
             PayloadFilter::Empty => HashSet::new(),
@@ -228,6 +229,28 @@ impl ProofManager {
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
+        let proposal_result =
+            if proof_block.is_empty() && opt_batches.is_empty() && inline_block.is_empty() {
+                "empty"
+            } else {
+                "non_empty"
+            };
+        Self::observe_proposal_proof_queue_snapshot(proposal_result, proof_queue_snapshot);
+        if proposal_result == "empty" {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                info!(
+                    "QS: empty proposal payload; proof_queue_total_proofs={}, proof_queue_local_proofs={}, proof_queue_remote_proofs={}, proof_queue_total_txns={}, proof_queue_local_txns={}, proof_queue_remote_txns={}",
+                    proof_queue_snapshot.total_proofs,
+                    proof_queue_snapshot.local_proofs,
+                    proof_queue_snapshot.remote_proofs,
+                    proof_queue_snapshot.total_txns,
+                    proof_queue_snapshot.local_txns,
+                    proof_queue_snapshot.remote_txns,
+                );
+            );
+        }
+
         let enable_optqs_v2 = request
             .maybe_optqs_payload_pull_params
             .as_ref()
@@ -282,6 +305,24 @@ impl ProofManager {
         match request.callback.send(Ok(res)) {
             Ok(_) => (),
             Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
+        }
+    }
+
+    fn observe_proposal_proof_queue_snapshot(
+        proposal_result: &'static str,
+        snapshot: ProofQueueSnapshot,
+    ) {
+        for (scope, proofs, txns) in [
+            ("total", snapshot.total_proofs, snapshot.total_txns),
+            ("local", snapshot.local_proofs, snapshot.local_txns),
+            ("remote", snapshot.remote_proofs, snapshot.remote_txns),
+        ] {
+            counters::PROPOSAL_PROOF_QUEUE_PROOFS
+                .with_label_values(&[proposal_result, scope])
+                .observe(proofs as f64);
+            counters::PROPOSAL_PROOF_QUEUE_TXNS
+                .with_label_values(&[proposal_result, scope])
+                .observe(txns as f64);
         }
     }
 

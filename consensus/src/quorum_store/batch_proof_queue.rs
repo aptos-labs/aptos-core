@@ -136,6 +136,16 @@ impl<'a> PullSession<'a> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ProofQueueSnapshot {
+    pub(crate) total_proofs: u64,
+    pub(crate) local_proofs: u64,
+    pub(crate) remote_proofs: u64,
+    pub(crate) total_txns: u64,
+    pub(crate) local_txns: u64,
+    pub(crate) remote_txns: u64,
+}
+
 fn batch_kind_metric_label(kind: Option<BatchKind>) -> &'static str {
     match kind {
         Some(BatchKind::Normal) => "normal",
@@ -246,6 +256,21 @@ impl BatchProofQueue {
 
     pub(crate) fn num_batches_without_proof(&self) -> u64 {
         self.num_batches_without_proof_count
+    }
+
+    pub(crate) fn proof_queue_snapshot(&self) -> ProofQueueSnapshot {
+        ProofQueueSnapshot {
+            total_proofs: self.remaining_proofs,
+            local_proofs: self.remaining_local_proofs,
+            remote_proofs: self
+                .remaining_proofs
+                .saturating_sub(self.remaining_local_proofs),
+            total_txns: self.remaining_txns_with_duplicates,
+            local_txns: self.remaining_local_txns,
+            remote_txns: self
+                .remaining_txns_with_duplicates
+                .saturating_sub(self.remaining_local_txns),
+        }
     }
 
     #[cfg(test)]

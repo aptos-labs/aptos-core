@@ -615,6 +615,26 @@ pub static NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL: Lazy<Histogram> = Lazy::new(|| {
     ).unwrap()
 });
 
+pub static PROPOSAL_PROOF_QUEUE_PROOFS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_proof_queue_proofs",
+        "Proof queue proof count before block proposal generation, split by proposal result and proof scope.",
+        &["proposal_result", "scope"],
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_PROOF_QUEUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_proof_queue_txns",
+        "Proof queue txn count before block proposal generation, split by proposal result and proof scope.",
+        &["proposal_result", "scope"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of total txns left after adding or cleaning batches.
 pub static NUM_TOTAL_TXNS_LEFT_ON_UPDATE: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
