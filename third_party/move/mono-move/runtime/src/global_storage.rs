@@ -4,7 +4,7 @@
 //! Per-transaction global-storage state.
 //!
 //! Tracks every resource a transaction touches in a [`ResourceReadWriteSet`]:
-//! a map from [`StorageKey`] to an [`Entry`], plus an undo journal and a
+//! a map from [`InMemoryStorageKey`] to an [`Entry`], plus an undo journal and a
 //! checkpoint stack for rollback.
 //!
 //! # The read-write set
@@ -57,11 +57,11 @@ use crate::{
     heap::RootScanner,
     invariant_violation,
 };
-use mono_move_core::{storage::resource_provider::StorageKey, ResourceProvider, StorageRead};
-use std::{
-    collections::{hash_map, HashMap},
-    ptr::NonNull,
+use hashbrown::{hash_map::EntryRef, HashMap};
+use mono_move_core::{
+    storage::resource_provider::InMemoryStorageKey, ResourceProvider, StorageRead,
 };
+use std::ptr::NonNull;
 
 /// Counter incremented by every checkpoint. Used to tell whether a pending
 /// write was made in the current checkpoint (and so is directly writable) or
@@ -171,7 +171,7 @@ impl Entry {
 
 /// An entry in the undo journal that records old state of the resource.
 struct JournalEntry {
-    key: StorageKey,
+    key: InMemoryStorageKey,
     write: StorageWrite,
 }
 
@@ -188,7 +188,19 @@ struct Checkpoint {
 #[derive(Default)]
 pub struct ResourceReadWriteSet {
     /// Reads and writes to the global storage.
-    entries: HashMap<StorageKey, Entry>,
+    ///
+    /// This is a hash map, so iteration order is non-deterministic. Every place
+    /// that iterates `entries` must not depend on that order:
+    ///   - read-set validation (Block-STM) only checks each entry, so order
+    ///     does not matter;
+    ///   - aggregation (such as gas) must use a commutative combine so the
+    ///     result is order-independent;
+    ///   - producing the final write set must sort the entries into a
+    ///     deterministic order before emitting them.
+    // TODO(correctness):
+    //   Make sure we have a deterministic iteration API and write-set
+    //   generation.
+    entries: HashMap<InMemoryStorageKey, Entry>,
     /// Undo log of writes originating from older epochs. Used for rolling back
     /// to older checkpoints.
     journal: Vec<JournalEntry>,
@@ -207,7 +219,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn exists(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &InMemoryStorageKey,
     ) -> RuntimeResult<bool> {
         Ok(get_or_create_resource_entry(&mut self.entries, provider, key)?.exists())
     }
@@ -217,7 +229,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn borrow_global(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &InMemoryStorageKey,
     ) -> RuntimeResult<NonNull<u8>> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr()
@@ -237,7 +249,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn try_borrow_global_mut(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &InMemoryStorageKey,
     ) -> RuntimeResult<EntryPtr> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr_mut(self.current_epoch)
@@ -257,10 +269,10 @@ impl ResourceReadWriteSet {
     ///
     /// [`Self::try_borrow_global_mut`] ensures that entry exists in the map.
     /// If this condition is violated, panics.
-    pub(crate) fn commit_borrow_global_mut(&mut self, key: StorageKey, ptr: NonNull<u8>) {
+    pub(crate) fn commit_borrow_global_mut(&mut self, key: &InMemoryStorageKey, ptr: NonNull<u8>) {
         let entry = self
             .entries
-            .get_mut(&key)
+            .get_mut(key)
             .expect("Entry must exist after mutable borrow attempt");
         let old_write = std::mem::replace(&mut entry.write, StorageWrite::LocalHeap {
             ptr,
@@ -279,7 +291,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn move_to(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &InMemoryStorageKey,
         ptr: NonNull<u8>,
     ) -> RuntimeResult<()> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
@@ -306,7 +318,7 @@ impl ResourceReadWriteSet {
     pub(crate) fn try_move_from(
         &mut self,
         provider: &dyn ResourceProvider,
-        key: StorageKey,
+        key: &InMemoryStorageKey,
     ) -> RuntimeResult<EntryPtr> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
         let ptr = entry.as_ptr_mut(self.current_epoch).ok_or_else(|| {
@@ -336,10 +348,10 @@ impl ResourceReadWriteSet {
     ///
     /// [`Self::try_move_from`] ensures that entry exists in the map.
     /// If this condition is violated, panics.
-    pub(crate) fn commit_move_from(&mut self, key: StorageKey) {
+    pub(crate) fn commit_move_from(&mut self, key: &InMemoryStorageKey) {
         let entry = self
             .entries
-            .get_mut(&key)
+            .get_mut(key)
             .expect("Entry must exist after move_from attempt");
         let old_write = std::mem::replace(&mut entry.write, StorageWrite::Deleted {
             epoch: self.current_epoch,
@@ -435,9 +447,12 @@ impl ResourceReadWriteSet {
     /// the old one) if:
     ///   - previous write does not exist, or
     ///   - previous write was made in a different (older) epoch.
-    fn record_write_to_journal(&mut self, key: StorageKey, write: StorageWrite) {
+    fn record_write_to_journal(&mut self, key: &InMemoryStorageKey, write: StorageWrite) {
         if !write.is_at_epoch(self.current_epoch) {
-            self.journal.push(JournalEntry { key, write });
+            self.journal.push(JournalEntry {
+                key: key.clone(),
+                write,
+            });
         }
     }
 }
@@ -445,15 +460,18 @@ impl ResourceReadWriteSet {
 /// Looks up the resource entry, materializing it as a read and recording in
 /// the read-set.
 fn get_or_create_resource_entry<'a>(
-    entries: &'a mut HashMap<StorageKey, Entry>,
+    entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
     provider: &dyn ResourceProvider,
-    key: StorageKey,
+    key: &InMemoryStorageKey,
 ) -> RuntimeResult<&'a mut Entry> {
-    match entries.entry(key) {
-        hash_map::Entry::Occupied(entry) => Ok(entry.into_mut()),
-        hash_map::Entry::Vacant(entry) => Ok(entry.insert(Entry {
-            read: provider.get_resource(key)?,
-            write: StorageWrite::NotModified,
-        })),
+    match entries.entry_ref(key) {
+        EntryRef::Occupied(entry) => Ok(entry.into_mut()),
+        EntryRef::Vacant(entry) => {
+            let read = provider.get_resource(key)?;
+            Ok(entry.insert(Entry {
+                read,
+                write: StorageWrite::NotModified,
+            }))
+        },
     }
 }

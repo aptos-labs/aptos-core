@@ -11,7 +11,7 @@
 
 use mono_move_core::{
     align::{checked_align_max, MAX_ALIGN},
-    storage::resource_provider::StorageKey,
+    storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
     DescriptorId, ResourceProvider, ResourceProviderError, StorageRead, OBJECT_HEADER_SIZE,
 };
@@ -45,7 +45,7 @@ pub struct InMemoryResources {
     /// Map keys to the data-region pointer of an allocation in
     /// `anchors`. The allocation outlives `self`; the pointer is
     /// safe to hand to `get_resource`.
-    entries: RefCell<HashMap<StorageKey, *const u8>>,
+    entries: RefCell<HashMap<InMemoryStorageKey, *const u8>>,
     anchors: RefCell<Vec<Box<[u64]>>>,
 }
 
@@ -101,13 +101,13 @@ impl InMemoryResources {
     pub fn entries_install(&self, addr: AccountAddress, ty: InternedType, ptr: *const u8) {
         self.entries
             .borrow_mut()
-            .insert(StorageKey::Resource(addr, ty), ptr);
+            .insert(InMemoryStorageKey::resource(addr, ty), ptr);
     }
 }
 
 impl ResourceProvider for InMemoryResources {
-    fn get_resource(&self, key: StorageKey) -> Result<StorageRead, ResourceProviderError> {
-        Ok(match self.entries.borrow().get(&key) {
+    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
+        Ok(match self.entries.borrow().get(key) {
             Some(&ptr) => {
                 // SAFETY: pointer came from `install_anchor`, which
                 // returned the data-region start of a live anchored
