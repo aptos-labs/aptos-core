@@ -4,13 +4,13 @@
 //! Defines the [`ExecutionContext`] trait the interpreter calls into,
 //! and a minimal [`LocalExecutionContext`] impl for tests and benchmarks.
 
-use crate::error::RuntimeResult;
+use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::{NativeRegistry, ProductionNativeRegistry},
+    native::NativeRegistry,
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
-    ConstantPoolIndex, FunctionPtr,
+    ConstantPoolIndex, DescriptorProvider, FunctionPtr, NO_DESCRIPTOR_PROVIDER,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -27,12 +27,15 @@ pub trait ExecutionContext {
     /// Read-only access to the native function registry.
     fn natives(&self) -> &ProductionNativeRegistry<Self::GasMeter>;
 
-    /// Disjoint borrow of the native registry and the gas meter. The
-    /// interpreter needs both simultaneously at times.
-    fn natives_and_gas_meter(
+    /// Disjoint borrow of the native registry, the descriptor provider, and
+    /// the gas meter — all of which a native call site needs at once: the
+    /// registry to resolve the function, the provider for any GC the native
+    /// triggers, and the gas meter for charging.
+    fn natives_descriptors_and_gas_meter(
         &mut self,
     ) -> (
         &ProductionNativeRegistry<Self::GasMeter>,
+        &dyn DescriptorProvider,
         &mut Self::GasMeter,
     );
 
@@ -130,8 +133,14 @@ impl<'r, G: GasMeter> ExecutionContext for LocalExecutionContext<'r, G> {
         &self.natives
     }
 
-    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
-        (&self.natives, &mut self.gas_meter)
+    fn natives_descriptors_and_gas_meter(
+        &mut self,
+    ) -> (
+        &ProductionNativeRegistry<G>,
+        &dyn DescriptorProvider,
+        &mut G,
+    ) {
+        (&self.natives, &NO_DESCRIPTOR_PROVIDER, &mut self.gas_meter)
     }
 
     fn load_function(

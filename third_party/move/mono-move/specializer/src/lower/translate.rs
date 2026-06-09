@@ -1521,7 +1521,18 @@ impl<'a> LoweringState<'a> {
         };
         let args: Vec<FrameSlot> = cs.arg_slots.iter().map(to_slot).collect();
         let returns: Vec<FrameSlot> = cs.ret_slots.iter().map(to_slot).collect();
-        Ok(NativeABI::new(args, returns)?)
+        // Pointer slots among the args, frame-relative, for GC root scanning
+        // while the native is the top frame.
+        let mut heap_ptr_offsets = Vec::new();
+        for s in &cs.arg_slots {
+            let base = s.slot.offset.0 - callee_base;
+            for rel in type_pointer_offsets(s.ty)? {
+                heap_ptr_offsets.push(FrameOffset(base + rel));
+            }
+        }
+        heap_ptr_offsets.sort_by_key(|o| o.0);
+        heap_ptr_offsets.dedup();
+        Ok(NativeABI::new(args, returns, heap_ptr_offsets)?)
     }
 
     /// Lower one call. Args are written by reverse iteration over the

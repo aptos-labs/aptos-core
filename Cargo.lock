@@ -12788,10 +12788,10 @@ dependencies = [
  "bitflags 2.11.0",
  "bytes",
  "mono-move-alloc",
- "mono-move-gas",
  "move-binary-format",
  "move-core-types",
  "shared-dsa",
+ "smallvec",
  "thiserror 1.0.69",
 ]
 
@@ -12883,6 +12883,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
+ "bcs 0.1.4",
  "bytes",
  "codespan-reporting",
  "criterion",

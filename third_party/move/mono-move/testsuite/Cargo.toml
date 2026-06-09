@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+bcs = { workspace = true }
 bytes = { workspace = true }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }

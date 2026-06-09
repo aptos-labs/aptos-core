@@ -12,17 +12,27 @@ use mono_move_core::native::NativeContextFamily;
 pub use mono_move_core::native::NativeFunction;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
+pub mod function_info;
+pub mod mem;
 pub mod signer;
 pub mod test_natives;
+pub mod type_info;
 
+pub use function_info::make_all_function_info_natives;
+pub use mem::make_all_mem_natives;
 pub use signer::make_all_signer_natives;
 pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
+pub use type_info::make_all_type_info_natives;
 
 /// All natives shipped with the production MonoMove VM. Additional native
 /// modules are concatenated here as they are implemented.
 pub fn make_all_production_natives<F: NativeContextFamily>(
 ) -> Vec<(AccountAddress, Identifier, Identifier, NativeFunction<F>)> {
-    make_all_signer_natives::<F>()
+    let mut natives = make_all_signer_natives::<F>();
+    natives.extend(make_all_mem_natives::<F>());
+    natives.extend(make_all_type_info_natives::<F>());
+    natives.extend(make_all_function_info_natives::<F>());
+    natives
 }
 
 /// Parses a fully-qualified function name (e.g. "0x1::natives::u64_add")

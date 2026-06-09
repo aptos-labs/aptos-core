@@ -6,10 +6,9 @@
 //
 // TODO: move out of the runtime once a layer above it exists.
 
-use crate::{error::RuntimeResult, ExecutionContext};
+use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::ProductionNativeRegistry,
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
     ObjectDescriptor, ResourceProvider, ValueLayout,
@@ -70,8 +69,14 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         self.natives
     }
 
-    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
-        (self.natives, &mut self.gas_meter)
+    fn natives_descriptors_and_gas_meter(
+        &mut self,
+    ) -> (
+        &ProductionNativeRegistry<G>,
+        &dyn DescriptorProvider,
+        &mut G,
+    ) {
+        (self.natives, self.loader.guard(), &mut self.gas_meter)
     }
 
     /// Looks up cross-module targets in the read-set, falling back to
