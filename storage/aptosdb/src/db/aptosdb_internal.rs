@@ -149,7 +149,7 @@ impl AptosDB {
                 readonly,
                 max_num_nodes_per_lru_cache_shard,
                 hot_state_config,
-            )?;
+            );
 
         // Seed pruner progress after `delete_on_restart` wipes the hot_state_kv_db, before
         // initializing the pruner, so the pruner doesn't catch up from 0 over an empty DB.
@@ -306,7 +306,7 @@ impl AptosDB {
                     delete_on_restart: delete_hot_state_on_restart,
                     ..HotStateConfig::default()
                 },
-            )?;
+            );
 
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = Arc::new(hot_state_merkle_db);

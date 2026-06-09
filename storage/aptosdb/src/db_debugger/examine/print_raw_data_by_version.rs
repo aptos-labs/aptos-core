@@ -34,7 +34,7 @@ impl Cmd {
                 delete_on_restart: false,
                 ..HotStateConfig::default()
             },
-        )?;
+        );
 
         println!(
             "Transaction: {:?}",

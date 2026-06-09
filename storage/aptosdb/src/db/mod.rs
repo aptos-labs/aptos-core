@@ -111,60 +111,100 @@ impl AptosDB {
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
         hot_state_config: HotStateConfig,
-    ) -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb)> {
-        let ledger_db = LedgerDb::new(
-            db_paths.ledger_db_root_path(),
-            rocksdb_configs.ledger_db_config,
-            env,
-            block_cache,
-            readonly,
-        )?;
-        let hot_state_kv_db = StateKvDb::new(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-            /* is_hot = */ true,
-            hot_state_config.delete_on_restart,
-        )?;
-        let state_kv_db = StateKvDb::new(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-            /* is_hot = */ false,
-            /* delete_on_restart = */ false,
-        )?;
-        let hot_state_merkle_db = StateMerkleDb::new(
-            db_paths,
-            rocksdb_configs.state_merkle_db_config,
-            env,
-            block_cache,
-            readonly,
-            max_num_nodes_per_lru_cache_shard,
-            /* is_hot = */ true,
-            hot_state_config.delete_on_restart,
-        )?;
-        let state_merkle_db = StateMerkleDb::new(
-            db_paths,
-            rocksdb_configs.state_merkle_db_config,
-            env,
-            block_cache,
-            readonly,
-            max_num_nodes_per_lru_cache_shard,
-            /* is_hot = */ false,
-            /* delete_on_restart = */ false,
-        )?;
+    ) -> (LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb) {
+        // Open the ledger, (hot/cold) state kv, and (hot/cold) state merkle dbs concurrently on
+        // dedicated threads. Each open is mostly blocking I/O (and the sharded ones fan out further
+        // internally), so opening them at once shortens startup, especially on hosts with fewer
+        // cores. This runs once at startup, so the thread churn is negligible.
+        let (ledger_db, hot_state_kv_db, state_kv_db, hot_state_merkle_db, state_merkle_db) =
+            std::thread::scope(|scope| {
+                let ledger_handle = scope.spawn(|| {
+                    LedgerDb::new(
+                        db_paths.ledger_db_root_path(),
+                        rocksdb_configs.ledger_db_config,
+                        env,
+                        block_cache,
+                        readonly,
+                    )
+                    .expect("Failed to open ledger db")
+                });
+                let hot_state_kv_handle = scope.spawn(|| {
+                    StateKvDb::new(
+                        db_paths,
+                        rocksdb_configs.state_kv_db_config,
+                        env,
+                        block_cache,
+                        readonly,
+                        /* is_hot = */ true,
+                        hot_state_config.delete_on_restart,
+                    )
+                    .expect("Failed to open hot state kv db")
+                });
+                let state_kv_handle = scope.spawn(|| {
+                    StateKvDb::new(
+                        db_paths,
+                        rocksdb_configs.state_kv_db_config,
+                        env,
+                        block_cache,
+                        readonly,
+                        /* is_hot = */ false,
+                        /* delete_on_restart = */ false,
+                    )
+                    .expect("Failed to open state kv db")
+                });
+                let hot_state_merkle_handle = scope.spawn(|| {
+                    StateMerkleDb::new(
+                        db_paths,
+                        rocksdb_configs.state_merkle_db_config,
+                        env,
+                        block_cache,
+                        readonly,
+                        max_num_nodes_per_lru_cache_shard,
+                        /* is_hot = */ true,
+                        hot_state_config.delete_on_restart,
+                    )
+                    .expect("Failed to open hot state merkle db")
+                });
+                let state_merkle_handle = scope.spawn(|| {
+                    StateMerkleDb::new(
+                        db_paths,
+                        rocksdb_configs.state_merkle_db_config,
+                        env,
+                        block_cache,
+                        readonly,
+                        max_num_nodes_per_lru_cache_shard,
+                        /* is_hot = */ false,
+                        /* delete_on_restart = */ false,
+                    )
+                    .expect("Failed to open state merkle db")
+                });
 
-        Ok((
+                (
+                    ledger_handle
+                        .join()
+                        .expect("Ledger db open thread panicked"),
+                    hot_state_kv_handle
+                        .join()
+                        .expect("Hot state kv db open thread panicked"),
+                    state_kv_handle
+                        .join()
+                        .expect("State kv db open thread panicked"),
+                    hot_state_merkle_handle
+                        .join()
+                        .expect("Hot state merkle db open thread panicked"),
+                    state_merkle_handle
+                        .join()
+                        .expect("State merkle db open thread panicked"),
+                )
+            });
+
+        (
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
             hot_state_kv_db,
             state_kv_db,
-        ))
+        )
     }
 
     pub fn add_version_update_subscriber(
