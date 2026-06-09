@@ -431,7 +431,7 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
 /// without changing the result).
 #[inline]
 pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
-    use crate::stackless_exec_ir::CmpOp;
+    use crate::stackless_exec_ir::CmpKind;
     matches!(
         op,
         BinaryOp::Add
@@ -439,8 +439,8 @@ pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
             | BinaryOp::BitOr
             | BinaryOp::BitAnd
             | BinaryOp::BitXor
-            | BinaryOp::Cmp(CmpOp::Eq)
-            | BinaryOp::Cmp(CmpOp::Neq)
+            | BinaryOp::Cmp(CmpKind::Eq)
+            | BinaryOp::Cmp(CmpKind::Neq)
             | BinaryOp::Or
             | BinaryOp::And
     )

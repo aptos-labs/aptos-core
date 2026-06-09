@@ -12,7 +12,7 @@ use crate::{
     gas,
     stackless_exec_ir::{
         instr_utils::{clobbers_xfer, for_each_value_use, is_fallthrough_terminator},
-        BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
+        BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
     },
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -367,13 +367,13 @@ impl<'a> LoweringState<'a> {
     /// Emit a standalone comparison writing a 1-byte boolean to `dst`.
     fn emit_int_cmp(
         &mut self,
-        cmp: CmpOp,
+        cmp: CmpKind,
         dst: FrameOffset,
         lhs: FrameOffset,
         rhs: IntOperand,
     ) -> Result<()> {
         self.emit(MicroOp::IntCmp(IntCmpOp {
-            op: cmp_kind(cmp),
+            op: cmp,
             dst,
             lhs,
             rhs,
@@ -385,13 +385,13 @@ impl<'a> LoweringState<'a> {
     fn emit_jump_int_cmp(
         &mut self,
         target: CodeOffset,
-        cmp: CmpOp,
+        cmp: CmpKind,
         lhs: FrameOffset,
         rhs: IntOperand,
     ) -> Result<()> {
         self.emit(MicroOp::JumpIntCmp(JumpIntCmpOp {
             target,
-            op: cmp_kind(cmp),
+            op: cmp,
             lhs,
             rhs,
             gas_taken: 0,
@@ -996,14 +996,14 @@ impl<'a> LoweringState<'a> {
                 // specialized jumps. Everything else goes through the general
                 // `JumpIntCmp`, which dispatches on the operand type.
                 match (lhs_ty.is_u64(), op) {
-                    (true, CmpOp::Lt) => self.emit(MicroOp::JumpLessU64 {
+                    (true, CmpKind::Lt) => self.emit(MicroOp::JumpLessU64 {
                         target,
                         lhs: lhs_off,
                         rhs: rhs_off,
                         gas_taken: 0,
                         gas_fallthrough: 0,
                     })?,
-                    (true, CmpOp::Ge) => self.emit(MicroOp::JumpGreaterEqualU64 {
+                    (true, CmpKind::Ge) => self.emit(MicroOp::JumpGreaterEqualU64 {
                         target,
                         lhs: lhs_off,
                         rhs: rhs_off,
@@ -1011,7 +1011,7 @@ impl<'a> LoweringState<'a> {
                         gas_fallthrough: 0,
                     })?,
                     // x > y ↔ y < x
-                    (true, CmpOp::Gt) => self.emit(MicroOp::JumpLessU64 {
+                    (true, CmpKind::Gt) => self.emit(MicroOp::JumpLessU64 {
                         target,
                         lhs: rhs_off,
                         rhs: lhs_off,
@@ -1019,14 +1019,14 @@ impl<'a> LoweringState<'a> {
                         gas_fallthrough: 0,
                     })?,
                     // x <= y ↔ y >= x
-                    (true, CmpOp::Le) => self.emit(MicroOp::JumpGreaterEqualU64 {
+                    (true, CmpKind::Le) => self.emit(MicroOp::JumpGreaterEqualU64 {
                         target,
                         lhs: rhs_off,
                         rhs: lhs_off,
                         gas_taken: 0,
                         gas_fallthrough: 0,
                     })?,
-                    (true, CmpOp::Neq) => self.emit(MicroOp::JumpNotEqualU64 {
+                    (true, CmpKind::Neq) => self.emit(MicroOp::JumpNotEqualU64 {
                         target,
                         lhs: lhs_off,
                         rhs: rhs_off,
@@ -1074,35 +1074,35 @@ impl<'a> LoweringState<'a> {
                     // the general `JumpIntCmp`.
                     let v = imm_to_u64(imm)?;
                     match op {
-                        CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
+                        CmpKind::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
                             target,
                             src: src_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
-                        CmpOp::Lt => self.emit(MicroOp::JumpLessU64Imm {
+                        CmpKind::Lt => self.emit(MicroOp::JumpLessU64Imm {
                             target,
                             src: src_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
-                        CmpOp::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
+                        CmpKind::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
                             target,
                             src: src_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
-                        CmpOp::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
+                        CmpKind::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
                             target,
                             src: src_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
-                        CmpOp::Eq | CmpOp::Neq => {
+                        CmpKind::Eq | CmpKind::Neq => {
                             self.emit_jump_int_cmp(target, *op, src_off, IntOperand::ImmU64(v))?
                         },
                     }
@@ -1817,21 +1817,6 @@ fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
     Ok(IntOperand::slot(int_ty, off))
 }
 
-/// Map an IR [`CmpOp`] to the micro-op [`CmpKind`].
-///
-/// TODO: `CmpOp` and `CmpKind` have identical variants; consider unifying on a
-/// single shared type in core to drop this mapping.
-fn cmp_kind(op: CmpOp) -> CmpKind {
-    match op {
-        CmpOp::Lt => CmpKind::Lt,
-        CmpOp::Le => CmpKind::Le,
-        CmpOp::Gt => CmpKind::Gt,
-        CmpOp::Ge => CmpKind::Ge,
-        CmpOp::Eq => CmpKind::Eq,
-        CmpOp::Neq => CmpKind::Neq,
-    }
-}
-
 enum EqKind {
     /// Integer comparison.
     Int,
@@ -1868,13 +1853,13 @@ fn eq_kind(ty: &Type) -> Result<EqKind> {
     })
 }
 
-/// Map an equality [`CmpOp`] to the `negate` flag of the structural-equality
+/// Map an equality [`CmpKind`] to the `negate` flag of the structural-equality
 /// ops (`false` for `Eq`, `true` for `Neq`).
-fn eq_negate(op: CmpOp) -> Result<bool> {
+fn eq_negate(op: CmpKind) -> Result<bool> {
     match op {
-        CmpOp::Eq => Ok(false),
-        CmpOp::Neq => Ok(true),
-        CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
+        CmpKind::Eq => Ok(false),
+        CmpKind::Neq => Ok(true),
+        CmpKind::Lt | CmpKind::Le | CmpKind::Gt | CmpKind::Ge => {
             bail!("ordering comparison on a non-scalar operand is ill-typed")
         },
     }
