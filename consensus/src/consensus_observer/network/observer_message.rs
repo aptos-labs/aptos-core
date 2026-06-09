@@ -783,10 +783,12 @@ impl BlockTransactionPayload {
     }
 
     /// Returns the proofs of the transaction payload
-    pub fn payload_proofs_v2(&self) -> Vec<ProofOfStore<BatchInfoExt>> {
+    pub fn payload_proofs_v2(&self) -> Result<Vec<ProofOfStore<BatchInfoExt>>, Error> {
         match self {
-            BlockTransactionPayload::OptQuorumStoreV2(payload, _) => payload.proofs(),
-            _ => unreachable!(),
+            BlockTransactionPayload::OptQuorumStoreV2(payload, _) => Ok(payload.proofs()),
+            _ => Err(Error::InvalidMessageError(
+                "Transaction payload is not an OptQuorumStoreV2 variant!".into(),
+            )),
         }
     }
 
@@ -857,7 +859,7 @@ impl BlockTransactionPayload {
         // Get the batches in the block transaction payload
         let payload_proofs = self
             .payload_proofs()
-            .expect("non-OptQSV2 batch is expected");
+            .map_err(|e| Error::InvalidMessageError(e.to_string()))?;
         let payload_batches: Vec<&BatchInfo> =
             payload_proofs.iter().map(|proof| proof.info()).collect();
 
@@ -946,7 +948,7 @@ impl BlockTransactionPayload {
         expected_proofs: &[ProofOfStore<BatchInfoExt>],
     ) -> Result<(), Error> {
         // Get the batches in the block transaction payload
-        let payload_proofs = self.payload_proofs_v2();
+        let payload_proofs = self.payload_proofs_v2()?;
         let payload_batches: Vec<&BatchInfoExt> =
             payload_proofs.iter().map(|proof| proof.info()).collect();
 
@@ -1207,7 +1209,7 @@ impl BlockPayload {
                     ))
                 })?;
         } else {
-            let payload_proofs = self.transaction_payload.payload_proofs_v2();
+            let payload_proofs = self.transaction_payload.payload_proofs_v2()?;
             let validator_verifier = &epoch_state.verifier;
             payload_proofs
                 .par_iter()
@@ -1511,6 +1513,90 @@ mod test {
         transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap();
+    }
+
+    #[test]
+    fn test_verify_against_ordered_payload_optqs_v2_variant_mismatch() {
+        // Build an empty V2 ordered block payload (as produced by validators when
+        // enable_opt_qs_v2_payload_tx is enabled).
+        let v2_ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(
+            Vec::<(BatchInfoExt, Vec<SignedTransaction>)>::new().into(),
+            Vec::<BatchInfoExt>::new().into(),
+            Vec::<ProofOfStore<BatchInfoExt>>::new().into(),
+            PayloadExecutionLimit::MaxTransactionsToExecute(100),
+        ));
+
+        // Verify that non-V2 stored variants fail verification
+        let hybrid_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            false, // Produces the legacy QuorumStoreInlineHybrid variant
+        );
+        let error = hybrid_payload
+            .verify_against_ordered_payload(&v2_ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Verify that the QuorumStoreInlineHybridV2 variant also fails verification
+        let hybrid_v2_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            true, // Produces QuorumStoreInlineHybridV2
+        );
+        let error = hybrid_v2_payload
+            .verify_against_ordered_payload(&v2_ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Verify that the OptQuorumStoreV1 variant fails verification
+        let optqs_v1_payload =
+            BlockTransactionPayload::new_opt_quorum_store(vec![], vec![], None, None, vec![]);
+        let error = optqs_v1_payload
+            .verify_against_ordered_payload(&v2_ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Verify that the OptQuorumStoreV2 variant with matching batches and limit passes verification
+        let optqs_v2_payload = BlockTransactionPayload::new_opt_quorum_store_v2(
+            vec![],
+            vec![],
+            Some(100),
+            None,
+            vec![],
+        );
+        optqs_v2_payload
+            .verify_against_ordered_payload(&v2_ordered_payload)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_verify_against_ordered_payload_optqs_v1_variant_mismatch() {
+        // Build an empty V1 ordered block payload.
+        let v1_ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            Vec::<InlineBatch<BatchInfo>>::new().into(),
+            Vec::new().into(),
+            Vec::<ProofOfStore<BatchInfo>>::new().into(),
+            PayloadExecutionLimit::MaxTransactionsToExecute(100),
+        ));
+
+        // Verify that an OptQuorumStoreV2 transaction payload returns InvalidMessageError
+        let optqs_v2_payload = BlockTransactionPayload::new_opt_quorum_store_v2(
+            vec![],
+            vec![],
+            Some(100),
+            None,
+            vec![],
+        );
+        let error = optqs_v2_payload
+            .verify_against_ordered_payload(&v1_ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
     }
 
     #[test]
