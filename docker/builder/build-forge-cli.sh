@@ -5,18 +5,21 @@ set -ex
 
 PROFILE=${PROFILE:-release}
 
-echo "Building forge"
-echo "PROFILE: $PROFILE"
-echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
-
-PERF_FLAGS=()
+BUILD_PROFILE=$PROFILE
 if [[ "$PROFILE" == "performance" ]]; then
-  PERF_FLAGS=(--config .cargo/performance.toml)
+  # No need to build with `--profile performance` since the most demanding
+  # thing forge does is generate load.
+  BUILD_PROFILE=release
 fi
 
-cargo build --locked --profile=$PROFILE "${PERF_FLAGS[@]}" \
+echo "Building forge"
+echo "PROFILE: $PROFILE"
+echo "BUILD_PROFILE: $BUILD_PROFILE"
+echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
+
+cargo build --locked --profile=$BUILD_PROFILE \
     -p aptos-forge-cli \
     "$@"
 
 mkdir dist
-cp $CARGO_TARGET_DIR/$PROFILE/forge dist/forge
+cp $CARGO_TARGET_DIR/$BUILD_PROFILE/forge dist/forge
