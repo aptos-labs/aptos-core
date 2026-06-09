@@ -18,8 +18,8 @@ use crate::{
     invariant_violation,
     memory::{
         read_account_address, read_bool, read_descriptor, read_fat_ptr, read_obj_size, read_ptr,
-        read_u32, read_u64, read_u8, vec_elem_ptr, write_bool, write_fat_ptr, write_ptr, write_u32,
-        write_u64, write_u8, MemoryRegion,
+        read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr, write_bool, write_fat_ptr,
+        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
@@ -35,8 +35,8 @@ use mono_move_core::{
     storage::resource_provider::StorageKey,
     CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, DescriptorProvider, FrameOffset,
     Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -45,13 +45,12 @@ use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
-
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
+pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
     /// Per-transaction context (function resolution, gas counters,
     /// descriptor table, etc.).
     pub(crate) exec_ctx: &'a mut T,
@@ -77,7 +76,7 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
     rng: StdRng,
 }
 
-impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
+impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'a, T> {
     pub fn new(exec_ctx: &'a mut T, entry: &Function) -> Self {
         Self::with_heap_size(exec_ctx, entry, DEFAULT_HEAP_SIZE)
     }
@@ -750,7 +749,7 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
+impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'_, T> {
     #[inline(always)]
     pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -947,19 +946,19 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::AbortMsg { code, message } => {
                     let code = read_u64(fp, code);
                     let vec_ptr = read_ptr(fp, message);
-                    let message = if vec_ptr.is_null() {
+                    let len = read_vec_len(vec_ptr) as usize;
+                    let message = if len == 0 {
                         String::new()
                     } else {
                         // TODO: charge gas for abort message bytes.
-                        let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET) as usize;
                         if len > ABORT_MESSAGE_SIZE_LIMIT {
                             return Err(RuntimeError::AbortMessageTooLong {
                                 len,
                                 max: ABORT_MESSAGE_SIZE_LIMIT,
                             });
                         }
-                        // SAFETY: `vec_ptr` is non-null (checked above) and
-                        // points at a heap vector with `len` initialized
+                        // SAFETY: `vec_ptr` is non-null for non-zero lengths
+                        // and points at a heap vector with `len` initialized
                         // bytes at `VEC_DATA_OFFSET`.
                         let data = vec_ptr.add(VEC_DATA_OFFSET);
                         String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
@@ -1140,11 +1139,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::VecLen { dst, vec_ref } => {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let len = if vec_ptr.is_null() {
-                        0
-                    } else {
-                        read_u64(vec_ptr, VEC_LENGTH_OFFSET)
-                    };
+                    let len = read_vec_len(vec_ptr);
                     write_u64(fp, dst, len);
                 },
 
@@ -1164,7 +1159,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         write_ptr(ref_base, ref_off as usize, vec_ptr);
                     }
 
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     let total = read_obj_size(vec_ptr) as usize;
                     let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
                         / elem_size as usize) as u64;
@@ -1188,10 +1183,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 } => {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::PopFromEmptyVector);
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if len == 0 {
                         return Err(RuntimeError::PopFromEmptyVector);
                     }
@@ -1213,14 +1205,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::LoadElem,
-                            idx,
-                            len: 0,
-                        });
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if idx >= len {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
                             op: VecOp::LoadElem,
@@ -1244,14 +1229,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::StoreElem,
-                            idx,
-                            len: 0,
-                        });
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if idx >= len {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
                             op: VecOp::StoreElem,
@@ -1276,14 +1254,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::Borrow,
-                            idx,
-                            len: 0,
-                        });
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if idx >= len {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
                             op: VecOp::Borrow,

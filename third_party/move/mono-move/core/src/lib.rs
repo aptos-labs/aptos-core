@@ -11,6 +11,7 @@ mod object_descriptor;
 mod prepared_module;
 pub mod storage;
 pub mod types;
+pub mod value_layout;
 
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
@@ -43,3 +44,7 @@ pub use storage::{
     NO_RESOURCE_PROVIDER,
 };
 pub use types::{convert_mut_to_immut_ref, strip_ref};
+pub use value_layout::{
+    reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
+    LayoutProvider, ValueLayout, ValueLayoutTable,
+};

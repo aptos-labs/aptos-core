@@ -3,7 +3,7 @@
 
 //! Low-level memory utilities: aligned buffer and raw pointer helpers.
 
-use crate::VEC_DATA_OFFSET;
+use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 use mono_move_core::{DescriptorId, MAX_ALIGN};
 use move_core_types::account_address::AccountAddress;
 use std::alloc::{self, Layout};
@@ -58,6 +58,20 @@ impl Drop for MemoryRegion {
 // ---------------------------------------------------------------------------
 // Raw pointer helpers
 // ---------------------------------------------------------------------------
+
+/// Reads a vector's length, treating the null pointer as the empty vector.
+///
+/// # Safety
+///
+/// `ptr` is null or points to a vector allocation.
+pub unsafe fn read_vec_len(ptr: *mut u8) -> u64 {
+    if ptr.is_null() {
+        0
+    } else {
+        // SAFETY: caller guarantees this is a vector.
+        unsafe { read_u64(ptr, VEC_LENGTH_OFFSET) }
+    }
+}
 
 /// # Safety
 /// `base.add(byte_offset)` must be valid and point to an initialized `u8`.

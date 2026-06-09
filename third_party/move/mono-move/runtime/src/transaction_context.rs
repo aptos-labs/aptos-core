@@ -10,8 +10,9 @@ use crate::ExecutionContext;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ResourceProvider,
+    types::{InternedType, InternedTypeList},
+    DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider, ObjectDescriptor,
+    ResourceProvider, ValueLayout,
 };
 use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
@@ -98,5 +99,15 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
 impl<'guard, 'ctx, G: GasMeter> DescriptorProvider for TransactionContext<'guard, 'ctx, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.loader.guard().descriptor(id)
+    }
+}
+
+impl<'guard, 'ctx, G: GasMeter> LayoutProvider for TransactionContext<'guard, 'ctx, G> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard().layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard().layout_id(ty)
     }
 }

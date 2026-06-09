@@ -230,7 +230,7 @@ pub(crate) enum AllocationError {
     RuntimeError(RuntimeError),
 }
 
-type AllocationResult<T> = Result<T, AllocationError>;
+pub(crate) type AllocationResult<T> = Result<T, AllocationError>;
 
 impl From<RuntimeError> for AllocationError {
     fn from(err: RuntimeError) -> Self {
@@ -325,7 +325,7 @@ impl<'a> RootScanner<'a> {
 ///
 /// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
 /// so the caller can trigger GC and retry.
-fn heap_alloc(
+pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
     descriptor_id: DescriptorId,
