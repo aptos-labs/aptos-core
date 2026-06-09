@@ -1,0 +1,129 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x99::capture_alignment
+// Function definition at index 0
+fun combine(l0: bool, l1: vector<u64>, l2: u64): u64
+    borrow_loc l1
+    vec_len <u64>
+    move_loc l2
+    add
+    st_loc l2
+    // @5
+    move_loc l0
+    br_false l0
+    move_loc l2
+    ld_u64 1
+    add
+    // @10
+    ret
+l0: move_loc l2
+    ret
+
+// Function definition at index 1
+fun run(l0: bool): u64
+    local l1: vector<u64>
+    local l2: |u64|u64 has drop
+    vec_pack <u64>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    ld_u64 10
+    vec_push_back <u64>
+    // @5
+    mut_borrow_loc l1
+    ld_u64 20
+    vec_push_back <u64>
+    move_loc l0
+    move_loc l1
+    // @10
+    pack_closure combine, 11
+    st_loc l2
+    ld_u64 100
+    move_loc l2
+    call_closure <|u64|u64 has drop>
+    // @15
+    ret
+
+=== stackless ===
+// module 0x99::capture_alignment
+
+fun combine(r0, r1, r2): u64 {
+  slots: params(3), locals(0), temps(2)
+    r0: bool
+    r1: vector<u64>
+    r2: u64
+    r3: &vector<u64>
+    r4: u64
+  code:
+  L2:
+    0: r3 := imm_borrow_loc r1
+    1: r4 := vec_len u64, r3
+    2: r2 := add r4, r2
+    3: br_false L0, r0
+  L1:
+    4: r4 := add r2, #1
+    5: ret [r4]
+  L0:
+    6: ret [r2]
+}
+
+fun run(r0): u64 {
+  slots: params(1), locals(2), temps(2)
+    r0: bool
+    r1: vector<u64>
+    r2: |u64|u64
+    r3: &mut vector<u64>
+    r4: u64
+  code:
+  L0:
+    0: r1 := vec_pack u64, 0, []
+    1: r3 := mut_borrow_loc r1
+    2: r4 := ld_u64 10
+    3: vec_push_back u64, r3, r4
+    4: r3 := mut_borrow_loc r1
+    5: r4 := ld_u64 20
+    6: vec_push_back u64, r3, r4
+    7: r2 := pack_closure combine, 11, [r0, r1]
+    8: r4 := ld_u64 100
+    9: [r4] := call_closure [|u64|u64], [r4, r2]
+    10: ret [r4]
+}
+=== micro-ops ===
+// module 0x99::capture_alignment
+
+fun combine() {
+  frame_data_size: 48
+  entry_gas: 12
+  code:
+    0: SlotBorrow [24] <- &[8]
+    1: VecLen [40] <- vec_len([24])
+    2: AddU64 [16] <- [40] + [16]
+    3: JumpZeroByte @7 [0] gas_taken=54 gas_fallthrough=59
+    4: AddU64Imm [40] <- [16] + #1
+    5: Move8 [0] <- [40]
+    6: Return
+    7: Move8 [0] <- [16]
+    8: Return
+}
+
+fun run() {
+  frame_data_size: 48
+  entry_gas: 258
+  code:
+    0: VecNew [8]
+    1: SlotBorrow [24] <- &[8]
+    2: StoreImm8 [40] <- #10
+    3: VecPushBack [24].push([40], size=8, desc=2)
+    4: SlotBorrow [24] <- &[8]
+    5: StoreImm8 [40] <- #20
+    6: VecPushBack [24].push([40], size=8, desc=2)
+    7: PackClosure [16] <- func_ref=Unresolved(combine), mask=11, captured_desc=3, captured=[[0](1), [8](8)]
+    8: StoreImm8 [40] <- #100
+    9: CallClosure closure=[16], provided_args=[[40](8)]
+    10: Move8 [40] <- [72]
+    11: Move8 [0] <- [40]
+    12: Return
+  safe_point_layouts:
+    3: []
+    6: []
+    7: []
+}

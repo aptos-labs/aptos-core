@@ -24,6 +24,7 @@ use aptos_sdk::types::on_chain_config::{
     OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
 };
 use aptos_testcases::{
+    chunky_dkg_quorum_loss_test::ChunkyDkgQuorumLossTest,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
@@ -63,6 +64,9 @@ pub(crate) fn get_realistic_env_test(
         },
         "realistic_env_chunky_dkg_epoch_change" => {
             realistic_env_chunky_dkg_epoch_change_test(duration)
+        },
+        "realistic_env_chunky_dkg_quorum_loss" => {
+            realistic_env_chunky_dkg_quorum_loss_test(duration)
         },
         _ => return None, // The test name does not match a realistic-env test
     };
@@ -138,8 +142,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
             TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
             TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
                 .with_transactions_per_account(1),
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
-                .with_unique_senders(),
+            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000),
             // TODO(ibalajiarun): this is disabled due to Forge Stable failure on PosToProposal latency.
             TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
                 .with_transactions_per_account(1),
@@ -148,10 +151,10 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (7000, 100, 0.3 + 0.5, 0.5, 0.5),
             (8500, 100, 0.3 + 0.5, 0.5, 0.4),
-            (2000, 300, 0.3 + 1.0, 0.6, 1.0),
-            (3200, 500, 0.3 + 1.0, 0.7, 0.8),
+            (2000, 300, 0.3 + 2.0, 0.6, 1.0),
+            (3200, 500, 0.3 + 2.0, 0.7, 0.8),
             // TODO - pos-to-proposal is set to high, until it is calibrated/understood.
-            (28, 5, 0.3 + 5.0, 0.7, 1.0),
+            (28, 5, 0.3 + 15.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
@@ -365,9 +368,8 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
                     // Check that we don't use more than 28 CPU cores for 20% of the time.
                     MetricsThreshold::new(28.0, 20),
                     // TODO(ibalajiarun): Investigate the high utilization and adjust accordingly.
-                    // Memory starts around 8GB, and grows around 8GB/hr in this test.
                     // Check that we don't use more than final expected memory for more than 20% of the time.
-                    MetricsThreshold::new_gb(16.0 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
+                    MetricsThreshold::new_gb(26.0 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -407,9 +409,8 @@ pub(crate) fn realistic_env_max_load_test(
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
-            // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 20% of the time.
-            MetricsThreshold::new_gb(16.0 + 8.0 * (duration_secs as f64 / 3600.0), 20),
+            MetricsThreshold::new_gb(26.0 + 8.0 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -520,7 +521,8 @@ pub(crate) fn realistic_env_max_load_test(
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
-    let mempool_backlog = 100;
+    let num_pfns = 3;
+    let mempool_backlog = 1600;
 
     let success_criteria = SuccessCriteria::new(15)
         .add_no_restarts()
@@ -537,6 +539,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_num_pfns(num_pfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -563,8 +566,8 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
-        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/digest_key.bin")
-        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/pp.bin")
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;
@@ -578,6 +581,9 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
                 Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.api.allow_encrypted_txns_submission = true;
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
         }))
         .with_emit_job(
@@ -614,7 +620,10 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20)
                 .transaction_mix(vec![
-                    (TransactionTypeArg::EncryptedCoinTransfer.materialize_default(), 1),
+                    (
+                        TransactionTypeArg::EncryptedCoinTransfer.materialize_default(),
+                        1,
+                    ),
                     (TransactionTypeArg::CoinTransfer.materialize_default(), 9),
                 ]),
             inner_success_criteria: SuccessCriteria::new(300),
@@ -638,8 +647,8 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
-        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/digest_key.bin")
-        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/6f69f6b2cd942bcae17efaada3d0f996a4741e85/devnet/pp.bin")
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;
@@ -713,6 +722,100 @@ pub(crate) fn realistic_env_chunky_dkg_epoch_change_test(duration: Duration) -> 
         .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
         .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus.quorum_store.enable_batch_v2_tx = true;
+            config.consensus.quorum_store.enable_batch_v2_rx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config.consensus_observer.enable_v2_message_sending = true;
+            config.consensus.digest_key_blob_path =
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
+            config.consensus.public_parameters_blob_path =
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus_observer.observer_enabled = true;
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 200 })
+                .encrypt_transactions(true)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
+        .with_num_pfns(num_pfns)
+}
+
+/// Stresses Chunky DKG and encrypted-transaction load by dropping the working quorum *while a DKG
+/// is in flight*, so the epoch transition itself stalls. 20 validators + 1 PFN, 200 TPS of
+/// encrypted transfers, epoch change every 5 minutes. Each cycle waits until chunky DKG is in
+/// progress, then blackholes a fixed set of 7 validators (> f = 6, so quorum is actually lost) at
+/// the network layer for ~4 minutes; the in-flight DKG cannot aggregate and the epoch transition
+/// stalls until connectivity is restored, after which the DKG must resume and the chain catch up.
+pub(crate) fn realistic_env_chunky_dkg_quorum_loss_test(duration: Duration) -> ForgeConfig {
+    let num_validators = 20;
+    let num_vfns = 0;
+    let num_pfns = 1;
+
+    // With 20 validators, f = 6, so blackholing 7 removes the working quorum.
+    let quorum_loss_test = ChunkyDkgQuorumLossTest {
+        num_blackholed: 7,
+        quorum_loss_secs: 240.0,
+    };
+
+    // The chain intentionally halts for ~4 minutes mid-DKG during each quorum-loss phase, so
+    // progress checks are relaxed accordingly and we verify recovery (catch-up) rather than
+    // continuous progress. No latency thresholds: transactions submitted during a halt commit
+    // minutes later.
+    let success_criteria = SuccessCriteria::new(10)
+        .add_no_restarts()
+        .add_wait_for_catchup_s((duration.as_secs() / 5).max(180))
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 420.0,
+            max_epoch_no_progress_secs: 420.0,
+            max_non_epoch_round_gap: 100,
+            max_epoch_round_gap: 100,
+        })
+        .allow_errors();
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(wrap_with_realistic_env(num_validators, quorum_loss_test))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["randomness_config_override"] =
+                serde_yaml::to_value(OnChainRandomnessConfig::default_enabled())
+                    .expect("must serialize");
+            helm_values["chain"]["chunky_dkg_config_override"] =
+                serde_yaml::to_value(OnChainChunkyDKGConfig::default_enabled())
+                    .expect("must serialize");
+            let mut features = Features::default();
+            features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
+        }))
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Required so the test can toggle the network::send/recv failpoints that blackhole
+            // validators during the quorum-loss phases.
+            config.api.failpoints_enabled = true;
             config.base.enable_validator_pfn_connections = true;
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;

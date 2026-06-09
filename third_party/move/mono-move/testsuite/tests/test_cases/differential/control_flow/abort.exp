@@ -1,0 +1,27 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun do_abort(l0: u64)
+    move_loc l0
+    abort
+
+=== stackless ===
+// module 0x1::test
+
+fun do_abort(r0) {
+  slots: params(1), locals(0), temps(0)
+    r0: u64
+  code:
+  L0:
+    0: abort r0
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun do_abort() {
+  frame_data_size: 8
+  entry_gas: 2
+  code:
+    0: Abort [0]
+}

@@ -1,0 +1,45 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::field_ref_fusion
+
+struct S has drop+copy
+  _1: u64
+  _2: u8
+
+fun read_field_val(x: S): u8
+    borrow_loc x
+    borrow_field S, _2
+    read_ref
+    ret
+
+fun read_and_add(x: &u64): u64
+    move_loc x
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+fun read_field_ref_twice(x: S): u64
+    local fref: &u64
+    borrow_loc x
+    borrow_field S, _1
+    st_loc fref
+    copy_loc fref
+    read_ref
+    move_loc fref
+    read_ref
+    add
+    ret
+
+fun test_read_and_add(x: u64): u64
+    local v: u64
+    move_loc x
+    st_loc v
+    borrow_loc v
+    call read_and_add
+    ret
+
+// RUN: execute 0x66::field_ref_fusion::test_read_and_add --args 0
+// CHECK: results: 1
+
+// RUN: execute 0x66::field_ref_fusion::test_read_and_add --args 41
+// CHECK: results: 42

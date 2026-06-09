@@ -5412,8 +5412,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                                 .map_err(|e| S::Error::custom(format!("{}", e)))?,
                             None => id.try_into_move_value(layout).map_err(|_| {
                                 S::Error::custom(format!(
-                                    "Custom serialization failed for {:?} with layout {}",
-                                    kind, layout
+                                    "Custom serialization failed for {:?}",
+                                    kind
                                 ))
                             })?,
                         };
@@ -5433,8 +5433,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                         // If no delayed field extension, it is not known how the delayed value
                         // should be serialized. So, just return an error.
                         Err(invariant_violation::<S>(format!(
-                            "no custom serializer for delayed value ({:?}) with layout {}",
-                            kind, layout
+                            "no custom serializer for delayed value ({:?})",
+                            kind
                         )))
                     },
                 }
@@ -5637,9 +5637,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                                     DelayedFieldID::try_from_move_value(layout, value, &())
                                         .map_err(|_| {
                                             D::Error::custom(format!(
-                                        "Custom deserialization failed for {:?} with layout {}",
-                                        kind, layout
-                                    ))
+                                                "Custom deserialization failed for {:?}",
+                                                kind
+                                            ))
                                         })?;
                                 id
                             },
@@ -5653,8 +5653,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                         Err(D::Error::custom(
                             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                                 .with_message(format!(
-                                    "no custom deserializer for native value ({:?}) with layout {}",
-                                    kind, layout
+                                    "no custom deserializer for native value ({:?})",
+                                    kind
                                 )),
                         ))
                     },
@@ -6475,11 +6475,8 @@ impl Value {
         use crate::values::function_values_impl::mock::MockAbstractFunction;
         use MoveTypeLayout as L;
 
-        if let L::Native(kind, layout) = layout {
-            panic!(
-                "impossible to get native layout ({:?}) with {}",
-                kind, layout
-            )
+        if let L::Native(kind, _) = layout {
+            panic!("impossible to get native layout ({:?})", kind)
         }
 
         match (layout, &self) {

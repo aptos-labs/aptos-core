@@ -40,3 +40,10 @@ fn test_batch() {
 
     assert_eq!(batch.into_transactions(), signed_txns);
 }
+
+#[test]
+fn test_batch_verify_rejects_empty() {
+    let source = AccountAddress::random();
+    let batch = Batch::new(BatchId::new_for_test(1), vec![], 0, 1, source, 0);
+    assert_err!(batch.verify());
+}

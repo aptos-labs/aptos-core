@@ -12,8 +12,8 @@
 //! the unspecialized per-kind variants defined here, which tag-dispatch on
 //! the operand type at runtime.
 
-use super::FrameOffset;
-use crate::types::Type;
+use super::{CodeOffset, FrameOffset};
+use crate::types::{InternedType, Type};
 use move_core_types::int256::{I256, U256};
 use std::fmt;
 
@@ -323,4 +323,126 @@ pub struct IntNegateOp {
     pub ty: IntTy,
     pub dst: FrameOffset,
     pub src: FrameOffset,
+}
+
+/// Universal cast operation, supporting all integer pairs — including
+/// self-casts.
+///
+/// Abort semantics follow one universal rule: the cast succeeds iff the
+/// source value fits in the target type's range, and aborts otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IntCastOp {
+    pub from: IntTy,
+    pub to: IntTy,
+    pub dst: FrameOffset,
+    pub src: FrameOffset,
+}
+
+/// Comparison relation for [`super::MicroOp::IntCmp`]. `CmpKind` itself
+/// carries no type or width: the operands determine both, so one variant is
+/// reused across every type it applies to.
+///
+/// - Ordering variants (`Lt`/`Le`/`Gt`/`Ge`) apply to integer operands only;
+///   the operand's type decides whether the comparison is signed or unsigned.
+/// - Equality variants (`Eq`/`Neq`) apply to any flat value of any width —
+///   every integer width plus `bool` (1 byte) and `address` (32 bytes) —
+///   since they just compare bit patterns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CmpKind {
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Neq,
+}
+
+impl fmt::Display for CmpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            CmpKind::Lt => "<",
+            CmpKind::Le => "<=",
+            CmpKind::Gt => ">",
+            CmpKind::Ge => ">=",
+            CmpKind::Eq => "==",
+            CmpKind::Neq => "!=",
+        })
+    }
+}
+
+/// `dst = (lhs <op> rhs)` producing a 1-byte boolean (`0` / `1`).
+/// `lhs` is an integer slot (of the same type as `rhs`).
+/// `dst` is a 1-byte slot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntCmpOp {
+    pub op: CmpKind,
+    pub dst: FrameOffset,
+    pub lhs: FrameOffset,
+    pub rhs: IntOperand,
+}
+
+/// Fused compare-and-branch: jump to `target` if `op(lhs, rhs)` holds. Like
+/// [`IntCmpOp`] but branches on the result instead of storing it.
+/// Note that there are specialized `*U64` variants of this micro-op.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JumpIntCmpOp {
+    pub target: CodeOffset,
+    pub op: CmpKind,
+    pub lhs: FrameOffset,
+    pub rhs: IntOperand,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
+}
+
+/// `dst = (lhs == rhs)` (or `!=` when `negate`), a structural equality over
+/// the aggregate values at `lhs`/`rhs`, producing a 1-byte boolean. Used for
+/// aggregate types (vectors, structs) — everything that is not a flat scalar
+/// handled by [`IntCmpOp`]. A vector slot holds a pointer to its heap data,
+/// which the comparison reads through.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ValueCmpOp {
+    pub negate: bool,
+    pub dst: FrameOffset,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+}
+
+/// Like [`ValueCmpOp`], but the operands are **references**: `lhs`/`rhs` hold
+/// 16-byte fat pointers, read through to obtain the operand pointers of the
+/// referent value of type `ty`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ValueRefCmpOp {
+    pub negate: bool,
+    pub dst: FrameOffset,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+}
+
+/// Fused compare-and-branch counterpart of [`ValueCmpOp`]: jump to `target`
+/// if the equality result holds (negated when `negate`). Operands are inline
+/// values; see [`ValueCmpOp`] for the field meanings.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct JumpValueCmpOp {
+    pub target: CodeOffset,
+    pub negate: bool,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
+}
+
+/// Fused compare-and-branch counterpart of [`ValueRefCmpOp`]: operands are
+/// 16-byte fat pointers read through to the referent values.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct JumpValueRefCmpOp {
+    pub target: CodeOffset,
+    pub negate: bool,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
 }

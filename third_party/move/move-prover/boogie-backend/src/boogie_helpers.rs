@@ -461,6 +461,29 @@ pub fn boogie_num_type_string_capital(kind: &str, num: &str, bv_flag: bool) -> S
     [pre, num].join("")
 }
 
+/// Boogie procedure-name suffix for an integer-typed dest of an arithmetic op,
+/// e.g. `U64`, `I128`, `Bv32`. Used by the `Add`/`Sub`/`Mul`/`Div`/`Mod` arms of
+/// the bytecode translator to dispatch to the right per-type Boogie procedure.
+/// Panics if `ty` is not a primitive integer.
+pub fn boogie_int_suffix(ty: &Type, bv_flag: bool) -> String {
+    use PrimitiveType::*;
+    match ty {
+        Type::Primitive(U8) => boogie_num_type_string_capital("U", "8", bv_flag),
+        Type::Primitive(U16) => boogie_num_type_string_capital("U", "16", bv_flag),
+        Type::Primitive(U32) => boogie_num_type_string_capital("U", "32", bv_flag),
+        Type::Primitive(U64) => boogie_num_type_string_capital("U", "64", bv_flag),
+        Type::Primitive(U128) => boogie_num_type_string_capital("U", "128", bv_flag),
+        Type::Primitive(U256) => boogie_num_type_string_capital("U", "256", bv_flag),
+        Type::Primitive(I8) => boogie_num_type_string_capital("I", "8", bv_flag),
+        Type::Primitive(I16) => boogie_num_type_string_capital("I", "16", bv_flag),
+        Type::Primitive(I32) => boogie_num_type_string_capital("I", "32", bv_flag),
+        Type::Primitive(I64) => boogie_num_type_string_capital("I", "64", bv_flag),
+        Type::Primitive(I128) => boogie_num_type_string_capital("I", "128", bv_flag),
+        Type::Primitive(I256) => boogie_num_type_string_capital("I", "256", bv_flag),
+        _ => unreachable!("non-integer dest for arithmetic op"),
+    }
+}
+
 /// Return the boogie base type for a number type.
 /// If `bv_flag` is true, returns "Bv8", "Bv16", etc. for bitvector types.
 /// Otherwise returns "8", "16", etc. for integer types.

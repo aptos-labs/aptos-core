@@ -41,6 +41,16 @@ pub struct ExecutorViewWithChangeSet<'r> {
     pub(crate) change_set: VMChangeSet,
 }
 
+/// Test-only constructor so cross-session squash PoCs can layer a prior session's change set
+/// over an executor view (mirrors how the respawned epilogue session is built).
+pub fn new_for_executor_view_with_change_set_for_test<'r>(
+    base_executor_view: &'r dyn ExecutorView,
+    base_resource_group_view: &'r dyn ResourceGroupView,
+    change_set: VMChangeSet,
+) -> ExecutorViewWithChangeSet<'r> {
+    ExecutorViewWithChangeSet::new(base_executor_view, base_resource_group_view, change_set)
+}
+
 impl<'r> ExecutorViewWithChangeSet<'r> {
     pub(crate) fn new(
         base_executor_view: &'r dyn ExecutorView,

@@ -525,6 +525,7 @@ fn apply_transaction_by_writeset(
         aux_info,
         &ledger_summary.state,
         state_view,
+        TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     )
     .unwrap();
 

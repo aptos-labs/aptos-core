@@ -122,6 +122,7 @@ impl NativeTransaction {
             },
             aptos_types::transaction::Transaction::BlockEpilogue(_) => Self::BlockEpilogue,
             aptos_types::transaction::Transaction::BlockMetadata(_) => Self::BlockMetadata,
+            aptos_types::transaction::Transaction::BlockMetadataExt(_) => Self::BlockMetadata,
             _ => unimplemented!("non-user transaction {:?}", txn),
         }
     }

@@ -3,11 +3,13 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
+use mono_move_core::{native::ProductionNativeRegistry, types::EMPTY_TYPE_LIST};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
-use mono_move_runtime::{InterpreterContext, LocalRuntimeContext, RuntimeError};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_runtime::{
+    ExecutionContext, InterpreterContext, LocalRuntimeContext, RuntimeError, TransactionContext,
+};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -28,8 +30,13 @@ module 0x1::test {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader =
-        Loader::new_with_policy(&guard, &provider, LoadingPolicy::Lazy(LoweringPolicy::Lazy));
+    let natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
+    let loader = Loader::new_with_policy(
+        &guard,
+        &provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
+    );
 
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("test"));
     let fib_name = guard
@@ -70,13 +77,21 @@ fn test_out_of_gas_during_load() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
+    // 1 gas unit — far below the byte-length cost of any real module.
+    let natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
     let loader = Loader::new_with_policy(
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
     );
     // 1 gas unit — far below the byte-length cost of any real module.
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(1));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        SimpleGasMeter::new(1),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+        &natives,
+    );
 
     let id = guard
         .intern_address_name(&AccountAddress::ONE, ident_str!("test"))

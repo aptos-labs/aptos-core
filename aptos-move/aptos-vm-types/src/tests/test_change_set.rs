@@ -163,7 +163,7 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
 #[test]
 fn test_successful_squash() {
     let (mut change_set, additional_change_set) = build_change_sets_for_test();
-    assert_ok!(change_set.squash_additional_change_set(additional_change_set,));
+    assert_ok!(change_set.squash_additional_change_set(additional_change_set, true));
 
     let descriptor = "r";
     assert_eq!(
@@ -211,7 +211,7 @@ macro_rules! assert_invariant_violation {
         let cs2 = VMChangeSetBuilder::new()
             .with_resource_write_set($w2.clone())
             .build();
-        let res = cs1.squash_additional_change_set(cs2);
+        let res = cs1.squash_additional_change_set(cs2, true);
         check(res);
         let mut cs1 = VMChangeSetBuilder::new()
             .with_aggregator_v1_write_set($w3.clone())
@@ -219,7 +219,7 @@ macro_rules! assert_invariant_violation {
         let cs2 = VMChangeSetBuilder::new()
             .with_aggregator_v1_write_set($w4.clone())
             .build();
-        let res = cs1.squash_additional_change_set(cs2);
+        let res = cs1.squash_additional_change_set(cs2, true);
         check(res);
     };
 }
@@ -276,7 +276,7 @@ fn test_unsuccessful_squash_delete_delta() {
     let additional_change_set = VMChangeSetBuilder::new()
         .with_aggregator_v1_delta_set(aggregator_delta_set_2)
         .build();
-    let res = change_set.squash_additional_change_set(additional_change_set);
+    let res = change_set.squash_additional_change_set(additional_change_set, true);
     let err = assert_err!(res);
     assert_eq!(
         err.major_status(),
@@ -296,7 +296,7 @@ fn test_unsuccessful_squash_delta_create() {
     let additional_change_set = VMChangeSetBuilder::new()
         .with_aggregator_v1_write_set(aggregator_write_set_2)
         .build();
-    let res = change_set.squash_additional_change_set(additional_change_set);
+    let res = change_set.squash_additional_change_set(additional_change_set, true);
     let err = assert_err!(res);
     assert_eq!(
         err.major_status(),
@@ -406,7 +406,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
         .with_delayed_field_change_set(agg_changes_2)
         .build();
 
-    assert_ok!(change_set_1.squash_additional_change_set(change_set_2,));
+    assert_ok!(change_set_1.squash_additional_change_set(change_set_2, true));
 
     let output_map = change_set_1.delayed_field_change_set();
     assert_eq!(output_map.len(), 3);
@@ -503,7 +503,7 @@ fn test_resource_groups_squashing() {
 
     {
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(modify_tag_0.clone(),));
+        assert_ok!(change_set.squash_additional_change_set(modify_tag_0.clone(), true));
         assert_eq!(change_set.resource_write_set().len(), 1);
         // create(x)+modify(y) becomes create(y)
         assert_some_eq!(
@@ -519,7 +519,7 @@ fn test_resource_groups_squashing() {
 
     {
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(create_tag_1.clone(),));
+        assert_ok!(change_set.squash_additional_change_set(create_tag_1.clone(), true));
         assert_eq!(change_set.resource_write_set().len(), 1);
         assert_some_eq!(
             change_set.resource_write_set().get(&as_state_key!("1")),
@@ -531,7 +531,7 @@ fn test_resource_groups_squashing() {
             ))
         );
 
-        assert_ok!(change_set.squash_additional_change_set(modify_tag_1.clone(),));
+        assert_ok!(change_set.squash_additional_change_set(modify_tag_1.clone(), true));
         assert_eq!(change_set.resource_write_set().len(), 1);
         // create(x)+modify(y) becomes create(y)
         assert_some_eq!(
@@ -547,7 +547,7 @@ fn test_resource_groups_squashing() {
 
     {
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(modify_tag_1.clone(),));
+        assert_ok!(change_set.squash_additional_change_set(modify_tag_1.clone(), true));
         assert_eq!(change_set.resource_write_set().len(), 1);
         assert_some_eq!(
             change_set.resource_write_set().get(&as_state_key!("1")),
@@ -561,16 +561,40 @@ fn test_resource_groups_squashing() {
     }
 
     {
-        // read cannot modify size
-        let mut change_set = create_tag_0.clone();
-        assert_err!(change_set.squash_additional_change_set(
-            ExpandedVMChangeSetBuilder::new()
-                .with_group_reads_needing_delayed_field_exchange(vec![(
-                    as_state_key!("1"),
-                    (modification_metadata.metadata().clone(), 400)
-                )])
-                .build(),
-        ));
+        // A group write squashed with an in-place delayed-field change of a *different* size is
+        // rejected under both gas feature versions (a read cannot modify size).
+        let mismatched_inplace = ExpandedVMChangeSetBuilder::new()
+            .with_group_reads_needing_delayed_field_exchange(vec![(
+                as_state_key!("1"),
+                (modification_metadata.metadata().clone(), 400),
+            )])
+            .build();
+        let mut legacy = create_tag_0.clone();
+        assert_err!(legacy.squash_additional_change_set(mismatched_inplace.clone(), false));
+        let mut strict = create_tag_0.clone();
+        assert_err!(strict.squash_additional_change_set(mismatched_inplace, true));
+    }
+
+    {
+        // WriteResourceGroup ⊕ in-place delayed-field change of *matching* size: permitted under
+        // the legacy rules (the group write is kept), but fail-closed from RELEASE_V1_46. This is
+        // the gas-version-gated behavior change.
+        let matching_inplace = ExpandedVMChangeSetBuilder::new()
+            .with_group_reads_needing_delayed_field_exchange(vec![(
+                as_state_key!("1"),
+                (
+                    modification_metadata.metadata().clone(),
+                    single_tag_group_size.get(),
+                ),
+            )])
+            .build();
+
+        let mut legacy = create_tag_0.clone();
+        assert_ok!(legacy.squash_additional_change_set(matching_inplace.clone(), false));
+        assert_eq!(legacy.resource_write_set().len(), 1);
+
+        let mut strict = create_tag_0.clone();
+        assert_err!(strict.squash_additional_change_set(matching_inplace, true));
     }
 }
 
@@ -612,6 +636,40 @@ fn test_write_and_read_discrepancy_caught() {
             (metadata_op.metadata().clone(), group_size.get())
         )])
         .try_build());
+}
+
+/// Standalone-resource analogue of the resource-group gate: a `WriteWithDelayedFields` squashed
+/// with a later `InPlaceDelayedFieldChange` on the same key is rejected outright under the strict
+/// (gas_feature_version >= RELEASE_V1_46) squash, regardless of whether the materialized sizes
+/// match. (The group analogue is exercised in `test_resource_groups_squashing`.)
+#[test]
+fn test_squash_standalone_write_then_inplace_delayed_field_gated() {
+    let layout = TriompheArc::new(MoveTypeLayout::U64);
+    let write = ExpandedVMChangeSetBuilder::new()
+        .with_resource_write_set(vec![(
+            as_state_key!("1"),
+            (
+                WriteOp::creation(as_bytes!(1).into(), raw_metadata(100)),
+                Some(layout.clone()),
+            ),
+        )])
+        .build();
+    let inplace = ExpandedVMChangeSetBuilder::new()
+        .with_reads_needing_delayed_field_exchange(vec![(
+            as_state_key!("1"),
+            (raw_metadata(100), 8, layout),
+        )])
+        .build();
+
+    // Strict (>= RELEASE_V1_46): rejected outright, fail-closed.
+    let mut strict = write.clone();
+    let err = assert_err!(strict.squash_additional_change_set(inplace.clone(), true));
+    assert!(
+        format!("{:?}", err)
+            .contains("Refusing to squash a resource write with a later in-place delayed-field"),
+        "unexpected error: {:?}",
+        err
+    );
 }
 
 // TODO[agg_v2](cleanup) combine utilities with above utilities, and see if tests need cleanup.
@@ -748,7 +806,8 @@ mod tests {
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
             &mut base_update,
-            additional_update
+            additional_update,
+            true,
         ));
 
         assert_eq!(base_update.len(), 2);
@@ -791,7 +850,8 @@ mod tests {
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
             &mut base_update,
-            additional_update
+            additional_update,
+            true,
         ));
 
         assert_eq!(base_update.len(), 1);
@@ -829,7 +889,8 @@ mod tests {
 
         assert_err!(VMChangeSet::squash_additional_resource_writes(
             &mut base_update,
-            additional_update
+            additional_update,
+            true,
         ));
     }
 
@@ -860,7 +921,8 @@ mod tests {
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
             &mut base_update,
-            additional_update
+            additional_update,
+            true,
         ));
         assert!(base_update.is_empty(), "Must become a no-op");
     }
@@ -948,7 +1010,8 @@ mod tests {
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
             &mut base_update,
-            additional_update
+            additional_update,
+            true,
         ));
         assert_eq!(base_update.len(), 2);
         let inner_ops_1 = &extract_group_op(base_update.get(&key_1).unwrap()).inner_ops;
@@ -987,7 +1050,8 @@ mod tests {
         )]);
         assert_err!(VMChangeSet::squash_additional_resource_writes(
             &mut base_update,
-            additional_update
+            additional_update,
+            true,
         ));
     }
 }

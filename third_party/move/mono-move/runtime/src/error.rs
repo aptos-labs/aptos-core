@@ -3,8 +3,12 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError};
+use mono_move_core::{
+    native::VMInternalError, ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError,
+};
 use mono_move_gas::GasExhaustedError;
+use mono_move_loader::LoaderError;
+use move_core_types::account_address::AccountAddress;
 use std::fmt;
 use thiserror::Error;
 
@@ -15,9 +19,8 @@ pub enum RuntimeError {
     #[error(transparent)]
     GasExhausted(#[from] GasExhaustedError),
 
-    // TODO: replace with a typed loader error once the loader has one.
     #[error(transparent)]
-    Loader(anyhow::Error),
+    Loader(#[from] LoaderError),
 
     #[error("{op}.{ty}: overflow")]
     ArithmeticOverflow { op: ArithOp, ty: IntTy },
@@ -45,11 +48,23 @@ pub enum RuntimeError {
     #[error("Negate.{ty}: Negate of MIN overflows")]
     NegateMinOverflow { ty: IntTy },
 
+    #[error("Cast.{from}->{to}: value out of range for {to}")]
+    CastOutOfRange { from: IntTy, to: IntTy },
+
     #[error("VecPopBack on empty vector")]
     PopFromEmptyVector,
 
     #[error("{op} index out of bounds: idx={idx} len={len}")]
     VectorIndexOutOfBounds { op: VecOp, idx: u64, len: u64 },
+
+    #[error("{op}: resource does not exist at {addr}")]
+    ResourceDoesNotExist {
+        op: GlobalStorageOp,
+        addr: AccountAddress,
+    },
+
+    #[error("MoveTo: resource already exists at {addr}")]
+    ResourceAlreadyExists { addr: AccountAddress },
 
     #[error("stack overflow")]
     StackOverflow,
@@ -72,6 +87,24 @@ pub enum RuntimeError {
 
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
+
+    #[error("resource provider: {0}")]
+    ResourceProvider(#[from] ResourceProviderError),
+
+    #[error(transparent)]
+    VMInternal(#[from] VMInternalError),
+
+    #[error("BCS deserialize: unexpected end of input")]
+    BCSEof,
+
+    #[error("BCS deserialize: malformed ULEB128 length")]
+    BCSInvalidUleb,
+
+    #[error("BCS deserialize: sequence length {len} exceeds maximum")]
+    BCSSequenceTooLong { len: u64 },
+
+    #[error("BCS deserialize: {remaining} trailing byte(s) after value")]
+    BCSRemainingInput { remaining: usize },
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -80,8 +113,7 @@ impl IntoExecutionError for RuntimeError {
         match self {
             GasExhausted(_) => ExecutionErrorKind::OutOfGas,
 
-            // TODO: delegate to the loader's typed error once it has one.
-            Loader(_) => ExecutionErrorKind::Placeholder,
+            Loader(e) => e.kind(),
 
             ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
@@ -90,9 +122,12 @@ impl IntoExecutionError for RuntimeError {
             | ArithmeticUnderOverflow { .. }
             | DivisionByZeroOrOverflow { .. }
             | NegateMinOverflow { .. }
+            | CastOutOfRange { .. }
             | PopFromEmptyVector
             | VectorIndexOutOfBounds { .. }
-            | InvalidAbortMessage => ExecutionErrorKind::InvalidOperation,
+            | InvalidAbortMessage
+            | ResourceDoesNotExist { .. }
+            | ResourceAlreadyExists { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -100,7 +135,13 @@ impl IntoExecutionError for RuntimeError {
             | VecAllocSizeOverflow
             | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
 
+            BCSEof | BCSInvalidUleb | BCSSequenceTooLong { .. } | BCSRemainingInput { .. } => {
+                ExecutionErrorKind::InvalidOperation
+            },
+
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            ResourceProvider(e) => e.kind(),
+            VMInternal(e) => e.kind(),
         }
     }
 }
@@ -170,6 +211,23 @@ impl fmt::Display for VecOp {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalStorageOp {
+    BorrowGlobal,
+    BorrowGlobalMut,
+    MoveFrom,
+}
+
+impl fmt::Display for GlobalStorageOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GlobalStorageOp::BorrowGlobal => write!(f, "BorrowGlobal"),
+            GlobalStorageOp::BorrowGlobalMut => write!(f, "BorrowGlobalMut"),
+            GlobalStorageOp::MoveFrom => write!(f, "MoveFrom"),
+        }
+    }
+}
+
 /// Conditions that should never occur if the compiler, verifier, and
 /// runtime maintain their invariants. Surfaced rather than panicked so
 /// callers can produce a clean per-transaction outcome and alert
@@ -194,6 +252,12 @@ pub enum RuntimeInvariantViolation {
     #[error("descriptor {descriptor_id} not found in descriptor table")]
     DescriptorNotFound { descriptor_id: u32 },
 
+    #[error("type has no published layout")]
+    ValueLayoutNotFound,
+
+    #[error("unreachable: {0}")]
+    Unreachable(String),
+
     #[error("GC scan: invalid object size {size} (expected non-zero, MAX_ALIGN-byte aligned)")]
     GcInvalidObjectSize { size: usize },
 
@@ -203,16 +267,28 @@ pub enum RuntimeInvariantViolation {
     #[error("CallClosure: null closure pointer")]
     NullClosure,
 
+    #[error("CallClosure: closure_src object has descriptor {descriptor_id}, not the closure descriptor")]
+    ClosureSrcNotClosure { descriptor_id: u32 },
+
     #[error("CallClosure: callee has {num_params} params, exceeds 64-bit mask capacity")]
     TooManyClosureParams { num_params: usize },
+
+    #[error("CallClosure: mask {mask:#b} references parameters beyond callee's {num_params}")]
+    ClosureMaskExceedsParams { mask: u64, num_params: usize },
+
+    #[error("CallClosure: packed captured values_size {packed} != resolved callee's captured layout {expected}")]
+    ClosureCapturedLayoutMismatch { expected: u32, packed: u32 },
 
     #[error("CallClosure: null function pointer in closure")]
     NullFuncRefInClosure,
 
+    #[error("CallClosure: unknown func_ref tag {tag}")]
+    InvalidClosureFuncRefTag { tag: u8 },
+
     #[error("CallClosure: null captured_data for closure with captured params")]
     NullCapturedData,
 
-    #[error("CallClosure: provided_args[{provided_idx}].size {provided_size} != callee param_sizes[{param_idx}] {param_size}")]
+    #[error("CallClosure: provided_args[{provided_idx}].size {provided_size} != callee param_slots[{param_idx}].size {param_size}")]
     ClosureArgSizeMismatch {
         provided_idx: usize,
         provided_size: u32,
@@ -227,6 +303,21 @@ pub enum RuntimeInvariantViolation {
         "CallClosure: {provided} provided_args but only {consumed} non-captured params consumed"
     )]
     ClosureArgsCountMismatch { provided: usize, consumed: usize },
+
+    #[error("resource provider: {0}")]
+    ResourceProviderInvariant(String),
+
+    #[error("rollback({requested}): only {available} checkpoint(s) on the stack")]
+    RollbackUnderflow { requested: usize, available: usize },
+
+    #[error("enum tag {tag} out of range for {variant_count} variants")]
+    EnumTagOutOfRange { tag: u64, variant_count: usize },
+
+    #[error("MoveTo: null source pointer")]
+    MoveToNullSource,
+
+    #[error("CallNative: native_idx {idx} out of bounds in registry of size {registry_size}")]
+    NativeIdxOutOfBounds { idx: u32, registry_size: usize },
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

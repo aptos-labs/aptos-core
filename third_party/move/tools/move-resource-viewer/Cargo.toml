@@ -16,4 +16,5 @@ move-core-types = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 
 anyhow = { workspace = true }
+fxhash = { workspace = true }
 hex = { workspace = true }

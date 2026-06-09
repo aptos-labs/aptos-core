@@ -46,7 +46,7 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
         .reader
         .latest_state_checkpoint_view()
         .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
-    Ok(ChainIdResource::fetch_config(&db_state_view)
+    Ok(ChainIdResource::fetch_config(&db_state_view)?
         .expect("[aptos-node] missing chain ID resource")
         .chain_id())
 }
@@ -76,12 +76,6 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     );
     AptosVM::set_blockstm_v2_enabled_once(node_config.execution.blockstm_v2_enabled);
     AptosVM::set_enable_pre_write_once(node_config.execution.enable_pre_write);
-    AptosVM::set_persist_hotness_in_epilogue_once(
-        node_config
-            .storage
-            .hot_state_config
-            .persist_hotness_in_epilogue,
-    );
 
     if node_config
         .execution

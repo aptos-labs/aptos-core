@@ -1,0 +1,103 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x66::vec_pushback_safe_point
+// Function definition at index 0
+#[persistent] public fun caller(l0: u64): u64
+    local l1: vector<u64>
+    call fresh
+    vec_pack <u64>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    move_loc l0
+    // @5
+    vec_push_back <u64>
+    call take
+    mut_borrow_loc l1
+    vec_pop_back <u64>
+    ret
+
+// Function definition at index 1
+fun fresh(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+// Function definition at index 2
+fun take(l0: vector<u8>)
+    ret
+
+=== stackless ===
+// module 0x66::vec_pushback_safe_point
+
+fun caller(r0): u64 {
+  slots: params(1), locals(1), temps(2), xfer(1)
+    r0: u64
+    r1: vector<u64>
+    r2: &mut vector<u64>
+    r3: u64
+  code:
+  L0:
+    0: [x0] := call fresh, []
+    1: r1 := vec_pack u64, 0, []
+    2: r2 := mut_borrow_loc r1
+    3: vec_push_back u64, r2, r0
+    4: [] := call take, [x0]
+    5: r2 := mut_borrow_loc r1
+    6: r3 := vec_pop_back u64, r2
+    7: ret [r3]
+}
+
+fun fresh(): vector<u8> {
+  slots: params(0), locals(0), temps(1)
+    r0: vector<u8>
+  code:
+  L0:
+    0: r0 := vec_pack u8, 0, []
+    1: ret [r0]
+}
+
+fun take(r0) {
+  slots: params(1), locals(0), temps(0)
+    r0: vector<u8>
+  code:
+  L0:
+    0: ret []
+}
+=== micro-ops ===
+// module 0x66::vec_pushback_safe_point
+
+fun caller() {
+  frame_data_size: 40
+  entry_gas: 170
+  code:
+    0: CallIndirect 0x66::vec_pushback_safe_point::fresh
+    1: VecNew [8]
+    2: SlotBorrow [16] <- &[8]
+    3: VecPushBack [16].push([0], size=8, desc=2)
+    4: CallIndirect 0x66::vec_pushback_safe_point::take
+    5: SlotBorrow [16] <- &[8]
+    6: VecPopBack [32] <- [16].pop(size=8)
+    7: Move8 [0] <- [32]
+    8: Return
+  safe_point_layouts:
+    3: [64]
+}
+
+fun fresh() {
+  frame_data_size: 8
+  entry_gas: 64
+  code:
+    0: VecNew [0]
+    1: Return
+}
+
+fun take() {
+  frame_data_size: 8
+  entry_gas: 2
+  code:
+    0: Return
+}
+=== frame-layout ===
+// module 0x66::vec_pushback_safe_point
+fun caller: heap_ptr_offsets=[8, 16] zero_frame=true
+fun fresh: heap_ptr_offsets=[0] zero_frame=true
+fun take: heap_ptr_offsets=[0] zero_frame=false

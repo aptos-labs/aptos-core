@@ -11,6 +11,7 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_store::{StatePruner, StateStore},
+    trading_native::ENABLE_TRADING_NATIVE,
     transaction_store::TransactionStore,
 };
 #[cfg(any(test, feature = "db-debugger"))]
@@ -19,7 +20,8 @@ use crate::{
     utils::truncation_helper::get_current_version_in_state_merkle_db,
 };
 use aptos_config::config::{
-    HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig, StorageDirPaths,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
@@ -84,6 +86,9 @@ impl AptosDB {
             hot_state_config,
         ));
 
+        // The native-position DB isn't open here; it attaches later
+        // via `AptosDB::init_native_position`, which re-binds the
+        // pruner via `LedgerPrunerManager::attach_native_pruners`.
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&ledger_db),
             pruner_config.ledger_pruner_config,
@@ -106,6 +111,7 @@ impl AptosDB {
             pre_commit_lock: std::sync::Mutex::new(()),
             commit_lock: std::sync::Mutex::new(()),
             update_subscriber: None,
+            position: None,
         }
     }
 
@@ -155,7 +161,14 @@ impl AptosDB {
             db.write_pruner_progress(synced_version)?;
         }
 
-        let myself = Self::new_with_dbs(
+        // Capture before `pruner_config` is moved; the position pruners
+        // reuse the same windows as main state's value/merkle pruners.
+        let position_value_pruner_config = pruner_config.ledger_pruner_config;
+        let position_state_merkle_pruner_config = pruner_config.state_merkle_pruner_config;
+        let position_epoch_snapshot_pruner_config: StateMerklePrunerConfig =
+            pruner_config.epoch_snapshot_pruner_config.into();
+
+        let mut myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
@@ -168,6 +181,20 @@ impl AptosDB {
             internal_indexer_db,
             hot_state_config,
         );
+
+        if ENABLE_TRADING_NATIVE {
+            myself.init_native_position(
+                db_paths,
+                rocksdb_configs.state_kv_db_config,
+                rocksdb_configs.state_merkle_db_config,
+                position_value_pruner_config,
+                position_state_merkle_pruner_config,
+                position_epoch_snapshot_pruner_config,
+                &env,
+                &block_cache,
+                readonly,
+            )?;
+        }
 
         if !readonly {
             if let Some(version) = myself.get_synced_version()? {
@@ -199,6 +226,28 @@ impl AptosDB {
                 }
                 if let Some(pruner) = &myself.state_store.state_pruner.hot_epoch_snapshot_pruner {
                     pruner.maybe_set_pruner_target_db_version(version);
+                }
+            }
+
+            // Activate the native-position pruners; otherwise their
+            // workers idle at persisted progress until the next position
+            // commit, even when committed versions are already ahead.
+            let synced_version = myself.get_synced_version()?;
+            if let Some(bundle) = myself.position.as_ref()
+                && let Some(position_pruner) = bundle.position_pruner.as_ref()
+            {
+                if let Some(version) = synced_version {
+                    position_pruner
+                        .value_pruner
+                        .maybe_set_pruner_target_db_version(version);
+                }
+                if let Some(version) = bundle.snapshot_version {
+                    position_pruner
+                        .state_merkle_pruner
+                        .maybe_set_pruner_target_db_version(version);
+                    position_pruner
+                        .epoch_snapshot_pruner
+                        .maybe_set_pruner_target_db_version(version);
                 }
             }
         }

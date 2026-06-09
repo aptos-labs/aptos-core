@@ -1,0 +1,166 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x42::basic
+struct Point has copy + drop
+  x: u64
+  y: u64
+
+// Function definition at index 0
+#[persistent] public fun add(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+fun get_x(l0: &Point): u64
+    move_loc l0
+    borrow_field Point, x
+    read_ref
+    ret
+
+// Function definition at index 2
+#[persistent] public fun get_x_of(l0: u64, l1: u64): u64
+    local l2: Point
+    move_loc l0
+    move_loc l1
+    call make_point
+    st_loc l2
+    borrow_loc l2
+    // @5
+    call get_x
+    ret
+
+// Function definition at index 3
+fun make_point(l0: u64, l1: u64): Point
+    move_loc l0
+    move_loc l1
+    pack Point
+    ret
+
+// Function definition at index 4
+#[persistent] public fun max(l0: u64, l1: u64): u64
+    copy_loc l0
+    copy_loc l1
+    gt
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: move_loc l1
+    ret
+
+=== stackless ===
+// module 0x42::basic
+
+fun add(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun get_x(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x42::basic::Point
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_field Point::x, r0
+    1: ret [r1]
+}
+
+fun get_x_of(r0, r1): u64 {
+  slots: params(2), locals(1), temps(0), xfer(2)
+    r0: u64
+    r1: u64
+    r2: 0x42::basic::Point
+  code:
+  L0:
+    0: [r2] := call make_point, [r0, r1]
+    1: x0 := imm_borrow_loc r2
+    2: [x0] := call get_x, [x0]
+    3: ret [x0]
+}
+
+fun make_point(r0, r1): Point {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: 0x42::basic::Point
+  code:
+  L0:
+    0: r2 := pack 0x42::basic::Point, [r0, r1]
+    1: ret [r2]
+}
+
+fun max(r0, r1): u64 {
+  slots: params(2), locals(0), temps(0)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_le L0, r0, r1
+  L1:
+    1: ret [r0]
+  L0:
+    2: ret [r1]
+}
+=== micro-ops ===
+// module 0x42::basic
+
+fun add() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun get_x() {
+  frame_data_size: 24
+  entry_gas: 80
+  code:
+    0: ReadRefOffset [16] <- *([0]+0) (size=8)
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun get_x_of() {
+  frame_data_size: 32
+  entry_gas: 228
+  code:
+    0: Move8 [64] <- [8]
+    1: Move8 [56] <- [0]
+    2: CallIndirect 0x42::basic::make_point
+    3: Move(16) [16] <- [56]
+    4: SlotBorrow [56] <- &[16]
+    5: CallIndirect 0x42::basic::get_x
+    6: Move8 [0] <- [56]
+    7: Return
+}
+
+fun make_point() {
+  frame_data_size: 32
+  entry_gas: 152
+  code:
+    0: Move8 [24] <- [8]
+    1: Move8 [16] <- [0]
+    2: Move(16) [0] <- [16]
+    3: Return
+}
+
+fun max() {
+  frame_data_size: 16
+  entry_gas: 3
+  code:
+    0: JumpGreaterEqualU64 @2 [8] >= [0] gas_taken=54 gas_fallthrough=54
+    1: Return
+    2: Move8 [0] <- [8]
+    3: Return
+}

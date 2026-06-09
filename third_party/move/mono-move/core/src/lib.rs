@@ -3,32 +3,36 @@
 
 pub mod align;
 mod error;
-mod execution_context;
 mod function;
 mod instruction;
 pub mod interner;
+pub mod native;
 mod object_descriptor;
 mod prepared_module;
+pub mod storage;
 pub mod types;
+pub mod value_layout;
 
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
-pub use execution_context::{ExecutionContext, LocalExecutionContext};
 pub use function::{
     Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
 };
 pub use instruction::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, MicroOp, MicroOpGasSchedule, PackClosureOp, ShiftOperand,
-    SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
+    captured_values_size, next_captured_value_offset, CallClosureOp, ClosureFuncRef, CmpKind,
+    CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, MicroOp,
+    PackClosureOp, ShiftOperand, SizedSlot, ValueCmpOp, ValueRefCmpOp,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_FUNC_REF_SIZE, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET,
     ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE,
 };
-pub use interner::{Interner, ModuleId};
+pub use interner::{view_function_ref, FunctionRef, InternedFunctionRef, Interner, ModuleId};
+pub use move_binary_format::file_format::ConstantPoolIndex;
 pub use object_descriptor::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
     CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
@@ -36,4 +40,12 @@ pub use object_descriptor::{
 pub use prepared_module::{
     FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
 };
+pub use storage::{
+    ModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
+    NO_RESOURCE_PROVIDER,
+};
 pub use types::{convert_mut_to_immut_ref, strip_ref};
+pub use value_layout::{
+    reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
+    LayoutProvider, ValueLayout, ValueLayoutTable,
+};

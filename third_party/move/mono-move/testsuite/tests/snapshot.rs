@@ -3,47 +3,22 @@
 
 //! End-to-end snapshot tests for the specializer pipeline.
 //!
-//! Each `.masm` / `.move` input runs: assemble/compile → stackless IR →
-//! micro-op lowering. Output is diffed against a `.exp` snapshot; `UPBL=1`
-//! refreshes snapshots in place.
+//! Each `.move` input runs: compile → stackless IR → micro-op lowering.
+//! Output is diffed against a `.exp` snapshot; `UPBL=1` refreshes snapshots
+//! in place.
+//!
+//! These remaining snapshots cover functions the specializer cannot yet fully
+//! lower (e.g. generic field access). As features land, such tests migrate to
+//! the differential suite, which also compares execution against the legacy VM.
 
 use mono_move_global_context::GlobalContext;
-use mono_move_testsuite::{
-    assemble_masm_source, compile_move_path, print_sections::format_micro_ops,
-};
+use mono_move_testsuite::{compile_move_path, print_sections::render_micro_ops};
 use specializer::destack;
 use std::path::Path;
 
 const EXP_EXT: &str = "exp";
 
-datatest_stable::harness!(
-    masm_runner,
-    "tests/test_cases/snapshot/masm",
-    r".*\.masm$",
-    move_runner,
-    "tests/test_cases/snapshot/move",
-    r".*\.move$",
-);
-
-fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
-    let input = std::fs::read_to_string(path)?;
-    let module = assemble_masm_source(&input).map_err(|e| format!("{:#}", e))?;
-
-    let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx.try_execution_context(0).unwrap();
-
-    let ir = destack(module, &guard).map_err(|e| format!("{:#}", e))?;
-    let mut output = format!("{}", &ir);
-    output.push_str("\n=== micro-ops ===\n");
-    output.push_str(&format_micro_ops(&guard, &ir));
-
-    let baseline_path = path.with_extension(EXP_EXT);
-    move_prover_test_utils::baseline_test::verify_or_update_baseline(
-        baseline_path.as_path(),
-        &output,
-    )?;
-    Ok(())
-}
+datatest_stable::harness!(move_runner, "tests/test_cases/snapshot/move", r".*\.move$",);
 
 fn move_runner(path: &Path) -> datatest_stable::Result<()> {
     let modules = compile_move_path(path).map_err(|e| format!("{:#}", e))?;
@@ -61,7 +36,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         output.push_str("\n=== specializer ===\n");
         output.push_str(&module_ir.to_string());
         output.push_str("\n=== micro-ops ===\n");
-        output.push_str(&format_micro_ops(&guard, &module_ir));
+        output.push_str(&render_micro_ops(&guard, &module_ir));
     }
     let baseline_path = path.with_extension(EXP_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(

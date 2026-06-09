@@ -28,6 +28,7 @@ module 0x42::TestSintArithmetic {
     }
     spec div {
         aborts_if y == 0;
+        aborts_if x == MIN_I64 && y == -1;
         ensures result_1 == x / y;
         ensures result_2 == x % y;
     }
@@ -134,6 +135,7 @@ module 0x42::TestSintArithmetic {
     }
     spec div_by_zero_i64 {
         aborts_if y == 0;
+        aborts_if x == MIN_I64 && y == -1;
     }
 
 

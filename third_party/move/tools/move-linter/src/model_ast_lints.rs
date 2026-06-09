@@ -12,6 +12,7 @@ mod cyclomatic_complexity;
 mod deprecated_usage;
 mod empty_if;
 mod equal_operands_in_bin_op;
+mod improper_test_function_qualifiers;
 mod known_to_abort;
 mod mutable_view_function;
 mod needless_bool;
@@ -49,6 +50,7 @@ use deprecated_usage::{
 };
 use empty_if::EmptyIf;
 use equal_operands_in_bin_op::EqualOperandsInBinOp;
+use improper_test_function_qualifiers::ImproperTestFunctionQualifiers;
 use known_to_abort::KnownToAbort;
 use move_compiler_v2::external_checks::{
     ConstantChecker, ExpChecker, FunctionChecker, StructChecker,
@@ -151,6 +153,7 @@ pub(crate) fn all_function_lints() -> Vec<(LintTier, Box<dyn FunctionChecker>)> 
         (Default, Box::<UnsafeFriendPackageEntry>::default()),
         // ── strict tier ───────────────────────────────────────────────
         (Strict, Box::<DeprecatedUsageInSignatures>::default()),
+        (Strict, Box::<ImproperTestFunctionQualifiers>::default()),
     ]
 }
 

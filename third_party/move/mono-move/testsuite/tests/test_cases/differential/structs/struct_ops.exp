@@ -1,0 +1,32 @@
+=== stackless ===
+// module 0x66::test
+
+fun pack_and_unpack(): u64 {
+  slots: params(0), locals(1), temps(2)
+    r0: 0x66::test::S
+    r1: u64
+    r2: u8
+  code:
+  L0:
+    0: r1 := ld_u64 3
+    1: r2 := ld_u8 2
+    2: r0 := pack 0x66::test::S, [r1, r2]
+    3: [r1, r2] := unpack 0x66::test::S, r0
+    4: ret [r1]
+}
+=== micro-ops ===
+// module 0x66::test
+
+fun pack_and_unpack() {
+  frame_data_size: 32
+  entry_gas: 158
+  code:
+    0: StoreImm8 [16] <- #3
+    1: StoreImm1 [24] <- #2
+    2: Move(1) [8] <- [24]
+    3: Move8 [0] <- [16]
+    4: Move(1) [24] <- [8]
+    5: Move8 [16] <- [0]
+    6: Move8 [0] <- [16]
+    7: Return
+}

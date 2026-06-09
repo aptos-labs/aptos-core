@@ -1,0 +1,31 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun loop_down(x: u64)
+l1: copy_loc x
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc x
+    ld_u64 1
+    sub
+    st_loc x
+    branch l1
+l2: ret
+
+fun conditional(flag: bool): u64
+    move_loc flag
+    br_true l1
+    ld_u64 0
+    ret
+l1: ld_u64 1
+    ret
+
+// RUN: execute 0x66::test::loop_down --args 0
+// CHECK: results:
+
+// RUN: execute 0x66::test::loop_down --args 1
+// CHECK: results:
+
+// RUN: execute 0x66::test::loop_down --args 1000
+// CHECK: results:

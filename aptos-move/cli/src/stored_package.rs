@@ -9,7 +9,6 @@ use aptos_framework::{
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
-use reqwest::Url;
 use std::{collections::BTreeMap, fmt, fs, path::Path};
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
@@ -41,11 +40,10 @@ impl fmt::Display for CachedPackageMetadata<'_> {
 impl CachedPackageRegistry {
     /// Creates a new registry.
     pub async fn create(
-        url: Url,
+        client: Client,
         addr: AccountAddress,
         with_bytecode: bool,
     ) -> anyhow::Result<Self> {
-        let client = Client::new(url);
         // Need to use a different type to deserialize JSON
         let inner = client
             .get_account_resource_bcs::<PackageRegistry>(addr, "0x1::code::PackageRegistry")

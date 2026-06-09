@@ -13,6 +13,11 @@ use crate::{
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
+    native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
+    position_buffered_state::{
+        PositionLedgerStateWithSummary, PositionProofReader, PositionSlot, PositionStateWithSummary,
+    },
+    position_state_store::PositionStateStore,
     pruner::PrunerManager,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -40,7 +45,14 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{iter::Iterator, time::Instant};
+use std::{collections::HashMap, iter::Iterator, sync::Arc, time::Instant};
+
+struct ChainPipeline<'a> {
+    store: &'a Arc<PositionStateStore>,
+    latest: PositionStateWithSummary,
+    last_checkpoint: PositionStateWithSummary,
+    snapshot_version: Option<Version>,
+}
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
@@ -310,9 +322,127 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
+            if self.position.is_some() {
+                s.spawn(|_| self.commit_native_position(chunk).unwrap());
+            }
         });
 
         Ok(new_root_hash)
+    }
+
+    fn commit_native_position(&self, chunk: &ChunkToCommit) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_position"]);
+        let Some(bundle) = self.position.as_ref() else {
+            return Ok(());
+        };
+        if chunk.transaction_outputs.is_empty() {
+            return Ok(());
+        }
+        let committer = NativeStateCommitter::new(bundle.kv_db.clone());
+
+        let chunk_first = chunk.first_version;
+        let chunk_last_inclusive = chunk_first + chunk.transaction_outputs.len() as Version - 1;
+        let chunk_checkpoint_version = chunk.state.last_checkpoint().version();
+        let checkpoint_within_chunk =
+            chunk_checkpoint_version.filter(|v| (chunk_first..=chunk_last_inclusive).contains(v));
+
+        let mut chain = bundle.state_store.as_ref().map(|store| {
+            let state = store.current_state();
+            let current = state.lock();
+            ChainPipeline {
+                store,
+                latest: current.latest().clone(),
+                last_checkpoint: current.last_checkpoint().clone(),
+                // The persisted JMT root the in-memory MapLayer
+                // chain is rooted at — what proof_reader queries.
+                snapshot_version: bundle.snapshot_version,
+            }
+        });
+
+        // Accumulate the whole chunk into per-shard batches; commit
+        // once at the end.
+        let mut sharded_kv_batches = new_sharded_kv_batches();
+        let mut in_chunk_prior = InChunkPriorVersions::new();
+
+        // SMT leaf updates queued for the next extend call. Within a
+        // segment (chunk_first..=checkpoint, then checkpoint+1..=chunk_last)
+        // each key collapses to its latest write; `committer.apply`
+        // still records every per-version write into the kv batches
+        // and stale-index.
+        let mut pending_leaf_updates: HashMap<HashValue, PositionSlot> = HashMap::new();
+
+        for (i, output) in chunk.transaction_outputs.iter().enumerate() {
+            let version = chunk_first + i as Version;
+            let position_writes: Vec<_> = output
+                .write_set()
+                .native_position_iter()
+                .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
+                .collect();
+            if !position_writes.is_empty() {
+                let merkle_updates = committer
+                    .apply(
+                        version,
+                        position_writes,
+                        &mut sharded_kv_batches,
+                        &mut in_chunk_prior,
+                    )
+                    .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?
+                    .position;
+                for u in merkle_updates {
+                    pending_leaf_updates.insert(u.state_key_hash, PositionSlot {
+                        state_key: u.state_key,
+                        value_hash: u.value_hash,
+                        value: None,
+                    });
+                }
+            }
+
+            if Some(version) == checkpoint_within_chunk
+                && let Some(pipeline) = chain.as_mut()
+                && !pending_leaf_updates.is_empty()
+            {
+                let updates: Vec<_> = std::mem::take(&mut pending_leaf_updates)
+                    .into_iter()
+                    .collect();
+                let proof_reader = PositionProofReader {
+                    merkle_db: bundle.merkle_db.clone(),
+                    version: pipeline.snapshot_version,
+                };
+                let new_latest = pipeline.latest.extend(version, updates, &proof_reader)?;
+                pipeline.last_checkpoint = new_latest.clone();
+                pipeline.latest = new_latest;
+            }
+        }
+
+        if !pending_leaf_updates.is_empty()
+            && let Some(pipeline) = chain.as_mut()
+        {
+            let updates: Vec<_> = pending_leaf_updates.into_iter().collect();
+            let proof_reader = PositionProofReader {
+                merkle_db: bundle.merkle_db.clone(),
+                version: pipeline.snapshot_version,
+            };
+            pipeline.latest =
+                pipeline
+                    .latest
+                    .extend(chunk_last_inclusive, updates, &proof_reader)?;
+        }
+
+        bundle
+            .kv_db
+            .commit(chunk_last_inclusive, None, sharded_kv_batches)
+            .map_err(|e| AptosDbError::Other(format!("position_db commit failed: {e}")))?;
+
+        if let Some(pipeline) = chain {
+            let new_state = PositionLedgerStateWithSummary::from_latest_and_last_checkpoint(
+                pipeline.latest,
+                pipeline.last_checkpoint,
+            );
+            let estimated_items = chunk.transaction_outputs.len();
+            let mut bufstate = pipeline.store.buffered_state_locked();
+            bufstate.update(new_state, (), estimated_items, /* sync_commit */ false)?;
+        }
+        Ok(())
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
@@ -639,6 +769,18 @@ impl AptosDB {
                 .maybe_set_pruner_target_db_version(version);
             if let Some(pruner) = &self.state_store.state_pruner.hot_state_kv_pruner {
                 pruner.maybe_set_pruner_target_db_version(version);
+            }
+            // Activate the native-position value pruner here too, after
+            // the commit is durable — same point as `state_kv_pruner`.
+            // (The merkle pruners are driven when snapshots persist.)
+            if let Some(position_pruner) = self
+                .position
+                .as_ref()
+                .and_then(|bundle| bundle.position_pruner.as_ref())
+            {
+                position_pruner
+                    .value_pruner
+                    .maybe_set_pruner_target_db_version(version);
             }
         }
 

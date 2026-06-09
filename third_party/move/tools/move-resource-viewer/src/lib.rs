@@ -5,7 +5,6 @@
 
 use crate::fat_type::{
     FatFunctionType, FatStructLayout, FatStructRef, FatStructType, FatType, StructName,
-    WrappedAbilitySet,
 };
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
@@ -505,7 +504,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     address,
                     module: module_name,
                     name,
-                    abilities: WrappedAbilitySet(abilities),
+                    abilities,
                     ty_args,
                     layout: FatStructLayout::Singleton(fat_fields),
                     contains_tables,
@@ -520,7 +519,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     address,
                     module: module_name,
                     name,
-                    abilities: WrappedAbilitySet(abilities),
+                    abilities,
                     ty_args,
                     layout: FatStructLayout::Variants(fat_variants),
                     contains_tables,
@@ -758,7 +757,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
 
         match &ty.layout {
             FatStructLayout::Singleton(field_tys) => Ok(AnnotatedMoveStruct {
-                abilities: ty.abilities.0,
+                abilities: ty.abilities,
                 ty_tag: struct_tag,
                 variant_info: None,
                 value: annotate_values(field_values, field_tys, limit)?,
@@ -767,7 +766,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 Some(tag) if (tag as usize) < variants.len() => {
                     let field_tys = &variants[tag as usize];
                     Ok(AnnotatedMoveStruct {
-                        abilities: ty.abilities.0,
+                        abilities: ty.abilities,
                         ty_tag: struct_tag,
                         variant_info,
                         value: annotate_values(field_values, field_tys, limit)?,

@@ -1,7 +1,7 @@
 module 0x42::pow {
 
   spec module {
-    pragma verify = false; // TODO: investigate flakiness
+    pragma verify = true; // Now stable thanks to `[weight = 10]` on the multi-pattern trigger.
   }
 
   fun pow(base: u64, exp: u64): u64 {
@@ -21,14 +21,16 @@ module 0x42::pow {
       ensures [inferred] result == pow_spec(base, exp);
       aborts_if [inferred] exp > 0 && pow_spec(base, exp - 1) * base > MAX_U64;
   } proof {
-      forall x: num, y: num {pow_spec(base, x), pow_spec(base, y)}
+      forall x: num, y: num {pow_spec(base, x), pow_spec(base, y)} [weight = 5]
           apply pow_spec_mul_mono(base, x, y);
   }
 
 
   /// Mathematical power function. Uses `num` so the recursive
   /// multiplication is not bounded by u64 wraparound.
-  spec fun pow_spec(base: num, exp: num): num {
+  /// `[weight = 20]` throttles the recursive defining axiom so its matching loop
+  /// cannot dominate the eager-instantiation budget.
+  spec fun pow_spec(base: num, exp: num): num [weight = 20] {
       if (exp == 0) { 1 } else { base * pow_spec(base, exp - 1) }
   }
 

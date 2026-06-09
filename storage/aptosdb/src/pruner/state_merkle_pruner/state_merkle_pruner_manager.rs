@@ -10,8 +10,9 @@ use crate::{
         pruner_manager::PrunerManager,
         pruner_utils,
         pruner_worker::PrunerWorker,
-        state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+        state_merkle_pruner::{generics::MerklePrunerSchema, StateMerklePruner},
     },
+    sharded_jmt_merkle_db::ShardedJmtMerkleDb,
     state_merkle_db::StateMerkleDb,
 };
 use aptos_config::config::StateMerklePrunerConfig;
@@ -21,6 +22,7 @@ use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     marker::PhantomData,
+    ops::Deref,
     sync::{atomic::Ordering, Arc},
 };
 
@@ -30,11 +32,8 @@ use std::{
 /// If the state pruner is enabled, it creates a worker thread on construction and joins it on
 /// destruction. When destructed, it quits the worker thread eagerly without waiting for all
 /// pending work to be done.
-pub struct StateMerklePrunerManager<S: StaleNodeIndexSchemaTrait>
-where
-    StaleNodeIndex: KeyCodec<S>,
-{
-    state_merkle_db: Arc<StateMerkleDb>,
+pub struct StateMerklePrunerManager<M, D = StateMerkleDb> {
+    state_merkle_db: Arc<D>,
     /// DB version window, which dictates how many versions of state merkle data to keep.
     prune_window: Version,
     /// It is None iff the pruner is not enabled.
@@ -42,14 +41,16 @@ where
     /// The minimal readable version for the state merkle data.
     min_readable_version: AtomicVersion,
 
-    _phantom: PhantomData<S>,
+    _phantom: PhantomData<M>,
 }
 
-impl<S: StaleNodeIndexSchemaTrait> PrunerManager for StateMerklePrunerManager<S>
+impl<M, D> PrunerManager for StateMerklePrunerManager<M, D>
 where
-    StaleNodeIndex: KeyCodec<S>,
+    M: MerklePrunerSchema,
+    D: Deref<Target = ShardedJmtMerkleDb> + Send + Sync + 'static,
+    StaleNodeIndex: KeyCodec<M::StaleIndexSchema>,
 {
-    type Pruner = StateMerklePruner<S>;
+    type Pruner = StateMerklePruner<M>;
 
     fn is_pruner_enabled(&self) -> bool {
         self.pruner_worker.is_some()
@@ -76,11 +77,11 @@ where
             .store(min_readable_version, Ordering::SeqCst);
 
         PRUNER_VERSIONS
-            .with_label_values(&[S::name(), "min_readable"])
+            .with_label_values(&[M::name(), "min_readable"])
             .set(min_readable_version as i64);
 
         self.state_merkle_db
-            .write_pruner_progress(&S::progress_metadata_key(None), min_readable_version)
+            .write_pruner_progress(&M::pruner_progress_key(), min_readable_version)
     }
 
     #[cfg(test)]
@@ -99,13 +100,15 @@ where
     }
 }
 
-impl<S: StaleNodeIndexSchemaTrait> StateMerklePrunerManager<S>
+impl<M, D> StateMerklePrunerManager<M, D>
 where
-    StaleNodeIndex: KeyCodec<S>,
+    M: MerklePrunerSchema,
+    D: Deref<Target = ShardedJmtMerkleDb> + Send + Sync + 'static,
+    StaleNodeIndex: KeyCodec<M::StaleIndexSchema>,
 {
     /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(
-        state_merkle_db: Arc<StateMerkleDb>,
+        state_merkle_db: Arc<D>,
         state_merkle_pruner_config: StateMerklePrunerConfig,
     ) -> Self {
         let pruner_worker = if state_merkle_pruner_config.enable {
@@ -117,11 +120,12 @@ where
             None
         };
 
-        let min_readable_version = pruner_utils::get_state_merkle_pruner_progress(&state_merkle_db)
-            .expect("Must succeed.");
+        let min_readable_version =
+            pruner_utils::get_state_merkle_pruner_progress::<M>(&state_merkle_db)
+                .expect("Must succeed.");
 
         PRUNER_VERSIONS
-            .with_label_values(&[S::name(), "min_readable"])
+            .with_label_values(&[M::name(), "min_readable"])
             .set(min_readable_version as i64);
 
         Self {
@@ -134,26 +138,26 @@ where
     }
 
     fn init_pruner(
-        state_merkle_db: Arc<StateMerkleDb>,
+        state_merkle_db: Arc<D>,
         state_merkle_pruner_config: StateMerklePrunerConfig,
     ) -> PrunerWorker {
         let pruner = Arc::new(
-            StateMerklePruner::<S>::new(Arc::clone(&state_merkle_db))
+            StateMerklePruner::<M>::new(Arc::clone(&state_merkle_db))
                 .expect("Failed to create state merkle pruner."),
         );
 
         PRUNER_WINDOW
-            .with_label_values(&[S::name()])
+            .with_label_values(&[M::name()])
             .set(state_merkle_pruner_config.prune_window as i64);
 
         PRUNER_BATCH_SIZE
-            .with_label_values(&[S::name()])
+            .with_label_values(&[M::name()])
             .set(state_merkle_pruner_config.batch_size as i64);
 
         PrunerWorker::new(
             pruner,
             state_merkle_pruner_config.batch_size,
-            "state_merkle",
+            M::worker_name(),
         )
     }
 
@@ -165,7 +169,7 @@ where
             .store(min_readable_version, Ordering::SeqCst);
 
         PRUNER_VERSIONS
-            .with_label_values(&[S::name(), "min_readable"])
+            .with_label_values(&[M::name(), "min_readable"])
             .set(min_readable_version as i64);
 
         self.pruner_worker

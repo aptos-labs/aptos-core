@@ -3,6 +3,8 @@
 
 //! Tests for Move struct support (both inline and heap-allocated).
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
@@ -26,16 +28,18 @@ fn struct_inline() {
 
     #[rustfmt::skip]
     let code = vec![
-        StoreImm8 { dst: FO(pair_a), imm: 10 },
-        StoreImm8 { dst: FO(pair_b), imm: 20 },
+        StoreImm8 { dst: FO(pair_a), imm: 10u64.to_le_bytes() },
+        StoreImm8 { dst: FO(pair_b), imm: 20u64.to_le_bytes() },
         AddU64 { dst: FO(result), lhs: FO(pair_a), rhs: FO(pair_b) },
         Return,
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: false,
@@ -65,20 +69,22 @@ fn struct_inline_borrow() {
 
     #[rustfmt::skip]
     let code = vec![
-        StoreImm8 { dst: FO(pair_a), imm: 10 },
-        StoreImm8 { dst: FO(pair_b), imm: 20 },
+        StoreImm8 { dst: FO(pair_a), imm: 10u64.to_le_bytes() },
+        StoreImm8 { dst: FO(pair_b), imm: 20u64.to_le_bytes() },
         SlotBorrow { dst: FO(r#ref), local: FO(pair_b) },
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
-        StoreImm8 { dst: FO(result), imm: 99 },
+        StoreImm8 { dst: FO(result), imm: 99u64.to_le_bytes() },
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         Move8 { dst: FO(result), src: FO(pair_b) },
         Return,
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
         zero_frame: true,
@@ -111,9 +117,9 @@ fn struct_heap_basic() {
     #[rustfmt::skip]
     let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(tmp), imm: 42 },
+        StoreImm8 { dst: FO(tmp), imm: 42u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
-        StoreImm8 { dst: FO(tmp), imm: 100 },
+        StoreImm8 { dst: FO(tmp), imm: 100u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(tmp)),
         MicroOp::struct_load8(FO(entry), 0, FO(result)),
         MicroOp::struct_load8(FO(entry), 8, FO(tmp)),
@@ -122,9 +128,11 @@ fn struct_heap_basic() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
@@ -156,9 +164,9 @@ fn struct_heap_survives_gc() {
     #[rustfmt::skip]
     let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(tmp), imm: 7 },
+        StoreImm8 { dst: FO(tmp), imm: 7u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
-        StoreImm8 { dst: FO(tmp), imm: 13 },
+        StoreImm8 { dst: FO(tmp), imm: 13u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(tmp)),
         ForceGC,
         MicroOp::struct_load8(FO(entry), 0, FO(result)),
@@ -168,9 +176,11 @@ fn struct_heap_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
@@ -211,15 +221,15 @@ fn struct_with_vector_field() {
     #[rustfmt::skip]
     let code = vec![
         HeapNew { dst: FO(ctr), descriptor_id: desc_ctr_struct },
-        StoreImm8 { dst: FO(tmp), imm: 999 },
+        StoreImm8 { dst: FO(tmp), imm: 999u64.to_le_bytes() },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
         VecNew { dst: FO(items) },
         SlotBorrow { dst: FO(vec_ref), local: FO(items) },
-        StoreImm8 { dst: FO(tmp), imm: 10 },
+        StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(tmp), imm: 20 },
+        StoreImm8 { dst: FO(tmp), imm: 20u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(tmp), imm: 30 },
+        StoreImm8 { dst: FO(tmp), imm: 30u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         MicroOp::struct_store8(FO(ctr), 8, FO(items)),
         ForceGC,
@@ -231,9 +241,11 @@ fn struct_with_vector_field() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 64,
         extended_frame_size: 88,
         zero_frame: true,
@@ -278,23 +290,25 @@ fn struct_borrow_field() {
     #[rustfmt::skip]
     let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(result), imm: 5 },
+        StoreImm8 { dst: FO(result), imm: 5u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
-        StoreImm8 { dst: FO(result), imm: 10 },
+        StoreImm8 { dst: FO(result), imm: 10u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(result)),
         SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
         MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
-        StoreImm8 { dst: FO(result), imm: 77 },
+        StoreImm8 { dst: FO(result), imm: 77u64.to_le_bytes() },
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         MicroOp::struct_load8(FO(entry), 8, FO(result)),
         Return,
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
@@ -332,9 +346,9 @@ fn struct_borrow_survives_gc() {
     #[rustfmt::skip]
     let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(result), imm: 100 },
+        StoreImm8 { dst: FO(result), imm: 100u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
-        StoreImm8 { dst: FO(result), imm: 200 },
+        StoreImm8 { dst: FO(result), imm: 200u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(result)),
         SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
         MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
@@ -344,9 +358,11 @@ fn struct_borrow_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
+        entry_gas: 0,
+        param_slots: vec![],
+        param_region_size: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,

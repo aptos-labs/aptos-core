@@ -167,7 +167,7 @@ impl DoGetExecutionOutput {
                 );
             }
         }
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
@@ -182,6 +182,7 @@ impl DoGetExecutionOutput {
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
                 .is_some(),
+            onchain_config.transaction_info_v1(),
         )
     }
 
@@ -199,7 +200,7 @@ impl DoGetExecutionOutput {
             state_view_arc.clone(),
             onchain_config,
         )?;
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
@@ -222,6 +223,7 @@ impl DoGetExecutionOutput {
             state_view,
             false, // prime_state_cache
             append_state_checkpoint_to_block.is_some(),
+            onchain_config.transaction_info_v1(),
         )
     }
 
@@ -237,6 +239,7 @@ impl DoGetExecutionOutput {
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
         state_view: CachedStateView,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ExecutionOutput> {
         let out = Parser::parse(
             state_view.next_version(),
@@ -247,6 +250,7 @@ impl DoGetExecutionOutput {
             state_view,
             true,  // prime state cache
             false, // is_block
+            onchain_config.transaction_info_v1(),
         )?;
 
         let ret = out.clone();
@@ -360,6 +364,7 @@ impl Parser {
         base_state_view: CachedStateView,
         prime_state_cache: bool,
         is_block: bool,
+        transaction_info_v1: bool,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
 
@@ -447,6 +452,7 @@ impl Parser {
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),
+            transaction_info_v1,
         );
         let ret = out.clone();
         ret.subscribable_events
@@ -537,9 +543,9 @@ impl Parser {
             write_set: last_write_set,
         };
 
-        let validator_set = ValidatorSet::fetch_config(&write_set_view)
+        let validator_set = ValidatorSet::fetch_config(&write_set_view)?
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = ConfigurationResource::fetch_config(&write_set_view)
+        let configuration = ConfigurationResource::fetch_config(&write_set_view)?
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
         Ok(EpochState::new(
@@ -638,6 +644,7 @@ mod tests {
             auxiliary_infos,
             &state,
             CachedStateView::new_dummy(&state),
+            false,
             false,
             false,
         )

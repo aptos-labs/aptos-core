@@ -226,6 +226,43 @@ procedure {:inline 1} $1_vector_insert{{S}}(m: $Mutation (Vec ({{T}})), i: int, 
     }
 }
 
+// `vector::move_range(from, removal_position, length, to, insert_position)` extracts the
+// half-open range `[removal_position, removal_position+length)` from `from` and splices it
+// into `to` at `insert_position`, shifting `to[insert_position..]` to the right. Move enforces
+// that `from` and `to` are distinct (no aliasing of mutable references).
+procedure {:inline 1} $1_vector_move_range{{S}}(
+    from: $Mutation (Vec ({{T}})),
+    removal_position: int,
+    length: int,
+    to: $Mutation (Vec ({{T}})),
+    insert_position: int
+) returns (from': $Mutation (Vec ({{T}})), to': $Mutation (Vec ({{T}})))
+{
+    var from_v: Vec ({{T}});
+    var to_v: Vec ({{T}});
+    var middle: Vec ({{T}});
+    from_v := $Dereference(from);
+    to_v := $Dereference(to);
+    // The `< 0` checks are defensive — Move's u64 arguments are non-negative by typing,
+    // but Boogie ints can be arbitrary so we guard explicitly. Matches the convention
+    // used in `$1_vector_insert` above.
+    if (removal_position < 0
+        || length < 0
+        || removal_position + length > LenVec(from_v)
+        || insert_position < 0
+        || insert_position > LenVec(to_v)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    middle := SliceVec(from_v, removal_position, removal_position + length);
+    from' := $UpdateMutation(from,
+        ConcatVec(SliceVec(from_v, 0, removal_position),
+                  SliceVec(from_v, removal_position + length, LenVec(from_v))));
+    to' := $UpdateMutation(to,
+        ConcatVec(SliceVec(to_v, 0, insert_position),
+                  ConcatVec(middle, SliceVec(to_v, insert_position, LenVec(to_v)))));
+}
+
 procedure {:inline 1} $1_vector_length{{S}}(v: Vec ({{T}})) returns (l: int) {
     l := LenVec(v);
 }

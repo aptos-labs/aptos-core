@@ -1,0 +1,10 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/proof/weight_too_large.move:31:9
+   │
+31 │         ensures result == id_num(0);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/weight_too_large.move:26: id_zero
+   =         result = <redacted>
+   =     at tests/sources/functional/proof/weight_too_large.move:31: id_zero (spec)

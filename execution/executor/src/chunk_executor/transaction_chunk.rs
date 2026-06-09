@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    chunk_executor::chunk_onchain_config,
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
     workflow::do_get_execution_output::DoGetExecutionOutput,
 };
@@ -13,10 +14,7 @@ use aptos_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 use aptos_types::{
-    block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        transaction_slice_metadata::TransactionSliceMetadata,
-    },
+    block_executor::transaction_slice_metadata::TransactionSliceMetadata,
     transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
@@ -98,6 +96,7 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
+        let onchain_config = chunk_onchain_config(&state_view)?;
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
@@ -107,7 +106,7 @@ impl TransactionChunk for ChunkToExecute {
                 .collect(),
             parent_state,
             state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            onchain_config,
             TransactionSliceMetadata::unknown(),
         )
     }
@@ -141,6 +140,7 @@ impl TransactionChunk for ChunkToApply {
             first_version: _,
         } = self;
 
+        let onchain_config = chunk_onchain_config(&state_view)?;
         DoGetExecutionOutput::by_transaction_output(
             transactions,
             transaction_outputs,
@@ -150,6 +150,7 @@ impl TransactionChunk for ChunkToApply {
                 .collect(),
             parent_state,
             state_view,
+            onchain_config,
         )
     }
 }

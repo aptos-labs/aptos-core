@@ -62,9 +62,6 @@ const TEST_CONFIG: HotStateConfig = HotStateConfig {
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
     compute_root_hash: true,
-    use_write_set_v1: true,
-    persist_hotness_in_epilogue: false,
-    use_transaction_info_v1: false,
 };
 
 #[derive(Clone, Debug)]
@@ -424,7 +421,7 @@ impl StateByVersion {
 
     fn assert_state_summary(&self, state_summary: &StateSummary) {
         assert_eq!(
-            state_summary.hot_root_hash(),
+            state_summary.hot_root_hash().unwrap(),
             self.get_state(state_summary.version())
                 .hot_summary
                 .get_root_hash()

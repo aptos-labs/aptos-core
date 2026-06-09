@@ -1,0 +1,102 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun aeq(l0: address, l1: address): bool
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+// Function definition at index 1
+fun aneq(l0: address, l1: address): bool
+    move_loc l0
+    move_loc l1
+    neq
+    ret
+
+// Function definition at index 2
+fun asel(l0: address, l1: address): u64
+    move_loc l0
+    move_loc l1
+    eq
+    br_false l0
+    ld_u64 10
+    // @5
+    ret
+l0: ld_u64 20
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun aeq(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: address
+    r1: address
+    r2: bool
+  code:
+  L0:
+    0: r2 := eq r0, r1
+    1: ret [r2]
+}
+
+fun aneq(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: address
+    r1: address
+    r2: bool
+  code:
+  L0:
+    0: r2 := neq r0, r1
+    1: ret [r2]
+}
+
+fun asel(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: address
+    r1: address
+    r2: u64
+  code:
+  L2:
+    0: br_neq L0, r0, r1
+  L1:
+    1: r2 := ld_u64 10
+    2: ret [r2]
+  L0:
+    3: r2 := ld_u64 20
+    4: ret [r2]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun aeq() {
+  frame_data_size: 72
+  entry_gas: 17
+  code:
+    0: IntCmp [64] <- [0] == u256 [32]
+    1: Move(1) [0] <- [64]
+    2: Return
+}
+
+fun aneq() {
+  frame_data_size: 72
+  entry_gas: 17
+  code:
+    0: IntCmp [64] <- [0] != u256 [32]
+    1: Move(1) [0] <- [64]
+    2: Return
+}
+
+fun asel() {
+  frame_data_size: 72
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @4 [0] != u256 [32] gas_taken=56 gas_fallthrough=56
+    1: StoreImm8 [64] <- #10
+    2: Move8 [0] <- [64]
+    3: Return
+    4: StoreImm8 [64] <- #20
+    5: Move8 [0] <- [64]
+    6: Return
+}
