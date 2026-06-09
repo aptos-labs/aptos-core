@@ -357,6 +357,20 @@ pub enum CmpKind {
     Neq,
 }
 
+impl CmpKind {
+    /// Return the logically negated comparison.
+    pub fn negate(self) -> Self {
+        match self {
+            CmpKind::Lt => CmpKind::Ge,
+            CmpKind::Ge => CmpKind::Lt,
+            CmpKind::Gt => CmpKind::Le,
+            CmpKind::Le => CmpKind::Gt,
+            CmpKind::Eq => CmpKind::Neq,
+            CmpKind::Neq => CmpKind::Eq,
+        }
+    }
+}
+
 impl fmt::Display for CmpKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -445,4 +459,23 @@ pub struct JumpValueRefCmpOp {
     pub ty: InternedType,
     pub gas_taken: u64,
     pub gas_fallthrough: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cmp_kind_double_negate_is_identity() {
+        for kind in [
+            CmpKind::Lt,
+            CmpKind::Le,
+            CmpKind::Gt,
+            CmpKind::Ge,
+            CmpKind::Eq,
+            CmpKind::Neq,
+        ] {
+            assert_eq!(kind.negate().negate(), kind);
+        }
+    }
 }

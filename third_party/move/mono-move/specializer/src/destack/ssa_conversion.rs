@@ -8,7 +8,7 @@
 //! are mutable across blocks and keep their original slot indices.
 
 use super::ssa_function::SSAFunction;
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpOp, Instr, Label, Slot, UnaryOp};
+use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpKind, Instr, Label, Slot, UnaryOp};
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
@@ -410,12 +410,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::Shl => self.convert_binop(BinaryOp::Shl, false)?,
             B::Shr => self.convert_binop(BinaryOp::Shr, false)?,
             // --- Comparisons / logical (result type = bool) ---
-            B::Lt => self.convert_binop(BinaryOp::Cmp(CmpOp::Lt), true)?,
-            B::Gt => self.convert_binop(BinaryOp::Cmp(CmpOp::Gt), true)?,
-            B::Le => self.convert_binop(BinaryOp::Cmp(CmpOp::Le), true)?,
-            B::Ge => self.convert_binop(BinaryOp::Cmp(CmpOp::Ge), true)?,
-            B::Eq => self.convert_binop(BinaryOp::Cmp(CmpOp::Eq), true)?,
-            B::Neq => self.convert_binop(BinaryOp::Cmp(CmpOp::Neq), true)?,
+            B::Lt => self.convert_binop(BinaryOp::Cmp(CmpKind::Lt), true)?,
+            B::Gt => self.convert_binop(BinaryOp::Cmp(CmpKind::Gt), true)?,
+            B::Le => self.convert_binop(BinaryOp::Cmp(CmpKind::Le), true)?,
+            B::Ge => self.convert_binop(BinaryOp::Cmp(CmpKind::Ge), true)?,
+            B::Eq => self.convert_binop(BinaryOp::Cmp(CmpKind::Eq), true)?,
+            B::Neq => self.convert_binop(BinaryOp::Cmp(CmpKind::Neq), true)?,
             B::Or => self.convert_binop(BinaryOp::Or, true)?,
             B::And => self.convert_binop(BinaryOp::And, true)?,
 
