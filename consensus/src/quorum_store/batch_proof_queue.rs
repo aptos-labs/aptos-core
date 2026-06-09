@@ -66,6 +66,12 @@ pub(crate) struct PullSession<'a> {
     pub(crate) excluded_batch_keys: HashSet<BatchKey>,
     pub(crate) filtered_txns: HashSet<&'a TxnSummaryWithExpiration>,
     pub(crate) cur_txns_per_kind: HashMap<BatchKind, u64>,
+    pub(crate) too_young_local_batches: u64,
+    pub(crate) too_young_remote_batches: u64,
+    pub(crate) too_young_local_txns: u64,
+    pub(crate) too_young_remote_txns: u64,
+    pub(crate) too_young_local_ages_ms: Vec<u64>,
+    pub(crate) too_young_remote_ages_ms: Vec<u64>,
 }
 
 impl<'a> PullSession<'a> {
@@ -89,6 +95,12 @@ impl<'a> PullSession<'a> {
             excluded_batch_keys,
             filtered_txns,
             cur_txns_per_kind: HashMap::new(),
+            too_young_local_batches: 0,
+            too_young_remote_batches: 0,
+            too_young_local_txns: 0,
+            too_young_remote_txns: 0,
+            too_young_local_ages_ms: vec![],
+            too_young_remote_ages_ms: vec![],
         }
     }
 
@@ -134,6 +146,38 @@ impl<'a> PullSession<'a> {
     ) -> PerBatchKindTxnLimits {
         per_kind_txn_limits.remaining(&self.cur_txns_per_kind)
     }
+
+    fn record_too_young(&mut self, author: Author, num_txns: u64, age_ms: u64, my_peer_id: PeerId) {
+        if author == my_peer_id {
+            self.too_young_local_batches += 1;
+            self.too_young_local_txns += num_txns;
+            self.too_young_local_ages_ms.push(age_ms);
+        } else {
+            self.too_young_remote_batches += 1;
+            self.too_young_remote_txns += num_txns;
+            self.too_young_remote_ages_ms.push(age_ms);
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ProofQueueSnapshot {
+    pub(crate) total_proofs: u64,
+    pub(crate) local_proofs: u64,
+    pub(crate) remote_proofs: u64,
+    pub(crate) total_txns: u64,
+    pub(crate) local_txns: u64,
+    pub(crate) remote_txns: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BatchQueueSnapshot {
+    pub(crate) total_batches: u64,
+    pub(crate) local_batches: u64,
+    pub(crate) remote_batches: u64,
+    pub(crate) total_txns: u64,
+    pub(crate) local_txns: u64,
+    pub(crate) remote_txns: u64,
 }
 
 fn batch_kind_metric_label(kind: Option<BatchKind>) -> &'static str {
@@ -246,6 +290,48 @@ impl BatchProofQueue {
 
     pub(crate) fn num_batches_without_proof(&self) -> u64 {
         self.num_batches_without_proof_count
+    }
+
+    pub(crate) fn proof_queue_snapshot(&self) -> ProofQueueSnapshot {
+        ProofQueueSnapshot {
+            total_proofs: self.remaining_proofs,
+            local_proofs: self.remaining_local_proofs,
+            remote_proofs: self
+                .remaining_proofs
+                .saturating_sub(self.remaining_local_proofs),
+            total_txns: self.remaining_txns_with_duplicates,
+            local_txns: self.remaining_local_txns,
+            remote_txns: self
+                .remaining_txns_with_duplicates
+                .saturating_sub(self.remaining_local_txns),
+        }
+    }
+
+    pub(crate) fn non_proof_batch_queue_snapshot(&self) -> BatchQueueSnapshot {
+        let mut snapshot = BatchQueueSnapshot {
+            total_batches: 0,
+            local_batches: 0,
+            remote_batches: 0,
+            total_txns: 0,
+            local_txns: 0,
+            remote_txns: 0,
+        };
+
+        for (author, batches) in &self.author_to_non_proof_batches {
+            let num_batches = batches.len() as u64;
+            let num_txns = batches.values().map(|batch| batch.num_txns()).sum::<u64>();
+            snapshot.total_batches += num_batches;
+            snapshot.total_txns += num_txns;
+            if *author == self.my_peer_id {
+                snapshot.local_batches += num_batches;
+                snapshot.local_txns += num_txns;
+            } else {
+                snapshot.remote_batches += num_batches;
+                snapshot.remote_txns += num_txns;
+            }
+        }
+
+        snapshot
     }
 
     #[cfg(test)]
@@ -809,8 +895,9 @@ impl BatchProofQueue {
         // session's filtered_txns for subsequent pulls.
         let mut pending_filtered_txns: HashSet<&TxnSummaryWithExpiration> = HashSet::new();
 
-        let max_batch_creation_ts_usecs = min_batch_age_usecs
-            .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
+        let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
+        let max_batch_creation_ts_usecs =
+            min_batch_age_usecs.map(|min_age| now_usecs.saturating_sub(min_age));
 
         // Select the appropriate author map based on proof status
         let author_map = if batches_without_proofs {
@@ -829,18 +916,6 @@ impl BatchProofQueue {
         {
             let batch_iter = batches.iter().rev().filter_map(|(sort_key, _info)| {
                 if let Some(item) = items.get(&sort_key.batch_key) {
-                    let batch_create_ts_usecs =
-                        item.info.expiration().saturating_sub(batch_expiry_gap);
-
-                    if max_batch_creation_ts_usecs
-                        .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
-                    {
-                        counters::BATCH_SKIPPED_TOO_YOUNG
-                            .with_label_values(&[item.info.author().short_str().as_str()])
-                            .inc();
-                        return None;
-                    }
-
                     return Some((&item.info, item));
                 }
                 None
@@ -854,6 +929,25 @@ impl BatchProofQueue {
         while !iters.is_empty() && !full {
             match iters[idx].next() {
                 Some((batch, item)) => {
+                    let batch_create_ts_usecs =
+                        item.info.expiration().saturating_sub(batch_expiry_gap);
+
+                    if max_batch_creation_ts_usecs
+                        .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
+                    {
+                        counters::BATCH_SKIPPED_TOO_YOUNG
+                            .with_label_values(&[item.info.author().short_str().as_str()])
+                            .inc();
+                        session.record_too_young(
+                            item.info.author(),
+                            item.info.num_txns(),
+                            now_usecs.saturating_sub(batch_create_ts_usecs) / 1_000,
+                            self.my_peer_id,
+                        );
+                        idx = (idx + 1) % iters.len();
+                        continue;
+                    }
+
                     if session
                         .excluded_batch_keys
                         .contains(&BatchKey::from_info(batch))

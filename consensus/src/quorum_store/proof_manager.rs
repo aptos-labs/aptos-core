@@ -6,7 +6,7 @@ use crate::{
     monitor,
     quorum_store::{
         batch_generator::BackPressure,
-        batch_proof_queue::BatchProofQueue,
+        batch_proof_queue::{BatchProofQueue, BatchQueueSnapshot, ProofQueueSnapshot, PullSession},
         counters,
         tracing::{observe_batch, BatchStage},
     },
@@ -133,6 +133,9 @@ impl ProofManager {
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         let GetPayloadCommand::GetPayloadRequest(request) = msg;
+        let proof_queue_snapshot = self.batch_proof_queue.proof_queue_snapshot();
+        let non_proof_batch_queue_snapshot =
+            self.batch_proof_queue.non_proof_batch_queue_snapshot();
 
         let excluded_batches: HashSet<_> = match request.filter {
             PayloadFilter::Empty => HashSet::new(),
@@ -228,6 +231,33 @@ impl ProofManager {
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
+        let proposal_result =
+            if proof_block.is_empty() && opt_batches.is_empty() && inline_block.is_empty() {
+                "empty"
+            } else {
+                "non_empty"
+            };
+        Self::observe_proposal_proof_queue_snapshot(proposal_result, proof_queue_snapshot);
+        Self::observe_proposal_non_proof_batch_queue_snapshot(
+            proposal_result,
+            non_proof_batch_queue_snapshot,
+        );
+        Self::observe_proposal_too_young_snapshot(proposal_result, &session);
+        if proposal_result == "empty" {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                info!(
+                    "QS: empty proposal payload; proof_queue_total_proofs={}, proof_queue_local_proofs={}, proof_queue_remote_proofs={}, proof_queue_total_txns={}, proof_queue_local_txns={}, proof_queue_remote_txns={}",
+                    proof_queue_snapshot.total_proofs,
+                    proof_queue_snapshot.local_proofs,
+                    proof_queue_snapshot.remote_proofs,
+                    proof_queue_snapshot.total_txns,
+                    proof_queue_snapshot.local_txns,
+                    proof_queue_snapshot.remote_txns,
+                );
+            );
+        }
+
         let enable_optqs_v2 = request
             .maybe_optqs_payload_pull_params
             .as_ref()
@@ -282,6 +312,90 @@ impl ProofManager {
         match request.callback.send(Ok(res)) {
             Ok(_) => (),
             Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
+        }
+    }
+
+    fn observe_proposal_proof_queue_snapshot(
+        proposal_result: &'static str,
+        snapshot: ProofQueueSnapshot,
+    ) {
+        for (scope, proofs, txns) in [
+            ("total", snapshot.total_proofs, snapshot.total_txns),
+            ("local", snapshot.local_proofs, snapshot.local_txns),
+            ("remote", snapshot.remote_proofs, snapshot.remote_txns),
+        ] {
+            counters::PROPOSAL_PROOF_QUEUE_PROOFS
+                .with_label_values(&[proposal_result, scope])
+                .observe(proofs as f64);
+            counters::PROPOSAL_PROOF_QUEUE_TXNS
+                .with_label_values(&[proposal_result, scope])
+                .observe(txns as f64);
+        }
+    }
+
+    fn observe_proposal_non_proof_batch_queue_snapshot(
+        proposal_result: &'static str,
+        snapshot: BatchQueueSnapshot,
+    ) {
+        for (scope, batches, txns) in [
+            ("total", snapshot.total_batches, snapshot.total_txns),
+            ("local", snapshot.local_batches, snapshot.local_txns),
+            ("remote", snapshot.remote_batches, snapshot.remote_txns),
+        ] {
+            counters::PROPOSAL_NON_PROOF_QUEUE_BATCHES
+                .with_label_values(&[proposal_result, scope])
+                .observe(batches as f64);
+            counters::PROPOSAL_NON_PROOF_QUEUE_TXNS
+                .with_label_values(&[proposal_result, scope])
+                .observe(txns as f64);
+        }
+    }
+
+    fn observe_proposal_too_young_snapshot(
+        proposal_result: &'static str,
+        session: &PullSession<'_>,
+    ) {
+        let total_batches = session.too_young_local_batches + session.too_young_remote_batches;
+        let total_txns = session.too_young_local_txns + session.too_young_remote_txns;
+        for (scope, batches, txns) in [
+            ("total", total_batches, total_txns),
+            (
+                "local",
+                session.too_young_local_batches,
+                session.too_young_local_txns,
+            ),
+            (
+                "remote",
+                session.too_young_remote_batches,
+                session.too_young_remote_txns,
+            ),
+        ] {
+            counters::PROPOSAL_TOO_YOUNG_BATCHES
+                .with_label_values(&[proposal_result, scope])
+                .observe(batches as f64);
+            counters::PROPOSAL_TOO_YOUNG_TXNS
+                .with_label_values(&[proposal_result, scope])
+                .observe(txns as f64);
+        }
+
+        for age_ms in session
+            .too_young_local_ages_ms
+            .iter()
+            .chain(session.too_young_remote_ages_ms.iter())
+        {
+            counters::PROPOSAL_TOO_YOUNG_BATCH_AGE_MS
+                .with_label_values(&[proposal_result, "total"])
+                .observe(*age_ms as f64);
+        }
+        for age_ms in &session.too_young_local_ages_ms {
+            counters::PROPOSAL_TOO_YOUNG_BATCH_AGE_MS
+                .with_label_values(&[proposal_result, "local"])
+                .observe(*age_ms as f64);
+        }
+        for age_ms in &session.too_young_remote_ages_ms {
+            counters::PROPOSAL_TOO_YOUNG_BATCH_AGE_MS
+                .with_label_values(&[proposal_result, "remote"])
+                .observe(*age_ms as f64);
         }
     }
 

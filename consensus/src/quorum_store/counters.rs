@@ -615,6 +615,76 @@ pub static NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL: Lazy<Histogram> = Lazy::new(|| {
     ).unwrap()
 });
 
+pub static PROPOSAL_PROOF_QUEUE_PROOFS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_proof_queue_proofs",
+        "Proof queue proof count before block proposal generation, split by proposal result and proof scope.",
+        &["proposal_result", "scope"],
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_PROOF_QUEUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_proof_queue_txns",
+        "Proof queue txn count before block proposal generation, split by proposal result and proof scope.",
+        &["proposal_result", "scope"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_NON_PROOF_QUEUE_BATCHES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_non_proof_queue_batches",
+        "Non-proof batch queue count before block proposal generation, split by proposal result and batch scope.",
+        &["proposal_result", "scope"],
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_NON_PROOF_QUEUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_non_proof_queue_txns",
+        "Non-proof batch queue txn count before block proposal generation, split by proposal result and batch scope.",
+        &["proposal_result", "scope"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_TOO_YOUNG_BATCHES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_too_young_batches",
+        "OptQS batches skipped as too young during block proposal generation, split by proposal result and batch scope.",
+        &["proposal_result", "scope"],
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_TOO_YOUNG_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_too_young_txns",
+        "OptQS batch transactions skipped as too young during block proposal generation, split by proposal result and batch scope.",
+        &["proposal_result", "scope"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_TOO_YOUNG_BATCH_AGE_MS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proposal_too_young_batch_age_ms",
+        "Age in milliseconds of OptQS batches skipped as too young during block proposal generation.",
+        &["proposal_result", "scope"],
+        QUORUM_STORE_LATENCY_BUCKETS_IN_MS.to_vec(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of total txns left after adding or cleaning batches.
 pub static NUM_TOTAL_TXNS_LEFT_ON_UPDATE: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
