@@ -64,8 +64,7 @@ async fn test_fullnode_genesis_transaction_flow() {
         .with_init_genesis_config(std::sync::Arc::new(|conf| {
             // Chunky DKG churns reconfigs which races with the sync_only halt/
             // restart flow this test exercises; keep it off.
-            conf.chunky_dkg_config_override =
-                Some(OnChainChunkyDKGConfig::default_disabled());
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -213,8 +212,7 @@ async fn test_validator_genesis_transaction_and_db_restore_flow() {
         .with_init_genesis_config(std::sync::Arc::new(|conf| {
             // Chunky DKG churns reconfigs which races with the sync_only halt/
             // db-wipe/restart flow this test exercises; keep it off.
-            conf.chunky_dkg_config_override =
-                Some(OnChainChunkyDKGConfig::default_disabled());
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
