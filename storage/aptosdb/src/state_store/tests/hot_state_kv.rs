@@ -506,10 +506,10 @@ fn test_load_handles_max_key_hash() {
 /// Regression test for the prefix-bloom interaction in the per-shard hot-state scan.
 ///
 /// The `hot_state_value_by_key_hash` CF carries a prefix bloom filter on the 32-byte key hash
-/// (enabled explicitly below via `bloom_filter_bits`, as production does). `scan_shard_entries`
-/// jumps to the next key group by seeking to `(key_hash + 1, Version::MAX)` — a prefix that need
-/// not exist. Without `total_order_seek`, the bloom excludes every SST for that absent prefix and
-/// the scan stops after the first key per shard.
+/// (enabled explicitly below via `bloom_filter_bits`, as production does). `scan_shard_range`
+/// seeks to the next key group via `(key_hash + 1, Version::MAX)` — a prefix that need not exist.
+/// Without `total_order_seek`, the bloom excludes every SST for that absent prefix and the scan
+/// stops early, dropping the rest of the sub-range's keys.
 ///
 /// The bloom lives only on SSTs, hence the flush below; the default unit-test config (no bloom,
 /// data in the memtable) cannot reproduce this.
@@ -522,13 +522,20 @@ fn test_load_with_prefix_bloom_loads_all_keys_in_shard() {
     };
     let db = create_hot_state_kv_db_with_config(&tmp, rocksdb_config);
 
-    // Several distinct key hashes that all map to the same shard (shard 0: high nibble of
-    // byte 0 is 0 for any first byte in 0x00..=0x0f), so the scan must cross key-hash groups.
-    let key_hashes: Vec<HashValue> = (0u8..8)
-        .map(|i| {
-            let mut bytes = [0u8; HashValue::LENGTH];
-            bytes[0] = i;
-            HashValue::new(bytes)
+    // All keys are in shard 0 (byte 0 in 0x00..=0x0f → high nibble 0). byte 0 spreads them across
+    // every within-shard sub-range; byte 1 puts several keys in each, forcing the scan to seek
+    // across absent next-key prefixes *within* a sub-range — the step the prefix bloom blocks
+    // without total-order seek. byte 1 starts at 1 so no key equals a sub-range's lower bound
+    // (byte 0 = b, rest 0), as in production where that bound is almost never a real key, so even
+    // the first seek of each sub-range targets an absent prefix.
+    let key_hashes: Vec<HashValue> = (0u8..16)
+        .flat_map(|b0| {
+            (1u8..=3).map(move |b1| {
+                let mut bytes = [0u8; HashValue::LENGTH];
+                bytes[0] = b0;
+                bytes[1] = b1;
+                HashValue::new(bytes)
+            })
         })
         .collect();
     let shard_id = usize::from(key_hashes[0].nibble(0));
