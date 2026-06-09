@@ -26,7 +26,7 @@ pub mod test_helper;
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     pub(crate) ledger_db: Arc<LedgerDb>,
-    pub(crate) hot_state_kv_db: Option<Arc<StateKvDb>>,
+    pub(crate) hot_state_kv_db: Arc<StateKvDb>,
     pub(crate) state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
     pub(crate) state_store: Arc<StateStore>,
@@ -111,13 +111,7 @@ impl AptosDB {
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
         hot_state_config: HotStateConfig,
-    ) -> Result<(
-        LedgerDb,
-        Option<StateMerkleDb>,
-        StateMerkleDb,
-        Option<StateKvDb>,
-        StateKvDb,
-    )> {
+    ) -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs.ledger_db_config,
@@ -125,19 +119,18 @@ impl AptosDB {
             block_cache,
             readonly,
         )?;
-        let hot_state_kv_db = if !readonly {
-            Some(StateKvDb::new(
-                db_paths,
-                rocksdb_configs.state_kv_db_config,
-                env,
-                block_cache,
-                readonly,
-                /* is_hot = */ true,
-                hot_state_config.delete_on_restart,
-            )?)
-        } else {
-            None
-        };
+        // The hot state DBs are always opened, including in read-only mode. Read-only RocksDB
+        // can't create them, so callers pointing at a DB that predates hot state must materialize
+        // the dirs first (e.g. a best-effort read-write open); see the db-tool/debugger commands.
+        let hot_state_kv_db = StateKvDb::new(
+            db_paths,
+            rocksdb_configs.state_kv_db_config,
+            env,
+            block_cache,
+            readonly,
+            /* is_hot = */ true,
+            hot_state_config.delete_on_restart,
+        )?;
         let state_kv_db = StateKvDb::new(
             db_paths,
             rocksdb_configs.state_kv_db_config,
@@ -147,20 +140,16 @@ impl AptosDB {
             /* is_hot = */ false,
             /* delete_on_restart = */ false,
         )?;
-        let hot_state_merkle_db = if !readonly {
-            Some(StateMerkleDb::new(
-                db_paths,
-                rocksdb_configs.state_merkle_db_config,
-                env,
-                block_cache,
-                readonly,
-                max_num_nodes_per_lru_cache_shard,
-                /* is_hot = */ true,
-                hot_state_config.delete_on_restart,
-            )?)
-        } else {
-            None
-        };
+        let hot_state_merkle_db = StateMerkleDb::new(
+            db_paths,
+            rocksdb_configs.state_merkle_db_config,
+            env,
+            block_cache,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+            /* is_hot = */ true,
+            hot_state_config.delete_on_restart,
+        )?;
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs.state_merkle_db_config,
@@ -179,6 +168,28 @@ impl AptosDB {
             hot_state_kv_db,
             state_kv_db,
         ))
+    }
+
+    /// Best-effort: open the sub-DBs read-write once so any that a pre-hot-state DB lacks
+    /// (notably the hot state dirs) get created. Read-only RocksDB can't create them, so a
+    /// read-only consumer pointed at such a DB must call this first. Failures are ignored: a DB
+    /// locked by a running node already has the dirs, and a genuinely unwritable DB will surface
+    /// the error at the real open.
+    pub fn ensure_sub_dbs_created(db_paths: &StorageDirPaths) {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Self::open_dbs(
+                db_paths,
+                RocksdbConfigs::default(),
+                None,
+                None,
+                /*readonly=*/ false,
+                /*max_num_nodes_per_lru_cache_shard=*/ 0,
+                HotStateConfig {
+                    delete_on_restart: false,
+                    ..HotStateConfig::default()
+                },
+            )
+        }));
     }
 
     pub fn add_version_update_subscriber(

@@ -23,6 +23,9 @@ impl Cmd {
         let env = None;
         let block_cache = None;
 
+        // Read-only RocksDB can't create the hot state sub-DBs that a pre-hot-state DB may lack;
+        // materialize them first so the read-only open below succeeds.
+        AptosDB::ensure_sub_dbs_created(&StorageDirPaths::from_path(&self.db_dir));
         let (ledger_db, _, _, _, _) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
