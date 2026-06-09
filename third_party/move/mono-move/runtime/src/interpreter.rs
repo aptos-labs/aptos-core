@@ -33,7 +33,7 @@ use mono_move_core::{
     captured_values_size,
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     next_captured_value_offset,
-    storage::resource_provider::StorageKey,
+    storage::resource_provider::InMemoryStorageKey,
     CallClosureOp, ClosureFuncRef, CmpKind, ConstantPoolIndex, DescriptorId, DescriptorProvider,
     FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
     IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
@@ -1426,7 +1426,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let address = read_account_address(fp, addr);
                     let exists = self.read_write_set.exists(
                         self.exec_ctx.resource_provider(),
-                        &StorageKey::Resource(address, ty),
+                        &InMemoryStorageKey::resource(address, ty),
                     )?;
                     write_bool(fp, dst, exists);
                 },
@@ -1435,7 +1435,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let address = read_account_address(fp, addr);
                     let ptr = self.read_write_set.borrow_global(
                         self.exec_ctx.resource_provider(),
-                        &StorageKey::Resource(address, ty),
+                        &InMemoryStorageKey::resource(address, ty),
                     )?;
                     // A reference is a 16-byte fat pointer; the borrow points
                     // at the start of the resource, so the offset half is 0.
@@ -1444,7 +1444,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
                 MicroOp::BorrowGlobalMut { addr, ty, dst } => {
                     let address = read_account_address(fp, addr);
-                    let key = StorageKey::Resource(address, ty);
+                    let key = InMemoryStorageKey::resource(address, ty);
                     let ptr = match self
                         .read_write_set
                         .try_borrow_global_mut(self.exec_ctx.resource_provider(), &key)?
@@ -1463,7 +1463,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
                 MicroOp::MoveFrom { addr, ty, dst } => {
                     let address = read_account_address(fp, addr);
-                    let key = StorageKey::Resource(address, ty);
+                    let key = InMemoryStorageKey::resource(address, ty);
                     let entry_ptr = self
                         .read_write_set
                         .try_move_from(self.exec_ctx.resource_provider(), &key)?;
@@ -1492,7 +1492,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
                     self.read_write_set.move_to(
                         self.exec_ctx.resource_provider(),
-                        &StorageKey::Resource(address, ty),
+                        &InMemoryStorageKey::resource(address, ty),
                         ptr,
                     )?;
                 },
