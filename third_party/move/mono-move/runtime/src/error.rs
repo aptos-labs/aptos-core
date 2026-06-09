@@ -95,16 +95,16 @@ pub enum RuntimeError {
     VMInternal(#[from] VMInternalError),
 
     #[error("BCS deserialize: unexpected end of input")]
-    BcsEof,
+    BCSEof,
 
     #[error("BCS deserialize: malformed ULEB128 length")]
-    BcsInvalidUleb,
+    BCSInvalidUleb,
 
     #[error("BCS deserialize: sequence length {len} exceeds maximum")]
-    BcsSequenceTooLong { len: u64 },
+    BCSSequenceTooLong { len: u64 },
 
     #[error("BCS deserialize: {remaining} trailing byte(s) after value")]
-    BcsRemainingInput { remaining: usize },
+    BCSRemainingInput { remaining: usize },
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -135,7 +135,7 @@ impl IntoExecutionError for RuntimeError {
             | VecAllocSizeOverflow
             | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
 
-            BcsEof | BcsInvalidUleb | BcsSequenceTooLong { .. } | BcsRemainingInput { .. } => {
+            BCSEof | BCSInvalidUleb | BCSSequenceTooLong { .. } | BCSRemainingInput { .. } => {
                 ExecutionErrorKind::InvalidOperation
             },
 
@@ -253,7 +253,7 @@ pub enum RuntimeInvariantViolation {
     DescriptorNotFound { descriptor_id: u32 },
 
     #[error("type has no published layout")]
-    TypeLayoutNotFound,
+    ValueLayoutNotFound,
 
     #[error("unreachable: {0}")]
     Unreachable(String),

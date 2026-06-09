@@ -2,11 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Type layouts: a flat, ID-indexed description of a value's shape used to
-//! drive layout-sensitive value walks (BCS size queries, BCS serialization,
-//! BCS deserialization into the flat in-memory representation, as well as
-//! comparison and equality).
+//! drive layout-sensitive value walks (e.g., BCS size queries, BCS
+//! serialization, BCS deserialization into the flat in-memory representation,
+//! comparison, and equality).
 //!
-//! A [`TypeLayout`] is resolved once per concrete type at lowering time and
+//! A [`ValueLayout`] is resolved once per concrete type at lowering time and
 //! then walked by chasing [`LayoutId`]s, so there is no need for the walk to
 //! re-interpret the [`Type`] DAG. Layouts are built in the same pass that
 //! publishes GC [`ObjectDescriptor`](crate::ObjectDescriptor)s. The two tables
@@ -19,12 +19,12 @@
 
 use crate::{
     types::{view_type, InternedType, InternedTypeList, Type},
-    DescriptorId,
+    DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
 use std::collections::HashMap;
 
-/// Typed index into the program's [`TypeLayout`] table.
+/// Typed index into the program's [`ValueLayout`] table.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LayoutId(u32);
@@ -59,7 +59,7 @@ bitflags! {
 }
 
 /// Layout description of a value.
-pub struct TypeLayout {
+pub struct ValueLayout {
     /// In-memory size in bytes.
     pub size: u32,
     /// In-memory alignment.
@@ -67,7 +67,7 @@ pub struct TypeLayout {
     /// Fixed BCS size in bytes, or [`None`] when data-dependent (e.g., for
     /// vectors, enums, function values and anything that transitively owns
     /// them).
-    pub const_bcs_size: Option<u32>,
+    pub fixed_bcs_size: Option<u32>,
     /// Flags with extra information about this layout / type.
     pub flags: LayoutFlags,
     /// Describes layout's shape.
@@ -75,14 +75,16 @@ pub struct TypeLayout {
 }
 
 /// Layout information for a struct field.
-pub struct FieldTypeLayout {
+pub struct FieldValueLayout {
     pub offset: u32,
     pub id: LayoutId,
 }
 
 /// Shape-specific layout data.
 pub enum LayoutKind {
-    /// An unsigned integer (`u8`, ...,`u256`) or boolean.
+    /// A boolean: a 1-byte value holding `0` or `1`.
+    Bool,
+    /// An unsigned integer (`u8`, ..., `u256`).
     UnsignedInt,
     /// A signed integer (`i8`, ..., `i256`).
     SignedInt,
@@ -92,7 +94,7 @@ pub enum LayoutKind {
     /// TODO: for non-inline structs, we need a descriptor ID.
     Struct {
         /// Byte offsets and IDs of each field within the struct payload.
-        fields: Box<[FieldTypeLayout]>,
+        fields: Box<[FieldValueLayout]>,
     },
     /// A vector: an 8-byte heap-pointer slot. `elem_id` is the element layout
     /// (for the per-element walk); `descriptor_id` is the GC descriptor of the
@@ -115,20 +117,24 @@ pub enum LayoutKind {
     Function,
 }
 
-impl TypeLayout {
+impl ValueLayout {
     /// Builds a layout from its parts. The flag computation lives in the
     /// builder (it needs child layouts), so this is a plain constructor.
     pub fn new(
         size: u32,
         align: u32,
-        const_bcs_size: Option<u32>,
+        fixed_bcs_size: Option<u32>,
         flags: LayoutFlags,
         kind: LayoutKind,
     ) -> Self {
+        debug_assert!(
+            align <= MAX_ALIGN as u32,
+            "value alignment must not exceed MAX_ALIGN"
+        );
         Self {
             size,
             align,
-            const_bcs_size,
+            fixed_bcs_size,
             flags,
             kind,
         }
@@ -139,14 +145,21 @@ impl TypeLayout {
         self.flags.contains(LayoutFlags::NO_POINTERS_NO_PADDING)
     }
 
-    /// The fixed BCS size of this type, or [`None`] when data-dependent.
-    pub fn const_serialized_size(&self) -> Option<u32> {
-        self.const_bcs_size
+    /// The fixed BCS size of a value of this type, or [`None`] when
+    /// data-dependent.
+    pub fn fixed_serialized_size(&self) -> Option<u32> {
+        self.fixed_bcs_size
     }
 
-    /// Layout of `bool` (ordered as a 1-byte unsigned integer).
+    /// Layout of `bool`: a 1-byte `0`/`1` value.
     pub fn bool() -> Self {
-        Self::unsigned_int(1, 1)
+        Self {
+            size: 1,
+            align: 1,
+            fixed_bcs_size: Some(1),
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            kind: LayoutKind::Bool,
+        }
     }
 
     /// Layout of `u8`.
@@ -171,12 +184,12 @@ impl TypeLayout {
 
     /// Layout of `u128`.
     pub fn u128() -> Self {
-        Self::unsigned_int(16, 8)
+        Self::unsigned_int(16, MAX_ALIGN as u32)
     }
 
     /// Layout of `u256`.
     pub fn u256() -> Self {
-        Self::unsigned_int(32, 8)
+        Self::unsigned_int(32, MAX_ALIGN as u32)
     }
 
     /// Layout of `i8`.
@@ -201,20 +214,20 @@ impl TypeLayout {
 
     /// Layout of `i128`.
     pub fn i128() -> Self {
-        Self::signed_int(16, 8)
+        Self::signed_int(16, MAX_ALIGN as u32)
     }
 
     /// Layout of `i256`.
     pub fn i256() -> Self {
-        Self::signed_int(32, 8)
+        Self::signed_int(32, MAX_ALIGN as u32)
     }
 
     /// Layout of `address` or a signer.
     pub fn address() -> Self {
         Self {
             size: 32,
-            align: 8,
-            const_bcs_size: Some(32),
+            align: MAX_ALIGN as u32,
+            fixed_bcs_size: Some(32),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::Address,
         }
@@ -224,8 +237,8 @@ impl TypeLayout {
     pub fn reference() -> Self {
         Self {
             size: 16,
-            align: 8,
-            const_bcs_size: None,
+            align: MAX_ALIGN as u32,
+            fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::Ref,
         }
@@ -235,8 +248,8 @@ impl TypeLayout {
     pub fn function() -> Self {
         Self {
             size: 8,
-            align: 8,
-            const_bcs_size: None,
+            align: MAX_ALIGN as u32,
+            fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::Function,
         }
@@ -246,8 +259,8 @@ impl TypeLayout {
     pub fn vector(elem_id: LayoutId, descriptor_id: DescriptorId) -> Self {
         Self {
             size: 8,
-            align: 8,
-            const_bcs_size: None,
+            align: MAX_ALIGN as u32,
+            fixed_bcs_size: None,
             // Vectors are heap pointers, so their data can be bulk copied or
             // compared only if its element has no pointers or no padding, but
             // otherwise vectors do not qualify.
@@ -263,25 +276,29 @@ impl TypeLayout {
     pub fn struct_layout(
         size: u32,
         align: u32,
-        const_bcs_size: Option<u32>,
+        fixed_bcs_size: Option<u32>,
         flags: LayoutFlags,
-        fields: Box<[FieldTypeLayout]>,
-    ) -> TypeLayout {
+        fields: Box<[FieldValueLayout]>,
+    ) -> ValueLayout {
+        debug_assert!(
+            align <= MAX_ALIGN as u32,
+            "value alignment must not exceed MAX_ALIGN"
+        );
         Self {
             size,
             align,
-            const_bcs_size,
+            fixed_bcs_size,
             flags,
             kind: LayoutKind::Struct { fields },
         }
     }
 
     /// Layout for an open enum.
-    pub fn open_enum(ty: InternedType, ty_args: InternedTypeList) -> TypeLayout {
+    pub fn open_enum(ty: InternedType, ty_args: InternedTypeList) -> ValueLayout {
         Self {
             size: 8,
-            align: 8,
-            const_bcs_size: None,
+            align: MAX_ALIGN as u32,
+            fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::OpenEnum { ty, ty_args },
         }
@@ -291,7 +308,7 @@ impl TypeLayout {
         Self {
             size,
             align,
-            const_bcs_size: Some(size),
+            fixed_bcs_size: Some(size),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::UnsignedInt,
         }
@@ -301,12 +318,24 @@ impl TypeLayout {
         Self {
             size,
             align,
-            const_bcs_size: Some(size),
+            fixed_bcs_size: Some(size),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::SignedInt,
         }
     }
 }
+
+// Reserved layout IDs for types whose layout does not depend on type
+// arguments (primitives, references, functions). They occupy the first slots
+// of every layout table, in exactly this order.
+//
+// # Invariants
+//
+// - The numeric IDs below must match the order of [`reserved_layouts`], which
+//   seeds the table. Keep the two in sync.
+// - Never reorder or renumber an existing entry, and never insert in the
+//   middle: a layout table built at an earlier version would then resolve old
+//   IDs to the wrong layout. Only append new reserved IDs at the end.
 
 /// Reserved layout ID for [`Type::Bool`].
 pub const BOOL_LAYOUT_ID: LayoutId = LayoutId(0);
@@ -331,10 +360,13 @@ pub const U256_LAYOUT_ID: LayoutId = LayoutId(6);
 
 /// Reserved layout ID for [`Type::I8`].
 pub const I8_LAYOUT_ID: LayoutId = LayoutId(7);
+
 /// Reserved layout ID for [`Type::I16`].
 pub const I16_LAYOUT_ID: LayoutId = LayoutId(8);
+
 /// Reserved layout ID for [`Type::I32`].
 pub const I32_LAYOUT_ID: LayoutId = LayoutId(9);
+
 /// Reserved layout ID for [`Type::I64`].
 pub const I64_LAYOUT_ID: LayoutId = LayoutId(10);
 
@@ -382,50 +414,50 @@ pub fn reserved_layout_id(ty: &Type) -> Option<LayoutId> {
 }
 
 /// Returns the initial layout table: the reserved entries in ID order.
-pub fn reserved_layouts() -> Vec<TypeLayout> {
+pub fn reserved_layouts() -> Vec<ValueLayout> {
     // Order MUST match the `*_LAYOUT_ID` constants above.
     vec![
-        TypeLayout::bool(),
-        TypeLayout::u8(),
-        TypeLayout::u16(),
-        TypeLayout::u32(),
-        TypeLayout::u64(),
-        TypeLayout::u128(),
-        TypeLayout::u256(),
-        TypeLayout::i8(),
-        TypeLayout::i16(),
-        TypeLayout::i32(),
-        TypeLayout::i64(),
-        TypeLayout::i128(),
-        TypeLayout::i256(),
-        TypeLayout::address(),
-        TypeLayout::reference(),
-        TypeLayout::function(),
+        ValueLayout::bool(),
+        ValueLayout::u8(),
+        ValueLayout::u16(),
+        ValueLayout::u32(),
+        ValueLayout::u64(),
+        ValueLayout::u128(),
+        ValueLayout::u256(),
+        ValueLayout::i8(),
+        ValueLayout::i16(),
+        ValueLayout::i32(),
+        ValueLayout::i64(),
+        ValueLayout::i128(),
+        ValueLayout::i256(),
+        ValueLayout::address(),
+        ValueLayout::reference(),
+        ValueLayout::function(),
     ]
 }
 
-/// Per-ID and per-type lookup of [`TypeLayout`]s.
+/// Per-ID and per-type lookup of [`ValueLayout`]s.
 pub trait LayoutProvider {
     /// Returns the layout for `id`, or [`None`] if `id` is unknown.
-    fn layout(&self, id: LayoutId) -> Option<&TypeLayout>;
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout>;
 
     /// Returns the layout id for `ty`, or [`None`] if no layout has been
     /// published for it yet (e.g. its module is not loaded).
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId>;
 
-    fn layout_by_ty(&self, ty: InternedType) -> Option<&TypeLayout> {
+    fn layout_by_ty(&self, ty: InternedType) -> Option<&ValueLayout> {
         let id = self.layout_id(ty)?;
         self.layout(id)
     }
 }
 
 // TODO: Test-only, remove when local execution context is refactored and removed.
-pub struct TypeLayoutTable {
-    table: Vec<TypeLayout>,
+pub struct ValueLayoutTable {
+    table: Vec<ValueLayout>,
     by_ty: HashMap<InternedType, LayoutId>,
 }
 
-impl TypeLayoutTable {
+impl ValueLayoutTable {
     pub fn new() -> Self {
         Self {
             table: reserved_layouts(),
@@ -433,7 +465,7 @@ impl TypeLayoutTable {
         }
     }
 
-    pub fn push(&mut self, ty: InternedType, layout: TypeLayout) -> LayoutId {
+    pub fn push(&mut self, ty: InternedType, layout: ValueLayout) -> LayoutId {
         let id = LayoutId::from_usize(self.table.len());
         self.table.push(layout);
         self.by_ty.insert(ty, id);
@@ -441,14 +473,14 @@ impl TypeLayoutTable {
     }
 }
 
-impl Default for TypeLayoutTable {
+impl Default for ValueLayoutTable {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LayoutProvider for TypeLayoutTable {
-    fn layout(&self, id: LayoutId) -> Option<&TypeLayout> {
+impl LayoutProvider for ValueLayoutTable {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
         self.table.get(id.as_usize())
     }
 
@@ -484,7 +516,7 @@ mod tests {
         for (id, width) in cases {
             let l = &layouts[id.as_usize()];
             assert_eq!(l.size, width);
-            assert_eq!(l.const_bcs_size, Some(width));
+            assert_eq!(l.fixed_bcs_size, Some(width));
             assert!(l.has_no_pointers_no_padding());
         }
 
@@ -503,7 +535,7 @@ mod tests {
 
         let r = &layouts[REF_LAYOUT_ID.as_usize()];
         assert_eq!(r.size, 16);
-        assert_eq!(r.const_bcs_size, None);
+        assert_eq!(r.fixed_bcs_size, None);
         assert!(matches!(r.kind, LayoutKind::Ref));
 
         let f = &layouts[FUNCTION_LAYOUT_ID.as_usize()];

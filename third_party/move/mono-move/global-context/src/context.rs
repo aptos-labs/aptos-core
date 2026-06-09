@@ -56,8 +56,7 @@ use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, types::NominalLayout, DescriptorId, DescriptorProvider,
     FrameOffset, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeLayout, TRIVIAL_DESCRIPTOR_ID,
-
+    ValueLayout, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -225,20 +224,29 @@ fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
 struct Layouts {
     /// Type to layout ID mapping. Types are concrete.
     by_ty: DashMap<InternedType, LayoutId, ahash::RandomState>,
-    /// All existing layouts in ID order.
-    table: boxcar::Vec<TypeLayout>,
+    /// All existing layouts in ID order. `boxcar::Vec` is an append-only
+    /// concurrent vector: entries are pushed through a shared `&` reference and
+    /// are never moved, so [`LayoutId`] indices stay stable and concurrent
+    /// reads need no lock.
+    table: boxcar::Vec<ValueLayout>,
 }
 
 impl Default for Layouts {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Layouts {
+    /// Creates a fresh table seeded with the reserved layouts and an empty
+    /// type-to-ID map.
+    fn new() -> Self {
         Self {
             by_ty: DashMap::default(),
             table: initial_layouts(),
         }
     }
-}
 
-impl Layouts {
     /// Resets layout table and type to layout ID mappings. Reserved layouts
     /// are added back to the layout table.
     fn reset(&mut self) {
@@ -248,7 +256,7 @@ impl Layouts {
     }
 }
 
-fn initial_layouts() -> boxcar::Vec<TypeLayout> {
+fn initial_layouts() -> boxcar::Vec<ValueLayout> {
     let mut table = boxcar::Vec::new();
     table.extend(reserved_layouts());
     table
@@ -731,7 +739,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
     /// Publishes the layout for the given type and returns its assigned
     /// [`LayoutId`].
-    pub fn publish_layout(&self, ty: InternedType, layout: TypeLayout) -> LayoutId {
+    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
         if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
             return *id;
         }
@@ -780,7 +788,7 @@ impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
 }
 
 impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
-    fn layout(&self, id: LayoutId) -> Option<&TypeLayout> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
         self.ctx.layouts.table.get(id.as_usize())
     }
 

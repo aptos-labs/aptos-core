@@ -19,14 +19,14 @@ use mono_move_core::{
     interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{NativeIdx, NativeName, NativeResolver},
     next_captured_value_offset,
-    type_layout::REF_LAYOUT_ID,
     types::{
         view_type, view_type_list, Alignment, FieldLayout, InternedType, InternedTypeList, Size,
         Type, EMPTY_TYPE_LIST,
     },
-    Code, CodeOffset, DescriptorId, FieldTypeLayout, FieldTypes, FrameLayoutInfo, FrameOffset,
+    value_layout::REF_LAYOUT_ID,
+    Code, CodeOffset, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset,
     Function, Interner, LayoutFlags, LayoutId, MicroOpGasSchedule, PreparedModule, SafePointEntry,
-    SizedSlot, SortedSafePointEntries, TypeLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    SizedSlot, SortedSafePointEntries, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::{access::ModuleAccess, file_format::FunctionHandleIndex};
@@ -571,10 +571,10 @@ pub trait SpecializerContext {
     fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId>;
 
     /// Returns the published layout for `id`, or `None` if unknown.
-    fn layout(&self, id: LayoutId) -> Option<&TypeLayout>;
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout>;
 
     /// Publishes `layout` for `ty` and returns its assigned id. Idempotent.
-    fn publish_layout(&self, ty: InternedType, layout: TypeLayout) -> LayoutId;
+    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId;
 }
 
 /// Interned type list of a closure target's captured parameters (the mask-set
@@ -850,7 +850,7 @@ fn discover_captured_data_descriptor(
 
 /// Recursive post-order DFS that visits every nominal reachable from the given
 /// type and, as a side effect, publishes its GC vector descriptors,
-/// `NominalLayout`s, and `TypeLayout`s. Returns the type's [`LayoutId`] when one
+/// `NominalLayout`s, and `ValueLayout`s. Returns the type's [`LayoutId`] when one
 /// could be built, or `None` when it is deferred.
 ///
 /// Additionally, for each `Type::Vector` reached, recurses into the element
@@ -925,7 +925,7 @@ fn discover_type_metadata(
             // uses), so `descriptor_id` is always valid on the layout.
             match (elem_id, descriptor_id) {
                 (Some(elem_id), Some(descriptor_id)) => {
-                    let layout = TypeLayout::vector(elem_id, descriptor_id);
+                    let layout = ValueLayout::vector(elem_id, descriptor_id);
                     Ok(Some(ctx.publish_layout(ty, layout)))
                 },
                 _ => Ok(None),
@@ -973,7 +973,7 @@ fn discover_type_metadata(
                     let mut nominal_fields = Vec::with_capacity(fields.len());
 
                     let mut layout_fields = Vec::with_capacity(fields.len());
-                    let mut const_bcs_total: u64 = 0;
+                    let mut fixed_bcs_total: u64 = 0;
                     let mut data_dependent = false;
 
                     for (&ft, &fid) in fields.iter().zip(&field_ids) {
@@ -994,10 +994,10 @@ fn discover_type_metadata(
                         offset = align_up_u32(offset, al);
                         max_align = max_align.max(al);
                         nominal_fields.push(FieldLayout::new(offset, ft));
-                        layout_fields.push(FieldTypeLayout { offset, id });
-                        match child.const_bcs_size {
+                        layout_fields.push(FieldValueLayout { offset, id });
+                        match child.fixed_bcs_size {
                             Some(bcs_sz) => {
-                                const_bcs_total = const_bcs_total.saturating_add(bcs_sz as u64)
+                                fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64)
                             },
                             None => data_dependent = true,
                         }
@@ -1006,35 +1006,35 @@ fn discover_type_metadata(
                     let total = align_up_u32(offset, max_align);
                     ctx.set_nominal_layout(ty, total, max_align, Some(&nominal_fields))?;
 
-                    let const_bcs_size = if data_dependent || const_bcs_total > u32::MAX as u64 {
+                    let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
                         None
                     } else {
-                        Some(const_bcs_total as u32)
+                        Some(fixed_bcs_total as u32)
                     };
                     // The struct has no pointers and no padding exactly when
                     // its packed BCS size equals its in-memory size: a pointer
                     // field makes the BCS size data-dependent (`None`), and any
                     // alignment padding makes it strictly smaller than `total`.
                     let mut flags = LayoutFlags::empty();
-                    if const_bcs_size == Some(total) {
+                    if fixed_bcs_size == Some(total) {
                         flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
                     }
-                    let type_layout = TypeLayout::struct_layout(
+                    let value_layout = ValueLayout::struct_layout(
                         total,
                         max_align,
-                        const_bcs_size,
+                        fixed_bcs_size,
                         flags,
                         layout_fields.into_boxed_slice(),
                     );
-                    Ok(Some(ctx.publish_layout(ty, type_layout)))
+                    Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },
                 Some(FieldTypes::Enum(_)) => {
                     // Enum size is fixed (heap pointer) regardless of variant
                     // fields. We do not walk variants here because their types
                     // are only needed for pack/unpack/test.
                     ctx.set_nominal_layout(ty, 8, 8, None)?;
-                    let type_layout = TypeLayout::open_enum(ty, *nominal_ty_args);
-                    Ok(Some(ctx.publish_layout(ty, type_layout)))
+                    let value_layout = ValueLayout::open_enum(ty, *nominal_ty_args);
+                    Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },
             }
         },

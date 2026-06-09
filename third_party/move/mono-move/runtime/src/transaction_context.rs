@@ -12,7 +12,7 @@ use mono_move_core::{
     native::ProductionNativeRegistry,
     types::{InternedType, InternedTypeList},
     DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider, ObjectDescriptor,
-    ResourceProvider, TypeLayout,
+    ResourceProvider, ValueLayout,
 };
 use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
@@ -103,7 +103,7 @@ impl<'guard, 'ctx, G: GasMeter> DescriptorProvider for TransactionContext<'guard
 }
 
 impl<'guard, 'ctx, G: GasMeter> LayoutProvider for TransactionContext<'guard, 'ctx, G> {
-    fn layout(&self, id: LayoutId) -> Option<&TypeLayout> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
         self.loader.guard().layout(id)
     }
 

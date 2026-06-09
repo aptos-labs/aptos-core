@@ -1,23 +1,26 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Operations over value trees driven by value layouts.
-//!
-//!   - [`const_serialized_size`]: calculates BCS serialized size, if it is
-//!     fixed.
-//!   - [`serialized_size`]: returns BCS serialized size of an in-memory value.
-//!   - [`serialize`]: returns BCS-serialized bytes of an in-memory value.
-//!   - [`equals`]: structural equality of two values.
-//!   - [`compare`]: structural comparison of two values.
-//!   - [`deserialize`]: deserializes BCS bytes into in-memory representation,
-//!     allocating data on the heap if needed (e.g., for vectors). Fails if
-//!     there is not enough heap space.
+//! Operations over value trees driven by value layouts: BCS-serializing an
+//! in-memory value and reporting its serialized size (fixed when the type
+//! allows, otherwise computed by walking the value), deserializing BCS bytes
+//! back into the flat in-memory representation (allocating heap storage for
+//! vectors, and failing rather than running GC when heap space runs out), and
+//! comparing two values for structural equality and ordering.
 //!
 //! TODO(correctness):
 //!   Current implementation works only for little-endian architectures,
 //!   we should revisit it to have big-endian working as well. In particular,
 //!   serialization fast-path via memcpy or integer comparison are broken for
 //!   big endian hosts.
+//!
+//! TODO:
+//!   Unify these value walks (serialize, deserialize, equals, compare) under a
+//!   shared visitor/fold abstraction instead of four parallel recursive
+//!   implementations.
+//!
+//! TODO(test):
+//!   Add differential tests for these walks against the existing Move VM.
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
@@ -26,20 +29,20 @@ use crate::{
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, TypeLayout, OBJECT_HEADER_SIZE,
+    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use std::cmp::Ordering;
 
-/// Returns the BCS size of the type if it has one, and it is a constant.
-/// Returns [`None`] otherwise (e.g., for enums, function values, etc.).
+/// Returns the fixed BCS size of a value of the given type, or [`None`] when it
+/// is data-dependent (e.g., for vectors, enums, function values, etc.).
 #[allow(dead_code)]
-pub fn const_serialized_size<T: LayoutProvider + ?Sized>(
+pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     ty: InternedType,
-) -> RuntimeResult<Option<u32>> {
+) -> RuntimeResult<Option<usize>> {
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
-    Ok(layout.const_serialized_size())
+    Ok(layout.fixed_serialized_size().map(|n| n as usize))
 }
 
 /// Returns the BCS serialized size the value stored at `base` of the given type.
@@ -75,7 +78,7 @@ pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
 
     let mut out = vec![];
-    if let Some(serialized_size) = layout.const_serialized_size() {
+    if let Some(serialized_size) = layout.fixed_serialized_size() {
         out.reserve(serialized_size as usize);
     }
 
@@ -93,9 +96,11 @@ pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
 unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,
-    layout: &TypeLayout,
+    layout: &ValueLayout,
     out: &mut Vec<u8>,
 ) -> RuntimeResult<()> {
+    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // to a non-recursive form to bound stack depth on deeply nested values.
     if layout.has_no_pointers_no_padding() {
         // SAFETY: for values with no padding and pointers, value's in-memory
         // bytes are its BCS encoding.
@@ -107,7 +112,10 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     }
 
     match &layout.kind {
-        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => Err(unreachable(
+        LayoutKind::Bool
+        | LayoutKind::UnsignedInt
+        | LayoutKind::SignedInt
+        | LayoutKind::Address => Err(unreachable(
             "Primitive types have no padding / pointers and must be already handled",
         )),
         LayoutKind::Struct { fields } => {
@@ -129,7 +137,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             let vec_ptr = unsafe { read_ptr(base, 0usize) };
             let len = unsafe { read_vec_len(vec_ptr) };
             if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
-                return Err(RuntimeError::BcsSequenceTooLong { len });
+                return Err(RuntimeError::BCSSequenceTooLong { len });
             }
             write_uleb128_len(out, len);
             if len == 0 {
@@ -172,17 +180,17 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     }
 }
 
-/// Structural equality of two values of the given type.
+/// Structural equality of two non-reference values of the given type.
 ///
 /// # Safety
 ///
 /// Input pointers `a` and `b` must point to fully initialized values of the
 /// given type.
 ///
-/// # Invariant
+/// # Precondition
 ///
-/// The reference values, the caller must read the reference to obtain the
-/// `base` pointer to the actual data.
+/// For reference values, the caller must first read the reference to obtain
+/// the `base` pointer to the actual data; these walks operate on the pointee.
 #[allow(dead_code)]
 pub unsafe fn equals<T: LayoutProvider + ?Sized>(
     layouts: &T,
@@ -202,16 +210,18 @@ pub unsafe fn equals<T: LayoutProvider + ?Sized>(
 /// Input pointers `a` and `b` must point to fully initialized values with the
 /// given layout.
 ///
-/// # Invariant
+/// # Precondition
 ///
-/// The reference values, the caller must read the reference to obtain the
-/// `base` pointer to the actual data.
+/// For reference values, the caller must first read the reference to obtain
+/// the `base` pointer to the actual data; these walks operate on the pointee.
 unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
     a: *const u8,
     b: *const u8,
     id: LayoutId,
 ) -> RuntimeResult<bool> {
+    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
 
     if layout.has_no_pointers_no_padding() {
@@ -221,7 +231,10 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     }
 
     match &layout.kind {
-        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => Err(unreachable(
+        LayoutKind::Bool
+        | LayoutKind::UnsignedInt
+        | LayoutKind::SignedInt
+        | LayoutKind::Address => Err(unreachable(
             "Primitive layouts must be handled by fast-path",
         )),
         LayoutKind::Struct { fields } => {
@@ -307,10 +320,10 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
 /// Input pointers `a` and `b` must point to fully initialized values with the
 /// given layout.
 ///
-/// # Invariant
+/// # Precondition
 ///
-/// The reference values, the caller must read the reference to obtain the
-/// `base` pointer to the actual data.
+/// For reference values, the caller must first read the reference to obtain
+/// the `base` pointer to the actual data; these walks operate on the pointee.
 #[allow(dead_code)]
 pub unsafe fn compare<T: LayoutProvider + ?Sized>(
     layouts: &T,
@@ -323,29 +336,38 @@ pub unsafe fn compare<T: LayoutProvider + ?Sized>(
     unsafe { compare_impl(layouts, a, b, id) }
 }
 
-/// Implementation of structural comparison of two values of the given layout.
+/// Implementation of structural comparison of two non-reference values of the
+/// given layout.
 ///
 /// # Safety
 ///
 /// Input pointers `a` and `b` must point to fully initialized values with the
 /// given layout.
 ///
-/// # Invariant
+/// # Precondition
 ///
-/// The reference values, the caller must read the reference to obtain the
-/// `base` pointer to the actual data.
+/// For reference values, the caller must first read the reference to obtain
+/// the `base` pointer to the actual data; these walks operate on the pointee.
 unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
     a: *const u8,
     b: *const u8,
     id: LayoutId,
 ) -> RuntimeResult<Ordering> {
+    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
     match &layout.kind {
-        LayoutKind::UnsignedInt => {
+        // A `bool` is a 1-byte `0`/`1` value, so it compares like a `u8`.
+        LayoutKind::Bool | LayoutKind::UnsignedInt => {
             // Read the little-endian bytes into the native integer of the
             // matching width and compare numerically. `from_le_bytes` keeps
             // this correct on any host endianness.
+            //
+            // TODO: These are unaligned, little-endian numeric reads, distinct
+            // from the aligned native-endian helpers in `memory.rs`. Endianness
+            // makes unifying the two non-trivial; revisit whether a shared set
+            // of typed read helpers can serve both.
             //
             // SAFETY: both pointers point to a valid `layout.size`-byte region.
             Ok(unsafe {
@@ -444,8 +466,14 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
 /// # Allocating semantics
 ///
 /// May allocate data on the heap, e.g. for vectors. **Never runs GC** and
-/// instead fails if there is not enough heap space. It is responsibility of
-/// the caller to run GC and retry.
+/// instead fails gracefully with an [`AllocationError`] if there is not enough
+/// heap space; it is the caller's responsibility to run GC and retry. Heap
+/// exhaustion is a normal error, never undefined behavior.
+///
+/// # Precondition
+///
+/// The given type must not be a reference: references are never serialized or
+/// deserialized.
 ///
 /// # Safety
 ///
@@ -465,7 +493,7 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     // SAFETY: caller must enforce the safety precondition.
     unsafe { deserialize_impl(layouts, heap, layout, bytes, &mut cursor, dst)? };
     if cursor != bytes.len() {
-        return Err(RuntimeError::BcsRemainingInput {
+        return Err(RuntimeError::BCSRemainingInput {
             remaining: bytes.len().saturating_sub(cursor),
         }
         .into());
@@ -479,11 +507,14 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
 unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
     heap: &mut Heap,
-    layout: &TypeLayout,
+    layout: &ValueLayout,
     bytes: &[u8],
     cursor: &mut usize,
     dst: *mut u8,
 ) -> AllocationResult<()> {
+    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // to a non-recursive form to bound stack depth on deeply nested values.
+    //
     // If no padding or no pointers, value's BCS bytes are exactly its
     // in-memory image.
     // TODO(correctness): breaks on big-endian hosts. This writes the
@@ -499,7 +530,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     }
 
     match &layout.kind {
-        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => {
+        LayoutKind::Bool
+        | LayoutKind::UnsignedInt
+        | LayoutKind::SignedInt
+        | LayoutKind::Address => {
             Err(unreachable("Primitive layouts must be handled by fast-path").into())
         },
         LayoutKind::Struct { fields } => {
@@ -527,7 +561,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
         } => {
             let len = read_uleb128_len(bytes, cursor)?;
             if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
-                return Err(RuntimeError::BcsSequenceTooLong { len }.into());
+                return Err(RuntimeError::BCSSequenceTooLong { len }.into());
             }
             if len == 0 {
                 // The empty vector is the null pointer.
@@ -633,14 +667,17 @@ unsafe fn bytes_cmp(a: *const u8, b: *const u8, n: usize) -> Ordering {
 /// Borrows the next `n` bytes, advancing the cursor. Returns an error if
 /// there is not enough bytes to read or the size of the slice overflows.
 fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> RuntimeResult<&'b [u8]> {
-    let end = cursor.checked_add(n).ok_or_else(|| RuntimeError::BcsEof)?;
+    let end = cursor.checked_add(n).ok_or_else(|| RuntimeError::BCSEof)?;
     if end > bytes.len() {
-        return Err(RuntimeError::BcsEof);
+        return Err(RuntimeError::BCSEof);
     }
     let slice = &bytes[*cursor..end];
     *cursor = end;
     Ok(slice)
 }
+
+// TODO: See if we can reuse move-binary-format's uleb128 APIs instead of
+// reimplementing the encode/decode here.
 
 /// Writes ULEB128-encoded length data.
 fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
@@ -665,7 +702,7 @@ fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> RuntimeResult<u64> {
     let mut result = 0u64;
     let mut shift = 0u32;
     loop {
-        let byte = *bytes.get(*cursor).ok_or_else(|| RuntimeError::BcsEof)?;
+        let byte = *bytes.get(*cursor).ok_or_else(|| RuntimeError::BCSEof)?;
         *cursor += 1;
 
         let cur = (byte & 0x7F) as u64;
@@ -673,13 +710,13 @@ fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> RuntimeResult<u64> {
         // shift count is out of range, or the high bits would be truncated (e.g.
         // a terminal `0x02` on the 10th byte where `shift == 63`).
         if shift >= 64 || (cur << shift) >> shift != cur {
-            return Err(RuntimeError::BcsInvalidUleb);
+            return Err(RuntimeError::BCSInvalidUleb);
         }
         result |= cur << shift;
         if byte & 0x80 == 0 {
             // Reject a non-minimal encoding (a trailing zero continuation).
             if byte == 0 && shift != 0 {
-                return Err(RuntimeError::BcsInvalidUleb);
+                return Err(RuntimeError::BCSInvalidUleb);
             }
             return Ok(result);
         }
@@ -689,7 +726,7 @@ fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> RuntimeResult<u64> {
 
 /// Invariant violation error when layout is not available during value walk.
 fn layout_not_found() -> RuntimeError {
-    RuntimeError::InvariantViolation(RuntimeInvariantViolation::TypeLayoutNotFound)
+    RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
 }
 
 /// An invariant violation for an unreachable state.
@@ -702,9 +739,9 @@ mod tests {
     use super::*;
     use crate::heap::AllocationError;
     use mono_move_core::{
-        type_layout::{U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
         types::U64_TY,
-        DescriptorId, FieldTypeLayout, LayoutFlags, LayoutId, TypeLayoutTable,
+        value_layout::{U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
+        DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
     };
     use serde::Serialize;
     use std::mem::{offset_of, size_of};
@@ -713,14 +750,14 @@ mod tests {
         x as *const T as *const u8
     }
 
-    fn vector_layout(elem_id: LayoutId) -> TypeLayout {
-        TypeLayout::vector(elem_id, DescriptorId(2))
+    fn vector_layout(elem_id: LayoutId) -> ValueLayout {
+        ValueLayout::vector(elem_id, DescriptorId(2))
     }
 
     #[test]
     fn deserialize_empty_vector_is_null() {
         let mut heap = Heap::new(4096);
-        let table = TypeLayoutTable::new();
+        let table = ValueLayoutTable::new();
         let layout = vector_layout(U8_LAYOUT_ID);
         let bytes = [0u8]; // ULEB len 0.
         let mut slot = 0u64;
@@ -742,7 +779,7 @@ mod tests {
 
     #[test]
     fn deserialize_out_of_heap_memory_errors() {
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let vid = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
         let layout = table.layout(vid).unwrap();
         // The vector for 1000 u64s far exceeds this heap, so allocation fails.
@@ -800,7 +837,7 @@ mod tests {
         let mut cursor = 0;
         assert!(matches!(
             read_uleb128_len(&bytes, &mut cursor),
-            Err(RuntimeError::BcsInvalidUleb)
+            Err(RuntimeError::BCSInvalidUleb)
         ));
     }
 
@@ -813,7 +850,7 @@ mod tests {
         let mut cursor = 0;
         assert!(matches!(
             read_uleb128_len(&bytes, &mut cursor),
-            Err(RuntimeError::BcsInvalidUleb)
+            Err(RuntimeError::BCSInvalidUleb)
         ));
     }
 
@@ -824,7 +861,7 @@ mod tests {
         let mut cursor = 0;
         assert!(matches!(
             read_uleb128_len(&bytes, &mut cursor),
-            Err(RuntimeError::BcsInvalidUleb)
+            Err(RuntimeError::BCSInvalidUleb)
         ));
     }
 
@@ -835,14 +872,14 @@ mod tests {
         let mut cursor = 0;
         assert!(matches!(
             read_uleb128_len(&bytes, &mut cursor),
-            Err(RuntimeError::BcsEof)
+            Err(RuntimeError::BCSEof)
         ));
     }
 
     #[test]
     fn deserialize_rejects_trailing_bytes() {
-        let mut table = TypeLayoutTable::new();
-        table.push(U64_TY, TypeLayout::u64());
+        let mut table = ValueLayoutTable::new();
+        table.push(U64_TY, ValueLayout::u64());
         let mut heap = Heap::new(4096);
 
         let mut bytes = bcs::to_bytes(&7u64).unwrap();
@@ -860,7 +897,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(AllocationError::RuntimeError(
-                RuntimeError::BcsRemainingInput { remaining: 1 }
+                RuntimeError::BCSRemainingInput { remaining: 1 }
             ))
         ));
     }
@@ -868,14 +905,14 @@ mod tests {
     /// Builds a struct layout from field offsets/ids and the in-memory size,
     /// deriving the const BCS size and no-padding flag as the specializer does.
     fn build_struct_layout(
-        table: &TypeLayoutTable,
+        table: &ValueLayoutTable,
         size: u32,
         fields: Vec<(u32, LayoutId)>,
-    ) -> TypeLayout {
+    ) -> ValueLayout {
         let mut const_total = 0u64;
         let mut data_dependent = false;
         for &(_, id) in &fields {
-            match table.layout(id).unwrap().const_serialized_size() {
+            match table.layout(id).unwrap().fixed_serialized_size() {
                 Some(n) => const_total += n as u64,
                 None => data_dependent = true,
             }
@@ -887,10 +924,10 @@ mod tests {
         }
         let field_layouts = fields
             .into_iter()
-            .map(|(offset, id)| FieldTypeLayout { offset, id })
+            .map(|(offset, id)| FieldValueLayout { offset, id })
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        TypeLayout::struct_layout(size, 8, const_bcs, flags, field_layouts)
+        ValueLayout::struct_layout(size, 8, const_bcs, flags, field_layouts)
     }
 
     /// Checks the walks for a fixed-size struct against the Rust oracle:
@@ -902,7 +939,7 @@ mod tests {
     /// Every value must match the layout at `id`, and `size` must be that
     /// layout's in-memory size.
     unsafe fn check_struct<S: Serialize + Ord>(
-        table: &TypeLayoutTable,
+        table: &ValueLayoutTable,
         id: LayoutId,
         values: &[S],
         size: usize,
@@ -912,7 +949,7 @@ mod tests {
 
         // Const size is the packed BCS size; blittable iff that equals the
         // in-memory size.
-        assert_eq!(layout.const_serialized_size(), Some(bcs_len as u32));
+        assert_eq!(layout.fixed_serialized_size(), Some(bcs_len as u32));
         assert_eq!(layout.has_no_pointers_no_padding(), bcs_len == size);
 
         for x in values {
@@ -969,13 +1006,13 @@ mod tests {
             b: u64,
         }
 
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let layout = build_struct_layout(&table, size_of::<S>() as u32, vec![
             (offset_of!(S, a) as u32, U8_LAYOUT_ID),
             (offset_of!(S, b) as u32, U64_LAYOUT_ID),
         ]);
         // In-memory 16, BCS 9 (7 bytes padding), so not blittable.
-        assert_eq!(layout.const_serialized_size(), Some(9));
+        assert_eq!(layout.fixed_serialized_size(), Some(9));
         assert!(!layout.has_no_pointers_no_padding());
 
         let id = table.push(U64_TY, layout);
@@ -1001,13 +1038,13 @@ mod tests {
             b: u64,
         }
 
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let layout = build_struct_layout(&table, size_of::<S>() as u32, vec![
             (offset_of!(S, a) as u32, U64_LAYOUT_ID),
             (offset_of!(S, b) as u32, U64_LAYOUT_ID),
         ]);
         // No padding: BCS 16 equals in-memory 16, so blittable.
-        assert_eq!(layout.const_serialized_size(), Some(16));
+        assert_eq!(layout.fixed_serialized_size(), Some(16));
         assert!(layout.has_no_pointers_no_padding());
 
         let id = table.push(U64_TY, layout);
@@ -1035,13 +1072,13 @@ mod tests {
             c: u64,
         }
 
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let layout = build_struct_layout(&table, size_of::<S>() as u32, vec![
             (offset_of!(S, a) as u32, U16_LAYOUT_ID),
             (offset_of!(S, b) as u32, U8_LAYOUT_ID),
             (offset_of!(S, c) as u32, U64_LAYOUT_ID),
         ]);
-        assert_eq!(layout.const_serialized_size(), Some(11));
+        assert_eq!(layout.fixed_serialized_size(), Some(11));
         assert!(!layout.has_no_pointers_no_padding());
 
         let id = table.push(U64_TY, layout);
@@ -1075,7 +1112,7 @@ mod tests {
             y: u8,
         }
 
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let inner = build_struct_layout(&table, size_of::<Inner>() as u32, vec![
             (offset_of!(Inner, a) as u32, U64_LAYOUT_ID),
             (offset_of!(Inner, b) as u32, U64_LAYOUT_ID),
@@ -1088,7 +1125,7 @@ mod tests {
         ]);
         // Outer is BCS 17, size 24 (trailing pad): a blittable child (Inner)
         // does not make the parent blittable.
-        assert_eq!(outer.const_serialized_size(), Some(17));
+        assert_eq!(outer.fixed_serialized_size(), Some(17));
         assert!(!outer.has_no_pointers_no_padding());
 
         let id = table.push(U64_TY, outer);
@@ -1126,7 +1163,7 @@ mod tests {
     ///
     /// `id` and `size` must be the layout and in-memory size matching `S`.
     unsafe fn check_roundtrip<S: Serialize + Ord>(
-        table: &TypeLayoutTable,
+        table: &ValueLayoutTable,
         id: LayoutId,
         size: usize,
         values: &[S],
@@ -1174,9 +1211,9 @@ mod tests {
 
     #[test]
     fn test_vector_u64() {
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let vid = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
-        assert_eq!(table.layout(vid).unwrap().const_serialized_size(), None);
+        assert_eq!(table.layout(vid).unwrap().fixed_serialized_size(), None);
         let values: [Vec<u64>; 7] = [
             vec![],
             vec![1],
@@ -1191,7 +1228,7 @@ mod tests {
 
     #[test]
     fn test_vector_u8() {
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let vid = table.push(U64_TY, vector_layout(U8_LAYOUT_ID));
         let values = vec![
             vec![],
@@ -1206,7 +1243,7 @@ mod tests {
 
     #[test]
     fn test_vector_nested() {
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         // `vector<vector<u64>>`: the element is a vector pointer (not
         // blittable), so the walks recurse per element.
         let inner_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
@@ -1233,7 +1270,7 @@ mod tests {
             v: u64,
         }
 
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let kv_layout = build_struct_layout(&table, size_of::<Kv>() as u32, vec![
             (offset_of!(Kv, k) as u32, U8_LAYOUT_ID),
             (offset_of!(Kv, v) as u32, U64_LAYOUT_ID),
@@ -1262,12 +1299,12 @@ mod tests {
             items: Vec<u64>,
         }
 
-        let mut table = TypeLayoutTable::new();
+        let mut table = ValueLayoutTable::new();
         let vec_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
         let bag_layout = build_struct_layout(&table, 16, vec![(0, U64_LAYOUT_ID), (8, vec_id)]);
         let id = table.push(U64_TY, bag_layout);
         // The vector field makes the struct data-dependent and not blittable.
-        assert_eq!(table.layout(id).unwrap().const_serialized_size(), None);
+        assert_eq!(table.layout(id).unwrap().fixed_serialized_size(), None);
         assert!(!table.layout(id).unwrap().has_no_pointers_no_padding());
 
         let values: [Bag; 5] = [
@@ -1304,7 +1341,7 @@ mod prop_tests {
             ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY, U128_TY, U16_TY,
             U256_TY, U32_TY, U64_TY, U8_TY,
         },
-        TypeLayoutTable,
+        ValueLayoutTable,
     };
     use move_core_types::{
         account_address::AccountAddress,
@@ -1317,7 +1354,7 @@ mod prop_tests {
             proptest! {
                 #[test]
                 fn $name(x in $strat, y in $strat) {
-                    let table = TypeLayoutTable::new();
+                    let table = ValueLayoutTable::new();
                     let mut heap = Heap::new(128);
                     let size = std::mem::size_of::<$t>();
                     let bytes = bcs::to_bytes(&x).unwrap();
@@ -1325,8 +1362,8 @@ mod prop_tests {
 
                     // Constant serialized size is the fixed width.
                     prop_assert_eq!(
-                        const_serialized_size(&table, $ty).unwrap(),
-                        Some(size as u32)
+                        fixed_serialized_size(&table, $ty).unwrap(),
+                        Some(size)
                     );
 
                     let px = &x as *const $t as *const u8;
