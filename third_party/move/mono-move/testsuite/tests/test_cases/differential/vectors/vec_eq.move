@@ -22,6 +22,19 @@ module 0x1::test {
     fun cmp(a0: u64, a1: u64, b0: u64, b1: u64): u64 {
         if (build(a0, a1) == build(b0, b1)) { 10 } else { 42 }
     }
+
+    // Equality through references to vectors (exercises `ValueRefCmp`).
+    fun eq_ref(a0: u64, a1: u64, b0: u64, b1: u64): bool {
+        let a = build(a0, a1);
+        let b = build(b0, b1);
+        &a == &b
+    }
+
+    fun neq_ref(a0: u64, a1: u64, b0: u64, b1: u64): bool {
+        let a = build(a0, a1);
+        let b = build(b0, b1);
+        &a != &b
+    }
 }
 
 // RUN: execute 0x1::test::eq --args 1, 2, 1, 2
@@ -38,3 +51,15 @@ module 0x1::test {
 
 // RUN: execute 0x1::test::cmp --args 5, 6, 5, 7
 // CHECK: results: 42
+
+// RUN: execute 0x1::test::eq_ref --args 1, 2, 1, 2
+// CHECK: results: true
+
+// RUN: execute 0x1::test::eq_ref --args 1, 2, 1, 9
+// CHECK: results: false
+
+// RUN: execute 0x1::test::neq_ref --args 1, 2, 1, 9
+// CHECK: results: true
+
+// RUN: execute 0x1::test::neq_ref --args 3, 4, 3, 4
+// CHECK: results: false

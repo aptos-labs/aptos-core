@@ -532,8 +532,10 @@ pub enum MicroOp {
     /// `dst = (lhs <op> rhs)`, writing a 1-byte boolean. See [`IntCmpOp`].
     IntCmp(IntCmpOp),
 
-    /// `dst = (lhs == rhs)` (or `!=`), a structural equality over inline
-    /// values. `lhs`/`rhs` hold the values directly. See [`ValueCmpOp`].
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality over aggregate
+    /// values (vectors, structs). `lhs`/`rhs` are the operand slots; a vector
+    /// slot holds a pointer to its heap data, which the comparison reads
+    /// through. See [`ValueCmpOp`].
     ValueCmp(ValueCmpOp),
 
     /// `dst = (lhs == rhs)` (or `!=`), a structural equality where `lhs`/`rhs`

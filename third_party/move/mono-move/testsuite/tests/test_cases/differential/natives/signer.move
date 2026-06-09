@@ -1,8 +1,7 @@
 // Differential test for the signer natives.
 
-// `create_signer` is declared here for two reasons:
-// 1. To avoid pulling in the Aptos Framework, which is a bit more heavy weight for now
-// 2. The version defined in the Aptos Framework is public(friend) so we can't use it anyway
+// `create_signer` is declared here to avoid pulling in the Aptos Framework,
+// which is a bit more heavy weight for now.
 
 // RUN: publish
 module 0x1::create_signer {

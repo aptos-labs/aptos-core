@@ -624,7 +624,7 @@ impl<'a> LoweringState<'a> {
                                 let rhs = cmp_operand_from_slot(lhs_ty, rhs)?;
                                 self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
                             },
-                            EqKind::Value => {
+                            EqKind::NonIntValue => {
                                 self.emit(MicroOp::ValueCmp(ValueCmpOp {
                                     negate: eq_negate(*cmp)?,
                                     dst,
@@ -957,7 +957,7 @@ impl<'a> LoweringState<'a> {
                             let rhs_op = cmp_operand_from_slot(lhs_ty, rhs_off)?;
                             self.emit_jump_int_cmp(target, *op, lhs_off, rhs_op)?;
                         },
-                        EqKind::Value => {
+                        EqKind::NonIntValue => {
                             self.emit(MicroOp::JumpValueCmp(JumpValueCmpOp {
                                 target,
                                 negate: eq_negate(*op)?,
@@ -1643,7 +1643,7 @@ enum EqKind {
     /// Integer comparison.
     Int,
     /// Non-integer structural comparison.
-    Value,
+    NonIntValue,
     /// Reference: compared structurally through the pointer.
     Ref,
 }
@@ -1667,7 +1667,7 @@ fn eq_kind(ty: &Type) -> Result<EqKind> {
         | Type::I64
         | Type::I128
         | Type::I256 => EqKind::Int,
-        Type::Vector { .. } | Type::Nominal { .. } => EqKind::Value,
+        Type::Vector { .. } | Type::Nominal { .. } => EqKind::NonIntValue,
         Type::ImmutRef { .. } | Type::MutRef { .. } => EqKind::Ref,
         Type::Function { .. } | Type::TypeParam { .. } => {
             bail!("equality is not supported for this operand type")
@@ -1688,14 +1688,15 @@ fn eq_negate(op: CmpOp) -> Result<bool> {
 }
 
 /// Build an [`IntOperand`] for a comparison operand. Integer types delegate to
-/// [`int_operand_from_slot`]. `bool` (1 byte) and `address` (32 bytes) are
-/// flat values with only `==`/`!=` (no ordering), and comparing their bit
-/// patterns is exactly value equality, so they reuse the integer compare ops
-/// at the matching width.
+/// [`int_operand_from_slot`]. `bool` (1 byte), `address` and `signer` (both 32
+/// bytes) are flat values with only `==`/`!=` (no ordering), and comparing
+/// their bit patterns is exactly value equality, so they reuse the integer
+/// compare ops at the matching width.
 fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
     match ty {
         Type::Bool => Ok(IntOperand::SlotU8(off)),
-        Type::Address => Ok(IntOperand::SlotU256(off)),
+        // A signer holds an address, so it compares as a 32-byte value.
+        Type::Address | Type::Signer => Ok(IntOperand::SlotU256(off)),
         Type::U8
         | Type::U16
         | Type::U32
@@ -1708,8 +1709,7 @@ fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
         | Type::I64
         | Type::I128
         | Type::I256 => int_operand_from_slot(ty, off),
-        Type::Signer
-        | Type::ImmutRef { .. }
+        Type::ImmutRef { .. }
         | Type::MutRef { .. }
         | Type::Vector { .. }
         | Type::Nominal { .. }

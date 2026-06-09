@@ -392,10 +392,11 @@ pub struct JumpIntCmpOp {
     pub rhs: IntOperand,
 }
 
-/// `dst = (lhs == rhs)` (or `!=` when `negate`) for a structural equality of
-/// two values held **inline** at `lhs`/`rhs`, producing a 1-byte boolean. Used
-/// for aggregate types (vectors, structs) — everything that is not a flat
-/// scalar handled by [`IntCmpOp`].
+/// `dst = (lhs == rhs)` (or `!=` when `negate`), a structural equality over
+/// the aggregate values at `lhs`/`rhs`, producing a 1-byte boolean. Used for
+/// aggregate types (vectors, structs) — everything that is not a flat scalar
+/// handled by [`IntCmpOp`]. A vector slot holds a pointer to its heap data,
+/// which the comparison reads through.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ValueCmpOp {
     pub negate: bool,

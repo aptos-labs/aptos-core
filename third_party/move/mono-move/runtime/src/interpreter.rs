@@ -852,7 +852,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::JumpValueCmp(ref op) => {
-                    // Operands are values held inline at their slots.
+                    // Operands are the aggregate values at their slots; a
+                    // vector slot holds a pointer read through to its heap data.
                     let a = fp.add(op.lhs.into());
                     let b = fp.add(op.rhs.into());
                     let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
@@ -1532,7 +1533,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     write_u8(fp, op.dst, result as u8);
                 },
                 MicroOp::ValueCmp(ref op) => {
-                    // Operands are values held inline at their slots.
+                    // Operands are the aggregate values at their slots; a
+                    // vector slot holds a pointer read through to its heap data.
                     let a = fp.add(op.lhs.into());
                     let b = fp.add(op.rhs.into());
                     let eq = value_utils::equals(&*self.exec_ctx, a, b, op.ty)?;
@@ -1584,7 +1586,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         // and is writable (no aliasing to the heap).
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
-            if let Err(err) = value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+            if let Err(err) =
+                value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
             {
                 match err {
                     AllocationError::RuntimeError(err) => return Err(err),

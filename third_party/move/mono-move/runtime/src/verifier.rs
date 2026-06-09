@@ -11,9 +11,12 @@
 //! publish time.
 
 use mono_move_core::{
-    captured_values_size, native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset,
-    DescriptorId, DescriptorProvider, FrameOffset, Function, IntBinaryOp, MicroOp,
-    ObjectDescriptorInner, PackClosureOp, ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    captured_values_size,
+    native::NativeABI,
+    types::{view_type, InternedType},
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
+    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
+    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -403,7 +406,9 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             MicroOp::ValueCmp(ref op) => {
-                // TODO: We should check frame access based on the size from the type?
+                let size = self.type_size(pc, op.ty);
+                self.check_frame_access(Some(pc), op.lhs, size);
+                self.check_frame_access(Some(pc), op.rhs, size);
                 self.check_frame_access_1(pc, op.dst);
             },
             MicroOp::ValueRefCmp(ref op) => {
@@ -455,7 +460,9 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             MicroOp::JumpValueCmp(ref op) => {
-                // TODO: We should check frame access based on the size from the type?
+                let size = self.type_size(pc, op.ty);
+                self.check_frame_access(Some(pc), op.lhs, size);
+                self.check_frame_access(Some(pc), op.rhs, size);
                 self.check_jump(pc, op.target);
             },
             MicroOp::JumpValueRefCmp(ref op) => {
@@ -984,6 +991,25 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                     offset, end, meta_start, meta_end
                 ),
             );
+        }
+    }
+
+    /// In-memory byte width of a value-comparison operand. The compared value
+    /// occupies this many bytes at its slot; for vectors the slot holds an
+    /// 8-byte pointer that the comparison reads through. Records an error and
+    /// returns `0` when the type's layout is unavailable, so the caller's
+    /// bounds check still fails the function (via the recorded error) rather
+    /// than passing on an unknown size.
+    fn type_size(&mut self, pc: usize, ty: InternedType) -> u32 {
+        match view_type(ty).size_and_align() {
+            Some((size, _align)) => size,
+            None => {
+                self.err(
+                    Some(pc),
+                    "value comparison operand type has no known layout",
+                );
+                0
+            },
         }
     }
 
