@@ -43,8 +43,24 @@ use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    thread,
     time::Instant,
 };
+
+/// Number of concurrent key-hash sub-ranges scanned per shard when loading hot state on restart.
+/// The scan is dominated by random SST seeks, so on a cold restart it is I/O-latency-bound;
+/// splitting a shard into more concurrent scans than there are shards raises the read queue depth.
+/// Must divide the 16 low-nibble values evenly so the (uniformly distributed) hashes spread across
+/// balanced ranges.
+const NUM_HOT_LOAD_SUBSCANS: usize = 4;
+const _: () = assert!(
+    NUM_STATE_SHARDS == 16,
+    "hot-state sub-range math treats the shard as the high nibble of byte 0",
+);
+const _: () = assert!(
+    16 % NUM_HOT_LOAD_SUBSCANS == 0,
+    "hot-state sub-scans must divide the 16 low-nibble values evenly",
+);
 
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
@@ -440,10 +456,39 @@ impl StateKvDb {
 
         let start = Instant::now();
 
-        let shards: [_; NUM_STATE_SHARDS] = (0..NUM_STATE_SHARDS)
+        // Scan each shard's key-hash space in NUM_HOT_LOAD_SUBSCANS contiguous ranges concurrently.
+        // The scan is I/O-latency-bound on a cold restart (one random seek per live key), so we run
+        // it on dedicated threads rather than the rayon pool (sized to the core count) to let the
+        // blocking scans oversubscribe and raise the read queue depth.
+        let mut per_shard_entries: [Vec<(HashValue, Version, StateSlotKind)>; NUM_STATE_SHARDS] =
+            std::array::from_fn(|_| Vec::new());
+        thread::scope(|scope| -> Result<()> {
+            let mut handles = Vec::with_capacity(NUM_STATE_SHARDS * NUM_HOT_LOAD_SUBSCANS);
+            for shard_id in 0..NUM_STATE_SHARDS {
+                for sub in 0..NUM_HOT_LOAD_SUBSCANS {
+                    let handle = thread::Builder::new()
+                        .name(format!("hot-load-{shard_id}-{sub}"))
+                        .spawn_scoped(scope, move || {
+                            self.scan_shard_range(shard_id, sub, snapshot_version)
+                        })
+                        .expect("Failed to spawn hot state load thread");
+                    handles.push((shard_id, handle));
+                }
+            }
+            for (shard_id, handle) in handles {
+                let entries = handle.join().expect("Hot state load thread panicked")?;
+                per_shard_entries[shard_id].extend(entries);
+            }
+            Ok(())
+        })?;
+
+        // Assembling the LRU chain (sort + DashMap build) is CPU-bound, so keep it on rayon.
+        let shards: [_; NUM_STATE_SHARDS] = per_shard_entries
+            .into_iter()
+            .collect::<Vec<_>>()
             .into_par_iter()
-            .map(|shard_id| self.load_shard(shard_id, snapshot_version))
-            .collect::<Result<Vec<_>>>()?
+            .map(Self::assemble_lru_chain)
+            .collect::<Vec<_>>()
             .try_into()
             .expect("Collected exactly NUM_STATE_SHARDS results");
 
@@ -460,14 +505,21 @@ impl StateKvDb {
         Ok(shards)
     }
 
-    fn load_shard(
-        &self,
-        shard_id: usize,
-        snapshot_version: Version,
-    ) -> Result<LoadedHotStateShard> {
-        let entries = self.scan_shard_entries(shard_id, snapshot_version)?;
-        let loaded = Self::assemble_lru_chain(entries);
-        Ok(loaded)
+    /// Returns the `[lo, hi)` key-hash bounds of sub-range `sub` within `shard_id`. A shard is the
+    /// high nibble of byte 0; its low nibble (16 values) is split into NUM_HOT_LOAD_SUBSCANS equal
+    /// groups. `hi == None` means "to the end of the shard" — the last sub-range of the last shard,
+    /// whose upper edge (0x100) overflows byte 0.
+    fn shard_subscan_bounds(shard_id: usize, sub: usize) -> (HashValue, Option<HashValue>) {
+        let span = 16 / NUM_HOT_LOAD_SUBSCANS;
+        let hash_with_byte0 = |byte0: usize| {
+            let mut bytes = [0u8; HashValue::LENGTH];
+            bytes[0] = byte0 as u8;
+            HashValue::new(bytes)
+        };
+        let lo = hash_with_byte0((shard_id << 4) + sub * span);
+        let hi_byte0 = (shard_id << 4) + (sub + 1) * span;
+        let hi = (hi_byte0 < 256).then(|| hash_with_byte0(hi_byte0));
+        (lo, hi)
     }
 
     fn next_key_hash(key_hash: HashValue) -> Option<HashValue> {
@@ -483,14 +535,17 @@ impl StateKvDb {
         None
     }
 
-    /// Scans a single shard DB and returns the most recent hot entry per key_hash as of
-    /// `snapshot_version`. Entries newer than the snapshot are skipped. Evicted keys are excluded.
-    /// The returned entries have uninitialized LRU pointers.
-    fn scan_shard_entries(
+    /// Scans one key-hash sub-range of a shard DB and returns the most recent hot entry per
+    /// key_hash as of `snapshot_version`. Entries newer than the snapshot are skipped. Evicted keys
+    /// are excluded. The returned entries have uninitialized LRU pointers.
+    fn scan_shard_range(
         &self,
         shard_id: usize,
+        sub: usize,
         snapshot_version: Version,
     ) -> Result<Vec<(HashValue, Version, StateSlotKind)>> {
+        let (lo, hi) = Self::shard_subscan_bounds(shard_id, sub);
+
         // Below we seek across key_hash boundaries to skip stale versions of a key. The CF has a
         // prefix bloom filter on key_hash (production config), so without total-order seek the
         // bloom excludes the SST for the absent next prefix and the scan stops after one key.
@@ -499,11 +554,16 @@ impl StateKvDb {
         let mut iter = self
             .db_shard(shard_id)
             .iter_with_opts::<HotStateValueByKeyHashSchema>(read_opts)?;
-        iter.seek_to_first();
+        iter.seek(&(lo, Version::MAX))?;
 
         let mut entries = Vec::new();
 
         while let Some(((key_hash, hot_since_version), entry_opt)) = iter.next().transpose()? {
+            // Stop once the scan crosses into the next sub-range.
+            if hi.is_some_and(|hi| key_hash >= hi) {
+                break;
+            }
+
             // Skip entries newer than the snapshot version — they will be replayed.
             if hot_since_version > snapshot_version {
                 continue;
