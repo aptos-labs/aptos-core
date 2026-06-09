@@ -1,0 +1,153 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+struct Point has copy + drop
+  x: u64
+  y: u64
+
+// Function definition at index 0
+fun cmp(l0: u64, l1: u64, l2: u64, l3: u64): u64
+    move_loc l0
+    move_loc l1
+    pack Point
+    move_loc l2
+    move_loc l3
+    // @5
+    pack Point
+    eq
+    br_false l0
+    ld_u64 10
+    ret
+    // @10
+l0: ld_u64 42
+    ret
+
+// Function definition at index 1
+fun eq(l0: u64, l1: u64, l2: u64, l3: u64): bool
+    move_loc l0
+    move_loc l1
+    pack Point
+    move_loc l2
+    move_loc l3
+    // @5
+    pack Point
+    eq
+    ret
+
+// Function definition at index 2
+fun neq(l0: u64, l1: u64, l2: u64, l3: u64): bool
+    move_loc l0
+    move_loc l1
+    pack Point
+    move_loc l2
+    move_loc l3
+    // @5
+    pack Point
+    neq
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun cmp(r0, r1, r2, r3): u64 {
+  slots: params(4), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: 0x1::test::Point
+    r5: 0x1::test::Point
+    r6: u64
+  code:
+  L2:
+    0: r4 := pack 0x1::test::Point, [r0, r1]
+    1: r5 := pack 0x1::test::Point, [r2, r3]
+    2: br_neq L0, r4, r5
+  L1:
+    3: r6 := ld_u64 10
+    4: ret [r6]
+  L0:
+    5: r6 := ld_u64 42
+    6: ret [r6]
+}
+
+fun eq(r0, r1, r2, r3): bool {
+  slots: params(4), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: 0x1::test::Point
+    r5: 0x1::test::Point
+    r6: bool
+  code:
+  L0:
+    0: r4 := pack 0x1::test::Point, [r0, r1]
+    1: r5 := pack 0x1::test::Point, [r2, r3]
+    2: r6 := eq r4, r5
+    3: ret [r6]
+}
+
+fun neq(r0, r1, r2, r3): bool {
+  slots: params(4), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: 0x1::test::Point
+    r5: 0x1::test::Point
+    r6: bool
+  code:
+  L0:
+    0: r4 := pack 0x1::test::Point, [r0, r1]
+    1: r5 := pack 0x1::test::Point, [r2, r3]
+    2: r6 := neq r4, r5
+    3: ret [r6]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun cmp() {
+  frame_data_size: 72
+  code:
+    0: Charge #14
+    1: Move8 [40] <- [8]
+    2: Move8 [32] <- [0]
+    3: Move8 [56] <- [24]
+    4: Move8 [48] <- [16]
+    5: JumpValueCmp @10 [32] != [48] : 0x1::test::Point
+    6: Charge #6
+    7: StoreImm8 [64] <- #10
+    8: Move8 [0] <- [64]
+    9: Return
+    10: Charge #6
+    11: StoreImm8 [64] <- #42
+    12: Move8 [0] <- [64]
+    13: Return
+}
+
+fun eq() {
+  frame_data_size: 72
+  code:
+    0: Charge #21
+    1: Move8 [40] <- [8]
+    2: Move8 [32] <- [0]
+    3: Move8 [56] <- [24]
+    4: Move8 [48] <- [16]
+    5: ValueCmp [64] <- [32] == [48] : 0x1::test::Point
+    6: Move(1) [0] <- [64]
+    7: Return
+}
+
+fun neq() {
+  frame_data_size: 72
+  code:
+    0: Charge #21
+    1: Move8 [40] <- [8]
+    2: Move8 [32] <- [0]
+    3: Move8 [56] <- [24]
+    4: Move8 [48] <- [16]
+    5: ValueCmp [64] <- [32] != [48] : 0x1::test::Point
+    6: Move(1) [0] <- [64]
+    7: Return
+}

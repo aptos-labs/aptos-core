@@ -17,8 +17,9 @@ use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp,
-    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, MicroOp,
-    PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, FRAME_METADATA_SIZE,
+    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp,
+    JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, ValueCmpOp,
+    ValueRefCmpOp, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::{ConstantPoolIndex, FieldHandleIndex};
 
@@ -521,7 +522,8 @@ impl<'a> LoweringState<'a> {
                 let lhs_info = self.slot(*lhs)?;
                 let rhs_info = self.slot(*rhs)?;
                 let dst_info = self.def_slot(*dst)?;
-                let lhs_ty = self.slot_type(*lhs)?;
+                let lhs_interned = self.slot_interned_type(*lhs)?;
+                let lhs_ty = view_type(lhs_interned);
                 let dst = dst_info.offset;
                 let lhs = lhs_info.offset;
                 let rhs = rhs_info.offset;
@@ -617,9 +619,29 @@ impl<'a> LoweringState<'a> {
                             })?;
                         },
                         // Comparison produces a 1-byte boolean.
-                        BinaryOp::Cmp(cmp) => {
-                            let rhs = cmp_operand_from_slot(lhs_ty, rhs)?;
-                            self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
+                        BinaryOp::Cmp(cmp) => match eq_kind(lhs_ty)? {
+                            EqKind::Int => {
+                                let rhs = cmp_operand_from_slot(lhs_ty, rhs)?;
+                                self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
+                            },
+                            EqKind::NonIntValue => {
+                                self.emit(MicroOp::ValueCmp(ValueCmpOp {
+                                    negate: eq_negate(*cmp)?,
+                                    dst,
+                                    lhs,
+                                    rhs,
+                                    ty: lhs_interned,
+                                }))?;
+                            },
+                            EqKind::Ref => {
+                                self.emit(MicroOp::ValueRefCmp(ValueRefCmpOp {
+                                    negate: eq_negate(*cmp)?,
+                                    dst,
+                                    lhs,
+                                    rhs,
+                                    ty: strip_ref(lhs_interned)?,
+                                }))?;
+                            },
                         },
                         // Logical and/or on 1-byte booleans.
                         BinaryOp::And => self.emit(MicroOp::BoolAnd { dst, lhs, rhs })?,
@@ -891,8 +913,10 @@ impl<'a> LoweringState<'a> {
 
             // --- Fused compare+branch ---
             Instr::BrCmp(Label(l), op, lhs, rhs) => {
-                let lhs_ty = self.slot_type(*lhs)?;
-                let lhs_off = self.slot(*lhs)?.offset;
+                let lhs_interned = self.slot_interned_type(*lhs)?;
+                let lhs_ty = view_type(lhs_interned);
+                let lhs_info = self.slot(*lhs)?;
+                let lhs_off = lhs_info.offset;
                 let rhs_off = self.slot(*rhs)?.offset;
                 let target = CodeOffset(encode_label(*l));
                 let idx = self.out_buf.len();
@@ -928,9 +952,29 @@ impl<'a> LoweringState<'a> {
                         lhs: lhs_off,
                         rhs: rhs_off,
                     })?,
-                    _ => {
-                        let rhs_op = cmp_operand_from_slot(lhs_ty, rhs_off)?;
-                        self.emit_jump_int_cmp(target, *op, lhs_off, rhs_op)?;
+                    _ => match eq_kind(lhs_ty)? {
+                        EqKind::Int => {
+                            let rhs_op = cmp_operand_from_slot(lhs_ty, rhs_off)?;
+                            self.emit_jump_int_cmp(target, *op, lhs_off, rhs_op)?;
+                        },
+                        EqKind::NonIntValue => {
+                            self.emit(MicroOp::JumpValueCmp(JumpValueCmpOp {
+                                target,
+                                negate: eq_negate(*op)?,
+                                lhs: lhs_off,
+                                rhs: rhs_off,
+                                ty: lhs_interned,
+                            }))?;
+                        },
+                        EqKind::Ref => {
+                            self.emit(MicroOp::JumpValueRefCmp(JumpValueRefCmpOp {
+                                target,
+                                negate: eq_negate(*op)?,
+                                lhs: lhs_off,
+                                rhs: rhs_off,
+                                ty: strip_ref(lhs_interned)?,
+                            }))?;
+                        },
                     },
                 }
             },
@@ -1499,6 +1543,8 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0,
                 MicroOp::JumpIntCmp(op) => op.target.0,
+                MicroOp::JumpValueCmp(op) => op.target.0,
+                MicroOp::JumpValueRefCmp(op) => op.target.0,
                 other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             };
             let label = decode_label(encoded);
@@ -1516,6 +1562,8 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0 = resolved,
                 MicroOp::JumpIntCmp(op) => op.target.0 = resolved,
+                MicroOp::JumpValueCmp(op) => op.target.0 = resolved,
+                MicroOp::JumpValueRefCmp(op) => op.target.0 = resolved,
                 other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             }
         }
@@ -1591,15 +1639,64 @@ fn cmp_kind(op: CmpOp) -> CmpKind {
     }
 }
 
+enum EqKind {
+    /// Integer comparison.
+    Int,
+    /// Non-integer structural comparison.
+    NonIntValue,
+    /// Reference: compared structurally through the pointer.
+    Ref,
+}
+
+/// Classify how an equality operand of the given type is lowered.
+fn eq_kind(ty: &Type) -> Result<EqKind> {
+    Ok(match ty {
+        Type::Bool
+        | Type::Address
+        // Signers are just addresses.
+        | Type::Signer
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256 => EqKind::Int,
+        Type::Vector { .. } | Type::Nominal { .. } => EqKind::NonIntValue,
+        Type::ImmutRef { .. } | Type::MutRef { .. } => EqKind::Ref,
+        Type::Function { .. } | Type::TypeParam { .. } => {
+            bail!("equality is not supported for this operand type")
+        },
+    })
+}
+
+/// Map an equality [`CmpOp`] to the `negate` flag of the structural-equality
+/// ops (`false` for `Eq`, `true` for `Neq`).
+fn eq_negate(op: CmpOp) -> Result<bool> {
+    match op {
+        CmpOp::Eq => Ok(false),
+        CmpOp::Neq => Ok(true),
+        CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
+            bail!("ordering comparison on a non-scalar operand is ill-typed")
+        },
+    }
+}
+
 /// Build an [`IntOperand`] for a comparison operand. Integer types delegate to
-/// [`int_operand_from_slot`]. `bool` (1 byte) and `address` (32 bytes) are
-/// flat values with only `==`/`!=` (no ordering), and comparing their bit
-/// patterns is exactly value equality, so they reuse the integer compare ops
-/// at the matching width.
+/// [`int_operand_from_slot`]. `bool` (1 byte), `address` and `signer` (both 32
+/// bytes) are flat values with only `==`/`!=` (no ordering), and comparing
+/// their bit patterns is exactly value equality, so they reuse the integer
+/// compare ops at the matching width.
 fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
     match ty {
         Type::Bool => Ok(IntOperand::SlotU8(off)),
-        Type::Address => Ok(IntOperand::SlotU256(off)),
+        // A signer holds an address, so it compares as a 32-byte value.
+        Type::Address | Type::Signer => Ok(IntOperand::SlotU256(off)),
         Type::U8
         | Type::U16
         | Type::U32
@@ -1612,8 +1709,7 @@ fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
         | Type::I64
         | Type::I128
         | Type::I256 => int_operand_from_slot(ty, off),
-        Type::Signer
-        | Type::ImmutRef { .. }
+        Type::ImmutRef { .. }
         | Type::MutRef { .. }
         | Type::Vector { .. }
         | Type::Nominal { .. }

@@ -39,6 +39,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
             MicroOp::JumpIntCmp(op) => Some(op.target.0 as usize),
+            MicroOp::JumpValueCmp(op) => Some(op.target.0 as usize),
+            MicroOp::JumpValueRefCmp(op) => Some(op.target.0 as usize),
             MicroOp::StoreImm1 { .. }
             | MicroOp::StoreImm2 { .. }
             | MicroOp::StoreImm4 { .. }
@@ -115,6 +117,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::MoveFrom { .. }
             | MicroOp::MoveTo { .. }
             | MicroOp::IntCmp(_)
+            | MicroOp::ValueCmp(_)
+            | MicroOp::ValueRefCmp(_)
             | MicroOp::BoolNot { .. }
             | MicroOp::BoolAnd { .. }
             | MicroOp::BoolOr { .. } => None,
@@ -146,6 +150,14 @@ impl RemapTargets for MicroOp {
             MicroOp::JumpIntCmp(mut op) => {
                 op.target = co(op.target);
                 MicroOp::JumpIntCmp(op)
+            },
+            MicroOp::JumpValueCmp(mut op) => {
+                op.target = co(op.target);
+                MicroOp::JumpValueCmp(op)
+            },
+            MicroOp::JumpValueRefCmp(mut op) => {
+                op.target = co(op.target);
+                MicroOp::JumpValueRefCmp(op)
             },
             MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
                 MicroOp::JumpGreaterEqualU64Imm {
@@ -260,6 +272,8 @@ impl RemapTargets for MicroOp {
             | MicroOp::MoveFrom { .. }
             | MicroOp::MoveTo { .. }
             | MicroOp::IntCmp(_)
+            | MicroOp::ValueCmp(_)
+            | MicroOp::ValueRefCmp(_)
             | MicroOp::BoolNot { .. }
             | MicroOp::BoolAnd { .. }
             | MicroOp::BoolOr { .. }) => op,
@@ -328,6 +342,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
 
             // --- Comparison & boolean logic ---
             MicroOp::IntCmp(_) => 3,
+            MicroOp::ValueCmp(_) | MicroOp::ValueRefCmp(_) => 6,
             MicroOp::BoolNot { .. } | MicroOp::BoolAnd { .. } | MicroOp::BoolOr { .. } => 2,
 
             // --- Control flow ---
@@ -348,6 +363,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             | MicroOp::JumpLessU64 { .. }
             | MicroOp::JumpGreaterEqualU64 { .. }
             | MicroOp::JumpNotEqualU64 { .. } => 3,
+            MicroOp::JumpValueCmp(_) | MicroOp::JumpValueRefCmp(_) => 6,
 
             // --- Vector operations ---
             MicroOp::VecNew { .. } => 10,
