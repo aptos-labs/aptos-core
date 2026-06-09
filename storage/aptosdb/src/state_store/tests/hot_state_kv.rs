@@ -187,6 +187,29 @@ fn collect_lru_order(shard: &LoadedHotStateShard) -> Vec<(HashValue, Version)> {
     result
 }
 
+fn assert_hot_occupied(
+    shard: &LoadedHotStateShard,
+    key_hash: HashValue,
+    expected_hot_since_version: Version,
+    expected_value_version: Version,
+    expected_value: StateValue,
+) {
+    let slot = shard.map.get(&key_hash).unwrap();
+    match slot.kind() {
+        StateSlotKind::HotOccupied {
+            value_version,
+            value,
+            hot_since_version,
+            ..
+        } => {
+            assert_eq!(*hot_since_version, expected_hot_since_version);
+            assert_eq!(*value_version, expected_value_version);
+            assert_eq!(*value, expected_value);
+        },
+        other => panic!("Expected HotOccupied, got {other:?}"),
+    }
+}
+
 #[test]
 fn test_load_empty_db() {
     let tmp = TempPath::new();
@@ -276,6 +299,31 @@ fn test_load_occupied_and_vacant() {
     let slot_vac = shard_vac.map.get(&CryptoHash::hash(&key_vac)).unwrap();
     assert!(matches!(slot_vac.kind(), StateSlotKind::HotVacant { .. }));
     shard_vac.validate_lru_chain();
+}
+
+#[test]
+fn test_load_total_value_bytes() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key_occ = make_state_key(21);
+    let value = make_state_value(21);
+    put_hot_state_entry(
+        &db,
+        &key_occ,
+        100,
+        Some(HotStateEntry::Occupied {
+            value: value.clone(),
+            value_version: 50,
+        }),
+    );
+
+    let key_vac = make_state_key(22);
+    put_hot_state_entry(&db, &key_vac, 200, Some(HotStateEntry::Vacant));
+
+    let shards = db.load_hot_state_kvs(300).unwrap();
+    let total_value_bytes: usize = shards.iter().map(|shard| shard.total_value_bytes).sum();
+    assert_eq!(total_value_bytes, value.size());
 }
 
 #[test]
@@ -373,6 +421,82 @@ fn test_load_multiple_versions_same_key() {
 }
 
 #[test]
+fn test_load_skips_future_entry_and_falls_back_to_older_version() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(9);
+    let key_hash = CryptoHash::hash(&key);
+    put_hot_state_entry(
+        &db,
+        &key,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(91),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry(
+        &db,
+        &key,
+        20,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(92),
+            value_version: 15,
+        }),
+    );
+
+    let shards = db.load_hot_state_kvs(15).unwrap();
+    let shard = &shards[key.get_shard_id()];
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(91));
+    shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_snapshot_boundaries_across_eviction_and_reinsert() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(11);
+    let key_hash = CryptoHash::hash(&key);
+    let shard_id = key.get_shard_id();
+    put_hot_state_entry(
+        &db,
+        &key,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(111),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry(&db, &key, 20, None);
+    put_hot_state_entry(
+        &db,
+        &key,
+        30,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(112),
+            value_version: 25,
+        }),
+    );
+
+    let shards_at_15 = db.load_hot_state_kvs(15).unwrap();
+    let shard_at_15 = &shards_at_15[shard_id];
+    assert_hot_occupied(shard_at_15, key_hash, 10, 5, make_state_value(111));
+    shard_at_15.validate_lru_chain();
+
+    let shards_at_25 = db.load_hot_state_kvs(25).unwrap();
+    let shard_at_25 = &shards_at_25[shard_id];
+    assert!(!shard_at_25.map.contains_key(&key_hash));
+    shard_at_25.validate_lru_chain();
+
+    let shards_at_30 = db.load_hot_state_kvs(30).unwrap();
+    let shard_at_30 = &shards_at_30[shard_id];
+    assert_hot_occupied(shard_at_30, key_hash, 30, 25, make_state_value(112));
+    shard_at_30.validate_lru_chain();
+}
+
+#[test]
 fn test_load_evict_then_reinsert() {
     let tmp = TempPath::new();
     let db = create_hot_state_kv_db(&tmp);
@@ -466,6 +590,54 @@ fn test_load_lru_chain_ordering() {
             }
         }
     }
+}
+
+#[test]
+fn test_load_lru_chain_same_version_orders_by_key_hash() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let mut keys_by_shard: Vec<Vec<StateKey>> = (0..NUM_STATE_SHARDS).map(|_| Vec::new()).collect();
+    for seed in 0..=255u8 {
+        let key = make_state_key(seed);
+        keys_by_shard[key.get_shard_id()].push(key);
+    }
+
+    let (shard_id, mut keys) = keys_by_shard
+        .into_iter()
+        .enumerate()
+        .find(|(_, keys)| keys.len() >= 3)
+        .expect("at least one shard should have three keys");
+    keys.truncate(3);
+
+    for key in &keys {
+        put_hot_state_entry(
+            &db,
+            key,
+            100,
+            Some(HotStateEntry::Occupied {
+                value: make_state_value(100),
+                value_version: 50,
+            }),
+        );
+    }
+
+    let shards = db.load_hot_state_kvs(100).unwrap();
+    let shard = &shards[shard_id];
+    shard.validate_lru_chain();
+
+    let actual: Vec<_> = collect_lru_order(shard)
+        .into_iter()
+        .map(|(key_hash, hot_since_version)| {
+            assert_eq!(hot_since_version, 100);
+            key_hash
+        })
+        .collect();
+    let mut expected: Vec<_> = keys.iter().map(CryptoHash::hash).collect();
+    expected.sort();
+    expected.reverse();
+
+    assert_eq!(actual, expected);
 }
 
 #[test]
