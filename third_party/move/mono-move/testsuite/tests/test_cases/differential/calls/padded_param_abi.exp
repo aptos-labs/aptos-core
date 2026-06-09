@@ -79,7 +79,7 @@ fun keep_u64() {
   code:
     0: VecNew [16]
     1: SlotBorrow [24] <- &[16]
-    2: VecPushBack [24].push([8], size=8, desc=2)
+    2: VecPushBack [24].push([8], size=8, desc=0)
     3: JumpZeroByte @6 [0] gas_taken=84 gas_fallthrough=54
     4: Move8 [0] <- [8]
     5: Return

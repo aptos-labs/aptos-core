@@ -12,7 +12,7 @@ use mono_move_core::{
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    ObjectDescriptorTable, TRIVIAL_DESCRIPTOR_ID, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn enum_gc_traces_refs() {
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_val_enum =
         descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -374,7 +374,7 @@ fn enum_gc_variant_switching() {
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_ctr_enum =
         descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![

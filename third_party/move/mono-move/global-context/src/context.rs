@@ -653,6 +653,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
     ) -> DescriptorId {
+        if elem_ptr_offsets.is_empty() {
+            return TRIVIAL_DESCRIPTOR_ID;
+        }
         // Fast path: existing entry returns without touching the shard
         // write-lock.
         if let Some(id) = self.ctx.descriptors.vector_by_elem.get(&elem_ty) {

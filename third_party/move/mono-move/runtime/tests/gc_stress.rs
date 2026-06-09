@@ -30,7 +30,7 @@ use mono_move_core::{
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    ObjectDescriptorTable, TRIVIAL_DESCRIPTOR_ID, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -104,7 +104,7 @@ fn make_gc_stress_program(
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
     let desc_outer_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
-    let desc_inner_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_inner_vec = TRIVIAL_DESCRIPTOR_ID;
 
     // -- Function 1: make_entry(val) -> entry_ptr --
     let callee_val: u32 = 0;

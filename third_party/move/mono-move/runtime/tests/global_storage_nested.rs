@@ -25,6 +25,7 @@ use mono_move_core::{
     types::{InternedType, Type},
     Code, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
     ObjectDescriptorTable, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
@@ -145,7 +146,7 @@ fn borrow_global_mut_deep_copies_nested_struct() {
 #[test]
 fn borrow_global_mut_deep_copies_struct_with_vector() {
     let mut descriptors = ObjectDescriptorTable::new();
-    let vec_desc = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let vec_desc = TRIVIAL_DESCRIPTOR_ID;
     let parent_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![0]).unwrap());
 
     let resources = InMemoryResources::new();

@@ -186,14 +186,14 @@ fun capture_one() {
     0: VecNew [8]
     1: SlotBorrow [24] <- &[8]
     2: StoreImm8 [40] <- #10
-    3: VecPushBack [24].push([40], size=8, desc=2)
+    3: VecPushBack [24].push([40], size=8, desc=0)
     4: SlotBorrow [24] <- &[8]
     5: StoreImm8 [40] <- #20
-    6: VecPushBack [24].push([40], size=8, desc=2)
+    6: VecPushBack [24].push([40], size=8, desc=0)
     7: SlotBorrow [24] <- &[8]
     8: StoreImm8 [40] <- #30
-    9: VecPushBack [24].push([40], size=8, desc=2)
-    10: PackClosure [16] <- func_ref=Unresolved(len_plus), mask=1, captured_desc=3, captured=[[8](8)]
+    9: VecPushBack [24].push([40], size=8, desc=0)
+    10: PackClosure [16] <- func_ref=Unresolved(len_plus), mask=1, captured_desc=2, captured=[[8](8)]
     11: CallClosure closure=[16], provided_args=[[0](8)]
     12: Move8 [40] <- [72]
     13: Move8 [0] <- [40]
@@ -212,21 +212,21 @@ fun capture_two() {
     0: VecNew [8]
     1: SlotBorrow [32] <- &[8]
     2: StoreImm8 [48] <- #1
-    3: VecPushBack [32].push([48], size=8, desc=2)
+    3: VecPushBack [32].push([48], size=8, desc=0)
     4: SlotBorrow [32] <- &[8]
     5: StoreImm8 [48] <- #2
-    6: VecPushBack [32].push([48], size=8, desc=2)
+    6: VecPushBack [32].push([48], size=8, desc=0)
     7: VecNew [16]
     8: SlotBorrow [32] <- &[16]
     9: StoreImm8 [48] <- #3
-    10: VecPushBack [32].push([48], size=8, desc=2)
+    10: VecPushBack [32].push([48], size=8, desc=0)
     11: SlotBorrow [32] <- &[16]
     12: StoreImm8 [48] <- #4
-    13: VecPushBack [32].push([48], size=8, desc=2)
+    13: VecPushBack [32].push([48], size=8, desc=0)
     14: SlotBorrow [32] <- &[16]
     15: StoreImm8 [48] <- #5
-    16: VecPushBack [32].push([48], size=8, desc=2)
-    17: PackClosure [24] <- func_ref=Unresolved(len_sum), mask=11, captured_desc=4, captured=[[8](8), [16](8)]
+    16: VecPushBack [32].push([48], size=8, desc=0)
+    17: PackClosure [24] <- func_ref=Unresolved(len_sum), mask=11, captured_desc=3, captured=[[8](8), [16](8)]
     18: CallClosure closure=[24], provided_args=[[0](8)]
     19: Move8 [48] <- [80]
     20: Move8 [0] <- [48]
