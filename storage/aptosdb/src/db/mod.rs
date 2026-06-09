@@ -99,7 +99,10 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
             true,
             internal_indexer_db,
-            HotStateConfig::default(),
+            HotStateConfig {
+                delete_on_restart: !readonly,
+                ..Default::default()
+            },
         )
     }
 
