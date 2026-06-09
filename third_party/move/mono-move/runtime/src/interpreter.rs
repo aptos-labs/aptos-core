@@ -18,40 +18,40 @@ use crate::{
     invariant_violation,
     memory::{
         read_account_address, read_bool, read_descriptor, read_fat_ptr, read_obj_size, read_ptr,
-        read_u32, read_u64, read_u8, vec_elem_ptr, write_bool, write_fat_ptr, write_ptr, write_u32,
-        write_u64, write_u8, MemoryRegion,
+        read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr, write_bool, write_fat_ptr,
+        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
         VEC_LENGTH_OFFSET,
     },
-    ExecutionContext,
+    value_utils, ExecutionContext,
 };
 use mono_move_core::{
     captured_values_size,
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     next_captured_value_offset,
-    storage::resource_provider::StorageKey,
-    CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    storage::resource_provider::InMemoryStorageKey,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
+    DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
+    OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
-
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
+pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
     /// Per-transaction context (function resolution, gas counters,
     /// descriptor table, etc.).
     pub(crate) exec_ctx: &'a mut T,
@@ -77,7 +77,7 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
     rng: StdRng,
 }
 
-impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
+impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'a, T> {
     pub fn new(exec_ctx: &'a mut T, entry: &Function) -> Self {
         Self::with_heap_size(exec_ctx, entry, DEFAULT_HEAP_SIZE)
     }
@@ -750,7 +750,27 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
+impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'_, T> {
+    /// Shared body of the conditional `Jump*` micro-ops: charge the chosen
+    /// edge's cost, then jump to `target` or fall through to the next pc.
+    #[inline(always)]
+    fn cond_branch(
+        &mut self,
+        cond: bool,
+        target: CodeOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
+    ) -> RuntimeResult<StepResult> {
+        if cond {
+            self.exec_ctx.gas_meter().charge(gas_taken)?;
+            self.pc = target.into();
+        } else {
+            self.exec_ctx.gas_meter().charge(gas_fallthrough)?;
+            self.pc += 1;
+        }
+        Ok(StepResult::Continue)
+    }
+
     #[inline(always)]
     pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -811,110 +831,201 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     return self.exec_call_native(func, fp, native_idx, abi);
                 },
 
-                MicroOp::JumpNotZeroU64 { target, src } => {
-                    self.pc = if read_u64(fp, src) != 0 {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpNotZeroU64 {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) != 0,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpNotZeroByte { target, src } => {
+                MicroOp::JumpNotZeroByte {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
                     // Read as `u8` only to test against zero; the byte's sign is
                     // irrelevant.
-                    self.pc = if read_u8(fp, src) != 0 {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        read_u8(fp, src) != 0,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpZeroByte { target, src } => {
+                MicroOp::JumpZeroByte {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
                     // Read as `u8` only to test against zero; the byte's sign is
                     // irrelevant.
-                    self.pc = if read_u8(fp, src) == 0 {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        read_u8(fp, src) == 0,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
                 MicroOp::JumpIntCmp(ref op) => {
-                    self.pc = if int_cmp_bool(fp, op.lhs, op.op, &op.rhs) {
-                        op.target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                    return self.cond_branch(
+                        int_cmp_bool(fp, op.lhs, op.op, &op.rhs),
+                        op.target,
+                        op.gas_taken,
+                        op.gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) >= imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpValueCmp(ref op) => {
+                    // Operands are the aggregate values at their slots; a
+                    // vector slot holds a pointer read through to its heap data.
+                    let a = fp.add(op.lhs.into());
+                    let b = fp.add(op.rhs.into());
+                    let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
+                    return self.cond_branch(
+                        eq ^ op.negate,
+                        op.target,
+                        op.gas_taken,
+                        op.gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpLessU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) < imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpValueRefCmp(ref op) => {
+                    // Operands are references; read through the fat pointers to
+                    // obtain the operand data pointers.
+                    let (lb, lo) = read_fat_ptr(fp, op.lhs);
+                    let (rb, ro) = read_fat_ptr(fp, op.rhs);
+                    let eq = value_utils::equals(
+                        self.exec_ctx,
+                        lb.add(lo as usize),
+                        rb.add(ro as usize),
+                        op.ty,
+                    )?;
+                    return self.cond_branch(
+                        eq ^ op.negate,
+                        op.target,
+                        op.gas_taken,
+                        op.gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpGreaterU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) > imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpGreaterEqualU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) >= imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) <= imm {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpLessU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) < imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpLessU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) < read_u64(fp, rhs) {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpGreaterU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) > imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) >= read_u64(fp, rhs) {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpLessEqualU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, src) <= imm,
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) != read_u64(fp, rhs) {
-                        target.into()
-                    } else {
-                        self.pc + 1
-                    };
-                    return Ok(StepResult::Continue);
+                MicroOp::JumpLessU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, lhs) < read_u64(fp, rhs),
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
                 },
 
-                MicroOp::Jump { target } => {
+                MicroOp::JumpGreaterEqualU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, lhs) >= read_u64(fp, rhs),
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
+                },
+
+                MicroOp::JumpNotEqualU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    return self.cond_branch(
+                        read_u64(fp, lhs) != read_u64(fp, rhs),
+                        target,
+                        gas_taken,
+                        gas_fallthrough,
+                    );
+                },
+
+                MicroOp::Jump { target, gas } => {
+                    self.exec_ctx.gas_meter().charge(gas)?;
                     self.pc = target.into();
                     return Ok(StepResult::Continue);
                 },
@@ -947,19 +1058,19 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::AbortMsg { code, message } => {
                     let code = read_u64(fp, code);
                     let vec_ptr = read_ptr(fp, message);
-                    let message = if vec_ptr.is_null() {
+                    let len = read_vec_len(vec_ptr) as usize;
+                    let message = if len == 0 {
                         String::new()
                     } else {
                         // TODO: charge gas for abort message bytes.
-                        let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET) as usize;
                         if len > ABORT_MESSAGE_SIZE_LIMIT {
                             return Err(RuntimeError::AbortMessageTooLong {
                                 len,
                                 max: ABORT_MESSAGE_SIZE_LIMIT,
                             });
                         }
-                        // SAFETY: `vec_ptr` is non-null (checked above) and
-                        // points at a heap vector with `len` initialized
+                        // SAFETY: `vec_ptr` is non-null for non-zero lengths
+                        // and points at a heap vector with `len` initialized
                         // bytes at `VEC_DATA_OFFSET`.
                         let data = vec_ptr.add(VEC_DATA_OFFSET);
                         String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
@@ -978,6 +1089,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::StoreImm8 { dst, ref imm } => write_int::<[u8; 8]>(fp, dst, *imm),
                 MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
                 MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
+                MicroOp::StoreImmVec { dst, idx } => {
+                    self.exec_store_imm_vec(dst, idx)?;
+                },
 
                 // Add
                 MicroOp::AddU64 { dst, lhs, rhs } => {
@@ -1140,11 +1254,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::VecLen { dst, vec_ref } => {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let len = if vec_ptr.is_null() {
-                        0
-                    } else {
-                        read_u64(vec_ptr, VEC_LENGTH_OFFSET)
-                    };
+                    let len = read_vec_len(vec_ptr);
                     write_u64(fp, dst, len);
                 },
 
@@ -1164,7 +1274,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         write_ptr(ref_base, ref_off as usize, vec_ptr);
                     }
 
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     let total = read_obj_size(vec_ptr) as usize;
                     let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
                         / elem_size as usize) as u64;
@@ -1188,10 +1298,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 } => {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::PopFromEmptyVector);
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if len == 0 {
                         return Err(RuntimeError::PopFromEmptyVector);
                     }
@@ -1213,14 +1320,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::LoadElem,
-                            idx,
-                            len: 0,
-                        });
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if idx >= len {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
                             op: VecOp::LoadElem,
@@ -1244,14 +1344,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::StoreElem,
-                            idx,
-                            len: 0,
-                        });
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if idx >= len {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
                             op: VecOp::StoreElem,
@@ -1276,14 +1369,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
-                    if vec_ptr.is_null() {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::Borrow,
-                            idx,
-                            len: 0,
-                        });
-                    }
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let len = read_vec_len(vec_ptr);
                     if idx >= len {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
                             op: VecOp::Borrow,
@@ -1422,10 +1508,6 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     write_fat_ptr(fp, dst, obj_ptr, offset as u64);
                 },
 
-                MicroOp::Charge { cost } => {
-                    self.exec_ctx.gas_meter().charge(cost)?;
-                },
-
                 MicroOp::PackClosure(ref op) => {
                     self.exec_pack_closure(fp, op)?;
                 },
@@ -1450,7 +1532,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let address = read_account_address(fp, addr);
                     let exists = self.read_write_set.exists(
                         self.exec_ctx.resource_provider(),
-                        StorageKey::Resource(address, ty),
+                        &InMemoryStorageKey::resource(address, ty),
                     )?;
                     write_bool(fp, dst, exists);
                 },
@@ -1459,7 +1541,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     let address = read_account_address(fp, addr);
                     let ptr = self.read_write_set.borrow_global(
                         self.exec_ctx.resource_provider(),
-                        StorageKey::Resource(address, ty),
+                        &InMemoryStorageKey::resource(address, ty),
                     )?;
                     // A reference is a 16-byte fat pointer; the borrow points
                     // at the start of the resource, so the offset half is 0.
@@ -1468,15 +1550,15 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
                 MicroOp::BorrowGlobalMut { addr, ty, dst } => {
                     let address = read_account_address(fp, addr);
-                    let key = StorageKey::Resource(address, ty);
+                    let key = InMemoryStorageKey::resource(address, ty);
                     let ptr = match self
                         .read_write_set
-                        .try_borrow_global_mut(self.exec_ctx.resource_provider(), key)?
+                        .try_borrow_global_mut(self.exec_ctx.resource_provider(), &key)?
                     {
                         EntryPtr::Writable(ptr) => ptr,
                         EntryPtr::NonWritable(ptr) => {
                             let ptr = self.deep_copy(ptr)?;
-                            self.read_write_set.commit_borrow_global_mut(key, ptr);
+                            self.read_write_set.commit_borrow_global_mut(&key, ptr);
                             ptr
                         },
                     };
@@ -1487,15 +1569,15 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
                 MicroOp::MoveFrom { addr, ty, dst } => {
                     let address = read_account_address(fp, addr);
-                    let key = StorageKey::Resource(address, ty);
+                    let key = InMemoryStorageKey::resource(address, ty);
                     let entry_ptr = self
                         .read_write_set
-                        .try_move_from(self.exec_ctx.resource_provider(), key)?;
+                        .try_move_from(self.exec_ctx.resource_provider(), &key)?;
                     let ptr = match entry_ptr {
                         EntryPtr::Writable(ptr) => ptr,
                         EntryPtr::NonWritable(ptr) => {
                             let ptr = self.deep_copy(ptr)?;
-                            self.read_write_set.commit_move_from(key);
+                            self.read_write_set.commit_move_from(&key);
                             ptr
                         },
                     };
@@ -1516,13 +1598,34 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
                     self.read_write_set.move_to(
                         self.exec_ctx.resource_provider(),
-                        StorageKey::Resource(address, ty),
+                        &InMemoryStorageKey::resource(address, ty),
                         ptr,
                     )?;
                 },
                 MicroOp::IntCmp(ref op) => {
                     let result = int_cmp_bool(fp, op.lhs, op.op, &op.rhs);
                     write_u8(fp, op.dst, result as u8);
+                },
+                MicroOp::ValueCmp(ref op) => {
+                    // Operands are the aggregate values at their slots; a
+                    // vector slot holds a pointer read through to its heap data.
+                    let a = fp.add(op.lhs.into());
+                    let b = fp.add(op.rhs.into());
+                    let eq = value_utils::equals(&*self.exec_ctx, a, b, op.ty)?;
+                    write_bool(fp, op.dst, eq ^ op.negate);
+                },
+                MicroOp::ValueRefCmp(ref op) => {
+                    // Operands are references; read through the fat pointers to
+                    // obtain the operand data pointers.
+                    let (lb, lo) = read_fat_ptr(fp, op.lhs);
+                    let (rb, ro) = read_fat_ptr(fp, op.rhs);
+                    let eq = value_utils::equals(
+                        &*self.exec_ctx,
+                        lb.add(lo as usize),
+                        rb.add(ro as usize),
+                        op.ty,
+                    )?;
+                    write_bool(fp, op.dst, eq ^ op.negate);
                 },
                 MicroOp::BoolNot { dst, src } => write_bool(fp, dst, !read_bool(fp, src)),
                 MicroOp::BoolAnd { dst, lhs, rhs } => {
@@ -1540,6 +1643,41 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
         self.pc += 1;
         Ok(StepResult::Continue)
+    }
+
+    /// Allocates vector from constant pool and writes data pointer into `dst`.
+    fn exec_store_imm_vec(
+        &mut self,
+        dst: FrameOffset,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<()> {
+        // SAFETY: `current_func` points to the live, currently-executing
+        // function.
+        let module_id = unsafe { self.current_func.as_ref() }.module_id;
+        let (ty, bytes) = self.exec_ctx.load_constant(module_id, idx)?;
+
+        // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
+        // and is writable (no aliasing to the heap).
+        unsafe {
+            let dst = self.frame_ptr.add(usize::from(dst));
+            if let Err(err) =
+                value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+            {
+                match err {
+                    AllocationError::RuntimeError(err) => return Err(err),
+                    AllocationError::OutOfHeapMemory { .. } => {
+                        // TODO: add an ld_const test that fills the heap so
+                        // the first deserialize fails and this GC-then-retry
+                        // path runs. Needs a `ForceGC` native to drive it
+                        // deterministically in the differential suite.
+                        gc_collect!(self)?;
+                        value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+                            .map_err(AllocationError::into_runtime_error)?;
+                    },
+                }
+            }
+            Ok(())
+        }
     }
 
     /// Deep-copy the value tree rooted at the specified source into the
@@ -1982,6 +2120,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         callee: &Function,
         new_fp: *mut u8,
     ) -> RuntimeResult<StepResult> {
+        // Charge the callee's entry block before any of its instructions run.
+        self.exec_ctx.gas_meter().charge(callee.entry_gas)?;
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
@@ -2085,6 +2225,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
     pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
+        // Charge the entry function's entry block before any of its instructions run.
+        let func = unsafe { self.current_func.as_ref() };
+        self.exec_ctx.gas_meter().charge(func.entry_gas)?;
         loop {
             match self.step()? {
                 StepResult::Continue => {},

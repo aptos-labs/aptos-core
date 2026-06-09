@@ -4,13 +4,13 @@
 //! Minimal [`ExecutionContext`] + [`DescriptorProvider`] impl for tests
 //! and benchmarks that don't go through the full loader stack.
 
-use crate::{ExecutionContext, LocalExecutionContext};
+use crate::{error::RuntimeResult, ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ObjectDescriptorTable,
-    ResourceProvider,
+    types::{InternedType, InternedTypeList},
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
+    ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout, ValueLayoutTable,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -27,6 +27,7 @@ use mono_move_loader::LoaderResult;
 pub struct LocalRuntimeContext<'r, G: GasMeter = NoOpGasMeter> {
     inner: LocalExecutionContext<'r, G>,
     descriptors: ObjectDescriptorTable,
+    layouts: ValueLayoutTable,
 }
 
 impl LocalRuntimeContext<'static, NoOpGasMeter> {
@@ -36,6 +37,7 @@ impl LocalRuntimeContext<'static, NoOpGasMeter> {
         Self {
             inner: LocalExecutionContext::unmetered(),
             descriptors: ObjectDescriptorTable::new(),
+            layouts: ValueLayoutTable::new(),
         }
     }
 
@@ -44,6 +46,7 @@ impl LocalRuntimeContext<'static, NoOpGasMeter> {
         Self {
             inner: LocalExecutionContext::unmetered(),
             descriptors,
+            layouts: ValueLayoutTable::new(),
         }
     }
 }
@@ -60,6 +63,7 @@ impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
         Self {
             inner: LocalExecutionContext::new(gas_meter, resource_provider),
             descriptors,
+            layouts: ValueLayoutTable::new(),
         }
     }
 }
@@ -71,6 +75,7 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
         Self {
             inner: LocalExecutionContext::with_max_budget(),
             descriptors,
+            layouts: ValueLayoutTable::new(),
         }
     }
 
@@ -86,6 +91,7 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
         Self {
             inner: LocalExecutionContext::with_budget(amount),
             descriptors: ObjectDescriptorTable::new(),
+            layouts: ValueLayoutTable::new(),
         }
     }
 }
@@ -123,6 +129,14 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
         self.inner.load_function(module_id, name, ty_args)
     }
 
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &[u8])> {
+        self.inner.load_constant(module_id, idx)
+    }
+
     fn resource_provider(&self) -> &dyn ResourceProvider {
         self.inner.resource_provider()
     }
@@ -131,5 +145,15 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
 impl<'r, G: GasMeter> DescriptorProvider for LocalRuntimeContext<'r, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.descriptors.descriptor(id)
+    }
+}
+
+impl<'r, G: GasMeter> LayoutProvider for LocalRuntimeContext<'r, G> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.layouts.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.layouts.layout_id(ty)
     }
 }

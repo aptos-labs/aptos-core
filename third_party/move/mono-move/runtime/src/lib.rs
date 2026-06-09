@@ -12,6 +12,7 @@ mod local_runtime_context;
 pub(crate) mod memory;
 mod transaction_context;
 mod types;
+mod value_utils;
 mod verifier;
 
 pub use error::{RuntimeError, RuntimeStatus};
@@ -24,8 +25,8 @@ pub use memory::{
     write_u64, MemoryRegion,
 };
 pub use mono_move_core::{
-    DescriptorProvider, ObjectDescriptor, ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID,
-    TRIVIAL_DESCRIPTOR_ID,
+    DescriptorProvider, LayoutProvider, ObjectDescriptor, ObjectDescriptorTable,
+    CLOSURE_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 pub use transaction_context::TransactionContext;
 pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};

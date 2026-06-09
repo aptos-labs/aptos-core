@@ -12,7 +12,7 @@ Additionally, block-granularity metering makes it easier (though is not strictly
 3. **JIT compatibility.** A JIT compiler can emit gas checks at block boundaries without special-casing the metering layer. Per-instruction metering does not preclude JIT, but block metering makes it more natural.
 4. **Cost model stability.** Per-instruction metering makes it easy for implementation details — cache state, value representation, runtime type structure — to leak into gas costs. Block metering encourages a cleaner separation, though the choice of instrumentation point (§3) ultimately determines how much leaks through.
 
-The current implementation instruments at the micro-op level using an ISA-agnostic framework — the metering pass has no dependency on any instruction set, and instruction sets plug in by implementing four traits. Gas costs are fully static (type costs are resolved during monomorphisation), but the choice of instrumentation point is not yet settled — see §3.
+Gas is instrumented at the **stackless execution IR** level (§3), where basic blocks are already explicit. Per-block static costs are computed during lowering and charged when control transfers into each block, with no standalone charge op — see §4. Gas costs are fully static, since types are concrete by the time lowering runs.
 
 ---
 
@@ -30,7 +30,7 @@ The current implementation instruments at the micro-op level using an ISA-agnost
 
 ## 3. Where to Instrument
 
-*This is an open design question; no decision has been made yet.*
+**Decision: the stackless execution IR.** Its basic blocks are explicit (a `Vec<BasicBlock>` with stable `Label`s) and the lowerer already walks them block by block, so per-block costs can be computed during lowering with no separate CFG-reconstruction pass, no branch-index remapping, and no safe-point PC remapping. It is more stable than the micro-ops (insulated from low-level codegen decisions) while still able to resolve concrete type sizes, since lowering monomorphises before emitting code. The trade-offs that led here, across the three candidate layers, are below.
 
 The instrumentation pass can be applied at any layer of the compiler pipeline. The three main candidates are the original Move bytecode, the stackless execution IR, and the monomorphised micro-ops. Each presents a different trade-off between accuracy and stability.
 
@@ -53,7 +53,7 @@ The instrumentation pass can be applied at any layer of the compiler pipeline. T
 
 **Cons:**
 - Not a public or stable interface today. Gas semantics derived from it could still shift as the compiler pipeline evolves.
-- Generic code is not yet monomorphised: type sizes are unknown, making it impossible to give precise costs to instructions whose work scales with the size of their operands.
+- The IR is polymorphic, so type sizes are not knowable from the IR alone. This is sidestepped by computing costs *during lowering*, which monomorphises first: size-dependent costs read the concrete widths the lowering context has already resolved.
 
 ### Micro-ops
 
@@ -69,67 +69,46 @@ The ISA-agnostic design of `mono-move-gas` means the instrumentation pass itself
 
 ---
 
-## 4. Instrumentation Pass
+## 4. Fused Block-Charge Instrumentation
 
 ### 4.1 Overview
 
-The instrumentation pass takes a flat instruction sequence and returns a new sequence with charge ops inserted. It runs once — the resulting sequence is stored and executed by the interpreter without any further consultation of the gas schedule.
+Instrumentation is folded into lowering rather than run as a separate pass. As the lowerer emits a block's micro-ops, it sums the IR-level cost of that block's instructions (§4.2). It charges no cost via a standalone op; instead each block's cost is charged by the instruction that transfers control into it:
 
-The pass performs three steps:
+- **Entry block.** Block 0's cost is stored on the function as `entry_gas`. The call protocol charges it before any of the callee's instructions run — in `call_unchecked` for callees, and at the start of `run` for the root invocation.
 
-1. **CFG construction.** Partition the instruction sequence into basic blocks by identifying leaders: instruction 0, every branch target, and every instruction immediately following a branch.
+- **Every other block.** Its cost is stored on the predecessor jump that targets it. The unconditional `Jump` carries a single `gas` field (the target block's cost). Each conditional jump carries `gas_taken` and `gas_fallthrough` (the costs of the taken and fallthrough blocks); the interpreter charges exactly one, for the block it transfers into, before updating the pc.
 
-2. **Cost computation.** Look up the cost of every instruction in the gas schedule. Sum the static (base) costs within each block to get the block's charge amount. Identify instructions with a dynamic cost component that will need an extra charge op inserted after them.
+A block's cost is therefore always debited before the block executes: on entry the interpreter has already charged the block's full cost (its body **and** its terminating jump). A terminator's own cost belongs to its block and is charged on entry to that block; the gas a terminator *charges* is its successor's. No gap, no double count.
 
-3. **Emission.** Walk the original instruction sequence. At each basic-block leader, prepend a `Charge` op with the block's total cost. For each instruction with a dynamic cost component, append a dynamic `Charge` op immediately after the instruction. Remap all branch targets to account for the inserted ops (see §4.3).
+Because no op is inserted, micro-op offsets match an uninstrumented lowering: branch targets resolve directly to block leaders, and safe-point PCs need no remapping. It also removes one dispatch per block on the hot path (the §1 motivation), since the charge is folded into a jump that was going to execute anyway.
 
-For instructions with a runtime-variable cost, there are two options: emit a separate dynamic `Charge` instruction, or handle the variable charge inline in the interpreter for that specific instruction. The design supports both — the gas schedule decides per instruction.
+### 4.2 Cost computation
 
-### 4.2 Example
+Costs come from an IR-level gas schedule keyed on the stackless IR instructions, mirroring the work each lowers to. Size-dependent costs (e.g. `ReadRef`, `Move`, vector ops, copying call arguments and return values) resolve concrete byte widths from the lowering context, which has already monomorphised the function. All costs are therefore static — a block's total is a single constant — so no runtime-variable charge mechanism is needed.
 
-A simple accumulation loop compiled to micro-ops (each instruction costs 3 in the current placeholder schedule):
+### 4.3 Example
+
+A simple accumulation loop. Each block's cost is charged when control transfers into it; the loop header's cost is split across the two jumps that reach it.
 
 ```
 // Slots: sum = fp[0], i = fp[8]
 //
-// Before:
-//  0: StoreImm8 { dst: sum, imm: 0 }
-//  1: StoreImm8 { dst: i, imm: 0 }
-//  2: JumpGreaterEqualU64Imm { target: 6, src: i, imm: N }   ← loop header (BB1)
-//  3: AddU64    { dst: sum, lhs: sum, rhs: i }               ← loop body (BB2)
-//  4: AddU64Imm { dst: i, src: i, imm: 1 }
-//  5: JumpLessU64Imm { target: 3, src: i, imm: N }
-//  6: Return                                                  ← exit (BB3)
+//   L0 (entry):  StoreImm8 sum,0; StoreImm8 i,0; Jump L1            cost 6  → entry_gas
+//   L1 (header): JumpGreaterEqualU64Imm L3, i, N  (else L2)         cost 3
+//   L2 (body):   AddU64 sum,sum,i; AddU64Imm i,i,1; Jump L1         cost 9
+//   L3 (exit):   Return                                            cost 3
 //
-// Basic blocks: BB0=[0,1] cost 6, BB1=[2] cost 3, BB2=[3,4,5] cost 9, BB3=[6] cost 3
-//
-// After:
-//  0: Charge(6)
-//  1: StoreImm8 { dst: sum, imm: 0 }
-//  2: StoreImm8 { dst: i, imm: 0 }
-//  3: Charge(3)
-//  4: JumpGreaterEqualU64Imm { target: 9, src: i, imm: N }   ← remapped 6 → 9
-//  5: Charge(9)
-//  6: AddU64    { dst: sum, lhs: sum, rhs: i }
-//  7: AddU64Imm { dst: i, src: i, imm: 1 }
-//  8: JumpLessU64Imm { target: 3, src: i, imm: N }           ← remapped 2 → 3
-//  9: Charge(3)
-// 10: Return
+// Fused gas:
+//   entry_gas = 6                              (charged by the call protocol)
+//   L0's `Jump L1`                 gas = 3      (cost of L1)
+//   L1's conditional jump          gas_taken = 3 (L3),  gas_fallthrough = 9 (L2)
+//   L2's `Jump L1`                 gas = 3      (cost of L1)
 ```
 
-Each basic-block entry is now prefixed with a `Charge` op that debits the total cost of that block from the budget. Branch targets point at `Charge` ops so the budget is always decremented before any block executes.
+### 4.4 Dead code
 
-### 4.3 Branch-Target Remapping
-
-Inserting charge ops shifts every instruction index, so all branch targets must be remapped. The new index of a target `t` is `t` plus the number of `Charge` ops inserted before it, which can be computed in a single pass over the original sequence.
-
-### 4.4 Constraint: No Dynamic Cost on Branch Instructions
-
-A branch instruction must not have a dynamic cost component. The dynamic charge op is inserted immediately after the instruction, so on the taken path execution jumps away and the charge is never reached. For unconditional branches it is completely unreachable.
-
-### 4.5 Dead Code
-
-The pass instruments every basic block, including unreachable ones. The compiler should eliminate dead basic blocks before this pass runs, both to avoid wasted allocation and to prevent dead `Charge` ops from polluting the instruction cache.
+Costs are summed only for blocks the lowerer emits, and the charge is attached only to real jumps and calls, so unreachable blocks add no standalone ops. The compiler should still eliminate dead basic blocks upstream to avoid emitting them at all.
 
 ---
 

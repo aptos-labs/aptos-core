@@ -39,33 +39,31 @@ fun trigger(r0): u64 {
 
 fun get_val() {
   frame_data_size: 8
+  entry_gas: 56
   code:
-    0: Charge #4
-    1: StoreImm8 [0] <- #42
-    2: Return
+    0: StoreImm8 [0] <- #42
+    1: Return
 }
 
 fun consume() {
   frame_data_size: 16
+  entry_gas: 56
   code:
-    0: Charge #6
-    1: StoreImm8 [8] <- #99
-    2: Move8 [0] <- [8]
-    3: Return
+    0: StoreImm8 [8] <- #99
+    1: Move8 [0] <- [8]
+    2: Return
 }
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 3
   code:
-    0: Charge #3
-    1: JumpGreaterU64Imm @6 [0] > #0
-    2: Charge #14
-    3: CallIndirect 0x66::test::get_val
-    4: Move8 [0] <- [32]
-    5: Return
-    6: Charge #16
-    7: StoreImm8 [32] <- #5
-    8: CallIndirect 0x66::test::consume
-    9: Move8 [0] <- [32]
-    10: Return
+    0: JumpGreaterU64Imm @4 [0] > #0 gas_taken=92 gas_fallthrough=64
+    1: CallIndirect 0x66::test::get_val
+    2: Move8 [0] <- [32]
+    3: Return
+    4: StoreImm8 [32] <- #5
+    5: CallIndirect 0x66::test::consume
+    6: Move8 [0] <- [32]
+    7: Return
 }

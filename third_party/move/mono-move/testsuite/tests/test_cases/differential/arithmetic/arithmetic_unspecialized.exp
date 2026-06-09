@@ -261,216 +261,216 @@ fun negate_i256(r0): i256 {
 
 fun add_u8() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: IntAdd [2] <- [0] + u8 [1]
-    2: Move(1) [0] <- [2]
-    3: Return
+    0: IntAdd [2] <- [0] + u8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
 }
 
 fun sub_u16() {
   frame_data_size: 8
+  entry_gas: 23
   code:
-    0: Charge #15
-    1: IntSub [4] <- [0] - u16 [2]
-    2: Move(2) [0] <- [4]
-    3: Return
+    0: IntSub [4] <- [0] - u16 [2]
+    1: Move(2) [0] <- [4]
+    2: Return
 }
 
 fun mul_u32() {
   frame_data_size: 16
+  entry_gas: 35
   code:
-    0: Charge #21
-    1: IntMul [8] <- [0] * u32 [4]
-    2: Move(4) [0] <- [8]
-    3: Return
+    0: IntMul [8] <- [0] * u32 [4]
+    1: Move(4) [0] <- [8]
+    2: Return
 }
 
 fun div_u128() {
   frame_data_size: 48
+  entry_gas: 107
   code:
-    0: Charge #57
-    1: IntDiv [32] <- [0] / u128 [16]
-    2: Move(16) [0] <- [32]
-    3: Return
+    0: IntDiv [32] <- [0] / u128 [16]
+    1: Move(16) [0] <- [32]
+    2: Return
 }
 
 fun mod_u256() {
   frame_data_size: 96
+  entry_gas: 203
   code:
-    0: Charge #105
-    1: IntMod [64] <- [0] % u256 [32]
-    2: Move(32) [0] <- [64]
-    3: Return
+    0: IntMod [64] <- [0] % u256 [32]
+    1: Move(32) [0] <- [64]
+    2: Return
 }
 
 fun add_i8() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: IntAdd [2] <- [0] + i8 [1]
-    2: Move(1) [0] <- [2]
-    3: Return
+    0: IntAdd [2] <- [0] + i8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
 }
 
 fun sub_i16() {
   frame_data_size: 8
+  entry_gas: 23
   code:
-    0: Charge #15
-    1: IntSub [4] <- [0] - i16 [2]
-    2: Move(2) [0] <- [4]
-    3: Return
+    0: IntSub [4] <- [0] - i16 [2]
+    1: Move(2) [0] <- [4]
+    2: Return
 }
 
 fun mul_i32() {
   frame_data_size: 16
+  entry_gas: 35
   code:
-    0: Charge #21
-    1: IntMul [8] <- [0] * i32 [4]
-    2: Move(4) [0] <- [8]
-    3: Return
+    0: IntMul [8] <- [0] * i32 [4]
+    1: Move(4) [0] <- [8]
+    2: Return
 }
 
 fun div_i64() {
   frame_data_size: 24
+  entry_gas: 59
   code:
-    0: Charge #9
-    1: IntDiv [16] <- [0] / i64 [8]
-    2: Move8 [0] <- [16]
-    3: Return
+    0: IntDiv [16] <- [0] / i64 [8]
+    1: Move8 [0] <- [16]
+    2: Return
 }
 
 fun mod_i128() {
   frame_data_size: 48
+  entry_gas: 107
   code:
-    0: Charge #57
-    1: IntMod [32] <- [0] % i128 [16]
-    2: Move(16) [0] <- [32]
-    3: Return
+    0: IntMod [32] <- [0] % i128 [16]
+    1: Move(16) [0] <- [32]
+    2: Return
 }
 
 fun add_i256() {
   frame_data_size: 96
+  entry_gas: 203
   code:
-    0: Charge #105
-    1: IntAdd [64] <- [0] + i256 [32]
-    2: Move(32) [0] <- [64]
-    3: Return
+    0: IntAdd [64] <- [0] + i256 [32]
+    1: Move(32) [0] <- [64]
+    2: Return
 }
 
 fun bit_and_u128() {
   frame_data_size: 48
+  entry_gas: 107
   code:
-    0: Charge #57
-    1: IntBitAnd [32] <- [0] & u128 [16]
-    2: Move(16) [0] <- [32]
-    3: Return
+    0: IntBitAnd [32] <- [0] & u128 [16]
+    1: Move(16) [0] <- [32]
+    2: Return
 }
 
 fun bit_or_u8() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: IntBitOr [2] <- [0] | u8 [1]
-    2: Move(1) [0] <- [2]
-    3: Return
+    0: IntBitOr [2] <- [0] | u8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
 }
 
 fun bit_xor_u32() {
   frame_data_size: 16
+  entry_gas: 35
   code:
-    0: Charge #21
-    1: IntBitXor [8] <- [0] ^ u32 [4]
-    2: Move(4) [0] <- [8]
-    3: Return
+    0: IntBitXor [8] <- [0] ^ u32 [4]
+    1: Move(4) [0] <- [8]
+    2: Return
 }
 
 fun shl_u16() {
   frame_data_size: 8
+  entry_gas: 23
   code:
-    0: Charge #15
-    1: IntShl.u16 [4] <- [0] << [2]
-    2: Move(2) [0] <- [4]
-    3: Return
+    0: IntShl.u16 [4] <- [0] << [2]
+    1: Move(2) [0] <- [4]
+    2: Return
 }
 
 fun shr_u256() {
   frame_data_size: 72
+  entry_gas: 203
   code:
-    0: Charge #105
-    1: IntShr.u256 [40] <- [0] >> [32]
-    2: Move(32) [0] <- [40]
-    3: Return
+    0: IntShr.u256 [40] <- [0] >> [32]
+    1: Move(32) [0] <- [40]
+    2: Return
 }
 
 fun add_u8_imm() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: IntAdd [1] <- [0] + u8 #7
-    2: Move(1) [0] <- [1]
-    3: Return
+    0: IntAdd [1] <- [0] + u8 #7
+    1: Move(1) [0] <- [1]
+    2: Return
 }
 
 fun mul_u128_imm() {
   frame_data_size: 32
+  entry_gas: 107
   code:
-    0: Charge #57
-    1: IntMul [16] <- [0] * u128 #1000
-    2: Move(16) [0] <- [16]
-    3: Return
+    0: IntMul [16] <- [0] * u128 #1000
+    1: Move(16) [0] <- [16]
+    2: Return
 }
 
 fun bit_and_u32_imm() {
   frame_data_size: 8
+  entry_gas: 35
   code:
-    0: Charge #21
-    1: IntBitAnd [4] <- [0] & u32 #4095
-    2: Move(4) [0] <- [4]
-    3: Return
+    0: IntBitAnd [4] <- [0] & u32 #4095
+    1: Move(4) [0] <- [4]
+    2: Return
 }
 
 fun shl_u16_imm() {
   frame_data_size: 8
+  entry_gas: 23
   code:
-    0: Charge #15
-    1: IntShl.u16 [2] <- [0] << #3
-    2: Move(2) [0] <- [2]
-    3: Return
+    0: IntShl.u16 [2] <- [0] << #3
+    1: Move(2) [0] <- [2]
+    2: Return
 }
 
 fun sub_i32_imm() {
   frame_data_size: 8
+  entry_gas: 35
   code:
-    0: Charge #21
-    1: IntSub [4] <- [0] - i32 #-10
-    2: Move(4) [0] <- [4]
-    3: Return
+    0: IntSub [4] <- [0] - i32 #-10
+    1: Move(4) [0] <- [4]
+    2: Return
 }
 
 fun negate_i8() {
   frame_data_size: 8
+  entry_gas: 17
   code:
-    0: Charge #12
-    1: IntNegate.i8 [1] <- -[0]
-    2: Move(1) [0] <- [1]
-    3: Return
+    0: IntNegate.i8 [1] <- -[0]
+    1: Move(1) [0] <- [1]
+    2: Return
 }
 
 fun negate_i64() {
   frame_data_size: 16
+  entry_gas: 59
   code:
-    0: Charge #9
-    1: IntNegate.i64 [8] <- -[0]
-    2: Move8 [0] <- [8]
-    3: Return
+    0: IntNegate.i64 [8] <- -[0]
+    1: Move8 [0] <- [8]
+    2: Return
 }
 
 fun negate_i256() {
   frame_data_size: 64
+  entry_gas: 203
   code:
-    0: Charge #105
-    1: IntNegate.i256 [32] <- -[0]
-    2: Move(32) [0] <- [32]
-    3: Return
+    0: IntNegate.i256 [32] <- -[0]
+    1: Move(32) [0] <- [32]
+    2: Return
 }

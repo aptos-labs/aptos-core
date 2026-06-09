@@ -66,12 +66,12 @@ fun outer(r0): _0 {
 
 fun entry() {
   frame_data_size: 8
+  entry_gas: 90
   code:
-    0: Charge #16
-    1: Move8 [32] <- [0]
-    2: CallIndirect 0x1::test::outer<u64>
-    3: Move8 [0] <- [32]
-    4: Return
+    0: Move8 [32] <- [0]
+    1: CallIndirect 0x1::test::outer<u64>
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun innermost(): skipped (not all types are concrete)

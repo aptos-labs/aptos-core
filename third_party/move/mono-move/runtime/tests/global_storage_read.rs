@@ -62,7 +62,9 @@ fn local_ctx_with<'r>(
 fn make_program(code: Vec<MicroOp>) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 40,
@@ -133,6 +135,7 @@ fn exists_returns_false_after_move_from() {
     let tmp: FO = FO(40);
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::MoveFrom {
                 addr: ADDR,
@@ -146,6 +149,7 @@ fn exists_returns_false_after_move_from() {
             },
             MicroOp::Return,
         ]),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,
@@ -288,6 +292,7 @@ fn move_from_marks_deleted_and_second_borrow_aborts() {
     let tmp: FO = FO(40);
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::MoveFrom {
                 addr: ADDR,
@@ -301,6 +306,7 @@ fn move_from_marks_deleted_and_second_borrow_aborts() {
             },
             MicroOp::Return,
         ]),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,

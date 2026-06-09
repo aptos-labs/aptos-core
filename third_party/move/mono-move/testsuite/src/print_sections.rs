@@ -20,7 +20,7 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
     types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Interner,
+    DescriptorId, FieldTypes, FrameOffset, Interner, LayoutId, LayoutProvider, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -250,5 +250,17 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         Ok(self
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets))
+    }
+
+    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        self.guard.layout_id_for(ty)
+    }
+
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.guard.layout(id)
+    }
+
+    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        self.guard.publish_layout(ty, layout)
     }
 }

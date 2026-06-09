@@ -99,91 +99,91 @@ fun unpack_reordered(): u64 {
 
 fun consume() {
   frame_data_size: 32
+  entry_gas: 116
   code:
-    0: Charge #15
-    1: Move8 [16] <- [0]
-    2: MulU64Imm [16] <- [16] * #1000
-    3: Move8 [24] <- [8]
-    4: AddU64 [24] <- [16] + [24]
-    5: Move8 [0] <- [24]
-    6: Return
+    0: Move8 [16] <- [0]
+    1: MulU64Imm [16] <- [16] * #1000
+    2: Move8 [24] <- [8]
+    3: AddU64 [24] <- [16] + [24]
+    4: Move8 [0] <- [24]
+    5: Return
 }
 
 fun consume_two() {
   frame_data_size: 24
+  entry_gas: 64
   code:
-    0: Charge #11
-    1: MulU64Imm [16] <- [0] * #1000
-    2: AddU64 [16] <- [16] + [8]
-    3: Move8 [0] <- [16]
-    4: Return
+    0: MulU64Imm [16] <- [0] * #1000
+    1: AddU64 [16] <- [16] + [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun pack_natural() {
   frame_data_size: 8
+  entry_gas: 174
   code:
-    0: Charge #24
-    1: CallIndirect 0xc0ffee::pack_overlap_safety::split
-    2: CallIndirect 0xc0ffee::pack_overlap_safety::consume
-    3: Move8 [0] <- [32]
-    4: Return
+    0: CallIndirect 0xc0ffee::pack_overlap_safety::split
+    1: CallIndirect 0xc0ffee::pack_overlap_safety::consume
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun pack_reordered() {
   frame_data_size: 16
+  entry_gas: 226
   code:
-    0: Charge #32
-    1: CallIndirect 0xc0ffee::pack_overlap_safety::split
-    2: Move8 [8] <- [40]
-    3: Move8 [0] <- [48]
-    4: Move8 [48] <- [8]
-    5: Move8 [40] <- [0]
-    6: CallIndirect 0xc0ffee::pack_overlap_safety::consume
-    7: Move8 [0] <- [40]
-    8: Return
+    0: CallIndirect 0xc0ffee::pack_overlap_safety::split
+    1: Move8 [8] <- [40]
+    2: Move8 [0] <- [48]
+    3: Move8 [48] <- [8]
+    4: Move8 [40] <- [0]
+    5: CallIndirect 0xc0ffee::pack_overlap_safety::consume
+    6: Move8 [0] <- [40]
+    7: Return
 }
 
 fun pair_provider() {
   frame_data_size: 32
+  entry_gas: 156
   code:
-    0: Charge #60
-    1: StoreImm8 [0] <- #30
-    2: StoreImm8 [8] <- #40
-    3: Move8 [24] <- [8]
-    4: Move8 [16] <- [0]
-    5: Move(16) [0] <- [16]
-    6: Return
+    0: StoreImm8 [0] <- #30
+    1: StoreImm8 [8] <- #40
+    2: Move8 [24] <- [8]
+    3: Move8 [16] <- [0]
+    4: Move(16) [0] <- [16]
+    5: Return
 }
 
 fun split() {
   frame_data_size: 24
+  entry_gas: 110
   code:
-    0: Charge #6
-    1: StoreImm8 [0] <- #10
-    2: StoreImm8 [8] <- #20
-    3: Return
+    0: StoreImm8 [0] <- #10
+    1: StoreImm8 [8] <- #20
+    2: Return
 }
 
 fun unpack_natural() {
   frame_data_size: 8
+  entry_gas: 176
   code:
-    0: Charge #24
-    1: CallIndirect 0xc0ffee::pack_overlap_safety::pair_provider
-    2: CallIndirect 0xc0ffee::pack_overlap_safety::consume_two
-    3: Move8 [0] <- [32]
-    4: Return
+    0: CallIndirect 0xc0ffee::pack_overlap_safety::pair_provider
+    1: CallIndirect 0xc0ffee::pack_overlap_safety::consume_two
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun unpack_reordered() {
   frame_data_size: 16
+  entry_gas: 176
   code:
-    0: Charge #32
-    1: CallIndirect 0xc0ffee::pack_overlap_safety::pair_provider
-    2: Move8 [0] <- [48]
-    3: Move8 [8] <- [40]
-    4: Move8 [48] <- [8]
-    5: Move8 [40] <- [0]
-    6: CallIndirect 0xc0ffee::pack_overlap_safety::consume_two
-    7: Move8 [0] <- [40]
-    8: Return
+    0: CallIndirect 0xc0ffee::pack_overlap_safety::pair_provider
+    1: Move8 [0] <- [48]
+    2: Move8 [8] <- [40]
+    3: Move8 [48] <- [8]
+    4: Move8 [40] <- [0]
+    5: CallIndirect 0xc0ffee::pack_overlap_safety::consume_two
+    6: Move8 [0] <- [40]
+    7: Return
 }

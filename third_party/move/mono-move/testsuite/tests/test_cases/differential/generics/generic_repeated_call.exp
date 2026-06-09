@@ -58,21 +58,21 @@ fun identity(r0): _0 {
 
 fun entry() {
   frame_data_size: 24
+  entry_gas: 256
   code:
-    0: Charge #52
-    1: StoreImm8 [48] <- #10
-    2: CallIndirect 0x1::test::identity<u64>
-    3: Move8 [8] <- [48]
-    4: StoreImm8 [48] <- #20
-    5: CallIndirect 0x1::test::identity<u64>
-    6: Move8 [16] <- [48]
-    7: StoreImm8 [48] <- #12
-    8: CallIndirect 0x1::test::identity<u64>
-    9: Move8 [0] <- [48]
-    10: AddU64 [16] <- [8] + [16]
-    11: AddU64 [16] <- [16] + [0]
-    12: Move8 [0] <- [16]
-    13: Return
+    0: StoreImm8 [48] <- #10
+    1: CallIndirect 0x1::test::identity<u64>
+    2: Move8 [8] <- [48]
+    3: StoreImm8 [48] <- #20
+    4: CallIndirect 0x1::test::identity<u64>
+    5: Move8 [16] <- [48]
+    6: StoreImm8 [48] <- #12
+    7: CallIndirect 0x1::test::identity<u64>
+    8: Move8 [0] <- [48]
+    9: AddU64 [16] <- [8] + [16]
+    10: AddU64 [16] <- [16] + [0]
+    11: Move8 [0] <- [16]
+    12: Return
 }
 
 fun identity(): skipped (not all types are concrete)

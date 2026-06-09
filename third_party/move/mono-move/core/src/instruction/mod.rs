@@ -120,16 +120,15 @@ use crate::{
     types::{display_type, display_type_list, view_name, InternedType, InternedTypeList},
     FunctionPtr,
 };
+use move_binary_format::file_format::ConstantPoolIndex;
 use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
-mod gas;
 mod unspecialized;
-pub use gas::MicroOpGasSchedule;
 pub use unspecialized::{
     CmpKind, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    JumpIntCmpOp, ShiftOperand,
+    JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, ShiftOperand, ValueCmpOp, ValueRefCmpOp,
 };
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
@@ -531,6 +530,17 @@ pub enum MicroOp {
     /// `dst = (lhs <op> rhs)`, writing a 1-byte boolean. See [`IntCmpOp`].
     IntCmp(IntCmpOp),
 
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality over aggregate
+    /// values (vectors, structs). `lhs`/`rhs` are the operand slots; a vector
+    /// slot holds a pointer to its heap data, which the comparison reads
+    /// through. See [`ValueCmpOp`].
+    ValueCmp(ValueCmpOp),
+
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality where `lhs`/`rhs`
+    /// hold references (16-byte fat pointers) read through to the operand
+    /// values. See [`ValueRefCmpOp`].
+    ValueRefCmp(ValueRefCmpOp),
+
     /// `dst = !src`, both `dst` and `src` are 1-byte booleans.
     BoolNot {
         dst: FrameOffset,
@@ -607,37 +617,66 @@ pub enum MicroOp {
     Return,
 
     /// Unconditional jump.
+    ///
+    /// `gas` is the cost of the destination block, charged before
+    /// the jump transfers control.
     Jump {
         target: CodeOffset,
+        gas: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
+    ///
+    /// `gas_taken` / `gas_fallthrough` are the costs of the taken and
+    /// fallthrough destination blocks. The interpreter charges exactly one,
+    /// for the block it transfers into, before updating the pc. (Shared by
+    /// all conditional jumps below.)
+    ///
+    /// TODO: if instruction size becomes a concern, move these gas costs out
+    /// of the jump variants into a per-pc side table.
     JumpNotZeroU64 {
         target: CodeOffset,
         src: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the byte at `src` is **not** zero.
     JumpNotZeroByte {
         target: CodeOffset,
         src: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the byte at `src` **is** zero.
     JumpZeroByte {
         target: CodeOffset,
         src: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Unspecialized fused compare-and-branch: jump to `target` if
     /// `op(lhs, rhs)` holds, dispatching on the operand type.
     JumpIntCmp(JumpIntCmpOp),
 
+    /// Fused structural-equality compare-and-branch: jump to `target` if
+    /// `lhs == rhs` (or `!=`) over inline values. See [`JumpValueCmpOp`].
+    JumpValueCmp(JumpValueCmpOp),
+
+    /// Fused structural-equality compare-and-branch where `lhs`/`rhs` hold
+    /// references (16-byte fat pointers) read through to the operand values.
+    /// See [`JumpValueRefCmpOp`].
+    JumpValueRefCmp(JumpValueRefCmpOp),
+
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.
     JumpGreaterEqualU64Imm {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **<** `imm`.
@@ -645,6 +684,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **>** `imm`.
@@ -652,6 +693,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **<=** `imm`.
@@ -659,6 +702,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
@@ -666,6 +711,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` >= u64 at `rhs`.
@@ -673,6 +720,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` != u64 at `rhs`.
@@ -680,6 +729,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Abort the current execution with a u64 abort code, read from
@@ -768,6 +819,14 @@ pub enum MicroOp {
         idx: FrameOffset,
         src: FrameOffset,
         elem_size: u32,
+    },
+
+    /// Creates a vector from the constant pool, allocating it on the heap and
+    /// writing the data pointer into `dst`. The empty-vector constant creates
+    /// a null pointer. MAY TRIGGER GC.
+    StoreImmVec {
+        dst: FrameOffset,
+        idx: ConstantPoolIndex,
     },
 
     //======================================================================
@@ -938,17 +997,6 @@ pub enum MicroOp {
     },
 
     //======================================================================
-    // Gas metering
-    //======================================================================
-    // Inserted by the instrumentation pass; never emitted directly by user code.
-    //======================================================================
-    /// Charge a pre-computed static gas cost for the current basic block.
-    /// The interpreter must call the gas meter and abort on exhaustion.
-    Charge {
-        cost: u64,
-    },
-
-    //======================================================================
     // Global storage
     //======================================================================
     // Access to published resources. In every op `addr` holds the account
@@ -1060,6 +1108,8 @@ pub enum MicroOp {
     CallClosure(Box<CallClosureOp>),
 }
 
+// TODO: make gas costs optional in this output. Most tests don't care about
+// costs, but some want to print and assert them.
 impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1198,6 +1248,24 @@ impl fmt::Display for MicroOp {
                 "IntCmp [{}] <- [{}] {} {}",
                 op.dst.0, op.lhs.0, op.op, op.rhs
             ),
+            MicroOp::ValueCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "ValueCmp [{}] <- [{}] {} [{}] : ",
+                    op.dst.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
+            MicroOp::ValueRefCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "ValueRefCmp [{}] <- *[{}] {} *[{}] : ",
+                    op.dst.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
             MicroOp::BoolNot { dst, src } => {
                 write!(f, "BoolNot [{}] <- ![{}]", dst.0, src.0)
             },
@@ -1268,42 +1336,125 @@ impl fmt::Display for MicroOp {
             MicroOp::AbortMsg { code, message } => {
                 write!(f, "AbortMsg code=[{}] msg=[{}]", code.0, message.0)
             },
-            MicroOp::Jump { target } => {
-                write!(f, "Jump @{}", target.0)
+            MicroOp::Jump { target, gas } => {
+                write!(f, "Jump @{} gas={}", target.0, gas)
             },
-            MicroOp::JumpNotZeroU64 { target, src } => {
-                write!(f, "JumpNotZeroU64 @{} [{}]", target.0, src.0)
+            MicroOp::JumpNotZeroU64 {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpNotZeroU64 @{} [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, gas_taken, gas_fallthrough
+                )
             },
-            MicroOp::JumpNotZeroByte { target, src } => {
-                write!(f, "JumpNotZeroByte @{} [{}]", target.0, src.0)
-            },
-            MicroOp::JumpZeroByte { target, src } => {
-                write!(f, "JumpZeroByte @{} [{}]", target.0, src.0)
-            },
+            MicroOp::JumpNotZeroByte {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => write!(
+                f,
+                "JumpNotZeroByte @{} [{}] gas_taken={} gas_fallthrough={}",
+                target.0, src.0, gas_taken, gas_fallthrough
+            ),
+            MicroOp::JumpZeroByte {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => write!(
+                f,
+                "JumpZeroByte @{} [{}] gas_taken={} gas_fallthrough={}",
+                target.0, src.0, gas_taken, gas_fallthrough
+            ),
             MicroOp::JumpIntCmp(op) => write!(
                 f,
-                "JumpIntCmp @{} [{}] {} {}",
-                op.target.0, op.lhs.0, op.op, op.rhs
+                "JumpIntCmp @{} [{}] {} {} gas_taken={} gas_fallthrough={}",
+                op.target.0, op.lhs.0, op.op, op.rhs, op.gas_taken, op.gas_fallthrough
             ),
-            MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
+            MicroOp::JumpValueCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
                 write!(
                     f,
-                    "JumpGreaterEqualU64Imm @{} [{}] >= #{}",
-                    target.0, src.0, imm
-                )
-            },
-            MicroOp::JumpGreaterU64Imm { target, src, imm } => {
-                write!(f, "JumpGreaterU64Imm @{} [{}] > #{}", target.0, src.0, imm)
-            },
-            MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
+                    "JumpValueCmp @{} [{}] {} [{}] : ",
+                    op.target.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)?;
                 write!(
                     f,
-                    "JumpLessEqualU64Imm @{} [{}] <= #{}",
-                    target.0, src.0, imm
+                    " gas_taken={} gas_fallthrough={}",
+                    op.gas_taken, op.gas_fallthrough
                 )
             },
-            MicroOp::JumpLessU64 { target, lhs, rhs } => {
-                write!(f, "JumpLessU64 @{} [{}] < [{}]", target.0, lhs.0, rhs.0)
+            MicroOp::JumpValueRefCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "JumpValueRefCmp @{} *[{}] {} *[{}] : ",
+                    op.target.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)?;
+                write!(
+                    f,
+                    " gas_taken={} gas_fallthrough={}",
+                    op.gas_taken, op.gas_fallthrough
+                )
+            },
+            MicroOp::JumpGreaterEqualU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpGreaterEqualU64Imm @{} [{}] >= #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpGreaterU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpGreaterU64Imm @{} [{}] > #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpLessEqualU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpLessEqualU64Imm @{} [{}] <= #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpLessU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpLessU64 @{} [{}] < [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
+                )
             },
             MicroOp::VecNew { dst } => {
                 write!(f, "VecNew [{}]", dst.0)
@@ -1357,6 +1508,9 @@ impl fmt::Display for MicroOp {
                     "VecStoreElem [{}][[{}]] <- [{}] (size={})",
                     vec_ref.0, idx.0, src.0, elem_size
                 )
+            },
+            MicroOp::StoreImmVec { dst, idx } => {
+                write!(f, "StoreImmVec [{}] <- const[{}]", dst.0, idx.0)
             },
             MicroOp::SlotBorrow { dst, local } => {
                 write!(f, "SlotBorrow [{}] <- &[{}]", dst.0, local.0)
@@ -1480,28 +1634,47 @@ impl fmt::Display for MicroOp {
             MicroOp::StoreRandomU64 { dst } => {
                 write!(f, "StoreRandomU64 [{}]", dst.0)
             },
-            MicroOp::JumpLessU64Imm { target, src, imm } => {
-                write!(f, "JumpLessU64Imm @{} [{}] < #{}", target.0, src.0, imm)
-            },
-            MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpLessU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpGreaterEqualU64 @{} [{}] >= [{}]",
-                    target.0, lhs.0, rhs.0
+                    "JumpLessU64Imm @{} [{}] < #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
                 )
             },
-            MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpGreaterEqualU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpNotEqualU64 @{} [{}] != [{}]",
-                    target.0, lhs.0, rhs.0
+                    "JumpGreaterEqualU64 @{} [{}] >= [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpNotEqualU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpNotEqualU64 @{} [{}] != [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
                 )
             },
             MicroOp::ForceGC => {
                 write!(f, "ForceGC")
-            },
-            MicroOp::Charge { cost } => {
-                write!(f, "Charge #{}", cost)
             },
             MicroOp::PackClosure(op) => {
                 write!(
@@ -1714,6 +1887,7 @@ impl MicroOp {
             // Allocating: may trigger GC.
             MicroOp::HeapNew { .. }
             | MicroOp::VecPushBack { .. }
+            | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
@@ -1755,6 +1929,8 @@ impl MicroOp {
             | MicroOp::JumpNotZeroByte { .. }
             | MicroOp::JumpZeroByte { .. }
             | MicroOp::JumpIntCmp(_)
+            | MicroOp::JumpValueCmp(_)
+            | MicroOp::JumpValueRefCmp(_)
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
             | MicroOp::JumpGreaterU64Imm { .. }
@@ -1782,7 +1958,6 @@ impl MicroOp {
             | MicroOp::HeapMoveTo8 { .. }
             | MicroOp::HeapMoveToImm8 { .. }
             | MicroOp::HeapMoveTo { .. }
-            | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::CallClosure(_)
             | MicroOp::IntAdd(_)
@@ -1801,6 +1976,8 @@ impl MicroOp {
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::MoveTo { .. }
             | MicroOp::IntCmp(_)
+            | MicroOp::ValueCmp(_)
+            | MicroOp::ValueRefCmp(_)
             | MicroOp::BoolNot { .. }
             | MicroOp::BoolAnd { .. }
             | MicroOp::BoolOr { .. } => false,

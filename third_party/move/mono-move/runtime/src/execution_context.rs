@@ -4,12 +4,13 @@
 //! Defines the [`ExecutionContext`] trait the interpreter calls into,
 //! and a minimal [`LocalExecutionContext`] impl for tests and benchmarks.
 
+use crate::error::RuntimeResult;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::{NativeRegistry, ProductionNativeRegistry},
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
-    types::InternedTypeList,
-    FunctionPtr,
+    types::{InternedType, InternedTypeList},
+    ConstantPoolIndex, FunctionPtr,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -45,6 +46,16 @@ pub trait ExecutionContext {
         ty_args: InternedTypeList,
     ) -> LoaderResult<FunctionPtr>;
 
+    /// Resolve a constant from `module_id`'s constant pool, returning its
+    /// interned type and BCS bytes. The calling function was loaded from
+    /// `module_id`, so the module is always present and loaded in the read
+    /// set; a missing or not-yet-loaded entry is an invariant violation.
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &[u8])>;
+
     /// Access the resource provider to fetch resource from storage on read-set
     /// cache miss.
     fn resource_provider(&self) -> &dyn ResourceProvider;
@@ -52,7 +63,7 @@ pub trait ExecutionContext {
 
 /// A [`ExecutionContext`] that supports only local execution within a
 /// single executable: `load_function` always errors. Carries a real gas
-/// meter so the interpreter can charge `MicroOp::Charge` costs.
+/// meter so the interpreter can charge per-block costs.
 ///
 /// Intended for tests and benches that don't exercise cross-module dispatch.
 ///
@@ -130,6 +141,14 @@ impl<'r, G: GasMeter> ExecutionContext for LocalExecutionContext<'r, G> {
         _ty_args: InternedTypeList,
     ) -> LoaderResult<FunctionPtr> {
         panic!("LocalExecutionContext: load_function not supported")
+    }
+
+    fn load_constant(
+        &self,
+        _module_id: InternedModuleId,
+        _idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &[u8])> {
+        panic!("LocalExecutionContext: load_constant not supported")
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

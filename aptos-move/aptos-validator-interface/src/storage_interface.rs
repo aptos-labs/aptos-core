@@ -22,6 +22,9 @@ pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 
 impl DBDebuggerInterface {
     pub fn open<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
+        // Read-only RocksDB can't create the hot state sub-DBs that a pre-hot-state DB may lack;
+        // materialize them first so the read-only open below succeeds.
+        AptosDB::ensure_sub_dbs_created(&StorageDirPaths::from_path(db_root_path.clone()));
         Ok(Self(Arc::new(
             AptosDB::open(
                 StorageDirPaths::from_path(db_root_path),

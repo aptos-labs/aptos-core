@@ -49,39 +49,39 @@ fun trigger(): u64 {
 
 fun multi_ret() {
   frame_data_size: 40
+  entry_gas: 156
   code:
-    0: Charge #4
-    1: StoreImm8 [16] <- #7
-    2: Return
+    0: StoreImm8 [16] <- #7
+    1: Return
 }
 
 fun other_call() {
   frame_data_size: 16
+  entry_gas: 2
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 
 fun caller() {
   frame_data_size: 24
+  entry_gas: 180
   code:
-    0: Charge #104
-    1: Move(16) [48] <- [0]
-    2: CallIndirect 0x66::test::multi_ret
-    3: Move8 [16] <- [64]
-    4: ReadRef [16] <- *[48] (size=8)
-    5: StoreImm8 [48] <- #0
-    6: StoreImm8 [56] <- #0
-    7: CallIndirect 0x66::test::other_call
-    8: Return
+    0: Move(16) [48] <- [0]
+    1: CallIndirect 0x66::test::multi_ret
+    2: Move8 [16] <- [64]
+    3: ReadRef [16] <- *[48] (size=8)
+    4: StoreImm8 [48] <- #0
+    5: StoreImm8 [56] <- #0
+    6: CallIndirect 0x66::test::other_call
+    7: Return
 }
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 118
   code:
-    0: Charge #16
-    1: StoreImm8 [0] <- #99
-    2: SlotBorrow [32] <- &[0]
-    3: CallIndirect 0x66::test::caller
-    4: Return
+    0: StoreImm8 [0] <- #99
+    1: SlotBorrow [32] <- &[0]
+    2: CallIndirect 0x66::test::caller
+    3: Return
 }

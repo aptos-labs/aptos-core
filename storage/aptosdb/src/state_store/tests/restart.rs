@@ -155,3 +155,52 @@ proptest! {
         );
     }
 }
+
+/// The hot state sub-DBs are now opened even in read-only mode. Read-only RocksDB can't create
+/// them, so a DB that predates hot state (its hot dirs absent) fails to open read-only until
+/// `ensure_sub_dbs_created` materializes them — the guard the read-only db-tool and debugger
+/// commands rely on.
+#[test]
+fn test_readonly_open_needs_hot_state_dirs_and_guard_recreates_them() {
+    let tmp_dir = TempPath::new();
+    tmp_dir.create_as_dir().unwrap();
+    let root = tmp_dir.path();
+
+    // Materialize a full DB (including the hot sub-DBs) with one read-write open, then drop it.
+    drop(open_db(
+        root, /* max_items_per_shard = */ 1_000, /* buffered_state_target_items = */ 10,
+    ));
+
+    // Simulate a pre-hot-state DB by deleting the hot sub-DB dirs.
+    let hot_kv_dir = root.join("hot_state_kv_db");
+    let hot_merkle_dir = root.join("hot_state_merkle_db");
+    assert!(
+        hot_kv_dir.is_dir() && hot_merkle_dir.is_dir(),
+        "hot state dirs should exist after a read-write open",
+    );
+    std::fs::remove_dir_all(&hot_kv_dir).unwrap();
+    std::fs::remove_dir_all(&hot_merkle_dir).unwrap();
+
+    let open_readonly = || {
+        AptosDB::open(
+            StorageDirPaths::from_path(root),
+            /* readonly = */ true,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs::default(),
+            /* buffered_state_target_items = */ 10,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
+        )
+    };
+
+    // Without the hot dirs the read-only open fails: read-only RocksDB can't recreate them.
+    assert!(open_readonly().is_err());
+
+    // The guard recreates the missing sub-DBs read-write, so the read-only open then succeeds.
+    AptosDB::ensure_sub_dbs_created(&StorageDirPaths::from_path(root));
+    assert!(open_readonly().is_ok());
+}

@@ -3,6 +3,8 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
@@ -46,7 +48,9 @@ fn enum_basic() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 24,
@@ -100,7 +104,9 @@ fn enum_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 24,
@@ -162,7 +168,9 @@ fn enum_gc_traces_refs() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,
@@ -217,7 +225,7 @@ fn enum_pattern_match() {
         StoreImm8 { dst: FO(tmp), imm: 25u64.to_le_bytes() },
         MicroOp::enum_store8(FO(op), 8, FO(tmp)),
         MicroOp::enum_get_tag(FO(op), FO(tmp)),
-        JumpNotZeroU64 { target: CO(12), src: FO(tmp) },
+        JumpNotZeroU64 { target: CO(12), src: FO(tmp), gas_taken: 0, gas_fallthrough: 0 },
         MicroOp::enum_load8(FO(op), 0, FO(result)),
         MicroOp::enum_load8(FO(op), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
@@ -227,7 +235,9 @@ fn enum_pattern_match() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 24,
@@ -276,7 +286,9 @@ fn enum_variant_switch() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 24,
@@ -327,7 +339,9 @@ fn enum_borrow_field() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,
@@ -384,7 +398,9 @@ fn enum_gc_variant_switching() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,
@@ -443,7 +459,9 @@ fn enum_in_struct() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 32,
@@ -513,7 +531,9 @@ fn enum_in_vector() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,

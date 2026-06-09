@@ -23,16 +23,16 @@ fun load_and_store() {
 
 fun load_values() {
   frame_data_size: 8
+  entry_gas: 56
   code:
-    0: Charge #4
-    1: StoreImm8 [0] <- #42
-    2: Return
+    0: StoreImm8 [0] <- #42
+    1: Return
 }
 
 fun load_and_store() {
   frame_data_size: 8
+  entry_gas: 4
   code:
-    0: Charge #4
-    1: StoreImm8 [0] <- #10
-    2: Return
+    0: StoreImm8 [0] <- #10
+    1: Return
 }

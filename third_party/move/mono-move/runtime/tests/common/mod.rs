@@ -11,13 +11,26 @@
 
 use mono_move_core::{
     align::{checked_align_max, MAX_ALIGN},
-    storage::resource_provider::StorageKey,
+    storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
     DescriptorId, ResourceProvider, ResourceProviderError, StorageRead, OBJECT_HEADER_SIZE,
 };
 use mono_move_runtime::write_object_header;
 use move_core_types::account_address::AccountAddress;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
+
+/// Builds an interned module id for hand-built test functions.
+#[macro_export]
+macro_rules! program_module_id {
+    ($name:literal) => {{
+        static MODULE_ID: ::mono_move_core::interner::ModuleId =
+            ::mono_move_core::interner::ModuleId::new(
+                ::move_core_types::account_address::AccountAddress::ONE,
+                ::mono_move_alloc::GlobalArenaPtr::from_static($name),
+            );
+        ::mono_move_alloc::GlobalArenaPtr::from_static(&MODULE_ID)
+    }};
+}
 
 /// In-memory [`ResourceProvider`] for tests. Owns the resource
 /// bytes in `Box<[u64]>` buffers (giving `MAX_ALIGN` alignment and
@@ -32,7 +45,7 @@ pub struct InMemoryResources {
     /// Map keys to the data-region pointer of an allocation in
     /// `anchors`. The allocation outlives `self`; the pointer is
     /// safe to hand to `get_resource`.
-    entries: RefCell<HashMap<StorageKey, *const u8>>,
+    entries: RefCell<HashMap<InMemoryStorageKey, *const u8>>,
     anchors: RefCell<Vec<Box<[u64]>>>,
 }
 
@@ -88,13 +101,13 @@ impl InMemoryResources {
     pub fn entries_install(&self, addr: AccountAddress, ty: InternedType, ptr: *const u8) {
         self.entries
             .borrow_mut()
-            .insert(StorageKey::Resource(addr, ty), ptr);
+            .insert(InMemoryStorageKey::resource(addr, ty), ptr);
     }
 }
 
 impl ResourceProvider for InMemoryResources {
-    fn get_resource(&self, key: StorageKey) -> Result<StorageRead, ResourceProviderError> {
-        Ok(match self.entries.borrow().get(&key) {
+    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
+        Ok(match self.entries.borrow().get(key) {
             Some(&ptr) => {
                 // SAFETY: pointer came from `install_anchor`, which
                 // returned the data-region start of a live anchored

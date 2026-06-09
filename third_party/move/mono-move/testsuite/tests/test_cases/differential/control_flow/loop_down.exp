@@ -33,27 +33,23 @@ fun conditional(r0): u64 {
 
 fun loop_down() {
   frame_data_size: 8
+  entry_gas: 3
   code:
-    0: Charge #3
-    1: JumpLessEqualU64Imm @5 [0] <= #0
-    2: Charge #5
-    3: SubU64Imm [0] <- [0] - #1
-    4: Jump @0
-    5: Charge #2
-    6: Return
+    0: JumpLessEqualU64Imm @3 [0] <= #0 gas_taken=2 gas_fallthrough=7
+    1: SubU64Imm [0] <- [0] - #1
+    2: Jump @0 gas=3
+    3: Return
 }
 
 fun conditional() {
   frame_data_size: 16
+  entry_gas: 3
   code:
-    0: Charge #3
-    1: JumpNotZeroByte @6 [0]
-    2: Charge #6
-    3: StoreImm8 [8] <- #0
-    4: Move8 [0] <- [8]
-    5: Return
-    6: Charge #6
-    7: StoreImm8 [8] <- #1
-    8: Move8 [0] <- [8]
-    9: Return
+    0: JumpNotZeroByte @4 [0] gas_taken=56 gas_fallthrough=56
+    1: StoreImm8 [8] <- #0
+    2: Move8 [0] <- [8]
+    3: Return
+    4: StoreImm8 [8] <- #1
+    5: Move8 [0] <- [8]
+    6: Return
 }

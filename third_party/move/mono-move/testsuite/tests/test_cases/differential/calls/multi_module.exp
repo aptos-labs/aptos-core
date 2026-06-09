@@ -25,11 +25,11 @@ fun double(r0): u64 {
 
 fun double() {
   frame_data_size: 16
+  entry_gas: 59
   code:
-    0: Charge #7
-    1: AddU64 [8] <- [0] + [0]
-    2: Move8 [0] <- [8]
-    3: Return
+    0: AddU64 [8] <- [0] + [0]
+    1: Move8 [0] <- [8]
+    2: Return
 }
 === bytecode ===
 // Bytecode version v10
@@ -62,10 +62,10 @@ fun triple(r0): u64 {
 
 fun triple() {
   frame_data_size: 16
+  entry_gas: 64
   code:
-    0: Charge #10
-    1: AddU64 [8] <- [0] + [0]
-    2: AddU64 [8] <- [8] + [0]
-    3: Move8 [0] <- [8]
-    4: Return
+    0: AddU64 [8] <- [0] + [0]
+    1: AddU64 [8] <- [8] + [0]
+    2: Move8 [0] <- [8]
+    3: Return
 }

@@ -6,12 +6,13 @@
 //
 // TODO: move out of the runtime once a layer above it exists.
 
-use crate::ExecutionContext;
+use crate::{error::RuntimeResult, ExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ResourceProvider,
+    types::{InternedType, InternedTypeList},
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
+    ObjectDescriptor, ResourceProvider, ValueLayout,
 };
 use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
@@ -90,6 +91,19 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         )
     }
 
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &[u8])> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        Ok((
+            module.interned_constant_type_at(idx),
+            module.constant_data_at(idx),
+        ))
+    }
+
     fn resource_provider(&self) -> &dyn ResourceProvider {
         self.resource_provider
     }
@@ -98,5 +112,15 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
 impl<'guard, 'ctx, G: GasMeter> DescriptorProvider for TransactionContext<'guard, 'ctx, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.loader.guard().descriptor(id)
+    }
+}
+
+impl<'guard, 'ctx, G: GasMeter> LayoutProvider for TransactionContext<'guard, 'ctx, G> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard().layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard().layout_id(ty)
     }
 }
