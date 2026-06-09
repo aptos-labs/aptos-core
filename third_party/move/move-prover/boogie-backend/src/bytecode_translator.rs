@@ -13,9 +13,9 @@ use crate::{
         boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
         boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
-        boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
-        boogie_native_spec_fun_name, boogie_num_literal, boogie_num_type_base,
-        boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
+        boogie_function_name, boogie_int_suffix, boogie_make_vec_from_strings,
+        boogie_modifies_memory_name, boogie_native_spec_fun_name, boogie_num_literal,
+        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_name,
         boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
         boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
         boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
@@ -720,8 +720,9 @@ impl<'env> BoogieTranslator<'env> {
                 }
                 emit!(
                     self.writer,
-                    "p{}: {}",
+                    "p{}_v{}: {}",
                     pos,
+                    idx,
                     boogie_type(self.env, captured_ty, false)
                 )
             }
@@ -780,6 +781,13 @@ impl<'env> BoogieTranslator<'env> {
             "function $IsValid'{}'(x: {}): bool {{ true }}",
             boogie_type_suffix(self.env, fun_type, false),
             fun_ty_boogie_name
+        );
+        emitln!(
+            self.writer,
+            "function {{:inline}} $IsEqual'{}'(v1: {}, v2: {}): bool {{ v1 == v2 }}",
+            boogie_type_suffix(self.env, fun_type, false),
+            fun_ty_boogie_name,
+            fun_ty_boogie_name,
         );
 
         // Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.
@@ -974,7 +982,7 @@ impl<'env> BoogieTranslator<'env> {
             let fun_env = &self.env.get_function(info.fun.to_qualified_id());
             let fun_name = boogie_function_name(fun_env, &info.fun.inst, &[]);
             let args = (0..info.mask.captured_count())
-                .map(|pos| format!("fun->p{}", pos))
+                .map(|pos| format!("fun->p{}_v{}", pos, idx))
                 .chain((0..params.len()).map(|pos| format!("p{}", pos)))
                 .join(", ");
             let call_prefix = if result_str.is_empty() {
@@ -990,6 +998,7 @@ impl<'env> BoogieTranslator<'env> {
             if fun_env.is_opaque() || !has_inline {
                 self.emit_opaque_closure_body(
                     info,
+                    idx,
                     fun_env,
                     &params,
                     results,
@@ -1253,6 +1262,7 @@ impl<'env> BoogieTranslator<'env> {
     fn emit_opaque_closure_body(
         &self,
         info: &ClosureInfo,
+        variant_idx: usize,
         fun_env: &FunctionEnv,
         params: &[Type],
         results: &Type,
@@ -1262,7 +1272,7 @@ impl<'env> BoogieTranslator<'env> {
         // Build args for ALL callee params by interleaving captured and non-captured
         // using ClosureMask::compose.
         let captured_args: Vec<String> = (0..info.mask.captured_count())
-            .map(|pos| format!("fun->p{}", pos))
+            .map(|pos| format!("fun->p{}_v{}", pos, variant_idx))
             .collect();
         let callee_param_tys = fun_env.get_parameter_types();
         let non_captured_args: Vec<String> = callee_param_tys
@@ -6547,77 +6557,11 @@ impl FunctionTranslator<'_> {
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
 
+                        let suffix = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
+                        // Quirk: U8 omits the _unchecked suffix even when set.
                         let add_type = match &self.get_local_type(dest) {
-                            Type::Primitive(PrimitiveType::U8) => {
-                                boogie_num_type_string_capital("U", "8", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U16) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("U", "16", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::U32) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("U", "32", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::U64) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("U", "64", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::U128) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("U", "128", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::U256) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("U", "256", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::I8) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("I", "8", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::I16) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("I", "16", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::I32) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("I", "32", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::I64) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("I", "64", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::I128) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("I", "128", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(PrimitiveType::I256) => format!(
-                                "{}{}",
-                                boogie_num_type_string_capital("I", "256", bv_flag),
-                                unchecked
-                            ),
-                            Type::Primitive(_)
-                            | Type::Tuple(_)
-                            | Type::Vector(_)
-                            | Type::Struct(_, _, _)
-                            | Type::TypeParameter(_)
-                            | Type::Reference(_, _)
-                            | Type::Fun(..)
-                            | Type::TypeDomain(_)
-                            | Type::ResourceDomain(_, _, _)
-                            | Type::StateDomain
-                            | Type::Error
-                            | Type::Var(_) => unreachable!(),
+                            Type::Primitive(PrimitiveType::U8) => suffix,
+                            _ => format!("{}{}", suffix, unchecked),
                         };
                         emitln!(
                             writer,
@@ -6636,56 +6580,7 @@ impl FunctionTranslator<'_> {
                             .get_temp_index_oper(mid, fid, dest, baseline_flag)
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
-                        let sub_type = match &self.get_local_type(dest) {
-                            Type::Primitive(PrimitiveType::U8) => {
-                                boogie_num_type_string_capital("U", "8", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U16) => {
-                                boogie_num_type_string_capital("U", "16", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U32) => {
-                                boogie_num_type_string_capital("U", "32", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U64) => {
-                                boogie_num_type_string_capital("U", "64", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U128) => {
-                                boogie_num_type_string_capital("U", "128", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U256) => {
-                                boogie_num_type_string_capital("U", "256", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I8) => {
-                                boogie_num_type_string_capital("I", "8", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I16) => {
-                                boogie_num_type_string_capital("I", "16", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I32) => {
-                                boogie_num_type_string_capital("I", "32", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I64) => {
-                                boogie_num_type_string_capital("I", "64", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I128) => {
-                                boogie_num_type_string_capital("I", "128", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I256) => {
-                                boogie_num_type_string_capital("I", "256", bv_flag)
-                            },
-                            Type::Primitive(_)
-                            | Type::Tuple(_)
-                            | Type::Vector(_)
-                            | Type::Struct(_, _, _)
-                            | Type::TypeParameter(_)
-                            | Type::Reference(_, _)
-                            | Type::Fun(..)
-                            | Type::TypeDomain(_)
-                            | Type::ResourceDomain(_, _, _)
-                            | Type::StateDomain
-                            | Type::Error
-                            | Type::Var(_) => unreachable!(),
-                        };
+                        let sub_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
                             "call {} := $Sub{}({}, {});",
@@ -6703,56 +6598,7 @@ impl FunctionTranslator<'_> {
                             .get_temp_index_oper(mid, fid, dest, baseline_flag)
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
-                        let mul_type = match &self.get_local_type(dest) {
-                            Type::Primitive(PrimitiveType::U8) => {
-                                boogie_num_type_string_capital("U", "8", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U16) => {
-                                boogie_num_type_string_capital("U", "16", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U32) => {
-                                boogie_num_type_string_capital("U", "32", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U64) => {
-                                boogie_num_type_string_capital("U", "64", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U128) => {
-                                boogie_num_type_string_capital("U", "128", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::U256) => {
-                                boogie_num_type_string_capital("U", "256", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I8) => {
-                                boogie_num_type_string_capital("I", "8", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I16) => {
-                                boogie_num_type_string_capital("I", "16", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I32) => {
-                                boogie_num_type_string_capital("I", "32", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I64) => {
-                                boogie_num_type_string_capital("I", "64", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I128) => {
-                                boogie_num_type_string_capital("I", "128", bv_flag)
-                            },
-                            Type::Primitive(PrimitiveType::I256) => {
-                                boogie_num_type_string_capital("I", "256", bv_flag)
-                            },
-                            Type::Primitive(_)
-                            | Type::Tuple(_)
-                            | Type::Vector(_)
-                            | Type::Struct(_, _, _)
-                            | Type::TypeParameter(_)
-                            | Type::Reference(_, _)
-                            | Type::Fun(..)
-                            | Type::TypeDomain(_)
-                            | Type::ResourceDomain(_, _, _)
-                            | Type::StateDomain
-                            | Type::Error
-                            | Type::Var(_) => unreachable!(),
-                        };
+                        let mul_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
                             "call {} := $Mul{}({}, {});",
@@ -6770,30 +6616,7 @@ impl FunctionTranslator<'_> {
                             .get_temp_index_oper(mid, fid, dest, baseline_flag)
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
-                        let div_type = if bv_flag {
-                            match &self.get_local_type(dest) {
-                                Type::Primitive(PrimitiveType::U8) => "Bv8".to_string(),
-                                Type::Primitive(PrimitiveType::U16) => "Bv16".to_string(),
-                                Type::Primitive(PrimitiveType::U32) => "Bv32".to_string(),
-                                Type::Primitive(PrimitiveType::U64) => "Bv64".to_string(),
-                                Type::Primitive(PrimitiveType::U128) => "Bv128".to_string(),
-                                Type::Primitive(PrimitiveType::U256) => "Bv256".to_string(),
-                                Type::Primitive(_)
-                                | Type::Tuple(_)
-                                | Type::Vector(_)
-                                | Type::Struct(_, _, _)
-                                | Type::TypeParameter(_)
-                                | Type::Reference(_, _)
-                                | Type::Fun(..)
-                                | Type::TypeDomain(_)
-                                | Type::ResourceDomain(_, _, _)
-                                | Type::StateDomain
-                                | Type::Error
-                                | Type::Var(_) => unreachable!(),
-                            }
-                        } else {
-                            "".to_string()
-                        };
+                        let div_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
                             "call {} := $Div{}({}, {});",
@@ -6811,30 +6634,7 @@ impl FunctionTranslator<'_> {
                             .get_temp_index_oper(mid, fid, dest, baseline_flag)
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
-                        let mod_type = if bv_flag {
-                            match &self.get_local_type(dest) {
-                                Type::Primitive(PrimitiveType::U8) => "Bv8".to_string(),
-                                Type::Primitive(PrimitiveType::U16) => "Bv16".to_string(),
-                                Type::Primitive(PrimitiveType::U32) => "Bv32".to_string(),
-                                Type::Primitive(PrimitiveType::U64) => "Bv64".to_string(),
-                                Type::Primitive(PrimitiveType::U128) => "Bv128".to_string(),
-                                Type::Primitive(PrimitiveType::U256) => "Bv256".to_string(),
-                                Type::Primitive(_)
-                                | Type::Tuple(_)
-                                | Type::Vector(_)
-                                | Type::Struct(_, _, _)
-                                | Type::TypeParameter(_)
-                                | Type::Reference(_, _)
-                                | Type::Fun(..)
-                                | Type::TypeDomain(_)
-                                | Type::ResourceDomain(_, _, _)
-                                | Type::StateDomain
-                                | Type::Error
-                                | Type::Var(_) => unreachable!(),
-                            }
-                        } else {
-                            "".to_string()
-                        };
+                        let mod_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
                             "call {} := $Mod{}({}, {});",

@@ -605,6 +605,8 @@ pub struct GlobalEnv {
     pub(crate) next_free_node_id: RefCell<usize>,
     /// A map from node id to associated information of the expression.
     pub(crate) exp_info: RefCell<BTreeMap<NodeId, ExpInfo>>,
+    /// SMT-LIB `:weight N` annotation per quantifier `NodeId`.
+    pub(crate) quant_weights: RefCell<BTreeMap<NodeId, u32>>,
     /// Sparse map tracking which AST nodes originated from syntactic sugar.
     /// Only populated for nodes that were desugared from concise syntax.
     /// Note: this mapping is not yet guaranteed to survive all AST rewrites,
@@ -700,6 +702,7 @@ impl GlobalEnv {
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
             exp_info: Default::default(),
+            quant_weights: Default::default(),
             surface_syntax: Default::default(),
             module_data: vec![],
             global_id_counter: RefCell::new(0),
@@ -2717,6 +2720,12 @@ impl GlobalEnv {
         if let Some(info) = opt_info {
             self.exp_info.borrow_mut().insert(id, info.clone());
         }
+        // Two statements (not `if let ... borrow_mut()`): the `if let` would hold an
+        // immutable `Ref` through the then-branch and clash with the `borrow_mut`.
+        let weight = self.quant_weights.borrow().get(&node_id).copied();
+        if let Some(weight) = weight {
+            self.quant_weights.borrow_mut().insert(id, weight);
+        }
         id
     }
 
@@ -2725,6 +2734,16 @@ impl GlobalEnv {
         let mut mods = self.exp_info.borrow_mut();
         let info = mods.get_mut(&node_id).expect("node exist");
         info.ty = ty;
+    }
+
+    /// Sets the SMT-LIB `:weight N` annotation for a quantifier node.
+    pub fn set_quant_weight(&self, node_id: NodeId, weight: u32) {
+        self.quant_weights.borrow_mut().insert(node_id, weight);
+    }
+
+    /// Returns the SMT-LIB `:weight N` annotation for a quantifier node, if set.
+    pub fn get_quant_weight(&self, node_id: NodeId) -> Option<u32> {
+        self.quant_weights.borrow().get(&node_id).copied()
     }
 
     /// Sets instantiation for the given node id. Must not have been set before.

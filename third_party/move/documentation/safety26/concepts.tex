@@ -1,0 +1,94 @@
+
+\begin{masm_figure}{Move bytecode syntax}{fig:syntax}
+\begin{array}{l@{\,}c@{\,}l@{\quad}}
+\tau    & ::= & u64 \mid bool \mid s\langle\sq\tau\rangle \mid \Bor \tau \mid \MutBor \tau \\
+m       & ::= & \mathrm{mut} \mid \mathrm{imm} \\[0.6ex]
+o       & ::= & \MOVELOC\ l \mid \COPYLOC\ l \mid \BORROWLOC\ m\ l \mid \BORROWFIELD\ m\ g \\
+        &     & \mid \READREF \mid \WRITEREF \mid \PACK\ s \mid \UNPACK\ s \\
+        &     & \mid \BRTRUE\ \ell \mid \EVAL\ op \mid \CALL\ f\langle\sq\tau\rangle \mid \RET \\
+\end{array}
+\end{masm_figure}
+
+\begin{masm_figure}{Small-step transitions}{fig:semantics}
+\sigma  ::= \langle F,\ S \rangle        \quad
+F ::= \varepsilon \mid F \cdot  \langle L,\ P \rangle         \quad
+\pi ::= \varepsilon \mid \pi \cdot g      \quad % \quad\quad\quad
+r ::= (i,\ l,\ \pi)                      \quad % \quad\quad\quad
+P ::= \varepsilon \mid o \cdot P         \quad % \quad\quad\quad
+\Also
+\begin{array}{l@{\,}c@{\,}l}
+\langle F \cdot \langle L, \CALL\ f\langle\sq\tau\rangle \cdot P\rangle,\ S \cdot \sq{v}\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle \cdot \langle \sq\tau(L_f), \sq\tau(P_f\rangle),\ S\rangle \\
+\langle F \cdot \langle L, \RET \cdot P\rangle,\ S\rangle
+  & \to &
+  \langle F,\ S\rangle \\
+\langle F \cdot \langle L, \MOVELOC\ l \cdot P\rangle,\ S\rangle
+  & \to &
+  \langle F \cdot \langle L[l\mapsto\bot], P\rangle,\ S \cdot L(l)\rangle \\
+\langle F \cdot \langle L, \COPYLOC\ l \cdot P\rangle, S\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot L(l)\rangle \\
+\langle F \cdot \langle L, \BORROWLOC\ m\ l \cdot P\rangle, S\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot (\mathrm{index}(F), l, \varepsilon)\rangle \\
+\langle F \cdot \langle L, \BORROWFIELD\ m\ g \cdot P\rangle,\ S \cdot (i, l, \pi)\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot (i, l, \pi \cdot g)\rangle \\
+\langle \hat F = F \cdot \langle L, \READREF \cdot P\rangle, S \cdot (i, l, \pi)\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot \hat F[i][l][\pi] \rangle \\
+\langle \hat F = F \cdot \langle L, \WRITEREF \cdot P\rangle, S \cdot (i, l, \pi) \cdot v\rangle
+  & \to &
+  \langle \hat F[ i \mapsto \langle \hat F[i.l.\pi \mapsto v], P\rangle, S\rangle \\
+\langle F \cdot \langle L, \PACK\ s \cdot P\rangle,\ S \cdot \sq{v}\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot s(\sq{v})\rangle \\
+\langle F \cdot \langle L, \UNPACK\ s \cdot P\rangle,\ S \cdot s(\sq{v})\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot \sq{v}\rangle \\
+\langle F \cdot \langle L, \EVAL\ op \cdot P\rangle,\ S \cdot \sq{v}\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S \cdot op(\sq{v})\rangle \\
+\langle F \cdot \langle L, \BRTRUE\ \ell \cdot P\rangle,\ S \cdot \mathrm{true}\rangle
+  & \to &
+  \langle F \cdot \langle L, P_f[\ell..]\rangle,\ S\rangle \\
+\langle F \cdot \langle L, \BRTRUE\ \ell \cdot P\rangle,\ S \cdot \mathrm{false}\rangle
+  & \to &
+  \langle F \cdot \langle L, P\rangle,\ S\rangle \\
+
+\end{array}
+\end{masm_figure}
+
+\subsection{Concepts}
+\label{sec:concepts}
+
+The runtime checks operate over Move's typed bytecode.
+Figure~\ref{fig:syntax} gives the bytecode syntax and Figure~\ref{fig:semantics} the small-step semantics used in the rest of this section.
+We model basic types, operations, and structs with borrowing paths; among others, global resource storage and higher-order functions are left out for brevity of the discussion.
+
+In instructions, $l$ ranges over local indices, $f$ over function names, $s$ over struct names, $g$ over field names, and $\sq{\tau}$ over type-argument vectors.
+A struct value is written $s(\sq{v})$ for struct $s$ with field values $\sq{v}$.
+A configuration $\sigma = \langle F, S\rangle$ pairs a call stack $F$ of frames with a global operand stack $S$; the stack grows to the right ($S \cdot v$ denotes $S$ extended with $v$ on top), and the rightmost frame of $F$ is the active one whose remaining instructions drive the next transition.
+Each frame $\langle L, P\rangle$ holds a locals map $L$ together with the instruction stream $P$ to continue on return.
+We write $\hat F$ for the full stack $F \cdot \langle L, P\rangle$ when its tail has been pattern-matched, and $\mathrm{index}(F)$ for the number of frames below the active frame --- equivalently, the active frame's index.
+
+A reference is a triple $(i, l, \pi)$ where $i$ is an offset into the frame stack $F$, $l$ is a local in that frame, and $\pi$ is a field path into the value at $L[l]$.
+$\BORROWLOC\ m\ l$ pushes $(\mathrm{index}(F), l, \varepsilon)$, a reference to the active frame's local $l$ with empty path; the modifier $m \in \{\mathrm{mut}, \mathrm{imm}\}$ tracks whether the borrow allows mutation, but does not affect the runtime value.
+$\BORROWFIELD\ m\ g$ extends the path on the top reference by one field $g$.
+$\READREF$ reads the value reached by navigating $\pi$ in $\hat F[i]_L[l]$, written $\hat F[i]_L[l] \,@\, \pi$, and $\WRITEREF$ writes back at that path, using $v\{\pi := v'\}$ to denote the value $v$ with its sub-value at path $\pi$ replaced by $v'$.
+For each reference $r = (i, l, \pi)$, the static (monomorphized) type $\tau(r)$ is known in the context of $F$.
+
+$\PACK\ s$ pops the field values $\sq{v}$ from $S$ and pushes the struct value $s(\sq{v})$; $\UNPACK\ s$ does the reverse.
+
+$\CALL\ f\langle\sq\tau\rangle$ pops the arguments $\sq{v}$ from $S$ and pushes a fresh frame $\langle L_f, P_f\rangle$, where $L_f$ initializes $f$'s parameters from $\sq{v}$ (the remaining locals set to $\bot$) and $P_f$ is $f$'s body; the caller's continuation $P$ is preserved in the now-suspended caller frame.
+For a generic function, the new locals will have types instantiated by the type parameters $\sq\tau$.
+$\RET$ pops the active frame, returning execution to the caller's preserved continuation.
+$\BRTRUE\ \ell$ pops a boolean: if true, the active frame's continuation is replaced by $P_f[\ell..]$, the suffix of $f$'s body starting at label $\ell$; if false, execution falls through to $P$.
+
+
+ %$l$ ranges over local indices, $S$ over (instantiated) struct types, $f$ over function names, and $\sq{\tau}$ over type-argument vectors.}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

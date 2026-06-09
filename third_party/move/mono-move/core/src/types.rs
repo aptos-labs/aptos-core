@@ -183,7 +183,6 @@ pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
 #[derive(Copy, Clone)]
 pub struct FieldLayout {
     pub offset: FieldOffset,
-    #[allow(dead_code)]
     ty: InternedType,
 }
 
@@ -191,6 +190,11 @@ impl FieldLayout {
     /// Creates a new field layout entry.
     pub fn new(offset: FieldOffset, ty: InternedType) -> Self {
         Self { offset, ty }
+    }
+
+    /// Returns the interned type of this field.
+    pub fn ty(&self) -> InternedType {
+        self.ty
     }
 }
 

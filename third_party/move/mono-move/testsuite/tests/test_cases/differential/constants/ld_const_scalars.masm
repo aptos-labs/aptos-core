@@ -1,0 +1,107 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun c_bool_true(): bool
+    ld_const<bool> 1
+    ret
+
+fun c_bool_false(): bool
+    ld_const<bool> 0
+    ret
+
+fun c_u8(): u8
+    ld_const<u8> 255
+    ret
+
+fun c_u16(): u16
+    ld_const<u16> 65535
+    ret
+
+fun c_u32(): u32
+    ld_const<u32> 4294967295
+    ret
+
+fun c_u64(): u64
+    ld_const<u64> 18446744073709551615
+    ret
+
+fun c_u128(): u128
+    ld_const<u128> 340282366920938463463374607431768211455
+    ret
+
+fun c_u256(): u256
+    ld_const<u256> 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ret
+
+fun c_i8(): i8
+    ld_const<i8> -128
+    ret
+
+fun c_i16(): i16
+    ld_const<i16> -32768
+    ret
+
+fun c_i32(): i32
+    ld_const<i32> -2147483648
+    ret
+
+fun c_i64(): i64
+    ld_const<i64> -9223372036854775808
+    ret
+
+fun c_i128(): i128
+    ld_const<i128> -170141183460469231731687303715884105728
+    ret
+
+fun c_i256(): i256
+    ld_const<i256> -57896044618658097711785492504343953926634992332820282019728792003956564819968
+    ret
+
+fun c_address(): address
+    ld_const<address> 0xCAFE
+    ret
+
+// RUN: execute 0x66::test::c_bool_true
+// CHECK: results: true
+
+// RUN: execute 0x66::test::c_bool_false
+// CHECK: results: false
+
+// RUN: execute 0x66::test::c_u8
+// CHECK: results: 255
+
+// RUN: execute 0x66::test::c_u16
+// CHECK: results: 65535
+
+// RUN: execute 0x66::test::c_u32
+// CHECK: results: 4294967295
+
+// RUN: execute 0x66::test::c_u64
+// CHECK: results: 18446744073709551615
+
+// RUN: execute 0x66::test::c_u128
+// CHECK: results: 340282366920938463463374607431768211455
+
+// RUN: execute 0x66::test::c_u256
+// CHECK: results: 115792089237316195423570985008687907853269984665640564039457584007913129639935
+
+// RUN: execute 0x66::test::c_i8
+// CHECK: results: -128
+
+// RUN: execute 0x66::test::c_i16
+// CHECK: results: -32768
+
+// RUN: execute 0x66::test::c_i32
+// CHECK: results: -2147483648
+
+// RUN: execute 0x66::test::c_i64
+// CHECK: results: -9223372036854775808
+
+// RUN: execute 0x66::test::c_i128
+// CHECK: results: -170141183460469231731687303715884105728
+
+// RUN: execute 0x66::test::c_i256
+// CHECK: results: -57896044618658097711785492504343953926634992332820282019728792003956564819968
+
+// RUN: execute 0x66::test::c_address
+// CHECK: results: 0xcafe

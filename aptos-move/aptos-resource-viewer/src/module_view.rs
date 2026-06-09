@@ -40,7 +40,10 @@ pub struct ModuleView<'a, S> {
 
 impl<'a, S: StateView> ModuleView<'a, S> {
     pub fn new(state_view: &'a S) -> Self {
-        let features = Features::fetch_config(state_view).unwrap_or_default();
+        let features = Features::fetch_config(state_view)
+            .ok()
+            .flatten()
+            .unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features);
 
         Self {

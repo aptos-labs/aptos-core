@@ -1,0 +1,19 @@
+=== stackless ===
+// module 0x1::test
+
+fun identity(r0): address {
+  slots: params(1), locals(0), temps(0)
+    r0: address
+  code:
+  L0:
+    0: ret [r0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun identity() {
+  frame_data_size: 32
+  entry_gas: 198
+  code:
+    0: Return
+}

@@ -13,7 +13,7 @@ use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const FORMATTER_BINARY_NAME: &str = "movefmt";
-const TARGET_FORMATTER_VERSION: &str = "1.5.1";
+const TARGET_FORMATTER_VERSION: &str = "1.5.3";
 
 const FORMATTER_EXE_ENV: &str = "FORMATTER_EXE";
 #[cfg(target_os = "windows")]
@@ -25,7 +25,7 @@ const FORMATTER_EXE: &str = "movefmt";
 #[derive(Debug, Parser)]
 pub struct FormatterUpdateTool {
     /// The owner of the repo to download the binary from.
-    #[clap(long, default_value = "movebit")]
+    #[clap(long, default_value = "aptos-labs")]
     repo_owner: String,
 
     /// The name of the repo to download the binary from.

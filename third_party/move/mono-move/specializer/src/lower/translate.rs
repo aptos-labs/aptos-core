@@ -4,58 +4,118 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use super::{
-    context::{concrete_type_size, LoweringContext, SlotInfo, TypedSlot},
+    context::{concrete_type_size, CallSiteInfo, LoweringContext, TypedSlot},
     gc_layout::type_pointer_offsets,
     parallel_copy,
 };
-use crate::stackless_exec_ir::{
-    instr_utils::{clobbers_xfer, for_each_use},
-    BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
+use crate::{
+    gas,
+    stackless_exec_ir::{
+        instr_utils::{clobbers_xfer, for_each_value_use, is_fallthrough_terminator},
+        BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
+    },
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use mono_move_core::{
+    native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
-    CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, SafePointEntry, ShiftOperand,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp,
+    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp,
+    JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, ValueCmpOp,
+    ValueRefCmpOp, FRAME_METADATA_SIZE,
 };
+use move_binary_format::file_format::{ConstantPoolIndex, FieldHandleIndex};
+
+/// Validates that a primitive constant's BCS bytes are exactly `N` wide and
+/// returns them as a fixed array. Fixed-width integers and `address` encode
+/// with no length prefix, so these bytes are already the in-memory
+/// representation the matching `StoreImm` expects.
+fn const_imm<const N: usize>(idx: ConstantPoolIndex, bytes: &[u8]) -> Result<[u8; N]> {
+    bytes.try_into().map_err(|_| {
+        anyhow!(
+            "LdConst at constant pool index {}: expected {}-byte constant data, got {}",
+            idx.0,
+            N,
+            bytes.len()
+        )
+    })
+}
+
+/// Temporary result of lowering a function to micro-ops.
+pub(super) struct LoweredFunction {
+    pub code: Vec<MicroOp>,
+    /// Static cost of the entry basic block.
+    pub entry_gas: u64,
+    /// One entry **per allocating micro-op only**, in code-offset order.
+    /// Non-allocating PCs are not represented; the vector is sparse.
+    /// Each entry's `code_offset` indexes directly into `code`.
+    pub safe_points: Vec<SafePointEntry>,
+}
 
 /// Lower a slot-allocated function to its micro-op form.
-///
-/// Returns `(ops, safe_points)`:
-/// - `ops` — pre-instrumentation micro-ops in emission order.
-/// - `safe_points` — one entry **per allocating micro-op only**,
-///   in code-offset order. Non-allocating PCs are not represented;
-///   the vector is sparse. Each entry's `code_offset` indexes
-///   directly into `ops`.
-pub fn lower_function(
+pub(super) fn lower_function(
     func_ir: &FunctionIR,
     ctx: &LoweringContext,
-) -> Result<(Vec<MicroOp>, Vec<SafePointEntry>)> {
+) -> Result<LoweredFunction> {
     let mut state = LoweringState::new(func_ir, ctx);
-    for block in &func_ir.blocks {
+    for (block_idx, block) in func_ir.blocks.iter().enumerate() {
         // Xfer slots are block-local.
         debug_assert!(
             state.xfer_bindings.iter().all(Option::is_none),
             "xfer_bindings not fully cleared at block boundary",
         );
         debug_assert!(
-            state.pending_def_bind.is_none(),
-            "pending_def_bind not committed at block boundary",
+            state.pending_def_binds.is_empty(),
+            "pending_def_binds not committed at block boundary",
         );
         state.xfer_bindings.fill(None);
         state.label_map[block.label.0 as usize] = Some(state.out_buf.len() as u32);
         for instr in &block.instrs {
+            // Cost is computed before lowering so Xfer operand bindings are live.
+            let cost = gas::instr_cost(instr, &state)?;
+            state.block_costs[block.label.0 as usize] += cost;
             state.lower_instr(func_ir, instr)?;
             state.commit_xfer_bindings_after(instr);
         }
+        // Record a conditional branch's fallthrough block (the next in emission
+        // order) on its fixup, so `fixup_branches` can write that block's cost
+        // into the jump's `gas_fallthrough`.
+        if block.instrs.last().is_some_and(is_fallthrough_terminator) {
+            let fallthrough = func_ir.blocks.get(block_idx + 1).ok_or_else(|| {
+                anyhow::anyhow!("conditional terminator in final block has no fallthrough block")
+            })?;
+            let fixup = state
+                .branch_fixups
+                .last_mut()
+                .expect("conditional terminator must have pushed a branch fixup");
+            fixup.fallthrough_label = Some(fallthrough.label);
+        }
     }
     state.fixup_branches()?;
-    Ok((state.out_buf, state.pending_safe_points))
+    let entry_gas = func_ir
+        .blocks
+        .first()
+        .map(|entry| state.block_costs[entry.label.0 as usize])
+        .unwrap_or_default();
+    Ok(LoweredFunction {
+        code: state.out_buf,
+        entry_gas,
+        safe_points: state.pending_safe_points,
+    })
+}
+
+/// A branch micro-op awaiting target resolution and gas fill-in.
+struct BranchFixup {
+    /// Index in `out_buf` of the branch micro-op.
+    idx: usize,
+    /// For a conditional branch, the label of the fallthrough block (the next
+    /// block in emission order). `None` for an unconditional branch.
+    fallthrough_label: Option<Label>,
 }
 
 struct LoweringState<'a> {
     /// Read-only frame layout for the function being lowered.
-    ctx: &'a LoweringContext,
+    ctx: &'a LoweringContext<'a>,
     /// Output buffer. Micro-ops are appended in emit order.
     out_buf: Vec<MicroOp>,
     /// `Label(i)` → index in `out_buf` where block `i` begins. Dense
@@ -63,15 +123,26 @@ struct LoweringState<'a> {
     /// Read by `fixup_branches` to resolve branch targets after all
     /// blocks are emitted.
     label_map: Vec<Option<u32>>,
-    /// Indices into `out_buf` of branch micro-ops whose `target` was
-    /// emitted with a placeholder label encoding. `fixup_branches`
-    /// walks this list and rewrites each target to the real micro-op
-    /// index from `label_map`.
-    branch_fixups: Vec<usize>,
+    /// `Label(i)` → static gas cost of block `i`, summed as the block lowers.
+    /// Dense (one entry per block). Once the block loop has costed every block,
+    /// `lower_function` reads it: `fixup_branches` copies each cost into the
+    /// jumps targeting that block, and block 0's cost becomes `entry_gas`.
+    block_costs: Vec<u64>,
+    /// Branch micro-ops emitted with a placeholder label encoding (and
+    /// placeholder gas). `fixup_branches` walks this list and rewrites each
+    /// target to the real micro-op index from `label_map`, and fills in the
+    /// jump's gas fields from the per-block costs.
+    branch_fixups: Vec<BranchFixup>,
     /// Monotonic cursor into `ctx.call_sites`. Before a call is lowered,
     /// it points at *that* call's `CallSiteInfo`; immediately after the
     /// `CallFunc` op is emitted, it advances by one.
     call_site_cursor: usize,
+    /// Monotonic cursor into `ctx.closure_pack_sites`; advances once per
+    /// lowered `Instr::PackClosure`.
+    closure_pack_cursor: usize,
+    /// Monotonic cursor into `ctx.closure_call_sites`; advances once per
+    /// lowered `Instr::CallClosure`.
+    closure_call_cursor: usize,
     /// Types of the function IR's home (frame-resident) slots, indexed
     /// by Home slot id.
     home_slot_types: &'a [InternedType],
@@ -79,29 +150,65 @@ struct LoweringState<'a> {
     /// live value visible to the GC; `None` otherwise. Length
     /// `ctx.num_xfer_positions`.
     xfer_bindings: Vec<Option<TypedSlot>>,
-    /// Holds at most one pending Xfer binding. `Some((j, ts))`
-    /// means `Xfer(j)` is to be bound to typed slot `ts`; `None`
-    /// means no binding is pending.
-    pending_def_bind: Option<(u16, TypedSlot)>,
+    /// Xfer bindings staged by the current IR instruction's defs and
+    /// committed by `commit_xfer_bindings_after`. Each tuple is
+    /// `(j, typed_slot)`: the Xfer position `j` and the value bound there.
+    pending_def_binds: Vec<(u16, TypedSlot)>,
     /// Safe-point entries in code-offset order. Populated by `emit`
     /// when `op.is_allocating()`.
     pending_safe_points: Vec<SafePointEntry>,
 }
 
+impl gas::CostContext for LoweringState<'_> {
+    fn slot_size(&self, slot: Slot) -> Result<u32> {
+        Ok(self.slot(slot)?.size)
+    }
+
+    fn slot_ty(&self, slot: Slot) -> Result<InternedType> {
+        self.slot_interned_type(slot)
+    }
+
+    fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<u32> {
+        Ok(self.resolve_field(struct_ty, fh)?.1)
+    }
+}
+
 impl<'a> LoweringState<'a> {
-    fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext) -> Self {
+    fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext<'a>) -> Self {
         let num_xfer_positions = ctx.num_xfer_positions as usize;
         LoweringState {
             ctx,
             out_buf: Vec::new(),
             label_map: vec![None; func_ir.blocks.len()],
+            block_costs: vec![0u64; func_ir.blocks.len()],
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
+            closure_pack_cursor: 0,
+            closure_call_cursor: 0,
             home_slot_types: &func_ir.home_slot_types,
             xfer_bindings: vec![None; num_xfer_positions],
-            pending_def_bind: None,
+            pending_def_binds: Vec::new(),
             pending_safe_points: Vec::new(),
         }
+    }
+
+    /// Resolve a `FieldHandleIndex` against the struct type `struct_ty`
+    /// and return `(field_byte_offset, field_byte_size)`.
+    fn resolve_field(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<(u32, u32)> {
+        let layout = view_type(struct_ty)
+            .layout()
+            .ok_or_else(|| anyhow::anyhow!("struct type has no layout populated"))?;
+        let fields = layout
+            .field_layouts()
+            .ok_or_else(|| anyhow::anyhow!("nominal type is not a struct (no field layouts)"))?;
+        let pos = self.ctx.module.field_position_at(fh) as usize;
+        let field = fields
+            .get(pos)
+            .ok_or_else(|| anyhow::anyhow!("field index {} out of range for struct", pos))?;
+        let (size, _) = view_type(field.ty())
+            .size_and_align()
+            .ok_or_else(|| anyhow::anyhow!("field type has no concrete size"))?;
+        Ok((field.offset, size))
     }
 
     fn xfer_binding(&self, j: u16) -> Result<TypedSlot> {
@@ -109,7 +216,7 @@ impl<'a> LoweringState<'a> {
             .with_context(|| format!("Xfer({}) read without a prior def in this block", j))
     }
 
-    fn slot(&self, slot: Slot) -> Result<SlotInfo> {
+    fn slot(&self, slot: Slot) -> Result<SizedSlot> {
         Ok(match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => self.xfer_binding(j)?.slot,
@@ -120,22 +227,44 @@ impl<'a> LoweringState<'a> {
     /// Returns layout info for a destination slot. For
     /// `Slot::Xfer(j)`, stages a pending binding from `Xfer(j)` to
     /// the typed slot at arg position `j` of the upcoming call.
-    /// Errors if a binding is already staged or for `Slot::Vid`.
-    fn def_slot(&mut self, slot: Slot) -> Result<SlotInfo> {
+    /// Errors for `Slot::Vid`.
+    fn def_slot(&mut self, slot: Slot) -> Result<SizedSlot> {
         Ok(match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => {
                 let call_site = &self.ctx.call_sites[self.call_site_cursor];
                 let typed_slot = call_site.arg_slots[j as usize];
-                debug_assert!(
-                    self.pending_def_bind.is_none(),
-                    "second Xfer def_slot in one IR instr",
-                );
-                self.pending_def_bind = Some((j, typed_slot));
+                self.pending_def_binds.push((j, typed_slot));
                 typed_slot.slot
             },
             Slot::Vid(i) => bail!("Vid({}) in post-allocation IR", i),
         })
+    }
+
+    /// Resolves each `slot` to its [`SizedSlot`] frame layout.
+    fn slots_to_sized_slots(&self, slots: &[Slot]) -> Result<Vec<SizedSlot>> {
+        slots.iter().map(|slot| self.slot(*slot)).collect()
+    }
+
+    /// Place a call's return values; `ret_slots` are their caller-frame
+    /// locations. The call clobbers the whole callee region, so clear all Xfer
+    /// bindings, then re-bind each `Xfer` ret (for GC) and copy each `Home` in.
+    fn bind_call_returns(&mut self, rets: &[Slot], ret_slots: &[TypedSlot]) -> Result<()> {
+        self.xfer_bindings.fill(None);
+        for (k, ret_slot) in rets.iter().enumerate() {
+            match *ret_slot {
+                Slot::Xfer(j) => {
+                    self.xfer_bindings[j as usize] = Some(ret_slots[k]);
+                },
+                Slot::Home(i) => {
+                    let src = ret_slots[k].slot;
+                    let dst = self.ctx.home_slots[i as usize];
+                    self.emit_single_move(dst.offset, src)?;
+                },
+                Slot::Vid(_) => bail!("Vid slot in post-allocation IR"),
+            }
+        }
+        Ok(())
     }
 
     /// Append `op` to the output buffer. For allocating `op`s,
@@ -168,6 +297,16 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
+    /// Record a fixup for the branch micro-op about to be emitted next, so
+    /// `fixup_branches` can resolve its target and gas. Call immediately
+    /// before the corresponding `emit`.
+    fn record_branch_fixup(&mut self) {
+        self.branch_fixups.push(BranchFixup {
+            idx: self.out_buf.len(),
+            fallthrough_label: None,
+        });
+    }
+
     /// Interned-type corresponding to `slot`.
     fn slot_interned_type(&self, slot: Slot) -> Result<InternedType> {
         Ok(match slot {
@@ -183,26 +322,30 @@ impl<'a> LoweringState<'a> {
         Ok(view_type(self.slot_interned_type(slot)?))
     }
 
-    /// Size in bytes of `ref_slot`'s pointee.
-    fn ref_pointee_size(&self, ref_slot: Slot) -> Result<u32> {
-        concrete_type_size(
-            strip_ref(self.slot_interned_type(ref_slot)?)?,
-            "ref pointee type",
-        )
+    /// Emit an `IntCast` to `to` from `src` into `dst`. The source type comes
+    /// from `src`'s slot type and the `to` type is supplied by the caller.
+    fn lower_cast(&mut self, dst: Slot, src: Slot, to: IntTy) -> Result<()> {
+        let from = IntTy::from_type(self.slot_type(src)?)
+            .ok_or_else(|| anyhow::anyhow!("cast source must be an integer type"))?;
+        let src_info = self.slot(src)?;
+        let dst_info = self.def_slot(dst)?;
+        self.emit(MicroOp::IntCast(IntCastOp {
+            from,
+            to,
+            dst: dst_info.offset,
+            src: src_info.offset,
+        }))
     }
 
-    /// Returns true if the type is exactly 8 bytes wide. Used to gate the
-    /// u64-shaped micro-ops (`AddU64`, `JumpLessU64`, etc.), which read and
-    /// write 8 bytes unconditionally and so cannot be reused for narrower
-    /// types without overrunning into adjacent slots.
-    fn is_u64_sized(ty: &Type) -> bool {
-        matches!(ty.size_and_align(), Some((8, _)))
+    /// Size in bytes of `ref_slot`'s pointee.
+    fn ref_pointee_size(&self, ref_slot: Slot) -> Result<u32> {
+        super::context::ref_pointee_size(self.slot_interned_type(ref_slot)?)
     }
 
     /// Emit one byte-copy from `src` to `dst_offset`. Caller is
     /// responsible for ensuring no other concurrent move clobbers the
     /// source bytes.
-    fn emit_single_move(&mut self, dst_offset: FrameOffset, src: SlotInfo) -> Result<()> {
+    fn emit_single_move(&mut self, dst_offset: FrameOffset, src: SizedSlot) -> Result<()> {
         if dst_offset == src.offset {
             return Ok(());
         }
@@ -221,6 +364,41 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
+    /// Emit a standalone comparison writing a 1-byte boolean to `dst`.
+    fn emit_int_cmp(
+        &mut self,
+        cmp: CmpOp,
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: IntOperand,
+    ) -> Result<()> {
+        self.emit(MicroOp::IntCmp(IntCmpOp {
+            op: cmp_kind(cmp),
+            dst,
+            lhs,
+            rhs,
+        }))
+    }
+
+    /// Emit a fused compare-and-branch to the (encoded) `target`. The caller
+    /// is responsible for pushing the branch-fixup index first.
+    fn emit_jump_int_cmp(
+        &mut self,
+        target: CodeOffset,
+        cmp: CmpOp,
+        lhs: FrameOffset,
+        rhs: IntOperand,
+    ) -> Result<()> {
+        self.emit(MicroOp::JumpIntCmp(JumpIntCmpOp {
+            target,
+            op: cmp_kind(cmp),
+            lhs,
+            rhs,
+            gas_taken: 0,
+            gas_fallthrough: 0,
+        }))
+    }
+
     /// Lower one IR instruction.
     fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> Result<()> {
         match instr {
@@ -229,71 +407,174 @@ impl<'a> LoweringState<'a> {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v,
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdTrue(dst) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm1 {
                     dst: dst_info.offset,
                     imm: 1,
                 })?;
             },
             Instr::LdFalse(dst) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm1 {
                     dst: dst_info.offset,
                     imm: 0,
                 })?;
             },
+            // 1-byte integers store directly into their 1-byte slot.
             Instr::LdU8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm1 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: *v,
                 })?;
             },
+            // 2-/4-byte integers store directly into their 2-/4-byte slot.
             Instr::LdU16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm2 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdU32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm4 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: v.to_le_bytes(),
                 })?;
             },
+            // 1-byte integers store directly into their 1-byte slot.
             Instr::LdI8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm1 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: *v as u8,
                 })?;
             },
+            // 2-/4-byte signed integers store their two's-complement LE bytes
+            // directly into their 2-/4-byte slot.
             Instr::LdI16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm2 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdI32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
+                self.emit(MicroOp::StoreImm4 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdI64(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: v.to_le_bytes(),
                 })?;
+            },
+            Instr::LdU128(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm16 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdI128(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm16 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdU256(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm32 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdI256(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm32 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdConst(dst, idx) => {
+                let ty = view_type(self.ctx.module.interned_constant_type_at(*idx));
+                let bcs_bytes = self.ctx.module.constant_data_at(*idx);
+                let dst_info = self.def_slot(*dst)?;
+                // Constants store their value BCS-encoded. Fixed-width
+                // integers encode as their raw little-endian bytes and
+                // `address` as its 32 raw bytes, both with no length prefix,
+                // so the constant data drops straight into the matching
+                // `StoreImm`. Vectors are heap-allocated at runtime from the
+                // constant pool, so they keep their own micro-op.
+                //
+                // TODO(endianness): revisit this when we fix the endianness
+                // story for the VM.
+                match ty {
+                    Type::Bool | Type::U8 | Type::I8 => {
+                        self.emit(MicroOp::StoreImm1 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<1>(*idx, bcs_bytes)?[0],
+                        })?;
+                    },
+                    Type::U16 | Type::I16 => {
+                        self.emit(MicroOp::StoreImm2 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<2>(*idx, bcs_bytes)?,
+                        })?;
+                    },
+                    Type::U32 | Type::I32 => {
+                        self.emit(MicroOp::StoreImm4 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<4>(*idx, bcs_bytes)?,
+                        })?;
+                    },
+                    Type::U64 | Type::I64 => {
+                        self.emit(MicroOp::StoreImm8 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<8>(*idx, bcs_bytes)?,
+                        })?;
+                    },
+                    Type::U128 | Type::I128 => {
+                        self.emit(MicroOp::StoreImm16 {
+                            dst: dst_info.offset,
+                            imm: Box::new(const_imm::<16>(*idx, bcs_bytes)?),
+                        })?;
+                    },
+                    Type::U256 | Type::I256 | Type::Address => {
+                        self.emit(MicroOp::StoreImm32 {
+                            dst: dst_info.offset,
+                            imm: Box::new(const_imm::<32>(*idx, bcs_bytes)?),
+                        })?;
+                    },
+                    Type::Vector { .. } => {
+                        self.emit(MicroOp::StoreImmVec {
+                            dst: dst_info.offset,
+                            idx: *idx,
+                        })?;
+                    },
+                    // The bytecode verifier rejects constants of these types,
+                    // so reaching them here is an invariant violation.
+                    Type::Signer
+                    | Type::ImmutRef { .. }
+                    | Type::MutRef { .. }
+                    | Type::Nominal { .. }
+                    | Type::Function { .. }
+                    | Type::TypeParam { .. } => bail!(
+                        "LdConst at constant pool index {}: constant type is not \
+                         permitted by the bytecode verifier",
+                        idx.0,
+                    ),
+                }
             },
 
             // --- Copy/Move ---
@@ -311,7 +592,8 @@ impl<'a> LoweringState<'a> {
                 let lhs_info = self.slot(*lhs)?;
                 let rhs_info = self.slot(*rhs)?;
                 let dst_info = self.def_slot(*dst)?;
-                let lhs_ty = self.slot_type(*lhs)?;
+                let lhs_interned = self.slot_interned_type(*lhs)?;
+                let lhs_ty = view_type(lhs_interned);
                 let dst = dst_info.offset;
                 let lhs = lhs_info.offset;
                 let rhs = rhs_info.offset;
@@ -406,11 +688,34 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                             })?;
                         },
-                        // Comparison-to-register and logical and/or are not
-                        // yet lowered for any integer width.
-                        BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
-                            bail!("BinaryOp {:?} not yet lowered", op)
+                        // Comparison produces a 1-byte boolean.
+                        BinaryOp::Cmp(cmp) => match eq_kind(lhs_ty)? {
+                            EqKind::Int => {
+                                let rhs = cmp_operand_from_slot(lhs_ty, rhs)?;
+                                self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
+                            },
+                            EqKind::NonIntValue => {
+                                self.emit(MicroOp::ValueCmp(ValueCmpOp {
+                                    negate: eq_negate(*cmp)?,
+                                    dst,
+                                    lhs,
+                                    rhs,
+                                    ty: lhs_interned,
+                                }))?;
+                            },
+                            EqKind::Ref => {
+                                self.emit(MicroOp::ValueRefCmp(ValueRefCmpOp {
+                                    negate: eq_negate(*cmp)?,
+                                    dst,
+                                    lhs,
+                                    rhs,
+                                    ty: strip_ref(lhs_interned)?,
+                                }))?;
+                            },
                         },
+                        // Logical and/or on 1-byte booleans.
+                        BinaryOp::And => self.emit(MicroOp::BoolAnd { dst, lhs, rhs })?,
+                        BinaryOp::Or => self.emit(MicroOp::BoolOr { dst, lhs, rhs })?,
                     }
                 }
             },
@@ -545,14 +850,39 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                             })?;
                         },
-                        BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
-                            bail!("BinaryOpImm {:?} not yet lowered", op)
+                        // Comparison against an immediate producing a 1-byte boolean.
+                        BinaryOp::Cmp(cmp) => {
+                            let rhs = cmp_operand_from_imm(imm)?;
+                            self.emit_int_cmp(*cmp, dst, lhs, rhs)?;
+                        },
+                        // Logical and/or against a constant bool, with identity
+                        // `true` for `&&` and `false` for `||`: the identity
+                        // yields `src`, the other value yields the constant `!identity`.
+                        BinaryOp::And | BinaryOp::Or => {
+                            let ImmValue::Bool(b) = imm else {
+                                bail!("BinaryOpImm {:?}: imm must be bool", op);
+                            };
+                            let identity = matches!(op, BinaryOp::And);
+                            if *b == identity {
+                                self.emit_single_move(dst, src_info)?;
+                            } else {
+                                self.emit(MicroOp::StoreImm1 {
+                                    dst,
+                                    imm: (!identity) as u8,
+                                })?;
+                            }
                         },
                     }
                 }
             },
 
             // --- Unary ops ---
+            Instr::UnaryOp(dst, op, src) if op.cast_target_ty().is_some() => {
+                let to = op
+                    .cast_target_ty()
+                    .expect("guard above ensures this is a cast");
+                self.lower_cast(*dst, *src, to)?;
+            },
             Instr::UnaryOp(dst, UnaryOp::Negate, src) => {
                 let src_ty = self.slot_type(*src)?;
                 let signed_ty = IntTy::from_type(src_ty)
@@ -567,6 +897,23 @@ impl<'a> LoweringState<'a> {
                     dst: dst_info.offset,
                     src: src_info.offset,
                 }))?;
+            },
+            Instr::UnaryOp(dst, UnaryOp::FreezeRef, src) => {
+                // Runtime no-op: &mut T and &T share the same 16-byte
+                // fat-pointer representation. Propagate the slot value.
+                // TODO: fold this away at the stackless exec IR level so
+                // lowering emits nothing at all.
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit_single_move(dst_info.offset, src_info)?;
+            },
+            Instr::UnaryOp(dst, UnaryOp::Not, src) => {
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::BoolNot {
+                    dst: dst_info.offset,
+                    src: src_info.offset,
+                })?;
             },
 
             // --- References ---
@@ -609,114 +956,159 @@ impl<'a> LoweringState<'a> {
 
             // --- Control flow ---
             Instr::Branch(Label(l)) => {
-                let idx = self.out_buf.len();
-                self.branch_fixups.push(idx);
+                self.record_branch_fixup();
                 self.emit(MicroOp::Jump {
                     target: CodeOffset(encode_label(*l)),
+                    gas: 0,
                 })?;
             },
             Instr::BrTrue(Label(l), cond) => {
                 let cond_info = self.slot(*cond)?;
-                let idx = self.out_buf.len();
-                self.branch_fixups.push(idx);
-                // [TODO]: we are representing booleans as 0/1 in u64 slots here.
-                // This needs to be updated with a more compact boolean representation.
-                self.emit(MicroOp::JumpNotZeroU64 {
+                self.record_branch_fixup();
+                self.emit(MicroOp::JumpNotZeroByte {
                     target: CodeOffset(encode_label(*l)),
                     src: cond_info.offset,
+                    gas_taken: 0,
+                    gas_fallthrough: 0,
                 })?;
             },
             Instr::BrFalse(Label(l), cond) => {
                 let cond_info = self.slot(*cond)?;
-                let idx = self.out_buf.len();
-                self.branch_fixups.push(idx);
-                // [TODO]: we are representing booleans as 0/1 in u64 slots here.
-                // This needs to be updated with a more compact boolean representation.
-                self.emit(MicroOp::JumpLessU64Imm {
+                self.record_branch_fixup();
+                self.emit(MicroOp::JumpZeroByte {
                     target: CodeOffset(encode_label(*l)),
                     src: cond_info.offset,
-                    imm: 1,
+                    gas_taken: 0,
+                    gas_fallthrough: 0,
                 })?;
             },
 
             // --- Fused compare+branch ---
             Instr::BrCmp(Label(l), op, lhs, rhs) => {
-                let lhs_ty = self.slot_type(*lhs)?;
-                if Self::is_u64_sized(lhs_ty) {
-                    let lhs_info = self.slot(*lhs)?;
-                    let rhs_info = self.slot(*rhs)?;
-                    let idx = self.out_buf.len();
-                    self.branch_fixups.push(idx);
-                    match op {
-                        CmpOp::Lt => self.emit(MicroOp::JumpLessU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: lhs_info.offset,
-                            rhs: rhs_info.offset,
-                        })?,
-                        CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: lhs_info.offset,
-                            rhs: rhs_info.offset,
-                        })?,
-                        // x > y ↔ y < x
-                        CmpOp::Gt => self.emit(MicroOp::JumpLessU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: rhs_info.offset,
-                            rhs: lhs_info.offset,
-                        })?,
-                        // x <= y ↔ y >= x
-                        CmpOp::Le => self.emit(MicroOp::JumpGreaterEqualU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: rhs_info.offset,
-                            rhs: lhs_info.offset,
-                        })?,
-                        CmpOp::Neq => self.emit(MicroOp::JumpNotEqualU64 {
-                            target: CodeOffset(encode_label(*l)),
-                            lhs: lhs_info.offset,
-                            rhs: rhs_info.offset,
-                        })?,
-                        CmpOp::Eq => {
-                            bail!("BrCmp Eq for u64-sized type not yet lowered")
+                let lhs_interned = self.slot_interned_type(*lhs)?;
+                let lhs_ty = view_type(lhs_interned);
+                let lhs_info = self.slot(*lhs)?;
+                let lhs_off = lhs_info.offset;
+                let rhs_off = self.slot(*rhs)?.offset;
+                let target = CodeOffset(encode_label(*l));
+                self.record_branch_fixup();
+                // Fast path: unsigned `u64` ordering / not-equal use the
+                // specialized jumps. Everything else goes through the general
+                // `JumpIntCmp`, which dispatches on the operand type.
+                match (lhs_ty.is_u64(), op) {
+                    (true, CmpOp::Lt) => self.emit(MicroOp::JumpLessU64 {
+                        target,
+                        lhs: lhs_off,
+                        rhs: rhs_off,
+                        gas_taken: 0,
+                        gas_fallthrough: 0,
+                    })?,
+                    (true, CmpOp::Ge) => self.emit(MicroOp::JumpGreaterEqualU64 {
+                        target,
+                        lhs: lhs_off,
+                        rhs: rhs_off,
+                        gas_taken: 0,
+                        gas_fallthrough: 0,
+                    })?,
+                    // x > y ↔ y < x
+                    (true, CmpOp::Gt) => self.emit(MicroOp::JumpLessU64 {
+                        target,
+                        lhs: rhs_off,
+                        rhs: lhs_off,
+                        gas_taken: 0,
+                        gas_fallthrough: 0,
+                    })?,
+                    // x <= y ↔ y >= x
+                    (true, CmpOp::Le) => self.emit(MicroOp::JumpGreaterEqualU64 {
+                        target,
+                        lhs: rhs_off,
+                        rhs: lhs_off,
+                        gas_taken: 0,
+                        gas_fallthrough: 0,
+                    })?,
+                    (true, CmpOp::Neq) => self.emit(MicroOp::JumpNotEqualU64 {
+                        target,
+                        lhs: lhs_off,
+                        rhs: rhs_off,
+                        gas_taken: 0,
+                        gas_fallthrough: 0,
+                    })?,
+                    _ => match eq_kind(lhs_ty)? {
+                        EqKind::Int => {
+                            let rhs_op = cmp_operand_from_slot(lhs_ty, rhs_off)?;
+                            self.emit_jump_int_cmp(target, *op, lhs_off, rhs_op)?;
                         },
-                    }
-                } else {
-                    bail!("BrCmp for non-u64 type not yet lowered");
+                        EqKind::NonIntValue => {
+                            self.emit(MicroOp::JumpValueCmp(JumpValueCmpOp {
+                                target,
+                                negate: eq_negate(*op)?,
+                                lhs: lhs_off,
+                                rhs: rhs_off,
+                                ty: lhs_interned,
+                                gas_taken: 0,
+                                gas_fallthrough: 0,
+                            }))?;
+                        },
+                        EqKind::Ref => {
+                            self.emit(MicroOp::JumpValueRefCmp(JumpValueRefCmpOp {
+                                target,
+                                negate: eq_negate(*op)?,
+                                lhs: lhs_off,
+                                rhs: rhs_off,
+                                ty: strip_ref(lhs_interned)?,
+                                gas_taken: 0,
+                                gas_fallthrough: 0,
+                            }))?;
+                        },
+                    },
                 }
             },
             Instr::BrCmpImm(Label(l), op, src, imm) => {
                 let src_ty = self.slot_type(*src)?;
-                if Self::is_u64_sized(src_ty) {
-                    let src_info = self.slot(*src)?;
+                let src_off = self.slot(*src)?.offset;
+                let target = CodeOffset(encode_label(*l));
+                self.record_branch_fixup();
+                if src_ty.is_u64() {
+                    // Fast path: specialized unsigned `u64` ordering jumps.
+                    // Note: equality has no specialized imm jump, so it uses
+                    // the general `JumpIntCmp`.
                     let v = imm_to_u64(imm)?;
-                    let idx = self.out_buf.len();
-                    self.branch_fixups.push(idx);
                     match op {
                         CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
+                            gas_taken: 0,
+                            gas_fallthrough: 0,
                         })?,
                         CmpOp::Lt => self.emit(MicroOp::JumpLessU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
+                            gas_taken: 0,
+                            gas_fallthrough: 0,
                         })?,
                         CmpOp::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
+                            gas_taken: 0,
+                            gas_fallthrough: 0,
                         })?,
                         CmpOp::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
-                            target: CodeOffset(encode_label(*l)),
-                            src: src_info.offset,
+                            target,
+                            src: src_off,
                             imm: v,
+                            gas_taken: 0,
+                            gas_fallthrough: 0,
                         })?,
                         CmpOp::Eq | CmpOp::Neq => {
-                            bail!("BrCmpImm {:?} for u64-sized type not yet lowered", op)
+                            self.emit_jump_int_cmp(target, *op, src_off, IntOperand::ImmU64(v))?
                         },
                     }
                 } else {
-                    bail!("BrCmpImm for non-u64 type not yet lowered");
+                    let rhs_op = cmp_operand_from_imm(imm)?;
+                    self.emit_jump_int_cmp(target, *op, src_off, rhs_op)?;
                 }
             },
 
@@ -824,6 +1216,256 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
 
+            // --- Inline-struct: by-value ---
+            //
+            // The struct lives in a frame slot at compile-time-known offset;
+            // the field's absolute frame offset is therefore also compile-time.
+            // No fat pointer is materialized.
+            Instr::ImmBorrowLocField(dst, fh, local) | Instr::MutBorrowLocField(dst, fh, local) => {
+                let struct_ty = self.slot_interned_type(*local)?;
+                let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
+                let local_info = self.slot(*local)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::SlotBorrow {
+                    dst: dst_info.offset,
+                    local: FrameOffset(local_info.offset.0 + field_offset),
+                })?;
+            },
+            Instr::ReadLocalField(dst, fh, local) => {
+                let struct_ty = self.slot_interned_type(*local)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let local_info = self.slot(*local)?;
+                let dst_info = self.def_slot(*dst)?;
+                let src = SizedSlot {
+                    offset: FrameOffset(local_info.offset.0 + field_offset),
+                    size: field_size,
+                    align: local_info.align,
+                };
+                self.emit_single_move(dst_info.offset, src)?;
+            },
+            Instr::WriteLocalField(fh, local, val) => {
+                let struct_ty = self.slot_interned_type(*local)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let local_info = self.slot(*local)?;
+                let val_info = self.slot(*val)?;
+                let src = SizedSlot {
+                    offset: val_info.offset,
+                    size: field_size,
+                    align: val_info.align,
+                };
+                self.emit_single_move(FrameOffset(local_info.offset.0 + field_offset), src)?;
+            },
+
+            // --- Inline-struct: by-ref ---
+            //
+            // The struct's location is only known at runtime via the fat
+            // pointer in `src` (or `dst_ref`). Use the offset-bearing ref
+            // micro-ops to fold the field offset into the address compute in a
+            // single dispatch.
+            Instr::ImmBorrowField(dst, fh, src) | Instr::MutBorrowField(dst, fh, src) => {
+                let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
+                let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::DeriveRefOffsetImm {
+                    dst_ref: dst_info.offset,
+                    src_ref: src_info.offset,
+                    offset: field_offset,
+                })?;
+            },
+            Instr::ReadField(dst, fh, src) => {
+                let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::ReadRefOffset {
+                    dst: dst_info.offset,
+                    ref_ptr: src_info.offset,
+                    offset: field_offset,
+                    size: field_size,
+                })?;
+            },
+            Instr::WriteField(fh, dst_ref, val) => {
+                let struct_ty = strip_ref(self.slot_interned_type(*dst_ref)?)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let ref_info = self.slot(*dst_ref)?;
+                let val_info = self.slot(*val)?;
+                self.emit(MicroOp::WriteRefOffset {
+                    ref_ptr: ref_info.offset,
+                    offset: field_offset,
+                    src: val_info.offset,
+                    size: field_size,
+                })?;
+            },
+
+            // --- Pack / Unpack: per-field byte copies between frame slots ---
+            //
+            // Per instance, emit fields in whichever order is overlap-safe
+            // for the resolved offsets: reverse if `reverse_emit_is_safe`,
+            // else forward if `forward_emit_is_safe`, else bail. A true
+            // copy cycle (which neither order resolves) needs a swap-style
+            // bytecode op which does not currently exist.
+            Instr::Pack(dst, struct_ty, args) => {
+                // `struct_ty` must be a concrete nominal with a populated layout.
+                let layout = view_type(*struct_ty)
+                    .layout()
+                    .ok_or_else(|| anyhow::anyhow!("Pack: struct_ty has no populated layout"))?;
+                let fields = layout.field_layouts().ok_or_else(|| {
+                    anyhow::anyhow!("Pack: nominal type is not a struct (no field layouts)")
+                })?;
+                if fields.len() != args.len() {
+                    bail!(
+                        "Pack: arg count {} does not match struct field count {}",
+                        args.len(),
+                        fields.len()
+                    );
+                }
+                let dst_info = self.def_slot(*dst)?;
+                let arg_infos = args
+                    .iter()
+                    .map(|s| self.slot(*s))
+                    .collect::<Result<Vec<_>>>()?;
+                // Pre-compute (size, align) per field once.
+                let field_widths: Vec<(u32, u32)> = fields
+                    .iter()
+                    .map(|field| {
+                        view_type(field.ty())
+                            .size_and_align()
+                            .ok_or_else(|| anyhow::anyhow!("Pack: field type has no concrete size"))
+                    })
+                    .collect::<Result<_>>()?;
+                let copies: Vec<_> = fields
+                    .iter()
+                    .zip(arg_infos.iter())
+                    .zip(field_widths.iter())
+                    .map(|((field, arg_info), &(size, _))| parallel_copy::Copy {
+                        src: arg_info.offset,
+                        dst: FrameOffset(dst_info.offset.0 + field.offset),
+                        width: size,
+                    })
+                    .collect();
+                let mut indices: Vec<usize> = (0..fields.len()).collect();
+                // TODO: check if we can have cheaper checks for reverse/forward emit safety
+                // in the presence of alignments.
+                if parallel_copy::reverse_emit_is_safe(&copies) {
+                    indices.reverse();
+                } else if !parallel_copy::forward_emit_is_safe(&copies) {
+                    bail!("Pack: neither reverse nor forward emit is overlap-safe");
+                }
+                for i in indices {
+                    let (size, align) = field_widths[i];
+                    self.emit_single_move(
+                        FrameOffset(dst_info.offset.0 + fields[i].offset),
+                        SizedSlot {
+                            offset: arg_infos[i].offset,
+                            size,
+                            align,
+                        },
+                    )?;
+                }
+            },
+            Instr::Unpack(dsts, struct_ty, src) => {
+                // See the `Instr::Pack` arm above for the `struct_ty` contract.
+                let layout = view_type(*struct_ty)
+                    .layout()
+                    .ok_or_else(|| anyhow::anyhow!("Unpack: struct_ty has no populated layout"))?;
+                let fields = layout.field_layouts().ok_or_else(|| {
+                    anyhow::anyhow!("Unpack: nominal type is not a struct (no field layouts)")
+                })?;
+                if fields.len() != dsts.len() {
+                    bail!(
+                        "Unpack: dst count {} does not match struct field count {}",
+                        dsts.len(),
+                        fields.len()
+                    );
+                }
+                let src_info = self.slot(*src)?;
+                // Pre-compute (size, align) per field and resolve each dst's
+                // SizedSlot. We do this in a separate pass so we can build the
+                // per-copy view the debug assert needs without interleaving
+                // it with the actual emit.
+                let mut field_widths = Vec::with_capacity(fields.len());
+                let mut dst_offsets = Vec::with_capacity(dsts.len());
+                for (field, dst) in fields.iter().zip(dsts.iter()) {
+                    let (size, align) =
+                        view_type(field.ty()).size_and_align().ok_or_else(|| {
+                            anyhow::anyhow!("Unpack: field type has no concrete size")
+                        })?;
+                    field_widths.push((size, align));
+                    let dst_info = self.def_slot(*dst)?;
+                    dst_offsets.push(dst_info.offset);
+                }
+                let copies: Vec<_> = fields
+                    .iter()
+                    .zip(dst_offsets.iter())
+                    .zip(field_widths.iter())
+                    .map(|((field, dst_off), &(size, _))| parallel_copy::Copy {
+                        src: FrameOffset(src_info.offset.0 + field.offset),
+                        dst: *dst_off,
+                        width: size,
+                    })
+                    .collect();
+                let mut indices: Vec<usize> = (0..fields.len()).collect();
+                if parallel_copy::reverse_emit_is_safe(&copies) {
+                    indices.reverse();
+                } else if !parallel_copy::forward_emit_is_safe(&copies) {
+                    bail!("Unpack: neither reverse nor forward emit is overlap-safe");
+                }
+                for i in indices {
+                    let (size, align) = field_widths[i];
+                    self.emit_single_move(dst_offsets[i], SizedSlot {
+                        offset: FrameOffset(src_info.offset.0 + fields[i].offset),
+                        size,
+                        align,
+                    })?;
+                }
+            },
+
+            // --- Closures ---
+            Instr::PackClosure(dst, _fhi, mask, captured) => {
+                // Target identity + captured-data descriptor were resolved in
+                // `try_build_context`; read them positionally.
+                let info = &self.ctx.closure_pack_sites[self.closure_pack_cursor];
+                self.closure_pack_cursor += 1;
+                let dst_off = self.def_slot(*dst)?.offset;
+                // Captured sources, in ascending captured-param order (the
+                // destacker already ordered the IR `captured` list this way).
+                let captured_slots = self.slots_to_sized_slots(captured)?;
+                self.emit(MicroOp::PackClosure(Box::new(PackClosureOp {
+                    dst: dst_off,
+                    func_ref: ClosureFuncRef::Unresolved(info.func_ref),
+                    mask: mask.bits(),
+                    captured_data_descriptor_id: info.captured_data_descriptor_id,
+                    values_size: info.values_size,
+                    captured: captured_slots,
+                })))?;
+            },
+            Instr::PackClosureGeneric(..) => bail!("generic closures not yet lowered"),
+            Instr::CallClosure(rets, _sig_types, all_args) => {
+                let ret_slots = &self.ctx.closure_call_sites[self.closure_call_cursor];
+                self.closure_call_cursor += 1;
+                // The destacker pushes the closure as the last operand;
+                // everything before it is a provided (non-captured) argument.
+                let Some((closure_slot, provided)) = all_args.split_last() else {
+                    bail!("CallClosure has no closure operand");
+                };
+                let closure_src = self.slot(*closure_slot)?.offset;
+                let provided_args = self.slots_to_sized_slots(provided)?;
+                self.emit(MicroOp::CallClosure(Box::new(CallClosureOp {
+                    closure_src,
+                    provided_args,
+                })))?;
+                self.bind_call_returns(rets, ret_slots)?;
+            },
+
+            // --- Generic and variant field forms: not yet lowered ---
+            Instr::ImmBorrowFieldGeneric(..)
+            | Instr::MutBorrowFieldGeneric(..)
+            | Instr::ReadFieldGeneric(..)
+            | Instr::WriteFieldGeneric(..) => {
+                bail!("generic field instruction not yet lowered")
+            },
+
             _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }
 
@@ -834,23 +1476,52 @@ impl<'a> LoweringState<'a> {
     fn commit_xfer_bindings_after(&mut self, instr: &Instr) {
         // Calls manage their own Xfer state in `lower_call`.
         if !clobbers_xfer(instr) {
-            // Release Xfer bindings consumed by this instr's uses.
-            for_each_use(instr, |s| {
+            // Release Xfer bindings consumed by this instr's value uses.
+            // Place uses leave the slot live, so their binding
+            // must persist for the GC to scan at the next safe point.
+            for_each_value_use(instr, |s| {
                 if let Slot::Xfer(j) = s {
                     self.xfer_bindings[j as usize] = None;
                 }
             });
-            // Clear-then-commit so an instr that uses and re-defs
-            // the same `Xfer(j)` ends with the new value visible.
-            if let Some((j, ts)) = self.pending_def_bind.take() {
+            // Clear-then-commit so an instr that uses and re-defs the
+            // same `Xfer(j)` ends with the new value visible.
+            // Precolor guarantees distinct `j` per instr; assert it,
+            // since a duplicate would drop a `TypedSlot` and corrupt
+            // the safe-point heap-pointer map.
+            #[cfg(debug_assertions)]
+            {
+                let mut seen = shared_dsa::UnorderedSet::new();
+                for (j, _) in &self.pending_def_binds {
+                    debug_assert!(
+                        seen.insert(*j),
+                        "duplicate Xfer({}) staged for one IR instr",
+                        j,
+                    );
+                }
+            }
+            for (j, ts) in self.pending_def_binds.drain(..) {
                 self.xfer_bindings[j as usize] = Some(ts);
             }
         } else {
             debug_assert!(
-                self.pending_def_bind.is_none(),
+                self.pending_def_binds.is_empty(),
                 "calls must not leave a pending Xfer def bind",
             );
         }
+    }
+
+    /// Derive a [`NativeABI`] for a native call site from its arg/ret
+    /// slots.
+    fn derive_native_abi(&self, cs: &CallSiteInfo) -> Result<NativeABI> {
+        let callee_base = self.ctx.frame_data_size + FRAME_METADATA_SIZE as u32;
+        let to_slot = |s: &TypedSlot| FrameSlot {
+            offset: s.slot.offset.0 - callee_base,
+            size: s.slot.size,
+        };
+        let args: Vec<FrameSlot> = cs.arg_slots.iter().map(to_slot).collect();
+        let returns: Vec<FrameSlot> = cs.ret_slots.iter().map(to_slot).collect();
+        Ok(NativeABI::new(args, returns)?)
     }
 
     /// Lower one call. Args are written by reverse iteration over the
@@ -924,43 +1595,45 @@ impl<'a> LoweringState<'a> {
             }
         }
 
-        self.emit(MicroOp::CallIndirect {
-            module_id: cs.callee_module_id,
-            func_name: cs.callee_func_name,
-            ty_args: cs.ty_args,
-        })?;
+        match cs.native_idx {
+            Some(native_idx) => {
+                let abi = self.derive_native_abi(cs)?;
+                self.emit(MicroOp::CallNative {
+                    native_idx,
+                    ty_args: cs.ty_args,
+                    abi: Box::new(abi),
+                })?;
+            },
+            None => {
+                self.emit(MicroOp::CallIndirect {
+                    module_id: cs.callee_module_id,
+                    func_name: cs.callee_func_name,
+                    ty_args: cs.ty_args,
+                })?;
+            },
+        }
         self.call_site_cursor += 1;
 
-        // Clear all Xfer bindings (calls clobber the entire callee
-        // region). The ret loop below re-binds the positions this
-        // call returns to.
-        self.xfer_bindings.fill(None);
-
-        // Place each ret. Xfer rets are recorded in `xfer_bindings`
-        // immediately — `CallIndirect` has already written the
-        // values.
-        for (k, ret_slot) in rets.iter().enumerate() {
-            match *ret_slot {
-                Slot::Xfer(j) => {
-                    self.xfer_bindings[j as usize] = Some(cs.ret_slots[k]);
-                },
-                Slot::Home(i) => {
-                    let src = cs.ret_slots[k].slot;
-                    let dst = self.ctx.home_slots[i as usize];
-                    self.emit_single_move(dst.offset, src)?;
-                },
-                Slot::Vid(_) => bail!("Vid slot in post-allocation IR"),
-            }
-        }
+        // Place each ret (Xfer rets are already written by `CallIndirect`).
+        self.bind_call_returns(rets, &cs.ret_slots)?;
         Ok(())
     }
 
+    /// Resolve each branch's target label to a real micro-op index, and fill
+    /// in its gas fields from [`Self::block_costs`] (indexed by block label).
+    ///
+    /// An unconditional jump stores its target block's cost; a conditional jump
+    /// stores both the taken block's cost (`gas_taken`) and the fallthrough
+    /// block's cost (`gas_fallthrough`).
     fn fixup_branches(&mut self) -> Result<()> {
-        for &idx in &self.branch_fixups {
+        for fixup in &self.branch_fixups {
+            let idx = fixup.idx;
             // Extract the encoded label from the op, resolve it, then patch.
             let encoded = match &self.out_buf[idx] {
-                MicroOp::Jump { target }
+                MicroOp::Jump { target, .. }
                 | MicroOp::JumpNotZeroU64 { target, .. }
+                | MicroOp::JumpNotZeroByte { target, .. }
+                | MicroOp::JumpZeroByte { target, .. }
                 | MicroOp::JumpGreaterEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64Imm { target, .. }
                 | MicroOp::JumpGreaterU64Imm { target, .. }
@@ -968,21 +1641,112 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpLessU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0,
+                MicroOp::JumpIntCmp(op) => op.target.0,
+                MicroOp::JumpValueCmp(op) => op.target.0,
+                MicroOp::JumpValueRefCmp(op) => op.target.0,
                 other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             };
             let label = decode_label(encoded);
             let resolved = self.resolve_label(label)?;
+            // Cost of the block this branch transfers into.
+            // Conditional jumps additionally need the fallthrough block's cost.
+            let taken = self.block_costs[label as usize];
+            let fallthrough = fixup
+                .fallthrough_label
+                .map(|l| self.block_costs[l.0 as usize]);
             match &mut self.out_buf[idx] {
-                MicroOp::Jump { target }
-                | MicroOp::JumpNotZeroU64 { target, .. }
-                | MicroOp::JumpGreaterEqualU64Imm { target, .. }
-                | MicroOp::JumpLessU64Imm { target, .. }
-                | MicroOp::JumpGreaterU64Imm { target, .. }
-                | MicroOp::JumpLessEqualU64Imm { target, .. }
-                | MicroOp::JumpLessU64 { target, .. }
-                | MicroOp::JumpGreaterEqualU64 { target, .. }
-                | MicroOp::JumpNotEqualU64 { target, .. } => target.0 = resolved,
-                _ => unreachable!(),
+                MicroOp::Jump { target, gas } => {
+                    target.0 = resolved;
+                    *gas = taken;
+                },
+                MicroOp::JumpNotZeroU64 {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpNotZeroByte {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpZeroByte {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpGreaterEqualU64Imm {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpLessU64Imm {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpGreaterU64Imm {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpLessEqualU64Imm {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpLessU64 {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpGreaterEqualU64 {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                }
+                | MicroOp::JumpNotEqualU64 {
+                    target,
+                    gas_taken,
+                    gas_fallthrough,
+                    ..
+                } => {
+                    target.0 = resolved;
+                    *gas_taken = taken;
+                    *gas_fallthrough = fallthrough.ok_or_else(|| {
+                        anyhow::anyhow!("conditional branch at {} has no fallthrough label", idx)
+                    })?;
+                },
+                MicroOp::JumpIntCmp(op) => {
+                    op.target.0 = resolved;
+                    op.gas_taken = taken;
+                    op.gas_fallthrough = fallthrough.ok_or_else(|| {
+                        anyhow::anyhow!("conditional branch at {} has no fallthrough label", idx)
+                    })?;
+                },
+                MicroOp::JumpValueCmp(op) => {
+                    op.target.0 = resolved;
+                    op.gas_taken = taken;
+                    op.gas_fallthrough = fallthrough.ok_or_else(|| {
+                        anyhow::anyhow!("conditional branch at {} has no fallthrough label", idx)
+                    })?;
+                },
+                MicroOp::JumpValueRefCmp(op) => {
+                    op.target.0 = resolved;
+                    op.gas_taken = taken;
+                    op.gas_fallthrough = fallthrough.ok_or_else(|| {
+                        anyhow::anyhow!("conditional branch at {} has no fallthrough label", idx)
+                    })?;
+                },
+                other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             }
         }
         Ok(())
@@ -1040,6 +1804,120 @@ fn shift_imm_u8(imm: &ImmValue) -> Result<u8> {
 fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
     let int_ty = IntTy::from_type(ty).ok_or_else(|| anyhow::anyhow!("expected an integer type"))?;
     Ok(IntOperand::slot(int_ty, off))
+}
+
+/// Map an IR [`CmpOp`] to the micro-op [`CmpKind`].
+///
+/// TODO: `CmpOp` and `CmpKind` have identical variants; consider unifying on a
+/// single shared type in core to drop this mapping.
+fn cmp_kind(op: CmpOp) -> CmpKind {
+    match op {
+        CmpOp::Lt => CmpKind::Lt,
+        CmpOp::Le => CmpKind::Le,
+        CmpOp::Gt => CmpKind::Gt,
+        CmpOp::Ge => CmpKind::Ge,
+        CmpOp::Eq => CmpKind::Eq,
+        CmpOp::Neq => CmpKind::Neq,
+    }
+}
+
+enum EqKind {
+    /// Integer comparison.
+    Int,
+    /// Non-integer structural comparison.
+    NonIntValue,
+    /// Reference: compared structurally through the pointer.
+    Ref,
+}
+
+/// Classify how an equality operand of the given type is lowered.
+fn eq_kind(ty: &Type) -> Result<EqKind> {
+    Ok(match ty {
+        Type::Bool
+        | Type::Address
+        // Signers are just addresses.
+        | Type::Signer
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256 => EqKind::Int,
+        Type::Vector { .. } | Type::Nominal { .. } => EqKind::NonIntValue,
+        Type::ImmutRef { .. } | Type::MutRef { .. } => EqKind::Ref,
+        Type::Function { .. } | Type::TypeParam { .. } => {
+            bail!("equality is not supported for this operand type")
+        },
+    })
+}
+
+/// Map an equality [`CmpOp`] to the `negate` flag of the structural-equality
+/// ops (`false` for `Eq`, `true` for `Neq`).
+fn eq_negate(op: CmpOp) -> Result<bool> {
+    match op {
+        CmpOp::Eq => Ok(false),
+        CmpOp::Neq => Ok(true),
+        CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
+            bail!("ordering comparison on a non-scalar operand is ill-typed")
+        },
+    }
+}
+
+/// Build an [`IntOperand`] for a comparison operand. Integer types delegate to
+/// [`int_operand_from_slot`]. `bool` (1 byte), `address` and `signer` (both 32
+/// bytes) are flat values with only `==`/`!=` (no ordering), and comparing
+/// their bit patterns is exactly value equality, so they reuse the integer
+/// compare ops at the matching width.
+fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
+    match ty {
+        Type::Bool => Ok(IntOperand::SlotU8(off)),
+        // A signer holds an address, so it compares as a 32-byte value.
+        Type::Address | Type::Signer => Ok(IntOperand::SlotU256(off)),
+        Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256 => int_operand_from_slot(ty, off),
+        Type::ImmutRef { .. }
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => bail!("operand type has no comparison lowering"),
+    }
+}
+
+/// Immediate counterpart of [`cmp_operand_from_slot`]: a bool immediate
+/// compares as the 1-byte value `0`/`1`.
+fn cmp_operand_from_imm(imm: &ImmValue) -> Result<IntOperand> {
+    match imm {
+        ImmValue::Bool(b) => Ok(IntOperand::ImmU8(*b as u8)),
+        ImmValue::U8(_)
+        | ImmValue::U16(_)
+        | ImmValue::U32(_)
+        | ImmValue::U64(_)
+        | ImmValue::U128(_)
+        | ImmValue::U256(_)
+        | ImmValue::I8(_)
+        | ImmValue::I16(_)
+        | ImmValue::I32(_)
+        | ImmValue::I64(_)
+        | ImmValue::I128(_)
+        | ImmValue::I256(_) => int_operand_from_imm(imm),
+    }
 }
 
 /// Build an [`IntOperand`] imm arm matching `imm`. The destacker emits an

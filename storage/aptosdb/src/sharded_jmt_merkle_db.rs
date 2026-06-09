@@ -18,13 +18,12 @@
 //! labels — are left to outer wrappers that compose this substrate.
 
 use crate::{
+    common::populate_jmt_writes,
     lru_node_cache::LruNodeCache,
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-        stale_node_index::StaleNodeIndexSchema,
-        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
     },
     versioned_node_cache::VersionedNodeCache,
 };
@@ -130,14 +129,6 @@ impl ShardedJmtMerkleDb {
         self.lru_cache.is_some()
     }
 
-    pub(crate) fn version_caches(&self) -> &HashMap<Option<usize>, VersionedNodeCache> {
-        &self.version_caches
-    }
-
-    pub(crate) fn lru_cache(&self) -> Option<&LruNodeCache> {
-        self.lru_cache.as_ref()
-    }
-
     pub(crate) fn commit(
         &self,
         version: Version,
@@ -161,7 +152,15 @@ impl ShardedJmtMerkleDb {
                 })
         });
 
-        self.commit_top_levels(version, top_levels_batch)
+        self.commit_top_levels(version, top_levels_batch)?;
+
+        if let Some(lru_cache) = self.lru_cache.as_ref() {
+            self.version_caches
+                .iter()
+                .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
+        }
+
+        Ok(())
     }
 
     /// Commits JMT node data without writing any commit progress metadata.
@@ -282,35 +281,15 @@ impl ShardedJmtMerkleDb {
             self.db_tag
         )]);
 
-        let mut batch = self.db(shard_id).new_native_batch();
-
-        let node_batch = tree_update_batch
-            .node_batch
-            .iter()
-            .flatten()
-            .collect::<Vec<_>>();
-        node_batch.iter().try_for_each(|(node_key, node)| {
+        for (node_key, _) in tree_update_batch.node_batch.iter().flatten() {
             ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
-            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
-        })?;
-
-        let stale_node_index_batch = tree_update_batch
-            .stale_node_index_batch
-            .iter()
-            .flatten()
-            .collect::<Vec<_>>();
-        stale_node_index_batch.iter().try_for_each(|row| {
+        }
+        for row in tree_update_batch.stale_node_index_batch.iter().flatten() {
             ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
-            if previous_epoch_ending_version.is_some()
-                && row.node_key.version() <= previous_epoch_ending_version.unwrap()
-            {
-                batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
-            } else {
-                // These are processed by the state merkle pruner.
-                batch.put::<StaleNodeIndexSchema>(row, &())
-            }
-        })?;
+        }
 
+        let mut batch = self.db(shard_id).new_native_batch();
+        populate_jmt_writes(&mut batch, tree_update_batch, previous_epoch_ending_version)?;
         Self::put_progress(Some(version), shard_id, &mut batch)?;
 
         batch.into_raw_batch(self.db(shard_id))
@@ -470,6 +449,62 @@ impl ShardedJmtMerkleDb {
         root_persisted_version: Option<Version>,
     ) -> Result<[Option<Version>; NUM_STATE_SHARDS]> {
         JellyfishMerkleTree::new(self).get_shard_persisted_versions(root_persisted_version)
+    }
+
+    /// Asserts JMT root == SMT root to catch scratchpad/JMT drift.
+    pub fn merklize_snapshot(
+        &self,
+        base_version: Option<Version>,
+        version: Version,
+        last_smt: &aptos_scratchpad::SparseMerkleTree,
+        smt: &aptos_scratchpad::SparseMerkleTree,
+        all_updates: [Vec<(HashValue, Option<(HashValue, StateKey)>)>; NUM_STATE_SHARDS],
+        previous_epoch_ending_version: Option<Version>,
+    ) -> Result<(HashValue, usize, RawBatch, Vec<RawBatch>)> {
+        let shard_persisted_versions = self.get_shard_persisted_versions(base_version)?;
+
+        let (shard_root_nodes, batches_for_shards): (Vec<_>, Vec<_>) =
+            THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["calculate_batches_for_shards"]);
+                all_updates
+                    .into_par_iter()
+                    .enumerate()
+                    .map(|(shard_id, updates)| {
+                        let node_hashes = smt.new_node_hashes_since(last_smt, shard_id as u8);
+                        let updates_refs: Vec<_> =
+                            updates.iter().map(|(h, v)| (*h, v.as_ref())).collect();
+                        self.merklize_value_set_for_shard(
+                            shard_id,
+                            updates_refs,
+                            Some(&node_hashes),
+                            version,
+                            base_version,
+                            shard_persisted_versions[shard_id],
+                            previous_epoch_ending_version,
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()
+                    .expect("Error calculating shard JMT batches.")
+                    .into_iter()
+                    .unzip()
+            });
+
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["calculate_top_levels_batch"]);
+        let (root_hash, leaf_count, top_levels_batch) = self.calculate_top_levels(
+            shard_root_nodes,
+            version,
+            base_version,
+            previous_epoch_ending_version,
+        )?;
+        assert_eq!(
+            root_hash,
+            smt.root_hash(),
+            "JMT vs SMT root hash mismatch — scratchpad/JMT drift detected: jmt={}, smt={}",
+            root_hash,
+            smt.root_hash()
+        );
+
+        Ok((root_hash, leaf_count, top_levels_batch, batches_for_shards))
     }
 
     pub(crate) fn write_pruner_progress(

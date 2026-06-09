@@ -14,6 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
 bytes = { workspace = true }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
@@ -21,6 +24,7 @@ mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
+mono-move-natives = { workspace = true }
 mono-move-runtime = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
@@ -32,10 +36,12 @@ move-stdlib = { path = "../../move-stdlib" }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
+smallvec = { workspace = true }
 specializer = { workspace = true }
 tempfile = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
 walkdir = { workspace = true }
@@ -46,4 +52,28 @@ harness = false
 
 [[test]]
 name = "snapshot"
+harness = false
+
+[[bench]]
+name = "fib"
+harness = false
+
+[[bench]]
+name = "nested_loop"
+harness = false
+
+[[bench]]
+name = "merge_sort"
+harness = false
+
+[[bench]]
+name = "bst"
+harness = false
+
+[[bench]]
+name = "match_sum"
+harness = false
+
+[[bench]]
+name = "int_arith_loop"
 harness = false

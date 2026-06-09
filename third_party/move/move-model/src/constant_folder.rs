@@ -242,10 +242,6 @@ impl<'env> ConstantFolder<'env> {
         }
     }
 
-    fn checked_shl(a: &BigInt, b: &BigInt) -> Option<BigInt> {
-        b.to_u16().map(|b| a.shl(b))
-    }
-
     fn checked_shr(a: &BigInt, b: &BigInt) -> Option<BigInt> {
         b.to_u16().map(|b| a.shr(b))
     }
@@ -319,18 +315,23 @@ impl<'env> ConstantFolder<'env> {
                         }
                     },
                     O::Shl => {
-                        // result_pty should be same size as arg0
-                        let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.shift_rhs_check(val1, &arg0_size, id, name())
-                            .and_then(|_| {
-                                self.binop_num(
-                                    name(),
-                                    Self::checked_shl,
-                                    id,
-                                    result_pty,
-                                    val0,
-                                    val1,
-                                )
+                        let Some(bits) = result_pty.get_num_bits() else {
+                            // Refuse to fold for spec-language `Num` (unbounded);
+                            // the prover's translation differs from runtime wrap.
+                            return None;
+                        };
+                        // Typing only admits unsigned `Shl` operands; the
+                        // modular wrap below assumes that.
+                        debug_assert!(!result_pty.is_signed());
+                        // Wrap modulo 2^N to match the runtime's wrapping `<<`.
+                        let num_bits = BigInt::from(bits);
+                        self.shift_rhs_check(val1, &num_bits, id, name())
+                            .and_then(|_| val1.to_u32())
+                            .map(|rhs| {
+                                let raw = val0.shl(rhs);
+                                let modulus = BigInt::from(1).shl(bits as u32);
+                                let wrapped = raw.rem(&modulus);
+                                ExpData::Value(id, Value::Number(wrapped)).into_exp()
                             })
                     },
                     O::Shr => {

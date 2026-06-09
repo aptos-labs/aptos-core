@@ -264,7 +264,7 @@ where
                     auxiliary_info,
                     parent_output.result_state(),
                     state_view,
-                    onchain_config.clone(),
+                    onchain_config,
                     TransactionSliceMetadata::block(parent_block_id, block_id),
                 )?
             };
@@ -352,16 +352,12 @@ where
                     Err(anyhow::anyhow!("Injected error in block state checkpoint."))
                 });
                 let parent_state_summary = parent_block.output.ensure_result_state_summary()?;
-                let use_transaction_info_v1 = parent_state_summary
-                    .hot_state_config()
-                    .use_transaction_info_v1;
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
                     parent_state_summary,
                     &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
                     None,
                     None,
-                    use_transaction_info_v1,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(
                     &output.execution_output,

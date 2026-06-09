@@ -132,7 +132,7 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         Self: Sized,
         C: OnChainConfig,
     {
-        C::fetch_config(self).ok_or_else(|| {
+        C::fetch_config(self)?.ok_or_else(|| {
             anyhow!(
                 "failed to fetch on-chain config: {:?}",
                 std::any::type_name::<C>()

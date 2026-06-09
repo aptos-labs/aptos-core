@@ -11,7 +11,7 @@ pub(crate) mod instr_utils;
 
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
-    PreparedModule,
+    IntTy, PreparedModule,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
@@ -24,6 +24,7 @@ use move_core_types::{
 };
 
 /// Named slot operand.
+/// TODO: consider renaming this enum to `NamedSlot`, to contrast with `SizedSlot`.
 ///
 /// - `Home` — frame-local storage: parameters, declared locals, and temporaries
 ///   due to destackification. These map 1:1 to frame slots.
@@ -80,6 +81,28 @@ pub enum UnaryOp {
     Not,
     Negate,
     FreezeRef,
+}
+
+impl UnaryOp {
+    /// Returns the target [`IntTy`] if the operation is a cast operation,
+    /// otherwise `None`.
+    pub fn cast_target_ty(self) -> Option<IntTy> {
+        Some(match self {
+            UnaryOp::CastU8 => IntTy::U8,
+            UnaryOp::CastU16 => IntTy::U16,
+            UnaryOp::CastU32 => IntTy::U32,
+            UnaryOp::CastU64 => IntTy::U64,
+            UnaryOp::CastU128 => IntTy::U128,
+            UnaryOp::CastU256 => IntTy::U256,
+            UnaryOp::CastI8 => IntTy::I8,
+            UnaryOp::CastI16 => IntTy::I16,
+            UnaryOp::CastI32 => IntTy::I32,
+            UnaryOp::CastI64 => IntTy::I64,
+            UnaryOp::CastI128 => IntTy::I128,
+            UnaryOp::CastI256 => IntTy::I256,
+            UnaryOp::Not | UnaryOp::Negate | UnaryOp::FreezeRef => return None,
+        })
+    }
 }
 
 /// Comparison operations that produce a boolean result.
@@ -188,6 +211,11 @@ pub enum Instr {
     // --- Struct (second field is the interned struct `Type`; generic
     // variants additionally carry an interned type-argument list) ---
     //
+    // Contract: for the non-generic `Pack` / `Unpack`, the carried
+    // `InternedType` MUST be a fully-substituted concrete `Type::Nominal`
+    // — no `Type::TypeParam` in any constituent, and its `NominalLayout`
+    // must be populated.
+    //
     // TODO: depending on how we pre-intern types, we may be able to unify
     // some of instructions here.
     Pack(Slot, InternedType, Vec<Slot>),
@@ -229,6 +257,16 @@ pub enum Instr {
     ReadVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
     WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
     WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
+
+    // --- Fused inline-struct field access (borrow_loc + field op combined) ---
+    /// `dst = &local.field` (imm_borrow_loc + imm_borrow_field on an inline struct local)
+    ImmBorrowLocField(Slot, FieldHandleIndex, Slot),
+    /// `dst = &mut local.field`
+    MutBorrowLocField(Slot, FieldHandleIndex, Slot),
+    /// `dst = local.field` (imm_borrow_loc + read_field on an inline struct local)
+    ReadLocalField(Slot, FieldHandleIndex, Slot),
+    /// `local.field = src` (mut_borrow_loc + write_field on an inline struct local)
+    WriteLocalField(FieldHandleIndex, Slot, Slot),
 
     // --- Globals (struct type is the interned `Type` for the named
     // resource; generic variants carry the instantiated nominal) ---
@@ -334,6 +372,10 @@ impl Instr {
             Instr::ReadVariantFieldGeneric(..) => "ReadVariantFieldGeneric",
             Instr::WriteVariantField(..) => "WriteVariantField",
             Instr::WriteVariantFieldGeneric(..) => "WriteVariantFieldGeneric",
+            Instr::ImmBorrowLocField(..) => "ImmBorrowLocField",
+            Instr::MutBorrowLocField(..) => "MutBorrowLocField",
+            Instr::ReadLocalField(..) => "ReadLocalField",
+            Instr::WriteLocalField(..) => "WriteLocalField",
             Instr::Exists(..) => "Exists",
             Instr::ExistsGeneric(..) => "ExistsGeneric",
             Instr::MoveFrom(..) => "MoveFrom",

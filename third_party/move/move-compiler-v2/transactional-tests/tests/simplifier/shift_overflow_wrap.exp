@@ -1,0 +1,33 @@
+processed 20 tasks
+task 0 lines 1-18:  publish [module 0xff::shift_max {]
+task 1 lines 20-25:  run --verbose [script {]
+task 2 lines 27-32:  run --verbose [script {]
+task 3 lines 34-39:  run --verbose [script {]
+task 4 lines 41-46:  run --verbose [script {]
+task 5 lines 48-57:  run --verbose [script {]
+task 6 lines 59-68:  run --verbose [script {]
+task 7 lines 70-70:  run 0xff::shift_max::u8_max_shl1 --verbose
+return values: 254
+task 8 lines 72-72:  run 0xff::shift_max::u16_max_shl1 --verbose
+return values: 65534
+task 9 lines 74-74:  run 0xff::shift_max::u32_max_shl1 --verbose
+return values: 4294967294
+task 10 lines 76-76:  run 0xff::shift_max::u64_max_shl1 --verbose
+return values: 18446744073709551614
+task 11 lines 78-78:  run 0xff::shift_max::u128_max_shl1 --verbose
+return values: 340282366920938463463374607431768211454
+task 12 lines 80-80:  run 0xff::shift_max::u256_max_shl1 --verbose
+return values: 115792089237316195423570985008687907853269984665640564039457584007913129639934
+task 13 lines 82-99:  publish [module 0xff::const_shift_max {]
+task 14 lines 101-101:  run 0xff::const_shift_max::c_u8 --verbose
+return values: 254
+task 15 lines 103-103:  run 0xff::const_shift_max::c_u16 --verbose
+return values: 65534
+task 16 lines 105-105:  run 0xff::const_shift_max::c_u32 --verbose
+return values: 4294967294
+task 17 lines 107-107:  run 0xff::const_shift_max::c_u64 --verbose
+return values: 18446744073709551614
+task 18 lines 109-109:  run 0xff::const_shift_max::c_u128 --verbose
+return values: 340282366920938463463374607431768211454
+task 19 lines 111-111:  run 0xff::const_shift_max::c_u256 --verbose
+return values: 115792089237316195423570985008687907853269984665640564039457584007913129639934

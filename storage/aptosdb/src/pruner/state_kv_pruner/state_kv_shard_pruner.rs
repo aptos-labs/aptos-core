@@ -2,50 +2,50 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    pruner::pruner_utils::get_or_initialize_subpruner_progress,
-    schema::{
-        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
-        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
-        state_value_by_key_hash::StateValueByKeyHashSchema,
+    pruner::{
+        pruner_utils::get_or_initialize_subpruner_progress,
+        state_kv_pruner::generics::StateValuePrunerSchema,
     },
+    schema::db_metadata::{DbMetadataSchema, DbMetadataValue},
 };
 use aptos_logger::info;
-use aptos_schemadb::{batch::SchemaBatch, ReadOptions, DB};
+use aptos_schemadb::{batch::SchemaBatch, schema::SeekKeyCodec, ReadOptions, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
-// Per-shard pruner for state KV data
-pub(in crate::pruner) struct StateKvShardPruner {
+// Per-shard pruner for state value data (main-state cold/hot or position).
+pub(in crate::pruner) struct StateKvShardPruner<S> {
     shard_id: usize,
     db_shard: Arc<DB>,
-    is_hot: bool,
+    _phantom: PhantomData<S>,
 }
 
-impl StateKvShardPruner {
+impl<S: StateValuePrunerSchema> StateKvShardPruner<S>
+where
+    Version: SeekKeyCodec<S::StaleIndexSchema>,
+{
     pub(in crate::pruner) fn new(
         shard_id: usize,
         db_shard: Arc<DB>,
         metadata_progress: Version,
-        is_hot: bool,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
             &db_shard,
-            &DbMetadataKey::StateKvShardPrunerProgress(shard_id),
+            &S::shard_progress_key(shard_id),
             metadata_progress,
         )?;
         let myself = Self {
             shard_id,
             db_shard,
-            is_hot,
+            _phantom: PhantomData,
         };
 
         info!(
             progress = progress,
             metadata_progress = metadata_progress,
-            is_hot = is_hot,
-            "Catching up state kv shard {shard_id}."
+            "Catching up {} shard {shard_id}.",
+            S::name(),
         );
         myself.prune(progress, metadata_progress)?;
 
@@ -63,25 +63,21 @@ impl StateKvShardPruner {
         read_opts.fill_cache(false);
         let mut iter = self
             .db_shard
-            .iter_with_opts::<StaleStateValueIndexByKeyHashSchema>(read_opts)?;
+            .iter_with_opts::<S::StaleIndexSchema>(read_opts)?;
+        // Seek to the first stale-index row at or after `current_progress`.
         iter.seek(&current_progress)?;
         for item in iter {
             let (index, _) = item?;
             if index.stale_since_version > target_version {
                 break;
             }
-            batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
+            batch.delete::<S::StaleIndexSchema>(&index)?;
             if !index.is_first_write() {
-                let db_key = (index.state_key_hash, index.version);
-                if self.is_hot {
-                    batch.delete::<HotStateValueByKeyHashSchema>(&db_key)?;
-                } else {
-                    batch.delete::<StateValueByKeyHashSchema>(&db_key)?;
-                }
+                batch.delete::<S::ValueSchema>(&(index.state_key_hash, index.version))?;
             }
         }
         batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKvShardPrunerProgress(self.shard_id),
+            &S::shard_progress_key(self.shard_id),
             &DbMetadataValue::Version(target_version),
         )?;
 

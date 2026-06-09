@@ -850,7 +850,7 @@ pub trait ExpRewriterFunctions {
                     .collect();
                 (changed, Proof::Apply(loc.clone(), *lemma_id, new_args))
             },
-            Proof::ForallApply(loc, bindings, patterns, lemma_id, args) => {
+            Proof::ForallApply(loc, bindings, patterns, lemma_id, args, weight) => {
                 let mut changed = false;
                 let new_patterns: Vec<Vec<_>> = patterns
                     .iter()
@@ -881,6 +881,7 @@ pub trait ExpRewriterFunctions {
                         new_patterns,
                         *lemma_id,
                         new_args,
+                        *weight,
                     ),
                 )
             },

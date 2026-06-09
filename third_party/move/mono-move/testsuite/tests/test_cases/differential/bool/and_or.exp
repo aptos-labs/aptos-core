@@ -1,0 +1,120 @@
+=== stackless ===
+// module 0x1::test
+
+fun and_(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: bool
+    r1: bool
+    r2: bool
+  code:
+  L0:
+    0: r2 := and r0, r1
+    1: ret [r2]
+}
+
+fun or_(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: bool
+    r1: bool
+    r2: bool
+  code:
+  L0:
+    0: r2 := or r0, r1
+    1: ret [r2]
+}
+
+fun and_true(r0): bool {
+  slots: params(1), locals(0), temps(1)
+    r0: bool
+    r1: bool
+  code:
+  L0:
+    0: r1 := and r0, #true
+    1: ret [r1]
+}
+
+fun and_false(r0): bool {
+  slots: params(1), locals(0), temps(1)
+    r0: bool
+    r1: bool
+  code:
+  L0:
+    0: r1 := and r0, #false
+    1: ret [r1]
+}
+
+fun or_true(r0): bool {
+  slots: params(1), locals(0), temps(1)
+    r0: bool
+    r1: bool
+  code:
+  L0:
+    0: r1 := or r0, #true
+    1: ret [r1]
+}
+
+fun or_false(r0): bool {
+  slots: params(1), locals(0), temps(1)
+    r0: bool
+    r1: bool
+  code:
+  L0:
+    0: r1 := or r0, #false
+    1: ret [r1]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun and_() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: BoolAnd [2] <- [0] & [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun or_() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: BoolOr [2] <- [0] | [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun and_true() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: Move(1) [1] <- [0]
+    1: Move(1) [0] <- [1]
+    2: Return
+}
+
+fun and_false() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: StoreImm1 [1] <- #0
+    1: Move(1) [0] <- [1]
+    2: Return
+}
+
+fun or_true() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: StoreImm1 [1] <- #1
+    1: Move(1) [0] <- [1]
+    2: Return
+}
+
+fun or_false() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: Move(1) [1] <- [0]
+    1: Move(1) [0] <- [1]
+    2: Return
+}

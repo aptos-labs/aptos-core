@@ -3,6 +3,7 @@
 
 //! Integration tests for the Lazy loading policy.
 
+use mono_move_core::native::NoNatives;
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -28,6 +29,7 @@ fn load_lazy_cache_miss_and_hit() {
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &NoNatives,
     );
 
     let id_module = ModuleId::new(AccountAddress::ONE, ident_str!("test").to_owned());

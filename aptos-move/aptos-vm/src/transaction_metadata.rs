@@ -68,6 +68,8 @@ impl TransactionMetadata {
             if let Ok(TransactionExecutableRef::Script(s)) = txn.payload().executable_ref() {
                 let script_hash = HashValue::sha3_256_of(s.code()).to_vec();
                 let is_approved_gov_script = ApprovedExecutionHashes::fetch_config(resolver)
+                    .ok()
+                    .flatten()
                     .is_some_and(|approved| {
                         approved
                             .entries

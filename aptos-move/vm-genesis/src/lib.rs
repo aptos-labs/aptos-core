@@ -88,6 +88,7 @@ const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const CHUNKY_DKG_MODULE_NAME: &str = "chunky_dkg";
 const CHUNKY_DKG_CONFIG_MODULE_NAME: &str = "chunky_dkg_config";
 const CHUNKY_DKG_CONFIG_SEQNUM_MODULE_NAME: &str = "chunky_dkg_config_seqnum";
+const EPOCH_TIMEOUT_CONFIG_MODULE_NAME: &str = "epoch_timeout_config";
 const DECRYPTION_MODULE_NAME: &str = "decryption";
 const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
@@ -230,7 +231,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         HashValue::new(new_id),
         framework,
     );
-    assert_ok!(change_set.squash_additional_change_set(additional_change_set));
+    // Genesis runs at the latest gas feature version, so use the strict resource-group squash.
+    assert_ok!(change_set.squash_additional_change_set(additional_change_set, true));
 
     let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
     verify_genesis_module_write_set(change_set.write_set());
@@ -349,6 +351,7 @@ pub fn encode_genesis_change_set(
         chunky_dkg_config,
     );
     initialize_chunky_dkg(&mut session, &module_storage, &mut traversal_context);
+    initialize_epoch_timeout_config(&mut session, &module_storage, &mut traversal_context);
     initialize_decryption(&mut session, &module_storage, &mut traversal_context);
     initialize_on_chain_governance(
         &mut session,
@@ -402,7 +405,8 @@ pub fn encode_genesis_change_set(
         HashValue::new(new_id),
         framework,
     );
-    assert_ok!(change_set.squash_additional_change_set(additional_change_set));
+    // Genesis runs at the latest gas feature version, so use the strict resource-group squash.
+    assert_ok!(change_set.squash_additional_change_set(additional_change_set, true));
 
     let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
     verify_genesis_module_write_set(change_set.write_set());
@@ -641,6 +645,22 @@ fn initialize_randomness_config_seqnum(
         module_storage,
         traversal_context,
         RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_epoch_timeout_config(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        EPOCH_TIMEOUT_CONFIG_MODULE_NAME,
         "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),

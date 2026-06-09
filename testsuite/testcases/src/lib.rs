@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod chunky_dkg_quorum_loss_test;
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod dag_onchain_enable_test;

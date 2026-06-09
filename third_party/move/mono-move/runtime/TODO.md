@@ -12,8 +12,20 @@
   - Open question: runtime support v.s. compiler-generated helper?
 
 ## Global storage 
-- MoveFrom / MoveTo / BorrowGlobal(Mut) / Exists
-- Need to figure out how to interact with the block-level cache
+- **Done (correctness-only)**: `Exists`, `BorrowGlobal`, `BorrowGlobalMut`,
+  `MoveFrom`, `MoveTo` micro-ops; per-transaction working map + linear journal;
+  `checkpoint()` / `rollback(n)` on `InterpreterContext`; GC tracing of
+  local-heap writes. See `mono-move/docs/global_storage_design.md`.
+- Deferred:
+  - Inline values (small-resource fast path, `ResourceRead::Inline` /
+    `ResourceWrite::Inline`)
+  - Per-allocation lazy CoW (epoch tags in object headers)
+  - Per-allocation dirty bits
+  - Write detection via `memcmp` at publication
+  - Compaction pass at end of user session
+  - BCS size computation and gas charging for IO
+  - Block-STM versioning beyond the placeholder `version: u64` field
+  - Specializer / lowering changes so Move source emits the new MicroOps
 
 ## Abort / error handling
 - Abort instruction: exit with error code
@@ -45,6 +57,14 @@ interpreter dispatch and execution speed:
 - **Copy-and-patch**: JIT-compile by copying pre-compiled machine code
   templates and patching in operands. Near-native speed with much less
   complexity than a full JIT compiler
+
+## Code swapping
+- `Function::code` is currently an immutable `Box<[MicroOp]>`. When we add
+  demand-driven re-optimization that swaps in new code at runtime, the swap
+  must preserve this property: a code swap should not be observed by the
+  transaction that triggers it -- only future re-executions should see the new
+  code. The currently-executing transaction must keep running against the code
+  it started with.
 
 ## Deep copy
 - CopyLoc on heap-allocated struct/enum needs recursive deep copy of entire object graph

@@ -54,8 +54,9 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
-    types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, Interner, ModuleId,
-    ObjectDescriptor,
+    reserved_layout_id, reserved_layouts, types::NominalLayout, DescriptorId, DescriptorProvider,
+    FrameOffset, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
+    ValueLayout, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -76,7 +77,7 @@ pub use loaded_module::{
 };
 mod module_cache;
 use module_cache::ModuleCache;
-use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
+use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 mod types;
@@ -111,6 +112,7 @@ pub struct GlobalContext {
     /// Lock to switch between execution and maintenance modes:
     ///   - Read lock: execution phase.
     ///   - Write lock: maintenance phase.
+    // TODO: Consider removing since maintenance context requires &mut GlobalContext.
     phase: RwLock<()>,
 }
 
@@ -121,9 +123,22 @@ struct Context {
     module_ids: DashMap<ModuleIdInternerKey, InternedModuleId, ahash::RandomState>,
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
+    // TODO(perf): reconsider whether this indirection earns its keep. The
+    // alternative is to widen the closure's `Unresolved` func_ref payload to
+    // store the 24-byte triple inline, dropping both this map and the
+    // `InternedFunctionRef` arena allocation at the cost of a larger closure
+    // object.
+    function_refs: DashMap<
+        (InternedModuleId, InternedIdentifier, InternedTypeList),
+        InternedFunctionRef,
+        ahash::RandomState,
+    >,
     module_cache: ModuleCache,
     /// Published object descriptors.
     descriptors: Descriptors,
+    /// Published type layouts (the type-driven walk shape, separate from the
+    /// GC object descriptors above).
+    layouts: Layouts,
 }
 
 /// Storage for the published object-descriptor set.
@@ -152,6 +167,10 @@ struct Descriptors {
     /// write-lock once. Future descriptor kinds can share this cache by
     /// keying on the full `InternedType` (e.g. `vector<T>`, `struct<...>`).
     vector_by_elem: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// Captured-data idempotency cache: pointer-offset shape -> id. Captures
+    /// sharing a pointer shape share one descriptor. Pointer-free captures
+    /// bypass this cache for `TRIVIAL_DESCRIPTOR_ID`.
+    captured_data_by_pointer_offsets: DashMap<Vec<u32>, DescriptorId, ahash::RandomState>,
     /// All descriptors (reserved + user) in id order. Replaced atomically
     /// on append via `ArcSwap::rcu` (CAS loop). Readers `load()` without
     /// locking.
@@ -162,6 +181,7 @@ impl Default for Descriptors {
     fn default() -> Self {
         Self {
             vector_by_elem: DashMap::default(),
+            captured_data_by_pointer_offsets: DashMap::default(),
             table: ArcSwap::from_pointee(initial_descriptors()),
         }
     }
@@ -175,9 +195,11 @@ impl Descriptors {
         // compile-time error here.
         let Self {
             vector_by_elem,
+            captured_data_by_pointer_offsets,
             table,
         } = self;
         vector_by_elem.clear();
+        captured_data_by_pointer_offsets.clear();
         table.store(Arc::new(initial_descriptors()));
     }
 }
@@ -190,6 +212,56 @@ fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
     ]
 }
 
+/// Table of type layouts.
+///
+/// # Invariants
+///
+/// - Layouts can be obtained by indexing the table with [`LayoutId`] index.
+///   By construction, these indices always have to be in bounds.
+/// - First few slots are reserved for primitives, references, etc. These IDs
+///   do not have the mapping from type to ID. For all other types, the mapping
+///   from type to ID exists where ID can be used to index type's layout.
+struct Layouts {
+    /// Type to layout ID mapping. Types are concrete.
+    by_ty: DashMap<InternedType, LayoutId, ahash::RandomState>,
+    /// All existing layouts in ID order. `boxcar::Vec` is an append-only
+    /// concurrent vector: entries are pushed through a shared `&` reference and
+    /// are never moved, so [`LayoutId`] indices stay stable and concurrent
+    /// reads need no lock.
+    table: boxcar::Vec<ValueLayout>,
+}
+
+impl Default for Layouts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Layouts {
+    /// Creates a fresh table seeded with the reserved layouts and an empty
+    /// type-to-ID map.
+    fn new() -> Self {
+        Self {
+            by_ty: DashMap::default(),
+            table: initial_layouts(),
+        }
+    }
+
+    /// Resets layout table and type to layout ID mappings. Reserved layouts
+    /// are added back to the layout table.
+    fn reset(&mut self) {
+        let Self { by_ty, table } = self;
+        by_ty.clear();
+        *table = initial_layouts();
+    }
+}
+
+fn initial_layouts() -> boxcar::Vec<ValueLayout> {
+    let mut table = boxcar::Vec::new();
+    table.extend(reserved_layouts());
+    table
+}
+
 /// RAII guard for the maintenance phase providing exclusive write access.
 ///
 /// Only one maintenance context can exist at a time, ensuring exclusive
@@ -197,8 +269,8 @@ fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
 /// is held for the lifetime of this guard and automatically released when
 /// dropped.
 pub struct MaintenanceGuard<'ctx> {
-    /// Reference to the caches stored in context.
-    ctx: &'ctx Context,
+    /// Exclusive reference to the caches stored in context.
+    ctx: &'ctx mut Context,
     /// Pool of all arenas managing global allocations.
     global_arena: &'ctx GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
@@ -279,8 +351,10 @@ impl GlobalContext {
                 module_ids: DashMap::default(),
                 types: DashMap::default(),
                 type_lists: DashMap::default(),
+                function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
                 descriptors: Descriptors::default(),
+                layouts: Layouts::default(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -296,11 +370,11 @@ impl GlobalContext {
     /// Returns [`None`] if [`ExecutionGuard`] is currently held or there is
     /// an ongoing maintenance.
     #[must_use]
-    pub fn try_maintenance_context(&self) -> Option<MaintenanceGuard<'_>> {
+    pub fn try_maintenance_context(&mut self) -> Option<MaintenanceGuard<'_>> {
         let _guard = self.phase.try_write()?;
 
         Some(MaintenanceGuard {
-            ctx: &self.ctx,
+            ctx: &mut self.ctx,
             global_arena: &self.global_arena,
             maintenance_config: &self.maintenance_config,
             _guard,
@@ -595,21 +669,86 @@ impl<'ctx> ExecutionGuard<'ctx> {
                     ObjectDescriptor::new_vector(elem_size, offsets)
                         .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}")),
                 );
-                // `rcu` retries on CAS conflict; the closure runs again,
-                // re-reading `next.len()` so the assigned id always matches
-                // the table state at the successful store.
-                let mut assigned_id = DescriptorId(0);
-                self.ctx.descriptors.table.rcu(|cur| {
-                    let mut next = cur.as_ref().clone();
-                    assigned_id = DescriptorId(
-                        u32::try_from(next.len())
-                            .expect("published descriptor count exceeds u32::MAX"),
-                    );
-                    next.push(desc.clone());
-                    Arc::new(next)
-                });
-                assigned_id
+                self.append_descriptor(desc)
             })
+    }
+
+    /// Appends `desc` to the shared descriptor table and returns its assigned
+    /// [`DescriptorId`]. `rcu` retries on CAS conflict; the closure re-reads
+    /// `next.len()` so the id always matches the table state at the store.
+    fn append_descriptor(&self, desc: Arc<ObjectDescriptor>) -> DescriptorId {
+        let mut assigned_id = DescriptorId(0);
+        self.ctx.descriptors.table.rcu(|cur| {
+            let mut next = cur.as_ref().clone();
+            assigned_id = DescriptorId(
+                u32::try_from(next.len()).expect("published descriptor count exceeds u32::MAX"),
+            );
+            next.push(desc.clone());
+            Arc::new(next)
+        });
+        assigned_id
+    }
+
+    /// Returns the GC trace descriptor for a closure's captured-data object.
+    /// `values_size` is the byte width of the packed values region;
+    /// `pointer_offsets` are intra-values heap-pointer offsets.
+    ///
+    /// A pointer-free capture (no offsets) returns the reserved
+    /// [`TRIVIAL_DESCRIPTOR_ID`]. A pointer-bearing capture materializes (or
+    /// reuses) a `CapturedData` descriptor, idempotent on the pointer-offset
+    /// shape.
+    pub fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        if pointer_offsets.is_empty() {
+            return TRIVIAL_DESCRIPTOR_ID;
+        }
+        let offsets: Vec<u32> = pointer_offsets.iter().map(|o| o.0).collect();
+        if let Some(id) = self
+            .ctx
+            .descriptors
+            .captured_data_by_pointer_offsets
+            .get(&offsets)
+        {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .captured_data_by_pointer_offsets
+            .entry(offsets.clone())
+            .or_insert_with(move || {
+                let desc = Arc::new(
+                    ObjectDescriptor::new_captured_data(values_size, offsets)
+                        .unwrap_or_else(|e| panic!("publish_captured_data_descriptor: {e}")),
+                );
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Returns the layout ID for the given type, or [`None`] if no layout has
+    /// been published yet.
+    pub fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        if let Some(id) = reserved_layout_id(view_type(ty)) {
+            return Some(id);
+        }
+        self.ctx.layouts.by_ty.get(&ty).map(|r| *r)
+    }
+
+    /// Publishes the layout for the given type and returns its assigned
+    /// [`LayoutId`].
+    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
+            return *id;
+        }
+
+        // TODO(perf): consider if we should append to the table without holding the shard lock.
+        *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
+            let idx = self.ctx.layouts.table.push(layout);
+            LayoutId::from_usize(idx)
+        })
     }
 
     /// Looks up a type previously interned from a signature token of `module`.
@@ -645,6 +784,16 @@ impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
         // that resolved here stays alive for the returned reference's
         // lifetime, which is tied to `&self`.
         Some(unsafe { &*ptr })
+    }
+}
+
+impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.ctx.layouts.table.get(id.as_usize())
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.layout_id_for(ty)
     }
 }
 
@@ -708,6 +857,27 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 
     fn module_id_of(&self, address: &AccountAddress, name: &IdentStr) -> InternedModuleId {
         self.intern_address_name_internal(*address, name)
+    }
+
+    fn function_ref_of(
+        &self,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> InternedFunctionRef {
+        // SAFETY: all three components are canonical (already-interned)
+        // pointers, so the tuple's pointer-based hash/eq is structural. The
+        // map is cleared on arena reset, so stored pointers stay valid.
+        let key = (module_id, func_name, ty_args);
+        if let Some(entry) = self.ctx.function_refs.get(&key) {
+            return *entry.value();
+        }
+        let ptr = self.global_arena.alloc(FunctionRef {
+            module_id,
+            func_name,
+            ty_args,
+        });
+        *self.ctx.function_refs.entry(key).or_insert(ptr)
     }
 
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
@@ -857,15 +1027,19 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             module_ids,
             types,
             type_lists,
+            function_refs,
             module_cache,
             descriptors,
+            layouts,
         } = self.ctx;
 
         identifiers.clear();
         module_ids.clear();
         types.clear();
         type_lists.clear();
+        function_refs.clear();
         descriptors.reset();
+        layouts.reset();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules

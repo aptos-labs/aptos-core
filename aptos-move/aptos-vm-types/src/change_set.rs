@@ -554,6 +554,11 @@ impl VMChangeSet {
     pub(crate) fn squash_additional_resource_writes(
         write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         additional_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
+        // Gated by gas feature version (see ChangeSetConfigs::strict_delayed_field_squash). When
+        // true, a full write (resource group or standalone delayed-field resource) followed by an
+        // in-place delayed-field change on the same key is rejected outright instead of being
+        // allowed when sizes match.
+        strict_delayed_field_squash: bool,
     ) -> Result<(), PanicError> {
         use AbstractResourceWriteOp::*;
         for (key, additional_entry) in additional_write_set.into_iter() {
@@ -644,7 +649,23 @@ impl VMChangeSet {
                                 ..
                             }),
                         ) => {
-                            // Read cannot change the size (i.e. delayed fields don't modify size)
+                            if strict_delayed_field_squash {
+                                // SAFETY (gas_feature_version >= RELEASE_V1_46): fail closed, the
+                                // standalone-resource analogue of the resource-group arm below. A
+                                // full resource write squashed with a later in-place delayed-field
+                                // exchange on the same key is rejected; a matching materialized
+                                // size does not prove the later exchange reconciles with what the
+                                // earlier session wrote.
+                                return Err(code_invariant_error(format!(
+                                    "Refusing to squash a resource write with a later in-place \
+                                     delayed-field change on the same key (fail-closed for safety): \
+                                     {:?} into {:?}.",
+                                    key, additional_entry
+                                )));
+                            }
+                            // Legacy behavior (gas_feature_version < RELEASE_V1_46): a read cannot
+                            // change the size (i.e. delayed fields don't modify size), so allow the
+                            // merge only when the materialized sizes match.
                             if materialized_size != &Some(*additional_materialized_size) {
                                 return Err(code_invariant_error(format!(
                                     "Trying to squash writes where read has different size: {:?}: {:?}",
@@ -667,7 +688,30 @@ impl VMChangeSet {
                                 },
                             ),
                         ) => {
-                            // Read cannot change the size (i.e. delayed fields don't modify size)
+                            if strict_delayed_field_squash {
+                                // SAFETY (gas_feature_version >= RELEASE_V1_46): fail closed. We
+                                // deliberately do NOT allow squashing a full resource-group write
+                                // (an earlier session that wrote the group, e.g. structurally
+                                // changed its membership) with a later in-place delayed-field
+                                // exchange on the same group (e.g. the gas epilogue touching an
+                                // aggregator in that group). A matching materialized size does not
+                                // prove the later session's delayed-field exchange reconciles with
+                                // the group the earlier session wrote, so rather than risk a silent
+                                // mis-merge of a resource group (which holds asset balances), we
+                                // abort the transaction. This is asset-safe: no change set is
+                                // applied. Legitimate flows touch the group purely in place
+                                // (ResourceGroupInPlaceDelayedFieldChange on both sides), handled by
+                                // the arm below.
+                                return Err(code_invariant_error(format!(
+                                    "Refusing to squash a resource-group write with a later \
+                                     in-place delayed-field change on the same group (fail-closed \
+                                     for safety): {:?} into {:?}.",
+                                    key, additional_entry
+                                )));
+                            }
+                            // Legacy behavior (gas_feature_version < RELEASE_V1_46): a read cannot
+                            // change the size (i.e. delayed fields don't modify size), so allow the
+                            // merge only when the materialized sizes match.
                             if materialized_size.map(|v| v.get())
                                 != Some(*additional_materialized_size)
                             {
@@ -739,6 +783,8 @@ impl VMChangeSet {
     pub fn squash_additional_change_set(
         &mut self,
         additional_change_set: Self,
+        // Gated by gas feature version (see ChangeSetConfigs::strict_delayed_field_squash).
+        strict_delayed_field_squash: bool,
     ) -> PartialVMResult<()> {
         let Self {
             resource_write_set: additional_resource_write_set,
@@ -757,6 +803,7 @@ impl VMChangeSet {
         Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
+            strict_delayed_field_squash,
         )?;
         Self::squash_additional_delayed_field_changes(
             &mut self.delayed_field_change_set,

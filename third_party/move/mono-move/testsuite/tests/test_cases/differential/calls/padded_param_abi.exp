@@ -1,0 +1,96 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x66::padded_param
+// Function definition at index 0
+fun driver(l0: bool, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    call keep_u64
+    ret
+
+// Function definition at index 1
+fun keep_u64(l0: bool, l1: u64): u64
+    local l2: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l2
+    mut_borrow_loc l2
+    copy_loc l1
+    vec_push_back <u64>
+    // @5
+    move_loc l0
+    br_false l0
+    move_loc l1
+    ret
+l0: mut_borrow_loc l2
+    // @10
+    vec_pop_back <u64>
+    ret
+
+=== stackless ===
+// module 0x66::padded_param
+
+fun driver(r0, r1): u64 {
+  slots: params(2), locals(0), temps(0), xfer(2)
+    r0: bool
+    r1: u64
+  code:
+  L0:
+    0: [x0] := call keep_u64, [r0, r1]
+    1: ret [x0]
+}
+
+fun keep_u64(r0, r1): u64 {
+  slots: params(2), locals(1), temps(2)
+    r0: bool
+    r1: u64
+    r2: vector<u64>
+    r3: &mut vector<u64>
+    r4: u64
+  code:
+  L2:
+    0: r2 := vec_pack u64, 0, []
+    1: r3 := mut_borrow_loc r2
+    2: vec_push_back u64, r3, r1
+    3: br_false L0, r0
+  L1:
+    4: ret [r1]
+  L0:
+    5: r3 := mut_borrow_loc r2
+    6: r4 := vec_pop_back u64, r3
+    7: ret [r4]
+}
+=== micro-ops ===
+// module 0x66::padded_param
+
+fun driver() {
+  frame_data_size: 16
+  entry_gas: 95
+  code:
+    0: Move8 [48] <- [8]
+    1: Move(1) [40] <- [0]
+    2: CallIndirect 0x66::padded_param::keep_u64
+    3: Move8 [0] <- [40]
+    4: Return
+}
+
+fun keep_u64() {
+  frame_data_size: 48
+  entry_gas: 43
+  code:
+    0: VecNew [16]
+    1: SlotBorrow [24] <- &[16]
+    2: VecPushBack [24].push([8], size=8, desc=2)
+    3: JumpZeroByte @6 [0] gas_taken=84 gas_fallthrough=54
+    4: Move8 [0] <- [8]
+    5: Return
+    6: SlotBorrow [24] <- &[16]
+    7: VecPopBack [40] <- [24].pop(size=8)
+    8: Move8 [0] <- [40]
+    9: Return
+  safe_point_layouts:
+    2: []
+}
+=== frame-layout ===
+// module 0x66::padded_param
+fun driver: heap_ptr_offsets=[] zero_frame=false
+fun keep_u64: heap_ptr_offsets=[16, 24] zero_frame=true

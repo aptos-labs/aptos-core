@@ -600,8 +600,27 @@ impl NumberOperationAnalysis<'_> {
                         move_model::ast::Operation::Cast => {
                             // Obtained the updated num_oper of the expression
                             let num_oper = global_state.get_node_num_oper(args[0].node_id());
+                            // Casts to a signed integer or `Num` cross a bv→int boundary:
+                            // signed types and `Num` are always represented as Boogie `int`,
+                            // so a `Bitwise` source must not propagate past the cast. The
+                            // boundary itself is then materialized as `$bv2int.N(...)` by
+                            // `translate_cast` in the spec backend.
+                            let target_ty = self.func_target.global_env().get_node_type(*id);
+                            let cast_oper = if target_ty.skip_reference().is_signed_int()
+                                || matches!(
+                                    target_ty.skip_reference(),
+                                    Type::Primitive(PrimitiveType::Num)
+                                ) {
+                                if num_oper == Bitwise {
+                                    Arithmetic
+                                } else {
+                                    num_oper
+                                }
+                            } else {
+                                num_oper
+                            };
                             // Update the node of cast
-                            global_state.update_node_oper(*id, num_oper, true);
+                            global_state.update_node_oper(*id, cast_oper, true);
                         },
                         move_model::ast::Operation::Int2Bv => {
                             global_state.update_node_oper(*id, Bitwise, true);

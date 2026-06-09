@@ -128,7 +128,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if (cond) {
     ///     ()
     /// } else {
-    ///     abort string::into_bytes(string_utils::format<N>(&fmt, arg1, ..., argN))
+    ///     abort string_utils::format<N>(&fmt, arg1, ..., argN).into_bytes()
     /// }
     /// ```
     fn expand_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
@@ -207,7 +207,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if ($left == $right) {
     ///     ()
     /// } else {
-    ///     abort string::into_bytes(string_utils::format2(<assertion_failed_message>, $left, $right))
+    ///     abort string_utils::format2(<assertion_failed_message>, $left, $right).into_bytes()
     /// }
     /// ```
     ///
@@ -221,7 +221,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if ($left == $right) {
     ///     ()
     /// } else {
-    ///     abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string::utf8(message), $left, $right))
+    ///     abort string_utils::format3(<assertion_failed_message>, string::utf8(message), $left, $right).into_bytes()
     /// }
     /// ```
     ///
@@ -235,7 +235,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if ($left == $right) {
     ///     ()
     /// } else {
-    ///     abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string_utils::format<N>(&fmt, arg1, ..., argN), $left, $right))
+    ///     abort string_utils::format3(<assertion_failed_message>, string_utils::format<N>(&fmt, arg1, ..., argN), $left, $right).into_bytes()
     /// }
     /// ```
     fn expand_assert_eq(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
@@ -353,9 +353,17 @@ impl ExpTranslator<'_, '_, '_> {
         )
     }
 
-    /// Calls `std::string::into_bytes(s)`.
+    /// Calls `s.into_bytes()` in receiver style.
     fn call_into_bytes(&self, loc: Loc, s: Exp) -> Exp {
-        self.call_stdlib_function(loc, STRING_MODULE, INTO_BYTES_FUNCTION_NAME, vec![s])
+        if !self.check_stdlib_module(loc, STRING_MODULE) {
+            return sp(loc, Exp_::UnresolvedError);
+        }
+        let function_name = sp(loc, INTO_BYTES_FUNCTION_NAME.into());
+        let module_access = sp(loc, ModuleAccess_::Name(function_name));
+        sp(
+            loc,
+            Exp_::Call(module_access, CallKind::Receiver, None, sp(loc, vec![s])),
+        )
     }
 
     /// Calls `std::string::utf8(bytes)`.

@@ -66,6 +66,7 @@
 //!    live, but the coalesced Vid is, at the IR level, an independent
 //!    stack value — the borrow checker does not see the aliasing.
 //!    Tracked by `home_mut_borrow_pos`; checked via `home_mut_borrowed`.
+//!    `MutBorrowLocField` is tracked under the same channel.
 //!
 //! With both channels clear over `[def_pos(vid)+1, live_end(vid))`, the
 //! Vid's snapshot equals the local's slot at every read site and they
@@ -73,9 +74,11 @@
 //! `MutBorrowVariantField` / `MutBorrowGlobal` need no tracking here:
 //! their `src` is a ref Vid (or address), never a local, so any
 //! local-storage mutation they cascade into was already gated on an
-//! upstream `MutBorrowLoc`. (Field-level coalescing, if ever added,
-//! would need to revisit this.)
+//! upstream `MutBorrowLoc` (or `MutBorrowLocField`). (Field-level
+//! coalescing, if ever added, would need to revisit this.)
 
+#[cfg(debug_assertions)]
+use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
     instr_utils::{clobbers_xfer, for_each_def, for_each_use},
     Instr, Slot,
@@ -171,8 +174,11 @@ impl BlockAnalysis {
                     // cannot appear
                 },
             });
-            if let Instr::MutBorrowLoc(_, src @ Slot::Home(_)) = instr {
-                home_mut_borrow_pos.entry(*src).or_default().push(i);
+            // Both shapes yield a `&mut` into the local's storage.
+            if let Instr::MutBorrowLoc(_, local @ Slot::Home(_))
+            | Instr::MutBorrowLocField(_, _, local @ Slot::Home(_)) = instr
+            {
+                home_mut_borrow_pos.entry(*local).or_default().push(i);
             }
         }
 
@@ -802,9 +808,9 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
         // Block-local lifetime: a fresh state at every block.
         bound.iter_mut().for_each(|b| *b = false);
         for (i, instr) in block.instrs.iter().enumerate() {
-            // (1) every Xfer use must be live.
+            // (1) every Xfer value use must be live.
             let mut unbound: Option<u16> = None;
-            for_each_use(instr, |s| {
+            for_each_value_use(instr, |s| {
                 if let Slot::Xfer(j) = s
                     && !bound[j as usize]
                     && unbound.is_none()
@@ -873,10 +879,8 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                 // this call returns to.
                 bound.iter_mut().for_each(|b| *b = false);
             } else {
-                // Non-call: consumed uses release their bindings
-                // (single-use). Matches the lowering's end-of-instr
-                // clear.
-                for_each_use(instr, |s| {
+                // Non-call: value uses release their bindings (single-use).
+                for_each_value_use(instr, |s| {
                     if let Slot::Xfer(j) = s {
                         bound[j as usize] = false;
                     }

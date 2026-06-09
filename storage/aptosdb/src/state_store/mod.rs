@@ -6,12 +6,13 @@
 use crate::{
     ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb},
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
-    pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{
+        leaked_stale_node_cleaner, ColdStateKv, EpochSnapshot, HotStateKv, StateKvPrunerManager,
+        StateMerkle, StateMerklePrunerManager,
+    },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         hot_state_value_by_key_hash::{HotStateEntry, HotStateValueByKeyHashSchema},
-        stale_node_index::StaleNodeIndexSchema,
-        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
         version_data::VersionDataSchema,
@@ -103,12 +104,12 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
 pub(crate) struct StatePruner {
-    pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
-    pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
-    pub hot_state_kv_pruner: Option<StateKvPrunerManager>,
-    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
-    pub state_kv_pruner: StateKvPrunerManager,
+    pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StateMerkle>>,
+    pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<EpochSnapshot>>,
+    pub hot_state_kv_pruner: Option<StateKvPrunerManager<HotStateKv>>,
+    pub state_merkle_pruner: StateMerklePrunerManager<StateMerkle>,
+    pub epoch_snapshot_pruner: StateMerklePrunerManager<EpochSnapshot>,
+    pub state_kv_pruner: StateKvPrunerManager<ColdStateKv>,
 }
 
 impl StatePruner {
@@ -120,22 +121,29 @@ impl StatePruner {
         config: PrunerConfig,
     ) -> Self {
         let hot_state_merkle_pruner = hot_state_merkle_db.as_ref().map(|db| {
-            StateMerklePrunerManager::new(Arc::clone(db), config.state_merkle_pruner_config)
+            StateMerklePrunerManager::<StateMerkle>::new(
+                Arc::clone(db),
+                config.state_merkle_pruner_config,
+            )
         });
         let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
-            StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
+            StateMerklePrunerManager::<EpochSnapshot>::new(
+                db,
+                config.epoch_snapshot_pruner_config.into(),
+            )
         });
-        let hot_state_kv_pruner =
-            hot_state_kv_db.map(|db| StateKvPrunerManager::new(db, config.ledger_pruner_config));
-        let state_merkle_pruner = StateMerklePrunerManager::new(
+        let hot_state_kv_pruner = hot_state_kv_db
+            .map(|db| StateKvPrunerManager::<HotStateKv>::new(db, config.ledger_pruner_config));
+        let state_merkle_pruner = StateMerklePrunerManager::<StateMerkle>::new(
             Arc::clone(&state_merkle_db),
             config.state_merkle_pruner_config,
         );
-        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
+        let epoch_snapshot_pruner = StateMerklePrunerManager::<EpochSnapshot>::new(
             Arc::clone(&state_merkle_db),
             config.epoch_snapshot_pruner_config.into(),
         );
-        let state_kv_pruner = StateKvPrunerManager::new(state_kv_db, config.ledger_pruner_config);
+        let state_kv_pruner =
+            StateKvPrunerManager::<ColdStateKv>::new(state_kv_db, config.ledger_pruner_config);
 
         leaked_stale_node_cleaner::maybe_start_cleaner(
             state_merkle_db,
@@ -849,11 +857,17 @@ impl StateStore {
         let current_state = out_current_state.lock().clone();
         info!(
             latest_in_memory_version = current_state.version(),
-            latest_in_memory_hot_root_hash = current_state.summary().hot_root_hash(),
+            latest_in_memory_hot_root_hash = current_state
+                .summary()
+                .hot_root_hash()
+                .expect("main state always has a hot half"),
             latest_in_memory_root_hash = current_state.summary().root_hash(),
             latest_snapshot_version = current_state.last_checkpoint().version(),
-            latest_snapshot_hot_root_hash =
-                current_state.last_checkpoint().summary().hot_root_hash(),
+            latest_snapshot_hot_root_hash = current_state
+                .last_checkpoint()
+                .summary()
+                .hot_root_hash()
+                .expect("main state always has a hot half"),
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
@@ -932,7 +946,7 @@ impl StateStore {
         }
 
         // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-        buffered_state.update(
+        buffered_state.update_and_report(
             updated,
             hot_state_updates,
             0,    /* estimated_items, doesn't matter since we sync-commit */
@@ -1005,6 +1019,12 @@ impl StateStore {
     }
 
     pub fn reset(&self) {
+        // Drain + shut down the old pipeline against the *current*
+        // chain family before `create_buffered_state_from_latest_snapshot`
+        // repoints `current_state` at a new MapLayer family. Doing
+        // the shutdown lazily via `Drop` would let the old thread's
+        // drop-time `sync_commit` read the new family and panic on
+        // `is_descendant_of`.
         self.buffered_state.lock().quit();
         // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
         // metadata here. This is safe because callers (restore / state-sync) open the DB with

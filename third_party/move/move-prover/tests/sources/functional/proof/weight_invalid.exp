@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: unexpected token
+   ┌─ tests/sources/functional/proof/weight_invalid.move:15:44
+   │
+15 │     spec fun id_num(n: num): num [weight = -1] {
+   │                                            ^ invalid weight `-`: expected a non-negative integer

@@ -1,0 +1,51 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x77::narrow
+
+fun add_u8(a: u8, b: u8): u8
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun sub_u8(a: u8, b: u8): u8
+    copy_loc a
+    copy_loc b
+    sub
+    ret
+
+fun mul_u8(a: u8, b: u8): u8
+    copy_loc a
+    copy_loc b
+    mul
+    ret
+
+fun add_i8(a: i8, b: i8): i8
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun sub_i8(a: i8, b: i8): i8
+    copy_loc a
+    copy_loc b
+    sub
+    ret
+
+fun negate_i8(a: i8): i8
+    copy_loc a
+    negate
+    ret
+
+// RUN: execute 0x77::narrow::add_u8 --args 100, 55
+// CHECK: results: 155
+// RUN: execute 0x77::narrow::sub_u8 --args 200, 75
+// CHECK: results: 125
+// RUN: execute 0x77::narrow::mul_u8 --args 12, 20
+// CHECK: results: 240
+
+// RUN: execute 0x77::narrow::add_i8 --args -50, 20
+// CHECK: results: -30
+// RUN: execute 0x77::narrow::sub_i8 --args 10, -20
+// CHECK: results: 30
+// RUN: execute 0x77::narrow::negate_i8 --args -42
+// CHECK: results: 42

@@ -1,0 +1,34 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::capture_middle_interleave
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 10
+    ld_u64 20
+    ld_u64 30
+    ret
+
+fun g(a: u64, b: u64, c: u64): u64
+    move_loc a
+    ld_u64 1000000
+    mul
+    move_loc b
+    ld_u64 1000
+    mul
+    add
+    move_loc c
+    add
+    ret
+
+public fun caller(): u64
+    local cl: |u64, u64|u64 has drop
+    ld_u64 7
+    pack_closure g, 2
+    st_loc cl
+    call three_rets
+    pop
+    move_loc cl
+    call_closure <|u64, u64|u64 has drop>
+    ret
+
+// RUN: execute 0x66::capture_middle_interleave::caller
+// CHECK: results: 10007020

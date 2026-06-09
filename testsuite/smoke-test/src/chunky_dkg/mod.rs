@@ -19,6 +19,7 @@ use tokio::time::Instant;
 
 mod correctness;
 mod enable_feature;
+mod epoch_timeout;
 mod governance_recovery;
 mod shadow_mode;
 mod stall_recovery;

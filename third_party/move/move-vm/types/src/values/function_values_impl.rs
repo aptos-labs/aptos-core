@@ -10,7 +10,7 @@ use move_core_types::{
     function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
+    value::{check_layout_within_bounds, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use serde::{
@@ -142,6 +142,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
         seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
         for (layout, value) in data.captured_layouts.into_iter().zip(captured.iter()) {
+            // Reject captured layouts whose DAG would unfold past the node-count cap.
+            check_layout_within_bounds::<S::Error>(&layout)?;
             seq.serialize_element(&layout)?;
             seq.serialize_element(&SerializationReadyValue {
                 ctx: self.ctx,
