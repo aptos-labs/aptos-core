@@ -104,11 +104,18 @@ impl ObjectDescriptor {
 
     /// Construct a [`Vector`](ObjectDescriptorInner::Vector) descriptor.
     ///
-    /// Returns `Err` if `elem_size == 0` or any offset in
-    /// `elem_pointer_offsets` is not 8-byte aligned, runs past
-    /// `elem_size`, or breaks strict ordering.
+    /// Returns `Err` if `elem_size == 0`, `elem_pointer_offsets` is empty,
+    /// or any offset in `elem_pointer_offsets` is not 8-byte aligned, runs
+    /// past `elem_size`, or breaks strict ordering. A vector with no
+    /// pointer offsets is pointer-free and uses the reserved `Trivial`
+    /// descriptor instead.
     pub fn new_vector(elem_size: u32, elem_pointer_offsets: Vec<u32>) -> anyhow::Result<Self> {
         anyhow::ensure!(elem_size > 0, "Vector: elem_size must be > 0");
+        anyhow::ensure!(
+            !elem_pointer_offsets.is_empty(),
+            "Vector: elem_pointer_offsets must be non-empty; pointer-free \
+             vectors use the Trivial descriptor"
+        );
         check_pointer_offsets(
             "Vector::elem_pointer_offsets",
             &elem_pointer_offsets,
@@ -373,7 +380,7 @@ mod tests {
     #[test]
     fn push_returns_increasing_ids() {
         let mut t = ObjectDescriptorTable::new();
-        let a = t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+        let a = t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
         let b = t.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
         assert_eq!(a, DescriptorId(2));
         assert_eq!(b, DescriptorId(3));
@@ -438,6 +445,13 @@ mod tests {
     fn vector_pointer_out_of_bounds_errors() {
         // 8 + 8 = 16 > 8
         assert!(err_msg(ObjectDescriptor::new_vector(8, vec![8])).contains("exceeds region size"));
+    }
+
+    #[test]
+    fn vector_empty_pointer_offsets_errors() {
+        // Pointer-free vectors are non-canonical as a Vector descriptor; they
+        // use the reserved Trivial descriptor instead.
+        assert!(err_msg(ObjectDescriptor::new_vector(8, vec![])).contains("non-empty"));
     }
 
     // ----- Enum tag accounting -----

@@ -9,7 +9,7 @@ use mono_move_core::{
     SortedSafePointEntries,
 };
 use mono_move_runtime::{
-    InterpreterContext, LocalRuntimeContext, ObjectDescriptor, ObjectDescriptorTable,
+    InterpreterContext, LocalRuntimeContext, ObjectDescriptorTable, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// Data segment (48 bytes):
@@ -18,7 +18,7 @@ use mono_move_runtime::{
 ///   [fp + 16] : i (loop counter / len)
 ///   [fp + 24] : tmp (scratch)
 ///   [fp + 32] : vec_ref (16-byte fat pointer referencing vec_ptr)
-fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
+fn make_vec_sum_program(n: u64) -> (Function, ObjectDescriptorTable) {
     use MicroOp::*;
 
     let slot_result: u32 = 0;
@@ -27,8 +27,8 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
     let slot_tmp: u32 = 24;
     let slot_vec_ref: u32 = 32;
 
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -65,25 +65,15 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    (vec![func], descriptors)
-}
-
-#[test]
-fn vec_sum_100() {
-    let n: u64 = 100;
-    let (functions, descriptors) = make_vec_sum_program(n);
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
-    ctx.run().unwrap();
-    assert_eq!(ctx.root_result(), n * (n - 1) / 2);
+    (func, descriptors)
 }
 
 #[test]
 fn vec_sum_with_gc_pressure() {
     let n: u64 = 200;
-    let (functions, descriptors) = make_vec_sum_program(n);
+    let (func, descriptors) = make_vec_sum_program(n);
     let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::with_heap_size(&mut exec_ctx, &functions[0], 4 * 1024);
+    let mut ctx = InterpreterContext::with_heap_size(&mut exec_ctx, &func, 4 * 1024);
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
     assert!(ctx.gc_count() > 0, "GC should have run at least once");

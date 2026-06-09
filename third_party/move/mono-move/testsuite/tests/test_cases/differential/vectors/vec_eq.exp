@@ -224,9 +224,9 @@ fun build() {
   code:
     0: VecNew [16]
     1: SlotBorrow [24] <- &[16]
-    2: VecPushBack [24].push([0], size=8, desc=2)
+    2: VecPushBack [24].push([0], size=8, desc=0)
     3: SlotBorrow [24] <- &[16]
-    4: VecPushBack [24].push([8], size=8, desc=2)
+    4: VecPushBack [24].push([8], size=8, desc=0)
     5: Move8 [0] <- [16]
     6: Return
   safe_point_layouts:
@@ -276,7 +276,7 @@ fun eq_len() {
   code:
     0: VecNew [24]
     1: SlotBorrow [32] <- &[24]
-    2: VecPushBack [32].push([0], size=8, desc=2)
+    2: VecPushBack [32].push([0], size=8, desc=0)
     3: Move8 [88] <- [16]
     4: Move8 [80] <- [8]
     5: CallIndirect 0x1::test::build

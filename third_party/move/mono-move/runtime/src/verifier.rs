@@ -562,8 +562,18 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                     pc,
                     "VecPushBack",
                     descriptor_id,
-                    |inner| matches!(inner, ObjectDescriptorInner::Vector { .. }),
-                    "a Vector",
+                    |inner| match inner {
+                        ObjectDescriptorInner::Vector {
+                            elem_pointer_offsets,
+                            ..
+                        } => !elem_pointer_offsets.is_empty(),
+                        ObjectDescriptorInner::Trivial => true,
+                        ObjectDescriptorInner::Closure
+                        | ObjectDescriptorInner::Struct { .. }
+                        | ObjectDescriptorInner::Enum { .. }
+                        | ObjectDescriptorInner::CapturedData { .. } => false,
+                    },
+                    "a non-empty Vector or Trivial",
                 );
             },
 

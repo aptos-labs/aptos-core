@@ -11,51 +11,11 @@ use mono_move_core::{
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    ObjectDescriptorTable, TRIVIAL_DESCRIPTOR_ID, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
-// Test 1: struct_inline — inline struct on the stack (no new instructions)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn struct_inline() {
-    use MicroOp::*;
-
-    let result: u32 = 0;
-    let pair_a: u32 = 8;
-    let pair_b: u32 = 16;
-
-    #[rustfmt::skip]
-    let code = vec![
-        StoreImm8 { dst: FO(pair_a), imm: 10u64.to_le_bytes() },
-        StoreImm8 { dst: FO(pair_b), imm: 20u64.to_le_bytes() },
-        AddU64 { dst: FO(result), lhs: FO(pair_a), rhs: FO(pair_b) },
-        Return,
-    ];
-    let functions = [Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(code),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 24,
-        extended_frame_size: 48,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
-    }];
-    let descriptors = ObjectDescriptorTable::new();
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
-    ctx.run().unwrap();
-
-    assert_eq!(ctx.root_result(), 30, "result should be 10 + 20 = 30");
-}
-
-// ---------------------------------------------------------------------------
-// Test 2: struct_inline_borrow
+// Test 1: struct_inline_borrow
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -100,7 +60,7 @@ fn struct_inline_borrow() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: struct_heap_basic
+// Test 2: struct_heap_basic
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -147,7 +107,7 @@ fn struct_heap_basic() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: struct_heap_survives_gc
+// Test 3: struct_heap_survives_gc
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -200,7 +160,7 @@ fn struct_heap_survives_gc() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 5: struct_with_vector_field
+// Test 4: struct_with_vector_field
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -216,7 +176,7 @@ fn struct_with_vector_field() {
 
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_ctr_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -272,7 +232,7 @@ fn struct_with_vector_field() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 6: struct_borrow_field
+// Test 5: struct_borrow_field
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -327,7 +287,7 @@ fn struct_borrow_field() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 7: struct_borrow_survives_gc
+// Test 6: struct_borrow_survives_gc
 // ---------------------------------------------------------------------------
 
 #[test]

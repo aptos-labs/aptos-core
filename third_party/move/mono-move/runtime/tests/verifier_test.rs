@@ -14,7 +14,7 @@ use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable
 
 fn trivial_descriptors() -> ObjectDescriptorTable {
     let mut t = ObjectDescriptorTable::new();
-    t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
     t
 }
 
@@ -694,10 +694,9 @@ fn multiple_errors_collected() {
 // `ObjectDescriptorTable`; see its unit tests in `runtime/src/types.rs`.
 // ---------------------------------------------------------------------------
 
-#[test]
-fn vec_pushback_must_target_vector_descriptor() {
+fn vec_pushback_func(descriptor_id: DescriptorId) -> Function {
     use MicroOp::*;
-    let func = Function {
+    Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
@@ -714,7 +713,7 @@ fn vec_pushback_must_target_vector_descriptor() {
                 vec_ref: FO(16),
                 elem: FO(8),
                 elem_size: 8,
-                descriptor_id: DescriptorId(0), // Trivial — wrong variant
+                descriptor_id,
             },
             Return,
         ]),
@@ -726,11 +725,26 @@ fn vec_pushback_must_target_vector_descriptor() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    };
+    }
+}
+
+#[test]
+fn vec_pushback_accepts_trivial_descriptor() {
+    // A pointer-free vector canonically uses the Trivial descriptor.
+    let func = vec_pushback_func(DescriptorId(0));
     let errors = verify_function(&func, &trivial_descriptors());
-    assert!(errors
-        .iter()
-        .any(|e| e.message.contains("VecPushBack") && e.message.contains("not a Vector")));
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+#[test]
+fn vec_pushback_rejects_non_vector_descriptor() {
+    // A Struct descriptor is neither Trivial nor a Vector.
+    let mut descriptors = ObjectDescriptorTable::new();
+    let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    let func = vec_pushback_func(struct_desc);
+    let errors = verify_function(&func, &descriptors);
+    assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
+        && e.message.contains("not a non-empty Vector or Trivial")));
 }
 
 #[test]
