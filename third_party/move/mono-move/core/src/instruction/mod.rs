@@ -120,6 +120,7 @@ use crate::{
     types::{display_type, display_type_list, view_name, InternedType, InternedTypeList},
     FunctionPtr,
 };
+use move_binary_format::file_format::ConstantPoolIndex;
 use move_core_types::int256::U256;
 use std::fmt;
 
@@ -770,6 +771,14 @@ pub enum MicroOp {
         elem_size: u32,
     },
 
+    /// Creates a vector from the constant pool, allocating it on the heap and
+    /// writing the data pointer into `dst`. The empty-vector constant creates
+    /// a null pointer. MAY TRIGGER GC.
+    StoreImmVec {
+        dst: FrameOffset,
+        idx: ConstantPoolIndex,
+    },
+
     //======================================================================
     // Reference (fat pointer) operations
     //======================================================================
@@ -1358,6 +1367,9 @@ impl fmt::Display for MicroOp {
                     vec_ref.0, idx.0, src.0, elem_size
                 )
             },
+            MicroOp::StoreImmVec { dst, idx } => {
+                write!(f, "StoreImmVec [{}] <- const[{}]", dst.0, idx.0)
+            },
             MicroOp::SlotBorrow { dst, local } => {
                 write!(f, "SlotBorrow [{}] <- &[{}]", dst.0, local.0)
             },
@@ -1714,6 +1726,7 @@ impl MicroOp {
             // Allocating: may trigger GC.
             MicroOp::HeapNew { .. }
             | MicroOp::VecPushBack { .. }
+            | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }

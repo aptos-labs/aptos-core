@@ -32,6 +32,7 @@ pub use instruction::{
     FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE,
 };
 pub use interner::{view_function_ref, FunctionRef, InternedFunctionRef, Interner, ModuleId};
+pub use move_binary_format::file_format::ConstantPoolIndex;
 pub use object_descriptor::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
     CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,

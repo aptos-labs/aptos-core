@@ -1,0 +1,34 @@
+=== stackless ===
+// module 0x1::test
+
+fun flag(r0): bool {
+  slots: params(1), locals(1), temps(3)
+    r0: u64
+    r1: vector<bool>
+    r2: &vector<bool>
+    r3: &bool
+    r4: bool
+  code:
+  L0:
+    0: r1 := ld_const #0
+    1: r2 := imm_borrow_loc r1
+    2: r3 := vec_imm_borrow bool, r2, r0
+    3: r4 := read_ref r3
+    4: ret [r4]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun flag() {
+  frame_data_size: 56
+  code:
+    0: Charge #27
+    1: StoreImmVec [8] <- const[0]
+    2: SlotBorrow [16] <- &[8]
+    3: VecBorrow [32] <- &[16][[0]] (elem_size=1)
+    4: ReadRef [48] <- *[32] (size=1)
+    5: Move(1) [0] <- [48]
+    6: Return
+  safe_point_layouts:
+    1: []
+}

@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
@@ -51,6 +53,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
     ];
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,

@@ -64,6 +64,7 @@ const SIGNER_REF: FO = FO(56);
 fn make_program(code: Vec<MicroOp>, frame_layout: FrameLayoutInfo) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,

@@ -3,6 +3,8 @@
 
 //! Tests for Move struct support (both inline and heap-allocated).
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
@@ -33,6 +35,7 @@ fn struct_inline() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -76,6 +79,7 @@ fn struct_inline_borrow() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -122,6 +126,7 @@ fn struct_heap_basic() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -168,6 +173,7 @@ fn struct_heap_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -231,6 +237,7 @@ fn struct_with_vector_field() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -292,6 +299,7 @@ fn struct_borrow_field() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -344,6 +352,7 @@ fn struct_borrow_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,

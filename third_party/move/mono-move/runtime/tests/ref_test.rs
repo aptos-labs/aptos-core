@@ -4,6 +4,8 @@
 //! Tests for fat-pointer references (VecBorrow, SlotBorrow, ReadRef, WriteRef,
 //! HeapBorrow).
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, MicroOp,
@@ -49,6 +51,7 @@ fn ref_basic() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -108,6 +111,7 @@ fn ref_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -156,6 +160,7 @@ fn ref_cross_frame() {
     ];
     let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(callee_code),
         param_slots: vec![],
         param_region_size: 16,
@@ -194,6 +199,7 @@ fn ref_cross_frame() {
     ];
     let main_func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(main_code),
         param_slots: vec![],
         param_region_size: 0,
@@ -274,6 +280,7 @@ fn ref_multiple_borrows() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -339,6 +346,7 @@ fn ref_borrow_local() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -418,6 +426,7 @@ fn ref_nested_vectors() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -504,6 +513,7 @@ fn ref_survives_double_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -560,6 +570,7 @@ fn ref_struct_field_borrow() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -611,6 +622,7 @@ fn ref_struct_field_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -655,6 +667,7 @@ fn ref_self_copy() {
     ];
     let function = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,

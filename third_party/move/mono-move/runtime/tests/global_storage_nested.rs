@@ -65,6 +65,7 @@ fn make_borrow_mut_program(desc_id: DescriptorId) -> Function {
     let _ = desc_id; // descriptor_id is no longer carried on the MicroOp.
     Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             MicroOp::BorrowGlobalMut {
                 addr: ADDR,
@@ -253,6 +254,7 @@ fn deep_copy_survives_gc_mid_walk() {
 
     let func = Function {
         name: GlobalArenaPtr::from_static("test_gc_mid_copy"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             // Three garbage allocations into the same unrooted slot.
             // Each HeapNew is 16B (header + 8B payload). With heap=32,
@@ -338,6 +340,7 @@ fn move_from_deep_copies_external_resource_survives_gc_mid_walk() {
 
     let func = Function {
         name: GlobalArenaPtr::from_static("test_move_from_gc_mid_copy"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             // Three garbage allocations into the same unrooted slot —
             // same pressure pattern as the BorrowGlobalMut variant.

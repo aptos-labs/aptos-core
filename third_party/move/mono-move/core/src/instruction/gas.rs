@@ -89,6 +89,7 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::VecPopBack { .. }
             | MicroOp::VecLoadElem { .. }
             | MicroOp::VecStoreElem { .. }
+            | MicroOp::StoreImmVec { .. }
             | MicroOp::SlotBorrow { .. }
             | MicroOp::VecBorrow { .. }
             | MicroOp::HeapBorrow { .. }
@@ -233,6 +234,7 @@ impl RemapTargets for MicroOp {
             | MicroOp::VecPopBack { .. }
             | MicroOp::VecLoadElem { .. }
             | MicroOp::VecStoreElem { .. }
+            | MicroOp::StoreImmVec { .. }
             | MicroOp::SlotBorrow { .. }
             | MicroOp::VecBorrow { .. }
             | MicroOp::HeapBorrow { .. }
@@ -281,6 +283,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::StoreImm1 { .. } => 2,
             MicroOp::StoreImm2 { .. } => 2,
             MicroOp::StoreImm4 { .. } => 2,
+            // TODO(gas): make size proportional to BCS size?
+            MicroOp::StoreImmVec { .. } => 10,
             MicroOp::StoreImm8 { .. } => 2,
             MicroOp::StoreImm16 { .. } => 3,
             MicroOp::StoreImm32 { .. } => 4,

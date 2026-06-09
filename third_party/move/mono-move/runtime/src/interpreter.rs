@@ -26,6 +26,7 @@ use crate::{
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
         VEC_LENGTH_OFFSET,
     },
+    value_utils::deserialize,
     ExecutionContext,
 };
 use mono_move_core::{
@@ -33,13 +34,14 @@ use mono_move_core::{
     native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
     next_captured_value_offset,
     storage::resource_provider::StorageKey,
-    CallClosureOp, ClosureFuncRef, CmpKind, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    CallClosureOp, ClosureFuncRef, CmpKind, ConstantPoolIndex, DescriptorId, DescriptorProvider,
+    FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
+    IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
+    OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
@@ -977,6 +979,9 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 MicroOp::StoreImm8 { dst, ref imm } => write_int::<[u8; 8]>(fp, dst, *imm),
                 MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
                 MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
+                MicroOp::StoreImmVec { dst, idx } => {
+                    self.exec_store_imm_vec(dst, idx)?;
+                },
 
                 // Add
                 MicroOp::AddU64 { dst, lhs, rhs } => {
@@ -1511,6 +1516,39 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
         self.pc += 1;
         Ok(StepResult::Continue)
+    }
+
+    /// Allocates vector from constant pool and writes data pointer into `dst`.
+    fn exec_store_imm_vec(
+        &mut self,
+        dst: FrameOffset,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<()> {
+        // SAFETY: `current_func` points to the live, currently-executing
+        // function.
+        let module_id = unsafe { self.current_func.as_ref() }.module_id;
+        let (ty, bytes) = self.exec_ctx.load_constant(module_id, idx)?;
+
+        // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
+        // and is writable (no aliasing to the heap).
+        unsafe {
+            let dst = self.frame_ptr.add(usize::from(dst));
+            if let Err(err) = deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst) {
+                match err {
+                    AllocationError::RuntimeError(err) => return Err(err),
+                    AllocationError::OutOfHeapMemory { .. } => {
+                        // TODO: add an ld_const test that fills the heap so
+                        // the first deserialize fails and this GC-then-retry
+                        // path runs. Needs a `ForceGC` native to drive it
+                        // deterministically in the differential suite.
+                        gc_collect!(self)?;
+                        deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+                            .map_err(AllocationError::into_runtime_error)?;
+                    },
+                }
+            }
+            Ok(())
+        }
     }
 
     /// Deep-copy the value tree rooted at the specified source into the

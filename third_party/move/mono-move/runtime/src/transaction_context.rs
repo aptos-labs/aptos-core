@@ -6,13 +6,13 @@
 //
 // TODO: move out of the runtime once a layer above it exists.
 
-use crate::ExecutionContext;
+use crate::{error::RuntimeResult, ExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
     types::{InternedType, InternedTypeList},
-    DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider, ObjectDescriptor,
-    ResourceProvider, ValueLayout,
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
+    ObjectDescriptor, ResourceProvider, ValueLayout,
 };
 use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
@@ -89,6 +89,19 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
             name,
             ty_args,
         )
+    }
+
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &[u8])> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        Ok((
+            module.interned_constant_type_at(idx),
+            module.constant_data_at(idx),
+        ))
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

@@ -3,6 +3,8 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
@@ -46,6 +48,7 @@ fn enum_basic() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -100,6 +103,7 @@ fn enum_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -162,6 +166,7 @@ fn enum_gc_traces_refs() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -227,6 +232,7 @@ fn enum_pattern_match() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -276,6 +282,7 @@ fn enum_variant_switch() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -327,6 +334,7 @@ fn enum_borrow_field() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -384,6 +392,7 @@ fn enum_gc_variant_switching() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -443,6 +452,7 @@ fn enum_in_struct() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,
@@ -513,6 +523,7 @@ fn enum_in_vector() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
         param_slots: vec![],
         param_region_size: 0,

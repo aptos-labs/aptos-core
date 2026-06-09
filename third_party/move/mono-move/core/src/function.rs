@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE};
+use crate::{
+    instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE},
+    interner::InternedModuleId,
+};
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
 use std::{fmt, ptr::NonNull};
 
@@ -133,6 +136,7 @@ impl SortedSafePointEntries {
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
+    pub module_id: InternedModuleId,
     pub code: Code,
     /// Per-parameter (aligned) frame slot, in declaration order.
     pub param_slots: Vec<SizedSlot>,

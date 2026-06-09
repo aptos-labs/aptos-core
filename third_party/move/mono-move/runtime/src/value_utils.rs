@@ -479,7 +479,6 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
 ///
 /// `dst` pointer must be writable for the in-memory size of the given type and
 /// outlive the call.
-#[allow(dead_code)]
 pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     layouts: &T,
     heap: &mut Heap,

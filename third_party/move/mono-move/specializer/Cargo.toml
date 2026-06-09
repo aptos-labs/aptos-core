@@ -6,7 +6,6 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
-bcs = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
 move-binary-format = { workspace = true }

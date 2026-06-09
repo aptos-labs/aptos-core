@@ -510,6 +510,11 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, dst);
             },
 
+            // ----- StoreImmVec: writes an 8-byte heap pointer to `dst` -----
+            MicroOp::StoreImmVec { dst, .. } => {
+                self.check_frame_access_8(pc, dst);
+            },
+
             MicroOp::VecLen { dst, vec_ref } => {
                 self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_frame_access_8(pc, dst);
