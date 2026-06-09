@@ -26,7 +26,7 @@ pub mod test_helper;
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     pub(crate) ledger_db: Arc<LedgerDb>,
-    pub(crate) hot_state_kv_db: Option<Arc<StateKvDb>>,
+    pub(crate) hot_state_kv_db: Arc<StateKvDb>,
     pub(crate) state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
     pub(crate) state_store: Arc<StateStore>,
@@ -111,13 +111,7 @@ impl AptosDB {
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
         hot_state_config: HotStateConfig,
-    ) -> Result<(
-        LedgerDb,
-        Option<StateMerkleDb>,
-        StateMerkleDb,
-        Option<StateKvDb>,
-        StateKvDb,
-    )> {
+    ) -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs.ledger_db_config,
@@ -125,19 +119,15 @@ impl AptosDB {
             block_cache,
             readonly,
         )?;
-        let hot_state_kv_db = if !readonly {
-            Some(StateKvDb::new(
-                db_paths,
-                rocksdb_configs.state_kv_db_config,
-                env,
-                block_cache,
-                readonly,
-                /* is_hot = */ true,
-                hot_state_config.delete_on_restart,
-            )?)
-        } else {
-            None
-        };
+        let hot_state_kv_db = StateKvDb::new(
+            db_paths,
+            rocksdb_configs.state_kv_db_config,
+            env,
+            block_cache,
+            readonly,
+            /* is_hot = */ true,
+            hot_state_config.delete_on_restart,
+        )?;
         let state_kv_db = StateKvDb::new(
             db_paths,
             rocksdb_configs.state_kv_db_config,
@@ -147,20 +137,16 @@ impl AptosDB {
             /* is_hot = */ false,
             /* delete_on_restart = */ false,
         )?;
-        let hot_state_merkle_db = if !readonly {
-            Some(StateMerkleDb::new(
-                db_paths,
-                rocksdb_configs.state_merkle_db_config,
-                env,
-                block_cache,
-                readonly,
-                max_num_nodes_per_lru_cache_shard,
-                /* is_hot = */ true,
-                hot_state_config.delete_on_restart,
-            )?)
-        } else {
-            None
-        };
+        let hot_state_merkle_db = StateMerkleDb::new(
+            db_paths,
+            rocksdb_configs.state_merkle_db_config,
+            env,
+            block_cache,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+            /* is_hot = */ true,
+            hot_state_config.delete_on_restart,
+        )?;
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs.state_merkle_db_config,
