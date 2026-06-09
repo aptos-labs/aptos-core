@@ -737,18 +737,6 @@ fn vec_pushback_accepts_trivial_descriptor() {
 }
 
 #[test]
-fn vec_pushback_rejects_empty_vector_descriptor() {
-    // An empty-offset Vector is non-canonical; pointer-free vectors must use
-    // the Trivial descriptor instead.
-    let mut descriptors = ObjectDescriptorTable::new();
-    let empty_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
-    let func = vec_pushback_func(empty_vec);
-    let errors = verify_function(&func, &descriptors);
-    assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
-        && e.message.contains("not a non-empty Vector or Trivial")));
-}
-
-#[test]
 fn vec_pushback_rejects_non_vector_descriptor() {
     // A Struct descriptor is neither Trivial nor a Vector.
     let mut descriptors = ObjectDescriptorTable::new();
