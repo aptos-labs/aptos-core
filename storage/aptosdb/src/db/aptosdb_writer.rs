@@ -459,11 +459,7 @@ impl AptosDB {
             &mut sharded_state_kv_batches,
         )?;
 
-        let hot_state_kv_db = self
-            .hot_state_kv_db
-            .as_ref()
-            .expect("hot_state_kv_db must exist on the write path");
-        let mut sharded_hot_state_kv_batches = hot_state_kv_db.new_sharded_native_batches();
+        let mut sharded_hot_state_kv_batches = self.hot_state_kv_db.new_sharded_native_batches();
         StateStore::put_hot_state_updates(
             chunk.hot_state_updates,
             &mut sharded_hot_state_kv_batches,
@@ -507,7 +503,7 @@ impl AptosDB {
                     .unwrap();
             });
             s.spawn(|_| {
-                hot_state_kv_db
+                self.hot_state_kv_db
                     .commit(
                         chunk.expect_last_version(),
                         None,
@@ -767,9 +763,10 @@ impl AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
-            if let Some(pruner) = &self.state_store.state_pruner.hot_state_kv_pruner {
-                pruner.maybe_set_pruner_target_db_version(version);
-            }
+            self.state_store
+                .state_pruner
+                .hot_state_kv_pruner
+                .maybe_set_pruner_target_db_version(version);
             // Activate the native-position value pruner here too, after
             // the commit is durable — same point as `state_kv_pruner`.
             // (The merkle pruners are driven when snapshots persist.)
