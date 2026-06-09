@@ -1,5 +1,5 @@
 [package]
-name = "aptos-dynamic-transaction-composer"
+name = "dynamic-transaction-composer"
 description = "Generating Move Script from a batched Move calls"
 version = "0.1.4"
 
