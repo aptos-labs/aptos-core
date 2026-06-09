@@ -6,7 +6,7 @@
 //
 // TODO: move out of the runtime once a layer above it exists.
 
-use crate::ExecutionContext;
+use crate::{error::RuntimeResult, ExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
@@ -15,7 +15,7 @@ use mono_move_core::{
     ObjectDescriptor, ResourceProvider, ValueLayout,
 };
 use mono_move_gas::GasMeter;
-use mono_move_loader::{Loader, LoaderResult, ModuleRead, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
 
 /// Per-transaction execution context. Maintains per-transaction state
 /// (gas meter, read-set of loaded modules) and serves the interpreter's
@@ -95,18 +95,13 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         &self,
         module_id: InternedModuleId,
         idx: ConstantPoolIndex,
-    ) -> Option<(InternedType, &[u8])> {
+    ) -> RuntimeResult<(InternedType, &[u8])> {
         let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
-        match self.read_set.get(arena_ref)? {
-            ModuleRead::Loaded { module, .. } => {
-                let module = &module.ir().module;
-                Some((
-                    module.interned_constant_type_at(idx),
-                    module.constant_data_at(idx),
-                ))
-            },
-            ModuleRead::Pending => None,
-        }
+        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        Ok((
+            module.interned_constant_type_at(idx),
+            module.constant_data_at(idx),
+        ))
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

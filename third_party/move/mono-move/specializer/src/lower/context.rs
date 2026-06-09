@@ -803,9 +803,10 @@ fn try_discover_types_for_lowering_in_function_impl(
             descriptors.closure_captured.push(layout);
         }
 
-        // A constant references its own type, which `nominal_type_in_instr`
-        // does not surface. Discover it so the runtime layout (and any nested
-        // vector descriptors) that `StoreImmVec` resolves are published.
+        // The walks above don't reach a constant's own type. A vector
+        // constant needs its (possibly nested) vector descriptors published
+        // so `StoreImmVec` can resolve them at runtime, so discover the
+        // constant's type here.
         if let Instr::LdConst(_, idx) = instr {
             let ty = module_ir.module.interned_constant_type_at(*idx);
             discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;

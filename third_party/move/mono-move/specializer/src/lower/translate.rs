@@ -12,7 +12,7 @@ use crate::stackless_exec_ir::{
     instr_utils::{clobbers_xfer, for_each_value_use},
     BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
@@ -20,8 +20,22 @@ use mono_move_core::{
     IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, MicroOp,
     PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, FRAME_METADATA_SIZE,
 };
-use move_binary_format::file_format::FieldHandleIndex;
-use move_core_types::account_address::AccountAddress;
+use move_binary_format::file_format::{ConstantPoolIndex, FieldHandleIndex};
+
+/// Validates that a primitive constant's BCS bytes are exactly `N` wide and
+/// returns them as a fixed array. Fixed-width integers and `address` encode
+/// with no length prefix, so these bytes are already the in-memory
+/// representation the matching `StoreImm` expects.
+fn const_imm<const N: usize>(idx: ConstantPoolIndex, bytes: &[u8]) -> Result<[u8; N]> {
+    bytes.try_into().map_err(|_| {
+        anyhow!(
+            "LdConst at constant pool index {}: expected {}-byte constant data, got {}",
+            idx.0,
+            N,
+            bytes.len()
+        )
+    })
+}
 
 /// Lower a slot-allocated function to its micro-op form.
 ///
@@ -423,27 +437,70 @@ impl<'a> LoweringState<'a> {
             },
             Instr::LdConst(dst, idx) => {
                 let ty = view_type(self.ctx.module.interned_constant_type_at(*idx));
+                let bcs_bytes = self.ctx.module.constant_data_at(*idx);
+                let dst_info = self.def_slot(*dst)?;
+                // Constants store their value BCS-encoded. Fixed-width
+                // integers encode as their raw little-endian bytes and
+                // `address` as its 32 raw bytes, both with no length prefix,
+                // so the constant data drops straight into the matching
+                // `StoreImm`. Vectors are heap-allocated at runtime from the
+                // constant pool, so they keep their own micro-op.
+                //
+                // TODO(endianness): revisit this when we fix the endianness
+                // story for the VM.
                 match ty {
-                    Type::Address => {
-                        let bytes = self.ctx.module.constant_data_at(*idx);
-                        let addr = bcs::from_bytes::<AccountAddress>(bytes)
-                            .context("LdConst<address>: malformed constant data")?;
-                        let dst_info = self.def_slot(*dst)?;
+                    Type::Bool | Type::U8 | Type::I8 => {
+                        self.emit(MicroOp::StoreImm1 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<1>(*idx, bcs_bytes)?[0],
+                        })?;
+                    },
+                    Type::U16 | Type::I16 => {
+                        self.emit(MicroOp::StoreImm2 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<2>(*idx, bcs_bytes)?,
+                        })?;
+                    },
+                    Type::U32 | Type::I32 => {
+                        self.emit(MicroOp::StoreImm4 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<4>(*idx, bcs_bytes)?,
+                        })?;
+                    },
+                    Type::U64 | Type::I64 => {
+                        self.emit(MicroOp::StoreImm8 {
+                            dst: dst_info.offset,
+                            imm: const_imm::<8>(*idx, bcs_bytes)?,
+                        })?;
+                    },
+                    Type::U128 | Type::I128 => {
+                        self.emit(MicroOp::StoreImm16 {
+                            dst: dst_info.offset,
+                            imm: Box::new(const_imm::<16>(*idx, bcs_bytes)?),
+                        })?;
+                    },
+                    Type::U256 | Type::I256 | Type::Address => {
                         self.emit(MicroOp::StoreImm32 {
                             dst: dst_info.offset,
-                            imm: Box::new(addr.into_bytes()),
+                            imm: Box::new(const_imm::<32>(*idx, bcs_bytes)?),
                         })?;
                     },
                     Type::Vector { .. } => {
-                        let dst_info = self.def_slot(*dst)?;
                         self.emit(MicroOp::StoreImmVec {
                             dst: dst_info.offset,
                             idx: *idx,
                         })?;
                     },
-                    _ => bail!(
-                        "LdConst at constant pool index {} not yet lowered \
-                         (only address and vector constants are supported)",
+                    // The bytecode verifier rejects constants of these types,
+                    // so reaching them here is an invariant violation.
+                    Type::Signer
+                    | Type::ImmutRef { .. }
+                    | Type::MutRef { .. }
+                    | Type::Nominal { .. }
+                    | Type::Function { .. }
+                    | Type::TypeParam { .. } => bail!(
+                        "LdConst at constant pool index {}: constant type is not \
+                         permitted by the bytecode verifier",
                         idx.0,
                     ),
                 }

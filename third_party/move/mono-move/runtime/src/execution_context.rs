@@ -4,6 +4,7 @@
 //! Defines the [`ExecutionContext`] trait the interpreter calls into,
 //! and a minimal [`LocalExecutionContext`] impl for tests and benchmarks.
 
+use crate::error::RuntimeResult;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::{NativeRegistry, ProductionNativeRegistry},
@@ -46,14 +47,14 @@ pub trait ExecutionContext {
     ) -> LoaderResult<FunctionPtr>;
 
     /// Resolve a constant from `module_id`'s constant pool, returning its
-    /// interned type and BCS bytes. The module is expected to be in the
-    /// read set already (the calling function was loaded from it). Returns
-    /// [`None`] if the module cannot be found.
+    /// interned type and BCS bytes. The calling function was loaded from
+    /// `module_id`, so the module is always present and loaded in the read
+    /// set; a missing or not-yet-loaded entry is an invariant violation.
     fn load_constant(
         &self,
         module_id: InternedModuleId,
         idx: ConstantPoolIndex,
-    ) -> Option<(InternedType, &[u8])>;
+    ) -> RuntimeResult<(InternedType, &[u8])>;
 
     /// Access the resource provider to fetch resource from storage on read-set
     /// cache miss.
@@ -146,8 +147,8 @@ impl<'r, G: GasMeter> ExecutionContext for LocalExecutionContext<'r, G> {
         &self,
         _module_id: InternedModuleId,
         _idx: ConstantPoolIndex,
-    ) -> Option<(InternedType, &[u8])> {
-        None
+    ) -> RuntimeResult<(InternedType, &[u8])> {
+        panic!("LocalExecutionContext: load_constant not supported")
     }
 
     fn resource_provider(&self) -> &dyn ResourceProvider {

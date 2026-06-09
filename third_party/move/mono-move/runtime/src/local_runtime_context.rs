@@ -4,7 +4,7 @@
 //! Minimal [`ExecutionContext`] + [`DescriptorProvider`] impl for tests
 //! and benchmarks that don't go through the full loader stack.
 
-use crate::{ExecutionContext, LocalExecutionContext};
+use crate::{error::RuntimeResult, ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::ProductionNativeRegistry,
@@ -133,7 +133,7 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
         &self,
         module_id: InternedModuleId,
         idx: ConstantPoolIndex,
-    ) -> Option<(InternedType, &[u8])> {
+    ) -> RuntimeResult<(InternedType, &[u8])> {
         self.inner.load_constant(module_id, idx)
     }
 
