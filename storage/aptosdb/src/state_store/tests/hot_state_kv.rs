@@ -524,9 +524,10 @@ fn test_load_with_prod_config_loads_all_keys_in_shard() {
     let tmp = TempPath::new();
     let db = create_hot_state_kv_db_with_config(&tmp, RocksdbConfigs::default().state_kv_db_config);
 
-    // Several distinct key hashes that all map to the same shard (shard 0: high nibble of
-    // byte 0 is 0 for any first byte in 0x00..=0x0f), so the scan must cross key-hash groups.
-    let key_hashes: Vec<HashValue> = (0u8..8)
+    // Key hashes covering shard 0's entire low-nibble space (byte 0 in 0x00..=0x0f all have high
+    // nibble 0). This spans every parallel within-shard sub-range, so the scan must cross both
+    // key-hash groups and sub-range boundaries without dropping keys.
+    let key_hashes: Vec<HashValue> = (0u8..16)
         .map(|i| {
             let mut bytes = [0u8; HashValue::LENGTH];
             bytes[0] = i;
