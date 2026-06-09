@@ -782,7 +782,7 @@ fn test_load_cross_shard() {
 fn test_load_write_then_load_roundtrip() {
     let tmp = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp);
-    let hot_state_kv_db = aptos_db.hot_state_kv_db.as_ref().unwrap();
+    let hot_state_kv_db = &aptos_db.hot_state_kv_db;
 
     let key1 = make_state_key(10);
     let val1 = make_state_value(10);
@@ -1062,7 +1062,7 @@ fn test_stale_index_direct_write_read() {
 fn test_put_hot_state_updates_values_and_stale_indices() {
     let tmp = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp);
-    let hot_state_kv_db = aptos_db.hot_state_kv_db.as_ref().unwrap();
+    let hot_state_kv_db = &aptos_db.hot_state_kv_db;
 
     let key1 = make_state_key(10);
     let val1 = make_state_value(10);
@@ -1208,7 +1208,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         HotStateConfig::default(),
     )
     .unwrap();
-    let hot_state_kv_db = aptos_db.hot_state_kv_db.as_ref().unwrap();
+    let hot_state_kv_db = &aptos_db.hot_state_kv_db;
 
     let key1 = make_state_key(42);
     let val_old = make_state_value(1);
@@ -1255,12 +1255,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     assert!(get_hot_state_entry(hot_state_kv_db, &key1, 200).is_some());
 
     // Trigger pruning
-    let pruner = aptos_db
-        .state_store
-        .state_pruner
-        .hot_state_kv_pruner
-        .as_ref()
-        .expect("hot state kv pruner should exist");
+    let pruner = &aptos_db.state_store.state_pruner.hot_state_kv_pruner;
     pruner
         .wake_and_wait_pruner(200)
         .expect("pruner should complete");
