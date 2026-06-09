@@ -164,7 +164,7 @@ impl OnChainChunkyDKGConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainChunkyDKGConfig::Off
+        Self::default_enabled()
     }
 
     pub fn chunky_dkg_enabled(&self) -> bool {
