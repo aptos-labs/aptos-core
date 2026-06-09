@@ -91,45 +91,45 @@ fun identity(r0): u64 {
 
 fun call_double_twice() {
   frame_data_size: 32
+  entry_gas: 244
   code:
-    0: Charge #61
-    1: PackClosure [8] <- func_ref=Unresolved(double), mask=0, captured_desc=<none>, captured=[]
-    2: CallClosure closure=[8], provided_args=[[0](8)]
-    3: Move8 [16] <- [56]
-    4: CallClosure closure=[8], provided_args=[[0](8)]
-    5: Move8 [24] <- [56]
-    6: AddU64 [24] <- [16] + [24]
-    7: Move8 [0] <- [24]
-    8: Return
+    0: PackClosure [8] <- func_ref=Unresolved(double), mask=0, captured_desc=<none>, captured=[]
+    1: CallClosure closure=[8], provided_args=[[0](8)]
+    2: Move8 [16] <- [56]
+    3: CallClosure closure=[8], provided_args=[[0](8)]
+    4: Move8 [24] <- [56]
+    5: AddU64 [24] <- [16] + [24]
+    6: Move8 [0] <- [24]
+    7: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun call_identity() {
   frame_data_size: 24
+  entry_gas: 151
   code:
-    0: Charge #41
-    1: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[]
-    2: CallClosure closure=[8], provided_args=[[0](8)]
-    3: Move8 [16] <- [48]
-    4: Move8 [0] <- [16]
-    5: Return
+    0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[]
+    1: CallClosure closure=[8], provided_args=[[0](8)]
+    2: Move8 [16] <- [48]
+    3: Move8 [0] <- [16]
+    4: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun double() {
   frame_data_size: 16
+  entry_gas: 59
   code:
-    0: Charge #7
-    1: AddU64 [8] <- [0] + [0]
-    2: Move8 [0] <- [8]
-    3: Return
+    0: AddU64 [8] <- [0] + [0]
+    1: Move8 [0] <- [8]
+    2: Return
 }
 
 fun identity() {
   frame_data_size: 8
+  entry_gas: 54
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }

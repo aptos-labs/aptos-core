@@ -34,27 +34,27 @@ fun addr(r0): address {
 
 fun len() {
   frame_data_size: 32
+  entry_gas: 60
   code:
-    0: Charge #18
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: VecLen [24] <- vec_len([8])
-    4: Move8 [0] <- [24]
-    5: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: VecLen [24] <- vec_len([8])
+    3: Move8 [0] <- [24]
+    4: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun addr() {
   frame_data_size: 80
+  entry_gas: 303
   code:
-    0: Charge #213
-    1: StoreImmVec [8] <- const[0]
-    2: SlotBorrow [16] <- &[8]
-    3: VecBorrow [32] <- &[16][[0]] (elem_size=32)
-    4: ReadRef [48] <- *[32] (size=32)
-    5: Move(32) [0] <- [48]
-    6: Return
+    0: StoreImmVec [8] <- const[0]
+    1: SlotBorrow [16] <- &[8]
+    2: VecBorrow [32] <- &[16][[0]] (elem_size=32)
+    3: ReadRef [48] <- *[32] (size=32)
+    4: Move(32) [0] <- [48]
+    5: Return
   safe_point_layouts:
-    1: []
+    0: []
 }

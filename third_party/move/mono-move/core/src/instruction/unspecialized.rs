@@ -390,6 +390,8 @@ pub struct JumpIntCmpOp {
     pub op: CmpKind,
     pub lhs: FrameOffset,
     pub rhs: IntOperand,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
 }
 
 /// `dst = (lhs == rhs)` (or `!=` when `negate`), a structural equality over
@@ -428,6 +430,8 @@ pub struct JumpValueCmpOp {
     pub lhs: FrameOffset,
     pub rhs: FrameOffset,
     pub ty: InternedType,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
 }
 
 /// Fused compare-and-branch counterpart of [`ValueRefCmpOp`]: operands are
@@ -439,4 +443,6 @@ pub struct JumpValueRefCmpOp {
     pub lhs: FrameOffset,
     pub rhs: FrameOffset,
     pub ty: InternedType,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
 }

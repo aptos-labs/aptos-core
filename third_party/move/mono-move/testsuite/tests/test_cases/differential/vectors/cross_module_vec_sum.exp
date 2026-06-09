@@ -92,33 +92,27 @@ fun push_and_sum(r0): u64 {
 
 fun push_and_sum() {
   frame_data_size: 64
+  entry_gas: 12
   code:
-    0: Charge #12
-    1: VecNew [8]
-    2: StoreImm8 [16] <- #0
-    3: Charge #3
-    4: JumpGreaterEqualU64 @10 [16] >= [0]
-    5: Charge #35
-    6: SlotBorrow [24] <- &[8]
-    7: VecPushBack [24].push([16], size=8, desc=2)
-    8: AddU64Imm [16] <- [16] + #1
-    9: Jump @3
-    10: Charge #6
-    11: StoreImm8 [0] <- #0
-    12: SlotBorrow [40] <- &[8]
-    13: VecLen [16] <- vec_len([40])
-    14: Charge #3
-    15: JumpLessEqualU64Imm @22 [16] <= #0
-    16: Charge #38
-    17: SlotBorrow [24] <- &[8]
-    18: VecPopBack [56] <- [24].pop(size=8)
-    19: AddU64 [0] <- [0] + [56]
-    20: SubU64Imm [16] <- [16] - #1
-    21: Jump @14
-    22: Charge #2
-    23: Return
+    0: VecNew [8]
+    1: StoreImm8 [16] <- #0
+    2: JumpGreaterEqualU64 @7 [16] >= [0] gas_taken=6 gas_fallthrough=37
+    3: SlotBorrow [24] <- &[8]
+    4: VecPushBack [24].push([16], size=8, desc=2)
+    5: AddU64Imm [16] <- [16] + #1
+    6: Jump @2 gas=3
+    7: StoreImm8 [0] <- #0
+    8: SlotBorrow [40] <- &[8]
+    9: VecLen [16] <- vec_len([40])
+    10: JumpLessEqualU64Imm @16 [16] <= #0 gas_taken=54 gas_fallthrough=42
+    11: SlotBorrow [24] <- &[8]
+    12: VecPopBack [56] <- [24].pop(size=8)
+    13: AddU64 [0] <- [0] + [56]
+    14: SubU64Imm [16] <- [16] - #1
+    15: Jump @10 gas=3
+    16: Return
   safe_point_layouts:
-    7: []
+    4: []
 }
 === frame-layout ===
 // module 0xc0ffee::foo
@@ -149,12 +143,12 @@ fun sum_first_n(r0): u64 {
 
 fun sum_first_n() {
   frame_data_size: 8
+  entry_gas: 90
   code:
-    0: Charge #16
-    1: Move8 [32] <- [0]
-    2: CallIndirect 0xc0ffee::foo::push_and_sum
-    3: Move8 [0] <- [32]
-    4: Return
+    0: Move8 [32] <- [0]
+    1: CallIndirect 0xc0ffee::foo::push_and_sum
+    2: Move8 [0] <- [32]
+    3: Return
 }
 === frame-layout ===
 // module 0xc0ffee::bar

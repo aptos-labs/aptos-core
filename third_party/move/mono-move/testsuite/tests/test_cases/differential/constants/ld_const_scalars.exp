@@ -140,120 +140,120 @@ fun c_address(): address {
 
 fun c_bool_true() {
   frame_data_size: 8
+  entry_gas: 14
   code:
-    0: Charge #4
-    1: StoreImm1 [0] <- #1
-    2: Return
+    0: StoreImm1 [0] <- #1
+    1: Return
 }
 
 fun c_bool_false() {
   frame_data_size: 8
+  entry_gas: 14
   code:
-    0: Charge #4
-    1: StoreImm1 [0] <- #0
-    2: Return
+    0: StoreImm1 [0] <- #0
+    1: Return
 }
 
 fun c_u8() {
   frame_data_size: 8
+  entry_gas: 14
   code:
-    0: Charge #4
-    1: StoreImm1 [0] <- #255
-    2: Return
+    0: StoreImm1 [0] <- #255
+    1: Return
 }
 
 fun c_u16() {
   frame_data_size: 8
+  entry_gas: 20
   code:
-    0: Charge #4
-    1: StoreImm2 [0] <- #65535
-    2: Return
+    0: StoreImm2 [0] <- #65535
+    1: Return
 }
 
 fun c_u32() {
   frame_data_size: 8
+  entry_gas: 32
   code:
-    0: Charge #4
-    1: StoreImm4 [0] <- #4294967295
-    2: Return
+    0: StoreImm4 [0] <- #4294967295
+    1: Return
 }
 
 fun c_u64() {
   frame_data_size: 8
+  entry_gas: 56
   code:
-    0: Charge #4
-    1: StoreImm8 [0] <- #18446744073709551615
-    2: Return
+    0: StoreImm8 [0] <- #18446744073709551615
+    1: Return
 }
 
 fun c_u128() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #340282366920938463463374607431768211455
-    2: Return
+    0: StoreImm16 [0] <- #340282366920938463463374607431768211455
+    1: Return
 }
 
 fun c_u256() {
   frame_data_size: 32
+  entry_gas: 200
   code:
-    0: Charge #6
-    1: StoreImm32 [0] <- #115792089237316195423570985008687907853269984665640564039457584007913129639935
-    2: Return
+    0: StoreImm32 [0] <- #115792089237316195423570985008687907853269984665640564039457584007913129639935
+    1: Return
 }
 
 fun c_i8() {
   frame_data_size: 8
+  entry_gas: 14
   code:
-    0: Charge #4
-    1: StoreImm1 [0] <- #128
-    2: Return
+    0: StoreImm1 [0] <- #128
+    1: Return
 }
 
 fun c_i16() {
   frame_data_size: 8
+  entry_gas: 20
   code:
-    0: Charge #4
-    1: StoreImm2 [0] <- #32768
-    2: Return
+    0: StoreImm2 [0] <- #32768
+    1: Return
 }
 
 fun c_i32() {
   frame_data_size: 8
+  entry_gas: 32
   code:
-    0: Charge #4
-    1: StoreImm4 [0] <- #2147483648
-    2: Return
+    0: StoreImm4 [0] <- #2147483648
+    1: Return
 }
 
 fun c_i64() {
   frame_data_size: 8
+  entry_gas: 56
   code:
-    0: Charge #4
-    1: StoreImm8 [0] <- #9223372036854775808
-    2: Return
+    0: StoreImm8 [0] <- #9223372036854775808
+    1: Return
 }
 
 fun c_i128() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #170141183460469231731687303715884105728
-    2: Return
+    0: StoreImm16 [0] <- #170141183460469231731687303715884105728
+    1: Return
 }
 
 fun c_i256() {
   frame_data_size: 32
+  entry_gas: 200
   code:
-    0: Charge #6
-    1: StoreImm32 [0] <- #57896044618658097711785492504343953926634992332820282019728792003956564819968
-    2: Return
+    0: StoreImm32 [0] <- #57896044618658097711785492504343953926634992332820282019728792003956564819968
+    1: Return
 }
 
 fun c_address() {
   frame_data_size: 32
+  entry_gas: 200
   code:
-    0: Charge #6
-    1: StoreImm32 [0] <- #115244366647234896281400162783457603113363464657609122162439886085512417509376
-    2: Return
+    0: StoreImm32 [0] <- #115244366647234896281400162783457603113363464657609122162439886085512417509376
+    1: Return
 }

@@ -102,36 +102,34 @@ fun eq_ref(r0, r1, r2, r3): bool {
 
 fun cmp_ref() {
   frame_data_size: 104
+  entry_gas: 107
   code:
-    0: Charge #18
-    1: Move8 [40] <- [8]
-    2: Move8 [32] <- [0]
-    3: Move8 [56] <- [24]
-    4: Move8 [48] <- [16]
-    5: SlotBorrow [64] <- &[32]
-    6: SlotBorrow [80] <- &[48]
-    7: JumpValueRefCmp @12 *[64] != *[80] : 0x1::test::Point
-    8: Charge #6
-    9: StoreImm8 [96] <- #10
-    10: Move8 [0] <- [96]
-    11: Return
-    12: Charge #6
-    13: StoreImm8 [96] <- #42
-    14: Move8 [0] <- [96]
-    15: Return
+    0: Move8 [40] <- [8]
+    1: Move8 [32] <- [0]
+    2: Move8 [56] <- [24]
+    3: Move8 [48] <- [16]
+    4: SlotBorrow [64] <- &[32]
+    5: SlotBorrow [80] <- &[48]
+    6: JumpValueRefCmp @10 *[64] != *[80] : 0x1::test::Point gas_taken=56 gas_fallthrough=56
+    7: StoreImm8 [96] <- #10
+    8: Move8 [0] <- [96]
+    9: Return
+    10: StoreImm8 [96] <- #42
+    11: Move8 [0] <- [96]
+    12: Return
 }
 
 fun eq_ref() {
   frame_data_size: 104
+  entry_gas: 121
   code:
-    0: Charge #25
-    1: Move8 [40] <- [8]
-    2: Move8 [32] <- [0]
-    3: Move8 [56] <- [24]
-    4: Move8 [48] <- [16]
-    5: SlotBorrow [64] <- &[32]
-    6: SlotBorrow [80] <- &[48]
-    7: ValueRefCmp [96] <- *[64] == *[80] : 0x1::test::Point
-    8: Move(1) [0] <- [96]
-    9: Return
+    0: Move8 [40] <- [8]
+    1: Move8 [32] <- [0]
+    2: Move8 [56] <- [24]
+    3: Move8 [48] <- [16]
+    4: SlotBorrow [64] <- &[32]
+    5: SlotBorrow [80] <- &[48]
+    6: ValueRefCmp [96] <- *[64] == *[80] : 0x1::test::Point
+    7: Move(1) [0] <- [96]
+    8: Return
 }

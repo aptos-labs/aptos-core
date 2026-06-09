@@ -67,34 +67,34 @@ fun take(r0) {
 
 fun caller() {
   frame_data_size: 40
+  entry_gas: 170
   code:
-    0: Charge #94
-    1: CallIndirect 0x66::vec_pushback_safe_point::fresh
-    2: VecNew [8]
-    3: SlotBorrow [16] <- &[8]
-    4: VecPushBack [16].push([0], size=8, desc=2)
-    5: CallIndirect 0x66::vec_pushback_safe_point::take
-    6: SlotBorrow [16] <- &[8]
-    7: VecPopBack [32] <- [16].pop(size=8)
-    8: Move8 [0] <- [32]
-    9: Return
+    0: CallIndirect 0x66::vec_pushback_safe_point::fresh
+    1: VecNew [8]
+    2: SlotBorrow [16] <- &[8]
+    3: VecPushBack [16].push([0], size=8, desc=2)
+    4: CallIndirect 0x66::vec_pushback_safe_point::take
+    5: SlotBorrow [16] <- &[8]
+    6: VecPopBack [32] <- [16].pop(size=8)
+    7: Move8 [0] <- [32]
+    8: Return
   safe_point_layouts:
-    4: [64]
+    3: [64]
 }
 
 fun fresh() {
   frame_data_size: 8
+  entry_gas: 64
   code:
-    0: Charge #12
-    1: VecNew [0]
-    2: Return
+    0: VecNew [0]
+    1: Return
 }
 
 fun take() {
   frame_data_size: 8
+  entry_gas: 2
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 === frame-layout ===
 // module 0x66::vec_pushback_safe_point

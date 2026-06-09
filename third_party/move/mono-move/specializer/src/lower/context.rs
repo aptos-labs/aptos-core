@@ -9,7 +9,7 @@
 use crate::{
     lower::{
         gc_layout::{derive_frame_layout, gc_layout_supports, type_pointer_offsets},
-        translate::lower_function,
+        translate::{lower_function, LoweredFunction},
     },
     stackless_exec_ir::{instr_utils::nominal_type_in_instr, FunctionIR, Instr, ModuleIR},
 };
@@ -20,15 +20,14 @@ use mono_move_core::{
     native::{NativeIdx, NativeName, NativeResolver},
     next_captured_value_offset,
     types::{
-        view_type, view_type_list, Alignment, FieldLayout, InternedType, InternedTypeList, Size,
-        Type, EMPTY_TYPE_LIST,
+        strip_ref, view_type, view_type_list, Alignment, FieldLayout, InternedType,
+        InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
-    Code, CodeOffset, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset,
-    Function, Interner, LayoutFlags, LayoutId, MicroOpGasSchedule, PreparedModule, SafePointEntry,
-    SizedSlot, SortedSafePointEntries, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
+    Interner, LayoutFlags, LayoutId, PreparedModule, SizedSlot, SortedSafePointEntries,
+    ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
 };
-use mono_move_gas::GasInstrumentor;
 use move_binary_format::{access::ModuleAccess, file_format::FunctionHandleIndex};
 use move_core_types::function::ClosureMask;
 use shared_dsa::{UnorderedMap, UnorderedSet};
@@ -48,6 +47,12 @@ pub fn concrete_type_size(ty: InternedType, label: &str) -> Result<u32> {
     let (size, _) =
         type_size_and_align(ty).ok_or_else(|| anyhow::anyhow!("{} has no concrete size", label))?;
     Ok(size)
+}
+
+/// Byte width of the pointee of reference type `ref_ty`. Errors when `ref_ty`
+/// is not a reference, or when its pointee isn't concrete.
+pub fn ref_pointee_size(ref_ty: InternedType) -> Result<u32> {
+    concrete_type_size(strip_ref(ref_ty)?, "ref pointee type")
 }
 
 /// A frame slot paired with the type of its value.
@@ -635,17 +640,11 @@ pub fn try_lower_function(
     };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
-    let (code, raw_safe_points) = lower_function(func_ir, &ctx)?;
-    // TODO: this remapping of safe-point PCs to the allocating op's own new position
-    // will go away once we move gas instrumentation to the stackless exec IR level.
-    let (code, pc_map) = GasInstrumentor::new(MicroOpGasSchedule).run_with_pc_map(code);
-    let mut safe_points = raw_safe_points
-        .into_iter()
-        .map(|entry| SafePointEntry {
-            code_offset: CodeOffset(pc_map[entry.code_offset.0 as usize]),
-            layout: entry.layout,
-        })
-        .collect::<Vec<_>>();
+    let LoweredFunction {
+        code,
+        entry_gas,
+        mut safe_points,
+    } = lower_function(func_ir, &ctx)?;
     // TODO: drop this sort if we can guarantee the input is already
     // sorted. `pc_map` is monotone and `emit` pushes in code-offset
     // order, so it's structurally a no-op today — kept as a safety
@@ -678,6 +677,7 @@ pub fn try_lower_function(
         name,
         module_id: module_ir.module.id(),
         code: Code::from_vec(code),
+        entry_gas,
         param_slots,
         param_region_size: derived.param_region_size as usize,
         param_and_local_sizes_sum,

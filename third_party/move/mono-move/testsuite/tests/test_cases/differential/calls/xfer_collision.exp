@@ -43,35 +43,35 @@ fun caller(r0): u64 {
 
 fun three_rets() {
   frame_data_size: 32
+  entry_gas: 164
   code:
-    0: Charge #8
-    1: StoreImm8 [0] <- #1
-    2: StoreImm8 [8] <- #2
-    3: StoreImm8 [16] <- #3
-    4: Return
+    0: StoreImm8 [0] <- #1
+    1: StoreImm8 [8] <- #2
+    2: StoreImm8 [16] <- #3
+    3: Return
 }
 
 fun three_args() {
   frame_data_size: 32
+  entry_gas: 64
   code:
-    0: Charge #10
-    1: AddU64 [24] <- [0] + [8]
-    2: AddU64 [24] <- [24] + [16]
-    3: Move8 [0] <- [24]
-    4: Return
+    0: AddU64 [24] <- [0] + [8]
+    1: AddU64 [24] <- [24] + [16]
+    2: Move8 [0] <- [24]
+    3: Return
 }
 
 fun caller() {
   frame_data_size: 16
+  entry_gas: 183
   code:
-    0: Charge #35
-    1: CallIndirect 0x66::xfer_collision::three_rets
-    2: Move8 [8] <- [56]
-    3: AddU64Imm [8] <- [8] + #5
-    4: Move8 [56] <- [48]
-    5: Move8 [48] <- [40]
-    6: Move8 [40] <- [0]
-    7: CallIndirect 0x66::xfer_collision::three_args
-    8: Move8 [0] <- [40]
-    9: Return
+    0: CallIndirect 0x66::xfer_collision::three_rets
+    1: Move8 [8] <- [56]
+    2: AddU64Imm [8] <- [8] + #5
+    3: Move8 [56] <- [48]
+    4: Move8 [48] <- [40]
+    5: Move8 [40] <- [0]
+    6: CallIndirect 0x66::xfer_collision::three_args
+    7: Move8 [0] <- [40]
+    8: Return
 }

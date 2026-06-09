@@ -49,40 +49,40 @@ fun caller(): u64 {
 
 fun three_rets() {
   frame_data_size: 32
+  entry_gas: 164
   code:
-    0: Charge #8
-    1: StoreImm8 [0] <- #10
-    2: StoreImm8 [8] <- #20
-    3: StoreImm8 [16] <- #30
-    4: Return
+    0: StoreImm8 [0] <- #10
+    1: StoreImm8 [8] <- #20
+    2: StoreImm8 [16] <- #30
+    3: Return
 }
 
 fun g() {
   frame_data_size: 40
+  entry_gas: 74
   code:
-    0: Charge #18
-    1: MulU64Imm [24] <- [0] * #1000000
-    2: MulU64Imm [32] <- [8] * #1000
-    3: AddU64 [32] <- [24] + [32]
-    4: AddU64 [32] <- [32] + [16]
-    5: Move8 [0] <- [32]
-    6: Return
+    0: MulU64Imm [24] <- [0] * #1000000
+    1: MulU64Imm [32] <- [8] * #1000
+    2: AddU64 [32] <- [24] + [32]
+    3: AddU64 [32] <- [32] + [16]
+    4: Move8 [0] <- [32]
+    5: Return
 }
 
 fun caller() {
   frame_data_size: 32
+  entry_gas: 293
   code:
-    0: Charge #59
-    1: StoreImm8 [8] <- #7
-    2: PackClosure [0] <- func_ref=Unresolved(g), mask=10, captured_desc=0, captured=[[8](8)]
-    3: CallIndirect 0x66::capture_middle_interleave::three_rets
-    4: Move8 [8] <- [56]
-    5: Move8 [16] <- [64]
-    6: Move8 [24] <- [72]
-    7: CallClosure closure=[0], provided_args=[[8](8), [16](8)]
-    8: Move8 [16] <- [56]
-    9: Move8 [0] <- [16]
-    10: Return
+    0: StoreImm8 [8] <- #7
+    1: PackClosure [0] <- func_ref=Unresolved(g), mask=10, captured_desc=0, captured=[[8](8)]
+    2: CallIndirect 0x66::capture_middle_interleave::three_rets
+    3: Move8 [8] <- [56]
+    4: Move8 [16] <- [64]
+    5: Move8 [24] <- [72]
+    6: CallClosure closure=[0], provided_args=[[8](8), [16](8)]
+    7: Move8 [16] <- [56]
+    8: Move8 [0] <- [16]
+    9: Return
   safe_point_layouts:
-    2: []
+    1: []
 }

@@ -142,125 +142,125 @@ fun test_increment_field(r0, r1): u64 {
 
 fun identity() {
   frame_data_size: 8
+  entry_gas: 54
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 
 fun add_two_fields() {
   frame_data_size: 32
+  entry_gas: 111
   code:
-    0: Charge #11
-    1: Move8 [16] <- [0]
-    2: Move8 [24] <- [8]
-    3: AddU64 [24] <- [16] + [24]
-    4: Move8 [0] <- [24]
-    5: Return
+    0: Move8 [16] <- [0]
+    1: Move8 [24] <- [8]
+    2: AddU64 [24] <- [16] + [24]
+    3: Move8 [0] <- [24]
+    4: Return
 }
 
 fun field_to_call() {
   frame_data_size: 16
+  entry_gas: 116
   code:
-    0: Charge #16
-    1: Move8 [40] <- [0]
-    2: CallIndirect 0x66::field_fusion::identity
-    3: Move8 [0] <- [40]
-    4: Return
+    0: Move8 [40] <- [0]
+    1: CallIndirect 0x66::field_fusion::identity
+    2: Move8 [0] <- [40]
+    3: Return
 }
 
 fun two_fields_to_call() {
   frame_data_size: 48
+  entry_gas: 147
   code:
-    0: Charge #21
-    1: Move8 [32] <- [0]
-    2: Move8 [40] <- [24]
-    3: AddU64 [72] <- [32] + [40]
-    4: CallIndirect 0x66::field_fusion::identity
-    5: Move8 [0] <- [72]
-    6: Return
+    0: Move8 [32] <- [0]
+    1: Move8 [40] <- [24]
+    2: AddU64 [72] <- [32] + [40]
+    3: CallIndirect 0x66::field_fusion::identity
+    4: Move8 [0] <- [72]
+    5: Return
 }
 
 fun field_plus_constant() {
   frame_data_size: 24
+  entry_gas: 85
   code:
-    0: Charge #9
-    1: Move8 [16] <- [0]
-    2: AddU64Imm [16] <- [16] + #42
-    3: Move8 [0] <- [16]
-    4: Return
+    0: Move8 [16] <- [0]
+    1: AddU64Imm [16] <- [16] + #42
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun increment_field() {
   frame_data_size: 24
+  entry_gas: 59
   code:
-    0: Charge #57
-    1: ReadRefOffset [16] <- *([0]+0) (size=8)
-    2: AddU64Imm [16] <- [16] + #1
-    3: WriteRefOffset *([0]+0) <- [16] (size=8)
-    4: Return
+    0: ReadRefOffset [16] <- *([0]+0) (size=8)
+    1: AddU64Imm [16] <- [16] + #1
+    2: WriteRefOffset *([0]+0) <- [16] (size=8)
+    3: Return
 }
 
 fun test_add_two_fields() {
   frame_data_size: 32
+  entry_gas: 164
   code:
-    0: Charge #68
-    1: Move8 [24] <- [8]
-    2: Move8 [16] <- [0]
-    3: Move(16) [56] <- [16]
-    4: CallIndirect 0x66::field_fusion::add_two_fields
-    5: Move8 [0] <- [56]
-    6: Return
+    0: Move8 [24] <- [8]
+    1: Move8 [16] <- [0]
+    2: Move(16) [56] <- [16]
+    3: CallIndirect 0x66::field_fusion::add_two_fields
+    4: Move8 [0] <- [56]
+    5: Return
 }
 
 fun test_field_to_call() {
   frame_data_size: 32
+  entry_gas: 164
   code:
-    0: Charge #68
-    1: Move8 [24] <- [8]
-    2: Move8 [16] <- [0]
-    3: Move(16) [56] <- [16]
-    4: CallIndirect 0x66::field_fusion::field_to_call
-    5: Move8 [0] <- [56]
-    6: Return
+    0: Move8 [24] <- [8]
+    1: Move8 [16] <- [0]
+    2: Move(16) [56] <- [16]
+    3: CallIndirect 0x66::field_fusion::field_to_call
+    4: Move8 [0] <- [56]
+    5: Return
 }
 
 fun test_two_fields_to_call() {
   frame_data_size: 64
+  entry_gas: 264
   code:
-    0: Charge #122
-    1: Move8 [40] <- [8]
-    2: Move8 [32] <- [0]
-    3: Move8 [56] <- [24]
-    4: Move8 [48] <- [16]
-    5: Move(16) [104] <- [48]
-    6: Move(16) [88] <- [32]
-    7: CallIndirect 0x66::field_fusion::two_fields_to_call
-    8: Move8 [0] <- [88]
-    9: Return
+    0: Move8 [40] <- [8]
+    1: Move8 [32] <- [0]
+    2: Move8 [56] <- [24]
+    3: Move8 [48] <- [16]
+    4: Move(16) [104] <- [48]
+    5: Move(16) [88] <- [32]
+    6: CallIndirect 0x66::field_fusion::two_fields_to_call
+    7: Move8 [0] <- [88]
+    8: Return
 }
 
 fun test_field_plus_constant() {
   frame_data_size: 32
+  entry_gas: 164
   code:
-    0: Charge #68
-    1: Move8 [24] <- [8]
-    2: Move8 [16] <- [0]
-    3: Move(16) [56] <- [16]
-    4: CallIndirect 0x66::field_fusion::field_plus_constant
-    5: Move8 [0] <- [56]
-    6: Return
+    0: Move8 [24] <- [8]
+    1: Move8 [16] <- [0]
+    2: Move(16) [56] <- [16]
+    3: CallIndirect 0x66::field_fusion::field_plus_constant
+    4: Move8 [0] <- [56]
+    5: Return
 }
 
 fun test_increment_field() {
   frame_data_size: 48
+  entry_gas: 216
   code:
-    0: Charge #24
-    1: Move8 [24] <- [8]
-    2: Move8 [16] <- [0]
-    3: SlotBorrow [72] <- &[16]
-    4: CallIndirect 0x66::field_fusion::increment_field
-    5: Move8 [40] <- [24]
-    6: Move8 [32] <- [16]
-    7: Move8 [0] <- [32]
-    8: Return
+    0: Move8 [24] <- [8]
+    1: Move8 [16] <- [0]
+    2: SlotBorrow [72] <- &[16]
+    3: CallIndirect 0x66::field_fusion::increment_field
+    4: Move8 [40] <- [24]
+    5: Move8 [32] <- [16]
+    6: Move8 [0] <- [32]
+    7: Return
 }

@@ -84,70 +84,70 @@ fun outer_len(): u64 {
 
 fun is_empty() {
   frame_data_size: 40
+  entry_gas: 31
   code:
-    0: Charge #24
-    1: VecNew [0]
-    2: SlotBorrow [8] <- &[0]
-    3: VecLen [24] <- vec_len([8])
-    4: IntCmp [32] <- [24] == u64 #0
-    5: Move(1) [0] <- [32]
-    6: Return
+    0: VecNew [0]
+    1: SlotBorrow [8] <- &[0]
+    2: VecLen [24] <- vec_len([8])
+    3: IntCmp [32] <- [24] == u64 #0
+    4: Move(1) [0] <- [32]
+    5: Return
 }
 
 fun elem() {
   frame_data_size: 80
+  entry_gas: 27
   code:
-    0: Charge #30
-    1: StoreImmVec [16] <- const[0]
-    2: SlotBorrow [24] <- &[16]
-    3: VecBorrow [40] <- &[24][[0]] (elem_size=8)
-    4: VecBorrow [56] <- &[40][[8]] (elem_size=1)
-    5: ReadRef [72] <- *[56] (size=1)
-    6: Move(1) [0] <- [72]
-    7: Return
+    0: StoreImmVec [16] <- const[0]
+    1: SlotBorrow [24] <- &[16]
+    2: VecBorrow [40] <- &[24][[0]] (elem_size=8)
+    3: VecBorrow [56] <- &[40][[8]] (elem_size=1)
+    4: ReadRef [72] <- *[56] (size=1)
+    5: Move(1) [0] <- [72]
+    6: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun inner_0_len() {
   frame_data_size: 48
+  entry_gas: 65
   code:
-    0: Charge #23
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: StoreImm8 [24] <- #0
-    4: VecBorrow [32] <- &[8][[24]] (elem_size=8)
-    5: VecLen [24] <- vec_len([32])
-    6: Move8 [0] <- [24]
-    7: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: StoreImm8 [24] <- #0
+    3: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    4: VecLen [24] <- vec_len([32])
+    5: Move8 [0] <- [24]
+    6: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun inner_1_len() {
   frame_data_size: 48
+  entry_gas: 65
   code:
-    0: Charge #23
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: StoreImm8 [24] <- #1
-    4: VecBorrow [32] <- &[8][[24]] (elem_size=8)
-    5: VecLen [24] <- vec_len([32])
-    6: Move8 [0] <- [24]
-    7: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: StoreImm8 [24] <- #1
+    3: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    4: VecLen [24] <- vec_len([32])
+    5: Move8 [0] <- [24]
+    6: Return
   safe_point_layouts:
-    1: []
+    0: []
 }
 
 fun outer_len() {
   frame_data_size: 32
+  entry_gas: 60
   code:
-    0: Charge #18
-    1: StoreImmVec [0] <- const[0]
-    2: SlotBorrow [8] <- &[0]
-    3: VecLen [24] <- vec_len([8])
-    4: Move8 [0] <- [24]
-    5: Return
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: VecLen [24] <- vec_len([8])
+    3: Move8 [0] <- [24]
+    4: Return
   safe_point_layouts:
-    1: []
+    0: []
 }

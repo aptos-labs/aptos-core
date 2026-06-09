@@ -220,109 +220,107 @@ fun neq_ref(r0, r1, r2, r3): bool {
 
 fun build() {
   frame_data_size: 40
+  entry_gas: 124
   code:
-    0: Charge #74
-    1: VecNew [16]
-    2: SlotBorrow [24] <- &[16]
-    3: VecPushBack [24].push([0], size=8, desc=2)
-    4: SlotBorrow [24] <- &[16]
-    5: VecPushBack [24].push([8], size=8, desc=2)
-    6: Move8 [0] <- [16]
-    7: Return
+    0: VecNew [16]
+    1: SlotBorrow [24] <- &[16]
+    2: VecPushBack [24].push([0], size=8, desc=2)
+    3: SlotBorrow [24] <- &[16]
+    4: VecPushBack [24].push([8], size=8, desc=2)
+    5: Move8 [0] <- [16]
+    6: Return
   safe_point_layouts:
-    3: []
-    5: []
+    2: []
+    4: []
 }
 
 fun cmp() {
   frame_data_size: 48
+  entry_gas: 153
   code:
-    0: Charge #36
-    1: Move8 [80] <- [8]
-    2: Move8 [72] <- [0]
-    3: CallIndirect 0x1::test::build
-    4: Move8 [32] <- [72]
-    5: Move8 [80] <- [24]
-    6: Move8 [72] <- [16]
-    7: CallIndirect 0x1::test::build
-    8: JumpValueCmp @13 [32] != [72] : vector<u64>
-    9: Charge #6
-    10: StoreImm8 [40] <- #10
-    11: Move8 [0] <- [40]
-    12: Return
-    13: Charge #6
-    14: StoreImm8 [40] <- #42
-    15: Move8 [0] <- [40]
-    16: Return
+    0: Move8 [80] <- [8]
+    1: Move8 [72] <- [0]
+    2: CallIndirect 0x1::test::build
+    3: Move8 [32] <- [72]
+    4: Move8 [80] <- [24]
+    5: Move8 [72] <- [16]
+    6: CallIndirect 0x1::test::build
+    7: JumpValueCmp @11 [32] != [72] : vector<u64> gas_taken=56 gas_fallthrough=56
+    8: StoreImm8 [40] <- #10
+    9: Move8 [0] <- [40]
+    10: Return
+    11: StoreImm8 [40] <- #42
+    12: Move8 [0] <- [40]
+    13: Return
 }
 
 fun eq() {
   frame_data_size: 48
+  entry_gas: 167
   code:
-    0: Charge #43
-    1: Move8 [80] <- [8]
-    2: Move8 [72] <- [0]
-    3: CallIndirect 0x1::test::build
-    4: Move8 [32] <- [72]
-    5: Move8 [80] <- [24]
-    6: Move8 [72] <- [16]
-    7: CallIndirect 0x1::test::build
-    8: ValueCmp [40] <- [32] == [72] : vector<u64>
-    9: Move(1) [0] <- [40]
-    10: Return
+    0: Move8 [80] <- [8]
+    1: Move8 [72] <- [0]
+    2: CallIndirect 0x1::test::build
+    3: Move8 [32] <- [72]
+    4: Move8 [80] <- [24]
+    5: Move8 [72] <- [16]
+    6: CallIndirect 0x1::test::build
+    7: ValueCmp [40] <- [32] == [72] : vector<u64>
+    8: Move(1) [0] <- [40]
+    9: Return
 }
 
 fun eq_len() {
   frame_data_size: 56
+  entry_gas: 119
   code:
-    0: Charge #67
-    1: VecNew [24]
-    2: SlotBorrow [32] <- &[24]
-    3: VecPushBack [32].push([0], size=8, desc=2)
-    4: Move8 [88] <- [16]
-    5: Move8 [80] <- [8]
-    6: CallIndirect 0x1::test::build
-    7: ValueCmp [48] <- [80] == [24] : vector<u64>
-    8: Move(1) [0] <- [48]
-    9: Return
+    0: VecNew [24]
+    1: SlotBorrow [32] <- &[24]
+    2: VecPushBack [32].push([0], size=8, desc=2)
+    3: Move8 [88] <- [16]
+    4: Move8 [80] <- [8]
+    5: CallIndirect 0x1::test::build
+    6: ValueCmp [48] <- [80] == [24] : vector<u64>
+    7: Move(1) [0] <- [48]
+    8: Return
   safe_point_layouts:
-    3: []
+    2: []
 }
 
 fun eq_ref() {
   frame_data_size: 88
+  entry_gas: 197
   code:
-    0: Charge #49
-    1: Move8 [120] <- [8]
-    2: Move8 [112] <- [0]
-    3: CallIndirect 0x1::test::build
-    4: Move8 [32] <- [112]
-    5: Move8 [120] <- [24]
-    6: Move8 [112] <- [16]
-    7: CallIndirect 0x1::test::build
-    8: Move8 [40] <- [112]
-    9: SlotBorrow [48] <- &[32]
-    10: SlotBorrow [64] <- &[40]
-    11: ValueRefCmp [80] <- *[48] == *[64] : vector<u64>
-    12: Move(1) [0] <- [80]
-    13: Return
+    0: Move8 [120] <- [8]
+    1: Move8 [112] <- [0]
+    2: CallIndirect 0x1::test::build
+    3: Move8 [32] <- [112]
+    4: Move8 [120] <- [24]
+    5: Move8 [112] <- [16]
+    6: CallIndirect 0x1::test::build
+    7: Move8 [40] <- [112]
+    8: SlotBorrow [48] <- &[32]
+    9: SlotBorrow [64] <- &[40]
+    10: ValueRefCmp [80] <- *[48] == *[64] : vector<u64>
+    11: Move(1) [0] <- [80]
+    12: Return
 }
 
 fun neq_ref() {
   frame_data_size: 88
+  entry_gas: 197
   code:
-    0: Charge #49
-    1: Move8 [120] <- [8]
-    2: Move8 [112] <- [0]
-    3: CallIndirect 0x1::test::build
-    4: Move8 [32] <- [112]
-    5: Move8 [120] <- [24]
-    6: Move8 [112] <- [16]
-    7: CallIndirect 0x1::test::build
-    8: Move8 [40] <- [112]
-    9: SlotBorrow [48] <- &[32]
-    10: SlotBorrow [64] <- &[40]
-    11: ValueRefCmp [80] <- *[48] != *[64] : vector<u64>
-    12: Move(1) [0] <- [80]
-    13: Return
+    0: Move8 [120] <- [8]
+    1: Move8 [112] <- [0]
+    2: CallIndirect 0x1::test::build
+    3: Move8 [32] <- [112]
+    4: Move8 [120] <- [24]
+    5: Move8 [112] <- [16]
+    6: CallIndirect 0x1::test::build
+    7: Move8 [40] <- [112]
+    8: SlotBorrow [48] <- &[32]
+    9: SlotBorrow [64] <- &[40]
+    10: ValueRefCmp [80] <- *[48] != *[64] : vector<u64>
+    11: Move(1) [0] <- [80]
+    12: Return
 }

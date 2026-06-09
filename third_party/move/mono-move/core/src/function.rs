@@ -138,6 +138,8 @@ pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub module_id: InternedModuleId,
     pub code: Code,
+    /// Gas cost of the entry basic block.
+    pub entry_gas: u64,
     /// Per-parameter (aligned) frame slot, in declaration order.
     pub param_slots: Vec<SizedSlot>,
     /// Byte size of the parameter region (includes padding in between parameters).
@@ -238,6 +240,7 @@ impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "fun {}() {{", self.name())?;
         writeln!(f, "  frame_data_size: {}", self.param_and_local_sizes_sum)?;
+        writeln!(f, "  entry_gas: {}", self.entry_gas)?;
         writeln!(f, "  code:")?;
         let code = self.code.get();
         for (i, op) in code.iter().enumerate() {
