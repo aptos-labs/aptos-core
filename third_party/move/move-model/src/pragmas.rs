@@ -173,6 +173,31 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with
 /// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
 pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
 
+/// Build a map from two parallel vectors of keys and values. Aborts when the lengths differ
+/// or when the keys contain a duplicate.
+/// `[move] fun map_new_from<K, V>(keys: vector<K>, values: vector<V>): Map<K, V>`
+pub const INTRINSIC_FUN_MAP_NEW_FROM: &str = "map_new_from";
+
+/// Decompose the map into two parallel vectors holding its keys and values. The order of
+/// the elements in the returned vectors is unspecified, but `keys[i]` maps to `values[i]`.
+/// `[move] fun map_to_vec_pair<K, V>(m: Map<K, V>): (vector<K>, vector<V>)`
+pub const INTRINSIC_FUN_MAP_TO_VEC_PAIR: &str = "map_to_vec_pair";
+
+/// Insert or update; returns the displaced key and value as `(Option<K>, Option<V>)`. Never
+/// aborts. The returned key equals the input key under structural equality (the SMT model
+/// encodes keys through `$EncodeKey`, which is an injection over `$IsEqual`).
+/// `[move] fun map_upsert_kv<K, V>(m: &mut Map<K, V>, k: K, v: V): (Option<K>, Option<V>)`
+pub const INTRINSIC_FUN_MAP_UPSERT_KV: &str = "map_upsert_kv";
+
+/// Project the map's keys into a vector. Order is unspecified.
+/// `[move] fun map_keys<K, V>(m: &Map<K, V>): vector<K>`
+pub const INTRINSIC_FUN_MAP_KEYS: &str = "map_keys";
+
+/// Project the map's values into a vector. Order is unspecified. Values may repeat if
+/// distinct keys map to equal values.
+/// `[move] fun map_values<K, V>(m: &Map<K, V>): vector<V>`
+pub const INTRINSIC_FUN_MAP_VALUES: &str = "map_values";
+
 /// Abort condition for map_destroy_empty: true when the map is non-empty
 /// `[spec] fun map_spec_aborts_destroy_empty<K, V>(m: Map<K, V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY: &str = "map_spec_aborts_destroy_empty";
@@ -188,6 +213,11 @@ pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL: &str = "map_spec_aborts_del";
 /// Abort condition for map_borrow / map_borrow_mut: true when key not found
 /// `[spec] fun map_spec_aborts_borrow<K, V>(m: Map<K, V>, k: K): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW: &str = "map_spec_aborts_borrow";
+
+/// Abort condition for map_new_from: true when len(keys) != len(values) or keys contains
+/// duplicates (under $EncodeKey).
+/// `[spec] fun map_spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM: &str = "map_spec_aborts_new_from";
 
 /// Definition of an intrinsic function associated with an intrinsic type.
 ///
@@ -297,6 +327,26 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
             ),
             (
+                INTRINSIC_FUN_MAP_NEW_FROM,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_TO_VEC_PAIR,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_UPSERT_KV,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_KEYS,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_VALUES,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
                 IntrinsicFunDef::spec_fun(),
             ),
@@ -310,6 +360,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
                 IntrinsicFunDef::spec_fun(),
             ),
         ])

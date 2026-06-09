@@ -1,7 +1,7 @@
 // Test that intrinsic map Move functions are inlined as pure spec calls during
 // spec inference, rather than becoming behavior predicates.
 //
-// `SimpleMap::contains_key`, `length`, and `create` are intrinsic Move functions that map
+// `SimpleMap::contains_key`, `length`, and `new` are intrinsic Move functions that map
 // to `spec_contains_key`, `spec_len`, and `spec_new` respectively via the IntrinsicDecl
 // pairing table. Before the fix, try_as_pure_spec_call returned None for these (they have
 // no `$name` spec function body), making them behavior predicates and producing
@@ -23,9 +23,9 @@ module 0x42::intrinsic_map {
         simple_map::length(m)
     }
 
-    // Wraps create — inference should inline spec_new, not use result_of.
+    // Wraps new — inference should inline spec_new, not use result_of.
     fun make(): SimpleMap<u64, u64> {
-        simple_map::create()
+        simple_map::new()
     }
 
     // Wraps destroy_empty — aborts if the map is non-empty.
@@ -41,5 +41,9 @@ module 0x42::intrinsic_map {
     // abort_spec_fun pairing in IntrinsicFunDef.
     fun get_value(m: &SimpleMap<u64, u64>, k: u64): u64 {
         *simple_map::borrow(m, &k)
+    }
+
+    fun touch<K: copy + drop + store, V: drop + store>(m: &mut SimpleMap<K, V>, k: K, v: V) {
+        simple_map::upsert(m, k, v);
     }
 }

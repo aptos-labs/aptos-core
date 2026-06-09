@@ -1,7 +1,7 @@
 // Test that intrinsic map Move functions are inlined as pure spec calls during
 // spec inference, rather than becoming behavior predicates.
 //
-// `SimpleMap::contains_key`, `length`, and `create` are intrinsic Move functions that map
+// `SimpleMap::contains_key`, `length`, and `new` are intrinsic Move functions that map
 // to `spec_contains_key`, `spec_len`, and `spec_new` respectively via the IntrinsicDecl
 // pairing table. Before the fix, try_as_pure_spec_call returned None for these (they have
 // no `$name` spec function body), making them behavior predicates and producing
@@ -37,15 +37,15 @@ module 0x42::intrinsic_map {
     }
 
 
-    // Wraps create — inference should inline spec_new, not use result_of.
+    // Wraps new — inference should inline spec_new, not use result_of.
     fun make(): SimpleMap<u64, u64> {
-        simple_map::create()
+        simple_map::new()
     }
     spec make(): simple_map::SimpleMap<u64, u64> {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_new<u64, u64>();
-        aborts_if [inferred] aborts_of<simple_map::create<u64, u64>>();
+        aborts_if [inferred] aborts_of<simple_map::new<u64, u64>>();
     }
 
 
@@ -74,6 +74,22 @@ module 0x42::intrinsic_map {
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_get<u64, u64>(m, k);
         aborts_if [inferred] aborts_of<simple_map::borrow<u64, u64>>(m, k);
+    }
+
+
+    fun touch<K: copy + drop + store, V: drop + store>(m: &mut SimpleMap<K, V>, k: K, v: V) {
+        simple_map::upsert(m, k, v);
+    }
+    spec touch<K: copy + drop + store, V: drop + store>(m: &mut simple_map::SimpleMap<K, V>, k: K, v: V) {
+        pragma opaque = true;
+        ensures [inferred] ensures_of<simple_map::upsert<K, V>>(old(m), k, v, {
+            let (_t0,_t1) = result_of<simple_map::upsert<K, V>>(old(m), k, v);
+            _t0
+        }, {
+            let (_t0,_t1) = result_of<simple_map::upsert<K, V>>(old(m), k, v);
+            _t1
+        });
+        aborts_if [inferred] aborts_of<simple_map::upsert<K, V>>(m, k, v);
     }
 
 }
