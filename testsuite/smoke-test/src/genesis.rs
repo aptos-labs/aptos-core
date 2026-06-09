@@ -22,7 +22,9 @@ use aptos_forge::{
     wait_for_all_nodes_to_catchup, LocalNode, LocalSwarm, Node, NodeExt, SwarmExt, Validator,
 };
 use aptos_temppath::TempPath;
-use aptos_types::{transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    on_chain_config::OnChainChunkyDKGConfig, transaction::Transaction, waypoint::Waypoint,
+};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
 use reqwest::Client;
@@ -59,6 +61,12 @@ async fn test_fullnode_genesis_transaction_flow() {
     let (mut swarm, cli_test_framework, _) = SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(num_fullnodes)
         .with_aptos()
+        .with_init_genesis_config(std::sync::Arc::new(|conf| {
+            // Chunky DKG churns reconfigs which races with the sync_only halt/
+            // restart flow this test exercises; keep it off.
+            conf.chunky_dkg_config_override =
+                Some(OnChainChunkyDKGConfig::default_disabled());
+        }))
         .build_with_cli(0)
         .await;
 
@@ -202,6 +210,12 @@ async fn test_validator_genesis_transaction_and_db_restore_flow() {
     let num_validators = 5;
     let (mut swarm, cli_test_framework, _) = SwarmBuilder::new_local(num_validators)
         .with_aptos()
+        .with_init_genesis_config(std::sync::Arc::new(|conf| {
+            // Chunky DKG churns reconfigs which races with the sync_only halt/
+            // db-wipe/restart flow this test exercises; keep it off.
+            conf.chunky_dkg_config_override =
+                Some(OnChainChunkyDKGConfig::default_disabled());
+        }))
         .build_with_cli(0)
         .await;
 
