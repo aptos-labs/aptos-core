@@ -7,6 +7,7 @@ use crate::{
     schema::{
         hot_state_value_by_key_hash::{HotStateEntry, HotStateValueByKeyHashSchema},
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+        HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
     },
     state_kv_db::{LoadedHotStateShard, StateKvDb},
     state_store::StateStore,
@@ -32,9 +33,13 @@ use proptest::{collection::vec, prelude::*};
 use std::collections::HashMap;
 
 fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
+    create_hot_state_kv_db_with_config(path, RocksdbConfig::default())
+}
+
+fn create_hot_state_kv_db_with_config(path: &TempPath, rocksdb_config: RocksdbConfig) -> StateKvDb {
     StateKvDb::new(
         &StorageDirPaths::from_path(path.path()),
-        RocksdbConfig::default(),
+        rocksdb_config,
         /* env = */ None,
         /* block_cache = */ None,
         /* readonly = */ false,
@@ -42,6 +47,17 @@ fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
         /* delete_on_restart = */ false,
     )
     .unwrap()
+}
+
+/// Flush the hot state value CF in every shard so the data lives in SSTs rather than the
+/// memtable. The prefix bloom filter (only built under production config) lives on SSTs, so
+/// only after flushing does the cross-key-hash seek in `load_hot_state_kvs` contend with it.
+fn flush_hot_state_value_cf(db: &StateKvDb) {
+    for shard_id in 0..NUM_STATE_SHARDS {
+        db.db_shard(shard_id)
+            .flush_cf(HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME)
+            .unwrap();
+    }
 }
 
 fn make_state_key(seed: u8) -> StateKey {
@@ -59,10 +75,19 @@ fn put_hot_state_entry(
     version: Version,
     entry: Option<HotStateEntry>,
 ) {
-    let shard_id = key.get_shard_id();
+    put_hot_state_entry_by_hash(db, CryptoHash::hash(key), version, entry);
+}
+
+fn put_hot_state_entry_by_hash(
+    db: &StateKvDb,
+    key_hash: HashValue,
+    version: Version,
+    entry: Option<HotStateEntry>,
+) {
+    let shard_id = usize::from(key_hash.nibble(0));
     let mut batch = db.db_shard(shard_id).new_native_batch();
     batch
-        .put::<HotStateValueByKeyHashSchema>(&(CryptoHash::hash(key), version), &entry)
+        .put::<HotStateValueByKeyHashSchema>(&(key_hash, version), &entry)
         .unwrap();
     db.db_shard(shard_id).write_schemas(batch).unwrap();
 }
@@ -442,6 +467,99 @@ fn test_load_skips_future_entry_and_falls_back_to_older_version() {
     let shards = db.load_hot_state_kvs(15).unwrap();
     let shard = &shards[key.get_shard_id()];
     assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(91));
+    shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_handles_max_key_hash() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key_hash = HashValue::new([0xFF; HashValue::LENGTH]);
+    let shard_id = usize::from(key_hash.nibble(0));
+    put_hot_state_entry_by_hash(
+        &db,
+        key_hash,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(10),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry_by_hash(
+        &db,
+        key_hash,
+        20,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(20),
+            value_version: 15,
+        }),
+    );
+
+    let shards = db.load_hot_state_kvs(15).unwrap();
+    let shard = &shards[shard_id];
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(10));
+    shard.validate_lru_chain();
+}
+
+/// Regression test for the prefix-bloom interaction in the per-shard hot-state scan.
+///
+/// The `hot_state_value_by_key_hash` CF carries a prefix bloom filter on the 32-byte key hash
+/// (enabled explicitly below via `bloom_filter_bits`, as production does). `scan_shard_entries`
+/// jumps to the next key group by seeking to `(key_hash + 1, Version::MAX)` — a prefix that need
+/// not exist. Without `total_order_seek`, the bloom excludes every SST for that absent prefix and
+/// the scan stops after the first key per shard.
+///
+/// The bloom lives only on SSTs, hence the flush below; the default unit-test config (no bloom,
+/// data in the memtable) cannot reproduce this.
+#[test]
+fn test_load_with_prefix_bloom_loads_all_keys_in_shard() {
+    let tmp = TempPath::new();
+    let rocksdb_config = RocksdbConfig {
+        bloom_filter_bits: Some(10.0),
+        ..RocksdbConfig::default()
+    };
+    let db = create_hot_state_kv_db_with_config(&tmp, rocksdb_config);
+
+    // Several distinct key hashes that all map to the same shard (shard 0: high nibble of
+    // byte 0 is 0 for any first byte in 0x00..=0x0f), so the scan must cross key-hash groups.
+    let key_hashes: Vec<HashValue> = (0u8..8)
+        .map(|i| {
+            let mut bytes = [0u8; HashValue::LENGTH];
+            bytes[0] = i;
+            HashValue::new(bytes)
+        })
+        .collect();
+    let shard_id = usize::from(key_hashes[0].nibble(0));
+    assert!(key_hashes
+        .iter()
+        .all(|kh| usize::from(kh.nibble(0)) == shard_id));
+
+    for key_hash in &key_hashes {
+        put_hot_state_entry_by_hash(
+            &db,
+            *key_hash,
+            10,
+            Some(HotStateEntry::Occupied {
+                value: make_state_value(1),
+                value_version: 5,
+            }),
+        );
+    }
+    flush_hot_state_value_cf(&db);
+
+    let shards = db.load_hot_state_kvs(100).unwrap();
+    let shard = &shards[shard_id];
+    assert_eq!(
+        shard.num_items,
+        key_hashes.len(),
+        "expected all {} keys in shard {shard_id} to load, got {}",
+        key_hashes.len(),
+        shard.num_items,
+    );
+    for key_hash in &key_hashes {
+        assert!(shard.map.contains_key(key_hash), "missing key {key_hash:?}");
+    }
     shard.validate_lru_chain();
 }
 
