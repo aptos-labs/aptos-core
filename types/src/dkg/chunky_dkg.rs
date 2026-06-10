@@ -63,12 +63,14 @@ pub static TEST_DIGEST_KEY: Lazy<Arc<DigestKey>> = Lazy::new(|| {
     Arc::new(DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail"))
 });
 /// Shared test PublicParameters for chunky DKG (unit tests only).
+/// Sized for n=20 (forge): `max_num_shares=72` (rounding upper bound),
+/// `max_aggregation=20` (per-chunk dealer-sum ceiling).
 pub static TEST_PUBLIC_PARAMETERS: Lazy<Arc<ChunkyDKGPublicParameters>> = Lazy::new(|| {
     let mut rng = StdRng::seed_from_u64(200u64);
     Arc::new(PublicParameters::new_for_testing(
-        24,
+        72,
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
-        4,
+        20,
         G2Affine::generator(),
         &mut rng,
     ))
