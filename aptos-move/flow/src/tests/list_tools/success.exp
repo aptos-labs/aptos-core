@@ -97,6 +97,11 @@
               "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
               "type": "string",
               "const": "function_usage"
+            },
+            {
+              "description": "Returns full-fidelity, compiler-sourced per-module facts (functions,\ntypes, constants, friends, attributes, locations) consumed by the\nGitNexus Move ingestion pipeline. See `build_facts` for the shape.",
+              "type": "string",
+              "const": "facts"
             }
           ]
         }
