@@ -4,12 +4,15 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    debug::DebugContext, interpreter::InterpreterDebugInterface, loader::LoadedFunction,
+    debug::{DebugContext, MoveStepDebugContext},
+    interpreter::InterpreterDebugInterface,
+    loader::LoadedFunction,
     RuntimeEnvironment,
 };
 use arc_swap::ArcSwap;
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
+    cell::{Cell, RefCell},
     env,
     fs::{File, OpenOptions},
     io::{BufWriter, Write},
@@ -28,9 +31,16 @@ pub(crate) const MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME: &str = "MOVE_VM_STEP_COMMAN
 
 static FILE_PATH: OnceLock<ArcSwap<String>> = OnceLock::new();
 static TRACING_ENABLED: OnceLock<AtomicBool> = OnceLock::new();
-static DEBUGGING_ENABLED: OnceLock<AtomicBool> = OnceLock::new();
 static LOGGING_FILE_WRITER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
-static DEBUG_CONTEXT: OnceLock<Mutex<DebugContext>> = OnceLock::new();
+
+thread_local! {
+    static DEBUGGING_ENABLED: Cell<bool> = Cell::new(
+        env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok()
+            || env::var(MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME).is_ok(),
+    );
+    static DEBUG_CONTEXT: RefCell<Box<dyn DebugContext>> =
+        RefCell::new(Box::new(MoveStepDebugContext::new()));
+}
 
 /// Turn tracing on or off, saving info to the path.
 pub fn enable_tracing(path_opt: Option<&str>) {
@@ -59,13 +69,13 @@ pub(crate) fn is_tracing_enabled() -> &'static AtomicBool {
 }
 
 #[inline]
-pub(crate) fn is_debugging_enabled() -> &'static AtomicBool {
-    DEBUGGING_ENABLED.get_or_init(|| {
-        AtomicBool::new(
-            env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok()
-                || env::var(MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME).is_ok(),
-        )
-    })
+pub(crate) fn is_debugging_enabled() -> bool {
+    DEBUGGING_ENABLED.with(|c| c.get())
+}
+
+#[cfg(feature = "debugger")]
+pub fn set_debugging_enabled(enable: bool) {
+    DEBUGGING_ENABLED.with(|c| c.set(enable));
 }
 
 pub fn flush_tracing_buffer() {
@@ -100,8 +110,14 @@ fn create_buffered_output(path: &Path) -> BufWriter<File> {
     BufWriter::with_capacity(4096 * 1024 /* 4096KB */, file)
 }
 
-pub(crate) fn get_debug_context() -> &'static Mutex<DebugContext> {
-    DEBUG_CONTEXT.get_or_init(|| Mutex::new(DebugContext::new()))
+#[cfg(feature = "debugger")]
+pub fn set_debug_context(ctx: Box<dyn DebugContext>) {
+    DEBUG_CONTEXT.with(|cell| *cell.borrow_mut() = ctx);
+}
+
+#[cfg(feature = "debugger")]
+pub fn capture_debug_thread_state() -> Box<dyn crate::debug::ThreadStateHandle> {
+    DEBUG_CONTEXT.with(|cell| cell.borrow().capture_thread_state())
 }
 
 pub(crate) fn debug_trace(
@@ -122,14 +138,16 @@ pub(crate) fn debug_trace(
             ))
             .unwrap();
     }
-    if is_debugging_enabled().load(Ordering::Relaxed) {
-        get_debug_context().lock().unwrap().debug_loop(
-            function,
-            locals,
-            pc,
-            instr,
-            runtime_environment,
-            interpreter,
-        );
+    if is_debugging_enabled() {
+        DEBUG_CONTEXT.with(|cell| {
+            cell.borrow_mut().debug_loop(
+                function,
+                locals,
+                pc,
+                instr,
+                runtime_environment,
+                interpreter,
+            );
+        });
     }
 }

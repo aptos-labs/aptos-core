@@ -84,3 +84,4 @@ termcolor = { workspace = true }
 default = []
 binary = ["testing"]
 testing = ["aptos-vm/testing"]
+debugger = []

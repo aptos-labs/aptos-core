@@ -205,8 +205,14 @@ impl TestRunner {
         writer: &Mutex<W>,
         options: &Mutex<F>,
     ) -> Result<TestResults> {
+        #[cfg(feature = "debugger")]
+        let thread_state = move_vm_runtime::tracing::capture_debug_thread_state();
         rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
+            .start_handler(move |_| {
+                #[cfg(feature = "debugger")]
+                thread_state.install_on_thread()
+            })
             .build()
             .unwrap()
             .install(|| {

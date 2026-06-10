@@ -3,9 +3,8 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    interpreter::InterpreterDebugInterface, source_locator, LoadedFunction, RuntimeEnvironment,
-};
+pub use crate::interpreter::InterpreterDebugInterface;
+use crate::{source_locator, LoadedFunction, RuntimeEnvironment};
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
     collections::{BTreeSet, VecDeque},
@@ -130,9 +129,29 @@ impl FromStr for DebugCommand {
     }
 }
 
+#[cfg(feature = "debugger")]
+pub trait ThreadStateHandle: Send + Sync {
+    fn install_on_thread(&self);
+}
+
+pub trait DebugContext: Send {
+    fn debug_loop(
+        &mut self,
+        function: &LoadedFunction,
+        locals: &Locals,
+        pc: u16,
+        instr: &Instruction,
+        runtime_environment: &RuntimeEnvironment,
+        interpreter: &dyn InterpreterDebugInterface,
+    );
+
+    #[cfg(feature = "debugger")]
+    fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle>;
+}
+
 #[derive(Debug)]
 #[allow(unused)]
-pub(crate) struct DebugContext {
+pub(crate) struct MoveStepDebugContext {
     breakpoints: BTreeSet<String>,
     input_checker: InputChecker,
 }
@@ -151,7 +170,7 @@ enum InputChecker {
     Continue,
 }
 
-impl DebugContext {
+impl MoveStepDebugContext {
     #[allow(unused)]
     pub(crate) fn new() -> Self {
         Self {
@@ -159,9 +178,11 @@ impl DebugContext {
             input_checker: InputChecker::StepRemaining(1),
         }
     }
+}
 
+impl DebugContext for MoveStepDebugContext {
     #[allow(unused)]
-    pub(crate) fn debug_loop(
+    fn debug_loop(
         &mut self,
         function: &LoadedFunction,
         locals: &Locals,
@@ -346,5 +367,16 @@ impl DebugContext {
                 }
             }
         }
+    }
+
+    #[cfg(feature = "debugger")]
+    fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
+        struct NoopThreadState;
+
+        impl ThreadStateHandle for NoopThreadState {
+            fn install_on_thread(&self) {}
+        }
+
+        Box::new(NoopThreadState)
     }
 }

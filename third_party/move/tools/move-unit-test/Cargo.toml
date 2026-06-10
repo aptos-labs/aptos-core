@@ -57,3 +57,4 @@ harness = false
 table-extension = [
     "move-vm-test-utils/table-extension"
 ]
+debugger = ["move-vm-runtime/debugger"]
