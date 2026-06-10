@@ -5,8 +5,8 @@
 
 set -e
 
-# Set to 1 after `emerge --sync` in this script (avoids running sync twice on Gentoo).
-EMERGE_SYNC_DONE=0
+# Set to true after `emerge --sync` in this script (avoids running sync twice on Gentoo).
+EMERGE_SYNC_DONE=false
 
 has_command() {
   command -v "$1" > /dev/null 2>&1
@@ -53,8 +53,8 @@ minimal_install_pkgs() {
       $pre_cmd yum install -y "$@"
       ;;
     pacman)
-      $pre_cmd pacman -Sy --noconfirm
-      $pre_cmd pacman -S --noconfirm --needed "$@"
+      # One-shot setup: sync and upgrade together so new packages match on-disk libs (Arch wiki).
+      $pre_cmd pacman -Syu --noconfirm --needed "$@"
       ;;
     apk)
       $pre_cmd apk --update add --no-cache "$@"
@@ -108,7 +108,7 @@ bootstrap_ssl_and_fetch_clients() {
         minimal_install_pkgs zypper ca-certificates curl wget unzip
       elif has_command emerge; then
         run_as_root emerge --sync
-        EMERGE_SYNC_DONE=1
+        EMERGE_SYNC_DONE=true
         minimal_install_pkgs emerge app-misc/ca-certificates net-misc/curl net-misc/wget app-arch/unzip
       elif has_command xbps-install; then
         minimal_install_pkgs xbps ca-certificates curl wget unzip
@@ -151,7 +151,12 @@ ensure_rustup() {
   if has_command curl; then
     curl --proto '=https' --tlsv1.2 -sSf "$rustup_url" -o "$tmp"
   elif has_command wget; then
-    wget -qO "$tmp" "$rustup_url"
+    # Prefer HTTPS-only + TLS 1.2 when GNU wget supports it (matches curl hardening above).
+    if wget --help 2>&1 | grep -q -- '--https-only'; then
+      wget --https-only --secure-protocol=TLSv1_2 -qO "$tmp" "$rustup_url"
+    else
+      wget -qO "$tmp" "$rustup_url"
+    fi
   elif has_command fetch && [ "$(uname -s)" = "FreeBSD" ]; then
     fetch -o "$tmp" "$rustup_url"
   else
@@ -204,7 +209,7 @@ case "$OS" in
       minimal_install_pkgs zypper ca-certificates curl wget unzip gcc gcc-c++ make pkg-config libopenssl-devel git libudev-devel lld libdw-devel clang llvm cmake
     elif has_command emerge; then
       # Gentoo Emerge
-      if [ "$EMERGE_SYNC_DONE" != 1 ]; then
+      if [ "$EMERGE_SYNC_DONE" != true ]; then
         run_as_root emerge --sync
       fi
       minimal_install_pkgs emerge app-misc/ca-certificates net-misc/curl net-misc/wget app-arch/unzip sys-devel/gcc dev-libs/openssl dev-vcs/git dev-lang/rust llvm-core/clang
