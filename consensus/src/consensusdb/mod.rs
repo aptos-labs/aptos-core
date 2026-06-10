@@ -27,6 +27,13 @@ use std::{iter::Iterator, path::Path, time::Instant};
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
 
+/// Bound the total live WAL (matching AptosDB's per-shard setting). With the
+/// RocksDB default, several rarely-written CFs (the DAG CFs, the deprecated
+/// `ordered_anchor_id`) keep unflushed memtables that pin the oldest WAL files,
+/// letting the WAL accumulate and slowing cold open. Crossing this bound forces
+/// a flush of the oldest data so stale WAL files are reclaimed.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
+
 /// Creates new physical DB checkpoint in directory specified by `checkpoint_path`.
 pub fn create_checkpoint<P: AsRef<Path> + Clone>(db_path: P, checkpoint_path: P) -> Result<()> {
     let start = Instant::now();
@@ -65,6 +72,7 @@ impl ConsensusDB {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+        opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
         let db = DB::open(path.clone(), "consensus", column_families, opts)
             .expect("ConsensusDB open failed; unable to continue");
 
