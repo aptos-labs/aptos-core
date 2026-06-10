@@ -103,11 +103,12 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 module_name,
                 function_name,
                 args,
+                heap_size,
                 checks,
             } => {
                 let v1_output =
                     execute_function_v1(&storage, &address, &module_name, &function_name, &args);
-                let v2_output = execute_function_v2(
+                let (v2_output, v2_gc_count) = execute_function_v2(
                     &guard,
                     &module_provider,
                     &address,
@@ -116,8 +117,14 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                     &args,
                     &v1_output.param_kinds,
                     &v1_output.return_kinds,
+                    heap_size,
                 );
-                check_output(&checks, &v1_output.output.display, &v2_output.display)?;
+                check_output(
+                    &checks,
+                    &v1_output.output.display,
+                    &v2_output.display,
+                    v2_gc_count,
+                )?;
             },
         }
     }
@@ -260,7 +267,8 @@ fn execute_function_v1(
     }
 }
 
-/// Executes a function via MonoMove VM, and returns normalized output.
+/// Executes a function via MonoMove VM. Returns the normalized output and the
+/// number of garbage collections that ran (for `CHECK-GC-COUNT`).
 fn execute_function_v2(
     guard: &ExecutionGuard<'_>,
     module_provider: &InMemoryModuleProvider,
@@ -270,9 +278,11 @@ fn execute_function_v2(
     args: &[String],
     arg_kinds: &[PrimitiveKind],
     return_kinds: &[PrimitiveKind],
-) -> Output {
+    heap_size: Option<usize>,
+) -> (Output, usize) {
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
+    let mut gc_count = 0;
     let outcome = crate::engine::with_mono_function(
         guard,
         module_provider,
@@ -280,7 +290,8 @@ fn execute_function_v2(
         module_name,
         function_name,
         |runner| {
-            runner.run(
+            runner.set_heap_size(heap_size);
+            let result = runner.run(
                 |interpreter| {
                     let mut offset: u32 = 0;
                     for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
@@ -314,7 +325,9 @@ fn execute_function_v2(
                     }
                     vals
                 },
-            )
+            );
+            gc_count = runner.gc_count();
+            result
         },
     );
 
@@ -327,7 +340,7 @@ fn execute_function_v2(
         },
         Ok(RunResult::Success(vals)) => format!("results: {}", vals.join(", ")),
     };
-    Output { display }
+    (Output { display }, gc_count)
 }
 
 /// Kind supported as an argument or return value in differential tests
@@ -350,6 +363,7 @@ enum PrimitiveKind {
     I128,
     I256,
     Address,
+    Signer,
     /// A `String` return value (return-only). Rendered as a UTF-8 string by
     /// reading the heap `vector<u8>` (V2) or decoding the BCS bytes (V1).
     Utf8String,
@@ -375,6 +389,7 @@ impl PrimitiveKind {
             Type::I128 => PrimitiveKind::I128,
             Type::I256 => PrimitiveKind::I256,
             Type::Address => PrimitiveKind::Address,
+            Type::Signer => PrimitiveKind::Signer,
             _ => return None,
         })
     }
@@ -412,7 +427,10 @@ impl PrimitiveKind {
             | PrimitiveKind::Utf8String
             | PrimitiveKind::ByteVector => 8,
             PrimitiveKind::U128 | PrimitiveKind::I128 => 16,
-            PrimitiveKind::U256 | PrimitiveKind::I256 | PrimitiveKind::Address => 32,
+            PrimitiveKind::U256
+            | PrimitiveKind::I256
+            | PrimitiveKind::Address
+            | PrimitiveKind::Signer => 32,
         }
     }
 
@@ -431,7 +449,8 @@ impl PrimitiveKind {
             | PrimitiveKind::I128
             | PrimitiveKind::U256
             | PrimitiveKind::I256
-            | PrimitiveKind::Address => 8,
+            | PrimitiveKind::Address
+            | PrimitiveKind::Signer => 8,
         }
     }
 
@@ -453,6 +472,10 @@ impl PrimitiveKind {
             PrimitiveKind::Address => {
                 let addr = AccountAddress::from_hex_literal(s).expect("invalid address literal");
                 MoveValue::Address(addr)
+            },
+            PrimitiveKind::Signer => {
+                let addr = AccountAddress::from_hex_literal(s).expect("invalid signer literal");
+                MoveValue::Signer(addr)
             },
             PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
                 unreachable!("String / vector<u8> are return-only kinds")
@@ -519,7 +542,7 @@ impl PrimitiveKind {
                 .expect("invalid i256 literal")
                 .to_le_bytes()
                 .to_vec(),
-            PrimitiveKind::Address => AccountAddress::from_hex_literal(s)
+            PrimitiveKind::Address | PrimitiveKind::Signer => AccountAddress::from_hex_literal(s)
                 .expect("invalid address literal")
                 .into_bytes()
                 .to_vec(),
@@ -546,7 +569,7 @@ impl PrimitiveKind {
             PrimitiveKind::I64 => i64::from_le_bytes(bytes[..8].try_into().unwrap()).to_string(),
             PrimitiveKind::I128 => i128::from_le_bytes(bytes[..16].try_into().unwrap()).to_string(),
             PrimitiveKind::I256 => I256::from_le_bytes(bytes[..32].try_into().unwrap()).to_string(),
-            PrimitiveKind::Address => {
+            PrimitiveKind::Address | PrimitiveKind::Signer => {
                 let arr: [u8; AccountAddress::LENGTH] = bytes[..32].try_into().unwrap();
                 AccountAddress::new(arr).to_hex_literal()
             },

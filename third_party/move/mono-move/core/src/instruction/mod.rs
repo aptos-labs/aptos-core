@@ -1048,9 +1048,9 @@ pub enum MicroOp {
         ty: InternedType,
     },
 
-    /// Move the owned value in the source slot `src` into global storage as a
-    /// resource of type `ty`, published under the address of the signer referenced
-    /// by the `signer_ref`.
+    /// Move the heap-allocated value pointer from the source slot `src` into global
+    /// storage map as a resource of type `ty`, published under the address of the
+    /// signer referenced by the `signer_ref`.
     MoveTo {
         signer_ref: FrameOffset,
         ty: InternedType,

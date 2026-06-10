@@ -804,4 +804,16 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
         self.loader.guard.publish_layout(ty, layout)
     }
+
+    fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
+    }
 }

@@ -307,6 +307,56 @@ impl<'a> LoweringState<'a> {
         });
     }
 
+    /// Emits the non-allocating copy that boxes a `size`-byte value from the
+    /// frame slot `src` into the heap object at.
+    fn emit_heap_move_to(
+        &mut self,
+        heap_ptr: FrameOffset,
+        src: FrameOffset,
+        size: u32,
+    ) -> Result<()> {
+        if size == 8 {
+            self.emit(MicroOp::HeapMoveTo8 {
+                heap_ptr,
+                offset: 0,
+                src,
+            })?;
+        } else {
+            self.emit(MicroOp::HeapMoveTo {
+                heap_ptr,
+                offset: 0,
+                src,
+                size,
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Emits the non-allocating copy that unboxes a `size`-byte value from the
+    /// heap object at into frame slot `dst`.
+    fn emit_heap_move_from(
+        &mut self,
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
+        size: u32,
+    ) -> Result<()> {
+        if size == 8 {
+            self.emit(MicroOp::HeapMoveFrom8 {
+                dst,
+                heap_ptr,
+                offset: 0,
+            })?;
+        } else {
+            self.emit(MicroOp::HeapMoveFrom {
+                dst,
+                heap_ptr,
+                offset: 0,
+                size,
+            })?;
+        }
+        Ok(())
+    }
+
     /// Interned-type corresponding to `slot`.
     fn slot_interned_type(&self, slot: Slot) -> Result<InternedType> {
         Ok(match slot {
@@ -1200,7 +1250,7 @@ impl<'a> LoweringState<'a> {
             Instr::VecPushBack(elem_ty, vec_ref, val) => {
                 let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
-                let descriptor_id = self.ctx.vec_descriptor_id(vec_ty).ok_or_else(|| {
+                let descriptor_id = self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
                     anyhow::anyhow!(
                         "VecPushBack: no descriptor published for this vector type \
                          (its element type may be generic or have unresolved layout)"
@@ -1458,12 +1508,117 @@ impl<'a> LoweringState<'a> {
                 self.bind_call_returns(rets, ret_slots)?;
             },
 
+            // --- Global storage ---
+            Instr::Exists(dst, ty, addr) => {
+                let addr_info = self.slot(*addr)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::Exists {
+                    addr: addr_info.offset,
+                    ty: *ty,
+                    dst: dst_info.offset,
+                })?;
+            },
+            Instr::ImmBorrowGlobal(dst, ty, addr) => {
+                let addr_info = self.slot(*addr)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::BorrowGlobal {
+                    dst: dst_info.offset,
+                    addr: addr_info.offset,
+                    ty: *ty,
+                })?;
+            },
+            Instr::MutBorrowGlobal(dst, ty, addr) => {
+                let addr_info = self.slot(*addr)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::BorrowGlobalMut {
+                    dst: dst_info.offset,
+                    addr: addr_info.offset,
+                    ty: *ty,
+                })?;
+            },
+            Instr::MoveFrom(dst, ty, addr) => {
+                // Move the resource out as an 8-byte heap pointer into
+                // `box_ptr`, then unbox its inline value into `dst`. `MoveFrom`
+                // may GC (deep-copy) before it writes `box_ptr`; the unbox copy
+                // that follows does not allocate.
+                let box_ptr = self
+                    .ctx
+                    .resource_box_slot
+                    .ok_or_else(|| anyhow::anyhow!("MoveFrom: box-pointer slot not reserved"))?;
+                let addr_info = self.slot(*addr)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::MoveFrom {
+                    dst: box_ptr,
+                    addr: addr_info.offset,
+                    ty: *ty,
+                })?;
+                debug_assert_eq!(
+                    dst_info.size,
+                    concrete_type_size(*ty, "move_from resource")?,
+                    "move_from: dst slot width must equal the resource's heap-object payload size",
+                );
+                self.emit_heap_move_from(dst_info.offset, box_ptr, dst_info.size)?;
+            },
+            Instr::MoveTo(ty, signer, val) => {
+                // Box the inline resource value into a fresh heap object, then
+                // publish the pointer. `HeapNew` allocates (and may GC) before
+                // it writes `box_ptr`; the `HeapMoveTo` box copy and `MoveTo`
+                // that follow do not allocate.
+                //
+                // If the resource embeds a child heap pointer (e.g. a vector
+                // field), the GC inside `HeapNew` relocates it in place before
+                // the `HeapMoveTo` reads it: `val` is a home slot, so
+                // `derive_frame_layout` lists its pointer offsets in the
+                // function's `frame_layout`, which the runtime scans at every
+                // collection (not only at frame entry). So `HeapMoveTo` copies
+                // the relocated child pointer, not a stale one. This relies on
+                // `frame_layout` being a whole-function root set; it would break
+                // if safe points became per-PC / liveness-based.
+                let descriptor_id = self.ctx.descriptor_id(*ty).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "MoveTo: no descriptor published for the resource type \
+                         (its layout may be unresolved)"
+                    )
+                })?;
+                let box_ptr = self
+                    .ctx
+                    .resource_box_slot
+                    .ok_or_else(|| anyhow::anyhow!("MoveTo: box-pointer slot not reserved"))?;
+                let signer_info = self.slot(*signer)?;
+                let val_info = self.slot(*val)?;
+                self.emit(MicroOp::HeapNew {
+                    dst: box_ptr,
+                    descriptor_id,
+                })?;
+                debug_assert_eq!(
+                    val_info.size,
+                    concrete_type_size(*ty, "move_to resource")?,
+                    "move_to: val slot width must equal the descriptor payload size HeapNew allocated",
+                );
+                self.emit_heap_move_to(box_ptr, val_info.offset, val_info.size)?;
+                self.emit(MicroOp::MoveTo {
+                    signer_ref: signer_info.offset,
+                    ty: *ty,
+                    src: box_ptr,
+                })?;
+            },
+
             // --- Generic and variant field forms: not yet lowered ---
             Instr::ImmBorrowFieldGeneric(..)
             | Instr::MutBorrowFieldGeneric(..)
             | Instr::ReadFieldGeneric(..)
             | Instr::WriteFieldGeneric(..) => {
                 bail!("generic field instruction not yet lowered")
+            },
+
+            // Generic global-storage ops carry a still-generic resource type
+            // that the lowering state can't substitute yet.
+            Instr::ExistsGeneric(..)
+            | Instr::MoveFromGeneric(..)
+            | Instr::MoveToGeneric(..)
+            | Instr::ImmBorrowGlobalGeneric(..)
+            | Instr::MutBorrowGlobalGeneric(..) => {
+                bail!("generic global-storage instruction not yet lowered")
             },
 
             _ => bail!("instruction {} not yet lowered", instr.opcode_name()),

@@ -127,6 +127,104 @@ pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
     )
 }
 
+/// Resource type carried by a global-storage instruction (`exists`,
+/// `move_from`, `move_to`, `borrow_global[_mut]`), if any. The returned type
+/// is the interned resource nominal embedded in the instruction; it may still
+/// contain type parameters that the caller substitutes with the function's
+/// type arguments.
+pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
+    match instr {
+        // Global-storage ops carry the resource nominal directly.
+        Instr::Exists(_, ty, _)
+        | Instr::ExistsGeneric(_, ty, _)
+        | Instr::MoveFrom(_, ty, _)
+        | Instr::MoveFromGeneric(_, ty, _)
+        | Instr::MoveTo(ty, _, _)
+        | Instr::MoveToGeneric(ty, _, _)
+        | Instr::ImmBorrowGlobal(_, ty, _)
+        | Instr::ImmBorrowGlobalGeneric(_, ty, _)
+        | Instr::MutBorrowGlobal(_, ty, _)
+        | Instr::MutBorrowGlobalGeneric(_, ty, _) => Some(*ty),
+
+        // Every other instruction: no resource type involved.
+        Instr::Pack(..)
+        | Instr::PackGeneric(..)
+        | Instr::Unpack(..)
+        | Instr::UnpackGeneric(..)
+        | Instr::PackVariant(..)
+        | Instr::PackVariantGeneric(..)
+        | Instr::UnpackVariant(..)
+        | Instr::UnpackVariantGeneric(..)
+        | Instr::TestVariant(..)
+        | Instr::TestVariantGeneric(..)
+        | Instr::ImmBorrowField(..)
+        | Instr::MutBorrowField(..)
+        | Instr::ReadField(..)
+        | Instr::WriteField(..)
+        | Instr::ImmBorrowLocField(..)
+        | Instr::MutBorrowLocField(..)
+        | Instr::ReadLocalField(..)
+        | Instr::WriteLocalField(..)
+        | Instr::ImmBorrowFieldGeneric(..)
+        | Instr::MutBorrowFieldGeneric(..)
+        | Instr::ReadFieldGeneric(..)
+        | Instr::WriteFieldGeneric(..)
+        | Instr::ImmBorrowVariantField(..)
+        | Instr::MutBorrowVariantField(..)
+        | Instr::ImmBorrowVariantFieldGeneric(..)
+        | Instr::MutBorrowVariantFieldGeneric(..)
+        | Instr::ReadVariantField(..)
+        | Instr::ReadVariantFieldGeneric(..)
+        | Instr::WriteVariantField(..)
+        | Instr::WriteVariantFieldGeneric(..)
+        | Instr::PackClosure(..)
+        | Instr::PackClosureGeneric(..)
+        | Instr::CallClosure(..)
+        | Instr::VecPack(..)
+        | Instr::VecLen(..)
+        | Instr::VecImmBorrow(..)
+        | Instr::VecMutBorrow(..)
+        | Instr::VecPushBack(..)
+        | Instr::VecPopBack(..)
+        | Instr::VecUnpack(..)
+        | Instr::VecSwap(..)
+        | Instr::LdConst(..)
+        | Instr::LdTrue(..)
+        | Instr::LdFalse(..)
+        | Instr::LdU8(..)
+        | Instr::LdU16(..)
+        | Instr::LdU32(..)
+        | Instr::LdU64(..)
+        | Instr::LdU128(..)
+        | Instr::LdU256(..)
+        | Instr::LdI8(..)
+        | Instr::LdI16(..)
+        | Instr::LdI32(..)
+        | Instr::LdI64(..)
+        | Instr::LdI128(..)
+        | Instr::LdI256(..)
+        | Instr::Copy(..)
+        | Instr::Move(..)
+        | Instr::UnaryOp(..)
+        | Instr::BinaryOp(..)
+        | Instr::BinaryOpImm(..)
+        | Instr::ImmBorrowLoc(..)
+        | Instr::MutBorrowLoc(..)
+        | Instr::ReadRef(..)
+        | Instr::WriteRef(..)
+        | Instr::Call(..)
+        | Instr::CallGeneric(..)
+        | Instr::Branch(..)
+        | Instr::BrTrue(..)
+        | Instr::BrFalse(..)
+        | Instr::BrCmp(..)
+        | Instr::BrCmpImm(..)
+        | Instr::Ret(..)
+        | Instr::Abort(..)
+        | Instr::AbortMsg(..) => None,
+    }
+}
+
 /// Concrete nominal (struct or enum) type whose layout `instr`'s
 /// lowering needs, if any.
 /// TODO: complete the function over all instructions.

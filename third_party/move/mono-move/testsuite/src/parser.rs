@@ -28,7 +28,7 @@
 //! in `--print(...)`. Unknown tokens or an empty section list cause the
 //! test to fail at parse time.
 //!
-//! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...]`
+//! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...] [--heap-size <n>]`
 //!
 //! Invokes `<func>` in the given module on both VMs. Arguments are
 //! comma-separated decimal literals, parsed according to the function's
@@ -36,6 +36,17 @@
 //! supported). The execution produces a result string of the form
 //! `results: v1, v2` on success, or `error: <message>` on failure (e.g.,
 //! abort).
+//!
+//! `--heap-size <n>` sets the MonoMove heap to `n` bytes (default otherwise).
+//! A small heap forces garbage collection under allocation pressure. The
+//! legacy VM has no heap-size knob and ignores it. Modifiers may appear in
+//! any order.
+//!
+//! ## `// CHECK-GC-COUNT: <n>`
+//!
+//! Must follow an execute directive. Asserts the MonoMove VM ran exactly `n`
+//! garbage collections during that step. V2-only — the legacy VM has no GC.
+//! Pair with `--heap-size` to drive collections deterministically.
 //!
 //! ## `// CHECK: <literal>`
 //!
@@ -84,6 +95,10 @@ pub enum Check {
     V1(String, MatchKind),
     /// MonoMove VM should produce this output.
     V2(String, MatchKind),
+    /// MonoMove VM must have run exactly this many garbage collections.
+    /// V2-only: the legacy VM has no GC. Pair with `--heap-size` to drive
+    /// collections deterministically.
+    GcCount(usize),
 }
 
 /// A snapshot section requested via `// RUN: publish --print(...)`.
@@ -112,6 +127,10 @@ pub enum Step {
         module_name: Identifier,
         function_name: Identifier,
         args: Vec<String>,
+        /// MonoMove heap size in bytes (`--heap-size`). `None` uses the
+        /// default. A small heap forces GC under allocation pressure. Has no
+        /// effect on the legacy VM.
+        heap_size: Option<usize>,
         checks: Vec<Check>,
     },
 }
@@ -174,6 +193,12 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
             let pattern = pattern.trim().to_string();
             attach_check(&mut steps, Check::V1(pattern.clone(), MatchKind::Exact))?;
             attach_check(&mut steps, Check::V2(pattern, MatchKind::Exact))?;
+        } else if let Some(count) = line.strip_prefix("// CHECK-GC-COUNT:") {
+            let count = count.trim();
+            let count = count
+                .parse::<usize>()
+                .map_err(|err| anyhow!("invalid CHECK-GC-COUNT {:?}: {}", count, err))?;
+            attach_check(&mut steps, Check::GcCount(count))?;
         } else if publish_print.is_some() {
             sources.push(raw_line);
         }
@@ -222,17 +247,43 @@ fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
 
 /// Parses execution step.
 fn parse_execute_step(line: &str) -> anyhow::Result<Step> {
-    let (id, args) = match line.split_once("--args") {
-        None => (line.trim(), vec![]),
-        Some((id, args)) => {
-            let args: Vec<String> = args
-                .split(',')
-                .map(|arg| arg.trim().to_string())
-                .filter(|arg| !arg.is_empty())
-                .collect();
-            (id.trim(), args)
-        },
+    // The function id comes first; `--flag` modifiers follow in any order.
+    let (id, modifiers) = match line.find("--") {
+        Some(i) => (line[..i].trim(), line[i..].trim()),
+        None => (line.trim(), ""),
     };
+
+    let mut args = vec![];
+    let mut heap_size = None;
+    // Each modifier is `--<flag> <value>`. Split on the ` --` boundary (not bare
+    // `--`) so a value containing `--` is not shredded, and match the flag name
+    // as a whole token so a typo like `--heap-size9` is rejected rather than
+    // silently parsed as `--heap-size 9`.
+    if let Some(rest) = modifiers.strip_prefix("--") {
+        for group in rest.split(" --").map(str::trim).filter(|g| !g.is_empty()) {
+            let (flag, value) = match group.split_once(char::is_whitespace) {
+                Some((flag, value)) => (flag, value.trim()),
+                None => (group, ""),
+            };
+            match flag {
+                "args" => {
+                    args = value
+                        .split(',')
+                        .map(|arg| arg.trim().to_string())
+                        .filter(|arg| !arg.is_empty())
+                        .collect();
+                },
+                "heap-size" => {
+                    heap_size = Some(
+                        value
+                            .parse::<usize>()
+                            .map_err(|err| anyhow!("invalid --heap-size {:?}: {}", value, err))?,
+                    );
+                },
+                other => bail!("Unknown execute modifier: --{}", other),
+            }
+        }
+    }
 
     let id = id.split("::").collect::<Vec<_>>();
     if id.len() != 3 {
@@ -251,6 +302,7 @@ fn parse_execute_step(line: &str) -> anyhow::Result<Step> {
         module_name,
         function_name,
         args,
+        heap_size,
         checks: vec![],
     })
 }
