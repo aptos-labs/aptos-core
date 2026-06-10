@@ -74,6 +74,7 @@ const ABORT: u64 = 2;
 const ABORT_MSG: u64 = 5;
 const JUMP: u64 = 2;
 const COND_JUMP: u64 = 3;
+const FORCE_GC: u64 = 100;
 
 /// Operand size and type queries used by [`instr_cost`]. A slot's size comes
 /// from the resolved layout, not its type, which may be polymorphic.
@@ -211,6 +212,8 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         Instr::Ret(slots) => RETURN + 2 * sum_move(cx, slots)?,
         Instr::Abort(..) => ABORT,
         Instr::AbortMsg(..) => ABORT_MSG,
+
+        Instr::ForceGc => FORCE_GC,
     })
 }
 

@@ -291,6 +291,10 @@ pub enum Instr {
     Ret(Vec<Slot>),
     Abort(Slot),
     AbortMsg(Slot, Slot),
+
+    // --- Test intrinsics ---
+    /// Triggers a garbage collection.
+    ForceGc,
 }
 
 impl Instr {
@@ -383,6 +387,7 @@ impl Instr {
             Instr::Ret(..) => "Ret",
             Instr::Abort(..) => "Abort",
             Instr::AbortMsg(..) => "AbortMsg",
+            Instr::ForceGc => "ForceGc",
         }
     }
 }
