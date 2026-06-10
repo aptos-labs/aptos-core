@@ -221,6 +221,11 @@ impl ShardedJmtMerkleDb {
         JellyfishMerkleTree::new(self).get_root_hash(version)
     }
 
+    /// Like [`Self::get_root_hash`], but returns `None` when there is no root node at `version`.
+    pub fn get_root_hash_option(&self, version: Version) -> Result<Option<HashValue>> {
+        JellyfishMerkleTree::new(self).get_root_hash_option(version)
+    }
+
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
         JellyfishMerkleTree::new(self).get_leaf_count(version)
     }
