@@ -9,9 +9,8 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
-    native::NativeName, types::EMPTY_TYPE_LIST, Function, Interner, NO_RESOURCE_PROVIDER,
+    native::NativeName, types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, NO_RESOURCE_PROVIDER,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::{make_all_production_natives, make_all_test_natives};
@@ -25,7 +24,7 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 const GAS_BUDGET: u64 = u64::MAX;
 
 /// The concrete per-transaction context the engine runs against.
-type TxnCtx<'guard, 'ctx> = TransactionContext<'guard, 'ctx, SimpleGasMeter>;
+type TxnCtx<'guard, 'ctx> = TransactionContext<'guard, 'ctx>;
 /// The interpreter context handed to `set`/`read` closures in [`MonoRunner::run`].
 type Interp<'i, 'guard, 'ctx> = InterpreterContext<'i, TxnCtx<'guard, 'ctx>>;
 
@@ -123,14 +122,12 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     function_name: &IdentStr,
     body: impl FnOnce(&mut MonoRunner<'_, '_, 'ctx>) -> R,
 ) -> Result<R> {
-    let mut natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
+    let mut natives = ProductionNativeRegistry::new();
     natives
         .register_all(
-            make_all_test_natives::<ProductionContextFamily<SimpleGasMeter>>()
+            make_all_test_natives::<ProductionContextFamily>()
                 .into_iter()
-                .chain(make_all_production_natives::<
-                    ProductionContextFamily<SimpleGasMeter>,
-                >())
+                .chain(make_all_production_natives::<ProductionContextFamily>())
                 .map(|(addr, module, function, func)| {
                     let name = NativeName {
                         module: guard.module_id_of(&addr, &module),
@@ -149,7 +146,7 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     );
     let mut txn_ctx = TransactionContext::new(
         loader,
-        SimpleGasMeter::new(GAS_BUDGET),
+        GasMeter::new(GAS_BUDGET),
         &NO_RESOURCE_PROVIDER,
         &natives,
     );

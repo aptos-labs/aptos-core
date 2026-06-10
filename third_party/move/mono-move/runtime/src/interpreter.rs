@@ -43,7 +43,6 @@ use mono_move_core::{
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
     OBJECT_HEADER_SIZE,
 };
-use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};

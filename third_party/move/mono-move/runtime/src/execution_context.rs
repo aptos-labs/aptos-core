@@ -10,22 +10,18 @@ use mono_move_core::{
     native::NativeRegistry,
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
-    ConstantPoolIndex, DescriptorProvider, FunctionPtr, NO_DESCRIPTOR_PROVIDER,
+    ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, NO_DESCRIPTOR_PROVIDER,
 };
-use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
 
 /// Runtime context consulted by the interpreter during execution: gas
 /// charging, cross-module function or resource resolution.
 pub trait ExecutionContext {
-    /// Concrete gas meter type for this execution context.
-    type GasMeter: GasMeter;
-
     /// Access the gas meter.
-    fn gas_meter(&mut self) -> &mut Self::GasMeter;
+    fn gas_meter(&mut self) -> &mut GasMeter;
 
     /// Read-only access to the native function registry.
-    fn natives(&self) -> &ProductionNativeRegistry<Self::GasMeter>;
+    fn natives(&self) -> &ProductionNativeRegistry;
 
     /// Disjoint borrow of the native registry, the descriptor provider, and
     /// the gas meter — all of which a native call site needs at once: the
@@ -34,9 +30,9 @@ pub trait ExecutionContext {
     fn natives_descriptors_and_gas_meter(
         &mut self,
     ) -> (
-        &ProductionNativeRegistry<Self::GasMeter>,
+        &ProductionNativeRegistry,
         &dyn DescriptorProvider,
-        &mut Self::GasMeter,
+        &mut GasMeter,
     );
 
     /// Resolve a runtime function call.
@@ -71,42 +67,31 @@ pub trait ExecutionContext {
 /// Intended for tests and benches that don't exercise cross-module dispatch.
 ///
 // TODO: migrate to a real impl and remove this.
-pub struct LocalExecutionContext<'r, G: GasMeter = NoOpGasMeter> {
-    gas_meter: G,
-    natives: ProductionNativeRegistry<G>,
+pub struct LocalExecutionContext<'r> {
+    gas_meter: GasMeter,
+    natives: ProductionNativeRegistry,
     resource_provider: &'r dyn ResourceProvider,
 }
 
-impl LocalExecutionContext<'static, NoOpGasMeter> {
-    /// No gas accounting at all (`charge` is a no-op).
-    pub fn unmetered() -> Self {
-        Self {
-            gas_meter: NoOpGasMeter,
-            natives: NativeRegistry::new(),
-            resource_provider: &NO_RESOURCE_PROVIDER,
-        }
-    }
-}
-
-impl LocalExecutionContext<'static, SimpleGasMeter> {
-    /// [`SimpleGasMeter`] with `u64::MAX` budget.
+impl LocalExecutionContext<'static> {
+    /// [`GasMeter`] with `u64::MAX` budget.
     pub fn with_max_budget() -> Self {
         Self::with_budget(u64::MAX)
     }
 
-    /// [`SimpleGasMeter`] with the given starting budget.
+    /// [`GasMeter`] with the given starting budget.
     pub fn with_budget(amount: u64) -> Self {
         Self {
-            gas_meter: SimpleGasMeter::new(amount),
+            gas_meter: GasMeter::new(amount),
             natives: NativeRegistry::new(),
             resource_provider: &NO_RESOURCE_PROVIDER,
         }
     }
 }
 
-impl<'r, G: GasMeter> LocalExecutionContext<'r, G> {
+impl<'r> LocalExecutionContext<'r> {
     /// Builds a context with the gas meter and resource provider.
-    pub fn new(gas_meter: G, resource_provider: &'r dyn ResourceProvider) -> Self {
+    pub fn new(gas_meter: GasMeter, resource_provider: &'r dyn ResourceProvider) -> Self {
         Self {
             gas_meter,
             natives: NativeRegistry::new(),
@@ -116,29 +101,27 @@ impl<'r, G: GasMeter> LocalExecutionContext<'r, G> {
 
     /// Install a populated native registry on this context. Replaces any
     /// previously-installed registry.
-    pub fn with_natives(mut self, natives: ProductionNativeRegistry<G>) -> Self {
+    pub fn with_natives(mut self, natives: ProductionNativeRegistry) -> Self {
         self.natives = natives;
         self
     }
 }
 
-impl<'r, G: GasMeter> ExecutionContext for LocalExecutionContext<'r, G> {
-    type GasMeter = G;
-
-    fn gas_meter(&mut self) -> &mut G {
+impl ExecutionContext for LocalExecutionContext<'_> {
+    fn gas_meter(&mut self) -> &mut GasMeter {
         &mut self.gas_meter
     }
 
-    fn natives(&self) -> &ProductionNativeRegistry<G> {
+    fn natives(&self) -> &ProductionNativeRegistry {
         &self.natives
     }
 
     fn natives_descriptors_and_gas_meter(
         &mut self,
     ) -> (
-        &ProductionNativeRegistry<G>,
+        &ProductionNativeRegistry,
         &dyn DescriptorProvider,
-        &mut G,
+        &mut GasMeter,
     ) {
         (&self.natives, &NO_DESCRIPTOR_PROVIDER, &mut self.gas_meter)
     }

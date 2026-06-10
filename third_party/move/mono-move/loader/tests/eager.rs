@@ -7,8 +7,7 @@
 //! closure (excluding M itself). Lowering itself stays per-call in
 //! `load_function`.
 
-use mono_move_core::native::NoNatives;
-use mono_move_gas::{GasMeter, SimpleGasMeter};
+use mono_move_core::{native::NoNatives, GasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_testsuite::InMemoryModuleProvider;
@@ -72,7 +71,7 @@ fn load_eager_preloads_struct_closure() {
     ));
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
     let before = gas.balance();
     let exec = loader.load_module(&mut read_set, &mut gas, id_a).unwrap();
     let charged = before - gas.balance();
@@ -137,7 +136,7 @@ fn load_eager_primitive_only_module_includes_self() {
     ));
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
     let exec = loader.load_module(&mut read_set, &mut gas, id_p).unwrap();
 
     assert_eq!(read_set.len(), 1);
@@ -171,7 +170,7 @@ fn load_eager_cache_hit_reproduces_state() {
 
     // Prime the cache.
     let mut rs1 = ModuleReadSet::new();
-    let mut g1 = SimpleGasMeter::new(u64::MAX);
+    let mut g1 = GasMeter::with_max_budget();
     let before1 = g1.balance();
     loader.load_module(&mut rs1, &mut g1, id_a).unwrap();
     let cost_first = before1 - g1.balance();
@@ -179,7 +178,7 @@ fn load_eager_cache_hit_reproduces_state() {
     // Cache hit on a fresh read-set must recreate the same shape:
     // same total charged, same number of read-set entries.
     let mut rs2 = ModuleReadSet::new();
-    let mut g2 = SimpleGasMeter::new(u64::MAX);
+    let mut g2 = GasMeter::with_max_budget();
     let before2 = g2.balance();
     loader.load_module(&mut rs2, &mut g2, id_a).unwrap();
     let cost_second = before2 - g2.balance();

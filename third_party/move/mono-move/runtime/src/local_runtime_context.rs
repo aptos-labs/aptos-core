@@ -11,10 +11,10 @@ use crate::{
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::{InternedType, InternedTypeList},
-    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, LayoutId, LayoutProvider,
-    ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout, ValueLayoutTable,
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
+    LayoutProvider, ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout,
+    ValueLayoutTable,
 };
-use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
 
 /// Combines a [`LocalExecutionContext`] with an owned
@@ -26,39 +26,18 @@ use mono_move_loader::LoaderResult;
 //
 // TODO: migrate to a real impl and remove this (mirrors the TODO on
 // `LocalExecutionContext` in `mono_move_core`).
-pub struct LocalRuntimeContext<'r, G: GasMeter = NoOpGasMeter> {
-    inner: LocalExecutionContext<'r, G>,
+pub struct LocalRuntimeContext<'r> {
+    inner: LocalExecutionContext<'r>,
     descriptors: ObjectDescriptorTable,
     layouts: ValueLayoutTable,
 }
 
-impl LocalRuntimeContext<'static, NoOpGasMeter> {
-    /// No gas accounting, no descriptors. Suitable for tests that exercise only
-    /// descriptor-less micro-ops.
-    pub fn unmetered() -> Self {
-        Self {
-            inner: LocalExecutionContext::unmetered(),
-            descriptors: ObjectDescriptorTable::new(),
-            layouts: ValueLayoutTable::new(),
-        }
-    }
-
-    /// No gas accounting; uses the supplied descriptor table.
-    pub fn unmetered_with_descriptors(descriptors: ObjectDescriptorTable) -> Self {
-        Self {
-            inner: LocalExecutionContext::unmetered(),
-            descriptors,
-            layouts: ValueLayoutTable::new(),
-        }
-    }
-}
-
-impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
+impl<'r> LocalRuntimeContext<'r> {
     /// General constructor: the gas meter, the resource provider, and
     /// the descriptor table. Used by tests that exercise global storage
     /// (which need a non-trivial resource provider).
     pub fn new(
-        gas_meter: G,
+        gas_meter: GasMeter,
         resource_provider: &'r dyn ResourceProvider,
         descriptors: ObjectDescriptorTable,
     ) -> Self {
@@ -70,8 +49,8 @@ impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
     }
 }
 
-impl LocalRuntimeContext<'static, SimpleGasMeter> {
-    /// [`SimpleGasMeter`] with `u64::MAX` budget and the supplied
+impl LocalRuntimeContext<'static> {
+    /// [`GasMeter`] with `u64::MAX` budget and the supplied
     /// descriptor table.
     pub fn with_max_budget(descriptors: ObjectDescriptorTable) -> Self {
         Self {
@@ -81,13 +60,13 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
         }
     }
 
-    /// [`SimpleGasMeter`] with `u64::MAX` budget and no user
+    /// [`GasMeter`] with `u64::MAX` budget and no user
     /// descriptors (just the reserved Trivial/Closure entries).
     pub fn with_max_budget_no_descriptors() -> Self {
         Self::with_max_budget(ObjectDescriptorTable::new())
     }
 
-    /// [`SimpleGasMeter`] with a custom budget. Useful for gas-exhaustion
+    /// [`GasMeter`] with a custom budget. Useful for gas-exhaustion
     /// tests. No user descriptors.
     pub fn with_budget(amount: u64) -> Self {
         Self {
@@ -98,32 +77,30 @@ impl LocalRuntimeContext<'static, SimpleGasMeter> {
     }
 }
 
-impl<'r, G: GasMeter> LocalRuntimeContext<'r, G> {
+impl LocalRuntimeContext<'_> {
     /// Install a populated native registry. Replaces the empty default
     /// installed by the constructors above.
-    pub fn with_natives(mut self, natives: ProductionNativeRegistry<G>) -> Self {
+    pub fn with_natives(mut self, natives: ProductionNativeRegistry) -> Self {
         self.inner = self.inner.with_natives(natives);
         self
     }
 }
 
-impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
-    type GasMeter = G;
-
-    fn gas_meter(&mut self) -> &mut G {
+impl ExecutionContext for LocalRuntimeContext<'_> {
+    fn gas_meter(&mut self) -> &mut GasMeter {
         self.inner.gas_meter()
     }
 
-    fn natives(&self) -> &ProductionNativeRegistry<G> {
+    fn natives(&self) -> &ProductionNativeRegistry {
         self.inner.natives()
     }
 
     fn natives_descriptors_and_gas_meter(
         &mut self,
     ) -> (
-        &ProductionNativeRegistry<G>,
+        &ProductionNativeRegistry,
         &dyn DescriptorProvider,
-        &mut G,
+        &mut GasMeter,
     ) {
         let (natives, _, gas_meter) = self.inner.natives_descriptors_and_gas_meter();
         (natives, &self.descriptors, gas_meter)
@@ -151,13 +128,13 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
     }
 }
 
-impl<'r, G: GasMeter> DescriptorProvider for LocalRuntimeContext<'r, G> {
+impl DescriptorProvider for LocalRuntimeContext<'_> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.descriptors.descriptor(id)
     }
 }
 
-impl<'r, G: GasMeter> LayoutProvider for LocalRuntimeContext<'r, G> {
+impl LayoutProvider for LocalRuntimeContext<'_> {
     fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
         self.layouts.layout(id)
     }

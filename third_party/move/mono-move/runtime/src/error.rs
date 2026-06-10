@@ -4,9 +4,9 @@
 //! Interpreter-internal error types.
 
 use mono_move_core::{
-    native::VMInternalError, ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError,
+    native::VMInternalError, ExecutionErrorKind, GasExhaustedError, IntTy, IntoExecutionError,
+    ResourceProviderError,
 };
-use mono_move_gas::GasExhaustedError;
 use mono_move_loader::LoaderError;
 use move_core_types::account_address::AccountAddress;
 use std::fmt;

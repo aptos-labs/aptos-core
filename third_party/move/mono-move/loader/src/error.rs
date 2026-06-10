@@ -3,8 +3,7 @@
 
 //! Loader subsystem error types.
 
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
-use mono_move_gas::GasExhaustedError;
+use mono_move_core::{ExecutionErrorKind, GasExhaustedError, IntoExecutionError};
 use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
 
