@@ -115,59 +115,81 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
         hot_state_config: HotStateConfig,
     ) -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb)> {
-        let ledger_db = LedgerDb::new(
-            db_paths.ledger_db_root_path(),
-            rocksdb_configs.ledger_db_config,
-            env,
-            block_cache,
-            readonly,
-        )?;
-        let hot_state_kv_db = StateKvDb::new(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-            /* is_hot = */ true,
-            hot_state_config.delete_on_restart,
-        )?;
-        let state_kv_db = StateKvDb::new(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-            /* is_hot = */ false,
-            /* delete_on_restart = */ false,
-        )?;
-        let hot_state_merkle_db = StateMerkleDb::new(
-            db_paths,
-            rocksdb_configs.state_merkle_db_config,
-            env,
-            block_cache,
-            readonly,
-            max_num_nodes_per_lru_cache_shard,
-            /* is_hot = */ true,
-            hot_state_config.delete_on_restart,
-        )?;
-        let state_merkle_db = StateMerkleDb::new(
-            db_paths,
-            rocksdb_configs.state_merkle_db_config,
-            env,
-            block_cache,
-            readonly,
-            max_num_nodes_per_lru_cache_shard,
-            /* is_hot = */ false,
-            /* delete_on_restart = */ false,
-        )?;
+        std::thread::scope(|scope| {
+            let ledger_handle = scope.spawn(|| {
+                LedgerDb::new(
+                    db_paths.ledger_db_root_path(),
+                    rocksdb_configs.ledger_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                )
+            });
+            let hot_state_kv_handle = scope.spawn(|| {
+                StateKvDb::new(
+                    db_paths,
+                    rocksdb_configs.state_kv_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                    /* is_hot = */ true,
+                    hot_state_config.delete_on_restart,
+                )
+            });
+            let state_kv_handle = scope.spawn(|| {
+                StateKvDb::new(
+                    db_paths,
+                    rocksdb_configs.state_kv_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                    /* is_hot = */ false,
+                    /* delete_on_restart = */ false,
+                )
+            });
+            let hot_state_merkle_handle = scope.spawn(|| {
+                StateMerkleDb::new(
+                    db_paths,
+                    rocksdb_configs.state_merkle_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                    max_num_nodes_per_lru_cache_shard,
+                    /* is_hot = */ true,
+                    hot_state_config.delete_on_restart,
+                )
+            });
+            let state_merkle_handle = scope.spawn(|| {
+                StateMerkleDb::new(
+                    db_paths,
+                    rocksdb_configs.state_merkle_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                    max_num_nodes_per_lru_cache_shard,
+                    /* is_hot = */ false,
+                    /* delete_on_restart = */ false,
+                )
+            });
 
-        Ok((
-            ledger_db,
-            hot_state_merkle_db,
-            state_merkle_db,
-            hot_state_kv_db,
-            state_kv_db,
-        ))
+            Ok((
+                ledger_handle
+                    .join()
+                    .expect("Ledger db open thread panicked")?,
+                hot_state_merkle_handle
+                    .join()
+                    .expect("Hot state merkle db open thread panicked")?,
+                state_merkle_handle
+                    .join()
+                    .expect("State merkle db open thread panicked")?,
+                hot_state_kv_handle
+                    .join()
+                    .expect("Hot state kv db open thread panicked")?,
+                state_kv_handle
+                    .join()
+                    .expect("State kv db open thread panicked")?,
+            ))
+        })
     }
 
     pub fn add_version_update_subscriber(
