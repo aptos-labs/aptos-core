@@ -3,12 +3,11 @@
 
 //! Native for the `mem` module.
 
-use crate::{natives, NativeFunction};
+use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, VMInternalError},
     types::view_type,
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 /// `0x1::mem::swap<T>(left: &mut T, right: &mut T)`
 ///
@@ -36,7 +35,6 @@ pub fn native_swap<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternal
 }
 
 /// Natives for the `mem` module.
-pub fn make_all_mem_natives<F: NativeContextFamily>(
-) -> Vec<(AccountAddress, Identifier, Identifier, NativeFunction<F>)> {
-    natives![("0x1::mem::swap", native_swap)]
+pub fn make_all_mem_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    polymorphic_natives![("0x1::mem::swap", native_swap)]
 }

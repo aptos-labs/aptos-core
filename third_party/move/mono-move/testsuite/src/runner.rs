@@ -9,7 +9,7 @@ use crate::{
     engine::RunResult,
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
-    parser::{PrintSection, Step},
+    parser::{Check, PrintSection, Step},
     print_sections,
 };
 use anyhow::{anyhow, bail};
@@ -106,25 +106,50 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 heap_size,
                 checks,
             } => {
-                let v1_output =
-                    execute_function_v1(&storage, &address, &module_name, &function_name, &args);
-                let (v2_output, v2_gc_count) = execute_function_v2(
-                    &guard,
-                    &module_provider,
-                    &address,
-                    &module_name,
-                    &function_name,
-                    &args,
-                    &v1_output.param_kinds,
-                    &v1_output.return_kinds,
-                    heap_size,
-                );
-                check_output(
-                    &checks,
-                    &v1_output.output.display,
-                    &v2_output.display,
-                    v2_gc_count,
-                )?;
+                // Run only the VM(s) a step actually checks (via `CHECK-V1` /
+                // `CHECK-V2`). This lets a step assert just one side — needed for
+                // natives one VM cannot run (e.g. `aggregator_v2`, which the
+                // legacy harness installs no extension for and would panic on).
+                // `CHECK-GC-COUNT` inspects the V2 collector, so it also needs V2.
+                let needs_v1 = checks.iter().any(|c| matches!(c, Check::V1(..)));
+                let needs_v2 = checks
+                    .iter()
+                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..)));
+
+                let v1 = needs_v1.then(|| {
+                    execute_function_v1(&storage, &address, &module_name, &function_name, &args)
+                });
+
+                let (v2_display, v2_gc_count) = if needs_v2 {
+                    // V2 needs the arg/return kinds. Reuse V1's if it ran,
+                    // otherwise load the function (without running it) to size them.
+                    let (param_kinds, return_kinds) = match &v1 {
+                        Some(v1) => (v1.param_kinds.clone(), v1.return_kinds.clone()),
+                        None => load_signature_v1(&storage, &address, &module_name, &function_name),
+                    };
+                    assert_eq!(
+                        param_kinds.len(),
+                        args.len(),
+                        "function requires a different number of arguments"
+                    );
+                    let (v2_output, v2_gc_count) = execute_function_v2(
+                        &guard,
+                        &module_provider,
+                        &address,
+                        &module_name,
+                        &function_name,
+                        &args,
+                        &param_kinds,
+                        &return_kinds,
+                        heap_size,
+                    );
+                    (v2_output.display, v2_gc_count)
+                } else {
+                    (String::new(), 0)
+                };
+
+                let v1_display = v1.map(|v| v.output.display).unwrap_or_default();
+                check_output(&checks, &v1_display, &v2_display, v2_gc_count)?;
             },
         }
     }
@@ -165,6 +190,60 @@ struct V1Output {
     return_kinds: Vec<PrimitiveKind>,
 }
 
+/// Maps a function's parameter and return types to [`PrimitiveKind`]s. Panics on
+/// any non-primitive type — the harness only supports primitive args/returns.
+fn primitive_kinds(
+    param_tys: &[Type],
+    return_tys: &[Type],
+    env: &RuntimeEnvironment,
+) -> (Vec<PrimitiveKind>, Vec<PrimitiveKind>) {
+    let param_kinds = param_tys
+        .iter()
+        .map(|ty| {
+            PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
+        })
+        .collect::<Vec<_>>();
+    let return_kinds = return_tys
+        .iter()
+        .map(|ty| PrimitiveKind::from_return_type(ty, env))
+        .collect::<Vec<_>>();
+    (param_kinds, return_kinds)
+}
+
+/// Loads a function via the legacy VM and returns its parameter and return
+/// kinds, without executing it. Used to size the V2 arg/return regions when the
+/// legacy VM is skipped for a step (no `CHECK-V1`/shared checks).
+fn load_signature_v1(
+    storage: &InMemoryStorage,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+) -> (Vec<PrimitiveKind>, Vec<PrimitiveKind>) {
+    let mut gas_meter = UnmeteredGasMeter;
+    let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
+    let module_storage = storage.as_unsync_module_storage();
+    let loader = LazyLoader::new(&module_storage);
+
+    let function = match loader.load_instantiated_function(
+        &LegacyLoaderConfig::unmetered(),
+        &mut gas_meter,
+        &mut traversal_context,
+        &ModuleId::new(*address, module_name.to_owned()),
+        function_name,
+        &[],
+    ) {
+        Ok(function) => function,
+        Err(err) => panic!("Failed to load function: {}", err),
+    };
+
+    primitive_kinds(
+        function.param_tys(),
+        function.return_tys(),
+        module_storage.runtime_environment(),
+    )
+}
+
 /// Execute a function via legacy MoveVM and returns normalized output.
 fn execute_function_v1(
     storage: &InMemoryStorage,
@@ -200,19 +279,11 @@ fn execute_function_v1(
     if function.param_tys().len() != args.len() {
         panic!("Function requires a different number of arguments");
     }
-    let param_kinds = function
-        .param_tys()
-        .iter()
-        .map(|ty| {
-            PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
-        })
-        .collect::<Vec<_>>();
-    let runtime_env = module_storage.runtime_environment();
-    let return_kinds = function
-        .return_tys()
-        .iter()
-        .map(|ty| PrimitiveKind::from_return_type(ty, runtime_env))
-        .collect::<Vec<_>>();
+    let (param_kinds, return_kinds) = primitive_kinds(
+        function.param_tys(),
+        function.return_tys(),
+        module_storage.runtime_environment(),
+    );
     let serialized_args = param_kinds
         .iter()
         .zip(args.iter())
