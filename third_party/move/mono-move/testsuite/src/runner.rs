@@ -7,6 +7,10 @@
 use crate::{
     compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
+    extensions::{
+        seed_extensions, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
+        TEST_TXN_INDEX,
+    },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
     parser::{Check, PrintSection, Step},
@@ -32,10 +36,7 @@ use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
 use mono_move_core::{native::NativeExtensions, types::type_to_string};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_natives::{
-    EventKind, EventStore, ObjectContextExtension, StorageUsageAtEpochBoundary,
-    TransactionContextExtension,
-};
+use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::serialize;
 use move_binary_format::CompiledModule;
 use move_core_types::{
@@ -63,18 +64,6 @@ use std::{path::Path, sync::OnceLock};
 struct Output {
     display: String,
 }
-
-// Fixed inputs seeded into both VMs' native extensions, so extension-backed
-// natives (AUID generation, state-storage usage, ...) produce matching output
-// across the two engines.
-const TEST_TXN_HASH: [u8; 32] = [7u8; 32];
-const TEST_STATE_ITEMS: u64 = 100;
-const TEST_STATE_BYTES: u64 = 2000;
-// Inputs to the monotonically-increasing counter. The reserved byte is 0,
-// matching `TransactionIndexKind::BlockExecution`.
-const TEST_SESSION_COUNTER: u8 = 2;
-const TEST_TXN_INDEX: u32 = 5;
-const TEST_RESERVED_BYTE: u8 = 0;
 
 /// A [`StateStorageView`] over empty storage that serves a fixed usage, for
 /// exercising the legacy `state_storage` native in the differential tests.
@@ -548,19 +537,7 @@ fn execute_function_v2(
     heap_size: Option<usize>,
 ) -> (Output, usize) {
     // Seed extensions with the same fixed inputs as the legacy side.
-    let mut extensions = NativeExtensions::new();
-    extensions.add(TransactionContextExtension::new(
-        TEST_TXN_HASH.to_vec(),
-        TEST_SESSION_COUNTER,
-        TEST_TXN_INDEX,
-        TEST_RESERVED_BYTE,
-    ));
-    extensions.add(ObjectContextExtension::new());
-    extensions.add(StorageUsageAtEpochBoundary::new(
-        TEST_STATE_ITEMS,
-        TEST_STATE_BYTES,
-    ));
-    extensions.add(EventStore::new());
+    let extensions = seed_extensions();
 
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
