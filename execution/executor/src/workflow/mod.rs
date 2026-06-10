@@ -38,6 +38,7 @@ impl ApplyExecutionOutput {
             base_view.position_state_summary.as_ref(),
             position_persisted.as_ref(),
             None,
+            base_view.user_positions.as_ref(),
         )?;
         let ledger_update_output = DoLedgerUpdate::run(
             &execution_output,

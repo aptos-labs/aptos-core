@@ -4,6 +4,7 @@
 use crate::state_store::{
     sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
     state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
+    user_positions::UserPositions,
 };
 use aptos_config::config::HotStateConfig;
 use aptos_types::{
@@ -19,6 +20,8 @@ pub struct LedgerSummary {
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
     /// Pre-committed native-position summary; `None` when position is disabled.
     pub position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+    /// Pre-committed per-account position index; `None` when position is disabled.
+    pub user_positions: Option<LedgerWithSummary<UserPositions>>,
 }
 
 impl LedgerSummary {
@@ -34,6 +37,7 @@ impl LedgerSummary {
             state_summary,
             transaction_accumulator,
             position_state_summary: None,
+            user_positions: None,
         }
     }
 

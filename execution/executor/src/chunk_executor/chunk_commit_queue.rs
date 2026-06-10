@@ -16,6 +16,7 @@ use aptos_storage_interface::{
     state_store::{
         sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
+        user_positions::UserPositions,
     },
     DbReader, LedgerSummary,
 };
@@ -46,6 +47,12 @@ pub struct ChunkCommitQueue {
     /// Native-position summary chained across chunks (the parent the next
     /// chunk rebases from). `None` when native position is disabled.
     latest_position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+    /// Per-account `UserPositions` index chained across chunks (the
+    /// parent the next chunk extends from). Mirrors
+    /// `latest_position_state_summary`. `None` when native position
+    /// is disabled.
+    latest_user_positions:
+        Option<LedgerWithSummary<UserPositions>>,
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
@@ -58,12 +65,14 @@ impl ChunkCommitQueue {
             state_summary,
             transaction_accumulator,
             position_state_summary,
+            user_positions,
         } = db.get_pre_committed_ledger_summary()?;
 
         Ok(Self {
             latest_state: state,
             latest_state_summary: state_summary,
             latest_position_state_summary: position_state_summary,
+            latest_user_positions: user_positions,
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
@@ -95,6 +104,7 @@ impl ChunkCommitQueue {
     ) -> Result<(
         LedgerStateSummary,
         Option<LedgerWithSummary<PositionStateWithSummary>>,
+        Option<LedgerWithSummary<UserPositions>>,
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {
@@ -108,6 +118,7 @@ impl ChunkCommitQueue {
         Ok((
             self.latest_state_summary.clone(),
             self.latest_position_state_summary.clone(),
+            self.latest_user_positions.clone(),
             self.latest_txn_accumulator.clone(),
             chunk,
         ))
@@ -133,6 +144,11 @@ impl ChunkCommitQueue {
             .output
             .ensure_state_checkpoint_output()?
             .position_state_summary
+            .clone();
+        self.latest_user_positions = chunk
+            .output
+            .ensure_state_checkpoint_output()?
+            .user_positions
             .clone();
         self.latest_txn_accumulator = chunk
             .output

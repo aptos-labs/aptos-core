@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
+use aptos_metrics_core::{
+    exponential_buckets, register_histogram, register_int_counter_vec, Histogram, IntCounterVec,
+};
 use once_cell::sync::Lazy;
 
 pub static POSITION_WRITES: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -9,6 +11,15 @@ pub static POSITION_WRITES: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_position_writes_total",
         "Position writes applied by NativeStateCommitter",
         &["kind"]
+    )
+    .unwrap()
+});
+
+pub static POSITION_COLD_LOAD_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_position_cold_load_seconds",
+        "Wall-clock duration of the position_db startup scan",
+        exponential_buckets(0.1, 2.0, 12).unwrap()
     )
     .unwrap()
 });

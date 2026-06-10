@@ -12,8 +12,10 @@ use crate::{
     pruner::PrunerManager,
 };
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
+use aptos_storage_interface::state_store::user_positions::UserPositions;
 use aptos_types::transaction::Version;
 use std::sync::{mpsc::Receiver, Arc};
 
@@ -32,6 +34,10 @@ pub(crate) struct PositionMerkleBatchCommitter {
     receiver: Receiver<CommitMessage<PositionMerkleCommit>>,
     position_pruner: Arc<PositionPruner>,
     persisted: PositionPersistedState,
+    /// Bundle handle for the scanner-side `UserPositions` index.
+    /// After a snapshot lands the chain is collapsed in place so the
+    /// in-memory depth doesn't grow without bound.
+    user_positions: Arc<Mutex<UserPositions>>,
 }
 
 impl PositionMerkleBatchCommitter {
@@ -40,12 +46,14 @@ impl PositionMerkleBatchCommitter {
         receiver: Receiver<CommitMessage<PositionMerkleCommit>>,
         position_pruner: Arc<PositionPruner>,
         persisted: PositionPersistedState,
+        user_positions: Arc<Mutex<UserPositions>>,
     ) -> Self {
         Self {
             merkle_db,
             receiver,
             position_pruner,
             persisted,
+            user_positions,
         }
     }
 
@@ -55,6 +63,7 @@ impl PositionMerkleBatchCommitter {
             receiver,
             position_pruner,
             persisted,
+            user_positions,
         } = self;
         run_batch_committer_loop(receiver, |commit| {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["position_batch_committer_work"]);
@@ -84,6 +93,13 @@ impl PositionMerkleBatchCommitter {
             // `version` are on disk, so cold-key proofs against this base
             // are serviceable.
             persisted.set(snapshot);
+            // Collapse the scanner-side `UserPositions` chain into a
+            // fresh family holding the current full state. Bounds
+            // in-memory chain depth by snapshot cadence — outstanding
+            // speculative branches keep the old family alive until
+            // they drop, then it's collected.
+            let mut up = user_positions.lock();
+            *up = up.rebase();
         });
         trace!("Position merkle batch committing thread exit.");
     }

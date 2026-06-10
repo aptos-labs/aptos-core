@@ -14,6 +14,7 @@ use crate::{
     position_pruner::PositionPruner,
 };
 use aptos_infallible::Mutex;
+use aptos_storage_interface::state_store::user_positions::UserPositions;
 use std::sync::Arc;
 
 pub(crate) type PositionStateStore =
@@ -26,6 +27,7 @@ impl PositionStateStore {
         last_snapshot: PositionStateWithSummary,
         position_pruner: Arc<PositionPruner>,
         persisted: PositionPersistedState,
+        user_positions: Arc<Mutex<UserPositions>>,
     ) -> Self {
         let current_state = Arc::new(Mutex::new(
             PositionLedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone()),
@@ -38,6 +40,7 @@ impl PositionStateStore {
             Arc::clone(&current_state),
             position_pruner,
             persisted,
+            user_positions,
         );
         Self::from_parts(current_state, buffered_state)
     }
