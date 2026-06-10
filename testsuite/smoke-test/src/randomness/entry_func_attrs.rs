@@ -14,7 +14,7 @@ use aptos::common::types::{CliError, CliTypedResult, GasOptions, TransactionSumm
 use aptos_forge::{Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_move_cli::MemberId;
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use aptos_types::on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig};
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
@@ -156,6 +156,9 @@ async fn common(params: TestParams) {
                 OnChainRandomnessConfig::default_disabled()
             };
             conf.randomness_config_override = Some(randomness_config);
+            // Chunky DKG depends on randomness; keep it off so the variant with
+            // randomness disabled can still bootstrap.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
