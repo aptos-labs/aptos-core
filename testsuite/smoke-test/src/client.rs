@@ -132,16 +132,39 @@ async fn test_latest_events_and_transactions() {
         .into_inner();
 
     create_and_fund_account(&mut swarm, 100).await;
-    let cur_events = client
-        .get_new_block_events_bcs(None, Some(2))
-        .await
-        .unwrap()
-        .into_inner();
-    let (cur_transations, cur_ledger) = client
-        .get_transactions(None, Some(2))
-        .await
-        .unwrap()
-        .into_parts();
+
+    // `enable_event` above serves these "latest events/transactions" queries from
+    // the internal indexer, which indexes asynchronously and lags behind storage.
+    // `create_and_fund_account` only waits for the storage commit, so the indexer
+    // may not yet reflect the blocks it produced. Poll until the latest events and
+    // transactions have advanced past the pre-funding snapshot before checking the
+    // ordering invariants below.
+    let deadline = Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS);
+    let (cur_events, cur_transations, cur_ledger) = loop {
+        let cur_events = client
+            .get_new_block_events_bcs(None, Some(2))
+            .await
+            .unwrap()
+            .into_inner();
+        let (cur_transations, cur_ledger) = client
+            .get_transactions(None, Some(2))
+            .await
+            .unwrap()
+            .into_parts();
+
+        if start_events[0].event.round() < cur_events[0].event.round()
+            && start_transations[0].version() < cur_transations[0].version()
+        {
+            break (cur_events, cur_transations, cur_ledger);
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for the internal indexer to catch up to the latest \
+             events and transactions",
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
 
     assert!(start_events[0].event.round() < cur_events[0].event.round());
     assert!(cur_events[0].event.round() < cur_events[1].event.round());
