@@ -13,7 +13,10 @@ use crate::{
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
-    native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
+    native_state_committer::{
+        new_sharded_kv_batches, InChunkPriorVersions, PositionWrite, NativeStateCommitter,
+    },
+    native_state_store::{UserPositionKey, UserPositionState},
     position_buffered_state::{
         PositionLedgerStateWithSummary, PositionProofReader, PositionSlot, PositionStateWithSummary,
     },
@@ -52,6 +55,34 @@ struct ChainPipeline<'a> {
     latest: PositionStateWithSummary,
     last_checkpoint: PositionStateWithSummary,
     snapshot_version: Option<Version>,
+}
+
+/// Collapse a chunk's `PositionWrite` stream into one `UserPositionState`
+/// per touched `UserPositionKey`, reading the base from `current` (the
+/// previous committed layer of `UserPositions`). Writes apply in
+/// arrival order so the final `UserPositionState` reflects
+/// latest-wins per `(account, market)`.
+pub(crate) fn materialize_user_position_updates(
+    current: &crate::native_state_store::UserPositions,
+    writes: Vec<PositionWrite>,
+) -> Vec<(UserPositionKey, UserPositionState)> {
+    use std::collections::hash_map::Entry;
+    let mut by_account: HashMap<UserPositionKey, UserPositionState> = HashMap::new();
+    for w in writes {
+        let entry = match by_account.entry(w.position_key) {
+            Entry::Vacant(v) => v.insert(current.get(&w.position_key).unwrap_or_default()),
+            Entry::Occupied(o) => o.into_mut(),
+        };
+        match w.value {
+            Some(pos) => {
+                entry.positions.insert(w.market, pos);
+            },
+            None => {
+                entry.positions.remove(&w.market);
+            },
+        }
+    }
+    by_account.into_iter().collect()
 }
 
 impl DbWriter for AptosDB {
@@ -364,12 +395,16 @@ impl AptosDB {
         let mut sharded_kv_batches = new_sharded_kv_batches();
         let mut in_chunk_prior = InChunkPriorVersions::new();
 
-        // SMT leaf updates queued for the next extend call. Within a
-        // segment (chunk_first..=checkpoint, then checkpoint+1..=chunk_last)
-        // each key collapses to its latest write; `committer.apply`
-        // still records every per-version write into the kv batches
-        // and stale-index.
+        // SMT leaf updates queued for the next JMT extend call. Within
+        // a segment (chunk_first..=checkpoint, then
+        // checkpoint+1..=chunk_last) each key collapses to its latest
+        // write; `committer.apply` still records every per-version
+        // write into the kv batches and stale-index.
         let mut pending_leaf_updates: HashMap<HashValue, PositionSlot> = HashMap::new();
+        // Decoded `PositionWrite`s for the whole chunk, in arrival
+        // order. Folded into `bundle.user_positions` once at chunk
+        // end, after the durable `position_db.commit(...)` succeeds.
+        let mut chunk_position_writes: Vec<PositionWrite> = Vec::new();
 
         for (i, output) in chunk.transaction_outputs.iter().enumerate() {
             let version = chunk_first + i as Version;
@@ -379,36 +414,37 @@ impl AptosDB {
                 .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
                 .collect();
             if !position_writes.is_empty() {
-                let merkle_updates = committer
+                let apply_out = committer
                     .apply(
                         version,
                         position_writes,
                         &mut sharded_kv_batches,
                         &mut in_chunk_prior,
                     )
-                    .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?
-                    .position;
-                for u in merkle_updates {
+                    .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?;
+                for u in apply_out.jmt_updates {
                     pending_leaf_updates.insert(u.state_key_hash, PositionSlot {
                         state_key: u.state_key,
                         value_hash: u.value_hash,
                         value: None,
                     });
                 }
+                chunk_position_writes.extend(apply_out.user_position_writes);
             }
 
             if Some(version) == checkpoint_within_chunk
                 && let Some(pipeline) = chain.as_mut()
                 && !pending_leaf_updates.is_empty()
             {
-                let updates: Vec<_> = std::mem::take(&mut pending_leaf_updates)
+                let jmt_updates: Vec<_> = std::mem::take(&mut pending_leaf_updates)
                     .into_iter()
                     .collect();
                 let proof_reader = PositionProofReader {
                     merkle_db: bundle.merkle_db.clone(),
                     version: pipeline.snapshot_version,
                 };
-                let new_latest = pipeline.latest.extend(version, updates, &proof_reader)?;
+                let new_latest =
+                    pipeline.latest.extend(version, jmt_updates, &proof_reader)?;
                 pipeline.last_checkpoint = new_latest.clone();
                 pipeline.latest = new_latest;
             }
@@ -417,7 +453,7 @@ impl AptosDB {
         if !pending_leaf_updates.is_empty()
             && let Some(pipeline) = chain.as_mut()
         {
-            let updates: Vec<_> = pending_leaf_updates.into_iter().collect();
+            let jmt_updates: Vec<_> = pending_leaf_updates.into_iter().collect();
             let proof_reader = PositionProofReader {
                 merkle_db: bundle.merkle_db.clone(),
                 version: pipeline.snapshot_version,
@@ -425,13 +461,22 @@ impl AptosDB {
             pipeline.latest =
                 pipeline
                     .latest
-                    .extend(chunk_last_inclusive, updates, &proof_reader)?;
+                    .extend(chunk_last_inclusive, jmt_updates, &proof_reader)?;
         }
 
         bundle
             .kv_db
             .commit(chunk_last_inclusive, None, sharded_kv_batches)
             .map_err(|e| AptosDbError::Other(format!("position_db commit failed: {e}")))?;
+
+        // `UserPositions` lives at the bundle level — extend only
+        // after the durable kv commit succeeds, so the layered view
+        // is always consistent with what's on disk.
+        if !chunk_position_writes.is_empty() {
+            let mut user_positions = bundle.user_positions.lock();
+            let updates = materialize_user_position_updates(&user_positions, chunk_position_writes);
+            *user_positions = user_positions.extend(chunk_last_inclusive, updates);
+        }
 
         if let Some(pipeline) = chain {
             let new_state = PositionLedgerStateWithSummary::from_latest_and_last_checkpoint(

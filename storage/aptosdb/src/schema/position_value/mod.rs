@@ -3,8 +3,8 @@
 
 //! Physical storage schema for the native-position `position_value` CF.
 //!
-//! Hash-keyed, mirroring `state_value_by_key_hash` from the main-state
-//! tier. The row key is the 32-byte `StateKey::hash()` (the same hash
+//! Hash-keyed, same shape as `state_value_by_key_hash` in the
+//! main-state tier. The row key is the 32-byte `StateKey::hash()` (the same hash
 //! the JMT uses as `account_key`) plus the bit-inverted version for
 //! newest-first ordering.
 //!
