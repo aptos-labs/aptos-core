@@ -41,42 +41,12 @@ pub enum UnitTestResult {
     Failure,
 }
 
-pub fn run_move_unit_tests<W: Write + Send>(
-    pkg_path: &Path,
-    build_config: move_package::BuildConfig,
-    unit_test_config: UnitTestingConfig,
-    natives: NativeFunctionTable,
-    genesis: ChangeSet,
-    gas_limit: Option<u64>,
-    cost_table: Option<CostTable>,
-    compute_coverage: bool,
-    writer: &mut W,
-    enable_enum_option: bool,
-) -> Result<UnitTestResult> {
-    run_move_unit_tests_with_factory(
-        pkg_path,
-        build_config,
-        unit_test_config,
-        natives,
-        genesis,
-        compute_coverage,
-        writer,
-        UnitTestFactoryWithCostTable::new(cost_table, gas_limit),
-        enable_enum_option,
-    )
-}
-
-pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Send>(
+pub fn build_test_plan_for_package<W: Write + Send>(
     pkg_path: &Path,
     mut build_config: move_package::BuildConfig,
-    mut unit_test_config: UnitTestingConfig,
-    natives: NativeFunctionTable,
-    genesis: ChangeSet,
-    compute_coverage: bool,
+    unit_test_config: &mut UnitTestingConfig,
     writer: &mut W,
-    factory: F,
-    enable_enum_option: bool,
-) -> Result<UnitTestResult> {
+) -> Result<TestPlan> {
     build_config.test_mode = true;
     build_config.dev_mode = true;
     build_config.generate_move_model = test_validation::needs_validation();
@@ -158,13 +128,53 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     let (test_plan, mut files, units) = test_plan.unwrap();
     files.extend(dep_file_map);
     let test_plan = test_plan.unwrap();
-    let no_tests = test_plan.is_empty();
-    let test_plan = TestPlan::new(
+    Ok(TestPlan::new(
         test_plan,
         files,
         units,
         compiled_package.bytecode_deps.into_values().collect(),
-    );
+    ))
+}
+
+pub fn run_move_unit_tests<W: Write + Send>(
+    pkg_path: &Path,
+    build_config: move_package::BuildConfig,
+    unit_test_config: UnitTestingConfig,
+    natives: NativeFunctionTable,
+    genesis: ChangeSet,
+    gas_limit: Option<u64>,
+    cost_table: Option<CostTable>,
+    compute_coverage: bool,
+    writer: &mut W,
+    enable_enum_option: bool,
+) -> Result<UnitTestResult> {
+    run_move_unit_tests_with_factory(
+        pkg_path,
+        build_config,
+        unit_test_config,
+        natives,
+        genesis,
+        compute_coverage,
+        writer,
+        UnitTestFactoryWithCostTable::new(cost_table, gas_limit),
+        enable_enum_option,
+    )
+}
+
+pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Send>(
+    pkg_path: &Path,
+    build_config: move_package::BuildConfig,
+    mut unit_test_config: UnitTestingConfig,
+    natives: NativeFunctionTable,
+    genesis: ChangeSet,
+    compute_coverage: bool,
+    writer: &mut W,
+    factory: F,
+    enable_enum_option: bool,
+) -> Result<UnitTestResult> {
+    let test_plan =
+        build_test_plan_for_package(pkg_path, build_config, &mut unit_test_config, writer)?;
+    let no_tests = test_plan.module_tests.is_empty();
 
     let trace_path = pkg_path.join(".trace");
     let coverage_map_path = pkg_path
