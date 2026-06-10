@@ -52,6 +52,8 @@ pub trait QuorumStoreStorage: Sync + Send {
 
 /// The name of the quorum store db file
 pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDB";
+/// Upperbound for total live WAL size.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 /// Bound the total live WAL (matching AptosDB's per-shard setting). Without it,
 /// RocksDB derives a multi-GB limit from the per-CF write buffers, and because

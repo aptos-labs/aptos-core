@@ -26,6 +26,8 @@ use std::{iter::Iterator, path::Path, time::Instant};
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
+/// Upperbound for total live WAL size.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 /// Bound the total live WAL (matching AptosDB's per-shard setting). With the
 /// RocksDB default, several rarely-written CFs (the DAG CFs, the deprecated
