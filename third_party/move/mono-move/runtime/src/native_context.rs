@@ -19,13 +19,9 @@ use mono_move_core::{
         VMInternalError, VMValue, Vector,
     },
     types::InternedType,
-    DescriptorProvider, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorProvider, GasMeter, TRIVIAL_DESCRIPTOR_ID,
 };
-use mono_move_gas::GasMeter;
-use std::{
-    cell::{Cell, UnsafeCell},
-    marker::PhantomData,
-};
+use std::cell::{Cell, UnsafeCell};
 
 /// Concrete [`NativeContext`] used by the production runtime.
 ///
@@ -46,7 +42,7 @@ use std::{
 ///  - Exclusivity against the rest of the interpreter is not a manual burden:
 ///    access to other VM components are passed in as `&mut T`, allowing us to have
 ///    exclusive access to those here.
-pub struct ProductionNativeContext<'a, G: GasMeter> {
+pub struct ProductionNativeContext<'a> {
     /// ABI of the native being invoked, describing the native's frame layout.
     abi: &'a NativeABI,
     /// Type arguments to the native.
@@ -60,7 +56,7 @@ pub struct ProductionNativeContext<'a, G: GasMeter> {
     ///
     /// TODO: Expose to native functions.
     #[allow(dead_code)]
-    gas: UnsafeCell<&'a mut G>,
+    gas: UnsafeCell<&'a mut GasMeter>,
     /// The VM's heap -- used by the natives to allocate new heap objects.
     heap: UnsafeCell<&'a mut Heap>,
     /// The transaction's read write set -- provides global storage access.
@@ -72,14 +68,14 @@ pub struct ProductionNativeContext<'a, G: GasMeter> {
     returns_started: Cell<bool>,
 }
 
-impl<'a, G: GasMeter> ProductionNativeContext<'a, G> {
+impl<'a> ProductionNativeContext<'a> {
     // TODO: revisit this lint.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frame_ptr: *mut u8,
         abi: &'a NativeABI,
         ty_args: &'a [InternedType],
-        gas_meter: &'a mut G,
+        gas_meter: &'a mut GasMeter,
         desc_provider: &'a dyn DescriptorProvider,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
@@ -98,7 +94,7 @@ impl<'a, G: GasMeter> ProductionNativeContext<'a, G> {
     }
 }
 
-impl<G: GasMeter> NativeContext for ProductionNativeContext<'_, G> {
+impl NativeContext for ProductionNativeContext<'_> {
     fn num_args(&self) -> usize {
         self.abi.args().len()
     }
@@ -235,14 +231,14 @@ impl<G: GasMeter> NativeContext for ProductionNativeContext<'_, G> {
 }
 
 /// A family of [`ProductionNativeContext`] types indexed by a lifetime.
-pub struct ProductionContextFamily<G: GasMeter>(PhantomData<fn() -> G>);
+pub struct ProductionContextFamily;
 
-impl<G: GasMeter> NativeContextFamily for ProductionContextFamily<G> {
-    type Of<'a> = ProductionNativeContext<'a, G>;
+impl NativeContextFamily for ProductionContextFamily {
+    type Of<'a> = ProductionNativeContext<'a>;
 }
 
 /// Shorthand for the [`NativeRegistry`] used by the production VM.
-pub type ProductionNativeRegistry<G> = NativeRegistry<ProductionContextFamily<G>>;
+pub type ProductionNativeRegistry = NativeRegistry<ProductionContextFamily>;
 
 /// Shorthand for the [`NativeFunction`] used by the production VM.
-pub type ProductionNativeFunction<G> = NativeFunction<ProductionContextFamily<G>>;
+pub type ProductionNativeFunction = NativeFunction<ProductionContextFamily>;

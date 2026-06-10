@@ -4,6 +4,7 @@
 pub mod align;
 mod error;
 mod function;
+mod gas;
 mod instruction;
 pub mod interner;
 pub mod memory;
@@ -22,6 +23,7 @@ pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecuti
 pub use function::{
     Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
 };
+pub use gas::{GasExhaustedError, GasMeter};
 pub use instruction::{
     captured_values_size, next_captured_value_offset, CallClosureOp, ClosureFuncRef, CmpKind,
     CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp,

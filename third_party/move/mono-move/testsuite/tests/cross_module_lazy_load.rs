@@ -9,8 +9,7 @@
 //! `CallIndirect` at runtime lazily loads it through the transaction
 //! context.
 
-use mono_move_core::types::EMPTY_TYPE_LIST;
-use mono_move_gas::SimpleGasMeter;
+use mono_move_core::{types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{
@@ -38,7 +37,7 @@ fn call_indirect_triggers_lazy_module_load() {
     // -- Build the global context and lazy loader ------------------------
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
+    let natives = ProductionNativeRegistry::new();
     let loader = Loader::new_with_policy(
         &guard,
         &module_provider,
@@ -49,7 +48,7 @@ fn call_indirect_triggers_lazy_module_load() {
     // -- Wrap into a TransactionContext ---------------------------
     let mut txn_ctx = TransactionContext::new(
         loader,
-        SimpleGasMeter::new(u64::MAX),
+        GasMeter::with_max_budget(),
         &mono_move_core::NO_RESOURCE_PROVIDER,
         &natives,
     );

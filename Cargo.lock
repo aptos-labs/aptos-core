@@ -12810,13 +12810,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mono-move-gas"
-version = "0.1.0"
-dependencies = [
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "mono-move-global-context"
 version = "0.1.0"
 dependencies = [
@@ -12841,7 +12834,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-global-context",
  "mono-move-testsuite",
  "move-core-types",
@@ -12878,7 +12870,6 @@ dependencies = [
  "hashbrown 0.14.3",
  "mono-move-alloc",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-loader",
  "move-core-types",
  "num-bigint 0.3.3",
@@ -12905,7 +12896,6 @@ dependencies = [
  "legacy-move-compiler",
  "libtest-mimic",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-global-context",
  "mono-move-loader",
  "mono-move-natives",
