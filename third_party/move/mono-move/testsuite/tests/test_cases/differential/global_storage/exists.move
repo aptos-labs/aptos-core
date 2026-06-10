@@ -1,10 +1,4 @@
 // RUN: publish
-//
-// `exists<R>` parity. A differential test can only populate global storage via
-// `move_to` within the same call, so these exercise the working-map presence
-// path; the external-storage presence path lives in the runtime crate's tests.
-// The signer and the resource address are passed separately (same value) so the
-// test does not depend on the stdlib `signer` module being staged for V2.
 module 0x42::globals_exists {
     struct R has key { v: u64 }
 

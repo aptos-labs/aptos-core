@@ -1543,7 +1543,7 @@ impl<'a> LoweringState<'a> {
                 // that follows does not allocate.
                 let box_ptr = self
                     .ctx
-                    .box_ptr
+                    .resource_box_slot
                     .ok_or_else(|| anyhow::anyhow!("MoveFrom: box-pointer slot not reserved"))?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
@@ -1552,6 +1552,11 @@ impl<'a> LoweringState<'a> {
                     addr: addr_info.offset,
                     ty: *ty,
                 })?;
+                debug_assert_eq!(
+                    dst_info.size,
+                    concrete_type_size(*ty, "move_from resource")?,
+                    "move_from: dst slot width must equal the resource's heap-object payload size",
+                );
                 self.emit_heap_move_from(dst_info.offset, box_ptr, dst_info.size)?;
             },
             Instr::MoveTo(ty, signer, val) => {
@@ -1577,7 +1582,7 @@ impl<'a> LoweringState<'a> {
                 })?;
                 let box_ptr = self
                     .ctx
-                    .box_ptr
+                    .resource_box_slot
                     .ok_or_else(|| anyhow::anyhow!("MoveTo: box-pointer slot not reserved"))?;
                 let signer_info = self.slot(*signer)?;
                 let val_info = self.slot(*val)?;
@@ -1585,6 +1590,11 @@ impl<'a> LoweringState<'a> {
                     dst: box_ptr,
                     descriptor_id,
                 })?;
+                debug_assert_eq!(
+                    val_info.size,
+                    concrete_type_size(*ty, "move_to resource")?,
+                    "move_to: val slot width must equal the descriptor payload size HeapNew allocated",
+                );
                 self.emit_heap_move_to(box_ptr, val_info.offset, val_info.size)?;
                 self.emit(MicroOp::MoveTo {
                     signer_ref: signer_info.offset,

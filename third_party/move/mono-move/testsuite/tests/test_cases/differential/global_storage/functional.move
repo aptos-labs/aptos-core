@@ -1,11 +1,4 @@
 // RUN: publish
-//
-// Functional global-storage parity cases that need no printed snapshot: a
-// missing `borrow_global_mut` aborts, a moved-out resource can no longer be
-// borrowed, and distinct addresses track independently. All resources are
-// created via `move_to` within the call (the working-map path). Signers and
-// addresses are passed separately (same value) to avoid staging the stdlib
-// `signer` module for V2.
 module 0x42::globals_fn {
     struct R has key { v: u64 }
 

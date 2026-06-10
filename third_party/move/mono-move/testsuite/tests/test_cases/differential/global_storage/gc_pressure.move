@@ -1,13 +1,4 @@
 // RUN: publish
-//
-// Global storage under GC pressure (differential analog of the runtime
-// `gc_traces_and_relocates_local_heap_writes` test). `move_to` then
-// `borrow_global_mut` records a `LocalHeap` write; the loop then allocates and
-// drops vectors to exhaust a small heap and force a collection. The GC must
-// relocate the resource's `LocalHeap` pointer (via the read-write-set scan),
-// so the final `borrow_global` reads the mutated value rather than a stale
-// pointer. `--heap-size` drives the collection; `CHECK-GC-COUNT` pins it to
-// exactly one.
 module 0x42::gc_globals {
     use std::vector;
 

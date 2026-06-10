@@ -333,157 +333,157 @@ fun take_missing(r0): u64 {
 
 fun borrow_missing() {
   frame_data_size: 56
+  entry_gas: 95
   code:
-    0: Charge #40
-    1: BorrowGlobal<0x42::globals::R> [32] <- addr=[0], ty=
-    2: ReadRefOffset [48] <- *([32]+0) (size=8)
-    3: Move8 [0] <- [48]
-    4: Return
+    0: BorrowGlobal<0x42::globals::R> [32] <- addr=[0], ty=
+    1: ReadRefOffset [48] <- *([32]+0) (size=8)
+    2: Move8 [0] <- [48]
+    3: Return
 }
 
 fun double_publish() {
   frame_data_size: 136
+  entry_gas: 348
   code:
-    0: Charge #390
-    1: SlotBorrow [32] <- &[0]
-    2: StoreImm8 [48] <- #1
-    3: StoreImm8 [56] <- #1
-    4: StoreImm8 [64] <- #1
-    5: StoreImm8 [72] <- #1
-    6: Move8 [88] <- [72]
-    7: Move8 [80] <- [64]
-    8: Move(16) [112] <- [80]
-    9: Move8 [104] <- [56]
-    10: Move8 [96] <- [48]
-    11: HeapNew [128] desc=2
-    12: HeapMoveTo [128]+0 <- [96] (size=32)
-    13: MoveTo<0x42::globals::R> signer=[32], src=[128]
-    14: SlotBorrow [32] <- &[0]
-    15: StoreImm8 [56] <- #2
-    16: StoreImm8 [48] <- #2
-    17: StoreImm8 [72] <- #2
-    18: StoreImm8 [64] <- #2
-    19: Move8 [88] <- [64]
-    20: Move8 [80] <- [72]
-    21: Move(16) [112] <- [80]
-    22: Move8 [104] <- [48]
-    23: Move8 [96] <- [56]
-    24: HeapNew [128] desc=2
-    25: HeapMoveTo [128]+0 <- [96] (size=32)
-    26: MoveTo<0x42::globals::R> signer=[32], src=[128]
-    27: Return
+    0: SlotBorrow [32] <- &[0]
+    1: StoreImm8 [48] <- #1
+    2: StoreImm8 [56] <- #1
+    3: StoreImm8 [64] <- #1
+    4: StoreImm8 [72] <- #1
+    5: Move8 [88] <- [72]
+    6: Move8 [80] <- [64]
+    7: Move(16) [112] <- [80]
+    8: Move8 [104] <- [56]
+    9: Move8 [96] <- [48]
+    10: HeapNew [128] desc=2
+    11: HeapMoveTo [128]+0 <- [96] (size=32)
+    12: MoveTo<0x42::globals::R> signer=[32], src=[128]
+    13: SlotBorrow [32] <- &[0]
+    14: StoreImm8 [56] <- #2
+    15: StoreImm8 [48] <- #2
+    16: StoreImm8 [72] <- #2
+    17: StoreImm8 [64] <- #2
+    18: Move8 [88] <- [64]
+    19: Move8 [80] <- [72]
+    20: Move(16) [112] <- [80]
+    21: Move8 [104] <- [48]
+    22: Move8 [96] <- [56]
+    23: HeapNew [128] desc=2
+    24: HeapMoveTo [128]+0 <- [96] (size=32)
+    25: MoveTo<0x42::globals::R> signer=[32], src=[128]
+    26: Return
   safe_point_layouts:
-    11: []
-    24: []
+    10: []
+    23: []
 }
 
 fun publish_and_read() {
   frame_data_size: 200
+  entry_gas: 372
   code:
-    0: Charge #326
-    1: SlotBorrow [88] <- &[0]
-    2: AddU64Imm [104] <- [64] + #1
-    3: AddU64Imm [112] <- [64] + #2
-    4: AddU64Imm [120] <- [64] + #3
-    5: Move8 [136] <- [120]
-    6: Move8 [128] <- [112]
-    7: Move(16) [160] <- [128]
-    8: Move8 [152] <- [104]
-    9: Move8 [144] <- [64]
-    10: HeapNew [192] desc=2
-    11: HeapMoveTo [192]+0 <- [144] (size=32)
-    12: MoveTo<0x42::globals::R> signer=[88], src=[192]
-    13: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty=
-    14: ReadRefOffset [104] <- *([72]+0) (size=8)
-    15: ReadRefOffset [120] <- *([72]+8) (size=8)
-    16: AddU64 [120] <- [104] + [120]
-    17: DeriveRefOffsetImm [176] <- [72]+16
-    18: ReadRefOffset [104] <- *([176]+0) (size=8)
-    19: AddU64 [104] <- [120] + [104]
-    20: DeriveRefOffsetImm [176] <- [72]+16
-    21: ReadRefOffset [120] <- *([176]+8) (size=8)
-    22: AddU64 [120] <- [104] + [120]
-    23: Move8 [0] <- [120]
-    24: Return
+    0: SlotBorrow [88] <- &[0]
+    1: AddU64Imm [104] <- [64] + #1
+    2: AddU64Imm [112] <- [64] + #2
+    3: AddU64Imm [120] <- [64] + #3
+    4: Move8 [136] <- [120]
+    5: Move8 [128] <- [112]
+    6: Move(16) [160] <- [128]
+    7: Move8 [152] <- [104]
+    8: Move8 [144] <- [64]
+    9: HeapNew [192] desc=2
+    10: HeapMoveTo [192]+0 <- [144] (size=32)
+    11: MoveTo<0x42::globals::R> signer=[88], src=[192]
+    12: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty=
+    13: ReadRefOffset [104] <- *([72]+0) (size=8)
+    14: ReadRefOffset [120] <- *([72]+8) (size=8)
+    15: AddU64 [120] <- [104] + [120]
+    16: DeriveRefOffsetImm [176] <- [72]+16
+    17: ReadRefOffset [104] <- *([176]+0) (size=8)
+    18: AddU64 [104] <- [120] + [104]
+    19: DeriveRefOffsetImm [176] <- [72]+16
+    20: ReadRefOffset [120] <- *([176]+8) (size=8)
+    21: AddU64 [120] <- [104] + [120]
+    22: Move8 [0] <- [120]
+    23: Return
   safe_point_layouts:
-    10: []
+    9: []
 }
 
 fun publish_and_take() {
   frame_data_size: 184
+  entry_gas: 412
   code:
-    0: Charge #384
-    1: SlotBorrow [88] <- &[0]
-    2: AddU64Imm [104] <- [64] + #1
-    3: AddU64Imm [112] <- [64] + #2
-    4: AddU64Imm [120] <- [64] + #3
-    5: Move8 [136] <- [120]
-    6: Move8 [128] <- [112]
-    7: Move(16) [160] <- [128]
-    8: Move8 [152] <- [104]
-    9: Move8 [144] <- [64]
-    10: HeapNew [176] desc=2
-    11: HeapMoveTo [176]+0 <- [144] (size=32)
-    12: MoveTo<0x42::globals::R> signer=[88], src=[176]
-    13: MoveFrom<0x42::globals::R> [176] <- addr=[32], ty=
-    14: HeapMoveFrom [144] <- [176]+0 (size=32)
-    15: Move(16) [128] <- [160]
-    16: Move8 [120] <- [152]
-    17: Move8 [104] <- [144]
-    18: Move8 [72] <- [136]
-    19: Move8 [80] <- [128]
-    20: AddU64 [120] <- [104] + [120]
-    21: AddU64 [120] <- [120] + [80]
-    22: AddU64 [120] <- [120] + [72]
-    23: Move8 [0] <- [120]
-    24: Return
+    0: SlotBorrow [88] <- &[0]
+    1: AddU64Imm [104] <- [64] + #1
+    2: AddU64Imm [112] <- [64] + #2
+    3: AddU64Imm [120] <- [64] + #3
+    4: Move8 [136] <- [120]
+    5: Move8 [128] <- [112]
+    6: Move(16) [160] <- [128]
+    7: Move8 [152] <- [104]
+    8: Move8 [144] <- [64]
+    9: HeapNew [176] desc=2
+    10: HeapMoveTo [176]+0 <- [144] (size=32)
+    11: MoveTo<0x42::globals::R> signer=[88], src=[176]
+    12: MoveFrom<0x42::globals::R> [176] <- addr=[32], ty=
+    13: HeapMoveFrom [144] <- [176]+0 (size=32)
+    14: Move(16) [128] <- [160]
+    15: Move8 [120] <- [152]
+    16: Move8 [104] <- [144]
+    17: Move8 [72] <- [136]
+    18: Move8 [80] <- [128]
+    19: AddU64 [120] <- [104] + [120]
+    20: AddU64 [120] <- [120] + [80]
+    21: AddU64 [120] <- [120] + [72]
+    22: Move8 [0] <- [120]
+    23: Return
   safe_point_layouts:
-    10: []
-    13: []
+    9: []
+    12: []
 }
 
 fun publish_mutate_read() {
   frame_data_size: 232
+  entry_gas: 342
   code:
-    0: Charge #311
-    1: SlotBorrow [88] <- &[0]
-    2: StoreImm8 [104] <- #0
-    3: StoreImm8 [112] <- #0
-    4: StoreImm8 [120] <- #0
-    5: Move8 [136] <- [120]
-    6: Move8 [128] <- [112]
-    7: Move(16) [160] <- [128]
-    8: Move8 [152] <- [104]
-    9: Move8 [144] <- [64]
-    10: HeapNew [224] desc=2
-    11: HeapMoveTo [224]+0 <- [144] (size=32)
-    12: MoveTo<0x42::globals::R> signer=[88], src=[224]
-    13: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty=
-    14: ReadRefOffset [104] <- *([72]+0) (size=8)
-    15: AddU64Imm [104] <- [104] + #1
-    16: DeriveRefOffsetImm [176] <- [72]+16
-    17: WriteRefOffset *([176]+8) <- [104] (size=8)
-    18: BorrowGlobal<0x42::globals::R> [192] <- addr=[32], ty=
-    19: DeriveRefOffsetImm [208] <- [192]+16
-    20: ReadRefOffset [104] <- *([208]+8) (size=8)
-    21: Move8 [0] <- [104]
-    22: Return
+    0: SlotBorrow [88] <- &[0]
+    1: StoreImm8 [104] <- #0
+    2: StoreImm8 [112] <- #0
+    3: StoreImm8 [120] <- #0
+    4: Move8 [136] <- [120]
+    5: Move8 [128] <- [112]
+    6: Move(16) [160] <- [128]
+    7: Move8 [152] <- [104]
+    8: Move8 [144] <- [64]
+    9: HeapNew [224] desc=2
+    10: HeapMoveTo [224]+0 <- [144] (size=32)
+    11: MoveTo<0x42::globals::R> signer=[88], src=[224]
+    12: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty=
+    13: ReadRefOffset [104] <- *([72]+0) (size=8)
+    14: AddU64Imm [104] <- [104] + #1
+    15: DeriveRefOffsetImm [176] <- [72]+16
+    16: WriteRefOffset *([176]+8) <- [104] (size=8)
+    17: BorrowGlobal<0x42::globals::R> [192] <- addr=[32], ty=
+    18: DeriveRefOffsetImm [208] <- [192]+16
+    19: ReadRefOffset [104] <- *([208]+8) (size=8)
+    20: Move8 [0] <- [104]
+    21: Return
   safe_point_layouts:
-    10: []
-    13: []
+    9: []
+    12: []
 }
 
 fun take_missing() {
   frame_data_size: 104
+  entry_gas: 167
   code:
-    0: Charge #176
-    1: MoveFrom<0x42::globals::R> [96] <- addr=[0], ty=
-    2: HeapMoveFrom [32] <- [96]+0 (size=32)
-    3: Move(16) [80] <- [48]
-    4: Move8 [72] <- [40]
-    5: Move8 [64] <- [32]
-    6: Move8 [0] <- [64]
-    7: Return
+    0: MoveFrom<0x42::globals::R> [96] <- addr=[0], ty=
+    1: HeapMoveFrom [32] <- [96]+0 (size=32)
+    2: Move(16) [80] <- [48]
+    3: Move8 [72] <- [40]
+    4: Move8 [64] <- [32]
+    5: Move8 [0] <- [64]
+    6: Return
   safe_point_layouts:
-    1: []
+    0: []
 }

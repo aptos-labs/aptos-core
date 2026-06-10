@@ -1,13 +1,4 @@
 // RUN: publish --print(micro-ops,frame-layout)
-//
-// Resources that embed heap pointers, exercised end-to-end (parity with the
-// legacy VM): a struct with a vector field, a struct whose vector pointer sits
-// behind a nested inline struct, and in-place mutation of a vector-bearing
-// resource through `borrow_global_mut`. The move_to box copies the struct's
-// inline bytes (including the child vector pointer) into the heap object, and
-// the child stays reachable/traceable. The deep-copy of committed/external
-// resources (the copy-on-write path) and the enum case are not reachable from
-// Move source — those are covered by the resource-map unit tests.
 module 0x42::nested_globals {
     use std::vector;
 

@@ -292,6 +292,13 @@ pub(crate) struct RootScanner<'a> {
 }
 
 impl<'a> RootScanner<'a> {
+    /// Test-only constructor. Production code only sees a
+    /// `RootScanner` handed in by [`gc_collect`].
+    #[cfg(test)]
+    pub(crate) fn for_test(heap: &'a Heap, free_ptr: *mut u8) -> RootScanner<'a> {
+        RootScanner { heap, free_ptr }
+    }
+
     /// Current to-space bump cursor.
     pub(crate) fn cursor(&self) -> usize {
         self.free_ptr as usize

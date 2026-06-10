@@ -115,10 +115,11 @@ pub enum CapturedDataLayout {
 /// discovery pass into lowering.
 #[derive(Default)]
 pub struct LoweringDescriptors {
-    /// `vector<T>` element type -> published descriptor id.
+    /// Type -> published descriptor id: a `vector<T>` for vector descriptors,
+    /// or a resource struct type for `move_to`/`move_from` descriptors.
     ///
-    /// TODO: generalize to also hold struct/enum descriptors; use a
-    /// type-generic name.
+    /// TODO: rename to a type-generic name now that it also holds struct
+    /// descriptors, and extend to enum descriptors.
     pub vec: UnorderedMap<InternedType, DescriptorId>,
     /// Captured-data layout per `PackClosure`, in IR order; consumed
     /// positionally by the build pass.
@@ -150,19 +151,21 @@ pub struct LoweringContext<'a> {
     /// micro-op, so does not need GC tracking.
     pub scratch: Option<FrameOffset>,
     /// Frame offset of the 8-byte slot used for lowering of [`Instr::MoveTo`]
-    /// and [`Instr::MoveFrom`] ([`None`] is no such instructions are present
-    /// in the function). This slot is used to hold the intermediate heap
-    /// pointer (the "box pointer"): [`Instr::MoveTo`] allocates the resource
-    /// object here before publishing it, and [`Instr::MoveTo`] receives the
-    /// moved-out pointer here before unboxing it.
+    /// and [`Instr::MoveFrom`] ([`None`] if no such instructions are present
+    /// in the function). This slot holds the intermediate heap pointer (the
+    /// "box pointer"): [`Instr::MoveTo`] allocates the resource object here
+    /// before publishing it, and [`Instr::MoveFrom`] receives the moved-out
+    /// pointer here before unboxing it.
     ///
     /// **Invariant:** this pointer is never a GC root. Its live range never
     /// spans a collection — the allocating instructions that writes it (for
     /// example [`mono_move_core::MicroOp::HeapNew`] for [`Instr::MoveTo`] and
     /// deep copy for [`Instr::MoveFrom`]) collects *before* the write, so it
     /// does not need GC tracking.
-    pub box_ptr: Option<FrameOffset>,
-    /// Records a mapping from types to their [DescriptorId]s.
+    pub resource_box_slot: Option<FrameOffset>,
+    /// Maps a type to the [`DescriptorId`] published for it: a `vector<T>` for
+    /// vector descriptors, or the resource struct type for `move_to`/`move_from`
+    /// descriptors.
     ///
     /// Invariant: contains an entry for every vector or resource type used in
     /// this function.
@@ -176,8 +179,8 @@ pub struct LoweringContext<'a> {
 
 impl LoweringContext<'_> {
     /// `DescriptorId` published for `ty`, or `None` if no entry exists. The key
-    /// is the type itself: a `vector<T>` for vector descriptors (not the element
-    /// type), or the resource struct type for `move_to`/`move_from` descriptors.
+    /// is the type itself: a `vector<T>` for vector descriptors, or the resource
+    /// struct type for `move_to`/`move_from` descriptors.
     pub fn descriptor_id(&self, ty: InternedType) -> Option<DescriptorId> {
         self.descriptors.get(&ty).copied()
     }
@@ -330,14 +333,14 @@ pub fn try_build_context<'a>(
         None
     };
 
-    // 3b. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
-    //     lowering, when the body uses either. It holds the intermediate heap
-    //     pointer between the alloc/move and the box/unbox copy. Does not have
-    //     to be GC-tracked.
-    let needs_box_ptr = func_ir
+    // 4. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
+    //    lowering, when the body uses either. It holds the intermediate heap
+    //    pointer between the alloc/move and the box/unbox copy. Must not be
+    //    GC-tracked.
+    let needs_resource_box_slot = func_ir
         .instrs()
         .any(|instr| matches!(instr, Instr::MoveTo(..) | Instr::MoveFrom(..)));
-    let box_ptr = if needs_box_ptr {
+    let resource_box_slot = if needs_resource_box_slot {
         let offset = align_up_u32(frame_data_size, FRAME_ALIGN);
         frame_data_size = offset + 8;
         Some(FrameOffset(offset))
@@ -347,7 +350,7 @@ pub fn try_build_context<'a>(
 
     // TODO: we need to revisit the complexity and performance of this function
     // after support for generic monomorphization is in place.
-    // 4. Lay out every callee-frame region in a single IR-order pass: regular
+    // 5. Lay out every callee-frame region in a single IR-order pass: regular
     //    calls (`Call`/`CallGeneric`) and closures (`PackClosure`/`CallClosure`)
     //    are disjoint instruction kinds writing disjoint outputs, so one walk
     //    serves both.
@@ -481,7 +484,7 @@ pub fn try_build_context<'a>(
         return_slots,
         num_xfer_positions: func_ir.num_xfer_positions,
         scratch,
-        box_ptr,
+        resource_box_slot,
         descriptors: descriptors.vec,
         closure_pack_sites,
         closure_call_sites,
@@ -850,8 +853,11 @@ fn try_discover_types_for_lowering_in_function_impl(
         // Resources accessed by global-storage ops are laid out as heap
         // objects, so `move_to` can spill the inline value. Discover the
         // resource's layout, then publish a struct descriptor keyed on the
-        // concrete resource type. Best-effort: a still-generic resource (in
-        // the module-level walk) is skipped, mirroring vector descriptors.
+        // concrete resource type.
+        //
+        // TODO: a still-generic resource (in the module-level walk) is skipped
+        // here, mirroring vector descriptors. Handle it once generic
+        // global-storage ops are lowered.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
             discover_type_metadata(ctx, resource_ty, ty_args, visited, &mut descriptors.vec)?;
             let resource_ty = ctx.subst_type(resource_ty, ty_args)?;

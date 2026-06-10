@@ -1,11 +1,4 @@
 // RUN: publish --print(bytecode,stackless,micro-ops)
-//
-// Global-storage end-to-end parity. The resource is a 32-byte struct with an
-// embedded inner struct, so the move_to box (and move_from unbox) copy the
-// inline value via the sized HeapMoveTo/HeapMoveFrom path, not the 8-byte fast
-// path. The signer and the resource address are passed separately (same value)
-// so the test does not depend on the stdlib `signer` module being staged for
-// the mono-move path.
 module 0x42::globals {
     struct Inner has store, drop { a: u64, b: u64 }
     struct R has key { x: u64, y: u64, inner: Inner }
