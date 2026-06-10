@@ -31,6 +31,15 @@ pub struct DownloadCommand {
         help = "End version of transaction range (exclusive) selected for benchmarking"
     )]
     end_version: Version,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "Allow a transaction range that is not aligned to block boundaries (e.g. a single \
+                transaction). The range is still partitioned into TransactionBlocks at any block \
+                starts it contains; a range with no block start becomes one block."
+    )]
+    allow_partial_blocks: bool,
 }
 
 impl DownloadCommand {
@@ -47,34 +56,45 @@ impl DownloadCommand {
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
 
-        // Explicitly get transaction corresponding to the end, so we can verify that blocks are
-        // fully selected.
-        let limit = self.end_version - self.begin_version + 1;
-        let (mut txns, _, mut auxiliary_infos) = debugger
-            .get_committed_transactions(self.begin_version, limit)
-            .await?;
+        let (txns, auxiliary_infos) = if self.allow_partial_blocks {
+            // Download exactly the requested range, without requiring it to be block-aligned.
+            let limit = self.end_version - self.begin_version;
+            let (txns, _, auxiliary_infos) = debugger
+                .get_committed_transactions(self.begin_version, limit)
+                .await?;
+            (txns, auxiliary_infos)
+        } else {
+            // Explicitly get transaction corresponding to the end, so we can verify that blocks
+            // are fully selected.
+            let limit = self.end_version - self.begin_version + 1;
+            let (mut txns, _, mut auxiliary_infos) = debugger
+                .get_committed_transactions(self.begin_version, limit)
+                .await?;
 
-        if !txns[0].is_block_start() {
-            bail!(
-                "First transaction {} must be a block start, but it is not",
-                self.begin_version
-            );
-        }
-        if !txns.pop().unwrap().is_block_start() {
-            bail!(
-                "All transactions in the block must be selected, transaction {} is not a block \
-                end",
-                self.end_version - 1
-            );
-        }
-        // Remove auxiliary info for the popped end transaction.
-        auxiliary_infos.pop();
+            if !txns[0].is_block_start() {
+                bail!(
+                    "First transaction {} must be a block start, but it is not",
+                    self.begin_version
+                );
+            }
+            if !txns.pop().unwrap().is_block_start() {
+                bail!(
+                    "All transactions in the block must be selected, transaction {} is not a \
+                    block end",
+                    self.end_version - 1
+                );
+            }
+            // Remove auxiliary info for the popped end transaction.
+            auxiliary_infos.pop();
+            (txns, auxiliary_infos)
+        };
 
+        let num_txns = txns.len();
         let txn_blocks = partition(self.begin_version, txns, auxiliary_infos);
         println!(
             "Downloaded {} blocks with {} transactions in total: versions [{}, {})",
             txn_blocks.len(),
-            limit,
+            num_txns,
             self.begin_version,
             self.end_version,
         );

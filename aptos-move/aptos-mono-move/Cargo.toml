@@ -1,0 +1,43 @@
+[package]
+name = "aptos-mono-move"
+description = "Differential benchmark harness: replay real transactions on MonoMove and the legacy MoveVM and compare global-storage writes"
+version = "0.1.0"
+default-run = "aptos-mono-move"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-framework-natives = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-table-natives = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+clap = { workspace = true }
+mono-move-core = { workspace = true }
+mono-move-global-context = { workspace = true }
+mono-move-loader = { workspace = true }
+mono-move-natives = { workspace = true }
+mono-move-runtime = { workspace = true }
+mono-move-testsuite = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "replay"
+harness = false

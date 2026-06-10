@@ -9,3 +9,8 @@ pub mod overrides;
 mod runner;
 mod state_view;
 mod workload;
+
+// Re-exported so downstream tools can decode the files produced by the
+// `download` and `initialize` commands.
+pub use state_view::ReadSet;
+pub use workload::TransactionBlock;

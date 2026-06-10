@@ -9,7 +9,7 @@ use crate::{
         ArithOp, RuntimeError, RuntimeInvariantViolation, RuntimeResult, RuntimeStatus, Signedness,
         VecOp,
     },
-    global_storage::{EntryPtr, ResourceReadWriteSet},
+    global_storage::{EntryPtr, ResourceReadWriteSet, StorageWrite},
     heap::{
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         AllocationError, Heap,
@@ -34,7 +34,7 @@ use mono_move_core::{
     native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
-    types::{view_type_list, InternedTypeList},
+    types::{view_type_list, InternedType, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
@@ -44,12 +44,25 @@ use mono_move_core::{
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
     OBJECT_HEADER_SIZE,
 };
-use move_core_types::int256::{I256, U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
+
+/// A resource write produced by an interpreter run, in a form ready for
+/// differential comparison against another VM's write set.
+#[derive(Debug)]
+pub enum ResourceWrite {
+    /// Resource was created or modified; holds the BCS bytes of the new value.
+    Value(Vec<u8>),
+    /// Resource was moved out of global storage.
+    Deleted,
+}
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
@@ -76,6 +89,10 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + Lay
     /// checkpoint stack.
     pub(crate) read_write_set: ResourceReadWriteSet,
     rng: StdRng,
+    /// Signer values for the root entry function. The leading `&signer`
+    /// parameters reference these. Kept here so the references stay valid for
+    /// the whole run; GC leaves them alone because they are not heap pointers.
+    signers: Vec<AccountAddress>,
 }
 
 impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'a, T> {
@@ -116,6 +133,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
+            signers: Vec::new(),
         }
     }
 
@@ -213,6 +231,23 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
     }
 
+    /// Resets the interpreter to re-run `entry` from a clean state, reusing the
+    /// already-allocated stack/heap and the already-verified function (no
+    /// re-verification). Discards the previous run's heap allocations,
+    /// global-storage read-write set, and auxiliary GC roots, and resets the call
+    /// stack to the root frame. Place arguments with [`Self::set_root_arg`] /
+    /// [`Self::deserialize_arg`], then call [`Self::run`].
+    ///
+    /// This is the cheap path for re-running over warm loader/provider caches
+    /// (e.g. benchmark samples). The gas meter is not reset, so use a budget
+    /// large enough for the intended number of runs.
+    pub fn reset_root(&mut self, entry: &Function) {
+        self.invoke(entry);
+        self.heap.reset();
+        self.read_write_set = ResourceReadWriteSet::new();
+        self.root_pool = RootPool::new();
+    }
+
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result(&self) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
@@ -261,6 +296,50 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
     }
 
+    /// Stores `signers` and writes a reference into each leading signer
+    /// parameter slot of `function`'s root frame, then returns the byte offset
+    /// at which the first non-signer argument begins (the end of the signer
+    /// parameter region). Call this before placing the remaining arguments with
+    /// [`Self::set_root_arg`] / [`Self::deserialize_arg`].
+    ///
+    /// A `&signer` parameter is a 16-byte reference, so its slot gets a fat
+    /// pointer into the stored signer value; a by-value `signer` parameter (32
+    /// bytes) gets the address copied inline. The signer values live in
+    /// `self.signers` for the duration of the run, and the references point into
+    /// that storage — GC ignores them because they are not heap pointers
+    /// (`relocate` skips non-heap pointers).
+    pub fn set_root_signers(&mut self, function: &Function, signers: &[AccountAddress]) -> u32 {
+        // Width of a reference (fat pointer); a `&signer` slot has this size.
+        const REFERENCE_SIZE: u32 = 16;
+
+        self.signers = signers.to_vec();
+        let base = self.stack.as_ptr();
+        for (i, slot) in function
+            .param_slots
+            .iter()
+            .take(self.signers.len())
+            .enumerate()
+        {
+            let dst = FRAME_METADATA_SIZE + usize::from(slot.offset);
+            // SAFETY: `self.signers[i]` is a live 32-byte address; `slot`
+            // addresses a leading signer parameter slot in the root frame,
+            // sized either 16 (a `&signer` reference) or 32 (a by-value signer).
+            unsafe {
+                let signer_ptr = self.signers.as_ptr().add(i) as *const u8;
+                if slot.size == REFERENCE_SIZE {
+                    write_fat_ptr(base, dst, signer_ptr, 0);
+                } else {
+                    std::ptr::copy_nonoverlapping(signer_ptr, base.add(dst), 32);
+                }
+            }
+        }
+        function
+            .param_slots
+            .get(self.signers.len())
+            .map(|slot| slot.offset.0)
+            .unwrap_or(function.param_region_size as u32)
+    }
+
     /// Read a raw heap pointer from the root frame at the given byte offset.
     pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
         unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
@@ -284,6 +363,54 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             }
         }
         Ok(ptr as u64)
+    }
+
+    /// Returns the write this run made to the resource at `key`, or `None` if
+    /// the resource was only read (or never touched). `Value` carries the BCS
+    /// bytes of the resulting value; `Deleted` means it was moved out. Intended
+    /// for the differential harness, which drives comparison off another VM's
+    /// write set. Table-item keys are never compared and return `None`.
+    pub fn resource_write(&self, key: &InMemoryStorageKey) -> RuntimeResult<Option<ResourceWrite>> {
+        let Some(entry) = self.read_write_set.get(key) else {
+            return Ok(None);
+        };
+        match entry.write {
+            StorageWrite::NotModified => Ok(None),
+            StorageWrite::Deleted { .. } => Ok(Some(ResourceWrite::Deleted)),
+            StorageWrite::LocalHeap { ptr, .. } => {
+                let ty = match key {
+                    InMemoryStorageKey::Resource { ty, .. } => *ty,
+                    InMemoryStorageKey::TableItem { .. } => return Ok(None),
+                };
+                // SAFETY: a `LocalHeap` write points at the start of a live
+                // value of type `ty` in this run's heap, and `exec_ctx`
+                // provides its layout.
+                let bytes = unsafe { value_utils::serialize(&*self.exec_ctx, ptr.as_ptr(), ty)? };
+                Ok(Some(ResourceWrite::Value(bytes)))
+            },
+        }
+    }
+
+    /// Deserialize a BCS-encoded entry-function argument of the given type into
+    /// the root frame at `offset`, allocating any heap sub-objects. Used to
+    /// place non-primitive (vector/struct) arguments that do not fit a raw
+    /// frame slot; primitive args go through [`Self::set_root_arg`].
+    pub fn deserialize_arg(
+        &mut self,
+        offset: u32,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> RuntimeResult<()> {
+        // SAFETY: `offset` addresses a writable root-frame slot sized for `ty`,
+        // and `exec_ctx` provides the layout. Mirrors `exec_store_imm_vec`.
+        unsafe {
+            let dst = self
+                .stack
+                .as_ptr()
+                .add(FRAME_METADATA_SIZE + offset as usize);
+            value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+                .map_err(AllocationError::into_runtime_error)
+        }
     }
 }
 
