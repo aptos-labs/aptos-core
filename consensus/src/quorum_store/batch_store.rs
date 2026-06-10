@@ -237,9 +237,15 @@ impl BatchStore {
         expiration_buffer_usecs: u64,
         batch_store: &BatchStore,
     ) {
+        let load_start = std::time::Instant::now();
         let db_content = db
             .get_all_batches()
             .expect("failed to read v1 data from db");
+        aptos_logger::info!(
+            num_batches = db_content.len(),
+            time_ms = load_start.elapsed().as_millis() as u64,
+            "Loaded quorum store batches (v1) from DB on recovery."
+        );
         let db_content = db_content.into_iter().map(|(k, v)| (k, v.into())).collect();
         Self::load_batches_from_db(
             current_epoch,
@@ -262,9 +268,15 @@ impl BatchStore {
         expiration_buffer_usecs: u64,
         batch_store: &BatchStore,
     ) {
+        let load_start = std::time::Instant::now();
         let db_content = db
             .get_all_batches_v2()
             .expect("failed to read v2 data from db");
+        aptos_logger::info!(
+            num_batches = db_content.len(),
+            time_ms = load_start.elapsed().as_millis() as u64,
+            "Loaded quorum store batches (v2) from DB on recovery."
+        );
         Self::load_batches_from_db(
             current_epoch,
             last_certified_time,

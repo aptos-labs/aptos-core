@@ -8,7 +8,7 @@ use aptos_db::{fast_sync_storage_wrapper::FastSyncStorageWrapper, AptosDB};
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
-use aptos_logger::{debug, info};
+use aptos_logger::info;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Version, waypoint::Waypoint,
@@ -188,14 +188,15 @@ pub fn initialize_database_and_checkpoints(
     }
 
     // Open the database
+    info!("Opening storage (AptosDB + backup service)...");
     let instant = Instant::now();
     let (_aptos_db, db_rw, backup_service, indexer_db_opt, update_receiver) =
         bootstrap_db(node_config)?;
 
     // Log the duration to open storage
-    debug!(
-        "Storage service started in {} ms",
-        instant.elapsed().as_millis()
+    info!(
+        time_ms = instant.elapsed().as_millis() as u64,
+        "Opened storage (AptosDB + backup service)."
     );
 
     Ok((
