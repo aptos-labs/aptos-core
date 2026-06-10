@@ -18,8 +18,18 @@ use move_model::{
         SpecVarId, StructEnv, StructId,
     },
     pragmas::{
-        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_TO_VEC_PAIR,
-        INTRINSIC_FUN_MAP_UPSERT_KV, INTRINSIC_FUN_MAP_VALUES, INTRINSIC_TYPE_MAP,
+        INTRINSIC_FUN_MAP_BACK_KEY, INTRINSIC_FUN_MAP_BORROW_BACK, INTRINSIC_FUN_MAP_BORROW_FRONT,
+        INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_INTERNAL_FIND,
+        INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH, INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND,
+        INTRINSIC_FUN_MAP_ITER_BORROW, INTRINSIC_FUN_MAP_ITER_BORROW_KEY,
+        INTRINSIC_FUN_MAP_ITER_IS_BEGIN, INTRINSIC_FUN_MAP_ITER_IS_END,
+        INTRINSIC_FUN_MAP_ITER_NEW_BEGIN, INTRINSIC_FUN_MAP_ITER_NEW_END,
+        INTRINSIC_FUN_MAP_ITER_NEXT, INTRINSIC_FUN_MAP_ITER_PREV, INTRINSIC_FUN_MAP_ITER_REMOVE,
+        INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER, INTRINSIC_FUN_MAP_KEYS,
+        INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK,
+        INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
+        INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_FUN_MAP_UPSERT_KV,
+        INTRINSIC_FUN_MAP_VALUES, INTRINSIC_TYPE_MAP,
     },
     symbol::Symbol,
     ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
@@ -279,26 +289,94 @@ fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
     None
 }
 
+/// Locate the `0x1::cmp` module. Returns `None` when the module is not in the model. Pinned
+/// to address `0x1` for the same reason as `find_option_struct`: the backend uses
+/// `$1_cmp_$compare*` Boogie symbols.
+fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
+    let cmp_sym = env.symbol_pool().make("cmp");
+    let std_addr = Address::Numerical(AccountAddress::ONE);
+    for module in env.get_modules() {
+        let name = module.get_name();
+        if name.addr() == &std_addr && name.name() == cmp_sym {
+            return Some(module.get_id());
+        }
+    }
+    None
+}
+
 impl Analyzer<'_> {
     /// Register type instantiations that intrinsic role bodies depend on but no Move source
-    /// references directly:
+    /// references directly. This covers two cases:
     ///
-    /// 1. `Option<K>` / `Option<V>` for roles whose Boogie body constructs Option results
-    ///    (currently `map_upsert_kv` returning `(Option<K>, Option<V>)`).
-    /// 2. `Vec<K>` / `Vec<V>` for roles whose Boogie body references the type-aware
-    ///    `$ContainsVec'<X>'` helper (`map_keys`, `map_values`, `map_to_vec_pair`,
-    ///    `map_new_from`).
+    /// 1. `Option<K>` / `Option<V>` for roles whose Boogie body constructs Option results:
+    ///    `map_upsert` (Option<V>), `map_upsert_kv` (Option<K> and Option<V>),
+    ///    `map_prev_key` / `map_next_key` (Option<K>), `map_remove_or_none` (Option<V>).
+    /// 2. `cmp::compare<K>` instances for order-dependent roles whose body uses
+    ///    `$1_cmp_$compare'<K>'`: `map_front_key`, `map_back_key`, `map_pop_front`,
+    ///    `map_pop_back`, `map_prev_key`, `map_next_key`.
     ///
     /// Both concrete and type-parameter args are registered, so callers parameterized
     /// over the map's K/V also get matching companion-type declarations.
     fn register_intrinsic_associated_types(&mut self) {
         let option_qid = find_option_struct(self.env);
+        let cmp_mid = find_cmp_module(self.env);
         let intrinsics = self.env.get_intrinsics();
+        let iter_struct_sym = self.env.symbol_pool().make("IteratorPtr");
 
         // Roles whose Boogie body constructs an `Option<K>` value.
-        let option_k_roles = [INTRINSIC_FUN_MAP_UPSERT_KV];
+        let option_k_roles = [
+            INTRINSIC_FUN_MAP_UPSERT_KV,
+            INTRINSIC_FUN_MAP_PREV_KEY,
+            INTRINSIC_FUN_MAP_NEXT_KEY,
+        ];
         // Roles whose Boogie body constructs an `Option<V>` value.
-        let option_v_roles = [INTRINSIC_FUN_MAP_UPSERT_KV];
+        let option_v_roles = [
+            INTRINSIC_FUN_MAP_UPSERT,
+            INTRINSIC_FUN_MAP_UPSERT_KV,
+            INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
+            INTRINSIC_FUN_MAP_GET,
+        ];
+        // Roles whose Boogie body uses `$1_cmp_$compare'<K>'`.
+        let cmp_k_roles = [
+            INTRINSIC_FUN_MAP_FRONT_KEY,
+            INTRINSIC_FUN_MAP_BACK_KEY,
+            INTRINSIC_FUN_MAP_BORROW_FRONT,
+            INTRINSIC_FUN_MAP_BORROW_BACK,
+            INTRINSIC_FUN_MAP_POP_FRONT,
+            INTRINSIC_FUN_MAP_POP_BACK,
+            INTRINSIC_FUN_MAP_PREV_KEY,
+            INTRINSIC_FUN_MAP_NEXT_KEY,
+            INTRINSIC_FUN_MAP_ITER_NEW_BEGIN,
+            INTRINSIC_FUN_MAP_ITER_IS_BEGIN,
+            INTRINSIC_FUN_MAP_ITER_NEXT,
+            INTRINSIC_FUN_MAP_ITER_PREV,
+            INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND,
+        ];
+        // Roles whose Boogie body references the map's companion `IteratorPtr<K>` type.
+        let iter_roles = [
+            INTRINSIC_FUN_MAP_ITER_NEW_BEGIN,
+            INTRINSIC_FUN_MAP_ITER_NEW_END,
+            INTRINSIC_FUN_MAP_ITER_IS_END,
+            INTRINSIC_FUN_MAP_ITER_IS_BEGIN,
+            INTRINSIC_FUN_MAP_ITER_BORROW_KEY,
+            INTRINSIC_FUN_MAP_ITER_BORROW,
+            INTRINSIC_FUN_MAP_ITER_NEXT,
+            INTRINSIC_FUN_MAP_ITER_PREV,
+            INTRINSIC_FUN_MAP_INTERNAL_FIND,
+            INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND,
+            // The IPWP family wraps an IteratorPtr<K>, so the iter type is also needed.
+            INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH,
+            INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER,
+            INTRINSIC_FUN_MAP_ITER_REMOVE,
+        ];
+        // Roles whose Boogie body references the map's companion `IteratorPtrWithPath<K>`
+        // type. The companion-of-companion is resolved by name lookup in the map's home
+        // module, parallel to the iter lookup.
+        let iter_with_path_roles = [
+            INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH,
+            INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER,
+            INTRINSIC_FUN_MAP_ITER_REMOVE,
+        ];
         // Roles whose Boogie body references the type-aware `$ContainsVec'<K>'` (a
         // per-vec-instance helper that uses `$IsEqual` instead of raw `==`). For each
         // such role we must register `Vec<K>` so the backend emits `$ContainsVec'<K>'`.
@@ -309,8 +387,16 @@ impl Analyzer<'_> {
             INTRINSIC_FUN_MAP_NEW_FROM,
         ];
 
-        // Collect first to avoid borrow conflicts with self.add_type below.
+        let iter_with_path_struct_sym = self.env.symbol_pool().make("IteratorPtrWithPath");
+
+        // Collect first to avoid borrow conflicts with self.add_type / native_inst below.
         let mut option_to_register: Vec<Type> = vec![];
+        let mut cmp_to_register: Vec<Type> = vec![];
+        // Pairs of (IteratorPtr struct qid, K) to register as struct instantiations so
+        // the backend emits their datatype declarations.
+        let mut iter_to_register: Vec<(QualifiedId<StructId>, Type)> = vec![];
+        // Pairs of (IteratorPtrWithPath struct qid, K) for the IPWP family.
+        let mut iter_with_path_to_register: Vec<(QualifiedId<StructId>, Type)> = vec![];
         for (struct_qid, ty_args) in self.info.table_inst.iter() {
             let Some(decl) = intrinsics.get_decl_for_struct(struct_qid) else {
                 continue;
@@ -321,18 +407,55 @@ impl Analyzer<'_> {
             let needs_option_v = option_v_roles
                 .iter()
                 .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            let needs_cmp_k = cmp_k_roles
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            let needs_iter = iter_roles
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            let needs_iter_with_path = iter_with_path_roles
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
             let needs_vec_k = vec_k_roles
                 .iter()
                 .any(|name| decl.get_fun_triple(self.env, name).is_some());
-            if !needs_option_k && !needs_option_v && !needs_vec_k {
+            if !needs_option_k && !needs_option_v && !needs_cmp_k && !needs_iter && !needs_vec_k {
                 continue;
             }
+            // Look up the IteratorPtr struct in the map's home module so iter templates
+            // can reference it. Only meaningful when iter roles are bound.
+            let iter_qid = if needs_iter {
+                self.env
+                    .get_module(struct_qid.module_id)
+                    .find_struct(iter_struct_sym)
+                    .map(|s| struct_qid.module_id.qualified(s.get_id()))
+            } else {
+                None
+            };
+            // Look up IteratorPtrWithPath similarly for the IPWP family.
+            let iter_with_path_qid = if needs_iter_with_path {
+                self.env
+                    .get_module(struct_qid.module_id)
+                    .find_struct(iter_with_path_struct_sym)
+                    .map(|s| struct_qid.module_id.qualified(s.get_id()))
+            } else {
+                None
+            };
             for (k, v) in ty_args.iter() {
                 if needs_option_k {
                     option_to_register.push(k.clone());
                 }
                 if needs_option_v {
                     option_to_register.push(v.clone());
+                }
+                if needs_cmp_k {
+                    cmp_to_register.push(k.clone());
+                }
+                if let Some(iter_qid) = iter_qid {
+                    iter_to_register.push((iter_qid, k.clone()));
+                }
+                if let Some(iter_with_path_qid) = iter_with_path_qid {
+                    iter_with_path_to_register.push((iter_with_path_qid, k.clone()));
                 }
                 if needs_vec_k {
                     // Register Vec<K> / Vec<V> so the prelude emits the per-type
@@ -346,6 +469,28 @@ impl Analyzer<'_> {
             for ty in option_to_register {
                 self.add_type(&Type::Struct(option_qid.module_id, option_qid.id, vec![ty]));
             }
+        }
+        if let Some(cmp_mid) = cmp_mid {
+            for ty in cmp_to_register {
+                // The cmp module's per-type compare instances are tracked via `native_inst`,
+                // indexed by module id with each entry being a single-type vector.
+                self.add_type(&ty);
+                self.info
+                    .native_inst
+                    .entry(cmp_mid)
+                    .or_default()
+                    .insert(vec![ty]);
+            }
+        }
+        for (iter_qid, k_ty) in iter_to_register {
+            self.add_type(&Type::Struct(iter_qid.module_id, iter_qid.id, vec![k_ty]));
+        }
+        for (iter_with_path_qid, k_ty) in iter_with_path_to_register {
+            self.add_type(&Type::Struct(
+                iter_with_path_qid.module_id,
+                iter_with_path_qid.id,
+                vec![k_ty],
+            ));
         }
     }
 

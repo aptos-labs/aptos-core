@@ -20,18 +20,33 @@ use move_model::{
     model::{GlobalEnv, QualifiedId, StructId},
     pragmas::{
         INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
-        INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_MUT,
+        INTRINSIC_FUN_MAP_BACK_KEY, INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_BACK,
+        INTRINSIC_FUN_MAP_BORROW_FRONT, INTRINSIC_FUN_MAP_BORROW_MUT,
         INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
         INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
-        INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY,
+        INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET,
+        INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_INTERNAL_FIND,
+        INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH, INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND,
+        INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_ITER_BORROW,
+        INTRINSIC_FUN_MAP_ITER_BORROW_KEY, INTRINSIC_FUN_MAP_ITER_IS_BEGIN,
+        INTRINSIC_FUN_MAP_ITER_IS_END, INTRINSIC_FUN_MAP_ITER_NEW_BEGIN,
+        INTRINSIC_FUN_MAP_ITER_NEW_END, INTRINSIC_FUN_MAP_ITER_NEXT, INTRINSIC_FUN_MAP_ITER_PREV,
+        INTRINSIC_FUN_MAP_ITER_REMOVE, INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER,
         INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW,
-        INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
-        INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEW_WITH_CONFIG,
+        INTRINSIC_FUN_MAP_NEW_WITH_REUSABLE, INTRINSIC_FUN_MAP_NEW_WITH_TYPE_SIZE_HINTS,
+        INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT,
+        INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_KEY,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_OOB, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_PREV,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_REMOVE, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG, INTRINSIC_FUN_MAP_SPEC_DEL,
+        INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW,
-        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT_KV,
-        INTRINSIC_FUN_MAP_VALUES,
+        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT,
+        INTRINSIC_FUN_MAP_UPSERT_KV, INTRINSIC_FUN_MAP_VALUES,
     },
     ty::{PrimitiveType, Type},
 };
@@ -114,11 +129,49 @@ struct MapImpl {
     fun_borrow_mut: String,
     fun_borrow_mut_with_default: String,
     fun_borrow_with_default: String,
+    fun_get: String,
     fun_new_from: String,
     fun_to_vec_pair: String,
+    fun_upsert: String,
     fun_upsert_kv: String,
     fun_keys: String,
     fun_values: String,
+    fun_front_key: String,
+    fun_back_key: String,
+    fun_borrow_front: String,
+    fun_borrow_back: String,
+    fun_pop_front: String,
+    fun_pop_back: String,
+    fun_prev_key: String,
+    fun_next_key: String,
+    fun_remove_or_none: String,
+    // iterator API
+    fun_iter_new_begin: String,
+    fun_iter_new_end: String,
+    fun_iter_is_end: String,
+    fun_iter_is_begin: String,
+    fun_iter_borrow_key: String,
+    fun_iter_borrow: String,
+    fun_iter_next: String,
+    fun_iter_prev: String,
+    fun_internal_find: String,
+    fun_internal_lower_bound: String,
+    fun_internal_find_with_path: String,
+    fun_iter_with_path_get_iter: String,
+    fun_iter_remove: String,
+    fun_new_with_config: String,
+    fun_new_with_reusable: String,
+    fun_new_with_type_size_hints: String,
+    /// Boogie name prefix for the map's iterator struct, looked up by the bare name
+    /// `IteratorPtr` in the map struct's own module. Empty when the module declares no
+    /// such struct (in which case the iter-* templates are skipped). The full Boogie
+    /// type name for a given K is `<iter_type_prefix>'<K_suffix>'`.
+    iter_type_prefix: String,
+    /// Boogie name prefix for the map's iterator-with-path struct, looked up by the bare
+    /// name `IteratorPtrWithPath` in the map struct's own module. Empty when the module
+    /// declares no such struct. Used by `internal_find_with_path`, `iter_with_path_get_iter`,
+    /// and `iter_remove` templates.
+    iter_with_path_type_prefix: String,
     // spec functions
     fun_spec_new: String,
     fun_spec_get: String,
@@ -133,6 +186,12 @@ struct MapImpl {
     fun_spec_aborts_del: String,
     fun_spec_aborts_borrow: String,
     fun_spec_aborts_new_from: String,
+    fun_spec_aborts_new_with_config: String,
+    fun_spec_aborts_empty_map: String,
+    fun_spec_aborts_iter_borrow_key: String,
+    fun_spec_aborts_iter_oob: String,
+    fun_spec_aborts_iter_prev: String,
+    fun_spec_aborts_iter_remove: String,
 }
 
 /// Help generating vector functions for bv types
@@ -515,6 +574,35 @@ impl MapImpl {
             .get_decl_for_struct(&struct_qid)
             .expect("intrinsic decl");
 
+        // Resolve the iterator type prefix by looking up a struct named `IteratorPtr`
+        // in the map's home module. The iter-* role templates expand this to the
+        // K-specific name `<prefix>'<K_suffix>'`.
+        let iter_struct_sym = env.symbol_pool().make("IteratorPtr");
+        let iter_type_prefix = struct_env
+            .module_env
+            .find_struct(iter_struct_sym)
+            .map(|s| {
+                format!(
+                    "${}_{}",
+                    boogie_module_name(&s.module_env),
+                    s.get_name().display(s.symbol_pool())
+                )
+            })
+            .unwrap_or_default();
+        // Same for the iterator-with-path wrapper struct.
+        let iter_with_path_struct_sym = env.symbol_pool().make("IteratorPtrWithPath");
+        let iter_with_path_type_prefix = struct_env
+            .module_env
+            .find_struct(iter_with_path_struct_sym)
+            .map(|s| {
+                format!(
+                    "${}_{}",
+                    boogie_module_name(&s.module_env),
+                    s.get_name().display(s.symbol_pool())
+                )
+            })
+            .unwrap_or_default();
+
         MapImpl {
             struct_name,
             insts,
@@ -564,6 +652,7 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT),
             ),
+            fun_get: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_GET)),
             fun_new_from: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW_FROM),
@@ -571,6 +660,10 @@ impl MapImpl {
             fun_to_vec_pair: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_TO_VEC_PAIR),
+            ),
+            fun_upsert: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_UPSERT),
             ),
             fun_upsert_kv: Self::triple_opt_to_name(
                 env,
@@ -584,6 +677,108 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_VALUES),
             ),
+            fun_front_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_FRONT_KEY),
+            ),
+            fun_back_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BACK_KEY),
+            ),
+            fun_borrow_front: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_FRONT),
+            ),
+            fun_borrow_back: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_BACK),
+            ),
+            fun_pop_front: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_POP_FRONT),
+            ),
+            fun_pop_back: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_POP_BACK),
+            ),
+            fun_prev_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_PREV_KEY),
+            ),
+            fun_next_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEXT_KEY),
+            ),
+            fun_remove_or_none: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_REMOVE_OR_NONE),
+            ),
+            fun_iter_new_begin: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_NEW_BEGIN),
+            ),
+            fun_iter_new_end: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_NEW_END),
+            ),
+            fun_iter_is_end: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_IS_END),
+            ),
+            fun_iter_is_begin: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_IS_BEGIN),
+            ),
+            fun_iter_borrow_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW_KEY),
+            ),
+            fun_iter_borrow: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW),
+            ),
+            fun_iter_next: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_NEXT),
+            ),
+            fun_iter_prev: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_PREV),
+            ),
+            fun_internal_find: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_INTERNAL_FIND),
+            ),
+            fun_internal_lower_bound: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND),
+            ),
+            fun_internal_find_with_path: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH),
+            ),
+            fun_iter_with_path_get_iter: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER),
+            ),
+            fun_iter_remove: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_REMOVE),
+            ),
+            fun_new_with_config: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW_WITH_CONFIG),
+            ),
+            fun_new_with_reusable: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW_WITH_REUSABLE),
+            ),
+            fun_new_with_type_size_hints: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW_WITH_TYPE_SIZE_HINTS),
+            ),
+            iter_type_prefix,
+            iter_with_path_type_prefix,
             fun_spec_new: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_NEW),
@@ -631,6 +826,30 @@ impl MapImpl {
             fun_spec_aborts_new_from: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM),
+            ),
+            fun_spec_aborts_new_with_config: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG),
+            ),
+            fun_spec_aborts_empty_map: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP),
+            ),
+            fun_spec_aborts_iter_borrow_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_KEY),
+            ),
+            fun_spec_aborts_iter_oob: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_OOB),
+            ),
+            fun_spec_aborts_iter_prev: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_PREV),
+            ),
+            fun_spec_aborts_iter_remove: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_REMOVE),
             ),
         }
     }

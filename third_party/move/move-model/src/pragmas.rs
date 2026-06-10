@@ -173,6 +173,11 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with
 /// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
 pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
 
+/// Optional lookup: returns `Some(v)` when the key is in the map, `None` otherwise.
+/// Never aborts. Requires `V: copy`.
+/// `[move] fun map_get<K, V>(m: &Map<K, V>, k: K): Option<V>`
+pub const INTRINSIC_FUN_MAP_GET: &str = "map_get";
+
 /// Build a map from two parallel vectors of keys and values. Aborts when the lengths differ
 /// or when the keys contain a duplicate.
 /// `[move] fun map_new_from<K, V>(keys: vector<K>, values: vector<V>): Map<K, V>`
@@ -182,6 +187,10 @@ pub const INTRINSIC_FUN_MAP_NEW_FROM: &str = "map_new_from";
 /// the elements in the returned vectors is unspecified, but `keys[i]` maps to `values[i]`.
 /// `[move] fun map_to_vec_pair<K, V>(m: Map<K, V>): (vector<K>, vector<V>)`
 pub const INTRINSIC_FUN_MAP_TO_VEC_PAIR: &str = "map_to_vec_pair";
+
+/// Insert or update; returns the displaced value as `Option<V>`. Never aborts.
+/// `[move] fun map_upsert<K, V>(m: &mut Map<K, V>, k: K, v: V): Option<V>`
+pub const INTRINSIC_FUN_MAP_UPSERT: &str = "map_upsert";
 
 /// Insert or update; returns the displaced key and value as `(Option<K>, Option<V>)`. Never
 /// aborts. The returned key equals the input key under structural equality (the SMT model
@@ -197,6 +206,135 @@ pub const INTRINSIC_FUN_MAP_KEYS: &str = "map_keys";
 /// distinct keys map to equal values.
 /// `[move] fun map_values<K, V>(m: &Map<K, V>): vector<V>`
 pub const INTRINSIC_FUN_MAP_VALUES: &str = "map_values";
+
+/// Return the smallest key under cmp::compare ordering. Aborts when the map is empty.
+/// `[move] fun map_front_key<K, V>(m: &Map<K, V>): K`
+pub const INTRINSIC_FUN_MAP_FRONT_KEY: &str = "map_front_key";
+
+/// Return the largest key under cmp::compare ordering. Aborts when the map is empty.
+/// `[move] fun map_back_key<K, V>(m: &Map<K, V>): K`
+pub const INTRINSIC_FUN_MAP_BACK_KEY: &str = "map_back_key";
+
+/// Return the smallest key under cmp::compare ordering together with a reference to its
+/// value. Aborts when the map is empty.
+/// `[move] fun map_borrow_front<K, V>(m: &Map<K, V>): (K, &V)`
+pub const INTRINSIC_FUN_MAP_BORROW_FRONT: &str = "map_borrow_front";
+
+/// Return the largest key under cmp::compare ordering together with a reference to its
+/// value. Aborts when the map is empty.
+/// `[move] fun map_borrow_back<K, V>(m: &Map<K, V>): (K, &V)`
+pub const INTRINSIC_FUN_MAP_BORROW_BACK: &str = "map_borrow_back";
+
+/// Pop the smallest entry (key, value) under cmp::compare. Aborts when the map is empty.
+/// `[move] fun map_pop_front<K, V>(m: &mut Map<K, V>): (K, V)`
+pub const INTRINSIC_FUN_MAP_POP_FRONT: &str = "map_pop_front";
+
+/// Pop the largest entry (key, value) under cmp::compare. Aborts when the map is empty.
+/// `[move] fun map_pop_back<K, V>(m: &mut Map<K, V>): (K, V)`
+pub const INTRINSIC_FUN_MAP_POP_BACK: &str = "map_pop_back";
+
+/// Largest key strictly less than the given key under cmp::compare, or None.
+/// `[move] fun map_prev_key<K, V>(m: &Map<K, V>, k: &K): Option<K>`
+pub const INTRINSIC_FUN_MAP_PREV_KEY: &str = "map_prev_key";
+
+/// Smallest key strictly greater than the given key under cmp::compare, or None.
+/// `[move] fun map_next_key<K, V>(m: &Map<K, V>, k: &K): Option<K>`
+pub const INTRINSIC_FUN_MAP_NEXT_KEY: &str = "map_next_key";
+
+/// Remove the entry at the given key if present, returning Some(V) or None.
+/// `[move] fun map_remove_or_none<K, V>(m: &mut Map<K, V>, k: &K): Option<V>`
+pub const INTRINSIC_FUN_MAP_REMOVE_OR_NONE: &str = "map_remove_or_none";
+
+// === Iterator API roles. ===
+// These intrinsics operate on the map's IteratorPtr type — looked up by name in the
+// map struct's own module. The role bindings are sound only for maps whose
+// IteratorPtr is shaped like BigOrderedMap's: an enum with an `End` variant and a
+// `Some { ..., key: K }` variant (additional fields are not read in spec, only the
+// `key` field is). OrderedMap's IteratorPtr does not match this shape.
+
+/// Iterator at the smallest key, or end-sentinel if the map is empty. Never aborts.
+/// `[move] fun map_iter_new_begin<K, V>(m: &Map<K, V>): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_ITER_NEW_BEGIN: &str = "map_iter_new_begin";
+
+/// End sentinel iterator. Never aborts.
+/// `[move] fun map_iter_new_end<K, V>(m: &Map<K, V>): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_ITER_NEW_END: &str = "map_iter_new_end";
+
+/// True iff the iterator is the end sentinel. Never aborts.
+/// `[move] fun map_iter_is_end<K, V>(it: &IteratorPtr<K>, m: &Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_ITER_IS_END: &str = "map_iter_is_end";
+
+/// True iff the iterator is at the begin position. An End iterator on an empty map
+/// counts as begin. Never aborts.
+/// `[move] fun map_iter_is_begin<K, V>(it: &IteratorPtr<K>, m: &Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_ITER_IS_BEGIN: &str = "map_iter_is_begin";
+
+/// Read the key the iterator points at. Aborts if at end.
+/// `[move] fun map_iter_borrow_key<K>(it: &IteratorPtr<K>): &K`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW_KEY: &str = "map_iter_borrow_key";
+
+/// Read the value the iterator points at. Aborts if at end.
+/// `[move] fun map_iter_borrow<K, V>(it: IteratorPtr<K>, m: &Map<K, V>): &V`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW: &str = "map_iter_borrow";
+
+/// Advance the iterator to the next-larger key, or end if none. Aborts if currently
+/// at end.
+/// `[move] fun map_iter_next<K, V>(it: IteratorPtr<K>, m: &Map<K, V>): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_ITER_NEXT: &str = "map_iter_next";
+
+/// Step the iterator to the prev-smaller key. Aborts if currently at the begin
+/// (smallest key or empty-map end).
+/// `[move] fun map_iter_prev<K, V>(it: IteratorPtr<K>, m: &Map<K, V>): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_ITER_PREV: &str = "map_iter_prev";
+
+/// Iterator at the given key if present, end-sentinel otherwise. Never aborts.
+/// `[move] fun map_internal_find<K, V>(m: &Map<K, V>, k: &K): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_INTERNAL_FIND: &str = "map_internal_find";
+
+/// Iterator at the smallest key K >= input under cmp::compare ordering, or
+/// end-sentinel if no such key exists. Never aborts.
+/// `[move] fun map_internal_lower_bound<K, V>(m: &Map<K, V>, k: &K): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND: &str = "map_internal_lower_bound";
+
+// === IteratorPtrWithPath family ===
+// These roles operate on a companion-of-companion type `IteratorPtrWithPath<K>` that
+// wraps an `IteratorPtr<K>` with an implementation-only path. Like the iter roles,
+// they require the map type to declare both `IteratorPtr` and `IteratorPtrWithPath`
+// structs in its home module.
+
+/// Iterator-with-path at the given key if present, end-sentinel iterator-with-path
+/// otherwise. Never aborts.
+/// `[move] fun map_internal_find_with_path<K, V>(m: &Map<K, V>, k: &K): IteratorPtrWithPath<K>`
+pub const INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH: &str = "map_internal_find_with_path";
+
+/// Project the wrapped `IteratorPtr<K>` from an `IteratorPtrWithPath<K>`. Never aborts.
+/// `[move] fun map_iter_with_path_get_iter<K>(it: &IteratorPtrWithPath<K>): IteratorPtr<K>`
+pub const INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER: &str = "map_iter_with_path_get_iter";
+
+/// Remove the entry at the iterator-with-path's key, returning its value. Aborts when
+/// the iterator points to end.
+/// `[move] fun map_iter_remove<K, V>(it: IteratorPtrWithPath<K>, m: &mut Map<K, V>): V`
+pub const INTRINSIC_FUN_MAP_ITER_REMOVE: &str = "map_iter_remove";
+
+// === Configured constructors ===
+// Variants of map_new that take additional configuration parameters. The Boogie body
+// returns `EmptyTable()` with abort conditions on the config parameters when applicable.
+
+/// Create an empty map with explicit degree/reuse-slots configuration. Aborts when
+/// either `inner_max_degree` or `leaf_max_degree` is non-zero but out of range.
+/// `[move] fun map_new_with_config<K, V>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): Map<K, V>`
+pub const INTRINSIC_FUN_MAP_NEW_WITH_CONFIG: &str = "map_new_with_config";
+
+/// Create an empty map with the reusable-slots policy enabled. Conservatively reports
+/// `aborts_if false` (matches the existing trusted spec; the Move source's BCS-size
+/// check on K/V is not expressible at this layer).
+/// `[move] fun map_new_with_reusable<K, V>(): Map<K, V>`
+pub const INTRINSIC_FUN_MAP_NEW_WITH_REUSABLE: &str = "map_new_with_reusable";
+
+/// Create an empty map configured against the provided key/value size hints.
+/// Conservatively reports `aborts_if false` (matches the existing trusted spec).
+/// `[move] fun map_new_with_type_size_hints<K, V>(avg_key_bytes: u64, max_key_bytes: u64, avg_value_bytes: u64, max_value_bytes: u64): Map<K, V>`
+pub const INTRINSIC_FUN_MAP_NEW_WITH_TYPE_SIZE_HINTS: &str = "map_new_with_type_size_hints";
 
 /// Abort condition for map_destroy_empty: true when the map is non-empty
 /// `[spec] fun map_spec_aborts_destroy_empty<K, V>(m: Map<K, V>): bool`
@@ -218,6 +356,35 @@ pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW: &str = "map_spec_aborts_borrow";
 /// duplicates (under $EncodeKey).
 /// `[spec] fun map_spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM: &str = "map_spec_aborts_new_from";
+
+/// Abort condition for map_new_with_config: true when a configured degree is non-zero and
+/// outside the supported range.
+/// `[spec] fun map_spec_aborts_new_with_config<K, V>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG: &str = "map_spec_aborts_new_with_config";
+
+/// Abort condition for the order-key family (front_key / back_key / borrow_front /
+/// borrow_back / pop_front / pop_back): true when the map is empty.
+/// `[spec] fun map_spec_aborts_empty_map<K, V>(m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP: &str = "map_spec_aborts_empty_map";
+
+/// Abort condition for map_iter_borrow_key: true when the iterator is the End sentinel.
+/// `[spec] fun map_spec_aborts_iter_borrow_key<K>(it: IteratorPtr<K>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_KEY: &str = "map_spec_aborts_iter_borrow_key";
+
+/// Abort condition for map_iter_borrow / map_iter_next: true when the iterator is End or
+/// its cached key is no longer in the map.
+/// `[spec] fun map_spec_aborts_iter_oob<K, V>(it: IteratorPtr<K>, m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_OOB: &str = "map_spec_aborts_iter_oob";
+
+/// Abort condition for map_iter_prev: true when the iterator is at begin (smallest key,
+/// or End-on-empty-map) or its cached key is no longer in the map.
+/// `[spec] fun map_spec_aborts_iter_prev<K, V>(it: IteratorPtr<K>, m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_PREV: &str = "map_spec_aborts_iter_prev";
+
+/// Abort condition for map_iter_remove: true when the wrapped iterator is End or its
+/// cached key is no longer in the map.
+/// `[spec] fun map_spec_aborts_iter_remove<K, V>(self: IteratorPtrWithPath<K>, m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_REMOVE: &str = "map_spec_aborts_iter_remove";
 
 /// Definition of an intrinsic function associated with an intrinsic type.
 ///
@@ -326,12 +493,17 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
             ),
+            (INTRINSIC_FUN_MAP_GET, IntrinsicFunDef::move_fun(None, None)),
             (
                 INTRINSIC_FUN_MAP_NEW_FROM,
                 IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM)),
             ),
             (
                 INTRINSIC_FUN_MAP_TO_VEC_PAIR,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_UPSERT,
                 IntrinsicFunDef::move_fun(None, None),
             ),
             (
@@ -344,6 +516,112 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_VALUES,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_FRONT_KEY,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_BACK_KEY,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_BORROW_FRONT,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_BORROW_BACK,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_POP_FRONT,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_POP_BACK,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_PREV_KEY,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_NEXT_KEY,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_NEW_BEGIN,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_NEW_END,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_IS_END,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_IS_BEGIN,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_BORROW_KEY,
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_KEY),
+                ),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_BORROW,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_OOB)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_NEXT,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_OOB)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_PREV,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_PREV)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_FIND,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_FIND_WITH_PATH,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_WITH_PATH_GET_ITER,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_REMOVE,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_REMOVE)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_NEW_WITH_CONFIG,
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG),
+                ),
+            ),
+            (
+                INTRINSIC_FUN_MAP_NEW_WITH_REUSABLE,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_NEW_WITH_TYPE_SIZE_HINTS,
                 IntrinsicFunDef::move_fun(None, None),
             ),
             (
@@ -364,6 +642,30 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY_MAP,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_KEY,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_OOB,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_PREV,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_REMOVE,
                 IntrinsicFunDef::spec_fun(),
             ),
         ])

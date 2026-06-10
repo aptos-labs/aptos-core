@@ -3,6 +3,11 @@ spec aptos_framework::ordered_map {
     spec OrderedMap {
         pragma intrinsic = map,
             map_new = new,
+            map_new_from = new_from,
+            map_to_vec_pair = to_vec_pair,
+            map_keys = keys,
+            map_values = values,
+            map_upsert = upsert,
             map_len = length,
             map_destroy_empty = destroy_empty,
             map_has_key = contains,
@@ -14,7 +19,8 @@ spec aptos_framework::ordered_map {
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
             map_spec_has_key = spec_contains_key,
-            map_is_empty = is_empty;
+            map_is_empty = is_empty,
+            map_spec_aborts_new_from = spec_aborts_new_from;
     }
 
     spec native fun spec_len<K, V>(t: OrderedMap<K, V>): num;
@@ -22,6 +28,7 @@ spec aptos_framework::ordered_map {
     spec native fun spec_set<K, V>(t: OrderedMap<K, V>, k: K, v: V): OrderedMap<K, V>;
     spec native fun spec_remove<K, V>(t: OrderedMap<K, V>, k: K): OrderedMap<K, V>;
     spec native fun spec_get<K, V>(t: OrderedMap<K, V>, k: K): V;
+    spec native fun spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool;
 
     spec length {
         pragma intrinsic;
@@ -121,8 +128,7 @@ spec aptos_framework::ordered_map {
     }
 
     spec values {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
 
@@ -143,38 +149,19 @@ spec aptos_framework::ordered_map {
     }
 
     spec keys {
-        pragma verify = false;
-        pragma opaque;
-        ensures [abstract] forall k: K: vector::spec_contains(result, k) <==> spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
     spec to_vec_pair {
-        pragma verify = false;
-        pragma opaque;
+        pragma intrinsic;
     }
 
-    spec new_from<K, V>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if [abstract] exists i in 0..len(keys), j in 0..len(keys) where i != j : keys[i] == keys[j];
-        aborts_if [abstract] len(keys) != len(values);
-        ensures [abstract] forall k: K {spec_contains_key(result, k)} : vector::spec_contains(keys,k) <==> spec_contains_key(result, k);
-        ensures [abstract] forall i in 0..len(keys) : spec_get(result, keys[i]) == values[i];
-        ensures [abstract] spec_len(result) == len(keys);
+    spec new_from {
+        pragma intrinsic;
     }
 
     spec upsert {
-        pragma opaque;
-        pragma verify = false;
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result);
-        ensures [abstract] spec_contains_key(self, key);
-        ensures [abstract] spec_get(self, key) == value;
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result)) && (option::borrow(result) == spec_get(old(
-            self), key)));
-        ensures [abstract] !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
-        ensures [abstract] spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
-        ensures [abstract] forall k: K: spec_contains_key(old(self), k) && k != key ==> spec_get(old(self), k) == spec_get(self, k);
-        ensures [abstract] forall k: K: spec_contains_key(old(self), k) ==> spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
     spec replace_key_inplace {
