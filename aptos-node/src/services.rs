@@ -18,7 +18,7 @@ use aptos_indexer_grpc_table_info::runtime::{
     bootstrap as bootstrap_indexer_table_info, bootstrap_internal_indexer_db,
 };
 use aptos_inspection_service::server::InspectionServiceComponents;
-use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
+use aptos_logger::{info, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{
     network::MempoolSyncMsg, MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
 };
@@ -160,7 +160,10 @@ pub fn start_consensus_runtime(
         consensus_publisher,
         num_worker_threads,
     );
-    debug!("Consensus started in {} ms", instant.elapsed().as_millis());
+    info!(
+        time_ms = instant.elapsed().as_millis() as u64,
+        "Consensus started (incl. ConsensusDB, QuorumStoreDB, RandDB open + recovery)."
+    );
 
     consensus
 }
@@ -192,7 +195,10 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         mempool_reconfig_subscription,
         peers_and_metadata,
     );
-    debug!("Mempool started in {} ms", instant.elapsed().as_millis());
+    info!(
+        time_ms = instant.elapsed().as_millis() as u64,
+        "Mempool started."
+    );
 
     (mempool, consensus_to_mempool_sender)
 }

@@ -167,6 +167,7 @@ impl AptosDB {
         let position_epoch_snapshot_pruner_config: StateMerklePrunerConfig =
             pruner_config.epoch_snapshot_pruner_config.into();
 
+        let state_store_start = Instant::now();
         let mut myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
@@ -179,6 +180,10 @@ impl AptosDB {
             empty_buffered_state_for_restore,
             internal_indexer_db,
             hot_state_config,
+        );
+        info!(
+            time_ms = state_store_start.elapsed().as_millis() as u64,
+            "Built AptosDB StateStore and pruners (incl. hot-state load, truncation, replay)."
         );
 
         if ENABLE_TRADING_NATIVE {

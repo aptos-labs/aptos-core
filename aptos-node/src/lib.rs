@@ -692,6 +692,8 @@ pub fn setup_environment_and_start_node(
     api_port_tx: Option<oneshot::Sender<u16>>,
     indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<AptosHandle> {
+    let node_boot_start = std::time::Instant::now();
+
     // Log the node config at node startup
     node_config.log_all_configs();
 
@@ -780,6 +782,7 @@ pub fn setup_environment_and_start_node(
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
+    let network_setup_start = std::time::Instant::now();
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
     let (
         network_runtimes,
@@ -796,6 +799,10 @@ pub fn setup_environment_and_start_node(
         peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
+    info!(
+        time_ms = network_setup_start.elapsed().as_millis() as u64,
+        "Set up networks and gathered application interfaces."
+    );
 
     // Start the peer monitoring service
     let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
@@ -805,6 +812,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus
+    let state_sync_start = std::time::Instant::now();
     let (aptos_data_client, state_sync_runtime, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
@@ -813,6 +821,10 @@ pub fn setup_environment_and_start_node(
             event_subscription_service,
             db_rw.clone(),
         )?;
+    info!(
+        time_ms = state_sync_start.elapsed().as_millis() as u64,
+        "Started state sync (driver, data client, storage service)."
+    );
 
     // Inject the now-available components into the already-running inspection service.
     // This unblocks /peer_information (and any other endpoints that need these values).
@@ -864,9 +876,13 @@ pub fn setup_environment_and_start_node(
     );
 
     // Wait until state sync has been initialized
-    debug!("Waiting until state sync is initialized!");
+    info!("Waiting until state sync is initialized (bootstrapping)...");
+    let state_sync_bootstrap_start = std::time::Instant::now();
     state_sync_runtime.block_until_initialized();
-    debug!("State sync initialization complete.");
+    info!(
+        time_ms = state_sync_bootstrap_start.elapsed().as_millis() as u64,
+        "State sync initialization (bootstrapping) complete."
+    );
 
     // Create the consensus observer and publisher (if enabled)
     let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =
@@ -890,6 +906,11 @@ pub fn setup_environment_and_start_node(
         vtxn_pool,
         consensus_publisher.clone(),
         &mut admin_service,
+    );
+
+    info!(
+        time_ms = node_boot_start.elapsed().as_millis() as u64,
+        "Node startup complete; all runtimes initialized."
     );
 
     Ok(AptosHandle {
