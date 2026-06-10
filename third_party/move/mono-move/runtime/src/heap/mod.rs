@@ -226,6 +226,13 @@ impl Heap {
             gc_count: 0,
         }
     }
+
+    /// Resets the bump pointer to the start of the buffer, discarding all live
+    /// allocations without reallocating. Used to re-run an execution from a
+    /// clean heap (e.g. across benchmark samples).
+    pub(crate) fn reset(&mut self) {
+        self.bump_ptr = self.buffer.as_ptr();
+    }
 }
 
 /// Outcome of a bump-allocation attempt.

@@ -374,6 +374,13 @@ impl ResourceReadWriteSet {
         self.journal.len()
     }
 
+    /// Returns the entry recorded for `key`, if this run has touched it (read,
+    /// written, or both). Used to read back the final write of a resource for
+    /// differential comparison against another VM.
+    pub(crate) fn get(&self, key: &InMemoryStorageKey) -> Option<&Entry> {
+        self.entries.get(key)
+    }
+
     /// Save the current state and advance the epoch. A subsequent roll back
     /// can return here.
     pub fn checkpoint(&mut self) {

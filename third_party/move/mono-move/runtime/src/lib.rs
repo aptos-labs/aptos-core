@@ -9,6 +9,7 @@ pub(crate) mod global_storage;
 pub(crate) mod heap;
 mod interpreter;
 mod local_runtime_context;
+mod materializing_provider;
 pub(crate) mod memory;
 mod native_context;
 mod transaction_context;
@@ -18,8 +19,9 @@ mod verifier;
 
 pub use error::{RuntimeError, RuntimeStatus};
 pub use execution_context::{ExecutionContext, LocalExecutionContext};
-pub use interpreter::InterpreterContext;
+pub use interpreter::{InterpreterContext, ResourceWrite};
 pub use local_runtime_context::LocalRuntimeContext;
+pub use materializing_provider::MaterializingResourceProvider;
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
     write_u64, MemoryRegion,

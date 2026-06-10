@@ -37,6 +37,7 @@ pub mod proof;
 pub mod proptest_types;
 pub mod quorum_store;
 pub mod randomness;
+pub mod replay;
 pub mod secret_sharing;
 pub mod serde_helper;
 pub mod stake_pool;

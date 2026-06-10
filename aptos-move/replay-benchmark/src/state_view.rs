@@ -12,37 +12,12 @@ use aptos_types::{
     transaction::Version,
 };
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Represents the read-set obtained when executing transactions.
-#[derive(Serialize, Deserialize)]
-pub(crate) struct ReadSet {
-    data: HashMap<StateKey, StateValue>,
-}
-
-impl TStateView for ReadSet {
-    type Key = StateKey;
-
-    fn next_version(&self) -> Version {
-        0
-    }
-
-    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
-        let slot = match self.data.get(state_key) {
-            Some(state_value) => StateSlot::new(state_key.clone(), StateSlotKind::ColdOccupied {
-                value_version: 0,
-                value: state_value.clone(),
-            }),
-            None => StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant),
-        };
-        Ok(slot)
-    }
-
-    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        unreachable!("Should not be called when benchmarking")
-    }
-}
+// `ReadSet` now lives in `aptos-types` so lightweight consumers can decode the
+// produced files without depending on this crate. Re-exported to keep the
+// existing module path stable.
+pub use aptos_types::replay::ReadSet;
 
 /// [StateView] implementation that records all execution reads. Captured reads can be converted
 /// into a [ReadSet].
@@ -83,9 +58,7 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
     }
 
     pub(crate) fn into_read_set(self) -> ReadSet {
-        ReadSet {
-            data: self.captured_reads.into_inner(),
-        }
+        ReadSet::new(self.captured_reads.into_inner())
     }
 }
 
