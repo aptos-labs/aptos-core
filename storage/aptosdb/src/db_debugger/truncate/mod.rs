@@ -70,7 +70,7 @@ impl Cmd {
                         delete_on_restart: true,
                         ..HotStateConfig::default()
                     },
-                )?;
+                );
 
             let ledger_db = Arc::new(ledger_db);
             let state_merkle_db = Arc::new(state_merkle_db);
