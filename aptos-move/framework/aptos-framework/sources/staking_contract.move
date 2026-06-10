@@ -62,6 +62,8 @@ module aptos_framework::staking_contract {
     const ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY: u64 = 8;
     /// Changing beneficiaries for operators is not supported.
     const EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED: u64 = 9;
+    /// Beneficiary cannot be a reserved address that cannot receive coin distributions.
+    const EINVALID_BENEFICIARY_ADDRESS: u64 = 10;
 
     /// Maximum number of distributions a stake pool can support.
     const MAXIMUM_PENDING_DISTRIBUTIONS: u64 = 20;
@@ -746,6 +748,12 @@ module aptos_framework::staking_contract {
         assert!(features::operator_beneficiary_change_enabled(), std::error::invalid_state(
             EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED
         ));
+        // @vm_reserved can never have an account created for it, so it can't receive coin distributions.
+        // Allowing it as a beneficiary would permanently brick distribution for the staking contract.
+        assert!(
+            new_beneficiary != @vm_reserved,
+            error::invalid_argument(EINVALID_BENEFICIARY_ADDRESS),
+        );
         // The beneficiay address of an operator is stored under the operator's address.
         // So, the operator does not need to be validated with respect to a staking pool.
         let operator_addr = signer::address_of(operator);
@@ -1339,6 +1347,18 @@ module aptos_framework::staking_contract {
         assert!(staking_contract_exists(staker_address, operator_2_address), 0);
         assert!(!staking_contract_exists(staker_address, operator_1_address), 1);
         assert!(commission_percentage(staker_address, operator_2_address) == 10, 2);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    #[expected_failure(abort_code = 0x1000a, location = Self)]
+    public entry fun test_set_beneficiary_to_reserved_address_aborts(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires Store, BeneficiaryForOperator {
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
+        // Setting the beneficiary to @vm_reserved must be rejected, otherwise distribution would be bricked.
+        set_beneficiary_for_operator(operator, @vm_reserved);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator1 = @0x234, beneficiary = @0x345, operator2 = @0x456)]
