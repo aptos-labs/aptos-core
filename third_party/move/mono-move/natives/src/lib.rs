@@ -31,6 +31,11 @@ pub use type_info::make_all_type_info_natives;
 /// specialized to one concrete instantiation registers as
 /// [`Dispatch::Monomorphic`] carrying that instantiation's type arguments. The
 /// consumer interns these into a `NativeName` registry key.
+//
+// TODO: this duplicates `NativeName`'s shape. We keep it separate because
+// `NativeName` holds arena-interned ids that require an `ExecutionGuard`, which
+// is unavailable when these tables are built statically. Revisit if interning
+// becomes available earlier.
 pub enum Dispatch {
     Polymorphic,
     Monomorphic(&'static [InternedType]),

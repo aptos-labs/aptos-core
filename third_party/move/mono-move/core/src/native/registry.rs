@@ -23,10 +23,9 @@ pub struct NativeIdx(pub u32);
 ///
 /// A native is either a template that serves every instantiation, or a body
 /// specialized to one concrete instantiation. The two variants let
-/// type-agnostic natives (e.g. `signer::borrow_address`) register once while
-/// type-sensitive natives (e.g. `aggregator_v2::try_add`) register a separate
-/// body per concrete type. Resolution tries the monomorphic key first and falls
-/// back to the polymorphic one (see [`NativeRegistry::resolve`]).
+/// type-agnostic natives register once while type-sensitive natives register a
+/// separate body per concrete type. Resolution tries the monomorphic key first
+/// and falls back to the polymorphic one (see [`NativeRegistry::resolve`]).
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NativeName {
     /// One implementation for all instantiations.

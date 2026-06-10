@@ -127,6 +127,11 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                         Some(v1) => (v1.param_kinds.clone(), v1.return_kinds.clone()),
                         None => load_signature_v1(&storage, &address, &module_name, &function_name),
                     };
+                    assert_eq!(
+                        param_kinds.len(),
+                        args.len(),
+                        "function requires a different number of arguments"
+                    );
                     let (v2_output, v2_gc_count) = execute_function_v2(
                         &guard,
                         &module_provider,
