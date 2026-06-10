@@ -115,81 +115,141 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
         hot_state_config: HotStateConfig,
     ) -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb)> {
-        std::thread::scope(|s| {
-            let ledger_handle = s.spawn(|| {
-                LedgerDb::new(
-                    db_paths.ledger_db_root_path(),
-                    rocksdb_configs.ledger_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                )
-            });
-            let hot_state_kv_handle = s.spawn(|| {
-                StateKvDb::new(
-                    db_paths,
-                    rocksdb_configs.state_kv_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    /* is_hot = */ true,
-                    hot_state_config.delete_on_restart,
-                )
-            });
-            let state_kv_handle = s.spawn(|| {
-                StateKvDb::new(
-                    db_paths,
-                    rocksdb_configs.state_kv_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    /* is_hot = */ false,
-                    /* delete_on_restart = */ false,
-                )
-            });
-            let hot_state_merkle_handle = s.spawn(|| {
-                StateMerkleDb::new(
-                    db_paths,
-                    rocksdb_configs.state_merkle_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    max_num_nodes_per_lru_cache_shard,
-                    /* is_hot = */ true,
-                    hot_state_config.delete_on_restart,
-                )
-            });
-            let state_merkle_handle = s.spawn(|| {
-                StateMerkleDb::new(
-                    db_paths,
-                    rocksdb_configs.state_merkle_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    max_num_nodes_per_lru_cache_shard,
-                    /* is_hot = */ false,
-                    /* delete_on_restart = */ false,
-                )
-            });
+        let start = Instant::now();
+        let result = std::thread::scope(
+            |s| -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb, StateKvDb)> {
+                // Open each sub-DB group on its own named thread, each timing its own
+                // open so the slowest group is attributable in the logs.
+                let ledger_handle = std::thread::Builder::new()
+                    .name("open-ledger-db".to_string())
+                    .spawn_scoped(s, || {
+                        let t = Instant::now();
+                        let db = LedgerDb::new(
+                            db_paths.ledger_db_root_path(),
+                            rocksdb_configs.ledger_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                        );
+                        info!(
+                            db_group = "ledger",
+                            time_ms = t.elapsed().as_millis() as u64,
+                            "Opened AptosDB sub-DB group."
+                        );
+                        db
+                    })
+                    .expect("Failed to spawn open-ledger-db thread");
+                let hot_state_kv_handle = std::thread::Builder::new()
+                    .name("open-hot-kv-db".to_string())
+                    .spawn_scoped(s, || {
+                        let t = Instant::now();
+                        let db = StateKvDb::new(
+                            db_paths,
+                            rocksdb_configs.state_kv_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            /* is_hot = */ true,
+                            hot_state_config.delete_on_restart,
+                        );
+                        info!(
+                            db_group = "hot_state_kv",
+                            time_ms = t.elapsed().as_millis() as u64,
+                            "Opened AptosDB sub-DB group."
+                        );
+                        db
+                    })
+                    .expect("Failed to spawn open-hot-kv-db thread");
+                let state_kv_handle = std::thread::Builder::new()
+                    .name("open-kv-db".to_string())
+                    .spawn_scoped(s, || {
+                        let t = Instant::now();
+                        let db = StateKvDb::new(
+                            db_paths,
+                            rocksdb_configs.state_kv_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            /* is_hot = */ false,
+                            /* delete_on_restart = */ false,
+                        );
+                        info!(
+                            db_group = "state_kv",
+                            time_ms = t.elapsed().as_millis() as u64,
+                            "Opened AptosDB sub-DB group."
+                        );
+                        db
+                    })
+                    .expect("Failed to spawn open-kv-db thread");
+                let hot_state_merkle_handle = std::thread::Builder::new()
+                    .name("open-hot-mkl-db".to_string())
+                    .spawn_scoped(s, || {
+                        let t = Instant::now();
+                        let db = StateMerkleDb::new(
+                            db_paths,
+                            rocksdb_configs.state_merkle_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            max_num_nodes_per_lru_cache_shard,
+                            /* is_hot = */ true,
+                            hot_state_config.delete_on_restart,
+                        );
+                        info!(
+                            db_group = "hot_state_merkle",
+                            time_ms = t.elapsed().as_millis() as u64,
+                            "Opened AptosDB sub-DB group."
+                        );
+                        db
+                    })
+                    .expect("Failed to spawn open-hot-mkl-db thread");
+                let state_merkle_handle = std::thread::Builder::new()
+                    .name("open-mkl-db".to_string())
+                    .spawn_scoped(s, || {
+                        let t = Instant::now();
+                        let db = StateMerkleDb::new(
+                            db_paths,
+                            rocksdb_configs.state_merkle_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            max_num_nodes_per_lru_cache_shard,
+                            /* is_hot = */ false,
+                            /* delete_on_restart = */ false,
+                        );
+                        info!(
+                            db_group = "state_merkle",
+                            time_ms = t.elapsed().as_millis() as u64,
+                            "Opened AptosDB sub-DB group."
+                        );
+                        db
+                    })
+                    .expect("Failed to spawn open-mkl-db thread");
 
-            Ok((
-                ledger_handle
-                    .join()
-                    .expect("Ledger db open thread panicked")?,
-                hot_state_merkle_handle
-                    .join()
-                    .expect("Hot state merkle db open thread panicked")?,
-                state_merkle_handle
-                    .join()
-                    .expect("State merkle db open thread panicked")?,
-                hot_state_kv_handle
-                    .join()
-                    .expect("Hot state kv db open thread panicked")?,
-                state_kv_handle
-                    .join()
-                    .expect("State kv db open thread panicked")?,
-            ))
-        })
+                Ok((
+                    ledger_handle
+                        .join()
+                        .expect("Ledger db open thread panicked")?,
+                    hot_state_merkle_handle
+                        .join()
+                        .expect("Hot state merkle db open thread panicked")?,
+                    state_merkle_handle
+                        .join()
+                        .expect("State merkle db open thread panicked")?,
+                    hot_state_kv_handle
+                        .join()
+                        .expect("Hot state kv db open thread panicked")?,
+                    state_kv_handle
+                        .join()
+                        .expect("State kv db open thread panicked")?,
+                ))
+            },
+        );
+        info!(
+            time_ms = start.elapsed().as_millis() as u64,
+            "Opened all AptosDB sub-DBs concurrently."
+        );
+        result
     }
 
     pub fn add_version_update_subscriber(

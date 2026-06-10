@@ -39,7 +39,13 @@ pub use rocksdb::{
     DBCompressionType, Env, Options, ReadOptions, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use rocksdb::{ErrorKind, WriteOptions};
-use std::{collections::HashSet, fmt, iter::Iterator, path::Path};
+use std::{
+    collections::HashSet,
+    fmt,
+    iter::Iterator,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -151,6 +157,7 @@ impl DB {
         cfds: Vec<ColumnFamilyDescriptor>,
         open_mode: OpenMode,
     ) -> DbResult<DB> {
+        let start = Instant::now();
         // ignore error, since it'll fail to list cfs on the first open
         let existing_cfs: HashSet<String> = rocksdb::DB::list_cf(&db_opts, path.de_unc())
             .unwrap_or_default()
@@ -195,7 +202,14 @@ impl DB {
         }
         .into_db_res()?;
 
-        Ok(Self::log_construct(name, open_mode, inner, db_opts))
+        Ok(Self::log_construct(
+            name,
+            open_mode,
+            &requested_cfs,
+            inner,
+            db_opts,
+            start.elapsed(),
+        ))
     }
 
     fn cfd_for_unrecognized_cf(cf: &String) -> ColumnFamilyDescriptor {
@@ -206,17 +220,48 @@ impl DB {
         ColumnFamilyDescriptor::new(cf.to_string(), cf_opts)
     }
 
-    fn log_construct(name: &str, open_mode: OpenMode, inner: rocksdb::DB, opts: Options) -> DB {
-        info!(
-            rocksdb_name = name,
-            open_mode = ?open_mode,
-            "Opened RocksDB."
-        );
-        DB {
+    fn log_construct(
+        name: &str,
+        open_mode: OpenMode,
+        requested_cfs: &HashSet<String>,
+        inner: rocksdb::DB,
+        opts: Options,
+        open_duration: Duration,
+    ) -> DB {
+        let db = DB {
             name: name.to_string(),
             inner,
             opts,
+        };
+        // Best-effort on-disk size summary aggregated across the DB's column
+        // families, logged alongside the open latency to explain slow opens
+        // (e.g. a large SST / WAL backlog). Property reads that fail fall back
+        // to 0 so this never blocks an open.
+        let mut total_sst_bytes: u64 = 0;
+        let mut live_sst_bytes: u64 = 0;
+        let mut estimate_num_keys: u64 = 0;
+        for cf in requested_cfs {
+            total_sst_bytes += db
+                .get_property(cf.as_str(), "rocksdb.total-sst-files-size")
+                .unwrap_or(0);
+            live_sst_bytes += db
+                .get_property(cf.as_str(), "rocksdb.live-sst-files-size")
+                .unwrap_or(0);
+            estimate_num_keys += db
+                .get_property(cf.as_str(), "rocksdb.estimate-num-keys")
+                .unwrap_or(0);
         }
+        info!(
+            rocksdb_name = name,
+            open_mode = ?open_mode,
+            time_ms = open_duration.as_millis() as u64,
+            num_cfs = requested_cfs.len(),
+            total_sst_bytes = total_sst_bytes,
+            live_sst_bytes = live_sst_bytes,
+            estimate_num_keys = estimate_num_keys,
+            "Opened RocksDB."
+        );
+        db
     }
 
     /// Reads single record by key.

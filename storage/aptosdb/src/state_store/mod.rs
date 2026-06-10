@@ -452,6 +452,7 @@ impl StateStore {
         hot_state_config: HotStateConfig,
     ) -> Self {
         if !hack_for_tests && !empty_buffered_state_for_restore {
+            let sync_progress_start = std::time::Instant::now();
             Self::sync_commit_progress(
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
@@ -460,6 +461,10 @@ impl StateStore {
                 Arc::clone(&hot_state_merkle_db),
                 /*crash_if_difference_is_too_large=*/ true,
                 hot_state_config.delete_on_restart,
+            );
+            info!(
+                time_ms = sync_progress_start.elapsed().as_millis() as u64,
+                "Synced DB commit progress (truncation) on open."
             );
         }
         let state_db = Arc::new(StateDb {
@@ -748,6 +753,7 @@ impl StateStore {
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         hot_state_config: HotStateConfig,
     ) -> Result<BufferedState> {
+        let init_start = std::time::Instant::now();
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -884,6 +890,7 @@ impl StateStore {
                 .hot_root_hash()
                 .expect("main state always has a hot half"),
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
+            time_ms = init_start.elapsed().as_millis() as u64,
             "StateStore initialization finished.",
         );
         Ok(buffered_state)
