@@ -444,8 +444,7 @@ proptest! {
                     delete_on_restart: true,
                     ..HotStateConfig::default()
                 },
-            )
-            .unwrap();
+            );
 
         let ledger_metadata_db = ledger_db.metadata_db_arc();
 
