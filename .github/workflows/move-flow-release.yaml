@@ -9,7 +9,7 @@ on:
       release_version:
         type: string
         required: true
-        description: "The release version. E.g. '0.1.0':"
+        description: "The release version. E.g. '1.0.4':"
       source_git_ref_override:
         type: string
         required: false
@@ -45,3 +45,81 @@ jobs:
       release_title: ${{ inputs.release_title || format('move-flow v{0}', inputs.release_version) }}
       dry_run: ${{ inputs.dry_run }}
       skip_checks: ${{ inputs.skip_checks }}
+
+  publish-crate:
+    name: "Publish aptos-move-flow to crates.io"
+    needs: release-move-flow
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: cargo publish (idempotent)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set +e
+          output=$(cargo publish -p aptos-move-flow 2>&1)
+          rc=$?
+          echo "$output"
+          if [ $rc -eq 0 ]; then
+            echo "::notice::aptos-move-flow published to crates.io."
+            exit 0
+          fi
+          if echo "$output" | grep -qiE 'already (exists|uploaded)|is already uploaded'; then
+            echo "::notice::aptos-move-flow version already present on crates.io — treating as success."
+            exit 0
+          fi
+          exit $rc
+
+  publish-plugin:
+    name: "Publish move-flow plugin PR to aptos-ai"
+    needs: release-move-flow
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Check for plugin-publisher PAT
+        id: check_pat
+        env:
+          PLUGIN_PUBLISHER_PAT: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_AI_PLUGIN_PUBLISHER }}
+        run: |
+          if [ -z "${PLUGIN_PUBLISHER_PAT}" ]; then
+            echo "has_pat=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::plugin PR skipped: APTOS_BOT_GH_PAT_APTOS_AI_PLUGIN_PUBLISHER not configured"
+          else
+            echo "has_pat=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check out aptos-core
+        if: steps.check_pat.outputs.has_pat == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      - name: Check out aptos-labs/aptos-ai
+        if: steps.check_pat.outputs.has_pat == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: aptos-labs/aptos-ai
+          token: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_AI_PLUGIN_PUBLISHER }}
+          path: aptos-ai
+          ref: main
+      - name: Set up Rust toolchain
+        if: steps.check_pat.outputs.has_pat == 'true'
+        uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Configure git identity
+        if: steps.check_pat.outputs.has_pat == 'true'
+        run: |
+          git config --global user.email "aptos-bot@aptos.dev"
+          git config --global user.name "aptos-bot"
+      - name: Run publish-plugin.sh against the aptos-ai checkout
+        if: steps.check_pat.outputs.has_pat == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_AI_PLUGIN_PUBLISHER }}
+        run: |
+          ./aptos-move/flow/scripts/publish-plugin.sh "${{ github.workspace }}/aptos-ai"

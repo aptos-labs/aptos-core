@@ -82,8 +82,78 @@ on:
         description: "Skip version checks"
 
 jobs:
+  preflight:
+    name: "Pre-flight checks"
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: "read"
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Validate release_version format
+        run: |
+          if ! echo "${{ inputs.release_version }}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::release_version '${{ inputs.release_version }}' is malformed."
+            echo "::error::Expected semantic version of the form 'MAJOR.MINOR.PATCH' (e.g. '1.0.4'), matching ^[0-9]+\\.[0-9]+\\.[0-9]+$."
+            exit 1
+          fi
+          echo "release_version '${{ inputs.release_version }}' has valid format."
+      - name: Enforce skip_checks restriction
+        run: |
+          if [ "${{ inputs.dry_run }}" = "false" ] && [ "${{ inputs.skip_checks }}" = "true" ]; then
+            echo "::error::skip_checks=true is not allowed when dry_run=false."
+            echo "::error::Real releases must pass all version checks. Either set dry_run=true (testing) or skip_checks=false (real release)."
+            exit 1
+          fi
+          echo "skip_checks gate OK (dry_run=${{ inputs.dry_run }}, skip_checks=${{ inputs.skip_checks }})."
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+          fetch-depth: 0
+      - name: Validate source ref reachable from release branches (real releases only)
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          git fetch origin --no-tags --quiet
+          HEAD_SHA="$(git rev-parse HEAD)"
+          REACHED_BY=""
+          while IFS= read -r BRANCH; do
+            BRANCH="${BRANCH##[[:space:]]*}"
+            case "$BRANCH" in
+              origin/main|origin/release-*)
+                REACHED_BY="$BRANCH"
+                break
+                ;;
+            esac
+          done < <(git branch -r --contains "$HEAD_SHA")
+          if [ -z "$REACHED_BY" ]; then
+            EFFECTIVE="${{ inputs.source_git_ref_override || github.ref_name }}"
+            echo "::error::Real releases must originate from a commit reachable from 'origin/main' or an 'origin/release-*' branch."
+            echo "::error::Effective source ref '$EFFECTIVE' (HEAD=$HEAD_SHA) is not on any allowed branch."
+            echo "::error::Re-run from 'main' or a 'release-*' branch, or set dry_run=true."
+            exit 1
+          fi
+          echo "HEAD '$HEAD_SHA' reachable from '$REACHED_BY' — allowed for real releases."
+      - name: Tag-collision check
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          TAG="${{ inputs.binary_name }}-v${{ inputs.release_version }}"
+          echo "Checking for existing release/tag '$TAG' ..."
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::A GitHub Release tagged '$TAG' already exists."
+            echo "::error::Bump the version in Cargo.toml (and release_version input) or delete the existing release before re-running."
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "::error::A git tag '$TAG' already exists on origin."
+            echo "::error::Bump the version in Cargo.toml (and release_version input) or delete the existing tag before re-running."
+            exit 1
+          fi
+          echo "No existing release or tag named '$TAG'. Proceeding."
+
   build-linux-x86:
     name: "Build Linux x86_64"
+    needs: preflight
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -108,6 +178,7 @@ jobs:
 
   build-linux-arm:
     name: "Build Linux ARM64"
+    needs: preflight
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v6
@@ -132,6 +203,7 @@ jobs:
 
   build-macos-x86:
     name: "Build macOS x86_64"
+    needs: preflight
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v6
@@ -156,6 +228,7 @@ jobs:
 
   build-macos-arm:
     name: "Build macOS ARM64"
+    needs: preflight
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -180,15 +253,14 @@ jobs:
 
   build-windows-x86:
     name: "Build Windows x86_64"
+    needs: preflight
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_git_ref_override || github.sha }}
-      # Ensure we use caching
       - name: Run cargo cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
-      # Ensure that long paths work
       - name: Ensure long paths work
         run: git config --global core.longpaths true
         shell: bash
@@ -239,18 +311,18 @@ jobs:
         id: release_info
         run: |
           if [ -n "${{ inputs.release_title }}" ]; then
-            echo "title=${{ inputs.release_title }}" >> $GITHUB_OUTPUT
+            echo "title=${{ inputs.release_title }}" >> "$GITHUB_OUTPUT"
           else
-            echo "title=${{ inputs.binary_name }} v${{ inputs.release_version }}" >> $GITHUB_OUTPUT
+            echo "title=${{ inputs.binary_name }} v${{ inputs.release_version }}" >> "$GITHUB_OUTPUT"
           fi
-          echo "tag=${{ inputs.binary_name }}-v${{ inputs.release_version }}" >> $GITHUB_OUTPUT
+          echo "tag=${{ inputs.binary_name }}-v${{ inputs.release_version }}" >> "$GITHUB_OUTPUT"
       - name: Create GitHub Release
-        uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # pin@v1.2.1
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # pin@v2.6.2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${{ steps.release_info.outputs.tag }}"
+          tag_name: "${{ steps.release_info.outputs.tag }}"
+          name: "${{ steps.release_info.outputs.title }}"
           prerelease: false
-          title: "${{ steps.release_info.outputs.title }}"
+          fail_on_unmatched_files: true
           files: |
             ${{ inputs.binary_name }}-*.zip
             ${{ inputs.binary_name }}-*.zip.sha256
