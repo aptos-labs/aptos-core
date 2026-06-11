@@ -1,0 +1,153 @@
+=== stackless ===
+// module 0x1::test
+
+fun is_empty(): bool {
+  slots: params(0), locals(1), temps(3)
+    r0: vector<vector<u8>>
+    r1: &vector<vector<u8>>
+    r2: u64
+    r3: bool
+  code:
+  L0:
+    0: r0 := vec_pack vector<u8>, 0, []
+    1: r1 := imm_borrow_loc r0
+    2: r2 := vec_len vector<u8>, r1
+    3: r3 := eq r2, #0
+    4: ret [r3]
+}
+
+fun elem(r0, r1): u8 {
+  slots: params(2), locals(1), temps(4)
+    r0: u64
+    r1: u64
+    r2: vector<vector<u8>>
+    r3: &vector<vector<u8>>
+    r4: &vector<u8>
+    r5: &u8
+    r6: u8
+  code:
+  L0:
+    0: r2 := ld_const #0
+    1: r3 := imm_borrow_loc r2
+    2: r4 := vec_imm_borrow vector<u8>, r3, r0
+    3: r5 := vec_imm_borrow u8, r4, r1
+    4: r6 := read_ref r5
+    5: ret [r6]
+}
+
+fun inner_0_len(): u64 {
+  slots: params(0), locals(1), temps(3)
+    r0: vector<vector<u8>>
+    r1: &vector<vector<u8>>
+    r2: u64
+    r3: &vector<u8>
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := ld_u64 0
+    3: r3 := vec_imm_borrow vector<u8>, r1, r2
+    4: r2 := vec_len u8, r3
+    5: ret [r2]
+}
+
+fun inner_1_len(): u64 {
+  slots: params(0), locals(1), temps(3)
+    r0: vector<vector<u8>>
+    r1: &vector<vector<u8>>
+    r2: u64
+    r3: &vector<u8>
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := ld_u64 1
+    3: r3 := vec_imm_borrow vector<u8>, r1, r2
+    4: r2 := vec_len u8, r3
+    5: ret [r2]
+}
+
+fun outer_len(): u64 {
+  slots: params(0), locals(1), temps(2)
+    r0: vector<vector<u8>>
+    r1: &vector<vector<u8>>
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: r1 := imm_borrow_loc r0
+    2: r2 := vec_len vector<u8>, r1
+    3: ret [r2]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun is_empty() {
+  frame_data_size: 40
+  entry_gas: 31
+  code:
+    0: VecNew [0]
+    1: SlotBorrow [8] <- &[0]
+    2: VecLen [24] <- vec_len([8])
+    3: IntCmp [32] <- [24] == u64 #0
+    4: Move(1) [0] <- [32]
+    5: Return
+}
+
+fun elem() {
+  frame_data_size: 80
+  entry_gas: 27
+  code:
+    0: StoreImmVec [16] <- const[0]
+    1: SlotBorrow [24] <- &[16]
+    2: VecBorrow [40] <- &[24][[0]] (elem_size=8)
+    3: VecBorrow [56] <- &[40][[8]] (elem_size=1)
+    4: ReadRef [72] <- *[56] (size=1)
+    5: Move(1) [0] <- [72]
+    6: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun inner_0_len() {
+  frame_data_size: 48
+  entry_gas: 65
+  code:
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: StoreImm8 [24] <- #0
+    3: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    4: VecLen [24] <- vec_len([32])
+    5: Move8 [0] <- [24]
+    6: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun inner_1_len() {
+  frame_data_size: 48
+  entry_gas: 65
+  code:
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: StoreImm8 [24] <- #1
+    3: VecBorrow [32] <- &[8][[24]] (elem_size=8)
+    4: VecLen [24] <- vec_len([32])
+    5: Move8 [0] <- [24]
+    6: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun outer_len() {
+  frame_data_size: 32
+  entry_gas: 60
+  code:
+    0: StoreImmVec [0] <- const[0]
+    1: SlotBorrow [8] <- &[0]
+    2: VecLen [24] <- vec_len([8])
+    3: Move8 [0] <- [24]
+    4: Return
+  safe_point_layouts:
+    0: []
+}

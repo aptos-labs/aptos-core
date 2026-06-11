@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::FrameOffset;
 use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
@@ -18,15 +19,19 @@ pub struct FrameSlot {
 /// ABI descriptor for a native function: where its arguments and return
 /// values sit in the calling frame, plus a few derived offsets the
 /// interpreter consults on every dispatch.
-//
-// TODO: add `heap_ptr_offsets: Vec<u32>` so the GC can scan a native's
-// frame correctly. Needed before any native can heap-allocate.
+///
+/// Invariants (validated by [`Self::new`]): `args` and `returns` are each
+/// sorted by offset and non-overlapping, and `heap_ptr_offsets` is sorted
+/// ascending.
 #[derive(Debug, Clone)]
 pub struct NativeABI {
     args: Vec<FrameSlot>,
     returns: Vec<FrameSlot>,
     args_end: u32,
     total_frame_size: u32,
+    /// Frame offsets of the pointer slots among the args, sorted ascending. The
+    /// GC scans these when a native is the top frame.
+    heap_ptr_offsets: Vec<FrameOffset>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -40,9 +45,14 @@ pub enum NativeABIError {
 impl NativeABI {
     /// Safe constructor for a NativeABI that also validates the ABI is well-formed.
     /// `args` and `returns` must be sorted by offset and must not overlap.
-    pub fn new(args: Vec<FrameSlot>, returns: Vec<FrameSlot>) -> Result<Self, NativeABIError> {
+    pub fn new(
+        args: Vec<FrameSlot>,
+        returns: Vec<FrameSlot>,
+        heap_ptr_offsets: Vec<FrameOffset>,
+    ) -> Result<Self, NativeABIError> {
         check_well_formed(&args, "arg")?;
         check_well_formed(&returns, "return")?;
+        check_sorted(&heap_ptr_offsets)?;
         let args_end = args.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
         let returns_end = returns.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
         Ok(Self {
@@ -50,6 +60,7 @@ impl NativeABI {
             returns,
             args_end,
             total_frame_size: args_end.max(returns_end),
+            heap_ptr_offsets,
         })
     }
 
@@ -68,6 +79,10 @@ impl NativeABI {
     pub fn total_frame_size(&self) -> u32 {
         self.total_frame_size
     }
+
+    pub fn heap_ptr_offsets(&self) -> &[FrameOffset] {
+        &self.heap_ptr_offsets
+    }
 }
 
 fn check_well_formed(slots: &[FrameSlot], kind: &'static str) -> Result<(), NativeABIError> {
@@ -79,6 +94,20 @@ fn check_well_formed(slots: &[FrameSlot], kind: &'static str) -> Result<(), Nati
         }
         if prev.offset + prev.size > curr.offset {
             return Err(NativeABIError::Overlap { kind, idx: i });
+        }
+    }
+    Ok(())
+}
+
+/// The GC scans `heap_ptr_offsets` in order; they must be strictly ascending
+/// (hence also free of duplicates).
+fn check_sorted(offsets: &[FrameOffset]) -> Result<(), NativeABIError> {
+    for i in 1..offsets.len() {
+        if offsets[i].0 <= offsets[i - 1].0 {
+            return Err(NativeABIError::Unsorted {
+                kind: "heap pointer offset",
+                idx: i,
+            });
         }
     }
     Ok(())

@@ -181,86 +181,86 @@ fun len_sum(r0, r1, r2): u64 {
 
 fun capture_one() {
   frame_data_size: 48
+  entry_gas: 283
   code:
-    0: Charge #147
-    1: VecNew [8]
-    2: SlotBorrow [24] <- &[8]
-    3: StoreImm8 [40] <- #10
-    4: VecPushBack [24].push([40], size=8, desc=2)
-    5: SlotBorrow [24] <- &[8]
-    6: StoreImm8 [40] <- #20
-    7: VecPushBack [24].push([40], size=8, desc=2)
-    8: SlotBorrow [24] <- &[8]
-    9: StoreImm8 [40] <- #30
-    10: VecPushBack [24].push([40], size=8, desc=2)
-    11: PackClosure [16] <- func_ref=Unresolved(len_plus), mask=1, captured_desc=3, captured=[[8](8)]
-    12: CallClosure closure=[16], provided_args=[[0](8)]
-    13: Move8 [40] <- [72]
-    14: Move8 [0] <- [40]
-    15: Return
+    0: VecNew [8]
+    1: SlotBorrow [24] <- &[8]
+    2: StoreImm8 [40] <- #10
+    3: VecPushBack [24].push([40], size=8, desc=0)
+    4: SlotBorrow [24] <- &[8]
+    5: StoreImm8 [40] <- #20
+    6: VecPushBack [24].push([40], size=8, desc=0)
+    7: SlotBorrow [24] <- &[8]
+    8: StoreImm8 [40] <- #30
+    9: VecPushBack [24].push([40], size=8, desc=0)
+    10: PackClosure [16] <- func_ref=Unresolved(len_plus), mask=1, captured_desc=2, captured=[[8](8)]
+    11: CallClosure closure=[16], provided_args=[[0](8)]
+    12: Move8 [40] <- [72]
+    13: Move8 [0] <- [40]
+    14: Return
   safe_point_layouts:
-    4: []
-    7: []
+    3: []
+    6: []
+    9: []
     10: []
-    11: []
 }
 
 fun capture_two() {
   frame_data_size: 56
+  entry_gas: 383
   code:
-    0: Charge #221
-    1: VecNew [8]
-    2: SlotBorrow [32] <- &[8]
-    3: StoreImm8 [48] <- #1
-    4: VecPushBack [32].push([48], size=8, desc=2)
-    5: SlotBorrow [32] <- &[8]
-    6: StoreImm8 [48] <- #2
-    7: VecPushBack [32].push([48], size=8, desc=2)
-    8: VecNew [16]
-    9: SlotBorrow [32] <- &[16]
-    10: StoreImm8 [48] <- #3
-    11: VecPushBack [32].push([48], size=8, desc=2)
-    12: SlotBorrow [32] <- &[16]
-    13: StoreImm8 [48] <- #4
-    14: VecPushBack [32].push([48], size=8, desc=2)
-    15: SlotBorrow [32] <- &[16]
-    16: StoreImm8 [48] <- #5
-    17: VecPushBack [32].push([48], size=8, desc=2)
-    18: PackClosure [24] <- func_ref=Unresolved(len_sum), mask=11, captured_desc=4, captured=[[8](8), [16](8)]
-    19: CallClosure closure=[24], provided_args=[[0](8)]
-    20: Move8 [48] <- [80]
-    21: Move8 [0] <- [48]
-    22: Return
+    0: VecNew [8]
+    1: SlotBorrow [32] <- &[8]
+    2: StoreImm8 [48] <- #1
+    3: VecPushBack [32].push([48], size=8, desc=0)
+    4: SlotBorrow [32] <- &[8]
+    5: StoreImm8 [48] <- #2
+    6: VecPushBack [32].push([48], size=8, desc=0)
+    7: VecNew [16]
+    8: SlotBorrow [32] <- &[16]
+    9: StoreImm8 [48] <- #3
+    10: VecPushBack [32].push([48], size=8, desc=0)
+    11: SlotBorrow [32] <- &[16]
+    12: StoreImm8 [48] <- #4
+    13: VecPushBack [32].push([48], size=8, desc=0)
+    14: SlotBorrow [32] <- &[16]
+    15: StoreImm8 [48] <- #5
+    16: VecPushBack [32].push([48], size=8, desc=0)
+    17: PackClosure [24] <- func_ref=Unresolved(len_sum), mask=11, captured_desc=3, captured=[[8](8), [16](8)]
+    18: CallClosure closure=[24], provided_args=[[0](8)]
+    19: Move8 [48] <- [80]
+    20: Move8 [0] <- [48]
+    21: Return
   safe_point_layouts:
-    4: []
-    7: []
-    11: []
-    14: []
+    3: []
+    6: []
+    10: []
+    13: []
+    16: []
     17: []
-    18: []
 }
 
 fun len_plus() {
   frame_data_size: 40
+  entry_gas: 63
   code:
-    0: Charge #11
-    1: SlotBorrow [16] <- &[0]
-    2: VecLen [32] <- vec_len([16])
-    3: AddU64 [32] <- [32] + [8]
-    4: Move8 [0] <- [32]
-    5: Return
+    0: SlotBorrow [16] <- &[0]
+    1: VecLen [32] <- vec_len([16])
+    2: AddU64 [32] <- [32] + [8]
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
 fun len_sum() {
   frame_data_size: 56
+  entry_gas: 72
   code:
-    0: Charge #18
-    1: SlotBorrow [24] <- &[0]
-    2: VecLen [40] <- vec_len([24])
-    3: SlotBorrow [24] <- &[8]
-    4: VecLen [48] <- vec_len([24])
-    5: AddU64 [48] <- [40] + [48]
-    6: AddU64 [48] <- [48] + [16]
-    7: Move8 [0] <- [48]
-    8: Return
+    0: SlotBorrow [24] <- &[0]
+    1: VecLen [40] <- vec_len([24])
+    2: SlotBorrow [24] <- &[8]
+    3: VecLen [48] <- vec_len([24])
+    4: AddU64 [48] <- [40] + [48]
+    5: AddU64 [48] <- [48] + [16]
+    6: Move8 [0] <- [48]
+    7: Return
 }

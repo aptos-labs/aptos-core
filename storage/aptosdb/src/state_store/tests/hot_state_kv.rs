@@ -7,6 +7,7 @@ use crate::{
     schema::{
         hot_state_value_by_key_hash::{HotStateEntry, HotStateValueByKeyHashSchema},
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+        HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
     },
     state_kv_db::{LoadedHotStateShard, StateKvDb},
     state_store::StateStore,
@@ -28,11 +29,17 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use proptest::{collection::vec, prelude::*};
+use std::collections::HashMap;
 
 fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
+    create_hot_state_kv_db_with_config(path, RocksdbConfig::default())
+}
+
+fn create_hot_state_kv_db_with_config(path: &TempPath, rocksdb_config: RocksdbConfig) -> StateKvDb {
     StateKvDb::new(
         &StorageDirPaths::from_path(path.path()),
-        RocksdbConfig::default(),
+        rocksdb_config,
         /* env = */ None,
         /* block_cache = */ None,
         /* readonly = */ false,
@@ -42,12 +49,24 @@ fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
     .unwrap()
 }
 
+/// Flush the hot state value CF in every shard so the data lives in SSTs rather than the
+/// memtable. The prefix bloom filter (only built under production config) lives on SSTs, so
+/// only after flushing does the cross-key-hash seek in `load_hot_state_kvs` contend with it.
+fn flush_hot_state_value_cf(db: &StateKvDb) {
+    for shard_id in 0..NUM_STATE_SHARDS {
+        db.db_shard(shard_id)
+            .flush_cf(HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME)
+            .unwrap();
+    }
+}
+
 fn make_state_key(seed: u8) -> StateKey {
     StateKey::raw(&[seed])
 }
 
 fn make_state_value(seed: u8) -> StateValue {
-    StateValue::new_legacy(vec![seed, seed].into())
+    // Vary length with the seed so total_value_bytes isn't summed over fixed-width values.
+    StateValue::new_legacy(vec![seed; (seed % 16) as usize + 1].into())
 }
 
 fn put_hot_state_entry(
@@ -56,10 +75,19 @@ fn put_hot_state_entry(
     version: Version,
     entry: Option<HotStateEntry>,
 ) {
-    let shard_id = key.get_shard_id();
+    put_hot_state_entry_by_hash(db, CryptoHash::hash(key), version, entry);
+}
+
+fn put_hot_state_entry_by_hash(
+    db: &StateKvDb,
+    key_hash: HashValue,
+    version: Version,
+    entry: Option<HotStateEntry>,
+) {
+    let shard_id = usize::from(key_hash.nibble(0));
     let mut batch = db.db_shard(shard_id).new_native_batch();
     batch
-        .put::<HotStateValueByKeyHashSchema>(&(CryptoHash::hash(key), version), &entry)
+        .put::<HotStateValueByKeyHashSchema>(&(key_hash, version), &entry)
         .unwrap();
     db.db_shard(shard_id).write_schemas(batch).unwrap();
 }
@@ -187,6 +215,29 @@ fn collect_lru_order(shard: &LoadedHotStateShard) -> Vec<(HashValue, Version)> {
     result
 }
 
+fn assert_hot_occupied(
+    shard: &LoadedHotStateShard,
+    key_hash: HashValue,
+    expected_hot_since_version: Version,
+    expected_value_version: Version,
+    expected_value: StateValue,
+) {
+    let slot = shard.map.get(&key_hash).unwrap();
+    match slot.kind() {
+        StateSlotKind::HotOccupied {
+            value_version,
+            value,
+            hot_since_version,
+            ..
+        } => {
+            assert_eq!(*hot_since_version, expected_hot_since_version);
+            assert_eq!(*value_version, expected_value_version);
+            assert_eq!(*value, expected_value);
+        },
+        other => panic!("Expected HotOccupied, got {other:?}"),
+    }
+}
+
 #[test]
 fn test_load_empty_db() {
     let tmp = TempPath::new();
@@ -228,19 +279,8 @@ fn test_load_single_entry() {
     assert!(slot.is_hot());
     assert!(slot.prev().is_none()); // Only entry: head.
     assert!(slot.next().is_none()); // Only entry: tail.
-    match slot.kind() {
-        StateSlotKind::HotOccupied {
-            value_version,
-            value,
-            hot_since_version,
-            ..
-        } => {
-            assert_eq!(*value_version, 5);
-            assert_eq!(*value, make_state_value(1));
-            assert_eq!(*hot_since_version, 10);
-        },
-        other => panic!("Expected HotOccupied, got {other:?}"),
-    }
+
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(1));
     shard.validate_lru_chain();
 }
 
@@ -276,6 +316,45 @@ fn test_load_occupied_and_vacant() {
     let slot_vac = shard_vac.map.get(&CryptoHash::hash(&key_vac)).unwrap();
     assert!(matches!(slot_vac.kind(), StateSlotKind::HotVacant { .. }));
     shard_vac.validate_lru_chain();
+}
+
+#[test]
+fn test_load_total_value_bytes() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key_occ1 = make_state_key(21);
+    let value1 = make_state_value(21);
+    put_hot_state_entry(
+        &db,
+        &key_occ1,
+        100,
+        Some(HotStateEntry::Occupied {
+            value: value1.clone(),
+            value_version: 50,
+        }),
+    );
+
+    let key_occ2 = make_state_key(30);
+    let value2 = make_state_value(30);
+    put_hot_state_entry(
+        &db,
+        &key_occ2,
+        110,
+        Some(HotStateEntry::Occupied {
+            value: value2.clone(),
+            value_version: 60,
+        }),
+    );
+
+    let key_vac = make_state_key(22);
+    put_hot_state_entry(&db, &key_vac, 200, Some(HotStateEntry::Vacant));
+
+    // Distinct sizes so the assertion checks a real per-value sum, not count * constant.
+    assert_ne!(value1.size(), value2.size());
+    let shards = db.load_hot_state_kvs(300).unwrap();
+    let total_value_bytes: usize = shards.iter().map(|shard| shard.total_value_bytes).sum();
+    assert_eq!(total_value_bytes, value1.size() + value2.size());
 }
 
 #[test]
@@ -355,21 +434,184 @@ fn test_load_multiple_versions_same_key() {
     // Load at V20 — should pick V20 (the most recent entry).
     let shards = db.load_hot_state_kvs(20).unwrap();
     let shard = &shards[key.get_shard_id()];
-    let slot = shard.map.get(&CryptoHash::hash(&key)).unwrap();
-    match slot.kind() {
-        StateSlotKind::HotOccupied {
-            value_version,
-            hot_since_version,
-            value,
-            ..
-        } => {
-            assert_eq!(*hot_since_version, 20);
-            assert_eq!(*value_version, 15);
-            assert_eq!(*value, make_state_value(72));
-        },
-        other => panic!("Expected HotOccupied, got {other:?}"),
+    assert_hot_occupied(shard, CryptoHash::hash(&key), 20, 15, make_state_value(72));
+    shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_skips_future_entry_and_falls_back_to_older_version() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(9);
+    let key_hash = CryptoHash::hash(&key);
+    put_hot_state_entry(
+        &db,
+        &key,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(91),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry(
+        &db,
+        &key,
+        20,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(92),
+            value_version: 15,
+        }),
+    );
+
+    let shards = db.load_hot_state_kvs(15).unwrap();
+    let shard = &shards[key.get_shard_id()];
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(91));
+    shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_handles_max_key_hash() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key_hash = HashValue::new([0xFF; HashValue::LENGTH]);
+    let shard_id = usize::from(key_hash.nibble(0));
+    put_hot_state_entry_by_hash(
+        &db,
+        key_hash,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(10),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry_by_hash(
+        &db,
+        key_hash,
+        20,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(20),
+            value_version: 15,
+        }),
+    );
+
+    let shards = db.load_hot_state_kvs(15).unwrap();
+    let shard = &shards[shard_id];
+    assert_hot_occupied(shard, key_hash, 10, 5, make_state_value(10));
+    shard.validate_lru_chain();
+}
+
+/// Regression test for the prefix-bloom interaction in the per-shard hot-state scan.
+///
+/// The `hot_state_value_by_key_hash` CF carries a prefix bloom filter on the 32-byte key hash
+/// (enabled explicitly below via `bloom_filter_bits`, as production does). `scan_shard_range`
+/// seeks to the next key group via `(key_hash + 1, Version::MAX)` — a prefix that need not exist.
+/// Without `total_order_seek`, the bloom excludes every SST for that absent prefix and the scan
+/// stops early, dropping the rest of the sub-range's keys.
+///
+/// The bloom lives only on SSTs, hence the flush below; the default unit-test config (no bloom,
+/// data in the memtable) cannot reproduce this.
+#[test]
+fn test_load_with_prefix_bloom_loads_all_keys_in_shard() {
+    let tmp = TempPath::new();
+    let rocksdb_config = RocksdbConfig {
+        bloom_filter_bits: Some(10.0),
+        ..RocksdbConfig::default()
+    };
+    let db = create_hot_state_kv_db_with_config(&tmp, rocksdb_config);
+
+    // All keys are in shard 0 (byte 0 in 0x00..=0x0f → high nibble 0). byte 0 spreads them across
+    // every within-shard sub-range; byte 1 puts several keys in each, forcing the scan to seek
+    // across absent next-key prefixes *within* a sub-range — the step the prefix bloom blocks
+    // without total-order seek. byte 1 starts at 1 so no key equals a sub-range's lower bound
+    // (byte 0 = b, rest 0), as in production where that bound is almost never a real key, so even
+    // the first seek of each sub-range targets an absent prefix.
+    let key_hashes: Vec<HashValue> = (0u8..16)
+        .flat_map(|b0| {
+            (1u8..=3).map(move |b1| {
+                let mut bytes = [0u8; HashValue::LENGTH];
+                bytes[0] = b0;
+                bytes[1] = b1;
+                HashValue::new(bytes)
+            })
+        })
+        .collect();
+    let shard_id = usize::from(key_hashes[0].nibble(0));
+    assert!(key_hashes
+        .iter()
+        .all(|kh| usize::from(kh.nibble(0)) == shard_id));
+
+    for key_hash in &key_hashes {
+        put_hot_state_entry_by_hash(
+            &db,
+            *key_hash,
+            10,
+            Some(HotStateEntry::Occupied {
+                value: make_state_value(1),
+                value_version: 5,
+            }),
+        );
+    }
+    flush_hot_state_value_cf(&db);
+
+    let shards = db.load_hot_state_kvs(100).unwrap();
+    let shard = &shards[shard_id];
+    assert_eq!(
+        shard.num_items,
+        key_hashes.len(),
+        "expected all {} keys in shard {shard_id} to load, got {}",
+        key_hashes.len(),
+        shard.num_items,
+    );
+    for key_hash in &key_hashes {
+        assert!(shard.map.contains_key(key_hash), "missing key {key_hash:?}");
     }
     shard.validate_lru_chain();
+}
+
+#[test]
+fn test_load_snapshot_boundaries_across_eviction_and_reinsert() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(11);
+    let key_hash = CryptoHash::hash(&key);
+    let shard_id = key.get_shard_id();
+    put_hot_state_entry(
+        &db,
+        &key,
+        10,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(111),
+            value_version: 5,
+        }),
+    );
+    put_hot_state_entry(&db, &key, 20, None);
+    put_hot_state_entry(
+        &db,
+        &key,
+        30,
+        Some(HotStateEntry::Occupied {
+            value: make_state_value(112),
+            value_version: 25,
+        }),
+    );
+
+    let shards_at_15 = db.load_hot_state_kvs(15).unwrap();
+    let shard_at_15 = &shards_at_15[shard_id];
+    assert_hot_occupied(shard_at_15, key_hash, 10, 5, make_state_value(111));
+    shard_at_15.validate_lru_chain();
+
+    let shards_at_25 = db.load_hot_state_kvs(25).unwrap();
+    let shard_at_25 = &shards_at_25[shard_id];
+    assert!(!shard_at_25.map.contains_key(&key_hash));
+    shard_at_25.validate_lru_chain();
+
+    let shards_at_30 = db.load_hot_state_kvs(30).unwrap();
+    let shard_at_30 = &shards_at_30[shard_id];
+    assert_hot_occupied(shard_at_30, key_hash, 30, 25, make_state_value(112));
+    shard_at_30.validate_lru_chain();
 }
 
 #[test]
@@ -404,18 +646,7 @@ fn test_load_evict_then_reinsert() {
     // Load at V30 — should pick the re-insertion (most recent entry).
     let shards = db.load_hot_state_kvs(30).unwrap();
     let shard = &shards[key.get_shard_id()];
-    let slot = shard.map.get(&CryptoHash::hash(&key)).unwrap();
-    match slot.kind() {
-        StateSlotKind::HotOccupied {
-            hot_since_version,
-            value,
-            ..
-        } => {
-            assert_eq!(*hot_since_version, 30);
-            assert_eq!(*value, make_state_value(82));
-        },
-        other => panic!("Expected HotOccupied, got {other:?}"),
-    }
+    assert_hot_occupied(shard, CryptoHash::hash(&key), 30, 25, make_state_value(82));
     shard.validate_lru_chain();
 }
 
@@ -469,6 +700,54 @@ fn test_load_lru_chain_ordering() {
 }
 
 #[test]
+fn test_load_lru_chain_same_version_orders_by_key_hash() {
+    let tmp = TempPath::new();
+    let db = create_hot_state_kv_db(&tmp);
+
+    let mut keys_by_shard: Vec<Vec<StateKey>> = (0..NUM_STATE_SHARDS).map(|_| Vec::new()).collect();
+    for seed in 0..=255u8 {
+        let key = make_state_key(seed);
+        keys_by_shard[key.get_shard_id()].push(key);
+    }
+
+    let (shard_id, mut keys) = keys_by_shard
+        .into_iter()
+        .enumerate()
+        .find(|(_, keys)| keys.len() >= 3)
+        .expect("at least one shard should have three keys");
+    keys.truncate(3);
+
+    for key in &keys {
+        put_hot_state_entry(
+            &db,
+            key,
+            100,
+            Some(HotStateEntry::Occupied {
+                value: make_state_value(100),
+                value_version: 50,
+            }),
+        );
+    }
+
+    let shards = db.load_hot_state_kvs(100).unwrap();
+    let shard = &shards[shard_id];
+    shard.validate_lru_chain();
+
+    let actual: Vec<_> = collect_lru_order(shard)
+        .into_iter()
+        .map(|(key_hash, hot_since_version)| {
+            assert_eq!(hot_since_version, 100);
+            key_hash
+        })
+        .collect();
+    let mut expected: Vec<_> = keys.iter().map(CryptoHash::hash).collect();
+    expected.sort();
+    expected.reverse();
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn test_load_cross_shard() {
     let tmp = TempPath::new();
     let db = create_hot_state_kv_db(&tmp);
@@ -503,7 +782,7 @@ fn test_load_cross_shard() {
 fn test_load_write_then_load_roundtrip() {
     let tmp = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp);
-    let hot_state_kv_db = aptos_db.hot_state_kv_db.as_ref().unwrap();
+    let hot_state_kv_db = &aptos_db.hot_state_kv_db;
 
     let key1 = make_state_key(10);
     let val1 = make_state_value(10);
@@ -545,20 +824,7 @@ fn test_load_write_then_load_roundtrip() {
 
     // Verify key1.
     let shard1 = &loaded_shards[key1.get_shard_id()];
-    let slot1 = shard1.map.get(&CryptoHash::hash(&key1)).unwrap();
-    match slot1.kind() {
-        StateSlotKind::HotOccupied {
-            value_version,
-            value,
-            hot_since_version,
-            ..
-        } => {
-            assert_eq!(*value_version, 50);
-            assert_eq!(*value, val1);
-            assert_eq!(*hot_since_version, 100);
-        },
-        other => panic!("Expected HotOccupied for key1, got {other:?}"),
-    }
+    assert_hot_occupied(shard1, CryptoHash::hash(&key1), 100, 50, val1);
     shard1.validate_lru_chain();
 
     // Verify key2.
@@ -573,6 +839,178 @@ fn test_load_write_then_load_roundtrip() {
         other => panic!("Expected HotVacant for key2, got {other:?}"),
     }
     shard2.validate_lru_chain();
+}
+
+// ---------------------------------------------------------------------------
+// Randomized end-to-end check against an oracle
+// ---------------------------------------------------------------------------
+
+fn make_state_key_u32(id: u32) -> StateKey {
+    StateKey::raw(&id.to_be_bytes())
+}
+
+/// Writes many hot state entries with one native batch per shard, rather than one
+/// commit per entry, so a few-hundred-key proptest case stays cheap.
+fn put_hot_state_entries_bulk(
+    db: &StateKvDb,
+    writes: Vec<(StateKey, Version, Option<HotStateEntry>)>,
+) {
+    let mut batches = db.new_sharded_native_batches();
+    for (key, version, entry) in writes {
+        batches[key.get_shard_id()]
+            .put::<HotStateValueByKeyHashSchema>(&(key.hash(), version), &entry)
+            .unwrap();
+    }
+    for (shard_id, batch) in batches.into_iter().enumerate() {
+        db.db_shard(shard_id).write_schemas(batch).unwrap();
+    }
+}
+
+/// One generated write, resolved against the `hot_since_version` it gets assigned.
+#[derive(Clone, Debug)]
+enum GenEntry {
+    Occupied {
+        value_seed: u8,
+        value_version_delta: Version,
+    },
+    Vacant,
+    Evicted,
+}
+
+impl GenEntry {
+    fn to_entry(&self, hot_since_version: Version) -> Option<HotStateEntry> {
+        match self {
+            GenEntry::Occupied {
+                value_seed,
+                value_version_delta,
+            } => Some(HotStateEntry::Occupied {
+                value: make_state_value(*value_seed),
+                value_version: hot_since_version.saturating_sub(*value_version_delta),
+            }),
+            GenEntry::Vacant => Some(HotStateEntry::Vacant),
+            GenEntry::Evicted => None,
+        }
+    }
+}
+
+fn arb_gen_entry() -> impl Strategy<Value = GenEntry> {
+    prop_oneof![
+        3 => (any::<u8>(), 0u64..8).prop_map(|(value_seed, value_version_delta)| {
+            GenEntry::Occupied {
+                value_seed,
+                value_version_delta,
+            }
+        }),
+        1 => Just(GenEntry::Vacant),
+        1 => Just(GenEntry::Evicted),
+    ]
+}
+
+/// A few hundred writes over up to 400 keys, paired with a snapshot version in
+/// `[0, num_writes]` so loading exercises both included and skipped (future) entries.
+fn arb_load_input() -> impl Strategy<Value = (Vec<(u32, GenEntry)>, Version)> {
+    vec((0u32..400, arb_gen_entry()), 300..800).prop_flat_map(|ops| {
+        let num_writes = ops.len() as Version;
+        (Just(ops), 0..=num_writes)
+    })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(20))]
+
+    /// Build a hot state KV DB from many versioned writes, then check that
+    /// `load_hot_state_kvs` at a random snapshot reproduces, for every key, its most
+    /// recent entry at or before that snapshot (absent if that entry is an eviction) —
+    /// with a well-formed LRU chain and matching `total_value_bytes`.
+    #[test]
+    fn test_load_hot_state_kvs_matches_oracle(
+        (ops, snapshot_version) in arb_load_input(),
+    ) {
+        let tmp = TempPath::new();
+        let db = create_hot_state_kv_db(&tmp);
+
+        // Each op gets a unique, strictly increasing hot_since_version (its index).
+        let mut writes = vec![];
+        // Oracle: per key, the latest (key, hot_since, entry) written at or before the snapshot.
+        let mut oracle = HashMap::new();
+        for (idx, (key_id, gen_entry)) in ops.into_iter().enumerate() {
+            let version = idx as Version;
+            let key = make_state_key_u32(key_id);
+            let entry = gen_entry.to_entry(version);
+            if version <= snapshot_version {
+                oracle.insert(key.hash(), (key.clone(), version, entry.clone()));
+            }
+            writes.push((key, version, entry));
+        }
+        put_hot_state_entries_bulk(&db, writes);
+
+        let shards = db.load_hot_state_kvs(snapshot_version).unwrap();
+
+        // Verify each expected slot and collect the expected LRU members per shard.
+        let mut expected_chain = vec![Vec::new(); NUM_STATE_SHARDS];
+        let mut expected_total_value_bytes = 0usize;
+        for (key, hot_since, entry) in oracle.values() {
+            let shard_id = key.get_shard_id();
+            let key_hash = key.hash();
+            let expected_entry = match entry {
+                None => {
+                    // Evicted: must be absent after load.
+                    prop_assert!(
+                        !shards[shard_id].map.contains_key(&key_hash),
+                        "evicted key {key_hash} (shard {shard_id}) should be absent"
+                    );
+                    continue;
+                },
+                Some(e) => e,
+            };
+            expected_chain[shard_id].push((key_hash, *hot_since));
+
+            let slot = shards[shard_id].map.get(&key_hash);
+            prop_assert!(
+                slot.is_some(),
+                "key {key_hash} (shard {shard_id}) missing from loaded shard"
+            );
+            let slot = slot.unwrap();
+            prop_assert_eq!(slot.expect_hot_since_version(), *hot_since);
+            match (slot.kind(), expected_entry) {
+                (
+                    StateSlotKind::HotOccupied {
+                        value,
+                        value_version,
+                        ..
+                    },
+                    HotStateEntry::Occupied {
+                        value: exp_value,
+                        value_version: exp_vv,
+                    },
+                ) => {
+                    prop_assert_eq!(value, exp_value);
+                    prop_assert_eq!(value_version, exp_vv);
+                    expected_total_value_bytes += exp_value.size();
+                },
+                (StateSlotKind::HotVacant { .. }, HotStateEntry::Vacant) => {},
+                (actual, _) => prop_assert!(
+                    false,
+                    "kind mismatch for {key_hash}: {actual:?} vs {expected_entry:?}"
+                ),
+            }
+        }
+
+        // Every shard's chain is well-formed and ordered by (hot_since_version, key_hash)
+        // descending head→tail, with num_items matching the oracle.
+        for (shard_id, shard) in shards.iter().enumerate() {
+            shard.validate_lru_chain();
+            prop_assert_eq!(shard.num_items, expected_chain[shard_id].len());
+
+            let mut expected = expected_chain[shard_id].clone();
+            expected.sort_by_key(|(key_hash, version)| (*version, *key_hash));
+            expected.reverse();
+            prop_assert_eq!(collect_lru_order(shard), expected);
+        }
+
+        let actual_total_value_bytes: usize = shards.iter().map(|s| s.total_value_bytes).sum();
+        prop_assert_eq!(actual_total_value_bytes, expected_total_value_bytes);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -624,7 +1062,7 @@ fn test_stale_index_direct_write_read() {
 fn test_put_hot_state_updates_values_and_stale_indices() {
     let tmp = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp);
-    let hot_state_kv_db = aptos_db.hot_state_kv_db.as_ref().unwrap();
+    let hot_state_kv_db = &aptos_db.hot_state_kv_db;
 
     let key1 = make_state_key(10);
     let val1 = make_state_value(10);
@@ -770,7 +1208,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         HotStateConfig::default(),
     )
     .unwrap();
-    let hot_state_kv_db = aptos_db.hot_state_kv_db.as_ref().unwrap();
+    let hot_state_kv_db = &aptos_db.hot_state_kv_db;
 
     let key1 = make_state_key(42);
     let val_old = make_state_value(1);
@@ -817,13 +1255,10 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     assert!(get_hot_state_entry(hot_state_kv_db, &key1, 200).is_some());
 
     // Trigger pruning
-    let pruner = aptos_db
+    aptos_db
         .state_store
         .state_pruner
         .hot_state_kv_pruner
-        .as_ref()
-        .expect("hot state kv pruner should exist");
-    pruner
         .wake_and_wait_pruner(200)
         .expect("pruner should complete");
 

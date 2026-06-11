@@ -3,8 +3,7 @@
 
 //! Integration tests for the Lazy loading policy.
 
-use mono_move_core::native::NoNatives;
-use mono_move_gas::{GasMeter, SimpleGasMeter};
+use mono_move_core::{native::NoNatives, GasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_testsuite::InMemoryModuleProvider;
@@ -37,7 +36,7 @@ fn load_lazy_cache_miss_and_hit() {
 
     // First call is a cache miss: fetches, deserializes, builds, installs.
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
     let gas_before = gas.balance();
     let exec = loader.load_module(&mut read_set, &mut gas, id).unwrap();
     let first_cost = exec.cost();
@@ -50,7 +49,7 @@ fn load_lazy_cache_miss_and_hit() {
     // Second call on a fresh read-set is a cache hit: charges the same
     // cost, records without fetching.
     let mut read_set2 = ModuleReadSet::new();
-    let mut gas2 = SimpleGasMeter::new(u64::MAX);
+    let mut gas2 = GasMeter::with_max_budget();
     let gas_before2 = gas2.balance();
     let exec2 = loader.load_module(&mut read_set2, &mut gas2, id).unwrap();
     assert_eq!(exec2.cost(), first_cost);

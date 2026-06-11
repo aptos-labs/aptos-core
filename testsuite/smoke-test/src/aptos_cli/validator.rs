@@ -28,8 +28,9 @@ use aptos_types::{
     network_address::DnsName,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
-        ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainRandomnessConfig, ProposerAndVoterConfig, ProposerElectionType,
+        TransactionShufflerType, ValidatorSet,
     },
     PeerId,
 };
@@ -566,6 +567,9 @@ async fn test_large_total_stake() {
             genesis_config.min_stake = 10_000_000;
             genesis_config.randomness_config_override =
                 Some(OnChainRandomnessConfig::default_disabled());
+            // Chunky DKG depends on randomness; keep it off.
+            genesis_config.chunky_dkg_config_override =
+                Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -1024,6 +1028,13 @@ async fn fetch_actual_voting_power(client: &Client, address: PeerId, version: u6
 async fn test_register_and_update_validator() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            // Disable chunky DKG so it doesn't run a reconfig during the test's
+            // validator update; otherwise the update aborts with
+            // ERECONFIGURATION_IN_PROGRESS.
+            genesis_config.chunky_dkg_config_override =
+                Some(OnChainChunkyDKGConfig::default_disabled());
+        }))
         .build_with_cli(0)
         .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
@@ -1134,6 +1145,9 @@ async fn test_join_and_leave_validator() {
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
             genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
+            // Chunky DKG depends on randomness; keep it off.
+            genesis_config.chunky_dkg_config_override =
+                Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -1301,6 +1315,9 @@ async fn test_owner_create_and_delegate_flow() {
             genesis_config.voting_duration_secs = 5;
             genesis_config.min_stake = 500000;
             genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
+            // Chunky DKG depends on randomness; keep it off.
+            genesis_config.chunky_dkg_config_override =
+                Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;

@@ -9,6 +9,7 @@
 mod display;
 pub(crate) mod instr_utils;
 
+pub use mono_move_core::CmpKind;
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
     IntTy, PreparedModule,
@@ -105,31 +106,6 @@ impl UnaryOp {
     }
 }
 
-/// Comparison operations that produce a boolean result.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CmpOp {
-    Lt,
-    Gt,
-    Le,
-    Ge,
-    Eq,
-    Neq,
-}
-
-impl CmpOp {
-    /// Return the logically negated comparison.
-    pub fn negate(self) -> Self {
-        match self {
-            CmpOp::Lt => CmpOp::Ge,
-            CmpOp::Ge => CmpOp::Lt,
-            CmpOp::Gt => CmpOp::Le,
-            CmpOp::Le => CmpOp::Gt,
-            CmpOp::Eq => CmpOp::Neq,
-            CmpOp::Neq => CmpOp::Eq,
-        }
-    }
-}
-
 /// Binary operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -143,7 +119,7 @@ pub enum BinaryOp {
     BitXor,
     Shl,
     Shr,
-    Cmp(CmpOp),
+    Cmp(CmpKind),
     Or,
     And,
 }
@@ -309,9 +285,9 @@ pub enum Instr {
     BrTrue(Label, Slot),
     BrFalse(Label, Slot),
     /// `BrCmp(target, op, lhs, rhs)` — branch to `target` if `op(lhs, rhs)` is true.
-    BrCmp(Label, CmpOp, Slot, Slot),
+    BrCmp(Label, CmpKind, Slot, Slot),
     /// `BrCmpImm(target, op, src, imm)` — branch to `target` if `op(src, imm)` is true.
-    BrCmpImm(Label, CmpOp, Slot, ImmValue),
+    BrCmpImm(Label, CmpKind, Slot, ImmValue),
     Ret(Vec<Slot>),
     Abort(Slot),
     AbortMsg(Slot, Slot),

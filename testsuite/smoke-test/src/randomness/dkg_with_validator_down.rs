@@ -6,7 +6,7 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::NodeExt;
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use aptos_types::on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -24,6 +24,9 @@ async fn dkg_with_validator_down() {
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            // This test takes validators down; chunky DKG dealer participation
+            // races with that. Keep chunky DKG off.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build()
         .await;

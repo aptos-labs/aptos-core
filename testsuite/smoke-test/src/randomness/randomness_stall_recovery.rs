@@ -9,7 +9,10 @@ use aptos::common::types::GasOptions;
 use aptos_config::config::{OverrideNodeConfig, PersistableConfig};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness};
+use aptos_types::{
+    on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig},
+    randomness::PerBlockRandomness,
+};
 use std::{
     ops::Add,
     sync::Arc,
@@ -34,6 +37,9 @@ async fn randomness_stall_recovery() {
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            // This test halts and recovers the chain via local config; chunky
+            // DKG state would also stall and is out of scope here.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;

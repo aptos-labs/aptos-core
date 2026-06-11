@@ -4,20 +4,17 @@
 //! Native function interface for MonoMove.
 pub mod abi;
 pub mod context;
-pub mod production;
 pub mod registry;
 pub mod result;
 pub mod value;
 
+// The root pool lives at the crate root; re-exported here for native authors.
+pub use crate::root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use abi::{FrameSlot, NativeABI, NativeABIError};
 pub use context::NativeContext;
-pub use production::{
-    ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
-    ProductionNativeRegistry,
-};
 pub use registry::{
     NativeContextFamily, NativeFunction, NativeIdx, NativeName, NativeRegistry,
     NativeRegistryError, NativeResolver, NoNatives,
 };
 pub use result::{NativeStatus, VMInternalError};
-pub use value::VMValue;
+pub use value::{Opaque, Ref, VMValue, Vector};

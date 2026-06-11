@@ -64,33 +64,31 @@ fun keep_u64(r0, r1): u64 {
 
 fun driver() {
   frame_data_size: 16
+  entry_gas: 95
   code:
-    0: Charge #21
-    1: Move8 [48] <- [8]
-    2: Move(1) [40] <- [0]
-    3: CallIndirect 0x66::padded_param::keep_u64
-    4: Move8 [0] <- [40]
-    5: Return
+    0: Move8 [48] <- [8]
+    1: Move(1) [40] <- [0]
+    2: CallIndirect 0x66::padded_param::keep_u64
+    3: Move8 [0] <- [40]
+    4: Return
 }
 
 fun keep_u64() {
   frame_data_size: 48
+  entry_gas: 43
   code:
-    0: Charge #43
-    1: VecNew [16]
-    2: SlotBorrow [24] <- &[16]
-    3: VecPushBack [24].push([8], size=8, desc=2)
-    4: JumpZeroByte @8 [0]
-    5: Charge #4
-    6: Move8 [0] <- [8]
-    7: Return
-    8: Charge #34
-    9: SlotBorrow [24] <- &[16]
-    10: VecPopBack [40] <- [24].pop(size=8)
-    11: Move8 [0] <- [40]
-    12: Return
+    0: VecNew [16]
+    1: SlotBorrow [24] <- &[16]
+    2: VecPushBack [24].push([8], size=8, desc=0)
+    3: JumpZeroByte @6 [0] gas_taken=84 gas_fallthrough=54
+    4: Move8 [0] <- [8]
+    5: Return
+    6: SlotBorrow [24] <- &[16]
+    7: VecPopBack [40] <- [24].pop(size=8)
+    8: Move8 [0] <- [40]
+    9: Return
   safe_point_layouts:
-    3: []
+    2: []
 }
 === frame-layout ===
 // module 0x66::padded_param

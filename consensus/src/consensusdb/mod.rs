@@ -26,6 +26,8 @@ use std::{iter::Iterator, path::Path, time::Instant};
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
+/// Upperbound for total live WAL size.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 /// Creates new physical DB checkpoint in directory specified by `checkpoint_path`.
 pub fn create_checkpoint<P: AsRef<Path> + Clone>(db_path: P, checkpoint_path: P) -> Result<()> {
@@ -65,6 +67,7 @@ impl ConsensusDB {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+        opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
         let db = DB::open(path.clone(), "consensus", column_families, opts)
             .expect("ConsensusDB open failed; unable to continue");
 

@@ -51,22 +51,22 @@ fun identity(r0): _0 {
 
 fun call_bool() {
   frame_data_size: 8
+  entry_gas: 29
   code:
-    0: Charge #19
-    1: StoreImm1 [32] <- #1
-    2: CallIndirect 0x42::generic_call::identity<bool>
-    3: Move(1) [0] <- [32]
-    4: Return
+    0: StoreImm1 [32] <- #1
+    1: CallIndirect 0x42::generic_call::identity<bool>
+    2: Move(1) [0] <- [32]
+    3: Return
 }
 
 fun call_u64() {
   frame_data_size: 8
+  entry_gas: 92
   code:
-    0: Charge #16
-    1: StoreImm8 [32] <- #7
-    2: CallIndirect 0x42::generic_call::identity<u64>
-    3: Move8 [0] <- [32]
-    4: Return
+    0: StoreImm8 [32] <- #7
+    1: CallIndirect 0x42::generic_call::identity<u64>
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun identity(): skipped (not all types are concrete)

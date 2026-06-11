@@ -42,35 +42,35 @@ fun trigger(r0): u64 {
 
 fun pair_provider() {
   frame_data_size: 32
+  entry_gas: 156
   code:
-    0: Charge #60
-    1: StoreImm8 [0] <- #10
-    2: StoreImm8 [8] <- #20
-    3: Move8 [24] <- [8]
-    4: Move8 [16] <- [0]
-    5: Move(16) [0] <- [16]
-    6: Return
+    0: StoreImm8 [0] <- #10
+    1: StoreImm8 [8] <- #20
+    2: Move8 [24] <- [8]
+    3: Move8 [16] <- [0]
+    4: Move(16) [0] <- [16]
+    5: Return
 }
 
 fun consume() {
   frame_data_size: 32
+  entry_gas: 64
   code:
-    0: Charge #10
-    1: AddU64 [24] <- [0] + [8]
-    2: AddU64 [24] <- [24] + [16]
-    3: Move8 [0] <- [24]
-    4: Return
+    0: AddU64 [24] <- [0] + [8]
+    1: AddU64 [24] <- [24] + [16]
+    2: Move8 [0] <- [24]
+    3: Return
 }
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 202
   code:
-    0: Charge #30
-    1: CallIndirect 0x66::unpack_xfer_overlap_probe::pair_provider
-    2: Move8 [48] <- [40]
-    3: Move8 [40] <- [32]
-    4: Move8 [32] <- [0]
-    5: CallIndirect 0x66::unpack_xfer_overlap_probe::consume
-    6: Move8 [0] <- [32]
-    7: Return
+    0: CallIndirect 0x66::unpack_xfer_overlap_probe::pair_provider
+    1: Move8 [48] <- [40]
+    2: Move8 [40] <- [32]
+    3: Move8 [32] <- [0]
+    4: CallIndirect 0x66::unpack_xfer_overlap_probe::consume
+    5: Move8 [0] <- [32]
+    6: Return
 }

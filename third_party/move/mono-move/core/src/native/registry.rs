@@ -9,6 +9,7 @@ use super::context::NativeContext;
 use crate::{
     interner::{InternedIdentifier, InternedModuleId},
     native::{NativeStatus, VMInternalError},
+    types::InternedTypeList,
 };
 use shared_dsa::UnorderedMap;
 use thiserror::Error;
@@ -18,11 +19,27 @@ use thiserror::Error;
 #[repr(transparent)]
 pub struct NativeIdx(pub u32);
 
-/// Fully-qualified native function name — used as keys in [`NativeRegistry`].
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct NativeName {
-    pub module: InternedModuleId,
-    pub function: InternedIdentifier,
+/// Key under which a native is registered in a [`NativeRegistry`].
+///
+/// A native is either a template that serves every instantiation, or a body
+/// specialized to one concrete instantiation. The two variants let
+/// type-agnostic natives register once while type-sensitive natives register a
+/// separate body per concrete type. Resolution tries the monomorphic key first
+/// and falls back to the polymorphic one (see [`NativeRegistry::resolve`]).
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NativeName {
+    /// One implementation for all instantiations.
+    Polymorphic {
+        module: InternedModuleId,
+        function: InternedIdentifier,
+    },
+    /// Implementation specialized to one concrete instantiation, matched only
+    /// when the call's type arguments equal `ty_args`.
+    Monomorphic {
+        module: InternedModuleId,
+        function: InternedIdentifier,
+        ty_args: InternedTypeList,
+    },
 }
 
 /// Describes a family of [`NativeContext`] types indexed by a lifetime.
@@ -43,14 +60,20 @@ pub trait NativeContextFamily {
 /// Without this, we cannot store native functions in a registry, which would
 /// otherwise mandate a fixed lifetime.
 pub type NativeFunction<F> = Box<
-    dyn for<'a> Fn(&mut <F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
+    dyn for<'a> Fn(&<F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
         + Send
         + Sync,
 >;
 
-/// Resolves a fully-qualified native name to its [`NativeIdx`].
+/// Resolves a native call to its [`NativeIdx`] from the callee's qualified name
+/// and the call's concrete type arguments.
 pub trait NativeResolver {
-    fn resolve(&self, name: &NativeName) -> Option<NativeIdx>;
+    fn resolve(
+        &self,
+        module: InternedModuleId,
+        function: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<NativeIdx>;
 }
 
 /// A [`NativeResolver`] that resolves nothing -- useful for tests and simulations that
@@ -58,7 +81,12 @@ pub trait NativeResolver {
 pub struct NoNatives;
 
 impl NativeResolver for NoNatives {
-    fn resolve(&self, _name: &NativeName) -> Option<NativeIdx> {
+    fn resolve(
+        &self,
+        _module: InternedModuleId,
+        _function: InternedIdentifier,
+        _ty_args: InternedTypeList,
+    ) -> Option<NativeIdx> {
         None
     }
 }
@@ -139,7 +167,19 @@ impl<F: NativeContextFamily> Default for NativeRegistry<F> {
 }
 
 impl<F: NativeContextFamily> NativeResolver for NativeRegistry<F> {
-    fn resolve(&self, name: &NativeName) -> Option<NativeIdx> {
-        self.lookup_by_name(name)
+    /// Resolves the monomorphic registration for `ty_args` if one exists,
+    /// otherwise falls back to a polymorphic (template) registration.
+    fn resolve(
+        &self,
+        module: InternedModuleId,
+        function: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<NativeIdx> {
+        self.lookup_by_name(&NativeName::Monomorphic {
+            module,
+            function,
+            ty_args,
+        })
+        .or_else(|| self.lookup_by_name(&NativeName::Polymorphic { module, function }))
     }
 }

@@ -55,27 +55,25 @@ fun eq(r0, r1): bool {
 
 fun compare() {
   frame_data_size: 24
+  entry_gas: 65
   code:
-    0: Charge #17
-    1: Move8 [56] <- [8]
-    2: Move8 [48] <- [0]
-    3: CallIndirect 0x1::test::eq
-    4: JumpZeroByte @9 [48]
-    5: Charge #6
-    6: StoreImm8 [16] <- #10
-    7: Move8 [0] <- [16]
-    8: Return
-    9: Charge #6
-    10: StoreImm8 [16] <- #42
-    11: Move8 [0] <- [16]
-    12: Return
+    0: Move8 [56] <- [8]
+    1: Move8 [48] <- [0]
+    2: CallIndirect 0x1::test::eq
+    3: JumpZeroByte @7 [48] gas_taken=56 gas_fallthrough=56
+    4: StoreImm8 [16] <- #10
+    5: Move8 [0] <- [16]
+    6: Return
+    7: StoreImm8 [16] <- #42
+    8: Move8 [0] <- [16]
+    9: Return
 }
 
 fun eq() {
   frame_data_size: 24
+  entry_gas: 17
   code:
-    0: Charge #10
-    1: IntCmp [16] <- [0] == u64 [8]
-    2: Move(1) [0] <- [16]
-    3: Return
+    0: IntCmp [16] <- [0] == u64 [8]
+    1: Move(1) [0] <- [16]
+    2: Return
 }

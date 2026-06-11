@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 mono-move-core = { workspace = true }
-mono-move-gas = { workspace = true }
 mono-move-global-context = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }

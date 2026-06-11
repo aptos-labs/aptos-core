@@ -54,8 +54,9 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
-    types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, FunctionRef, Interner,
-    ModuleId, ObjectDescriptor, TRIVIAL_DESCRIPTOR_ID,
+    reserved_layout_id, reserved_layouts, types::NominalLayout, DescriptorId, DescriptorProvider,
+    FrameOffset, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
+    ValueLayout, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -111,6 +112,7 @@ pub struct GlobalContext {
     /// Lock to switch between execution and maintenance modes:
     ///   - Read lock: execution phase.
     ///   - Write lock: maintenance phase.
+    // TODO: Consider removing since maintenance context requires &mut GlobalContext.
     phase: RwLock<()>,
 }
 
@@ -134,6 +136,9 @@ struct Context {
     module_cache: ModuleCache,
     /// Published object descriptors.
     descriptors: Descriptors,
+    /// Published type layouts (the type-driven walk shape, separate from the
+    /// GC object descriptors above).
+    layouts: Layouts,
 }
 
 /// Storage for the published object-descriptor set.
@@ -166,6 +171,9 @@ struct Descriptors {
     /// sharing a pointer shape share one descriptor. Pointer-free captures
     /// bypass this cache for `TRIVIAL_DESCRIPTOR_ID`.
     captured_data_by_pointer_offsets: DashMap<Vec<u32>, DescriptorId, ahash::RandomState>,
+    /// Struct-object idempotency cache: `struct_ty -> id`. Inline resources
+    /// laid out as heap objects share one descriptor per type.
+    struct_by_ty: DashMap<InternedType, DescriptorId, ahash::RandomState>,
     /// All descriptors (reserved + user) in id order. Replaced atomically
     /// on append via `ArcSwap::rcu` (CAS loop). Readers `load()` without
     /// locking.
@@ -177,6 +185,7 @@ impl Default for Descriptors {
         Self {
             vector_by_elem: DashMap::default(),
             captured_data_by_pointer_offsets: DashMap::default(),
+            struct_by_ty: DashMap::default(),
             table: ArcSwap::from_pointee(initial_descriptors()),
         }
     }
@@ -191,10 +200,12 @@ impl Descriptors {
         let Self {
             vector_by_elem,
             captured_data_by_pointer_offsets,
+            struct_by_ty,
             table,
         } = self;
         vector_by_elem.clear();
         captured_data_by_pointer_offsets.clear();
+        struct_by_ty.clear();
         table.store(Arc::new(initial_descriptors()));
     }
 }
@@ -207,6 +218,56 @@ fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
     ]
 }
 
+/// Table of type layouts.
+///
+/// # Invariants
+///
+/// - Layouts can be obtained by indexing the table with [`LayoutId`] index.
+///   By construction, these indices always have to be in bounds.
+/// - First few slots are reserved for primitives, references, etc. These IDs
+///   do not have the mapping from type to ID. For all other types, the mapping
+///   from type to ID exists where ID can be used to index type's layout.
+struct Layouts {
+    /// Type to layout ID mapping. Types are concrete.
+    by_ty: DashMap<InternedType, LayoutId, ahash::RandomState>,
+    /// All existing layouts in ID order. `boxcar::Vec` is an append-only
+    /// concurrent vector: entries are pushed through a shared `&` reference and
+    /// are never moved, so [`LayoutId`] indices stay stable and concurrent
+    /// reads need no lock.
+    table: boxcar::Vec<ValueLayout>,
+}
+
+impl Default for Layouts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Layouts {
+    /// Creates a fresh table seeded with the reserved layouts and an empty
+    /// type-to-ID map.
+    fn new() -> Self {
+        Self {
+            by_ty: DashMap::default(),
+            table: initial_layouts(),
+        }
+    }
+
+    /// Resets layout table and type to layout ID mappings. Reserved layouts
+    /// are added back to the layout table.
+    fn reset(&mut self) {
+        let Self { by_ty, table } = self;
+        by_ty.clear();
+        *table = initial_layouts();
+    }
+}
+
+fn initial_layouts() -> boxcar::Vec<ValueLayout> {
+    let mut table = boxcar::Vec::new();
+    table.extend(reserved_layouts());
+    table
+}
+
 /// RAII guard for the maintenance phase providing exclusive write access.
 ///
 /// Only one maintenance context can exist at a time, ensuring exclusive
@@ -214,8 +275,8 @@ fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
 /// is held for the lifetime of this guard and automatically released when
 /// dropped.
 pub struct MaintenanceGuard<'ctx> {
-    /// Reference to the caches stored in context.
-    ctx: &'ctx Context,
+    /// Exclusive reference to the caches stored in context.
+    ctx: &'ctx mut Context,
     /// Pool of all arenas managing global allocations.
     global_arena: &'ctx GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
@@ -299,6 +360,7 @@ impl GlobalContext {
                 function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
                 descriptors: Descriptors::default(),
+                layouts: Layouts::default(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -314,11 +376,11 @@ impl GlobalContext {
     /// Returns [`None`] if [`ExecutionGuard`] is currently held or there is
     /// an ongoing maintenance.
     #[must_use]
-    pub fn try_maintenance_context(&self) -> Option<MaintenanceGuard<'_>> {
+    pub fn try_maintenance_context(&mut self) -> Option<MaintenanceGuard<'_>> {
         let _guard = self.phase.try_write()?;
 
         Some(MaintenanceGuard {
-            ctx: &self.ctx,
+            ctx: &mut self.ctx,
             global_arena: &self.global_arena,
             maintenance_config: &self.maintenance_config,
             _guard,
@@ -597,6 +659,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
     ) -> DescriptorId {
+        if elem_ptr_offsets.is_empty() {
+            return TRIVIAL_DESCRIPTOR_ID;
+        }
         // Fast path: existing entry returns without touching the shard
         // write-lock.
         if let Some(id) = self.ctx.descriptors.vector_by_elem.get(&elem_ty) {
@@ -612,6 +677,36 @@ impl<'ctx> ExecutionGuard<'ctx> {
                 let desc = Arc::new(
                     ObjectDescriptor::new_vector(elem_size, offsets)
                         .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}")),
+                );
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Materializes a struct-object descriptor for `struct_ty` (the inline
+    /// resource laid out as a heap object) into the shared arena and returns
+    /// its assigned [`DescriptorId`]. Idempotent: subsequent calls with the
+    /// same `struct_ty` return the same id without re-allocating.
+    pub fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(id) = self.ctx.descriptors.struct_by_ty.get(&struct_ty) {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .struct_by_ty
+            .entry(struct_ty)
+            .or_insert_with(|| {
+                let offsets: Vec<u32> = ptr_offsets.iter().map(|o| o.0).collect();
+                let desc = Arc::new(
+                    ObjectDescriptor::new_struct(size, offsets)
+                        .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}")),
                 );
                 self.append_descriptor(desc)
             })
@@ -672,6 +767,29 @@ impl<'ctx> ExecutionGuard<'ctx> {
             })
     }
 
+    /// Returns the layout ID for the given type, or [`None`] if no layout has
+    /// been published yet.
+    pub fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        if let Some(id) = reserved_layout_id(view_type(ty)) {
+            return Some(id);
+        }
+        self.ctx.layouts.by_ty.get(&ty).map(|r| *r)
+    }
+
+    /// Publishes the layout for the given type and returns its assigned
+    /// [`LayoutId`].
+    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
+            return *id;
+        }
+
+        // TODO(perf): consider if we should append to the table without holding the shard lock.
+        *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
+            let idx = self.ctx.layouts.table.push(layout);
+            LayoutId::from_usize(idx)
+        })
+    }
+
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
@@ -705,6 +823,16 @@ impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
         // that resolved here stays alive for the returned reference's
         // lifetime, which is tied to `&self`.
         Some(unsafe { &*ptr })
+    }
+}
+
+impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.ctx.layouts.table.get(id.as_usize())
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.layout_id_for(ty)
     }
 }
 
@@ -941,6 +1069,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             function_refs,
             module_cache,
             descriptors,
+            layouts,
         } = self.ctx;
 
         identifiers.clear();
@@ -949,6 +1078,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         type_lists.clear();
         function_refs.clear();
         descriptors.reset();
+        layouts.reset();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules

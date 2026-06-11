@@ -26,10 +26,9 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
-    ModuleProvider,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
+    LayoutProvider, ModuleId, ModuleProvider, ValueLayout,
 };
-use mono_move_gas::GasMeter;
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FieldLayout, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot,
@@ -134,7 +133,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     pub fn load_module(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         match &self.policy {
@@ -158,7 +157,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     pub fn load_function(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -241,7 +240,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn lower_function_with_ty_args(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         module: &LoadedModule,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -318,7 +317,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_lazy_with_lazy_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         read_set.record_pending_loading(id)?;
@@ -340,7 +339,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_package(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         let package = match self.guard.get_module(id) {
@@ -428,7 +427,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_lazy_with_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         let module = match self.guard.get_module(id) {
@@ -468,7 +467,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn ensure_ready_for_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -502,7 +501,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn charge_mandatory_set_for_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -529,7 +528,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn compute_mandatory_set_for_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -621,7 +620,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn record_loaded_and_charge_slots<F>(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         slots: &[LoadedModuleSlot],
         mut on_read_set_miss: F,
     ) -> LoaderResult<()>
@@ -655,7 +654,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn charge_non_read_set_slots(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         slots: &[LoadedModuleSlot],
     ) -> LoaderResult<()> {
         self.record_loaded_and_charge_slots(read_set, gas_meter, slots, |read_set, slot| {
@@ -791,5 +790,29 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .loader
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets))
+    }
+
+    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard.layout_id_for(ty)
+    }
+
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard.layout(id)
+    }
+
+    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        self.loader.guard.publish_layout(ty, layout)
+    }
+
+    fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
     }
 }
