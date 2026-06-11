@@ -17,10 +17,11 @@ pub fn eval_proofs_at_roots_of_unity(c: &mut Criterion) {
         let poly: DensePolynomial<Fr> =
             DensePolynomial::from_coefficients_vec(vec![Fr::rand(&mut rng); poly_degree + 1]);
         let tau_powers_projective: Vec<Vec<G1Projective>> = setup
-            .tau_powers_g1
+            .rounds
             .iter()
-            .map(|gs| {
-                gs.iter()
+            .map(|r| {
+                r.tau_powers_g1
+                    .iter()
                     .map(|g| G1Projective::from(*g))
                     .collect::<Vec<G1Projective>>()
             })
@@ -48,10 +49,11 @@ pub fn eval_proofs_at_x_coords(c: &mut Criterion) {
         let x_coords = vec![Fr::rand(&mut rng); poly_degree];
 
         let tau_powers_projective: Vec<Vec<G1Projective>> = setup
-            .tau_powers_g1
+            .rounds
             .iter()
-            .map(|gs| {
-                gs.iter()
+            .map(|r| {
+                r.tau_powers_g1
+                    .iter()
                     .map(|g| G1Projective::from(*g))
                     .collect::<Vec<G1Projective>>()
             })

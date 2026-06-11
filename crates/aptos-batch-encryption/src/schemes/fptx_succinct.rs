@@ -88,8 +88,8 @@ impl BatchThresholdEncryption for FPTXSuccinct {
 
         let ek = AugmentedEncryptionKey {
             sig_mpk_g2: mpk,
-            tau_g2: digest_key.tau_g2,
-            tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
+            tau_g2: digest_key.tau_g2(),
+            tau_mpk_g2: (digest_key.tau_g2() * msk).into(),
         };
 
         Ok((ek, digest_key, vks, msk_shares))

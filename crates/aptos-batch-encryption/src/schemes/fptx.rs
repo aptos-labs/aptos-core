@@ -86,7 +86,7 @@ impl BatchThresholdEncryption for FPTX {
         let (mpk, vks, msk_shares) =
             key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2());
 
         Ok((ek, digest_key, vks, msk_shares))
     }

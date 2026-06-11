@@ -250,7 +250,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     )> {
         let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
 
-        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2());
 
         let vks: Vec<Self::VerificationKey> = threshold_config
             .get_players()
@@ -300,7 +300,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         subtranscript: &Self::SubTranscript,
     ) -> Result<Self::EncryptionKey> {
         let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
-        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2))
+        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2()))
     }
 
     fn setup_for_testing(
@@ -320,7 +320,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_weighted_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2());
 
         Ok((ek, digest_key, vks, msk_shares))
     }

@@ -6,7 +6,10 @@ use super::ids::{ComputedCoeffs, Id, IdSet};
 use crate::{
     errors::{BatchEncryptionError, DigestKeyInitError},
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
-    shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
+    shared::{
+        algebra::fk_algorithm::{FKDomain, FKDomainParams, PreparedInput},
+        ids::UncomputedCoeffs,
+    },
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
@@ -20,14 +23,90 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
+/// Round-independent setup data: tau_g2 plus the FK algorithm domain params (`toeplitz_domain`,
+/// `fft_domain`). This is what every consumer that only needs to derive an encryption key reads.
+///
+/// Carries `batch_size` and `num_rounds` so consumers don't need to touch a `RoundData` to learn
+/// the shape of the setup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DigestKeyHeader {
+    pub tau_g2: G2Affine,
+    pub batch_size: usize,
+    pub num_rounds: usize,
+    pub fk_params: FKDomainParams<Fr>,
+}
+
+/// Per-round setup data. One of these per round in the trusted setup file; the streaming
+/// `DigestKeyStore` only keeps a bounded window of these in memory at once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoundData {
+    pub tau_powers_g1: Vec<G1Affine>,
+    pub prepared_toeplitz_input: PreparedInput<Fr, G1Projective>,
+}
+
+/// Read-only view over the trusted setup. Both the eagerly-loaded [`DigestKey`] and the
+/// streaming `DigestKeyStore` implement this so consumers can be written once against either.
+pub trait DigestKeyView: Send + Sync {
+    fn header(&self) -> &DigestKeyHeader;
+    fn round(&self, r: usize) -> Arc<RoundData>;
+
+    fn max_batch_size(&self) -> usize {
+        self.header().batch_size
+    }
+
+    fn num_rounds(&self) -> usize {
+        self.header().num_rounds
+    }
+
+    fn tau_g2(&self) -> G2Affine {
+        self.header().tau_g2
+    }
+}
+
 /// The digest public parameters.
+///
+/// Internally split into a round-independent [`DigestKeyHeader`] and a vector of per-round
+/// [`RoundData`] blobs (each wrapped in `Arc` so they can be shared with — or migrated into —
+/// the streaming `DigestKeyStore` without copying). Callers that only need `tau_g2` go through
+/// [`DigestKey::tau_g2`]; callers that need per-round data go through [`DigestKey::round`].
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DigestKey {
-    pub tau_g2: G2Affine,
-    pub tau_powers_g1: Vec<Vec<G1Affine>>,
-    pub fk_domain: FKDomain<Fr, G1Projective>,
+    pub header: Arc<DigestKeyHeader>,
+    pub rounds: Vec<Arc<RoundData>>,
+}
+
+impl DigestKey {
+    /// Construct a `DigestKey` directly from its split-out pieces. Used by the file reader and
+    /// tests to assemble a key without going through the round-generating `new` path.
+    pub fn from_parts(header: Arc<DigestKeyHeader>, rounds: Vec<Arc<RoundData>>) -> Self {
+        Self { header, rounds }
+    }
+
+    pub fn tau_g2(&self) -> G2Affine {
+        self.header.tau_g2
+    }
+
+    pub fn tau_powers_g1_for_round(&self, round: usize) -> &[G1Affine] {
+        &self.rounds[round].tau_powers_g1
+    }
+
+    /// Borrow the round-data slot. Cheap clone (Arc).
+    pub fn round_data(&self, round: usize) -> Arc<RoundData> {
+        Arc::clone(&self.rounds[round])
+    }
+}
+
+impl DigestKeyView for DigestKey {
+    fn header(&self) -> &DigestKeyHeader {
+        &self.header
+    }
+
+    fn round(&self, r: usize) -> Arc<RoundData> {
+        Arc::clone(&self.rounds[r])
+    }
 }
 
 /// A succinct commitment to a set of IDs. Internally, a KZG commitment over a shifted
@@ -105,11 +184,36 @@ impl DigestKey {
             BatchEncryptionError::DigestInitError(DigestKeyInitError::FKDomainInitFailure),
         )?;
 
-        Ok(DigestKey {
+        Ok(Self::from_fk_domain(tau_g2, tau_powers_g1, fk_domain))
+    }
+
+    /// Internal helper: assemble a `DigestKey` from the legacy split (tau_g2, per-round powers,
+    /// fully-materialized `FKDomain`). Splits the FKDomain into params + per-round prepared
+    /// inputs and packages each round.
+    fn from_fk_domain(
+        tau_g2: G2Affine,
+        tau_powers_g1: Vec<Vec<G1Affine>>,
+        fk_domain: FKDomain<Fr, G1Projective>,
+    ) -> Self {
+        let batch_size = tau_powers_g1[0].len() - 1;
+        let num_rounds = tau_powers_g1.len();
+        let header = Arc::new(DigestKeyHeader {
             tau_g2,
-            tau_powers_g1,
-            fk_domain,
-        })
+            batch_size,
+            num_rounds,
+            fk_params: fk_domain.params(),
+        });
+        let rounds: Vec<Arc<RoundData>> = tau_powers_g1
+            .into_iter()
+            .zip(fk_domain.prepared_toeplitz_inputs)
+            .map(|(tau_powers_g1, prepared_toeplitz_input)| {
+                Arc::new(RoundData {
+                    tau_powers_g1,
+                    prepared_toeplitz_input,
+                })
+            })
+            .collect();
+        Self { header, rounds }
     }
 
     pub fn with_randomized_powers_of_tau(
@@ -152,19 +256,19 @@ impl DigestKey {
                 DigestKeyInitError::FKDomainInitFailure,
             ))?;
 
-        Ok(Self {
+        Ok(Self::from_fk_domain(
             tau_g2,
-            tau_powers_g1: randomized_tau_powers_g1,
+            randomized_tau_powers_g1,
             fk_domain,
-        })
+        ))
     }
 
     pub fn max_batch_size(&self) -> usize {
-        self.tau_powers_g1[0].len() - 1
+        self.header.batch_size
     }
 
     pub fn num_rounds(&self) -> usize {
-        self.tau_powers_g1.len()
+        self.header.num_rounds
     }
 
     pub fn digest(
@@ -173,23 +277,26 @@ impl DigestKey {
         round: u64,
     ) -> Result<(Digest, EvalProofsPromise)> {
         let round: usize = round as usize;
-        if round >= self.tau_powers_g1.len() {
+        if round >= self.header.num_rounds {
             Err(anyhow!(
                 "Tried to compute digest with round greater than setup length."
             ))
-        } else if ids.capacity() > self.tau_powers_g1[round].len() - 1 {
-            Err(anyhow!(
-                "Tried to compute a batch digest with size {}, where setup supports up to size {}",
-                ids.capacity(),
-                self.tau_powers_g1[round].len() - 1
-            ))?
         } else {
+            let round_data = self.round_data(round);
+            let tau_powers = &round_data.tau_powers_g1;
+            if ids.capacity() > tau_powers.len() - 1 {
+                Err(anyhow!(
+                    "Tried to compute a batch digest with size {}, where setup supports up to size {}",
+                    ids.capacity(),
+                    tau_powers.len() - 1
+                ))?;
+            }
             let ids = ids.compute_poly_coeffs();
             let mut coeffs = ids.poly_coeffs();
-            coeffs.resize(self.tau_powers_g1[round].len(), Fr::zero());
+            coeffs.resize(tau_powers.len(), Fr::zero());
 
             let digest = Digest {
-                digest_g1: G1Projective::msm(&self.tau_powers_g1[round], &coeffs)
+                digest_g1: G1Projective::msm(tau_powers, &coeffs)
                     .expect("Sizes should always match up b/c of check above")
                     .into(),
                 round,
@@ -201,7 +308,7 @@ impl DigestKey {
 
     fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
         Ok(PairingSetting::multi_pairing([pf, -digest.as_g1()], [
-            G2Affine::from(self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x())),
+            G2Affine::from(self.header.tau_g2 - G2Projective::from(G2Affine::generator() * id.x())),
             G2Affine::generator(),
         ])
         .is_zero()
@@ -351,8 +458,13 @@ pub(crate) mod tests {
     fn test_with_randomized_powers_of_tau() {
         let mut rng = thread_rng();
         let dk = DigestKey::new(&mut rng, 8, 2).unwrap();
+        let tau_powers_g1: Vec<Vec<G1Affine>> = dk
+            .rounds
+            .iter()
+            .map(|r| r.tau_powers_g1.clone())
+            .collect();
         let dk2 =
-            DigestKey::with_randomized_powers_of_tau(dk.tau_powers_g1.clone(), dk.tau_g2).unwrap();
+            DigestKey::with_randomized_powers_of_tau(tau_powers_g1, dk.header.tau_g2).unwrap();
         assert_eq!(dk, dk2);
     }
 }
