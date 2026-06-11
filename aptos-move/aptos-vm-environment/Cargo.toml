@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+testing = ["aptos-move-stdlib/testing"]
+profiling = ["move-vm-runtime/profiling"]
+
 [dependencies]
 aptos-framework-natives = { workspace = true }
 aptos-gas-algebra = { workspace = true }
@@ -36,8 +41,3 @@ triomphe = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["testing", "fuzzing"] }
 serde = { workspace = true }
-
-[features]
-default = []
-testing = ["aptos-move-stdlib/testing"]
-profiling = ["move-vm-runtime/profiling"]

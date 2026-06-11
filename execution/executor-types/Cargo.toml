@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+bench = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
@@ -35,11 +40,6 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing", "testing"] }
-
-[features]
-default = []
-fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
-bench = []
 
 [[bench]]
 name = "default"
