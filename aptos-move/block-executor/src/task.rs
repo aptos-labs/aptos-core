@@ -186,6 +186,22 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     fn output_approx_size(&self) -> u64;
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<Txn::Key, Txn::Tag>>;
+
+    /// State keys read by the VM during the execution that produced this output, recorded at
+    /// the VM (resolver) boundary so the result is identical across executor modes. Used to
+    /// accumulate hot state promotions. Outputs that do not track reads (e.g. mocks) fall
+    /// back to an empty set, which disables promotion.
+    fn hot_state_read_keys(&self) -> HashSet<Txn::Key> {
+        HashSet::new()
+    }
+
+    /// Keys that receive a value write when this output commits; these become hot via the
+    /// write itself, so the hot state accumulator must not promote them separately. Unlike
+    /// [Self::get_write_summary], this is meant to include in-place delayed field rewrites,
+    /// aggregator v1 writes/deltas and module writes.
+    fn hot_state_write_keys(&self) -> HashSet<Txn::Key> {
+        HashSet::new()
+    }
 }
 
 pub trait AfterMaterializationOutput<Txn: Transaction> {
