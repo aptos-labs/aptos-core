@@ -7,14 +7,15 @@
 
 use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use aptos_batch_encryption::{
-    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+    schemes::fptx_weighted::FPTXWeighted, shared::digest::DigestKeyView,
+    traits::BatchThresholdEncryption,
 };
 use aptos_crypto::{hash::HashValue, player::Player};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
 pub type EncryptionKey = <FPTXWeighted as BatchThresholdEncryption>::EncryptionKey;
-pub type DigestKey = <FPTXWeighted as BatchThresholdEncryption>::DigestKey;
+pub type DigestKey = aptos_batch_encryption::shared::digest::DigestKey;
 pub type Ciphertext = <FPTXWeighted as BatchThresholdEncryption>::Ciphertext;
 pub type Id = <FPTXWeighted as BatchThresholdEncryption>::Id;
 pub type Round = u64;
@@ -143,7 +144,9 @@ impl SecretSharedKey {
 #[derive(Clone)]
 pub struct SecretShareConfig {
     validator: Arc<ValidatorVerifier>,
-    digest_key: Arc<DigestKey>,
+    /// Trait-object so this works with both the in-memory [`DigestKey`] (tests) and the
+    /// streaming `DigestKeyStore` (production).
+    digest_key: Arc<dyn DigestKeyView>,
     msk_share: MasterSecretKeyShare,
     verification_keys: Vec<VerificationKey>,
     config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -154,7 +157,7 @@ pub struct SecretShareConfig {
 impl SecretShareConfig {
     pub fn new(
         validator: Arc<ValidatorVerifier>,
-        digest_key: Arc<DigestKey>,
+        digest_key: Arc<dyn DigestKeyView>,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -189,11 +192,11 @@ impl SecretShareConfig {
             .ok_or_else(|| anyhow::anyhow!("Peer {} not found in validator index", peer))
     }
 
-    pub fn digest_key(&self) -> &DigestKey {
-        &self.digest_key
+    pub fn digest_key(&self) -> &dyn DigestKeyView {
+        &*self.digest_key
     }
 
-    pub fn digest_key_arc(&self) -> Arc<DigestKey> {
+    pub fn digest_key_arc(&self) -> Arc<dyn DigestKeyView> {
         Arc::clone(&self.digest_key)
     }
 

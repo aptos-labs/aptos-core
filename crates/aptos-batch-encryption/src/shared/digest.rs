@@ -64,6 +64,63 @@ pub trait DigestKeyView: Send + Sync {
     fn tau_g2(&self) -> G2Affine {
         self.header().tau_g2
     }
+
+    fn digest(
+        &self,
+        ids: &mut IdSet<UncomputedCoeffs>,
+        round: u64,
+    ) -> Result<(Digest, EvalProofsPromise)> {
+        let round_usize: usize = round as usize;
+        if round_usize >= self.num_rounds() {
+            return Err(anyhow!(
+                "Tried to compute digest with round greater than setup length."
+            ));
+        }
+        let round_data = self.round(round_usize);
+        let tau_powers = &round_data.tau_powers_g1;
+        if ids.capacity() > tau_powers.len() - 1 {
+            return Err(anyhow!(
+                "Tried to compute a batch digest with size {}, where setup supports up to size {}",
+                ids.capacity(),
+                tau_powers.len() - 1
+            ));
+        }
+        let ids = ids.compute_poly_coeffs();
+        let mut coeffs = ids.poly_coeffs();
+        coeffs.resize(tau_powers.len(), Fr::zero());
+
+        let digest = Digest {
+            digest_g1: G1Projective::msm(tau_powers, &coeffs)
+                .expect("Sizes should always match up b/c of check above")
+                .into(),
+            round: round_usize,
+        };
+
+        Ok((digest.clone(), EvalProofsPromise::new(digest, ids)))
+    }
+
+    fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
+        Ok(PairingSetting::multi_pairing([pf, -digest.as_g1()], [
+            G2Affine::from(
+                self.header().tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
+            ),
+            G2Affine::generator(),
+        ])
+        .is_zero()
+        .then_some(())
+        .ok_or(BatchEncryptionError::EvalProofVerifyError)?)
+    }
+
+    fn verify(&self, digest: &Digest, pfs: &EvalProofs, id: Id) -> Result<()> {
+        let pf = pfs.computed_proofs[&id];
+        self.verify_pf(digest, id, pf)
+    }
+
+    fn verify_all(&self, digest: &Digest, pfs: &EvalProofs) -> Result<()> {
+        pfs.computed_proofs
+            .iter()
+            .try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
+    }
 }
 
 /// The digest public parameters.
@@ -270,62 +327,6 @@ impl DigestKey {
     pub fn num_rounds(&self) -> usize {
         self.header.num_rounds
     }
-
-    pub fn digest(
-        &self,
-        ids: &mut IdSet<UncomputedCoeffs>,
-        round: u64,
-    ) -> Result<(Digest, EvalProofsPromise)> {
-        let round: usize = round as usize;
-        if round >= self.header.num_rounds {
-            Err(anyhow!(
-                "Tried to compute digest with round greater than setup length."
-            ))
-        } else {
-            let round_data = self.round_data(round);
-            let tau_powers = &round_data.tau_powers_g1;
-            if ids.capacity() > tau_powers.len() - 1 {
-                Err(anyhow!(
-                    "Tried to compute a batch digest with size {}, where setup supports up to size {}",
-                    ids.capacity(),
-                    tau_powers.len() - 1
-                ))?;
-            }
-            let ids = ids.compute_poly_coeffs();
-            let mut coeffs = ids.poly_coeffs();
-            coeffs.resize(tau_powers.len(), Fr::zero());
-
-            let digest = Digest {
-                digest_g1: G1Projective::msm(tau_powers, &coeffs)
-                    .expect("Sizes should always match up b/c of check above")
-                    .into(),
-                round,
-            };
-
-            Ok((digest.clone(), EvalProofsPromise::new(digest, ids)))
-        }
-    }
-
-    fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
-        Ok(PairingSetting::multi_pairing([pf, -digest.as_g1()], [
-            G2Affine::from(self.header.tau_g2 - G2Projective::from(G2Affine::generator() * id.x())),
-            G2Affine::generator(),
-        ])
-        .is_zero()
-        .then_some(())
-        .ok_or(BatchEncryptionError::EvalProofVerifyError)?)
-    }
-
-    pub fn verify(&self, digest: &Digest, pfs: &EvalProofs, id: Id) -> Result<()> {
-        let pf = pfs.computed_proofs[&id];
-        self.verify_pf(digest, id, pf)
-    }
-
-    pub fn verify_all(&self, digest: &Digest, pfs: &EvalProofs) -> Result<()> {
-        pfs.computed_proofs
-            .iter()
-            .try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -339,7 +340,7 @@ impl EvalProofsPromise {
         Self { digest, ids }
     }
 
-    pub fn compute_all(&self, digest_key: &DigestKey) -> EvalProofs {
+    pub fn compute_all(&self, digest_key: &dyn DigestKeyView) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids
@@ -347,7 +348,7 @@ impl EvalProofsPromise {
         }
     }
 
-    pub fn compute_all_vzgg_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
+    pub fn compute_all_vzgg_multi_point_eval(&self, digest_key: &dyn DigestKeyView) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids
@@ -458,11 +459,8 @@ pub(crate) mod tests {
     fn test_with_randomized_powers_of_tau() {
         let mut rng = thread_rng();
         let dk = DigestKey::new(&mut rng, 8, 2).unwrap();
-        let tau_powers_g1: Vec<Vec<G1Affine>> = dk
-            .rounds
-            .iter()
-            .map(|r| r.tau_powers_g1.clone())
-            .collect();
+        let tau_powers_g1: Vec<Vec<G1Affine>> =
+            dk.rounds.iter().map(|r| r.tau_powers_g1.clone()).collect();
         let dk2 =
             DigestKey::with_randomized_powers_of_tau(tau_powers_g1, dk.header.tau_g2).unwrap();
         assert_eq!(dk, dk2);

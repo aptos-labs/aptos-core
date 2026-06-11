@@ -5,7 +5,7 @@ use crate::{
     group::*,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
-        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
+        digest::{Digest, DigestKey, DigestKeyView, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
         ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
@@ -30,7 +30,6 @@ impl BatchThresholdEncryption for FPTX {
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
     type Digest = Digest;
-    type DigestKey = DigestKey;
     type EncryptionKey = EncryptionKey;
     type EvalProof = EvalProof;
     type EvalProofs = EvalProofs;
@@ -45,7 +44,7 @@ impl BatchThresholdEncryption for FPTX {
     type VerificationKey = BIBEVerificationKey;
 
     fn setup(
-        _digest_key: &Self::DigestKey,
+        _digest_key: &dyn DigestKeyView,
         _pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         _subtranscript: &Self::SubTranscript,
         _threshold_config: &Self::ThresholdConfig,
@@ -61,7 +60,7 @@ impl BatchThresholdEncryption for FPTX {
     }
 
     fn extract_encryption_key(
-        _digest_key: &Self::DigestKey,
+        _digest_key: &dyn DigestKeyView,
         _subtranscript: &Self::SubTranscript,
     ) -> Result<Self::EncryptionKey> {
         // B/c unweighted chunky is being removed
@@ -75,7 +74,7 @@ impl BatchThresholdEncryption for FPTX {
         threshold_config: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
-        Self::DigestKey,
+        DigestKey,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -91,11 +90,11 @@ impl BatchThresholdEncryption for FPTX {
         Ok((ek, digest_key, vks, msk_shares))
     }
 
-    fn max_batch_size(dk: &Self::DigestKey) -> usize {
+    fn max_batch_size(dk: &dyn DigestKeyView) -> usize {
         dk.max_batch_size()
     }
 
-    fn num_rounds(dk: &Self::DigestKey) -> usize {
+    fn num_rounds(dk: &dyn DigestKeyView) -> usize {
         dk.num_rounds()
     }
 
@@ -109,7 +108,7 @@ impl BatchThresholdEncryption for FPTX {
     }
 
     fn digest(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         cts: &[Self::Ciphertext],
         round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
@@ -132,14 +131,14 @@ impl BatchThresholdEncryption for FPTX {
 
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
-        digest_key: &DigestKey,
+        digest_key: &dyn DigestKeyView,
     ) -> Self::EvalProofs {
         proofs.compute_all(digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
-        digest_key: &DigestKey,
+        digest_key: &dyn DigestKeyView,
     ) -> Self::EvalProofs {
         proofs.compute_all_vzgg_multi_point_eval(digest_key)
     }

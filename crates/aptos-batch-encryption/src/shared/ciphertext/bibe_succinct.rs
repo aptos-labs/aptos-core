@@ -126,7 +126,7 @@ pub mod tests {
         group::*,
         shared::{
             ciphertext::bibe::{BIBECTDecrypt as _, BIBECTEncrypt as _, InnerCiphertext as _},
-            digest::DigestKey,
+            digest::{DigestKey, DigestKeyView as _},
             encryption_key::AugmentedEncryptionKey,
             ids::{Id, IdSet},
             key_derivation::{self, BIBEDecryptionKey},

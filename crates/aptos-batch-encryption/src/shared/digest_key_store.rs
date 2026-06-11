@@ -301,9 +301,7 @@ fn loader_main_inner(inner: &Inner) -> Result<()> {
                 prepared_toeplitz_input: round_file.prepared_toeplitz_input,
             });
             *inner.pinned[r].write().unwrap() = Some(arc);
-            inner
-                .pinned_loaded_through
-                .store(r + 1, Ordering::Release);
+            inner.pinned_loaded_through.store(r + 1, Ordering::Release);
             inner.loader_wake.notify_all();
         }
         file_cursor_round += this_batch;

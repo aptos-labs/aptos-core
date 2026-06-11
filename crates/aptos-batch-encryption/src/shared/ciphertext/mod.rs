@@ -182,7 +182,7 @@ pub mod tests {
         schemes::fptx::FPTX,
         shared::{
             ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext},
-            digest::DigestKey,
+            digest::{DigestKey, DigestKeyView as _},
             encryption_key::AugmentedEncryptionKey,
             ids::{Id, IdSet},
             key_derivation::{self, BIBEDecryptionKey},

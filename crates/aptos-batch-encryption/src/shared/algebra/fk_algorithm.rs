@@ -413,7 +413,7 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
     pub fn params(&self) -> FKDomainParams<F> {
         FKDomainParams {
             toeplitz_domain: self.toeplitz_domain.clone(),
-            fft_domain: self.fft_domain.clone(),
+            fft_domain: self.fft_domain,
         }
     }
 }
