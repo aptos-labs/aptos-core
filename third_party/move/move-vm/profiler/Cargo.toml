@@ -11,11 +11,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+probe-profiler = ["dep:usdt"]
+
 [dependencies]
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 usdt = { workspace = true, optional = true }
-
-[features]
-default = []
-probe-profiler = ["dep:usdt"]

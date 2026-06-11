@@ -15,6 +15,7 @@ use aptos_sdk::{
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
 };
+use aptos_transaction_generator_lib::TransactionFeedback;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_test_root_address, AccountResource, BlockResource, CORE_CODE_ADDRESS},
@@ -54,6 +55,16 @@ use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
+
+/// Optional lower bound on the timestamp used in `epoch_change_block`.
+/// When non-zero, the epoch-change block's timestamp is clamped to at least
+/// this value, causing `BenchmarkTimestamp::from_db` to reflect the same
+/// floor in every subsequent block.  Set before calling `epoch_change_block`.
+static MIN_BLOCK_TIMESTAMP_USECS: AtomicU64 = AtomicU64::new(0);
+
+pub fn set_min_block_timestamp_usecs(min: u64) {
+    MIN_BLOCK_TIMESTAMP_USECS.store(min, Ordering::SeqCst);
+}
 
 fn validator_address() -> AccountAddress {
     // Replicate the exact same logic as genesis creation in test_config_with_custom_onchain
@@ -234,7 +245,8 @@ impl BenchmarkTimestamp {
 
         let epoch_interval = block_resource.epoch_interval();
         let last_reconfig_time = config.last_reconfiguration_time_micros();
-        let epoch_change_timestamp = last_reconfig_time + epoch_interval + 1;
+        let epoch_change_timestamp = (last_reconfig_time + epoch_interval + 1)
+            .max(MIN_BLOCK_TIMESTAMP_USECS.load(Ordering::SeqCst));
 
         info!(
             "epoch_change_block: last_reconfig_time={}, epoch_interval={}, \
@@ -540,6 +552,7 @@ impl TransactionGenerator {
         transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
         phase: Arc<AtomicUsize>,
         transactions_per_sender: usize,
+        feedback: Option<Arc<dyn TransactionFeedback>>,
     ) -> usize {
         let last_non_empty_phase = Arc::new(AtomicUsize::new(0));
         let transaction_generators = Mutex::new(transaction_generators);
@@ -548,6 +561,13 @@ impl TransactionGenerator {
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for i in 0..num_blocks {
+            // Wait in the main thread (outside rayon) until there is work to
+            // generate. This prevents flooding the pipeline with empty blocks
+            // while accounts are waiting for on-chain events (e.g. UIDs).
+            if let Some(fb) = feedback.as_ref() {
+                fb.wait_until_ready();
+            }
+
             let sender_indices = rand::seq::index::sample(
                 &mut thread_rng(),
                 account_pool_size,
@@ -952,11 +972,12 @@ impl TransactionGenerator {
                     val, last_generated_at
                 );
                 return true;
+            } else {
+                info!(
+                    "Block generation: no transactions generated in phase {}, moving to next phase",
+                    val
+                );
             }
-            info!(
-                "Block generation: no transactions generated in phase {}, moving to next phase",
-                val
-            );
         } else {
             let val = phase.load(Ordering::Relaxed);
             last_non_empty_phase.fetch_max(val, Ordering::Relaxed);

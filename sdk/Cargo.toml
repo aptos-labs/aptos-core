@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["tiny-bip39"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-batch-encryption = { workspace = true }
@@ -40,6 +43,3 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-
-[package.metadata.cargo-machete]
-ignored = ["tiny-bip39"]

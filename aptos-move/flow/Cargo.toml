@@ -11,6 +11,14 @@ publish = false
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ bin }-v{ version }/{ bin }-v{ version }-{ target }.zip"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/{ bin }-v{ version }/{ bin }-v{ version }-{ target }.zip"
+
 [[bin]]
 name = "move-flow"
 path = "src/main.rs"
@@ -65,4 +73,3 @@ move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 rmcp = { workspace = true, features = ["client"] }
 tempfile = { workspace = true }
-
