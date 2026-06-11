@@ -17,7 +17,8 @@ pub mod types;
 pub mod value_layout;
 
 pub use align::{
-    align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
+    align_max, align_up, align_up_u32, checked_align_max, checked_align_up, checked_align_up_u32,
+    MAX_ALIGN,
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
 pub use function::{

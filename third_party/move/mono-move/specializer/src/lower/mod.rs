@@ -5,6 +5,7 @@
 
 pub mod context;
 pub mod gc_layout;
+mod lower_utils;
 mod parallel_copy;
 mod translate;
 

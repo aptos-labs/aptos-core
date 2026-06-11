@@ -9,6 +9,12 @@
 //! Descriptors themselves are not re-verified here; their soundness is
 //! enforced by [`mono_move_core::ObjectDescriptor`]'s constructors at
 //! publish time.
+//!
+//! TODO(maintainability):
+//! 1. Call this something other than verifier (well-formedness checker) to
+//!    avoid ambiguity with bytecode verifier.
+//! 2. Replace various hard-coded constants with named constants.
+//! 3. Precisely list out what is checked and what is out of scope.
 
 use mono_move_core::{
     captured_values_size,
@@ -548,6 +554,60 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, src);
             },
 
+            MicroOp::EnumTestTag { dst, enum_ref, .. } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_frame_access_1(pc, dst);
+            },
+
+            MicroOp::EnumBorrowVariantField { dst, enum_ref, .. } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+
+            MicroOp::EnumCheckVariant { enum_ptr, .. } => {
+                self.check_frame_access_8(pc, enum_ptr);
+            },
+
+            MicroOp::EnumNew {
+                dst,
+                descriptor_id,
+                variant,
+            } => {
+                self.check_frame_access_8(pc, dst);
+                self.check_enum_new(pc, descriptor_id, variant);
+            },
+
+            MicroOp::EnumReadVariantField {
+                dst,
+                enum_ref,
+                offset,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), dst, size);
+            },
+
+            MicroOp::EnumWriteVariantField {
+                enum_ref,
+                offset,
+                src,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), src, size);
+            },
+
+            // Each owned heap pointer at `base + off` is an 8-byte frame slot.
+            MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {
+                for &off in offsets.iter() {
+                    self.check_frame_access(Some(pc), FrameOffset(base.0.saturating_add(off)), 8);
+                }
+            },
+
             // ----- Vec push/pop: vec_ref (16B fat pointer) + variable-width slot -----
             MicroOp::VecPushBack {
                 vec_ref,
@@ -1079,6 +1139,38 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 ),
             ),
             Some(_) => {},
+        }
+    }
+
+    /// `EnumNew` allocates an enum object and stamps `tag` into it. The
+    /// descriptor must be an `Enum`, and `tag` must name one of its variants
+    fn check_enum_new(&mut self, pc: usize, descriptor_id: DescriptorId, tag: u64) {
+        match self.provider.descriptor(descriptor_id) {
+            None => self.err(
+                Some(pc),
+                format!("EnumNew: unknown descriptor_id {}", descriptor_id),
+            ),
+            Some(desc) => match desc.inner() {
+                ObjectDescriptorInner::Enum {
+                    variant_pointer_offsets,
+                    ..
+                } => {
+                    let variant_count = variant_pointer_offsets.len();
+                    if tag as usize >= variant_count {
+                        self.err(
+                            Some(pc),
+                            format!(
+                                "EnumNew: tag {} out of range (descriptor {} has {} variants)",
+                                tag, descriptor_id, variant_count
+                            ),
+                        );
+                    }
+                },
+                _ => self.err(
+                    Some(pc),
+                    format!("EnumNew: descriptor_id {} is not an Enum", descriptor_id),
+                ),
+            },
         }
     }
 

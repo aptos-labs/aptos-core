@@ -66,6 +66,9 @@ pub enum RuntimeError {
     #[error("MoveTo: resource already exists at {addr}")]
     ResourceAlreadyExists { addr: AccountAddress },
 
+    #[error("enum variant mismatch: runtime variant tag {tag} is not the expected variant (STRUCT_VARIANT_MISMATCH)")]
+    EnumVariantMismatch { tag: u64 },
+
     #[error("stack overflow")]
     StackOverflow,
 
@@ -127,7 +130,8 @@ impl IntoExecutionError for RuntimeError {
             | VectorIndexOutOfBounds { .. }
             | InvalidAbortMessage
             | ResourceDoesNotExist { .. }
-            | ResourceAlreadyExists { .. } => ExecutionErrorKind::InvalidOperation,
+            | ResourceAlreadyExists { .. }
+            | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
