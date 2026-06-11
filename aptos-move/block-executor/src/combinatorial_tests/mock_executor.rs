@@ -900,6 +900,14 @@ where
         HashSet::new()
     }
 
+    fn storage_keys_read(&self) -> HashSet<K> {
+        HashSet::new()
+    }
+
+    fn storage_keys_written(&self) -> HashSet<K> {
+        HashSet::new()
+    }
+
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
