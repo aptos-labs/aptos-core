@@ -408,6 +408,15 @@ impl TransactionGeneratorCreator for WorkflowTxnGeneratorCreator {
     }
 
     fn transaction_feedback(&self) -> Option<Arc<dyn TransactionFeedback>> {
-        self.creators.iter().find_map(|c| c.transaction_feedback())
+        let feedbacks: Vec<_> = self
+            .creators
+            .iter()
+            .filter_map(|c| c.transaction_feedback())
+            .collect();
+        assert!(
+            feedbacks.len() <= 1,
+            "At most one creator in a workflow may provide TransactionFeedback"
+        );
+        feedbacks.into_iter().next()
     }
 }

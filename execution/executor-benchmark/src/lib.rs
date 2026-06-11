@@ -400,16 +400,16 @@ where
             transaction_feedback,
             ..
         } => transaction_feedback.clone(),
-        _ => None,
+        InitializedBenchmarkWorkload::Transfer { .. } => None,
     };
 
-    // generate_then_execute is incompatible with TransactionFeedback: feedback requires
-    // execution to run concurrently with generation so that on-chain events can flow back
-    // to the generator before all blocks are pre-generated.
-    let pipeline_config = if transaction_feedback.is_some() && pipeline_config.generate_then_execute
-    {
+    // generate_then_execute and split_stages are incompatible with TransactionFeedback:
+    // both delay execution until all blocks are pre-generated, preventing on-chain events
+    // from flowing back to the generator while wait_until_ready is blocking.
+    let pipeline_config = if transaction_feedback.is_some() {
         PipelineConfig {
             generate_then_execute: false,
+            split_stages: false,
             ..pipeline_config
         }
     } else {
