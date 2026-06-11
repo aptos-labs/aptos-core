@@ -2437,6 +2437,13 @@ where
                         read_write_summary,
                         approx_output_size,
                     );
+                    if block_limit_processor.is_hot_state_accumulation_enabled() {
+                        block_limit_processor.accumulate_hot_state_rw(
+                            output_before_guard.storage_keys_written().iter(),
+                            output_before_guard.storage_keys_read().iter(),
+                        );
+                    }
+
                     if idx < num_txns {
                         // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns
                         // tracks only user txns. Includes bcs-fallback discards (which accumulate
