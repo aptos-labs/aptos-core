@@ -14,6 +14,7 @@ use mono_move_core::{
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
     LayoutProvider, ObjectDescriptor, ResourceProvider, ValueLayout,
 };
+use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
 
 /// Per-transaction execution context. Maintains per-transaction state
@@ -85,7 +86,7 @@ impl ExecutionContext for TransactionContext<'_, '_> {
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
-        &dyn DescriptorProvider,
+        &ExecutionGuard<'_>,
         &mut GasMeter,
         &NativeExtensions,
     ) {

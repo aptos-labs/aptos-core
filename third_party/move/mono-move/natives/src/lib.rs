@@ -14,6 +14,7 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 mod address_derivation;
 pub mod aggregator_v2;
+pub mod bcs;
 pub mod event;
 pub mod function_info;
 pub mod mem;
@@ -25,6 +26,7 @@ pub mod transaction_context;
 pub mod type_info;
 
 pub use aggregator_v2::make_all_aggregator_v2_natives;
+pub use bcs::make_all_bcs_natives;
 pub use event::{make_all_event_natives, EventEntry, EventKind, EventStore};
 pub use function_info::make_all_function_info_natives;
 pub use mem::make_all_mem_natives;
@@ -72,6 +74,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_object_natives::<F>());
     natives.extend(make_all_state_storage_natives::<F>());
     natives.extend(make_all_event_natives::<F>());
+    natives.extend(make_all_bcs_natives::<F>());
     natives
 }
 

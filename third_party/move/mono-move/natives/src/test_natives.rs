@@ -4,7 +4,7 @@
 //! Synthetic natives used by the differential harness. Expected to go
 //! away once real natives are wired up.
 
-use crate::{monomorphic_natives, NativeEntry};
+use crate::{monomorphic_natives, polymorphic_natives, NativeEntry};
 use mono_move_core::native::{NativeContext, NativeContextFamily, NativeStatus, VMInternalError};
 
 pub fn native_u64_add<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
@@ -32,8 +32,16 @@ pub fn native_u64_identity<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VM
 }
 
 pub fn make_all_test_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
-    monomorphic_natives![
+    let mut natives = monomorphic_natives![
         ("0x1::test_natives::u64_add", native_u64_add),
         ("0x1::test_natives::u64_identity", native_u64_identity),
-    ]
+    ];
+    // The plain move-stdlib `bcs` module declares only `to_bytes`, so the
+    // differential harness reaches `bcs::serialized_size` through this test
+    // module instead (the V1 side re-registers the legacy impl here too).
+    natives.extend(polymorphic_natives![(
+        "0x1::test_natives::serialized_size",
+        crate::bcs::native_serialized_size
+    )]);
+    natives
 }

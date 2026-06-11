@@ -6,7 +6,7 @@
 use super::{
     extension::NativeExtension,
     result::VMInternalError,
-    value::{VMValue, Vector},
+    value::{Opaque, Ref, VMValue, Vector},
 };
 use crate::{interner::InternedModuleId, types::InternedType};
 use core::cell::RefMut;
@@ -91,4 +91,25 @@ pub trait NativeContext {
     ///
     /// Errors if `T` is not installed, or if it is already borrowed.
     fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError>;
+
+    /// BCS-serializes the value behind `value` (a `&T` reference) whose type is
+    /// `ty`, returning the encoded bytes.
+    ///
+    /// `Ok(None)` means the value is well-typed but not BCS-serializable (e.g. a
+    /// sequence longer than BCS allows); the caller maps this to a
+    /// serialization abort. VM-internal failures use the error channel.
+    fn serialize(
+        &self,
+        ty: InternedType,
+        value: &Ref<'_, Opaque>,
+    ) -> Result<Option<Vec<u8>>, VMInternalError>;
+
+    /// Returns the BCS serialized size of the value behind `value` of type `ty`,
+    /// without retaining the encoded bytes. Same failure semantics as
+    /// [`Self::serialize`].
+    fn serialized_size(
+        &self,
+        ty: InternedType,
+        value: &Ref<'_, Opaque>,
+    ) -> Result<Option<usize>, VMInternalError>;
 }

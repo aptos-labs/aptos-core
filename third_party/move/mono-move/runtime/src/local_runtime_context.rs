@@ -16,6 +16,7 @@ use mono_move_core::{
     LayoutProvider, ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout,
     ValueLayoutTable,
 };
+use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::LoaderResult;
 
 /// Combines a [`LocalExecutionContext`] with an owned
@@ -110,12 +111,14 @@ impl ExecutionContext for LocalRuntimeContext<'_> {
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
-        &dyn DescriptorProvider,
+        &ExecutionGuard<'_>,
         &mut GasMeter,
         &NativeExtensions,
     ) {
-        let (natives, _, gas_meter, extensions) = self.inner.native_call_borrows();
-        (natives, &self.descriptors, gas_meter, extensions)
+        // No guard here: this context never runs natives that need one.
+        unimplemented!(
+            "LocalRuntimeContext: natives requiring an execution guard are not supported"
+        )
     }
 
     fn load_function(

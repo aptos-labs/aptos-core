@@ -40,7 +40,7 @@ use mono_move_runtime::serialize;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::IdentStr,
+    identifier::{IdentStr, Identifier},
     int256::{I256, U256},
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
@@ -329,6 +329,26 @@ fn v1_native_table() -> NativeFunctionTable {
         Features::default(),
     );
     table.extend(crate::v1_test_natives::make_all_v1_test_natives());
+
+    // The plain move-stdlib `bcs` module declares only `to_bytes`, so the
+    // differential harness reaches `serialized_size` through the `test_natives`
+    // module. Re-register the legacy `bcs::serialized_size` impl under that name
+    // so the V1 side matches the V2 test native.
+    let serialized_size = table
+        .iter()
+        .find(|(addr, module, name, _)| {
+            *addr == AccountAddress::ONE
+                && module.as_str() == "bcs"
+                && name.as_str() == "serialized_size"
+        })
+        .map(|(_, _, _, f)| f.clone())
+        .expect("legacy bcs::serialized_size native is registered");
+    table.push((
+        AccountAddress::ONE,
+        Identifier::new("test_natives").unwrap(),
+        Identifier::new("serialized_size").unwrap(),
+        serialized_size,
+    ));
     table
 }
 

@@ -10,8 +10,9 @@ use mono_move_core::{
     native::{NativeExtensions, NativeRegistry},
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
-    ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, NO_DESCRIPTOR_PROVIDER,
+    ConstantPoolIndex, FunctionPtr, GasMeter,
 };
+use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::LoaderResult;
 
 /// Runtime context consulted by the interpreter during execution: gas
@@ -26,13 +27,21 @@ pub trait ExecutionContext {
     /// The per-transaction native extensions.
     fn extensions(&self) -> &NativeExtensions;
 
-    /// Disjoint borrows all the sub-components needed for a native call.
-    /// Needed for avoiding borrow conflicts downstream.
+    /// Disjoint borrows of all the sub-components a native call needs at once:
+    /// the registry to resolve the function, the execution guard to look up
+    /// object descriptors (for any GC the native triggers) and value layouts
+    /// (for serialization), the gas meter, and the native extensions. Needed to
+    /// avoid borrow conflicts downstream.
+    ///
+    /// Only the production [`TransactionContext`] has a guard; the local
+    /// test/bench contexts do not run natives and leave this `unimplemented!()`.
+    ///
+    /// [`TransactionContext`]: crate::TransactionContext
     fn native_call_borrows(
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
-        &dyn DescriptorProvider,
+        &ExecutionGuard<'_>,
         &mut GasMeter,
         &NativeExtensions,
     );
@@ -136,15 +145,13 @@ impl ExecutionContext for LocalExecutionContext<'_> {
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
-        &dyn DescriptorProvider,
+        &ExecutionGuard<'_>,
         &mut GasMeter,
         &NativeExtensions,
     ) {
-        (
-            &self.natives,
-            &NO_DESCRIPTOR_PROVIDER,
-            &mut self.gas_meter,
-            &self.extensions,
+        // No guard here: this context never runs natives that need one.
+        unimplemented!(
+            "LocalExecutionContext: natives requiring an execution guard are not supported"
         )
     }
 

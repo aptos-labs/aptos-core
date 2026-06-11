@@ -51,7 +51,6 @@ pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
 ///
 /// `base` must point to a fully initialized value of the given type, and must
 /// remain valid (with all reachable heap objects live) throughout the call.
-#[allow(dead_code)]
 pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,
@@ -69,7 +68,6 @@ pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
 ///
 /// `base` must point to a fully initialized value of the given type, and must
 /// remain valid (with all reachable heap objects live) throughout the call.
-#[allow(dead_code)]
 pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,

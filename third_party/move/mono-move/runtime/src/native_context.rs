@@ -7,21 +7,23 @@
 //! [`NativeContext`] trait, never on these types directly.
 
 use crate::{
-    error::RuntimeError,
+    error::{RuntimeError, RuntimeResult},
     global_storage::ResourceReadWriteSet,
     heap::{alloc_vec, is_heap_ptr, Heap, TopFrame},
     memory::{read_ptr, write_u64},
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
+    value_utils,
 };
 use mono_move_core::{
     interner::InternedModuleId,
     native::{
         NativeABI, NativeContext, NativeContextFamily, NativeExtension, NativeExtensions,
-        NativeFunction, NativeRegistry, RootPool, VMInternalError, VMValue, Vector,
+        NativeFunction, NativeRegistry, Opaque, Ref, RootPool, VMInternalError, VMValue, Vector,
     },
     types::InternedType,
-    DescriptorProvider, Function, GasMeter, FRAME_METADATA_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    Function, GasMeter, FRAME_METADATA_SIZE, TRIVIAL_DESCRIPTOR_ID,
 };
+use mono_move_global_context::ExecutionGuard;
 use std::cell::{Cell, RefMut, UnsafeCell};
 
 /// Concrete [`NativeContext`] used by the production runtime.
@@ -48,8 +50,9 @@ pub struct ProductionNativeContext<'a> {
     abi: &'a NativeABI,
     /// Type arguments to the native.
     ty_args: &'a [InternedType],
-    /// Descriptor provider, used by any GC the native triggers while allocating.
-    desc_provider: &'a dyn DescriptorProvider,
+    /// Execution guard, used for object-descriptor lookups (any GC the native
+    /// triggers while allocating) and value-layout lookups (serialization).
+    guard: &'a ExecutionGuard<'a>,
     /// Start of the native's slot region within the caller's frame. Args are
     /// read and returns written here, within the ABI-verified bounds.
     frame_ptr: *mut u8,
@@ -81,7 +84,7 @@ impl<'a> ProductionNativeContext<'a> {
         abi: &'a NativeABI,
         ty_args: &'a [InternedType],
         gas_meter: &'a mut GasMeter,
-        desc_provider: &'a dyn DescriptorProvider,
+        guard: &'a ExecutionGuard<'a>,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
@@ -89,7 +92,7 @@ impl<'a> ProductionNativeContext<'a> {
         Self {
             abi,
             ty_args,
-            desc_provider,
+            guard,
             frame_ptr,
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
@@ -262,7 +265,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // A `vector<u8>` has no inner pointers, so it uses the trivial descriptor.
         let ptr = alloc_vec(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -298,6 +301,42 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {
         self.extensions.get_mut::<T>()
+    }
+
+    fn serialize(
+        &self,
+        ty: InternedType,
+        value: &Ref<'_, Opaque>,
+    ) -> Result<Option<Vec<u8>>, VMInternalError> {
+        // SAFETY: `value` is a rooted reference to a fully initialized value of
+        // type `ty`. Serialization only reads and allocates no heap, so no GC
+        // runs and the raw pointer stays valid for the duration of the call.
+        let result = unsafe { value_utils::serialize(self.guard, value.ptr(), ty) };
+        map_serialization_result(result)
+    }
+
+    fn serialized_size(
+        &self,
+        ty: InternedType,
+        value: &Ref<'_, Opaque>,
+    ) -> Result<Option<usize>, VMInternalError> {
+        // SAFETY: see `serialize`.
+        let result = unsafe { value_utils::serialized_size(self.guard, value.ptr(), ty) };
+        map_serialization_result(result)
+    }
+}
+
+/// Maps a BCS (de)serialization result to the native ABI shape: a
+/// data-dependent failure that BCS cannot encode (a too-long sequence) becomes
+/// `Ok(None)`, which the caller turns into a serialization abort; any other
+/// error is a VM invariant violation.
+fn map_serialization_result<T>(result: RuntimeResult<T>) -> Result<Option<T>, VMInternalError> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(RuntimeError::BCSSequenceTooLong { .. }) => Ok(None),
+        Err(e) => Err(VMInternalError::InvariantViolation(format!(
+            "bcs serialization failed: {e}"
+        ))),
     }
 }
 
