@@ -30,7 +30,7 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, RootPool},
+    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type_list, InternedTypeList},
@@ -39,9 +39,9 @@ use mono_move_core::{
     IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
     CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
     CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
+    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
+    MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -1286,6 +1286,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::Move { dst, src, size } => {
+                    // Overlap-safe `copy`: `dst` and `src` may partially overlap.
+                    // E.g. the return-value shuffle may move results in the same home region.
                     std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
                 },
 
@@ -1681,6 +1683,143 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let right = read_bool(fp, rhs);
                     write_bool(fp, dst, left || right)
                 },
+                MicroOp::EnumTestTag {
+                    dst,
+                    enum_ref,
+                    variant,
+                } => {
+                    // Deref the enum fat pointer to the heap object, then read the tag.
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET);
+                    write_bool(fp, dst, tag == variant);
+                },
+
+                MicroOp::EnumBorrowVariantField {
+                    dst,
+                    enum_ref,
+                    ref offsets,
+                } => {
+                    // Deref the enum fat pointer to the heap object, read the
+                    // tag, then borrow the field at that variant's offset.
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET);
+                    let Some(variant_offset) = offsets.get(tag as usize) else {
+                        // A tag past the variant table is heap corruption (a
+                        // well-formed enum's tag is always in range), not a
+                        // user-level mismatch. Surface it as an invariant
+                        // violation.
+                        invariant_violation!(EnumTagOutOfRange {
+                            tag,
+                            variant_count: offsets.len(),
+                        });
+                    };
+                    match variant_offset {
+                        Some(offset) => write_fat_ptr(fp, dst, obj_ptr, *offset as u64),
+                        // Tag in range but this variant does not declare the
+                        // field (move semantics for this is a runtime error).
+                        None => return Err(RuntimeError::EnumVariantMismatch { tag }),
+                    }
+                },
+
+                MicroOp::EnumCheckVariant { enum_ptr, variant } => {
+                    // `enum_ptr` is the heap-pointer value; runtime error if
+                    // its tag is not the expected variant.
+                    let obj_ptr = read_ptr(fp, enum_ptr);
+                    let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET);
+                    if tag != variant {
+                        return Err(RuntimeError::EnumVariantMismatch { tag });
+                    }
+                },
+
+                MicroOp::EnumNew {
+                    dst,
+                    descriptor_id,
+                    tag,
+                } => {
+                    let obj_ptr = alloc_obj!(self, fp, descriptor_id)?;
+                    // No safe point between the allocation and these
+                    // non-allocating writes: stamp the tag through the fresh
+                    // pointer, then publish it to `dst`.
+                    write_u64(obj_ptr, ENUM_TAG_OFFSET, tag);
+                    write_ptr(fp, dst, obj_ptr);
+                },
+
+                MicroOp::EnumReadVariantField {
+                    dst,
+                    enum_ref,
+                    offset,
+                    size,
+                } => {
+                    // Double deref of the enum fat pointer to the heap object,
+                    // then copy the field bytes directly — no intermediate
+                    // scratch reference. The offset is a static uniform offset
+                    // (no tag dispatch).
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    // Non-overlapping: `dst` is a stack-region slot, the field
+                    // is heap-object bytes.
+                    std::ptr::copy_nonoverlapping(
+                        obj_ptr.add(offset as usize),
+                        fp.add(dst.into()),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::EnumWriteVariantField {
+                    enum_ref,
+                    offset,
+                    src,
+                    size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    // Non-overlapping: `src` is a stack-region slot, the field
+                    // is heap-object bytes.
+                    std::ptr::copy_nonoverlapping(
+                        fp.add(src.into()),
+                        obj_ptr.add(offset as usize),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::DeepCopy { dst, ref offsets } => {
+                    // Pre-condition: each `dst + off` holds a heap pointer
+                    // byte-copied from another value, so the pointee is still
+                    // shared with that value. Replace each non-null pointer
+                    // with a pointer to a fresh deep copy, making the value at
+                    // `dst` independent (Move value semantics). Null (e.g. an
+                    // empty vector) stays null.
+                    //
+                    // TODO(gas): the IR-level cost of the materializing
+                    // instruction charges only the shallow byte move, not this
+                    // heap-graph copy. Change charging to reflect at least the
+                    // amount of work done.
+                    if let &[off] = offsets.as_ref() {
+                        // Fast path for copying whole-enum / whole-vector /
+                        // aggregate with one heap backed field: a single owned
+                        // pointer at one offset. Uses single-root `deep_copy`,
+                        // avoiding the batch's per-op `Vec`s.
+                        if let Some(src) = NonNull::new(read_ptr(fp, (dst.0 + off) as usize)) {
+                            let new = self.deep_copy(src)?;
+                            write_ptr(fp, (dst.0 + off) as usize, new.as_ptr());
+                        }
+                    } else {
+                        let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
+                        let mut sources: Vec<NonNull<u8>> = Vec::with_capacity(offsets.len());
+                        for &off in offsets.iter() {
+                            if let Some(src) = NonNull::new(read_ptr(fp, (dst.0 + off) as usize)) {
+                                live_offsets.push(off);
+                                sources.push(src);
+                            }
+                        }
+                        let copies = self.deep_copy_batch(&sources)?;
+                        for (off, new) in live_offsets.iter().zip(copies) {
+                            write_ptr(fp, (dst.0 + off) as usize, new.as_ptr());
+                        }
+                    }
+                },
             }
         }
 
@@ -1755,6 +1894,68 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 }
             },
         }
+    }
+
+    /// Deep-copy each of `sources` into the local heap, returning the new root
+    /// pointers in the same order.
+    ///
+    /// All sources are rooted for the whole batch, so a GC triggered partway
+    /// through preserves and relocates the not-yet-copied ones. Because
+    /// `try_deep_copy` never GCs mid-copy, a *successful* pass builds every
+    /// result without an intervening GC, so the already-built results need no
+    /// root of their own — only the sources are rooted. Mirrors
+    /// [`Self::deep_copy`]'s single GC-then-retry-once policy, batched over all
+    /// sources.
+    ///
+    /// # Safety
+    ///
+    /// Every `source` must point to the data region of a live object whose
+    /// header is at `source - OBJECT_HEADER_SIZE`.
+    unsafe fn deep_copy_batch(
+        &mut self,
+        sources: &[NonNull<u8>],
+    ) -> RuntimeResult<Vec<NonNull<u8>>> {
+        // SAFETY: each source is a live object (caller contract); the handle
+        // keeps it live and relocated across any GC during the batch.
+        let guards: Vec<ObjectHandle> = sources
+            .iter()
+            .map(|&src| unsafe { self.root_pool.root_object(src.as_ptr()) })
+            .collect();
+        // First attempt. On out-of-memory, the partial copies are unrooted
+        // garbage; drop them, GC (which relocates the rooted sources), and
+        // retry the whole batch once.
+        let mut out = Vec::with_capacity(guards.len());
+        let mut needs_gc = false;
+        for guard in &guards {
+            // SAFETY: each root holds a live object; GC keeps `guard.ptr()`
+            // valid and relocated.
+            match unsafe {
+                self.heap
+                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+            } {
+                Ok(ptr) => out.push(ptr),
+                Err(AllocationError::RuntimeError(err)) => return Err(err),
+                Err(AllocationError::OutOfHeapMemory { .. }) => {
+                    needs_gc = true;
+                    break;
+                },
+            }
+        }
+        if !needs_gc {
+            return Ok(out);
+        }
+        gc_collect!(self)?;
+        out.clear();
+        for guard in &guards {
+            // SAFETY: as above, after relocation.
+            let ptr = unsafe {
+                self.heap
+                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+            }
+            .map_err(AllocationError::into_runtime_error)?;
+            out.push(ptr);
+        }
+        Ok(out)
     }
 
     /// Implementation of `MicroOp::PackClosure`.
