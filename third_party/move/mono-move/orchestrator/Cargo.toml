@@ -11,13 +11,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[[bin]]
+name = "mseir-compiler"
+path = "src/bin/mseir-compiler.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
 mono-move-global-context = { workspace = true }
 move-binary-format = { workspace = true }
 specializer = { workspace = true }
-
-[[bin]]
-name = "mseir-compiler"
-path = "src/bin/mseir-compiler.rs"

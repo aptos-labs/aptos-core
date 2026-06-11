@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
+use crate::{ObjectPool, TransactionFeedback, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
@@ -85,5 +85,9 @@ impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
             self.source_accounts_pool.clone(),
             self.destination_accounts_pool.clone(),
         ))
+    }
+
+    fn transaction_feedback(&self) -> Option<Arc<dyn TransactionFeedback>> {
+        self.creator.transaction_feedback()
     }
 }

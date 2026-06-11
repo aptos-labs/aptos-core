@@ -10,6 +10,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::NativeExtensions,
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
     LayoutProvider, ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout,
@@ -84,6 +85,12 @@ impl LocalRuntimeContext<'_> {
         self.inner = self.inner.with_natives(natives);
         self
     }
+
+    /// Install the per-transaction native extensions on the inner context.
+    pub fn with_extensions(mut self, extensions: NativeExtensions) -> Self {
+        self.inner = self.inner.with_extensions(extensions);
+        self
+    }
 }
 
 impl ExecutionContext for LocalRuntimeContext<'_> {
@@ -95,15 +102,20 @@ impl ExecutionContext for LocalRuntimeContext<'_> {
         self.inner.natives()
     }
 
-    fn natives_descriptors_and_gas_meter(
+    fn extensions(&self) -> &NativeExtensions {
+        self.inner.extensions()
+    }
+
+    fn native_call_borrows(
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &mut GasMeter,
+        &NativeExtensions,
     ) {
-        let (natives, _, gas_meter) = self.inner.natives_descriptors_and_gas_meter();
-        (natives, &self.descriptors, gas_meter)
+        let (natives, _, gas_meter, extensions) = self.inner.native_call_borrows();
+        (natives, &self.descriptors, gas_meter, extensions)
     }
 
     fn load_function(

@@ -25,10 +25,11 @@ use crate::{
     },
 };
 use mono_move_core::{
-    align_max, checked_align_max, native::NativeABI, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, ObjectDescriptorInner, RootPool, CAPTURED_DATA_VALUES_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    align_max, checked_align_max,
+    native::{NativeABI, NativeExtensions},
+    DescriptorId, DescriptorProvider, FrameOffset, Function, ObjectDescriptorInner, RootPool,
+    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
+    ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
 use std::ptr::NonNull;
 
@@ -70,6 +71,7 @@ pub(crate) mod macros {
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $ctx.current_func,
@@ -96,6 +98,7 @@ pub(crate) mod macros {
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $ctx.current_func,
@@ -118,6 +121,7 @@ pub(crate) mod macros {
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $ctx.current_func,
@@ -145,6 +149,7 @@ pub(crate) mod macros {
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $crate::heap::TopFrame::Function {
                     func: $ctx.current_func,
                     pc: $ctx.pc,
@@ -166,6 +171,7 @@ pub(crate) mod macros {
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $ctx.frame_ptr,
                 $crate::heap::TopFrame::Function {
                     func: $ctx.current_func,
@@ -267,6 +273,7 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
@@ -274,7 +281,7 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
     match try_alloc(heap) {
         Ok(ptr) => Ok(ptr),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
-            gc_collect(heap, provider, rws, extra_roots, fp, top_frame)?;
+            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
             try_alloc(heap).map_err(AllocationError::into_runtime_error)
         },
         Err(e) => Err(e.into_runtime_error()),
@@ -383,14 +390,22 @@ fn alloc_sized<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     total_size: usize,
     descriptor_id: DescriptorId,
 ) -> RuntimeResult<*mut u8> {
-    alloc_or_gc(heap, provider, rws, extra_roots, fp, top_frame, |h| {
-        heap_alloc(h, total_size, descriptor_id)
-    })
+    alloc_or_gc(
+        heap,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
+        fp,
+        top_frame,
+        |h| heap_alloc(h, total_size, descriptor_id),
+    )
 }
 
 /// Allocate a new vector object on the heap.
@@ -404,6 +419,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
@@ -420,6 +436,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         provider,
         rws,
         extra_roots,
+        extensions,
         fp,
         top_frame,
         total_size,
@@ -434,6 +451,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
@@ -464,6 +482,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
         provider,
         rws,
         extra_roots,
+        extensions,
         fp,
         top_frame,
         total_size,
@@ -480,6 +499,7 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     values_size: u32,
@@ -491,6 +511,7 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
         provider,
         rws,
         extra_roots,
+        extensions,
         fp,
         top_frame,
         total_size,
@@ -516,6 +537,7 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     top_frame: TopFrame<'_>,
     fp: *mut u8,
     vec_ref_offset: usize,
@@ -548,6 +570,7 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
             provider,
             rws,
             extra_roots,
+            extensions,
             fp,
             top_frame,
             descriptor_id,
@@ -616,6 +639,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     frame_ptr: *mut u8,
     top_frame: TopFrame<'_>,
 ) -> Result<(), RuntimeInvariantViolation> {
@@ -693,6 +717,17 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     // point into the local heap and must be relocated alongside the call
     // stack and pinned roots.
     rws.scan(&mut scanner);
+
+    // Phase 1d: native extension roots.
+    //
+    // TODO(correctness, security): a native holding an extension borrow across an
+    // allocation makes this a hard error; revisit how to guarantee exclusive
+    // access here (e.g. relocating only the disjoint root set).
+    unsafe {
+        extensions
+            .relocate_all_roots(&mut |base| scanner.relocate(base))
+            .map_err(|_| RuntimeInvariantViolation::ExtensionBorrowedDuringGC)?;
+    }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
     // `scan_ptr` is a raw cursor — header start of the next object to

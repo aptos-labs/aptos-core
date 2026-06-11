@@ -4,6 +4,7 @@
 //! Native function interface for MonoMove.
 pub mod abi;
 pub mod context;
+pub mod extension;
 pub mod registry;
 pub mod result;
 pub mod value;
@@ -12,6 +13,7 @@ pub mod value;
 pub use crate::root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use abi::{FrameSlot, NativeABI, NativeABIError};
 pub use context::NativeContext;
+pub use extension::{NativeExtension, NativeExtensions};
 pub use registry::{
     NativeContextFamily, NativeFunction, NativeIdx, NativeName, NativeRegistry,
     NativeRegistryError, NativeResolver, NoNatives,
