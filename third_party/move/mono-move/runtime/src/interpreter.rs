@@ -30,7 +30,7 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeIdx, NativeStatus, RootPool},
+    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type_list, InternedTypeList},
@@ -126,14 +126,41 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.heap.gc_count
     }
 
-    /// TODO: move to execution context
-    pub fn checkpoint(&mut self) {
-        self.read_write_set.checkpoint();
+    /// The VM heap. Exposed so callers can read heap-resident values.
+    pub fn heap(&self) -> &Heap {
+        &self.heap
     }
 
-    /// TODO: move to execution context
+    pub fn extensions(&self) -> &NativeExtensions {
+        self.exec_ctx.extensions()
+    }
+
+    /// Takes a checkpoint (opening a new sub-session): checkpoints the
+    /// read-write set and signals every native extension. The two advance in
+    /// lockstep, so a single [`Self::rollback`] depth undoes a checkpoint's
+    /// effects across both.
+    //
+    // TODO: move to execution context
+    pub fn checkpoint(&mut self) -> RuntimeResult<()> {
+        self.read_write_set.checkpoint();
+        self.exec_ctx
+            .extensions()
+            .checkpoint()
+            .map_err(RuntimeError::VMInternal)
+    }
+
+    /// Rolls back the `n` most recent checkpoints across the read-write set and
+    /// every native extension. `n == 0` is a no-op; `n` beyond the current
+    /// depth is an invariant violation. The read-write set rolls back first, so
+    /// an underflow is caught before any extension is touched.
+    //
+    // TODO: move to execution context
     pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
-        self.read_write_set.rollback(n)
+        self.read_write_set.rollback(n)?;
+        self.exec_ctx
+            .extensions()
+            .rollback(n)
+            .map_err(RuntimeError::VMInternal)
     }
 
     /// TODO: move to execution context
@@ -2219,7 +2246,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = self.frame_ptr;
         self.frame_ptr = new_fp;
         let result = {
-            let (registry, provider, gas_meter) = self.exec_ctx.natives_descriptors_and_gas_meter();
+            let (registry, provider, gas_meter, extensions) = self.exec_ctx.native_call_borrows();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
                     idx: native_idx.0,
@@ -2240,6 +2267,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 provider,
                 &mut self.heap,
                 &mut self.read_write_set,
+                extensions,
             );
             func(&ctx)
         };

@@ -13,10 +13,30 @@ use crate::{
     print_sections,
 };
 use anyhow::{anyhow, bail};
+use aptos_framework_natives::{
+    event::NativeEventContext, object::NativeObjectContext,
+    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
+};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
+use aptos_types::{
+    contract_event::ContractEvent,
+    event::EventKey,
+    on_chain_config::{Features, TimedFeaturesBuilder},
+    state_store::{
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        StateViewId,
+    },
+    transaction::user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+};
 use aptos_vm::natives::aptos_natives;
+use aptos_vm_types::resolver::StateStorageView;
+use mono_move_core::{native::NativeExtensions, types::type_to_string};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_natives::{
+    EventKind, EventStore, ObjectContextExtension, StorageUsageAtEpochBoundary,
+    TransactionContextExtension,
+};
+use mono_move_runtime::serialize;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
@@ -42,6 +62,144 @@ use std::{path::Path, sync::OnceLock};
 /// Execution output from a VM as a normalized display string.
 struct Output {
     display: String,
+}
+
+// Fixed inputs seeded into both VMs' native extensions, so extension-backed
+// natives (AUID generation, state-storage usage, ...) produce matching output
+// across the two engines.
+const TEST_TXN_HASH: [u8; 32] = [7u8; 32];
+const TEST_STATE_ITEMS: u64 = 100;
+const TEST_STATE_BYTES: u64 = 2000;
+// Inputs to the monotonically-increasing counter. The reserved byte is 0,
+// matching `TransactionIndexKind::BlockExecution`.
+const TEST_SESSION_COUNTER: u8 = 2;
+const TEST_TXN_INDEX: u32 = 5;
+const TEST_RESERVED_BYTE: u8 = 0;
+
+/// A [`StateStorageView`] over empty storage that serves a fixed usage, for
+/// exercising the legacy `state_storage` native in the differential tests.
+//
+// TODO: replace with a real state view if tests need natives that read actual
+// stored state.
+struct MockEmptyStateStorage {
+    usage: StateStorageUsage,
+}
+
+impl StateStorageView for MockEmptyStateStorage {
+    type Key = StateKey;
+
+    fn id(&self) -> StateViewId {
+        StateViewId::Miscellaneous
+    }
+
+    fn read_state_value(&self, _state_key: &StateKey) -> Result<(), StateViewError> {
+        Ok(())
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+        Ok(self.usage)
+    }
+}
+
+/// Normalized rendering of one emitted event, used to diff the two VMs' events.
+/// `creator`/`seq` are `Some` only for handle (V1) events.
+fn render_event(
+    creator: Option<AccountAddress>,
+    seq: Option<u64>,
+    type_str: &str,
+    blob: &[u8],
+) -> String {
+    match (creator, seq) {
+        (Some(creator), Some(seq)) => format!(
+            "handle creator={} seq={} {} {}",
+            creator.to_hex_literal(),
+            seq,
+            type_str,
+            render_bytes(blob),
+        ),
+        _ => format!("module {} {}", type_str, render_bytes(blob)),
+    }
+}
+
+/// Combines return values and rendered events into the normalized output string
+/// that `CHECK` directives match against: a `results:` segment when the call
+/// returns values and an `events:` segment when it emits events, joined by
+/// ` | `. A void, event-free call renders as `results:`.
+fn render_execution_output(vals: &[String], events: &[String]) -> String {
+    let mut segments = Vec::new();
+    if !vals.is_empty() {
+        segments.push(format!("results: {}", vals.join(", ")));
+    }
+    if !events.is_empty() {
+        segments.push(format!("events: {}", events.join("; ")));
+    }
+    if segments.is_empty() {
+        return "results:".to_string();
+    }
+    segments.join(" | ")
+}
+
+/// Renders the events emitted into the legacy VM's [`NativeEventContext`], in
+/// emission order, for cross-VM comparison.
+fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
+    extensions
+        .get::<NativeEventContext>()
+        .events_iter()
+        .map(|event| {
+            let type_str = event.type_tag().to_canonical_string();
+            match event {
+                ContractEvent::V1(e) => render_event(
+                    Some(e.key().get_creator_address()),
+                    Some(e.sequence_number()),
+                    &type_str,
+                    e.event_data(),
+                ),
+                ContractEvent::V2(_) => render_event(None, None, &type_str, event.event_data()),
+            }
+        })
+        .collect()
+}
+
+/// Serializes and renders the events recorded in mono-move's [`EventStore`], in
+/// emission order, for cross-VM comparison. `layouts` (the guard's published
+/// layouts) resolves the event types.
+///
+/// # Safety
+///
+/// The VM heap must be live: each entry's `msg_data` embeds heap pointers that
+/// [`serialize`] dereferences.
+unsafe fn finalize_events_v2(
+    extensions: &NativeExtensions,
+    layouts: &ExecutionGuard<'_>,
+) -> Vec<String> {
+    let store = extensions
+        .get_mut::<EventStore>()
+        .expect("event store installed");
+    store
+        .entries()
+        .iter()
+        .map(|entry| {
+            let type_str = type_to_string(entry.msg_ty);
+            // SAFETY: forwarded from this function's contract — the heap is live.
+            let blob = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }
+                .expect("event value serializes");
+            match &entry.kind {
+                EventKind::V2 => render_event(None, None, &type_str, &blob),
+                EventKind::V1 {
+                    guid,
+                    sequence_number,
+                } => {
+                    let key: EventKey = bcs::from_bytes(guid).expect("guid decodes to EventKey");
+                    render_event(
+                        Some(key.get_creator_address()),
+                        Some(*sequence_number),
+                        &type_str,
+                        &blob,
+                    )
+                },
+            }
+        })
+        .collect()
 }
 
 /// Run all steps in a differential test, checking both VMs produce matching
@@ -296,6 +454,37 @@ fn execute_function_v1(
         .map(|(kind, arg)| kind.to_move_value(arg).simple_serialize().unwrap())
         .collect::<Vec<_>>();
 
+    // Seed the native extensions with the same fixed inputs as the mono-move
+    // side, so extension-backed natives produce matching output.
+    let state_storage_view = MockEmptyStateStorage {
+        usage: StateStorageUsage::new(TEST_STATE_ITEMS as usize, TEST_STATE_BYTES as usize),
+    };
+    let mut extensions = NativeContextExtensions::default();
+    let user_transaction_context = UserTransactionContext::new(
+        AccountAddress::ZERO,
+        vec![],
+        AccountAddress::ZERO,
+        0,
+        0,
+        0,
+        None,
+        None,
+        TransactionIndexKind::BlockExecution {
+            transaction_index: TEST_TXN_INDEX,
+        },
+        false,
+    );
+    extensions.add(NativeTransactionContext::new(
+        TEST_TXN_HASH.to_vec(),
+        vec![],
+        0,
+        Some(user_transaction_context),
+        TEST_SESSION_COUNTER,
+    ));
+    extensions.add(NativeObjectContext::default());
+    extensions.add(NativeStateStorageContext::new(&state_storage_view));
+    extensions.add(NativeEventContext::default());
+
     let mut data_cache = TransactionDataCache::empty();
     let output = match MoveVM::execute_loaded_function(
         function,
@@ -303,7 +492,7 @@ fn execute_function_v1(
         &mut MoveVmDataCacheAdapter::new(&mut data_cache, storage, &loader),
         &mut gas_meter,
         &mut traversal_context,
-        &mut NativeContextExtensions::default(),
+        &mut extensions,
         &loader,
     ) {
         Ok(result) => {
@@ -321,8 +510,9 @@ fn execute_function_v1(
                     _ => kind.format_bytes(bytes),
                 })
                 .collect::<Vec<_>>();
+            let events = finalize_events_v1(&extensions);
             Output {
-                display: format!("results: {}", vals.join(", ")),
+                display: render_execution_output(&vals, &events),
             }
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
@@ -357,6 +547,21 @@ fn execute_function_v2(
     return_kinds: &[PrimitiveKind],
     heap_size: Option<usize>,
 ) -> (Output, usize) {
+    // Seed extensions with the same fixed inputs as the legacy side.
+    let mut extensions = NativeExtensions::new();
+    extensions.add(TransactionContextExtension::new(
+        TEST_TXN_HASH.to_vec(),
+        TEST_SESSION_COUNTER,
+        TEST_TXN_INDEX,
+        TEST_RESERVED_BYTE,
+    ));
+    extensions.add(ObjectContextExtension::new());
+    extensions.add(StorageUsageAtEpochBoundary::new(
+        TEST_STATE_ITEMS,
+        TEST_STATE_BYTES,
+    ));
+    extensions.add(EventStore::new());
+
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
     let mut gc_count = 0;
@@ -366,6 +571,7 @@ fn execute_function_v2(
         *address,
         module_name,
         function_name,
+        extensions,
         |runner| {
             runner.set_heap_size(heap_size);
             let result = runner.run(
@@ -400,7 +606,10 @@ fn execute_function_v2(
                         }
                         ret_off += kind.size();
                     }
-                    vals
+                    // SAFETY: the heap (and every pointer the events embed) is
+                    // live while the interpreter is.
+                    let events = unsafe { finalize_events_v2(interpreter.extensions(), guard) };
+                    (vals, events)
                 },
             );
             gc_count = runner.gc_count();
@@ -415,7 +624,7 @@ fn execute_function_v2(
             Some(m) => format!("aborted: code {} ({})", code, m),
             None => format!("aborted: code {}", code),
         },
-        Ok(RunResult::Success(vals)) => format!("results: {}", vals.join(", ")),
+        Ok(RunResult::Success((vals, events))) => render_execution_output(&vals, &events),
     };
     (Output { display }, gc_count)
 }

@@ -318,6 +318,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("CallNative: native_idx {idx} out of bounds in registry of size {registry_size}")]
     NativeIdxOutOfBounds { idx: u32, registry_size: usize },
+
+    #[error("a native extension was borrowed when the GC tried to scan its roots")]
+    ExtensionBorrowedDuringGC,
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime
