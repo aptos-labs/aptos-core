@@ -7,7 +7,7 @@
 use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::NativeRegistry,
+    native::{NativeExtensions, NativeRegistry},
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, NO_DESCRIPTOR_PROVIDER,
@@ -23,16 +23,18 @@ pub trait ExecutionContext {
     /// Read-only access to the native function registry.
     fn natives(&self) -> &ProductionNativeRegistry;
 
-    /// Disjoint borrow of the native registry, the descriptor provider, and
-    /// the gas meter — all of which a native call site needs at once: the
-    /// registry to resolve the function, the provider for any GC the native
-    /// triggers, and the gas meter for charging.
-    fn natives_descriptors_and_gas_meter(
+    /// The per-transaction native extensions.
+    fn extensions(&self) -> &NativeExtensions;
+
+    /// Disjoint borrows all the sub-components needed for a native call.
+    /// Needed for avoiding borrow conflicts downstream.
+    fn native_call_borrows(
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &mut GasMeter,
+        &NativeExtensions,
     );
 
     /// Resolve a runtime function call.
@@ -71,6 +73,7 @@ pub struct LocalExecutionContext<'r> {
     gas_meter: GasMeter,
     natives: ProductionNativeRegistry,
     resource_provider: &'r dyn ResourceProvider,
+    extensions: NativeExtensions,
 }
 
 impl LocalExecutionContext<'static> {
@@ -84,6 +87,7 @@ impl LocalExecutionContext<'static> {
         Self {
             gas_meter: GasMeter::new(amount),
             natives: NativeRegistry::new(),
+            extensions: NativeExtensions::new(),
             resource_provider: &NO_RESOURCE_PROVIDER,
         }
     }
@@ -95,6 +99,7 @@ impl<'r> LocalExecutionContext<'r> {
         Self {
             gas_meter,
             natives: NativeRegistry::new(),
+            extensions: NativeExtensions::new(),
             resource_provider,
         }
     }
@@ -103,6 +108,13 @@ impl<'r> LocalExecutionContext<'r> {
     /// previously-installed registry.
     pub fn with_natives(mut self, natives: ProductionNativeRegistry) -> Self {
         self.natives = natives;
+        self
+    }
+
+    /// Install the per-transaction native extensions. Replaces any previously
+    /// installed set.
+    pub fn with_extensions(mut self, extensions: NativeExtensions) -> Self {
+        self.extensions = extensions;
         self
     }
 }
@@ -116,14 +128,24 @@ impl ExecutionContext for LocalExecutionContext<'_> {
         &self.natives
     }
 
-    fn natives_descriptors_and_gas_meter(
+    fn extensions(&self) -> &NativeExtensions {
+        &self.extensions
+    }
+
+    fn native_call_borrows(
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &mut GasMeter,
+        &NativeExtensions,
     ) {
-        (&self.natives, &NO_DESCRIPTOR_PROVIDER, &mut self.gas_meter)
+        (
+            &self.natives,
+            &NO_DESCRIPTOR_PROVIDER,
+            &mut self.gas_meter,
+            &self.extensions,
+        )
     }
 
     fn load_function(
