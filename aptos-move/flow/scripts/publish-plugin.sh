@@ -3,126 +3,82 @@
 # Licensed pursuant to the Innovation-Enabling Source Code License, available at
 # https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 #
-# Publishes the MoveFlow Claude Code plugin to the aptos-labs/aptos-ai repo.
+# Publishes the MoveFlow Claude Code plugin to aptos-labs/aptos-ai.
 #
 # Usage: publish-plugin.sh [aptos-ai-repo-path]
 #
-# Builds move-flow, generates the plugin tree, syncs it into aptos-ai, and
-# opens (or updates) a PR. Defaults to ~/aptos-ai if no path is given.
+# Env (optional, set by CI):
+#   MOVE_FLOW_BIN    Prebuilt move-flow binary. Without it, builds from source.
+#   APTOS_CORE_SHA   SHA to record in the commit. Without it, uses HEAD.
 
 set -euo pipefail
-
-# --- Phase 0: Setup and validation ---
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 FLOW_DIR="$REPO_ROOT/aptos-move/flow"
 APTOS_AI="${1:-$HOME/aptos-ai}"
 
-VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' "$FLOW_DIR/Cargo.toml")
-if [ -z "$VERSION" ]; then
-    echo "ERROR: could not extract version from $FLOW_DIR/Cargo.toml"
-    exit 1
-fi
-
-for cmd in cargo gh git; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        echo "ERROR: $cmd is required but not found on PATH"
-        exit 1
-    fi
+for cmd in gh git; do
+    command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: $cmd not on PATH" >&2; exit 1; }
 done
 
-if [ ! -d "$APTOS_AI/.git" ]; then
-    echo "ERROR: $APTOS_AI is not a git repository"
-    exit 1
+# Read the first `version = "..."` in the [package] section. Faster than
+# cargo metadata; aptos-move-flow's Cargo.toml uses an inline literal.
+VERSION="$(awk -F'"' '/^\[/{s=$0} s=="[package]" && /^version *=/ {print $2; exit}' "$FLOW_DIR/Cargo.toml")"
+[ -n "$VERSION" ] || { echo "ERROR: could not read aptos-move-flow version" >&2; exit 1; }
+
+[ -d "$APTOS_AI/.git" ] || { echo "ERROR: $APTOS_AI is not a git repo" >&2; exit 1; }
+[ -z "$(git -C "$APTOS_AI" status --porcelain)" ] \
+    || { echo "ERROR: $APTOS_AI has uncommitted changes" >&2; exit 1; }
+
+if [ -n "${MOVE_FLOW_BIN:-}" ]; then
+    [ -x "$MOVE_FLOW_BIN" ] || { echo "ERROR: MOVE_FLOW_BIN=$MOVE_FLOW_BIN not executable" >&2; exit 1; }
+    MOVE_FLOW="$MOVE_FLOW_BIN"
+else
+    command -v cargo >/dev/null 2>&1 \
+        || { echo "ERROR: cargo not on PATH (needed to build from source; set MOVE_FLOW_BIN to skip)" >&2; exit 1; }
+    (cd "$REPO_ROOT" && cargo build -p aptos-move-flow --profile=ci)
+    MOVE_FLOW="$REPO_ROOT/target/ci/move-flow"
 fi
 
-if [ -n "$(git -C "$APTOS_AI" status --porcelain)" ]; then
-    echo "ERROR: $APTOS_AI has uncommitted changes. Please commit or stash first."
-    exit 1
-fi
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+"$MOVE_FLOW" plugin "$TMP/plugin"
+[ -f "$TMP/plugin/.claude-plugin/plugin.json" ] \
+    || { echo "ERROR: plugin generation failed" >&2; exit 1; }
 
-echo "Publishing move-flow plugin v${VERSION}"
-echo "  Source:  $FLOW_DIR"
-echo "  Target:  $APTOS_AI/plugins/move-flow/"
-echo
-
-# --- Phase 1: Build move-flow ---
-
-echo "==> Building move-flow..."
-(cd "$REPO_ROOT" && cargo build -p aptos-move-flow --profile=ci)
-MOVE_FLOW="$REPO_ROOT/target/ci/move-flow"
-
-if [ ! -x "$MOVE_FLOW" ]; then
-    echo "ERROR: build succeeded but binary not found at $MOVE_FLOW"
-    exit 1
-fi
-
-# --- Phase 2: Generate plugin tree ---
-
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-
-echo "==> Generating plugin tree..."
-"$MOVE_FLOW" plugin "$TMPDIR/plugin"
-
-if [ ! -f "$TMPDIR/plugin/.claude-plugin/plugin.json" ]; then
-    echo "ERROR: plugin generation failed — missing .claude-plugin/plugin.json"
-    exit 1
-fi
-
-# --- Phase 3: Sync into aptos-ai ---
-
-echo "==> Syncing into aptos-ai..."
 cd "$APTOS_AI"
 git checkout main
 git pull --ff-only origin main
-
 rm -rf plugins/move-flow
 mkdir -p plugins/move-flow
-cp -r "$TMPDIR/plugin/." plugins/move-flow/
-
-# --- Phase 4: Check for existing PR ---
+cp -r "$TMP/plugin/." plugins/move-flow/
 
 BRANCH="move-flow/v${VERSION}"
-EXISTING_PR=$(gh pr list --repo aptos-labs/aptos-ai --head "$BRANCH" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)
-
-# --- Phase 5: Branch, commit, push, PR ---
+# Populate the remote-tracking ref so --force-with-lease has something to
+# compare against; silent when the branch is new.
+git fetch origin "$BRANCH" 2>/dev/null || true
+EXISTING_PR=$(gh pr list --repo aptos-labs/aptos-ai --head "$BRANCH" --state open \
+    --json url --jq '.[0].url // empty' 2>/dev/null || true)
 
 git checkout -B "$BRANCH"
 git add plugins/move-flow/
-
 if git diff --cached --quiet; then
-    echo "No changes to publish — plugin is already up to date."
+    echo "Plugin already up to date."
     exit 0
 fi
 
-APTOS_CORE_SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
+SHA_SHORT="${APTOS_CORE_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD)}"
+SHA_SHORT="${SHA_SHORT:0:12}"
 
 git commit -m "Update move-flow plugin to v${VERSION}
 
-Generated from aptos-core commit ${APTOS_CORE_SHA}."
-
+Generated from aptos-core commit ${SHA_SHORT}."
 git push -u origin "$BRANCH" --force-with-lease
 
 if [ -z "$EXISTING_PR" ]; then
-    PR_URL=$(gh pr create \
-        --repo aptos-labs/aptos-ai \
+    gh pr create --repo aptos-labs/aptos-ai \
         --title "Update move-flow plugin to v${VERSION}" \
-        --body "$(cat <<EOF
-## Summary
-- Regenerated move-flow Claude Code plugin from aptos-core at \`${APTOS_CORE_SHA}\`
-- Plugin version: ${VERSION}
-
-## Files
-The \`plugins/move-flow/\` directory contains the full generated plugin tree
-(agents, skills, hooks, MCP config, plugin manifest).
-
-Generated by \`aptos-move/flow/scripts/publish-plugin.sh\`.
-EOF
-)")
-    echo
-    echo "PR created: $PR_URL"
+        --body "Regenerated move-flow plugin from aptos-core \`${SHA_SHORT}\` (v${VERSION})."
 else
-    echo
-    echo "Existing PR updated: $EXISTING_PR"
+    echo "Updated existing PR: $EXISTING_PR"
 fi

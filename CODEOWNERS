@@ -13,6 +13,7 @@
 /aptos-move/aptos-vm/src/keyless_validation.rs @alinush
 /aptos-move/aptos-vm-profiling/ @vgao1996
 /aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
+/aptos-move/flow/ @aptos-labs/move @zwxxb
 /aptos-move/framework/ @aptos-labs/move
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
 /aptos-move/framework/aptos-framework/sources/jwks.move @zjma
