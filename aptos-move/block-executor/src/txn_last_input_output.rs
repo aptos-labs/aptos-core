@@ -352,6 +352,15 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             output_wrapper.maybe_approx_output_size,
         );
 
+        // Hot state promotions are derived from the VM-observed read set carried by the
+        // output, so parallel and sequential execution accumulate identical promotions.
+        if block_limit_processor.is_hot_state_accumulation_enabled() {
+            let hot_state_writes = output_before_guard.storage_keys_written();
+            let hot_state_reads = output_before_guard.storage_keys_read();
+            block_limit_processor
+                .accumulate_hot_state_rw(hot_state_writes.iter(), hot_state_reads.iter());
+        }
+
         if txn_idx < num_txns - 1
             && block_limit_processor.should_end_block_parallel()
             && !skips_rest
