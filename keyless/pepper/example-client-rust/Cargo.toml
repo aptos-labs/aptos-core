@@ -18,7 +18,7 @@ aptos-infallible = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
-blstrs =  { workspace = true }
+blstrs = { workspace = true }
 clap = { workspace = true }
 firestore = { workspace = true }
 hex = { workspace = true }

@@ -12,6 +12,14 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[lib]
+doctest = false
+
+[features]
+default = []
+profiling = ["aptos-vm/profiling"]
+move-harness-with-test-only = ["aptos-cached-packages/move-harness-with-test-only"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -59,11 +67,3 @@ test-case = { workspace = true }
 thousands = { workspace = true }
 tokio = { workspace = true }
 triomphe = { workspace = true }
-
-[lib]
-doctest = false
-
-[features]
-default = []
-profiling = ["aptos-vm/profiling"]
-move-harness-with-test-only = ["aptos-cached-packages/move-harness-with-test-only"]
