@@ -5,7 +5,7 @@
 
 use super::{
     result::VMInternalError,
-    value::{VMValue, Vector},
+    value::{Opaque, Ref, VMValue, Vector},
 };
 use crate::types::InternedType;
 
@@ -72,4 +72,23 @@ pub trait NativeContext {
     /// returns a handle to it. The vector stays live for the rest of the
     /// native call.
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError>;
+
+    /// Grows the vector behind `target` so it can hold at least `required_cap`
+    /// elements of `elem_size` bytes, allocating it if it is empty. When
+    /// `target` is empty, the fresh allocation copies its GC descriptor from
+    /// `donor`, a non-empty `vector<T>` of the same element type. May trigger
+    /// GC; the new heap pointer is written back through `target`'s reference.
+    ///
+    /// # Safety
+    ///
+    /// `target` and `donor` must reference `vector<T>` values of the same `T`,
+    /// `elem_size` must equal the byte size of `T`, and if `target` is empty
+    /// then `donor` must be non-empty.
+    unsafe fn grow_vector<'a>(
+        &self,
+        target: &Ref<'a, Vector<'a, Opaque>>,
+        donor: &Ref<'a, Vector<'a, Opaque>>,
+        elem_size: usize,
+        required_cap: usize,
+    ) -> Result<(), VMInternalError>;
 }
