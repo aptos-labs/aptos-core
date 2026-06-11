@@ -68,6 +68,12 @@ pub struct StorageAdapter<'e, E> {
     executor_view: &'e E,
     resource_group_view: ResourceGroupAdapter<'e>,
     accessed_groups: RefCell<HashSet<StateKey>>,
+    /// State keys of all data reads (resources, resource groups, table items, aggregator v1)
+    /// that the VM performed through this resolver. Recorded here, at the VM boundary, so the
+    /// derived read set is identical regardless of the executor serving the reads (sequential,
+    /// BlockSTM, ...). Used for hot state promotion; module reads are recorded separately by
+    /// `ReadRecordingCodeStorage`.
+    recorded_reads: RefCell<HashSet<StateKey>>,
 }
 
 impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
@@ -92,7 +98,13 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             executor_view,
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
+            recorded_reads: RefCell::new(HashSet::new()),
         }
+    }
+
+    /// Returns the state keys read through this resolver so far, clearing the recorded set.
+    pub fn take_recorded_reads(&self) -> HashSet<StateKey> {
+        self.recorded_reads.take()
     }
 
     fn get_any_resource_with_layout(
@@ -105,6 +117,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
+            self.recorded_reads.borrow_mut().insert(key.clone());
             let buf =
                 self.resource_group_view
                     .get_resource_from_group(&key, struct_tag, maybe_layout)?;
@@ -120,6 +133,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size + group_size as usize))
         } else {
             let state_key = resource_state_key(address, struct_tag)?;
+            self.recorded_reads.borrow_mut().insert(state_key.clone());
             let buf = self
                 .executor_view
                 .get_resource_bytes(&state_key, maybe_layout)?;
@@ -181,6 +195,7 @@ impl<E: ExecutorView> TableResolver for StorageAdapter<'_, E> {
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, PartialVMError> {
         let state_key = StateKey::table_item(&(*handle).into(), key);
+        self.recorded_reads.borrow_mut().insert(state_key.clone());
         self.executor_view
             .get_resource_bytes(&state_key, maybe_layout)
     }
@@ -193,6 +208,7 @@ impl<E: ExecutorView> TAggregatorV1View for StorageAdapter<'_, E> {
         &self,
         id: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        self.recorded_reads.borrow_mut().insert(id.clone());
         self.executor_view.get_aggregator_v1_state_value(id)
     }
 }
@@ -252,6 +268,7 @@ impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
 
 impl<E: ExecutorView> ConfigStorage for StorageAdapter<'_, E> {
     fn fetch_config_bytes(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
+        self.recorded_reads.borrow_mut().insert(state_key.clone());
         Ok(self.executor_view.get_resource_bytes(state_key, None)?)
     }
 }
