@@ -92,40 +92,38 @@ fun run(r0): u64 {
 
 fun combine() {
   frame_data_size: 48
+  entry_gas: 12
   code:
-    0: Charge #10
-    1: SlotBorrow [24] <- &[8]
-    2: VecLen [40] <- vec_len([24])
-    3: AddU64 [16] <- [40] + [16]
-    4: JumpZeroByte @9 [0]
-    5: Charge #7
-    6: AddU64Imm [40] <- [16] + #1
-    7: Move8 [0] <- [40]
+    0: SlotBorrow [24] <- &[8]
+    1: VecLen [40] <- vec_len([24])
+    2: AddU64 [16] <- [40] + [16]
+    3: JumpZeroByte @7 [0] gas_taken=54 gas_fallthrough=59
+    4: AddU64Imm [40] <- [16] + #1
+    5: Move8 [0] <- [40]
+    6: Return
+    7: Move8 [0] <- [16]
     8: Return
-    9: Charge #4
-    10: Move8 [0] <- [16]
-    11: Return
 }
 
 fun run() {
   frame_data_size: 48
+  entry_gas: 258
   code:
-    0: Charge #117
-    1: VecNew [8]
-    2: SlotBorrow [24] <- &[8]
-    3: StoreImm8 [40] <- #10
-    4: VecPushBack [24].push([40], size=8, desc=2)
-    5: SlotBorrow [24] <- &[8]
-    6: StoreImm8 [40] <- #20
-    7: VecPushBack [24].push([40], size=8, desc=2)
-    8: PackClosure [16] <- func_ref=Unresolved(combine), mask=11, captured_desc=3, captured=[[0](1), [8](8)]
-    9: StoreImm8 [40] <- #100
-    10: CallClosure closure=[16], provided_args=[[40](8)]
-    11: Move8 [40] <- [72]
-    12: Move8 [0] <- [40]
-    13: Return
+    0: VecNew [8]
+    1: SlotBorrow [24] <- &[8]
+    2: StoreImm8 [40] <- #10
+    3: VecPushBack [24].push([40], size=8, desc=0)
+    4: SlotBorrow [24] <- &[8]
+    5: StoreImm8 [40] <- #20
+    6: VecPushBack [24].push([40], size=8, desc=0)
+    7: PackClosure [16] <- func_ref=Unresolved(combine), mask=11, captured_desc=2, captured=[[0](1), [8](8)]
+    8: StoreImm8 [40] <- #100
+    9: CallClosure closure=[16], provided_args=[[40](8)]
+    10: Move8 [40] <- [72]
+    11: Move8 [0] <- [40]
+    12: Return
   safe_point_layouts:
-    4: []
+    3: []
+    6: []
     7: []
-    8: []
 }

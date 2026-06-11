@@ -59,9 +59,11 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
+flate2 = { workspace = true }
 move-package = { workspace = true }
 passkey-types = { workspace = true }
 percent-encoding = { workspace = true }
+poem = { workspace = true, features = ["test"] }
 proptest = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }

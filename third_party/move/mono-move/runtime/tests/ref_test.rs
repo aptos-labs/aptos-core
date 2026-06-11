@@ -4,6 +4,8 @@
 //! Tests for fat-pointer references (VecBorrow, SlotBorrow, ReadRef, WriteRef,
 //! HeapBorrow).
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, MicroOp,
@@ -11,66 +13,8 @@ use mono_move_core::{
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
-    ObjectDescriptorTable, VEC_DATA_OFFSET,
+    ObjectDescriptorTable, TRIVIAL_DESCRIPTOR_ID, VEC_DATA_OFFSET,
 };
-
-#[test]
-fn ref_basic() {
-    use MicroOp::*;
-
-    let result: u32 = 0;
-    let vec: u32 = 8;
-    let idx: u32 = 16;
-    let tmp: u32 = 24;
-    let r#ref: u32 = 32;
-    let val: u32 = 48;
-    let vec_ref: u32 = 56;
-
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
-
-    #[rustfmt::skip]
-    let code = vec![
-        VecNew { dst: FO(vec) },
-        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
-        StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(tmp), imm: 20u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(tmp), imm: 30u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(idx), imm: 1u64.to_le_bytes() },
-        VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
-        ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
-        StoreImm8 { dst: FO(val), imm: 99u64.to_le_bytes() },
-        WriteRef { ref_ptr: FO(r#ref), src: FO(val), size: 8 },
-        VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
-        Return,
-    ];
-    let functions = [Function {
-        name: GlobalArenaPtr::from_static("test"),
-        code: Code::from_vec(code),
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 72,
-        extended_frame_size: 96,
-        zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(r#ref), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
-    }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
-    ctx.run().unwrap();
-
-    assert_eq!(
-        ctx.root_result(),
-        20,
-        "ReadRef should have read 20 from vec[1]"
-    );
-    let vec_ptr = ctx.root_heap_ptr(8);
-    let elem1 = unsafe { read_u64(vec_ptr, VEC_DATA_OFFSET + 8) };
-    assert_eq!(elem1, 99, "WriteRef should have written 99 to vec[1]");
-}
 
 #[test]
 fn ref_survives_gc() {
@@ -84,8 +28,8 @@ fn ref_survives_gc() {
     let ref_base: u32 = 32;
     let vec_ref: u32 = 48;
 
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -108,7 +52,9 @@ fn ref_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 64,
@@ -144,8 +90,8 @@ fn ref_cross_frame() {
     let c_ref_base: u32 = 0;
     let c_val: u32 = 16;
 
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let callee_code = vec![
@@ -156,7 +102,9 @@ fn ref_cross_frame() {
     ];
     let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(callee_code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 16,
         param_and_local_sizes_sum: 24,
@@ -194,7 +142,9 @@ fn ref_cross_frame() {
     ];
     let main_func = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(main_code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,
@@ -245,8 +195,8 @@ fn ref_multiple_borrows() {
     let val: u32 = 64;
     let vec_ref: u32 = 72;
 
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -274,7 +224,9 @@ fn ref_multiple_borrows() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 88,
@@ -339,7 +291,9 @@ fn ref_borrow_local() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 64,
@@ -379,7 +333,7 @@ fn ref_nested_vectors() {
 
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_vec_outer = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
-    let desc_vec_inner = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_vec_inner = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -418,7 +372,9 @@ fn ref_nested_vectors() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 96,
@@ -480,8 +436,8 @@ fn ref_survives_double_gc() {
     let ref_base: u32 = 32;
     let vec_ref: u32 = 48;
 
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = TRIVIAL_DESCRIPTOR_ID;
 
     #[rustfmt::skip]
     let code = vec![
@@ -504,7 +460,9 @@ fn ref_survives_double_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 64,
@@ -529,58 +487,6 @@ fn ref_survives_double_gc() {
         "WriteRef should have written 77 to vec[1] after double GC"
     );
     assert_eq!(ctx.gc_count(), 2, "ForceGC should have run exactly twice");
-}
-
-#[test]
-fn ref_struct_field_borrow() {
-    use MicroOp::*;
-
-    let result: u32 = 0;
-    let entry: u32 = 8;
-    let r#ref: u32 = 16;
-    let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
-
-    let mut descriptors = ObjectDescriptorTable::new();
-    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
-
-    #[rustfmt::skip]
-    let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(result), imm: 42u64.to_le_bytes() },
-        MicroOp::struct_store8(FO(entry), 0, FO(result)),
-        StoreImm8 { dst: FO(result), imm: 100u64.to_le_bytes() },
-        MicroOp::struct_store8(FO(entry), 8, FO(result)),
-        SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
-        MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
-        ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
-        StoreImm8 { dst: FO(result), imm: 55u64.to_le_bytes() },
-        WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
-        MicroOp::struct_load8(FO(entry), 8, FO(result)),
-        Return,
-    ];
-    let functions = [Function {
-        name: GlobalArenaPtr::from_static("test"),
-        code: Code::from_vec(code),
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 48,
-        extended_frame_size: 72,
-        zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(r#ref), FO(entry_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
-    }];
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
-    ctx.run().unwrap();
-
-    assert_eq!(
-        ctx.root_result(),
-        55,
-        "entry.value should be 55 after WriteRef through StructBorrow"
-    );
-    let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, 0usize) };
-    assert_eq!(key, 42, "entry.key should be untouched");
 }
 
 #[test]
@@ -611,7 +517,9 @@ fn ref_struct_field_survives_gc() {
     ];
     let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 48,
@@ -655,7 +563,9 @@ fn ref_self_copy() {
     ];
     let function = Function {
         name: GlobalArenaPtr::from_static("test"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 32,

@@ -9,22 +9,22 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
-    native::{NativeName, ProductionContextFamily, ProductionNativeRegistry},
-    types::EMPTY_TYPE_LIST,
-    Function, Interner, NO_RESOURCE_PROVIDER,
+    native::NativeName, types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, NO_RESOURCE_PROVIDER,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_natives::{make_all_production_natives, make_all_test_natives};
-use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus, TransactionContext};
+use mono_move_natives::{make_all_production_natives, make_all_test_natives, Dispatch};
+use mono_move_runtime::{
+    ExecutionContext, InterpreterContext, ProductionContextFamily, ProductionNativeRegistry,
+    RuntimeStatus, TransactionContext,
+};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// Gas budget for engine runs. Effectively unbounded.
 const GAS_BUDGET: u64 = u64::MAX;
 
 /// The concrete per-transaction context the engine runs against.
-type TxnCtx<'guard, 'ctx> = TransactionContext<'guard, 'ctx, SimpleGasMeter>;
+type TxnCtx<'guard, 'ctx> = TransactionContext<'guard, 'ctx>;
 /// The interpreter context handed to `set`/`read` closures in [`MonoRunner::run`].
 type Interp<'i, 'guard, 'ctx> = InterpreterContext<'i, TxnCtx<'guard, 'ctx>>;
 
@@ -44,9 +44,25 @@ pub enum RunResult<R> {
 pub struct MonoRunner<'a, 'guard, 'ctx> {
     txn_ctx: &'a mut TxnCtx<'guard, 'ctx>,
     function: &'guard Function,
+    /// Initial heap size for each run, or `None` for the interpreter default.
+    /// A small size makes GC-pressure tests trigger collections.
+    heap_size: Option<usize>,
+    /// Number of garbage collections the most recent [`run`](Self::run)
+    /// performed.
+    gc_count: usize,
 }
 
 impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
+    /// Sets the initial heap size used to build the interpreter on each run.
+    pub fn set_heap_size(&mut self, heap_size: Option<usize>) {
+        self.heap_size = heap_size;
+    }
+
+    /// Number of garbage collections the most recent [`run`](Self::run) ran.
+    pub fn gc_count(&self) -> usize {
+        self.gc_count
+    }
+
     /// Run the entry function once. `set_args` places arguments into the root
     /// frame before execution; on success `extract_returns` reads results from
     /// it.
@@ -58,13 +74,18 @@ impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
         // Each run starts with a full budget; the meter is shared across
         // repeated runs on this context (e.g. bench iterations).
         self.txn_ctx.gas_meter().reset(GAS_BUDGET);
-        let mut interp = InterpreterContext::new(&mut *self.txn_ctx, self.function);
+        let mut interp = match self.heap_size {
+            Some(n) => InterpreterContext::with_heap_size(&mut *self.txn_ctx, self.function, n),
+            None => InterpreterContext::new(&mut *self.txn_ctx, self.function),
+        };
         set_args(&mut interp);
-        match interp.run() {
+        let result = match interp.run() {
             Err(err) => RunResult::Error(format!("{}", err)),
             Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&interp)),
             Ok(RuntimeStatus::Aborted { code, message }) => RunResult::Aborted { code, message },
-        }
+        };
+        self.gc_count = interp.gc_count();
+        result
     }
 
     /// Call an entry whose args are 8-byte words and that returns a single
@@ -101,18 +122,22 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     function_name: &IdentStr,
     body: impl FnOnce(&mut MonoRunner<'_, '_, 'ctx>) -> R,
 ) -> Result<R> {
-    let mut natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
+    let mut natives = ProductionNativeRegistry::new();
     natives
         .register_all(
-            make_all_test_natives::<ProductionContextFamily<SimpleGasMeter>>()
+            make_all_test_natives::<ProductionContextFamily>()
                 .into_iter()
-                .chain(make_all_production_natives::<
-                    ProductionContextFamily<SimpleGasMeter>,
-                >())
-                .map(|(addr, module, function, func)| {
-                    let name = NativeName {
-                        module: guard.module_id_of(&addr, &module),
-                        function: guard.identifier_of(&function),
+                .chain(make_all_production_natives::<ProductionContextFamily>())
+                .map(|(addr, module, function, dispatch, func)| {
+                    let module = guard.module_id_of(&addr, &module);
+                    let function = guard.identifier_of(&function);
+                    let name = match dispatch {
+                        Dispatch::Polymorphic => NativeName::Polymorphic { module, function },
+                        Dispatch::Monomorphic(ty_args) => NativeName::Monomorphic {
+                            module,
+                            function,
+                            ty_args: guard.type_list_of(ty_args),
+                        },
                     };
                     (name, func)
                 }),
@@ -127,7 +152,7 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     );
     let mut txn_ctx = TransactionContext::new(
         loader,
-        SimpleGasMeter::new(GAS_BUDGET),
+        GasMeter::new(GAS_BUDGET),
         &NO_RESOURCE_PROVIDER,
         &natives,
     );
@@ -150,6 +175,8 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     let mut runner = MonoRunner {
         txn_ctx: &mut txn_ctx,
         function,
+        heap_size: None,
+        gc_count: 0,
     };
     Ok(body(&mut runner))
 }

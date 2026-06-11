@@ -210,7 +210,6 @@ members = [
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
     "third_party/move/mono-move/core",
-    "third_party/move/mono-move/gas",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/loader",
     "third_party/move/mono-move/natives",
@@ -542,7 +541,9 @@ bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594
 better_any = "0.1.1"
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
+bitflags = "2.11.0"
 bitvec = "1.0.1"
+boxcar = "0.2.13"
 blake2 = "0.10.4"
 blake3 = { version = "1.5.4", features = ["mmap", "rayon"] }
 blake2-rfc = "0.2.18"
@@ -894,7 +895,6 @@ z3tracer = "0.8.0"
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
 mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
-mono-move-gas = { path = "third_party/move/mono-move/gas" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }

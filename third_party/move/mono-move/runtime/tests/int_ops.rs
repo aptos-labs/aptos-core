@@ -34,6 +34,8 @@
 //! TODO: Revisit endianness. Interpreter uses native order for built-in types.
 //! I256/U256 currently do not have other endianness exposed.
 
+mod common;
+
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp, IntCastOp, IntNegateOp,
@@ -190,7 +192,9 @@ const FRAME_SIZE: u32 = 96;
 fn make_func(op: MicroOp) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("op"),
+        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![op, MicroOp::Return]),
+        entry_gas: 0,
         param_slots: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: FRAME_SIZE as usize,

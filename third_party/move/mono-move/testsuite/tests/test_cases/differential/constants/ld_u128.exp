@@ -42,33 +42,33 @@ fun small(): u128 {
 
 fun add_const() {
   frame_data_size: 32
+  entry_gas: 107
   code:
-    0: Charge #57
-    1: IntAdd [16] <- [0] + u128 #1267650600228229401496703205376
-    2: Move(16) [0] <- [16]
-    3: Return
+    0: IntAdd [16] <- [0] + u128 #1267650600228229401496703205376
+    1: Move(16) [0] <- [16]
+    2: Return
 }
 
 fun max() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #340282366920938463463374607431768211455
-    2: Return
+    0: StoreImm16 [0] <- #340282366920938463463374607431768211455
+    1: Return
 }
 
 fun mid() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #1267650600228229401496703205376
-    2: Return
+    0: StoreImm16 [0] <- #1267650600228229401496703205376
+    1: Return
 }
 
 fun small() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #42
-    2: Return
+    0: StoreImm16 [0] <- #42
+    1: Return
 }

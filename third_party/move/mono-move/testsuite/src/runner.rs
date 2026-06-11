@@ -9,7 +9,7 @@ use crate::{
     engine::RunResult,
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
-    parser::{PrintSection, Step},
+    parser::{Check, PrintSection, Step},
     print_sections,
 };
 use anyhow::{anyhow, bail};
@@ -22,7 +22,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     int256::{I256, U256},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::StatusCode,
 };
@@ -33,7 +33,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
     AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
-    RuntimeEnvironment,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
@@ -103,21 +103,53 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 module_name,
                 function_name,
                 args,
+                heap_size,
                 checks,
             } => {
-                let v1_output =
-                    execute_function_v1(&storage, &address, &module_name, &function_name, &args);
-                let v2_output = execute_function_v2(
-                    &guard,
-                    &module_provider,
-                    &address,
-                    &module_name,
-                    &function_name,
-                    &args,
-                    &v1_output.param_kinds,
-                    &v1_output.return_kinds,
-                );
-                check_output(&checks, &v1_output.output.display, &v2_output.display)?;
+                // Run only the VM(s) a step actually checks (via `CHECK-V1` /
+                // `CHECK-V2`). This lets a step assert just one side — needed for
+                // natives one VM cannot run (e.g. `aggregator_v2`, which the
+                // legacy harness installs no extension for and would panic on).
+                // `CHECK-GC-COUNT` inspects the V2 collector, so it also needs V2.
+                let needs_v1 = checks.iter().any(|c| matches!(c, Check::V1(..)));
+                let needs_v2 = checks
+                    .iter()
+                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..)));
+
+                let v1 = needs_v1.then(|| {
+                    execute_function_v1(&storage, &address, &module_name, &function_name, &args)
+                });
+
+                let (v2_display, v2_gc_count) = if needs_v2 {
+                    // V2 needs the arg/return kinds. Reuse V1's if it ran,
+                    // otherwise load the function (without running it) to size them.
+                    let (param_kinds, return_kinds) = match &v1 {
+                        Some(v1) => (v1.param_kinds.clone(), v1.return_kinds.clone()),
+                        None => load_signature_v1(&storage, &address, &module_name, &function_name),
+                    };
+                    assert_eq!(
+                        param_kinds.len(),
+                        args.len(),
+                        "function requires a different number of arguments"
+                    );
+                    let (v2_output, v2_gc_count) = execute_function_v2(
+                        &guard,
+                        &module_provider,
+                        &address,
+                        &module_name,
+                        &function_name,
+                        &args,
+                        &param_kinds,
+                        &return_kinds,
+                        heap_size,
+                    );
+                    (v2_output.display, v2_gc_count)
+                } else {
+                    (String::new(), 0)
+                };
+
+                let v1_display = v1.map(|v| v.output.display).unwrap_or_default();
+                check_output(&checks, &v1_display, &v2_display, v2_gc_count)?;
             },
         }
     }
@@ -158,6 +190,60 @@ struct V1Output {
     return_kinds: Vec<PrimitiveKind>,
 }
 
+/// Maps a function's parameter and return types to [`PrimitiveKind`]s. Panics on
+/// any non-primitive type — the harness only supports primitive args/returns.
+fn primitive_kinds(
+    param_tys: &[Type],
+    return_tys: &[Type],
+    env: &RuntimeEnvironment,
+) -> (Vec<PrimitiveKind>, Vec<PrimitiveKind>) {
+    let param_kinds = param_tys
+        .iter()
+        .map(|ty| {
+            PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
+        })
+        .collect::<Vec<_>>();
+    let return_kinds = return_tys
+        .iter()
+        .map(|ty| PrimitiveKind::from_return_type(ty, env))
+        .collect::<Vec<_>>();
+    (param_kinds, return_kinds)
+}
+
+/// Loads a function via the legacy VM and returns its parameter and return
+/// kinds, without executing it. Used to size the V2 arg/return regions when the
+/// legacy VM is skipped for a step (no `CHECK-V1`/shared checks).
+fn load_signature_v1(
+    storage: &InMemoryStorage,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+) -> (Vec<PrimitiveKind>, Vec<PrimitiveKind>) {
+    let mut gas_meter = UnmeteredGasMeter;
+    let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
+    let module_storage = storage.as_unsync_module_storage();
+    let loader = LazyLoader::new(&module_storage);
+
+    let function = match loader.load_instantiated_function(
+        &LegacyLoaderConfig::unmetered(),
+        &mut gas_meter,
+        &mut traversal_context,
+        &ModuleId::new(*address, module_name.to_owned()),
+        function_name,
+        &[],
+    ) {
+        Ok(function) => function,
+        Err(err) => panic!("Failed to load function: {}", err),
+    };
+
+    primitive_kinds(
+        function.param_tys(),
+        function.return_tys(),
+        module_storage.runtime_environment(),
+    )
+}
+
 /// Execute a function via legacy MoveVM and returns normalized output.
 fn execute_function_v1(
     storage: &InMemoryStorage,
@@ -193,18 +279,11 @@ fn execute_function_v1(
     if function.param_tys().len() != args.len() {
         panic!("Function requires a different number of arguments");
     }
-    let param_kinds = function
-        .param_tys()
-        .iter()
-        .map(|ty| {
-            PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
-        })
-        .collect::<Vec<_>>();
-    let return_kinds = function
-        .return_tys()
-        .iter()
-        .map(|ty| PrimitiveKind::from_type(ty).expect("Only primitive return types are supported"))
-        .collect::<Vec<_>>();
+    let (param_kinds, return_kinds) = primitive_kinds(
+        function.param_tys(),
+        function.return_tys(),
+        module_storage.runtime_environment(),
+    );
     let serialized_args = param_kinds
         .iter()
         .zip(args.iter())
@@ -226,7 +305,15 @@ fn execute_function_v1(
                 .return_values
                 .iter()
                 .zip(return_kinds.iter())
-                .map(|((bytes, _layout), kind)| kind.format_bytes(bytes))
+                .map(|((bytes, _layout), kind)| match kind {
+                    PrimitiveKind::Utf8String => {
+                        render_utf8(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+                    },
+                    PrimitiveKind::ByteVector => {
+                        render_bytes(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+                    },
+                    _ => kind.format_bytes(bytes),
+                })
                 .collect::<Vec<_>>();
             Output {
                 display: format!("results: {}", vals.join(", ")),
@@ -251,7 +338,8 @@ fn execute_function_v1(
     }
 }
 
-/// Executes a function via MonoMove VM, and returns normalized output.
+/// Executes a function via MonoMove VM. Returns the normalized output and the
+/// number of garbage collections that ran (for `CHECK-GC-COUNT`).
 fn execute_function_v2(
     guard: &ExecutionGuard<'_>,
     module_provider: &InMemoryModuleProvider,
@@ -261,9 +349,11 @@ fn execute_function_v2(
     args: &[String],
     arg_kinds: &[PrimitiveKind],
     return_kinds: &[PrimitiveKind],
-) -> Output {
+    heap_size: Option<usize>,
+) -> (Output, usize) {
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
+    let mut gc_count = 0;
     let outcome = crate::engine::with_mono_function(
         guard,
         module_provider,
@@ -271,7 +361,8 @@ fn execute_function_v2(
         module_name,
         function_name,
         |runner| {
-            runner.run(
+            runner.set_heap_size(heap_size);
+            let result = runner.run(
                 |interpreter| {
                     let mut offset: u32 = 0;
                     for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
@@ -286,13 +377,28 @@ fn execute_function_v2(
                     let mut vals = Vec::with_capacity(return_kinds.len());
                     for kind in return_kinds {
                         ret_off = mono_move_core::align_up_u32(ret_off, kind.align());
-                        let bytes = interpreter.root_result_bytes(ret_off, kind.size());
-                        vals.push(kind.format_bytes(bytes));
+                        match kind {
+                            PrimitiveKind::Utf8String => {
+                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
+                                vals.push(render_utf8(&content));
+                            },
+                            PrimitiveKind::ByteVector => {
+                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
+                                vals.push(render_bytes(&content));
+                            },
+                            _ => {
+                                let bytes =
+                                    interpreter.root_result_bytes_for_test(ret_off, kind.size());
+                                vals.push(kind.format_bytes(bytes));
+                            },
+                        }
                         ret_off += kind.size();
                     }
                     vals
                 },
-            )
+            );
+            gc_count = runner.gc_count();
+            result
         },
     );
 
@@ -305,7 +411,7 @@ fn execute_function_v2(
         },
         Ok(RunResult::Success(vals)) => format!("results: {}", vals.join(", ")),
     };
-    Output { display }
+    (Output { display }, gc_count)
 }
 
 /// Kind supported as an argument or return value in differential tests
@@ -328,6 +434,13 @@ enum PrimitiveKind {
     I128,
     I256,
     Address,
+    Signer,
+    /// A `String` return value (return-only). Rendered as a UTF-8 string by
+    /// reading the heap `vector<u8>` (V2) or decoding the BCS bytes (V1).
+    Utf8String,
+    /// A `vector<u8>` return value (return-only). Rendered as a `0x…` hex dump
+    /// of its bytes, read from the heap (V2) or the BCS return (V1).
+    ByteVector,
 }
 
 impl PrimitiveKind {
@@ -347,8 +460,32 @@ impl PrimitiveKind {
             Type::I128 => PrimitiveKind::I128,
             Type::I256 => PrimitiveKind::I256,
             Type::Address => PrimitiveKind::Address,
+            Type::Signer => PrimitiveKind::Signer,
             _ => return None,
         })
+    }
+
+    /// Like [`Self::from_type`] but also recognizes a `0x1::string::String`
+    /// return as [`PrimitiveKind::Utf8String`]. Used for return values, which
+    /// (unlike arguments) may be a `String`.
+    fn from_return_type(ty: &Type, env: &RuntimeEnvironment) -> Self {
+        if let Some(kind) = Self::from_type(ty) {
+            return kind;
+        }
+        // `vector<u8>` renders as a hex byte dump (distinct from `String`).
+        if let Type::Vector(elem) = ty
+            && matches!(&**elem, Type::U8)
+        {
+            return PrimitiveKind::ByteVector;
+        }
+        if let Ok(TypeTag::Struct(s)) = env.ty_to_ty_tag(ty)
+            && s.address == AccountAddress::ONE
+            && s.module.as_str() == "string"
+            && s.name.as_str() == "String"
+        {
+            return PrimitiveKind::Utf8String;
+        }
+        panic!("Only primitive, vector<u8>, and String return types are supported");
     }
 
     fn size(self) -> u32 {
@@ -356,9 +493,15 @@ impl PrimitiveKind {
             PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64 | PrimitiveKind::I64 => 8,
+            PrimitiveKind::U64
+            | PrimitiveKind::I64
+            | PrimitiveKind::Utf8String
+            | PrimitiveKind::ByteVector => 8,
             PrimitiveKind::U128 | PrimitiveKind::I128 => 16,
-            PrimitiveKind::U256 | PrimitiveKind::I256 | PrimitiveKind::Address => 32,
+            PrimitiveKind::U256
+            | PrimitiveKind::I256
+            | PrimitiveKind::Address
+            | PrimitiveKind::Signer => 32,
         }
     }
 
@@ -367,14 +510,18 @@ impl PrimitiveKind {
             PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64 | PrimitiveKind::I64 => 8,
+            PrimitiveKind::U64
+            | PrimitiveKind::I64
+            | PrimitiveKind::Utf8String
+            | PrimitiveKind::ByteVector => 8,
             // Wide integers and addresses are 8-byte aligned in the
             // frame even though their size is larger.
             PrimitiveKind::U128
             | PrimitiveKind::I128
             | PrimitiveKind::U256
             | PrimitiveKind::I256
-            | PrimitiveKind::Address => 8,
+            | PrimitiveKind::Address
+            | PrimitiveKind::Signer => 8,
         }
     }
 
@@ -396,6 +543,13 @@ impl PrimitiveKind {
             PrimitiveKind::Address => {
                 let addr = AccountAddress::from_hex_literal(s).expect("invalid address literal");
                 MoveValue::Address(addr)
+            },
+            PrimitiveKind::Signer => {
+                let addr = AccountAddress::from_hex_literal(s).expect("invalid signer literal");
+                MoveValue::Signer(addr)
+            },
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!("String / vector<u8> are return-only kinds")
             },
         }
     }
@@ -459,10 +613,13 @@ impl PrimitiveKind {
                 .expect("invalid i256 literal")
                 .to_le_bytes()
                 .to_vec(),
-            PrimitiveKind::Address => AccountAddress::from_hex_literal(s)
+            PrimitiveKind::Address | PrimitiveKind::Signer => AccountAddress::from_hex_literal(s)
                 .expect("invalid address literal")
                 .into_bytes()
                 .to_vec(),
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!("String / vector<u8> are return-only kinds")
+            },
         }
     }
 
@@ -483,12 +640,33 @@ impl PrimitiveKind {
             PrimitiveKind::I64 => i64::from_le_bytes(bytes[..8].try_into().unwrap()).to_string(),
             PrimitiveKind::I128 => i128::from_le_bytes(bytes[..16].try_into().unwrap()).to_string(),
             PrimitiveKind::I256 => I256::from_le_bytes(bytes[..32].try_into().unwrap()).to_string(),
-            PrimitiveKind::Address => {
+            PrimitiveKind::Address | PrimitiveKind::Signer => {
                 let arr: [u8; AccountAddress::LENGTH] = bytes[..32].try_into().unwrap();
                 AccountAddress::new(arr).to_hex_literal()
             },
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!(
+                    "String / vector<u8> returns are rendered from the heap, not format_bytes"
+                )
+            },
         }
     }
+}
+
+/// Renders raw UTF-8 bytes as a quoted string for cross-VM comparison.
+fn render_utf8(bytes: &[u8]) -> String {
+    format!("{:?}", String::from_utf8_lossy(bytes))
+}
+
+/// Renders raw bytes as a `0x…` hex string for cross-VM comparison.
+fn render_bytes(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut s = String::with_capacity(2 + bytes.len() * 2);
+    s.push_str("0x");
+    for b in bytes {
+        write!(s, "{b:02x}").unwrap();
+    }
+    s
 }
 
 /// Parse a boolean argument literal. Only `true`/`false` are accepted; the

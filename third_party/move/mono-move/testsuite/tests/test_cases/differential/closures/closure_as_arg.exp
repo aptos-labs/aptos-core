@@ -63,32 +63,32 @@ fun run(r0, r1): u64 {
 
 fun add_u64() {
   frame_data_size: 24
+  entry_gas: 59
   code:
-    0: Charge #7
-    1: AddU64 [16] <- [0] + [8]
-    2: Move8 [0] <- [16]
-    3: Return
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
 }
 
 fun apply() {
   frame_data_size: 24
+  entry_gas: 142
   code:
-    0: Charge #21
-    1: CallClosure closure=[0], provided_args=[[8](8)]
-    2: Move8 [16] <- [48]
-    3: Move8 [0] <- [16]
-    4: Return
+    0: CallClosure closure=[0], provided_args=[[8](8)]
+    1: Move8 [16] <- [48]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun run() {
   frame_data_size: 16
+  entry_gas: 151
   code:
-    0: Charge #36
-    1: PackClosure [40] <- func_ref=Unresolved(add_u64), mask=1, captured_desc=0, captured=[[0](8)]
-    2: Move8 [48] <- [8]
-    3: CallIndirect 0x99::closure_as_arg::apply
-    4: Move8 [0] <- [40]
-    5: Return
+    0: PackClosure [40] <- func_ref=Unresolved(add_u64), mask=1, captured_desc=0, captured=[[0](8)]
+    1: Move8 [48] <- [8]
+    2: CallIndirect 0x99::closure_as_arg::apply
+    3: Move8 [0] <- [40]
+    4: Return
   safe_point_layouts:
-    1: []
+    0: []
 }

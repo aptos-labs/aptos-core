@@ -72,33 +72,31 @@ fun asel(r0, r1): u64 {
 
 fun aeq() {
   frame_data_size: 72
+  entry_gas: 17
   code:
-    0: Charge #10
-    1: IntCmp [64] <- [0] == u256 [32]
-    2: Move(1) [0] <- [64]
-    3: Return
+    0: IntCmp [64] <- [0] == u256 [32]
+    1: Move(1) [0] <- [64]
+    2: Return
 }
 
 fun aneq() {
   frame_data_size: 72
+  entry_gas: 17
   code:
-    0: Charge #10
-    1: IntCmp [64] <- [0] != u256 [32]
-    2: Move(1) [0] <- [64]
-    3: Return
+    0: IntCmp [64] <- [0] != u256 [32]
+    1: Move(1) [0] <- [64]
+    2: Return
 }
 
 fun asel() {
   frame_data_size: 72
+  entry_gas: 3
   code:
-    0: Charge #3
-    1: JumpIntCmp @6 [0] != u256 [32]
-    2: Charge #6
-    3: StoreImm8 [64] <- #10
-    4: Move8 [0] <- [64]
-    5: Return
-    6: Charge #6
-    7: StoreImm8 [64] <- #20
-    8: Move8 [0] <- [64]
-    9: Return
+    0: JumpIntCmp @4 [0] != u256 [32] gas_taken=56 gas_fallthrough=56
+    1: StoreImm8 [64] <- #10
+    2: Move8 [0] <- [64]
+    3: Return
+    4: StoreImm8 [64] <- #20
+    5: Move8 [0] <- [64]
+    6: Return
 }

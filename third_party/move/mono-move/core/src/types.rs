@@ -375,6 +375,33 @@ impl Type {
         })
     }
 
+    /// The short kind word for this type (`"u64"`, `"vector"`, `"struct"`, ...).
+    /// Mirrors the legacy VM's `TypeTag::to_short_string`.
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            Type::Bool => "bool",
+            Type::U8 => "u8",
+            Type::U16 => "u16",
+            Type::U32 => "u32",
+            Type::U64 => "u64",
+            Type::U128 => "u128",
+            Type::U256 => "u256",
+            Type::I8 => "i8",
+            Type::I16 => "i16",
+            Type::I32 => "i32",
+            Type::I64 => "i64",
+            Type::I128 => "i128",
+            Type::I256 => "i256",
+            Type::Address => "address",
+            Type::Signer => "signer",
+            Type::Vector { .. } => "vector",
+            Type::Nominal { .. } => "struct",
+            Type::Function { .. } => "function",
+            Type::ImmutRef { .. } | Type::MutRef { .. } => "reference",
+            Type::TypeParam { .. } => "type parameter",
+        }
+    }
+
     /// True iff this is `Type::U64`. Used by the specializer to gate the
     /// u64-specialized micro-op fast paths.
     #[inline(always)]
@@ -519,6 +546,20 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
             Ok(())
         },
     }
+}
+
+/// Renders an interned type to its textual representation (see [`display_type`]).
+//
+// TODO: this traversal is unbounded; replace with a metered, depth-bounded
+// version.
+pub fn type_to_string(ty: InternedType) -> String {
+    struct Disp(InternedType);
+    impl fmt::Display for Disp {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            display_type(f, self.0)
+        }
+    }
+    Disp(ty).to_string()
 }
 
 /// Writes an interned type list as `T0, T1, ...`.

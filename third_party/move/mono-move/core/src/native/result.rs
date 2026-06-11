@@ -19,6 +19,12 @@ pub enum NativeStatus {
 pub enum VMInternalError {
     #[error("native function invariant violation: {0}")]
     InvariantViolation(String),
+    #[error("out of heap memory (requested {requested} bytes)")]
+    OutOfHeapMemory { requested: usize },
+    #[error("allocation size {requested} exceeds the maximum")]
+    AllocationTooLarge { requested: usize },
+    #[error("vector allocation size overflow")]
+    VecAllocSizeOverflow,
     // TODO: Gas Metering
 }
 
@@ -26,6 +32,9 @@ impl IntoExecutionError for VMInternalError {
     fn kind(&self) -> ExecutionErrorKind {
         match self {
             VMInternalError::InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            VMInternalError::OutOfHeapMemory { .. }
+            | VMInternalError::AllocationTooLarge { .. }
+            | VMInternalError::VecAllocSizeOverflow => ExecutionErrorKind::RuntimeLimitExceeded,
         }
     }
 }

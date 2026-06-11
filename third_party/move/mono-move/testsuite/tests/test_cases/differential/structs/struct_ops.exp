@@ -19,14 +19,14 @@ fun pack_and_unpack(): u64 {
 
 fun pack_and_unpack() {
   frame_data_size: 32
+  entry_gas: 158
   code:
-    0: Charge #22
-    1: StoreImm8 [16] <- #3
-    2: StoreImm1 [24] <- #2
-    3: Move(1) [8] <- [24]
-    4: Move8 [0] <- [16]
-    5: Move(1) [24] <- [8]
-    6: Move8 [16] <- [0]
-    7: Move8 [0] <- [16]
-    8: Return
+    0: StoreImm8 [16] <- #3
+    1: StoreImm1 [24] <- #2
+    2: Move(1) [8] <- [24]
+    3: Move8 [0] <- [16]
+    4: Move(1) [24] <- [8]
+    5: Move8 [16] <- [0]
+    6: Move8 [0] <- [16]
+    7: Return
 }

@@ -469,6 +469,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "fail",
+ "flate2",
  "futures",
  "hex",
  "itertools 0.13.0",
@@ -6670,6 +6671,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxcar"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36f64beae40a84da1b4b26ff2761a5b895c12adc41dc25aaee1c4f2bbfe97a6e"
+
+[[package]]
 name = "brotli"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9951,6 +9958,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures_codec"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad004dd81205978a2bba6c566ed70535ccf88c0be34649e628186474603f43ca"
+dependencies = [
+ "bytes",
+ "futures-sink",
+ "futures-util",
+ "memchr",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "fuzzer"
 version = "0.1.0"
 dependencies = [
@@ -12779,19 +12799,13 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.11.0",
  "bytes",
  "mono-move-alloc",
- "mono-move-gas",
  "move-binary-format",
  "move-core-types",
  "shared-dsa",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "mono-move-gas"
-version = "0.1.0"
-dependencies = [
+ "smallvec",
  "thiserror 1.0.69",
 ]
 
@@ -12802,6 +12816,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "arc-swap",
+ "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
  "mono-move-alloc",
@@ -12819,7 +12834,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-global-context",
  "mono-move-testsuite",
  "move-core-types",
@@ -12852,15 +12866,17 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
+ "hashbrown 0.14.3",
  "mono-move-alloc",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-loader",
  "move-core-types",
  "num-bigint 0.3.3",
  "paste",
  "proptest",
  "rand 0.7.3",
+ "serde",
  "thiserror 1.0.69",
 ]
 
@@ -12872,6 +12888,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
+ "bcs 0.1.4",
  "bytes",
  "codespan-reporting",
  "criterion",
@@ -12879,7 +12896,6 @@ dependencies = [
  "legacy-move-compiler",
  "libtest-mimic",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-global-context",
  "mono-move-loader",
  "mono-move-natives",
@@ -15351,6 +15367,7 @@ dependencies = [
  "serde_urlencoded",
  "serde_yaml 0.9.30",
  "smallvec",
+ "sse-codec",
  "sync_wrapper 1.0.1",
  "tempfile",
  "thiserror 1.0.69",
@@ -18434,9 +18451,7 @@ name = "specializer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
  "mono-move-core",
- "mono-move-gas",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -18499,6 +18514,17 @@ checksum = "8baeff88f34ed0691978ec34440140e1572b68c7dd4a495fd14a3dc1944daa80"
 dependencies = [
  "base64ct",
  "der 0.8.0",
+]
+
+[[package]]
+name = "sse-codec"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a395a858c7ff5c4b42aeab0501e07c978ac5e1ae5059f301884dab3fa405f47"
+dependencies = [
+ "futures-io",
+ "futures_codec",
+ "memchr",
 ]
 
 [[package]]

@@ -51,41 +51,41 @@ fun pos(): i128 {
 
 fun add_const() {
   frame_data_size: 32
+  entry_gas: 107
   code:
-    0: Charge #57
-    1: IntAdd [16] <- [0] + i128 #-1267650600228229401496703205376
-    2: Move(16) [0] <- [16]
-    3: Return
+    0: IntAdd [16] <- [0] + i128 #-1267650600228229401496703205376
+    1: Move(16) [0] <- [16]
+    2: Return
 }
 
 fun max_val() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #170141183460469231731687303715884105727
-    2: Return
+    0: StoreImm16 [0] <- #170141183460469231731687303715884105727
+    1: Return
 }
 
 fun min_val() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #170141183460469231731687303715884105728
-    2: Return
+    0: StoreImm16 [0] <- #170141183460469231731687303715884105728
+    1: Return
 }
 
 fun neg() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #340282365653287863235145205935065006080
-    2: Return
+    0: StoreImm16 [0] <- #340282365653287863235145205935065006080
+    1: Return
 }
 
 fun pos() {
   frame_data_size: 16
+  entry_gas: 104
   code:
-    0: Charge #5
-    1: StoreImm16 [0] <- #1267650600228229401496703205376
-    2: Return
+    0: StoreImm16 [0] <- #1267650600228229401496703205376
+    1: Return
 }

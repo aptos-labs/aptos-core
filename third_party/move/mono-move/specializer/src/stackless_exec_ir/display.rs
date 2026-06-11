@@ -4,7 +4,7 @@
 //! Display for the stackless IR. Types render from their interned form;
 //! entity handles (functions, fields, variants) resolve via `CompiledModule`.
 
-use super::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
+use super::{BinaryOp, CmpKind, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
 use mono_move_core::types::{display_type, display_type_list};
 use move_binary_format::{
     access::ModuleAccess,
@@ -777,14 +777,14 @@ fn binary_op_name(op: &BinaryOp) -> &'static str {
     }
 }
 
-fn cmp_op_name(op: &CmpOp) -> &'static str {
+fn cmp_op_name(op: &CmpKind) -> &'static str {
     match op {
-        CmpOp::Lt => "lt",
-        CmpOp::Gt => "gt",
-        CmpOp::Le => "le",
-        CmpOp::Ge => "ge",
-        CmpOp::Eq => "eq",
-        CmpOp::Neq => "neq",
+        CmpKind::Lt => "lt",
+        CmpKind::Gt => "gt",
+        CmpKind::Le => "le",
+        CmpKind::Ge => "ge",
+        CmpKind::Eq => "eq",
+        CmpKind::Neq => "neq",
     }
 }
 

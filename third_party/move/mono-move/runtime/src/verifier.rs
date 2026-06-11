@@ -11,9 +11,12 @@
 //! publish time.
 
 use mono_move_core::{
-    captured_values_size, native::NativeABI, CallClosureOp, ClosureFuncRef, CodeOffset,
-    DescriptorId, DescriptorProvider, FrameOffset, Function, IntBinaryOp, MicroOp,
-    ObjectDescriptorInner, PackClosureOp, ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    captured_values_size,
+    native::NativeABI,
+    types::{view_type, InternedType},
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
+    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
+    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -402,6 +405,18 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_1(pc, op.dst);
             },
 
+            MicroOp::ValueCmp(ref op) => {
+                let size = self.type_size(pc, op.ty);
+                self.check_frame_access(Some(pc), op.lhs, size);
+                self.check_frame_access(Some(pc), op.rhs, size);
+                self.check_frame_access_1(pc, op.dst);
+            },
+            MicroOp::ValueRefCmp(ref op) => {
+                self.check_frame_access(Some(pc), op.lhs, 16);
+                self.check_frame_access(Some(pc), op.rhs, 16);
+                self.check_frame_access_1(pc, op.dst);
+            },
+
             // Boolean logic: all operands are 1-byte `0`/`1` values.
             MicroOp::BoolNot { dst, src } => {
                 self.check_frame_access_1(pc, src);
@@ -419,16 +434,17 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), dst, size);
             },
 
-            MicroOp::Jump { target } => {
+            MicroOp::Jump { target, .. } => {
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpNotZeroU64 { target, src } => {
+            MicroOp::JumpNotZeroU64 { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpNotZeroByte { target, src } | MicroOp::JumpZeroByte { target, src } => {
+            MicroOp::JumpNotZeroByte { target, src, .. }
+            | MicroOp::JumpZeroByte { target, src, .. } => {
                 self.check_frame_access_1(pc, src);
                 self.check_jump(pc, target);
             },
@@ -444,45 +460,47 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_jump(pc, op.target);
             },
 
-            MicroOp::JumpGreaterEqualU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpValueCmp(ref op) => {
+                let size = self.type_size(pc, op.ty);
+                self.check_frame_access(Some(pc), op.lhs, size);
+                self.check_frame_access(Some(pc), op.rhs, size);
+                self.check_jump(pc, op.target);
+            },
+            MicroOp::JumpValueRefCmp(ref op) => {
+                self.check_frame_access(Some(pc), op.lhs, 16);
+                self.check_frame_access(Some(pc), op.rhs, 16);
+                self.check_jump(pc, op.target);
+            },
+
+            MicroOp::JumpGreaterEqualU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpLessU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpLessU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpGreaterU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpGreaterU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpLessEqualU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
+            MicroOp::JumpLessEqualU64Imm { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpLessU64 { target, lhs, rhs }
-            | MicroOp::JumpGreaterEqualU64 { target, lhs, rhs }
-            | MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpLessU64 {
+                target, lhs, rhs, ..
+            }
+            | MicroOp::JumpGreaterEqualU64 {
+                target, lhs, rhs, ..
+            }
+            | MicroOp::JumpNotEqualU64 {
+                target, lhs, rhs, ..
+            } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
                 self.check_jump(pc, target);
@@ -507,6 +525,11 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
 
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {
+                self.check_frame_access_8(pc, dst);
+            },
+
+            // ----- StoreImmVec: writes an 8-byte heap pointer to `dst` -----
+            MicroOp::StoreImmVec { dst, .. } => {
                 self.check_frame_access_8(pc, dst);
             },
 
@@ -539,8 +562,18 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                     pc,
                     "VecPushBack",
                     descriptor_id,
-                    |inner| matches!(inner, ObjectDescriptorInner::Vector { .. }),
-                    "a Vector",
+                    |inner| match inner {
+                        ObjectDescriptorInner::Vector {
+                            elem_pointer_offsets,
+                            ..
+                        } => !elem_pointer_offsets.is_empty(),
+                        ObjectDescriptorInner::Trivial => true,
+                        ObjectDescriptorInner::Closure
+                        | ObjectDescriptorInner::Struct { .. }
+                        | ObjectDescriptorInner::Enum { .. }
+                        | ObjectDescriptorInner::CapturedData { .. } => false,
+                    },
+                    "a non-empty Vector or Trivial",
                 );
             },
 
@@ -703,15 +736,16 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), src, size);
             },
 
-            // Inserted by the instrumentation pass; no frame accesses to verify.
-            MicroOp::Charge { .. } => {},
-
             MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
             MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
 
-            MicroOp::Exists { addr, ty: _, dst } | MicroOp::MoveFrom { addr, ty: _, dst } => {
-                // Exists writes a bool (currently widened to 8 bytes); MoveFrom
-                // writes an 8-byte owned heap pointer.
+            MicroOp::Exists { addr, ty: _, dst } => {
+                // Exists writes a bool.
+                self.check_frame_access(Some(pc), addr, 32);
+                self.check_frame_access_1(pc, dst);
+            },
+            MicroOp::MoveFrom { addr, ty: _, dst } => {
+                // MoveFrom writes an 8-byte owned heap pointer.
                 self.check_frame_access(Some(pc), addr, 32);
                 self.check_frame_access_8(pc, dst);
             },
@@ -962,6 +996,25 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 
+    /// In-memory byte width of a value-comparison operand. The compared value
+    /// occupies this many bytes at its slot; for vectors the slot holds an
+    /// 8-byte pointer that the comparison reads through. Records an error and
+    /// returns `0` when the type's layout is unavailable, so the caller's
+    /// bounds check still fails the function (via the recorded error) rather
+    /// than passing on an unknown size.
+    fn type_size(&mut self, pc: usize, ty: InternedType) -> u32 {
+        match view_type(ty).size_and_align() {
+            Some((size, _align)) => size,
+            None => {
+                self.err(
+                    Some(pc),
+                    "value comparison operand type has no known layout",
+                );
+                0
+            },
+        }
+    }
+
     fn check_frame_access_8(&mut self, pc: usize, offset: FrameOffset) {
         self.check_frame_access(Some(pc), offset, 8);
     }
@@ -1029,6 +1082,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 
+    // TODO: validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.get().len();
         if (target.0 as usize) >= code_len {

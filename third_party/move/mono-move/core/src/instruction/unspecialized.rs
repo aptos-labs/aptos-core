@@ -13,7 +13,7 @@
 //! the operand type at runtime.
 
 use super::{CodeOffset, FrameOffset};
-use crate::types::Type;
+use crate::types::{InternedType, Type};
 use move_core_types::int256::{I256, U256};
 use std::fmt;
 
@@ -357,6 +357,20 @@ pub enum CmpKind {
     Neq,
 }
 
+impl CmpKind {
+    /// Return the logically negated comparison.
+    pub fn negate(self) -> Self {
+        match self {
+            CmpKind::Lt => CmpKind::Ge,
+            CmpKind::Ge => CmpKind::Lt,
+            CmpKind::Gt => CmpKind::Le,
+            CmpKind::Le => CmpKind::Gt,
+            CmpKind::Eq => CmpKind::Neq,
+            CmpKind::Neq => CmpKind::Eq,
+        }
+    }
+}
+
 impl fmt::Display for CmpKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -390,4 +404,78 @@ pub struct JumpIntCmpOp {
     pub op: CmpKind,
     pub lhs: FrameOffset,
     pub rhs: IntOperand,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
+}
+
+/// `dst = (lhs == rhs)` (or `!=` when `negate`), a structural equality over
+/// the aggregate values at `lhs`/`rhs`, producing a 1-byte boolean. Used for
+/// aggregate types (vectors, structs) — everything that is not a flat scalar
+/// handled by [`IntCmpOp`]. A vector slot holds a pointer to its heap data,
+/// which the comparison reads through.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ValueCmpOp {
+    pub negate: bool,
+    pub dst: FrameOffset,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+}
+
+/// Like [`ValueCmpOp`], but the operands are **references**: `lhs`/`rhs` hold
+/// 16-byte fat pointers, read through to obtain the operand pointers of the
+/// referent value of type `ty`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ValueRefCmpOp {
+    pub negate: bool,
+    pub dst: FrameOffset,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+}
+
+/// Fused compare-and-branch counterpart of [`ValueCmpOp`]: jump to `target`
+/// if the equality result holds (negated when `negate`). Operands are inline
+/// values; see [`ValueCmpOp`] for the field meanings.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct JumpValueCmpOp {
+    pub target: CodeOffset,
+    pub negate: bool,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
+}
+
+/// Fused compare-and-branch counterpart of [`ValueRefCmpOp`]: operands are
+/// 16-byte fat pointers read through to the referent values.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct JumpValueRefCmpOp {
+    pub target: CodeOffset,
+    pub negate: bool,
+    pub lhs: FrameOffset,
+    pub rhs: FrameOffset,
+    pub ty: InternedType,
+    pub gas_taken: u64,
+    pub gas_fallthrough: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cmp_kind_double_negate_is_identity() {
+        for kind in [
+            CmpKind::Lt,
+            CmpKind::Le,
+            CmpKind::Gt,
+            CmpKind::Ge,
+            CmpKind::Eq,
+            CmpKind::Neq,
+        ] {
+            assert_eq!(kind.negate().negate(), kind);
+        }
+    }
 }
