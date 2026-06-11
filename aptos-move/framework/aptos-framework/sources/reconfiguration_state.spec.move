@@ -20,7 +20,9 @@ spec aptos_framework::reconfiguration_state {
     }
 
     spec is_in_progress(): bool {
+        pragma opaque;
         aborts_if false;
+        ensures result == spec_is_in_progress();
     }
 
     spec fun spec_is_in_progress(): bool {

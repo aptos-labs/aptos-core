@@ -3,11 +3,11 @@
 
 //! Natives for the `function_info` module.
 
-use crate::{natives, NativeFunction};
+use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::native::{
     NativeContext, NativeContextFamily, NativeStatus, Ref, VMInternalError, Vector,
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::identifier::Identifier;
 
 /// `0x1::function_info::is_identifier(s: &vector<u8>): bool`
 ///
@@ -30,7 +30,6 @@ pub fn native_is_identifier<C: NativeContext>(ctx: &C) -> Result<NativeStatus, V
 }
 
 /// Natives for the `function_info` module.
-pub fn make_all_function_info_natives<F: NativeContextFamily>(
-) -> Vec<(AccountAddress, Identifier, Identifier, NativeFunction<F>)> {
-    natives![("0x1::function_info::is_identifier", native_is_identifier)]
+pub fn make_all_function_info_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    monomorphic_natives![("0x1::function_info::is_identifier", native_is_identifier)]
 }

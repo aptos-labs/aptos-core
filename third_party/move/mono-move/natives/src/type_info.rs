@@ -3,7 +3,7 @@
 
 //! Natives for the `type_info` module.
 
-use crate::{natives, NativeFunction};
+use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
     native::{
         NativeContext, NativeContextFamily, NativeStatus, RootPool, VMInternalError, VMValue,
@@ -11,7 +11,7 @@ use mono_move_core::{
     },
     types::{type_to_string, view_name, view_type, view_type_list, Type},
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::account_address::AccountAddress;
 
 /// `0x1::type_info::type_name<T>(): String`
 ///
@@ -138,9 +138,8 @@ pub fn native_type_of<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInter
 }
 
 /// Natives for the `type_info` module.
-pub fn make_all_type_info_natives<F: NativeContextFamily>(
-) -> Vec<(AccountAddress, Identifier, Identifier, NativeFunction<F>)> {
-    natives![
+pub fn make_all_type_info_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    polymorphic_natives![
         ("0x1::type_info::type_name", native_type_name),
         ("0x1::type_info::type_of", native_type_of),
     ]

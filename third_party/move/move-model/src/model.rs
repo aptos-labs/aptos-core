@@ -770,6 +770,50 @@ impl GlobalEnv {
         *self.everything_is_target.borrow_mut() = on
     }
 
+    /// Demote every module matched by `predicate` out of the target /
+    /// primary-target sets, so it is treated as a dependency by downstream
+    /// tools that gate on `is_target()` / `is_primary_target()`.
+    ///
+    /// Target sets are file-keyed, so demotion is at file granularity. If a
+    /// matched module shares its source file with an unmatched sibling,
+    /// no demotion happens and the sibling's full name is returned in the
+    /// error so the caller can refuse with a precise message.
+    pub fn demote_modules_from_primary_targets<F>(
+        &mut self,
+        mut predicate: F,
+    ) -> Result<(), Vec<String>>
+    where
+        F: FnMut(&ModuleEnv<'_>) -> bool,
+    {
+        let mut by_file: BTreeMap<FileId, Vec<(bool, String)>> = BTreeMap::new();
+        for m in self.get_modules() {
+            let fid = m.get_loc().file_id();
+            by_file
+                .entry(fid)
+                .or_default()
+                .push((predicate(&m), m.get_full_name_str()));
+        }
+        let mut to_demote: Vec<FileId> = Vec::new();
+        let mut blocked: Vec<String> = Vec::new();
+        for (fid, mods) in by_file {
+            let any_match = mods.iter().any(|(b, _)| *b);
+            let all_match = mods.iter().all(|(b, _)| *b);
+            if any_match && !all_match {
+                blocked.extend(mods.into_iter().filter(|(b, _)| !*b).map(|(_, n)| n));
+            } else if all_match {
+                to_demote.push(fid);
+            }
+        }
+        if !blocked.is_empty() {
+            return Err(blocked);
+        }
+        for fid in to_demote {
+            self.file_id_is_target.remove(&fid);
+            self.file_id_is_primary_target.remove(&fid);
+        }
+        Ok(())
+    }
+
     /// Attempts to resolve address alias.
     pub fn resolve_address_alias(&self, alias: Symbol) -> Option<AccountAddress> {
         self.address_alias_map.get(&alias).cloned()

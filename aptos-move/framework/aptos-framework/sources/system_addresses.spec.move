@@ -57,12 +57,30 @@ spec aptos_framework::system_addresses {
         include AbortsIfNotAptosFramework;
     }
 
+    spec is_aptos_framework_address(addr: address): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == (addr == @aptos_framework);
+    }
+
     spec assert_framework_reserved_address(account: &signer) {
+        pragma opaque;
         aborts_if !is_framework_reserved_address(signer::address_of(account));
     }
 
     spec assert_framework_reserved(addr: address) {
+        pragma opaque;
         aborts_if !is_framework_reserved_address(addr);
+    }
+
+    spec is_framework_reserved_address(addr: address): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result ==
+            (addr == @aptos_framework
+             || addr == @0x2 || addr == @0x3 || addr == @0x4 || addr == @0x5
+             || addr == @0x6 || addr == @0x7 || addr == @0x8 || addr == @0x9
+             || addr == @0xa);
     }
     /// Specifies that a function aborts if the account does not have the aptos framework address.
     spec schema AbortsIfNotAptosFramework {
@@ -74,6 +92,24 @@ spec aptos_framework::system_addresses {
     spec assert_vm(account: &signer) {
         pragma opaque;
         include AbortsIfNotVM;
+    }
+
+    spec is_vm(account: &signer): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == (signer::address_of(account) == @vm_reserved);
+    }
+
+    spec is_vm_address(addr: address): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == (addr == @vm_reserved);
+    }
+
+    spec is_reserved_address(addr: address): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == (addr == @aptos_framework || addr == @vm_reserved);
     }
 
     /// Specifies that a function aborts if the account does not have the VM reserved address.
