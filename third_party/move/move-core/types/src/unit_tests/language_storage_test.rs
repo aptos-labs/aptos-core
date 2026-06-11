@@ -20,6 +20,61 @@ proptest! {
 }
 
 #[test]
+fn test_type_tag_deserialize_rejects_invalid_identifiers() {
+    // BCS mirror of `StructTag`, but with unvalidated strings in place of
+    // `Identifier` fields.
+    #[derive(serde::Serialize)]
+    struct RawStructTag {
+        address: AccountAddress,
+        module: String,
+        name: String,
+        type_args: Vec<TypeTag>,
+    }
+
+    let raw_struct_tag_bytes = |module: &str, name: &str| {
+        // `TypeTag::Struct` is enum variant 7 on the wire.
+        let mut bytes = vec![7u8];
+        bytes.extend(
+            bcs::to_bytes(&RawStructTag {
+                address: AccountAddress::ONE,
+                module: module.to_string(),
+                name: name.to_string(),
+                type_args: vec![],
+            })
+            .unwrap(),
+        );
+        bytes
+    };
+
+    // Sanity-check the layout: valid identifiers deserialize successfully.
+    let tag: TypeTag = bcs::from_bytes(&raw_struct_tag_bytes("m", "S")).unwrap();
+    assert_eq!(
+        tag,
+        TypeTag::Struct(Box::new(StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::from(ident_str!("m")),
+            name: Identifier::from(ident_str!("S")),
+            type_args: vec![],
+        }))
+    );
+
+    // Invalid identifiers must be rejected instead of producing a `TypeTag`
+    // whose Display output cannot be parsed back.
+    for (module, name) in [
+        ("\n\n\ng\n", "S"),
+        ("m", "\n\n\ng\n"),
+        ("has space", "S"),
+        ("m", ""),
+        ("0starts_with_digit", "S"),
+    ] {
+        bcs::from_bytes::<TypeTag>(&raw_struct_tag_bytes(module, name)).expect_err(&format!(
+            "deserializing struct tag with invalid identifier ({:?}, {:?}) should fail",
+            module, name
+        ));
+    }
+}
+
+#[test]
 fn test_type_tag_deserialize_case_insensitive() {
     let org_struct_tag = StructTag {
         address: AccountAddress::ONE,
