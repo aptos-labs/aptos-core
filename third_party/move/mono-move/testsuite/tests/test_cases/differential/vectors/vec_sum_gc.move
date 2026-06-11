@@ -9,7 +9,7 @@ module 0x42::vec_sum_gc {
             vector::push_back(&mut v, i);
             i = i + 1;
         };
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let acc = 0;
         let len = vector::length(&v);
         while (len > 0) {

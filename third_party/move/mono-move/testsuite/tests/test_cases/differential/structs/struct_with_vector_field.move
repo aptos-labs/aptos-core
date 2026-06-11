@@ -10,7 +10,7 @@ module 0x42::struct_with_vector_field {
         vector::push_back(&mut items, 20);
         vector::push_back(&mut items, 30);
         let c = Counter { tag: 999, items };
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let sum =
             *vector::borrow(&c.items, 0) + *vector::borrow(&c.items, 1) + *vector::borrow(&c.items, 2);
         c.tag * 1000 + sum

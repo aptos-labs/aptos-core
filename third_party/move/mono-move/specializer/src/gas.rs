@@ -213,7 +213,7 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         Instr::Abort(..) => ABORT,
         Instr::AbortMsg(..) => ABORT_MSG,
 
-        Instr::ForceGc => FORCE_GC,
+        Instr::ForceGC => FORCE_GC,
     })
 }
 

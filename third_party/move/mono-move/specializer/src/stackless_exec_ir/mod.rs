@@ -294,7 +294,7 @@ pub enum Instr {
 
     // --- Test intrinsics ---
     /// Triggers a garbage collection.
-    ForceGc,
+    ForceGC,
 }
 
 impl Instr {
@@ -387,7 +387,7 @@ impl Instr {
             Instr::Ret(..) => "Ret",
             Instr::Abort(..) => "Abort",
             Instr::AbortMsg(..) => "AbortMsg",
-            Instr::ForceGc => "ForceGc",
+            Instr::ForceGC => "ForceGC",
         }
     }
 }

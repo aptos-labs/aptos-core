@@ -5,7 +5,7 @@ module 0x42::struct_borrow_survives_gc {
     public fun borrow_field_across_gc(): u64 {
         let e = Entry { key: 100, value: 200 };
         let r = &mut e.value;
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let read = *r;
         read * 1000 + e.key
     }

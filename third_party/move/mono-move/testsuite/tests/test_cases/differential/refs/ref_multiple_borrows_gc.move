@@ -11,7 +11,7 @@ module 0x42::ref_multiple_borrows_gc {
         vector::push_back(&mut vb, 40);
         let ra = vector::borrow_mut(&mut va, 1);
         let rb = vector::borrow_mut(&mut vb, 1);
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let read = *ra;
         *ra = 55;
         *rb = 66;

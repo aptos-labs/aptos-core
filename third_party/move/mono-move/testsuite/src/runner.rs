@@ -158,7 +158,7 @@ fn stdlib_modules() -> &'static [CompiledModule] {
 fn test_utils_modules() -> &'static [CompiledModule] {
     static TEST_UTILS: OnceLock<Vec<CompiledModule>> = OnceLock::new();
     TEST_UTILS.get_or_init(|| {
-        compile_move_path(Path::new("tests/test_utils/test_utils.move"))
+        compile_move_path(Path::new(crate::compile::TEST_UTILS_PATH))
             .expect("test_utils library compiles")
     })
 }

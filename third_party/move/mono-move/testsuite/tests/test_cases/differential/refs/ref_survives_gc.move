@@ -8,7 +8,7 @@ module 0x42::ref_survives_gc {
         vector::push_back(&mut v, 200);
         vector::push_back(&mut v, 300);
         let r = vector::borrow_mut(&mut v, 2);
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let read = *r;
         *r = 42;
         read * 1000 + *vector::borrow(&v, 2)

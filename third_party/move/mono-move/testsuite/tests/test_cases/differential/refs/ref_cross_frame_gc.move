@@ -3,7 +3,7 @@ module 0x42::ref_cross_frame_gc {
     use std::vector;
 
     fun write_through_ref(r: &mut u64) {
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         *r = 77;
     }
 

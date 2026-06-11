@@ -15,26 +15,26 @@ use move_core_types::account_address::AccountAddress;
 /// Module of the test-utils intrinsics.
 const TEST_UTILS_MODULE: &str = "test_utils";
 /// The GC-forcing intrinsic function name.
-const FORGE_GC_FUNCTION: &str = "forge_gc";
+const FORCE_GC_FUNCTION: &str = "force_gc";
 
 impl SSAFunction {
     /// Replace calls to the test-utils intrinsics with their dedicated IR
     /// instructions.
     ///
-    // TODO(test): add feature gating so this pass is test-only.
+    // TODO: add feature gating so this pass is test-only.
     pub(crate) fn with_test_utils_passes(mut self, module: &PreparedModule) -> Result<Self> {
         for block in &mut self.blocks {
             for instr in &mut block.instrs {
-                if let Instr::Call(rets, handle, args) = instr {
-                    if is_forge_gc(module, *handle) {
-                        if !rets.is_empty() || !args.is_empty() {
-                            bail!(
-                                "0x0::test_utils::forge_gc must take no arguments and \
-                                 return nothing"
-                            );
-                        }
-                        *instr = Instr::ForceGc;
+                if let Instr::Call(rets, handle, args) = instr
+                    && is_force_gc(module, *handle)
+                {
+                    if !rets.is_empty() || !args.is_empty() {
+                        bail!(
+                            "0x0::test_utils::force_gc must take no arguments and \
+                             return nothing"
+                        );
                     }
+                    *instr = Instr::ForceGC;
                 }
             }
         }
@@ -42,10 +42,10 @@ impl SSAFunction {
     }
 }
 
-fn is_forge_gc(module: &PreparedModule, handle: FunctionHandleIndex) -> bool {
+fn is_force_gc(module: &PreparedModule, handle: FunctionHandleIndex) -> bool {
     let func_handle = module.function_handle_at(handle);
     let mod_handle = module.module_handle_at(func_handle.module);
     module.address_identifier_at(mod_handle.address) == &AccountAddress::ZERO
         && module.identifier_at(mod_handle.name).as_str() == TEST_UTILS_MODULE
-        && module.identifier_at(func_handle.name).as_str() == FORGE_GC_FUNCTION
+        && module.identifier_at(func_handle.name).as_str() == FORCE_GC_FUNCTION
 }

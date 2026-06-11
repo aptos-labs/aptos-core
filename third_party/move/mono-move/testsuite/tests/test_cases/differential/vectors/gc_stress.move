@@ -32,7 +32,7 @@ module 0x42::gc_stress {
         let i = 0;
         while (i < n) {
             if (i % 8 == 0) {
-                0x0::test_utils::forge_gc();
+                0x0::test_utils::force_gc();
             };
             let r = next_rand(&mut state) % 100;
             if (r < 30) {

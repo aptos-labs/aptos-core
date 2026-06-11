@@ -5,7 +5,7 @@ module 0x42::struct_field_ref_gc {
     public fun field_ref_across_gc(): u64 {
         let e = Entry { key: 7, value: 13 };
         let r = &mut e.value;
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let read = *r;
         *r = 21;
         read * 1000000 + e.value * 1000 + e.key

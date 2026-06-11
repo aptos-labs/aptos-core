@@ -15,7 +15,7 @@ module 0x42::ref_nested_vectors_gc {
         vector::push_back(&mut outer, inner1);
 
         let r = vector::borrow_mut(vector::borrow_mut(&mut outer, 1), 2);
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let read = *r;
         *r = 999;
 

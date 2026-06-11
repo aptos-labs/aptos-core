@@ -736,7 +736,7 @@ fn display_instr(
         Instr::Ret(rs) => write!(f, "ret {}", slot_names(rs)),
         Instr::Abort(c) => write!(f, "abort {}", slot_name(*c)),
         Instr::AbortMsg(c, m) => write!(f, "abort_msg {}, {}", slot_name(*c), slot_name(*m)),
-        Instr::ForceGc => write!(f, "force_gc"),
+        Instr::ForceGC => write!(f, "force_gc"),
     }
 }
 

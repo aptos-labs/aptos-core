@@ -6,7 +6,7 @@ module 0x42::gc_globals {
         move_to(&s, R { v: x });
         let r = borrow_global_mut<R>(a);
         r.v = r.v + 1;
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         borrow_global<R>(a).v
     }
 }

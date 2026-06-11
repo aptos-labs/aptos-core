@@ -1621,7 +1621,7 @@ impl<'a> LoweringState<'a> {
                 bail!("generic global-storage instruction not yet lowered")
             },
 
-            Instr::ForceGc => self.emit(MicroOp::ForceGC)?,
+            Instr::ForceGC => self.emit(MicroOp::ForceGC)?,
 
             _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }

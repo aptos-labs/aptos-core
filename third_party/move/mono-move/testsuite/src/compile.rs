@@ -39,10 +39,10 @@ pub fn compile(source: &str, kind: SourceKind) -> Result<Vec<CompiledModule>> {
     }
 }
 
-/// Path to the shared `test_utils` library, relative to the testsuite crate
-/// root. Injected as a compile dependency for test sources so they can call
-/// `0x0::test_utils::forge_gc`.
-pub const TEST_UTILS_PATH: &str = "tests/test_utils/test_utils.move";
+pub const TEST_UTILS_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/test_utils/test_utils.move"
+);
 
 /// Compile a Move source file at `path` into all contained modules.
 ///

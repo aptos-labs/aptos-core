@@ -7,7 +7,7 @@ module 0x42::ref_borrow_local_gc {
         let r = &mut x;
         let v = vector::empty<u64>();
         vector::push_back(&mut v, 7);
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         let read = *r;
         *r = 99;
         read * 1000 + *r + *vector::borrow(&v, 0)

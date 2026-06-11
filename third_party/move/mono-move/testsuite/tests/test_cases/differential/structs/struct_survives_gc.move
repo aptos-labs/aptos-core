@@ -4,7 +4,7 @@ module 0x42::struct_survives_gc {
 
     public fun struct_across_gc(): u64 {
         let e = Entry { f0: 7, f1: 13 };
-        0x0::test_utils::forge_gc();
+        0x0::test_utils::force_gc();
         e.f0 + e.f1
     }
 }
