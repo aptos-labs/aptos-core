@@ -300,6 +300,14 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
         HashSet::new()
     }
+
+    fn storage_keys_read(&self) -> HashSet<StateKey> {
+        HashSet::new()
+    }
+
+    fn storage_keys_written(&self) -> HashSet<StateKey> {
+        HashSet::new()
+    }
 }
 
 impl AfterMaterializationOutput<TestTransaction> for &TestOutput {

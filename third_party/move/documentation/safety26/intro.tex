@@ -20,3 +20,5 @@ The checks described in this paper fall into three groups.
 \emph{Reference checks} verify, at runtime, the same dangling- and aliasing-freedom properties that the static verifier is supposed to enforce.
 
 Since these checks are costly, the runtime supports \emph{trusted code} that waives them under certain conditions, and an \emph{asynchronous} checking mode that leverages idle workers in Block-STM~\cite{BlockSTM}, Aptos's speculative parallel executor.
+
+\tengzhang{I think we should explicitly state the contribution: 1) propose a second layer of in-depth-defense for blockchain which potentially holds millions of dollars, 2) present a set of dynamic checks that are necessary for the second layer to be effective, 3) present a mechanism for async check by leveraging block-STM, which is originally designed for throughput.}
