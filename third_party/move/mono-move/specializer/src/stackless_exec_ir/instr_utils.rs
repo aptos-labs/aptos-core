@@ -221,7 +221,8 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
         | Instr::BrCmpImm(..)
         | Instr::Ret(..)
         | Instr::Abort(..)
-        | Instr::AbortMsg(..) => None,
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
     }
 }
 
@@ -329,7 +330,8 @@ pub(crate) fn nominal_type_in_instr(
         | Instr::BrCmpImm(..)
         | Instr::Ret(..)
         | Instr::Abort(..)
-        | Instr::AbortMsg(..) => None,
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
     }
 }
 
@@ -419,7 +421,8 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::VecPushBack(..)
         | Instr::VecPopBack(..)
         | Instr::VecUnpack(..)
-        | Instr::VecSwap(..) => false,
+        | Instr::VecSwap(..)
+        | Instr::ForceGC => false,
     }
 }
 
@@ -521,7 +524,8 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::BrCmpImm(_, _, _, _)
         | Instr::Ret(_)
         | Instr::Abort(_)
-        | Instr::AbortMsg(_, _) => None,
+        | Instr::AbortMsg(_, _)
+        | Instr::ForceGC => None,
     }
 }
 
@@ -794,6 +798,9 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*code, &mut f);
             used::<USES>(*msg, &mut f);
         },
+
+        // No slot operands.
+        Instr::ForceGC => {},
     }
 }
 
@@ -1159,5 +1166,8 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(msg, &mut f);
             }
         },
+
+        // No slot operands.
+        Instr::ForceGC => {},
     }
 }

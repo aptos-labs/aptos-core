@@ -5,7 +5,7 @@
 //! normalized output for comparison.
 
 use crate::{
-    compile::{compile, compile_move_stdlib, SourceKind},
+    compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
@@ -59,11 +59,9 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
 
     // Publish the Move stdlib into both VMs so tests can call real stdlib
     // natives.
-    for module in stdlib_modules() {
+    for module in stdlib_modules().iter().chain(test_utils_modules()) {
         let mut blob = vec![];
-        module
-            .serialize(&mut blob)
-            .expect("stdlib module serializes");
+        module.serialize(&mut blob).expect("module serializes");
         storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
         module_provider.add_module(module);
     }
@@ -180,6 +178,14 @@ fn v1_native_table() -> NativeFunctionTable {
 fn stdlib_modules() -> &'static [CompiledModule] {
     static STDLIB: OnceLock<Vec<CompiledModule>> = OnceLock::new();
     STDLIB.get_or_init(|| compile_move_stdlib().expect("Move stdlib compiles"))
+}
+
+fn test_utils_modules() -> &'static [CompiledModule] {
+    static TEST_UTILS: OnceLock<Vec<CompiledModule>> = OnceLock::new();
+    TEST_UTILS.get_or_init(|| {
+        compile_move_path(Path::new(crate::compile::TEST_UTILS_PATH))
+            .expect("test_utils library compiles")
+    })
 }
 
 /// Output of V1 execution, plus the parameter and return types so V2 can
