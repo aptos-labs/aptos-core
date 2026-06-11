@@ -138,7 +138,7 @@ jobs:
               { TEST_NAME: 'realistic-env-max-load-encrypted', FORGE_RUNNER_DURATION_SECS: 480, FORGE_TEST_SUITE: 'realistic_env_max_load_encrypted' },
               // Pin to the aptos-core SHA that the etna-rust image is built from, so the forge
               // test runner matches the etna binary under test.
-              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_500tps', FORGE_IMAGE_NAME: 'etna-rust', GIT_SHA: 'c66dbf952b692bc017b459e3e6e44cc2a43d6958' }
+              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_500tps', FORGE_IMAGE_NAME: 'etna-rust', GIT_SHA: '355f89b539bba771357ca2fa5aab11c0779cfd06' }
             ];
 
             const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
