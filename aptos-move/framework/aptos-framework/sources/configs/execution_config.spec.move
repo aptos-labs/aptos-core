@@ -29,12 +29,17 @@ spec aptos_framework::execution_config {
     }
 
     spec set_for_next_epoch(account: &signer, config: vector<u8>) {
+        pragma opaque;
+        modifies global<config_buffer::PendingConfigs>(@aptos_framework);
         include config_buffer::SetForNextEpochAbortsIf;
+        let key = std::type_info::type_name<ExecutionConfig>();
+        let post configs_post = global<config_buffer::PendingConfigs>(@aptos_framework).configs;
+        ensures std::simple_map::spec_contains_key(configs_post, key);
+        ensures std::simple_map::spec_get(configs_post, key) == std::any::pack(ExecutionConfig { config });
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
-        include config_buffer::OnNewEpochRequirement<ExecutionConfig>;
-        aborts_if false;
+        pragma opaque;
+        include config_buffer::OnNewEpochApply<ExecutionConfig>;
     }
 }

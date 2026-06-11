@@ -150,6 +150,8 @@ spec aptos_framework::account {
         modifies global<Account>(new_address);
         ensures signer::address_of(result) == new_address;
         ensures exists<Account>(new_address);
+        ensures global<Account>(new_address).guid_creation_num == 2;
+        ensures global<Account>(new_address).sequence_number == 0;
     }
 
     spec exists_at {

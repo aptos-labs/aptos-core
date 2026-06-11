@@ -24,6 +24,8 @@ spec aptos_framework::chain_id {
 
     spec initialize {
         use std::signer;
+        pragma opaque;
+        modifies global<ChainId>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<ChainId>(@aptos_framework);
@@ -33,7 +35,9 @@ spec aptos_framework::chain_id {
     }
 
     spec get {
+        pragma opaque;
         /// [high-level-req-2]
         aborts_if !exists<ChainId>(@aptos_framework);
+        ensures result == global<ChainId>(@aptos_framework).id;
     }
 }

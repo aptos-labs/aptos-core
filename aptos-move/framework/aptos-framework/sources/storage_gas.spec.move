@@ -141,7 +141,6 @@ spec aptos_framework::storage_gas {
     /// A non decreasing curve must ensure that next is greater than cur.
     spec validate_points(points: &vector<Point>) {
         pragma aborts_if_is_strict = false;
-        pragma verify = false; // TODO: set because of timeout (property proved).
         pragma opaque;
         include ValidatePointsAbortsIf;
     }

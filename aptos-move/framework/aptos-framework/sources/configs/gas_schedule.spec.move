@@ -117,9 +117,8 @@ spec aptos_framework::gas_schedule {
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
-        include config_buffer::OnNewEpochRequirement<GasScheduleV2>;
-        aborts_if false;
+        pragma opaque;
+        include config_buffer::OnNewEpochApply<GasScheduleV2>;
     }
 
     spec set_storage_gas_config(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
