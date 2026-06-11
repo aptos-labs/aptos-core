@@ -47,10 +47,16 @@ impl<'r> RespawnedSession<'r> {
             base.as_resource_group_view(),
             previous_session_change_set,
         );
+        // The executor view above wraps the raw view underneath `base`, bypassing `base`'s
+        // read recording, so the new resolver must inherit the recorder explicitly.
+        let read_recorder = base.read_recorder();
 
         RespawnedSessionBuilder {
             executor_view,
-            resolver_builder: |executor_view| vm.as_move_resolver_with_group_view(executor_view),
+            resolver_builder: |executor_view| {
+                vm.as_move_resolver_with_group_view(executor_view)
+                    .with_read_recorder(read_recorder)
+            },
             session_builder: |resolver| {
                 Some(vm.new_session(resolver, session_id, user_transaction_context_opt))
             },
