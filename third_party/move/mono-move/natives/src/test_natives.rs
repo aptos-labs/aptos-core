@@ -4,7 +4,7 @@
 //! Synthetic natives used by the differential harness. Expected to go
 //! away once real natives are wired up.
 
-use crate::{monomorphic_natives, NativeEntry};
+use crate::{monomorphic_natives, polymorphic_natives, vector::native_move_range, NativeEntry};
 use mono_move_core::native::{NativeContext, NativeContextFamily, NativeStatus, VMInternalError};
 
 pub fn native_u64_add<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
@@ -32,8 +32,15 @@ pub fn native_u64_identity<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VM
 }
 
 pub fn make_all_test_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
-    monomorphic_natives![
+    let mut natives = monomorphic_natives![
         ("0x1::test_natives::u64_add", native_u64_add),
         ("0x1::test_natives::u64_identity", native_u64_identity),
-    ]
+    ];
+    // `vector::move_range` is not declared in the test stdlib, so expose the
+    // real native under a test-only module name to exercise it differentially.
+    natives.extend(polymorphic_natives![(
+        "0x1::vector_natives::move_range",
+        native_move_range
+    )]);
+    natives
 }

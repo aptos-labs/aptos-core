@@ -18,6 +18,7 @@ pub mod mem;
 pub mod signer;
 pub mod test_natives;
 pub mod type_info;
+pub mod vector;
 
 pub use aggregator_v2::make_all_aggregator_v2_natives;
 pub use function_info::make_all_function_info_natives;
@@ -25,6 +26,7 @@ pub use mem::make_all_mem_natives;
 pub use signer::make_all_signer_natives;
 pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
 pub use type_info::make_all_type_info_natives;
+pub use vector::make_all_vector_natives;
 
 /// How a native is dispatched against a call's type arguments. A native that
 /// works for any instantiation registers as [`Dispatch::Polymorphic`]; a native
@@ -59,6 +61,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_type_info_natives::<F>());
     natives.extend(make_all_function_info_natives::<F>());
     natives.extend(make_all_aggregator_v2_natives::<F>());
+    natives.extend(make_all_vector_natives::<F>());
     natives
 }
 

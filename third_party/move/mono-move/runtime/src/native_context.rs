@@ -10,16 +10,16 @@ use crate::{
     error::RuntimeError,
     global_storage::ResourceReadWriteSet,
     heap::{alloc_vec, is_heap_ptr, Heap, TopFrame},
-    memory::write_u64,
+    memory::{read_descriptor, read_obj_size, read_ptr, read_u64, write_ptr, write_u64},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
     native::{
-        NativeABI, NativeContext, NativeContextFamily, NativeFunction, NativeRegistry, RootPool,
-        VMInternalError, VMValue, Vector,
+        NativeABI, NativeContext, NativeContextFamily, NativeFunction, NativeRegistry, Opaque, Ref,
+        RootPool, VMInternalError, VMValue, Vector,
     },
     types::InternedType,
-    DescriptorProvider, GasMeter, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorId, DescriptorProvider, GasMeter, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
 };
 use std::cell::{Cell, UnsafeCell};
 
@@ -206,18 +206,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             len,
         )
         // Allocation failures are resource-limit conditions, not VM bugs.
-        .map_err(|e| match e {
-            RuntimeError::OutOfHeapMemory { requested } => {
-                VMInternalError::OutOfHeapMemory { requested }
-            },
-            RuntimeError::AllocationTooLarge { requested } => {
-                VMInternalError::AllocationTooLarge { requested }
-            },
-            RuntimeError::VecAllocSizeOverflow => VMInternalError::VecAllocSizeOverflow,
-            other => VMInternalError::InvariantViolation(format!(
-                "byte-vector allocation failed: {other}"
-            )),
-        })?;
+        .map_err(map_alloc_err)?;
         // SAFETY: `ptr` is a fresh vector with room for `len` bytes; no GC runs
         // between here and these writes, so the raw pointer is valid.
         unsafe {
@@ -227,6 +216,114 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    unsafe fn grow_vector<'a>(
+        &self,
+        target: &Ref<'a, Vector<'a, Opaque>>,
+        donor: &Ref<'a, Vector<'a, Opaque>>,
+        elem_size: usize,
+        required_cap: usize,
+    ) -> Result<(), VMInternalError> {
+        // A zero-sized element type would divide-by-zero in the capacity math
+        // below; the caller is contracted to pass the byte size of a real `T`.
+        debug_assert!(elem_size != 0, "grow_vector: elem_size must be non-zero");
+
+        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
+        // through `&self` at once is sound (see the type-level aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+
+        // The reference handles are rooted, so `target.ptr()` / `donor.ptr()`
+        // stay current across the GC `alloc_vec` may trigger.
+        // SAFETY: `target` references a live `vector<T>`; its slot holds the
+        // current heap pointer (null for an empty vector).
+        let old_ptr = unsafe { read_ptr(target.ptr(), 0usize) };
+
+        if old_ptr.is_null() {
+            // `target` is empty: allocate a fresh vector, copying the GC
+            // descriptor from the (non-empty) donor of the same element type.
+            // SAFETY: `donor` is a non-empty `vector<T>` (caller's contract).
+            let src_ptr = unsafe { read_ptr(donor.ptr(), 0usize) };
+            let descriptor_id = DescriptorId(unsafe { read_descriptor(src_ptr) });
+            let new_ptr = alloc_vec(
+                heap,
+                self.desc_provider,
+                rws,
+                &self.pool,
+                self.frame_ptr,
+                TopFrame::Native(self.abi),
+                descriptor_id,
+                elem_size as u32,
+                (required_cap as u64).max(4),
+            )
+            .map_err(map_alloc_err)?;
+            // `alloc_vec` zero-inits the length; just publish the new pointer
+            // through the (post-GC) reference.
+            // SAFETY: `target.ptr()` is re-read after the allocation's GC.
+            unsafe { write_ptr(target.ptr(), 0usize, new_ptr) };
+            return Ok(());
+        }
+
+        // `target` is non-empty: grow only if it can't already hold `required_cap`.
+        // SAFETY: `old_ptr` is a live vector object.
+        let old_len = unsafe { read_u64(old_ptr, VEC_LENGTH_OFFSET) };
+        let old_total = unsafe { read_obj_size(old_ptr) } as usize;
+        let old_cap = (old_total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size;
+        if required_cap <= old_cap {
+            return Ok(());
+        }
+
+        let descriptor_id = DescriptorId(unsafe { read_descriptor(old_ptr) });
+        let doubled = if old_cap == 0 { 4 } else { old_cap * 2 };
+        let new_cap = doubled.max(required_cap);
+        let new_ptr = alloc_vec(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            descriptor_id,
+            elem_size as u32,
+            new_cap as u64,
+        )
+        .map_err(map_alloc_err)?;
+
+        // `alloc_vec` may have run a GC; re-read the old pointer through the
+        // rooted reference, copy the live elements over, then publish the new
+        // pointer through the reference.
+        // SAFETY: `target.ptr()` is re-read after the GC; both objects own at
+        // least `byte_count` data bytes and are distinct allocations.
+        unsafe {
+            let old_ptr = read_ptr(target.ptr(), 0usize);
+            let byte_count = old_len as usize * elem_size;
+            if byte_count > 0 {
+                std::ptr::copy_nonoverlapping(
+                    old_ptr.add(VEC_DATA_OFFSET),
+                    new_ptr.add(VEC_DATA_OFFSET),
+                    byte_count,
+                );
+            }
+            write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len);
+            write_ptr(target.ptr(), 0usize, new_ptr);
+        }
+        Ok(())
+    }
+}
+
+/// Maps an allocation failure to the native-facing error. Resource-limit
+/// conditions surface as such; anything else is a VM invariant violation.
+fn map_alloc_err(e: RuntimeError) -> VMInternalError {
+    match e {
+        RuntimeError::OutOfHeapMemory { requested } => {
+            VMInternalError::OutOfHeapMemory { requested }
+        },
+        RuntimeError::AllocationTooLarge { requested } => {
+            VMInternalError::AllocationTooLarge { requested }
+        },
+        RuntimeError::VecAllocSizeOverflow => VMInternalError::VecAllocSizeOverflow,
+        other => VMInternalError::InvariantViolation(format!("vector allocation failed: {other}")),
     }
 }
 
