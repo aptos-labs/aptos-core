@@ -45,9 +45,11 @@ uses `llncs.cls`). The bibliography style is `splncs04`.
     and replay on transaction finalisation. Points at the
     implementation in `move-vm-runtime` (`execution_tracing`,
     `runtime_type_checks_async.rs`).
-  - `perf.tex` --- Performance (`sec:perf`). Headline numbers:
-    ~20% slowdown for type+ability, ~40% for reference safety;
-    `\TODO` for benchmark setup and breakdown.
+  - `perf.tex` --- Performance (`sec:perf`). Measured June 2026 on
+    the perp-DEX benchmark (60-core EPYC, Block-STM, 2-32 workers):
+    sync type+ability 28-29% on all code, 13-16% with the trusted
+    waiver, 10-11% async at 16+ workers (async loses below 8);
+    reference safety 26-29% in isolation, no waiver/async yet.
   - `concl.tex` --- Conclusion (`sec:concl`). Currently a
     related-work paragraph (JVM, CLR, sibling Move VMs;
     dynamically typed languages; EVM and SVM) and a

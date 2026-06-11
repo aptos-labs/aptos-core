@@ -1,11 +1,55 @@
 \section{Performance}
 \label{sec:perf}
 
-The runtime checks are not free, and we summarize their cost here.
-Measured across representative workloads, type checking together with ability enforcement incurs on average roughly a 20\% slowdown on executing transactions, and reference safety checking incurs on average roughly a 40\% slowdown.
-Both numbers are with synchronous checking; the asynchronous mode of Section~\ref{sec:async} amortizes a significant portion of this cost onto otherwise idle workers and is the default in production.
+We benchmark on a perpetual-futures DEX with 100 markets, driven by a weighted mix of oracle price updates, bulk market-maker orders, and retail taker orders, executed by Block-STM~\cite{BlockSTM} on a 60-vCPU Google Cloud instance with 235\,GB of RAM as the worker pool varies from 2 to 32 threads.
+Each reported number is the mean of three runs; run-to-run spread is below 1.3\%.
 
-\TODO{perf}{Expand with the benchmark setup (representative workload, hardware, gas version), per-instruction-class breakdown, and a comparison of sync vs.\ async numbers.}
+\begin{table}[t]
+\caption{Throughput (tx/s) under type and ability checking, slowdown vs the no-checks baseline.
+``Waiver'' skips trusted framework code (Section~\ref{sec:trusted}); ``async'' defers checks to trace replay (Section~\ref{sec:async}).}
+\label{tab:perf:type}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{rrcccc}
+\hline
+        & baseline & \multicolumn{2}{c}{synchronous} & \multicolumn{2}{c}{asynchronous} \\
+workers & (no checks) & all code & waiver & all code & waiver \\
+\hline
+2  & 864  & 611 ($-$29.3\%)  & 739 ($-$14.5\%)  & 513 ($-$40.6\%)  & 624 ($-$27.7\%) \\
+4  & 1427 & 1026 ($-$28.1\%) & 1236 ($-$13.4\%) & 914 ($-$35.9\%)  & 1088 ($-$23.7\%) \\
+8  & 1915 & 1350 ($-$29.5\%) & 1620 ($-$15.4\%) & 1427 ($-$25.5\%) & 1598 ($-$16.5\%) \\
+16 & 2019 & 1427 ($-$29.3\%) & 1691 ($-$16.2\%) & 1690 ($-$16.3\%) & 1799 ($-$10.9\%) \\
+32 & 1904 & 1363 ($-$28.4\%) & 1621 ($-$14.9\%) & 1633 ($-$14.2\%) & 1716 ($-$9.9\%) \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Throughput (tx/s) under reference safety checking, all code, synchronous, in isolation (type and ability checks disabled).}
+\label{tab:perf:ref}
+\centering
+\footnotesize
+\begin{tabular}{rrrr}
+\hline
+workers & checks off & checks on & slowdown \\
+\hline
+2  & 858  & 630  & $-$26.5\% \\
+4  & 1430 & 1054 & $-$26.3\% \\
+8  & 1918 & 1370 & $-$28.6\% \\
+16 & 2011 & 1450 & $-$27.9\% \\
+32 & 1893 & 1375 & $-$27.4\% \\
+\hline
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:perf:type} reports the cost of type and ability checking, which share a single per-instruction layer.
+Synchronously, the combined checks cost 28--29\% of throughput, uniformly across worker counts.
+The trusted-code waiver of Section~\ref{sec:trusted} roughly halves this to 13--16\%, as about two thirds of executed instructions on this workload fall into trusted framework code.
+The asynchronous mode of Section~\ref{sec:async} trades a small tracing overhead for deferred checking on idle workers: it is slower than synchronous below 8 workers, reaches parity at 8, and at 16--32 brings the cost to 10--11\%, the preferred configuration at production concurrency.
+
+Table~\ref{tab:perf:ref} reports reference safety checking in isolation: 26--29\%, again uniform across worker counts.
+The reference checker does not yet support the trusted-code waiver or asynchronous deferral; the type-check numbers above set a reasonable expectation for what extending these mechanisms should recover.
 
 %%% Local Variables:
 %%% mode: latex
