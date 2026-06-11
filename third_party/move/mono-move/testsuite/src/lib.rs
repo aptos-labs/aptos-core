@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Library for the mono-move differential and snapshot test harnesses.
+//! Library for the mono-move differential, snapshot, and unit test harnesses.
 
 pub mod compile;
 pub mod engine;
@@ -11,6 +11,7 @@ pub mod parser;
 pub mod print_sections;
 pub mod programs;
 pub mod runner;
+pub mod unit_test;
 pub mod v1_test_natives;
 
 pub use compile::{

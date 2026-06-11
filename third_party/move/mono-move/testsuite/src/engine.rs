@@ -111,17 +111,9 @@ impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
     }
 }
 
-/// Build the loader/native/transaction stack over an existing guard and module
-/// provider, load `address::module_name::function_name`, and hand a
-/// [`MonoRunner`] to `body`.
-pub fn with_mono_function<'guard, 'ctx, R>(
-    guard: &'guard ExecutionGuard<'ctx>,
-    module_provider: &'guard InMemoryModuleProvider,
-    address: AccountAddress,
-    module_name: &IdentStr,
-    function_name: &IdentStr,
-    body: impl FnOnce(&mut MonoRunner<'_, '_, 'ctx>) -> R,
-) -> Result<R> {
+/// Build the native registry mono-move executes against: the synthetic test
+/// natives plus the real production natives, keyed by interned name.
+pub(crate) fn build_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistry {
     let mut natives = ProductionNativeRegistry::new();
     natives
         .register_all(
@@ -143,6 +135,21 @@ pub fn with_mono_function<'guard, 'ctx, R>(
                 }),
         )
         .expect("natives have unique qualified names");
+    natives
+}
+
+/// Build the loader/native/transaction stack over an existing guard and module
+/// provider, load `address::module_name::function_name`, and hand a
+/// [`MonoRunner`] to `body`.
+pub fn with_mono_function<'guard, 'ctx, R>(
+    guard: &'guard ExecutionGuard<'ctx>,
+    module_provider: &'guard InMemoryModuleProvider,
+    address: AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+    body: impl FnOnce(&mut MonoRunner<'_, '_, 'ctx>) -> R,
+) -> Result<R> {
+    let natives = build_natives(guard);
 
     let loader = Loader::new_with_policy(
         guard,
