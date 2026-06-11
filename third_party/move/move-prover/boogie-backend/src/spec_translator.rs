@@ -30,6 +30,7 @@ use move_model::{
     },
     code_writer::CodeWriter,
     emit, emitln,
+    exp_rewriter::strip_all_olds,
     model::{
         FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
         SpecFunId, SpecVarId, StructId,
@@ -101,9 +102,18 @@ pub struct SpecTranslator<'env> {
     /// verify that BP memory-arg emissions only reference declared variables.
     declared_mem_names: RefCell<BTreeSet<String>>,
     /// Value-typed state variables introduced by `exists S in *` when the body
-    /// uses `..S |~` / `S.. |~` with `|&mut T|` closure parameters rather than
-    /// global memory. Maps `MemoryLabel → (boogie_var_name, T)`.
-    value_state_vars: RefCell<BTreeMap<MemoryLabel, (String, Type)>>,
+    /// uses `..S |~` / `S.. |~` with `|&mut T|`-shaped parameters rather than
+    /// global memory. Maps `MemoryLabel → [(boogie_var_name, T_i)]` — one entry
+    /// per `&mut` parameter of the labeled callee, ordered by parameter
+    /// position. Multiple entries are needed when a labeled call has more than
+    /// one `&mut` parameter, so each parameter's labeled state is bound to a
+    /// distinct Boogie variable of its own type.
+    ///
+    /// Invariant: one tuple per label, fixed by the first labeled call at that
+    /// label. Calls under the same label with differing `&mut` shape or args
+    /// are rejected; relaxing this requires widening the binding to the union
+    /// of `&mut` slots referenced at the label across all labeled calls.
+    value_state_vars: RefCell<BTreeMap<MemoryLabel, Vec<(String, Type)>>>,
     /// True while translating the argument of a behavioral predicate
     /// (`ensures_of` / `result_of` / etc.). In this context, a `&mut x.foo`
     /// borrow expression is treated as a value-yielding selector rather than
@@ -1893,20 +1903,42 @@ impl SpecTranslator<'_> {
         }
         self.translate_exp(fun_exp);
 
-        // Value-typed state-label substitutions: replace specific arg slots
-        // with the bound state variable when present.
+        // BP substitutes at the first `&mut` input only. Multi-`&mut` witnesses
+        // would silently mismatch downstream slots; reject and direct callers
+        // to call the spec function directly.
+        let bp_loc = self.env.get_node_loc(node_id);
+        let check_single_witness = |label_opt: Option<MemoryLabel>| {
+            if let Some(label) = label_opt {
+                let n = self
+                    .value_state_vars
+                    .borrow()
+                    .get(&label)
+                    .map(|entries| entries.len())
+                    .unwrap_or(0);
+                if n > 1 {
+                    self.error(
+                        &bp_loc,
+                        "state-labeled behavioral predicate over a function with multiple \
+                         `&mut` parameters is not supported; call the function's spec \
+                         function directly under the state label instead",
+                    );
+                }
+            }
+        };
+        check_single_witness(range.pre);
+        check_single_witness(range.post);
         let post_sub = range.post.and_then(|label| {
             self.value_state_vars
                 .borrow()
                 .get(&label)
-                .map(|(v, _)| v.clone())
+                .and_then(|entries| entries.first().map(|(v, _)| v.clone()))
         });
         let (pre_sub, mut_input_pos) = if let Some(label) = range.pre {
             let sub = self
                 .value_state_vars
                 .borrow()
                 .get(&label)
-                .map(|(v, _)| v.clone());
+                .and_then(|entries| entries.first().map(|(v, _)| v.clone()));
             let pos = sub
                 .as_ref()
                 .and_then(|_| Self::find_mut_ref_input_position(&inst_fun_type));
@@ -1914,24 +1946,28 @@ impl SpecTranslator<'_> {
         } else {
             (None, None)
         };
-        // `post_sub` substitutes the last `pred_args` slot — that's the trailing
-        // post-state clone for `EnsuresOf`. For `ResultOf` we've truncated away
-        // that slot, so the substitution would land on an input by mistake; gate
-        // it accordingly.
-        let post_sub_idx = if matches!(kind, BehaviorKind::ResultOf) {
-            None
+        // Only `EnsuresOf` has a synthetic trailing post-state clone that
+        // `post_sub` should rewrite. For other kinds, the post-side witness
+        // belongs at the same `&mut` input slot that `pre_sub` would target.
+        let (post_slot_sub, input_witness) = if matches!(kind, BehaviorKind::EnsuresOf) {
+            (
+                post_sub
+                    .clone()
+                    .map(|v| (v, pred_args.len().saturating_sub(1))),
+                pre_sub.clone(),
+            )
         } else {
-            Some(pred_args.len().saturating_sub(1))
+            (None, pre_sub.clone().or_else(|| post_sub.clone()))
         };
         for (i, arg) in pred_args.iter().take(emit_arg_count).enumerate() {
             emit!(self.writer, ", ");
-            if let Some(ref var) = post_sub {
-                if Some(i) == post_sub_idx {
+            if let Some((ref var, idx)) = post_slot_sub {
+                if i == idx {
                     emit!(self.writer, "{}", var);
                     continue;
                 }
             }
-            if let Some(ref var) = pre_sub {
+            if let Some(ref var) = input_witness {
                 if Some(i) == mut_input_pos {
                     emit!(self.writer, "{}", var);
                     continue;
@@ -2092,6 +2128,46 @@ impl SpecTranslator<'_> {
         }
         emit!(self.writer, "{}(", fun_name);
 
+        // Single-witness substitution for labeled state ranges: mirror the
+        // evaluator path. Multi-`&mut` witnesses are rejected, since this
+        // path only substitutes one slot.
+        let bp_loc = self.env.get_node_loc(node_id);
+        let check_single_witness = |label_opt: Option<MemoryLabel>| {
+            if let Some(label) = label_opt {
+                let n = self
+                    .value_state_vars
+                    .borrow()
+                    .get(&label)
+                    .map(|e| e.len())
+                    .unwrap_or(0);
+                if n > 1 {
+                    self.error(
+                        &bp_loc,
+                        "state-labeled behavioral predicate over a function with multiple \
+                         `&mut` parameters is not supported; call the function's spec \
+                         function directly under the state label instead",
+                    );
+                }
+            }
+        };
+        check_single_witness(range.pre);
+        check_single_witness(range.post);
+        let pre_sub = range.pre.and_then(|label| {
+            self.value_state_vars
+                .borrow()
+                .get(&label)
+                .and_then(|e| e.first().map(|(v, _)| v.clone()))
+        });
+        let post_sub = range.post.and_then(|label| {
+            self.value_state_vars
+                .borrow()
+                .get(&label)
+                .and_then(|e| e.first().map(|(v, _)| v.clone()))
+        });
+        let param_tys = fun_env.get_parameter_types();
+        let first_non_cap_mut_pos =
+            (0..num_params).find(|&i| !mask.is_captured(i) && param_tys[i].is_mutable_reference());
+
         // Memory args, then interleave captured + non-captured input args.
         let mut has_args = self.emit_fun_spec_memory_args(node_id, &fun_qid, kind, range);
         let mut captured_pos = 0;
@@ -2105,6 +2181,13 @@ impl SpecTranslator<'_> {
                 self.translate_behavior_arg(&closure_args[captured_pos]);
                 captured_pos += 1;
             } else {
+                if Some(i) == first_non_cap_mut_pos {
+                    if let Some(ref var) = pre_sub {
+                        emit!(self.writer, "{}", var);
+                        non_captured_pos += 1;
+                        continue;
+                    }
+                }
                 self.translate_behavior_arg(&pred_args[non_captured_pos]);
                 non_captured_pos += 1;
             }
@@ -2115,8 +2198,17 @@ impl SpecTranslator<'_> {
         // the per-function Skolem doesn't take them (post-state is in its
         // output tuple instead); skip them here.
         if kind == BehaviorKind::EnsuresOf {
-            for arg in &pred_args[non_captured_pos..] {
+            for (j, arg) in pred_args[non_captured_pos..].iter().enumerate() {
                 emit!(self.writer, ", ");
+                // Post-state clones come after `num_explicit_results` result
+                // slots; substitute the first post-state slot with the post
+                // witness if a labeled post range is in scope.
+                if j == num_explicit_results {
+                    if let Some(ref var) = post_sub {
+                        emit!(self.writer, "{}", var);
+                        continue;
+                    }
+                }
                 self.translate_behavior_arg(arg);
             }
         }
@@ -2468,42 +2560,47 @@ impl SpecTranslator<'_> {
             .count();
         let is_doubled =
             fun_decl.uses_old && mut_count > 0 && args.len() == fun_decl.params.len() + mut_count;
-        let value_state_sub = |label_opt: Option<MemoryLabel>| {
-            label_opt.and_then(|label| {
-                self.value_state_vars
-                    .borrow()
-                    .get(&label)
-                    .map(|(v, _)| v.clone())
-            })
+        // Per-`&mut`-parameter witness lookup. Each `&mut` parameter at index
+        // `i` (in declaration order, counting only `&mut`s) gets its own bound
+        // `S_val_i` variable when the call's pre/post label is bound in
+        // `value_state_vars`. Substituting one shared witness across every
+        // `&mut` slot would conflate distinct labeled states — incorrect for
+        // multi-`&mut` spec functions and a type error for mixed-type ones.
+        let value_state_sub = |label_opt: Option<MemoryLabel>| -> Vec<(String, Type)> {
+            label_opt
+                .and_then(|label| self.value_state_vars.borrow().get(&label).cloned())
+                .unwrap_or_default()
         };
-        let pre_sub = if is_doubled {
+        let pre_sub_vec: Vec<(String, Type)> = if is_doubled {
             value_state_sub(range.pre)
         } else {
-            None
+            Vec::new()
         };
-        let post_sub = if is_doubled {
+        let post_sub_vec: Vec<(String, Type)> = if is_doubled {
             value_state_sub(range.post)
         } else {
-            None
+            Vec::new()
         };
         if is_doubled {
             let mut arg_iter = args.iter();
+            let mut mut_idx: usize = 0;
             for move_model::model::Parameter(_, ty, _) in &fun_decl.params {
                 if ty.is_mutable_reference() {
                     let pre_arg = arg_iter.next().expect("doubled args missing pre slot");
                     let post_arg = arg_iter.next().expect("doubled args missing post slot");
                     maybe_comma();
-                    if let Some(ref var) = pre_sub {
+                    if let Some((var, _)) = pre_sub_vec.get(mut_idx) {
                         emit!(self.writer, "{}", var);
                     } else {
                         self.translate_exp(pre_arg);
                     }
                     maybe_comma();
-                    if let Some(ref var) = post_sub {
+                    if let Some((var, _)) = post_sub_vec.get(mut_idx) {
                         emit!(self.writer, "{}", var);
                     } else {
                         self.translate_exp(post_arg);
                     }
+                    mut_idx += 1;
                 } else {
                     let arg = arg_iter.next().expect("missing arg for non-mut param");
                     maybe_comma();
@@ -2511,9 +2608,41 @@ impl SpecTranslator<'_> {
                 }
             }
         } else {
-            for exp in args {
+            // Mirror the memory resolution above (`effective_label =
+            // range.post.or(range.pre)`): post wins when both labels are
+            // present, so the `&mut` witness should also be drawn from
+            // `range.post` first. Preferring `range.pre` here would pin the
+            // &mut value to S1 while the memory is at S2 for a full-range
+            // call. In practice this branch is rarely reached for plain
+            // spec-function calls — `spec_rewriter` marks any spec fun with
+            // a `&mut` parameter as `uses_old`, and `wrap_mut_ref_spec_fun_inputs`
+            // doubles the args, routing through the `is_doubled` branch above —
+            // but the alignment matters for correctness when it is reached.
+            let labeled_sub_vec: Vec<(String, Type)> = if mut_count > 0 {
+                let post = value_state_sub(range.post);
+                if !post.is_empty() {
+                    post
+                } else {
+                    value_state_sub(range.pre)
+                }
+            } else {
+                Vec::new()
+            };
+            let mut arg_iter = args.iter();
+            let mut mut_idx: usize = 0;
+            for move_model::model::Parameter(_, ty, _) in &fun_decl.params {
+                let arg = arg_iter.next().expect("missing arg");
                 maybe_comma();
-                self.translate_exp(exp);
+                if ty.is_mutable_reference() {
+                    if let Some((var, _)) = labeled_sub_vec.get(mut_idx) {
+                        emit!(self.writer, "{}", var);
+                    } else {
+                        self.translate_exp(arg);
+                    }
+                    mut_idx += 1;
+                } else {
+                    self.translate_exp(arg);
+                }
             }
         }
         emit!(self.writer, ")");
@@ -3030,80 +3159,154 @@ impl SpecTranslator<'_> {
         );
     }
 
-    /// For a `StateDomain` quantifier variable with name `label_name`, scan `exp` for
-    /// operations whose `range.pre` or `range.post` maps to `label_name` AND whose
-    /// callee has `&mut T`-typed parameters with no global memory. Recognizes two
-    /// such call shapes:
-    /// - `Behavior(EnsuresOf, range)` — `..S |~ ensures_of<f>(...)` for `|&mut T|` closures.
-    /// - `SpecFunction(mid, fid, range)` — `..S |~ user_spec_fun(...)` where the spec
-    ///   function declaration takes `&mut T` parameters and uses `old(...)` (so it has
-    ///   been doubled by `wrap_mut_ref_spec_fun_inputs` in the model-level translator).
-    /// Returns `(MemoryLabel, T)` — the label and the value type to use for the state variable.
+    /// For a `StateDomain` quantifier variable named `label_name`, return the
+    /// matching `MemoryLabel` and the `&mut` parameter value-types of the first
+    /// labeled call (`..S |~ ensures_of<f>(...)` or `..S |~ user_spec_fun(...)`).
+    /// Errors if a later labeled call on the same label disagrees on parameter
+    /// shape — `value_state_vars` is keyed by label and shared bindings would
+    /// silently misalign distinct calls.
     fn find_value_state_for_label(
         &self,
-        exp: &Exp,
+        exps: &[&Exp],
         label_name: Symbol,
-    ) -> Option<(MemoryLabel, Type)> {
+    ) -> Option<(MemoryLabel, Vec<Type>)> {
         let label_names = self.env.get_memory_label_names();
-        let mut result: Option<(MemoryLabel, Type)> = None;
-        exp.visit_pre_order(&mut |e| {
-            if result.is_some() {
-                return false;
-            }
-            match e {
-                ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, range), args) => {
-                    let matching_label = range
-                        .pre
-                        .into_iter()
-                        .chain(range.post)
-                        .find(|label| label_names.get(label).copied() == Some(label_name));
-                    if let Some(label) = matching_label {
-                        if let Some(fun_arg) = args.first() {
-                            let fun_type = self.env.get_node_type(fun_arg.node_id());
-                            let inst_fun_type = fun_type.instantiate(&self.type_inst);
-                            let (union_used, _) =
-                                compute_evaluator_memory_union(self.env, &inst_fun_type);
-                            if union_used.is_empty() {
-                                // No global memory — check for &mut T params
+        let mut hits: Vec<(MemoryLabel, Vec<Type>, Vec<Exp>, Loc)> = Vec::new();
+        for exp in exps {
+            exp.visit_pre_order(&mut |e| {
+                match e {
+                    ExpData::Call(
+                        id,
+                        Operation::Behavior(
+                            BehaviorKind::EnsuresOf
+                            | BehaviorKind::ResultOf
+                            | BehaviorKind::WriteOf(_)
+                            | BehaviorKind::RequiresOf
+                            | BehaviorKind::AbortsOf,
+                            range,
+                        ),
+                        args,
+                    ) => {
+                        let matching_label = range
+                            .pre
+                            .into_iter()
+                            .chain(range.post)
+                            .find(|label| label_names.get(label).copied() == Some(label_name));
+                        if let Some(label) = matching_label {
+                            if let Some(fun_arg) = args.first() {
+                                let fun_type = self.env.get_node_type(fun_arg.node_id());
+                                let inst_fun_type = fun_type.instantiate(&self.type_inst);
                                 if let Type::Fun(arg_ty, _, _) = &inst_fun_type {
-                                    for ty in arg_ty.clone().flatten() {
+                                    let param_tys = arg_ty.clone().flatten();
+                                    let mut mut_tys: Vec<Type> = Vec::new();
+                                    let mut mut_args: Vec<Exp> = Vec::new();
+                                    for (k, ty) in param_tys.iter().enumerate() {
                                         if ty.is_mutable_reference() {
-                                            result = Some((label, ty.skip_reference().clone()));
-                                            return false;
+                                            mut_tys.push(ty.skip_reference().clone());
+                                            if let Some(a) = args.get(k + 1) {
+                                                mut_args.push(strip_all_olds(a));
+                                            }
                                         }
+                                    }
+                                    if !mut_tys.is_empty() {
+                                        hits.push((
+                                            label,
+                                            mut_tys,
+                                            mut_args,
+                                            self.env.get_node_loc(*id),
+                                        ));
                                     }
                                 }
                             }
                         }
-                    }
-                },
-                ExpData::Call(_, Operation::SpecFunction(mid, fid, range), _) => {
-                    let matching_label = range
-                        .pre
-                        .into_iter()
-                        .chain(range.post)
-                        .find(|label| label_names.get(label).copied() == Some(label_name));
-                    if let Some(label) = matching_label {
-                        let module_env = self.env.get_module(*mid);
-                        let decl = module_env.get_spec_fun(*fid);
-                        // Only doubled (uses_old + &mut) spec functions need a value-typed
-                        // state variable — the same condition `wrap_mut_ref_spec_fun_inputs`
-                        // uses to decide whether to emit a `(Old(p), p)` pair.
-                        if decl.uses_old && decl.used_memory.is_empty() {
-                            for move_model::model::Parameter(_, ty, _) in &decl.params {
-                                if ty.is_mutable_reference() {
-                                    result = Some((label, ty.skip_reference().clone()));
-                                    return false;
+                    },
+                    ExpData::Call(id, Operation::SpecFunction(mid, fid, range), args) => {
+                        let matching_label = range
+                            .pre
+                            .into_iter()
+                            .chain(range.post)
+                            .find(|label| label_names.get(label).copied() == Some(label_name));
+                        if let Some(label) = matching_label {
+                            let module_env = self.env.get_module(*mid);
+                            let decl = module_env.get_spec_fun(*fid);
+                            let mut_count = decl
+                                .params
+                                .iter()
+                                .filter(|move_model::model::Parameter(_, ty, _)| {
+                                    ty.is_mutable_reference()
+                                })
+                                .count();
+                            if mut_count > 0 {
+                                let mut mut_tys: Vec<Type> = Vec::new();
+                                let mut mut_args: Vec<Exp> = Vec::new();
+                                let call_inst = self.get_node_instantiation(*id);
+                                let is_doubled =
+                                    decl.uses_old && args.len() == decl.params.len() + mut_count;
+                                let mut arg_iter = args.iter();
+                                for move_model::model::Parameter(_, ty, _) in &decl.params {
+                                    if ty.is_mutable_reference() {
+                                        mut_tys.push(ty.skip_reference().instantiate(&call_inst));
+                                        if is_doubled {
+                                            let _pre = arg_iter.next();
+                                            if let Some(post) = arg_iter.next() {
+                                                mut_args.push(strip_all_olds(post));
+                                            }
+                                        } else if let Some(a) = arg_iter.next() {
+                                            mut_args.push(strip_all_olds(a));
+                                        }
+                                    } else {
+                                        arg_iter.next();
+                                    }
+                                }
+                                if !mut_tys.is_empty() {
+                                    hits.push((
+                                        label,
+                                        mut_tys,
+                                        mut_args,
+                                        self.env.get_node_loc(*id),
+                                    ));
                                 }
                             }
                         }
-                    }
-                },
-                _ => {},
+                    },
+                    _ => {},
+                }
+                true
+            });
+        }
+        let first = hits.first().map(|(l, t, _, _)| (*l, t.clone()))?;
+        let first_args = hits
+            .first()
+            .map(|(_, _, a, _)| a.clone())
+            .unwrap_or_default();
+        for (label, tys, args, loc) in hits.iter().skip(1) {
+            if *label != first.0 {
+                continue;
             }
-            true
-        });
-        result
+            if *tys != first.1 {
+                self.error(
+                    loc,
+                    "labeled calls bound to the same state variable use functions with \
+                     inconsistent `&mut` parameter shapes; combine them into a single \
+                     labeled call, or split the state variable into distinct labels",
+                );
+                continue;
+            }
+            let args_match = args.len() == first_args.len()
+                && args
+                    .iter()
+                    .zip(first_args.iter())
+                    .all(|(a, b)| a.structural_eq(b));
+            if !args_match {
+                self.error(
+                    loc,
+                    "labeled calls bound to the same state variable refer to different \
+                     `&mut` arguments; each labeled call must use the same `&mut` \
+                     arguments, or use distinct state variables for the differing calls",
+                );
+            }
+        }
+        Some(first)
     }
 
     fn translate_quant(
@@ -3150,9 +3353,23 @@ impl SpecTranslator<'_> {
                 range_tmps.insert(var_name, range_tmp);
             }
         }
-        // Collect state-domain quantifier info: for each state-domain range variable,
-        // find the MemoryLabel and the affected memory types from the body.
-        let all_body_labels = self.collect_intermediate_labels_from_exp(body);
+        // Collect state-domain quantifier info: scan body + optional `where`
+        // condition + every trigger expression, since all three are lowered
+        // under the same `value_state_vars` / labeled-memory binder scope.
+        let mut scan_targets: Vec<&Exp> = vec![body];
+        if let Some(cond) = condition.as_ref() {
+            scan_targets.push(cond);
+        }
+        for trigger in triggers {
+            for pat in trigger {
+                scan_targets.push(pat);
+            }
+        }
+        let mut all_body_labels: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
+            BTreeSet::new();
+        for exp in &scan_targets {
+            all_body_labels.extend(self.collect_intermediate_labels_from_exp(exp));
+        }
         let mut state_domain_labels: BTreeMap<
             Symbol,
             BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)>,
@@ -3174,10 +3391,11 @@ impl SpecTranslator<'_> {
                 state_domain_labels.insert(var_name, affected);
             }
         }
-        // Snapshot value_state_vars before variable emission so we can
-        // restore it after the body, preventing leakage across quantifiers.
-        let pre_vs_keys: BTreeSet<MemoryLabel> =
-            self.value_state_vars.borrow().keys().copied().collect();
+        // Snapshot the full map (keys *and* values) so the outer entry for a
+        // shared `MemoryLabel` is restored after an inner nested quantifier
+        // overwrites it. Key-only restore would leave the inner's value live.
+        let pre_vs_snapshot: BTreeMap<MemoryLabel, Vec<(String, Type)>> =
+            self.value_state_vars.borrow().clone();
         // Translate quantified variables.
         emit!(self.writer, "({} ", kind);
         let mut quant_vars = HashMap::new();
@@ -3214,43 +3432,44 @@ impl SpecTranslator<'_> {
                     resource_vars.insert(var_name, addr_quant_var);
                 },
                 Type::StateDomain => {
-                    // Emit one Boogie memory variable per affected (label, memory_type) pair.
+                    // Memory and value-state binders are additive: a callee can
+                    // read global memory *and* use `old(p)` on `&mut p`, so both
+                    // kinds of binders must come into scope under the same label.
                     if let Some(affected) = state_domain_labels.get(&var_name) {
-                        if !affected.is_empty() {
-                            for (label, mem) in affected {
-                                let name =
-                                    boogie_resource_memory_name(self.env, mem, &Some(*label));
-                                let ty = boogie_struct_name(
-                                    &self.env.get_struct_qid(mem.to_qualified_id()),
-                                    &mem.inst,
-                                    false,
-                                );
-                                emit!(self.writer, "{}{}: $Memory {}", comma, name, ty);
-                                comma = ", ";
-                            }
-                        } else {
-                            // No global memory labels — check for value-typed state variables
-                            // arising from `|&mut T|` closure parameters.
-                            if let Some((label, val_ty)) =
-                                self.find_value_state_for_label(body, var_name)
-                            {
-                                let boogie_var = format!("{}_val", var_name_str);
-                                let bv_flag = false;
-                                emit!(
-                                    self.writer,
-                                    "{}{}: {}",
-                                    comma,
-                                    boogie_var,
-                                    boogie_type(self.env, &val_ty, bv_flag)
-                                );
-                                comma = ", ";
-                                self.value_state_vars
-                                    .borrow_mut()
-                                    .insert(label, (boogie_var, val_ty));
-                            }
+                        for (label, mem) in affected {
+                            let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
+                            let ty = boogie_struct_name(
+                                &self.env.get_struct_qid(mem.to_qualified_id()),
+                                &mem.inst,
+                                false,
+                            );
+                            emit!(self.writer, "{}{}: $Memory {}", comma, name, ty);
+                            comma = ", ";
                         }
                     }
-                    // Skip incrementing comma at the end — already done above
+                    if let Some((label, val_tys)) =
+                        self.find_value_state_for_label(&scan_targets, var_name)
+                    {
+                        let bv_flag = false;
+                        let mut entries: Vec<(String, Type)> = Vec::with_capacity(val_tys.len());
+                        for (i, val_ty) in val_tys.iter().enumerate() {
+                            let boogie_var = if val_tys.len() == 1 {
+                                format!("{}_val", var_name_str)
+                            } else {
+                                format!("{}_val_{}", var_name_str, i)
+                            };
+                            emit!(
+                                self.writer,
+                                "{}{}: {}",
+                                comma,
+                                boogie_var,
+                                boogie_type(self.env, val_ty, bv_flag)
+                            );
+                            comma = ", ";
+                            entries.push((boogie_var, val_ty.clone()));
+                        }
+                        self.value_state_vars.borrow_mut().insert(label, entries);
+                    }
                     continue;
                 },
                 _ => {
@@ -3393,10 +3612,7 @@ impl SpecTranslator<'_> {
             self.writer,
             &")".repeat(quant_vars.len().checked_add(1).unwrap())
         );
-        // Restore value_state_vars to pre-quantifier state to prevent leakage.
-        self.value_state_vars
-            .borrow_mut()
-            .retain(|k, _| pre_vs_keys.contains(k));
+        *self.value_state_vars.borrow_mut() = pre_vs_snapshot;
     }
 
     /// Translate a `some x: T: P[x]` expression. This saves information about the axiomatized

@@ -63,16 +63,18 @@ spec aptos_framework::version {
     }
 
     spec set_for_next_epoch(account: &signer, major: u64) {
+        pragma opaque;
+        modifies global<config_buffer::PendingConfigs>(@aptos_framework);
         aborts_if !exists<SetVersionCapability>(signer::address_of(account));
         aborts_if !exists<Version>(@aptos_framework);
         aborts_if global<Version>(@aptos_framework).major >= major;
-        aborts_if !exists<config_buffer::PendingConfigs>(@aptos_framework);
+        aborts_if aborts_of<config_buffer::upsert<Version>>(Version { major });
+        ensures ensures_of<config_buffer::upsert<Version>>(Version { major });
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
-        include config_buffer::OnNewEpochRequirement<Version>;
-        aborts_if false;
+        pragma opaque;
+        include config_buffer::OnNewEpochApply<Version>;
     }
 
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.

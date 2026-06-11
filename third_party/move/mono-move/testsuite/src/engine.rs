@@ -13,7 +13,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_natives::{make_all_production_natives, make_all_test_natives};
+use mono_move_natives::{make_all_production_natives, make_all_test_natives, Dispatch};
 use mono_move_runtime::{
     ExecutionContext, InterpreterContext, ProductionContextFamily, ProductionNativeRegistry,
     RuntimeStatus, TransactionContext,
@@ -128,10 +128,16 @@ pub fn with_mono_function<'guard, 'ctx, R>(
             make_all_test_natives::<ProductionContextFamily>()
                 .into_iter()
                 .chain(make_all_production_natives::<ProductionContextFamily>())
-                .map(|(addr, module, function, func)| {
-                    let name = NativeName {
-                        module: guard.module_id_of(&addr, &module),
-                        function: guard.identifier_of(&function),
+                .map(|(addr, module, function, dispatch, func)| {
+                    let module = guard.module_id_of(&addr, &module);
+                    let function = guard.identifier_of(&function);
+                    let name = match dispatch {
+                        Dispatch::Polymorphic => NativeName::Polymorphic { module, function },
+                        Dispatch::Monomorphic(ty_args) => NativeName::Monomorphic {
+                            module,
+                            function,
+                            ty_args: guard.type_list_of(ty_args),
+                        },
                     };
                     (name, func)
                 }),
