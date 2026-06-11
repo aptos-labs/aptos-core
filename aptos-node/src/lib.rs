@@ -735,6 +735,15 @@ pub fn setup_environment_and_start_node(
         }
     }
 
+    // Kick off the randomness trusted-setup deserialize (DigestKey / PublicParameters)
+    // on background threads now, so the tens-of-seconds load overlaps the database open
+    // below instead of blocking consensus startup afterward. The blob paths come from
+    // config (no DB needed); the values are read later during epoch setup.
+    aptos_dkg_runtime::prefetch_trusted_setup(
+        node_config.consensus.digest_key_blob_path.as_ref(),
+        node_config.consensus.public_parameters_blob_path.as_ref(),
+    );
+
     // Set up the storage database and any RocksDB checkpoints
     let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
@@ -750,16 +759,14 @@ pub fn setup_environment_and_start_node(
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
 
-    // Initialize the DigestKey and PublicParameters for chunky DKG
+    // Record DigestKey/PublicParameters source metrics. The file deserialize itself was
+    // kicked off before the database open by `prefetch_trusted_setup` (above), so it runs
+    // concurrently with RocksDB open rather than blocking consensus startup here.
     aptos_dkg_runtime::initialize_digest_key_with_counters(
-        node_config.consensus.digest_key_blob_path.as_ref(),
         chain_id,
         node_config.base.role.is_validator(),
     );
-    aptos_dkg_runtime::initialize_public_parameters_with_counters(
-        node_config.consensus.public_parameters_blob_path.as_ref(),
-        chain_id,
-    );
+    aptos_dkg_runtime::initialize_public_parameters_with_counters(chain_id);
 
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(

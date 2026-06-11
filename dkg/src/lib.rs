@@ -73,30 +73,61 @@ pub fn start_dkg_runtime(
     runtime
 }
 
-/// Initialize the DigestKey and emit Prometheus counters for the source.
-/// Spawns a background thread to eagerly load the key from file and record load duration.
-pub fn initialize_digest_key_with_counters(
-    blob_path: Option<&PathBuf>,
-    chain_id: ChainId,
-    is_validator: bool,
+/// Begin deserializing the randomness trusted setup (`DigestKey` / `PublicParameters`)
+/// from disk on background threads.
+///
+/// These are otherwise loaded lazily on first use during consensus epoch setup, where
+/// the (tens-of-seconds) BCS deserialize blocks the node from rejoining. Kicking the
+/// load off here -- before the database is opened -- lets it run concurrently with the
+/// RocksDB open instead of serially after it. The lazy globals are thread-safe, so the
+/// later first access simply returns the value these threads have already populated.
+///
+/// Only the file-backed load is started here (it needs no `chain_id`); test-chain
+/// fallbacks with no blob file are resolved later by the `*_with_counters` functions.
+/// Must be called before those functions (it owns the one-time path setup).
+pub fn prefetch_trusted_setup(
+    digest_key_blob_path: Option<&PathBuf>,
+    public_parameters_blob_path: Option<&PathBuf>,
 ) {
-    if let Some(path) = blob_path {
-        set_digest_key_path(path.clone());
+    // PublicParameters are needed by every role (fullnodes use them during state sync).
+    if let Some(path) = public_parameters_blob_path {
+        set_public_parameters_path(path.clone());
+        let path = path.clone();
+        std::thread::Builder::new()
+            .name("pub-params-load".into())
+            .spawn(move || {
+                let start = Instant::now();
+                let _ = &*PUBLIC_PARAMETERS;
+                counters::PUBLIC_PARAMS_LOAD_DURATION_SECONDS
+                    .observe(start.elapsed().as_secs_f64());
+                publish_blake3(&path, &counters::PUBLIC_PARAMS_BLAKE3, "PublicParameters");
+            })
+            .expect("Failed to spawn pub-params-load thread");
     }
-    let source = initialize_digest_key(chain_id, is_validator);
-    match source {
-        DigestKeySource::WillLoadFromFile { path, file_size } => {
-            counters::DIGEST_KEY_FILE_SIZE_BYTES.set(file_size as i64);
-            counters::DIGEST_KEY_SOURCE
-                .with_label_values(&["file"])
-                .set(1);
-            // Eagerly load the key in a background thread so the metric is available on all nodes.
-            std::thread::spawn(move || {
+    if let Some(path) = digest_key_blob_path {
+        set_digest_key_path(path.clone());
+        let path = path.clone();
+        std::thread::Builder::new()
+            .name("digest-key-load".into())
+            .spawn(move || {
                 let start = Instant::now();
                 let _ = &*DIGEST_KEY;
                 counters::DIGEST_KEY_LOAD_DURATION_SECONDS.observe(start.elapsed().as_secs_f64());
                 publish_blake3(&path, &counters::DIGEST_KEY_BLAKE3, "DigestKey");
-            });
+            })
+            .expect("Failed to spawn digest-key-load thread");
+    }
+}
+
+/// Emit Prometheus counters describing the resolved `DigestKey` source. The file load
+/// itself is kicked off earlier by [`prefetch_trusted_setup`].
+pub fn initialize_digest_key_with_counters(chain_id: ChainId, is_validator: bool) {
+    match initialize_digest_key(chain_id, is_validator) {
+        DigestKeySource::WillLoadFromFile { file_size, .. } => {
+            counters::DIGEST_KEY_FILE_SIZE_BYTES.set(file_size as i64);
+            counters::DIGEST_KEY_SOURCE
+                .with_label_values(&["file"])
+                .set(1);
         },
         DigestKeySource::TestKeyFallback => {
             counters::DIGEST_KEY_SOURCE
@@ -111,26 +142,15 @@ pub fn initialize_digest_key_with_counters(
     }
 }
 
-/// Initialize the PublicParameters and emit Prometheus counters for the source.
-/// Spawns a background thread to eagerly load from file and record load duration.
-pub fn initialize_public_parameters_with_counters(blob_path: Option<&PathBuf>, chain_id: ChainId) {
-    if let Some(path) = blob_path {
-        set_public_parameters_path(path.clone());
-    }
-    let source = initialize_public_parameters(chain_id);
-    match source {
-        PublicParametersSource::WillLoadFromFile { path, file_size } => {
+/// Emit Prometheus counters describing the resolved `PublicParameters` source. The file
+/// load itself is kicked off earlier by [`prefetch_trusted_setup`].
+pub fn initialize_public_parameters_with_counters(chain_id: ChainId) {
+    match initialize_public_parameters(chain_id) {
+        PublicParametersSource::WillLoadFromFile { file_size, .. } => {
             counters::PUBLIC_PARAMS_FILE_SIZE_BYTES.set(file_size as i64);
             counters::PUBLIC_PARAMS_SOURCE
                 .with_label_values(&["file"])
                 .set(1);
-            std::thread::spawn(move || {
-                let start = Instant::now();
-                let _ = &*PUBLIC_PARAMETERS;
-                counters::PUBLIC_PARAMS_LOAD_DURATION_SECONDS
-                    .observe(start.elapsed().as_secs_f64());
-                publish_blake3(&path, &counters::PUBLIC_PARAMS_BLAKE3, "PublicParameters");
-            });
         },
         PublicParametersSource::TestKeyFallback => {
             counters::PUBLIC_PARAMS_SOURCE
