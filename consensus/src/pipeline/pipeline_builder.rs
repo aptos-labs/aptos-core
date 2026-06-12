@@ -22,10 +22,11 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, DecryptionResult, ExecuteResult, LedgerUpdateResult,
-        MaterializeResult, NotifyStateSyncResult, OrderedBlocksForObserver, PipelineFutures,
-        PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
-        PreCommitResult, PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
+        CommitLedgerResult, CommitVoteResult, DecryptionOutcome, DecryptionResult, ExecuteResult,
+        LedgerUpdateResult, MaterializeResult, NotifyStateSyncResult, OrderedBlocksForObserver,
+        PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult,
+        PostLedgerUpdateResult, PreCommitResult, PrepareResult, RandResult, TaskError, TaskFuture,
+        TaskResult,
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -40,8 +41,9 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
+    decryption::OnchainPerBlockDecryptionKeyV2,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::OnChainConsensusConfig,
+    on_chain_config::{OnChainConfig, OnChainConsensusConfig},
     randomness::Randomness,
     secret_sharing::SecretShareConfig,
     state_store::StateViewId,
@@ -382,14 +384,36 @@ impl PipelineBuilder {
         compute_result: StateComputeResult,
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
+        let root_block_id = commit_proof.commit_info().id();
+        // Seed the decryption chain for the epoch. The on-chain
+        // `PerBlockDecryptionKeyV2` resource is the round-tracking marker: it
+        // exists only once the framework upgrade has gone through an epoch
+        // boundary, so its absence means legacy mode (digest keyed by
+        // consensus round, blocks emit V2 — identical to older binaries).
+        let outcome = if !self.is_decryption_enabled {
+            DecryptionOutcome::Disabled
+        } else {
+            let onchain = self.executor.state_view(root_block_id).ok().and_then(|sv| {
+                OnchainPerBlockDecryptionKeyV2::fetch_config(&sv)
+                    .ok()
+                    .flatten()
+            });
+            match onchain {
+                Some(r) => DecryptionOutcome::RoundTracked {
+                    next_encryption_round: r.next_encryption_round,
+                    payload: None,
+                },
+                None => DecryptionOutcome::Legacy(None),
+            }
+        };
         let decryption_fut = spawn_ready_fut(DecryptionResult {
             decrypted_txns: Vec::new(),
             regular_txns: Vec::new(),
             max_txns_from_block_to_execute: None,
             block_gas_limit: None,
-            decryption_key: None,
+            outcome: outcome.clone(),
         });
-        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None, None));
+        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None, outcome));
         let rand_check_fut = spawn_ready_fut((None, false));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
         let ledger_update_fut =
@@ -522,6 +546,7 @@ impl PipelineBuilder {
         let decryption_fut = spawn_shared_fut(
             Self::decrypt_encrypted_txns(
                 materialize_fut,
+                parent.decryption_fut.clone(),
                 block.clone(),
                 self.signer.author(),
                 self.is_decryption_enabled,
@@ -754,7 +779,7 @@ impl PipelineBuilder {
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            decryption_key,
+            outcome,
         } = decryption_fut.await?;
         let input_txns = [decrypted_txns, regular_txns].concat();
 
@@ -780,7 +805,7 @@ impl PipelineBuilder {
         });
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
-        Ok((Arc::new(sig_verified_txns), block_gas_limit, decryption_key))
+        Ok((Arc::new(sig_verified_txns), block_gas_limit, outcome))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's execution phase finishes
@@ -912,22 +937,31 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, block_gas_limit, decryption_result) = prepare_fut.await?;
+        let (user_txns, block_gas_limit, decryption_outcome) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
         let (rand_result, _need_randomness) = rand_check.await?;
 
         tracker.start_working();
-        let metadata_txn = match (rand_result, decryption_result) {
-            (Some(maybe_rand), Some(maybe_dec_key)) => {
-                block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, maybe_dec_key)
+        let metadata_txn = match (rand_result, decryption_outcome) {
+            (Some(maybe_rand), DecryptionOutcome::Legacy(decryption_key)) => {
+                block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, decryption_key)
             },
-            (Some(maybe_rand), None) => block.new_metadata_with_randomness(&validator, maybe_rand),
-            (None, Some(_decryption_key)) => {
+            (
+                Some(maybe_rand),
+                DecryptionOutcome::RoundTracked {
+                    next_encryption_round: _,
+                    payload,
+                },
+            ) => block.new_metadata_with_rand_and_dec_payload(&validator, maybe_rand, payload),
+            (Some(maybe_rand), DecryptionOutcome::Disabled) => {
+                block.new_metadata_with_randomness(&validator, maybe_rand)
+            },
+            (None, DecryptionOutcome::Legacy(_) | DecryptionOutcome::RoundTracked { .. }) => {
                 Err(anyhow!("Disabling only randomness is not supported yet"))?
             },
-            (None, None) => {
+            (None, DecryptionOutcome::Disabled) => {
                 // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
                 block.new_block_metadata(&validator).into()
             },

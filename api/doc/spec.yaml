@@ -13004,12 +13004,14 @@ components:
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
+      - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecPayload'
       discriminator:
         propertyName: type
         mapping:
           v0: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
           v1: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
           v2: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
+          v3: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecPayload'
     BlockMetadataExtensionEmpty:
       type: object
     BlockMetadataExtensionRandomness:
@@ -13024,6 +13026,15 @@ components:
           $ref: '#/components/schemas/HexEncodedBytes'
         decryption_key:
           $ref: '#/components/schemas/HexEncodedBytes'
+    BlockMetadataExtensionRandomnessAndDecPayload:
+      type: object
+      properties:
+        randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        decryption_key:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        encryption_round:
+          $ref: '#/components/schemas/U64'
     BlockMetadataExtension_BlockMetadataExtensionEmpty:
       allOf:
       - type: object
@@ -13060,6 +13071,18 @@ components:
             - v2
             example: v2
       - $ref: '#/components/schemas/BlockMetadataExtensionRandomnessAndDecKey'
+    BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - v3
+            example: v3
+      - $ref: '#/components/schemas/BlockMetadataExtensionRandomnessAndDecPayload'
     BlockMetadataTransaction:
       type: object
       description: |-
