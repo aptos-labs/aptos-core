@@ -80,9 +80,25 @@ on:
         required: false
         default: false
         description: "Skip version checks"
+      internal_call:
+        type: boolean
+        required: false
+        default: false
+        description: "Set true only by trusted wrapper workflows (e.g. Release move-flow)."
 
 jobs:
+  guard:
+    name: "Guard reserved crates"
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Block reserved crates from the generic entrypoint
+        if: ${{ inputs.crate_name == 'aptos-move-flow' && inputs.internal_call != true }}
+        run: |
+          echo "::error::aptos-move-flow must be released via the dedicated 'Release move-flow' workflow, not generic Binary Release."
+          exit 1
+
   build-linux-x86:
+    needs: guard
     name: "Build Linux x86_64"
     runs-on: ubuntu-22.04
     steps:
@@ -107,6 +123,7 @@ jobs:
             ${{ inputs.binary_name }}-*.zip.sha256
 
   build-linux-arm:
+    needs: guard
     name: "Build Linux ARM64"
     runs-on: ubuntu-22.04-arm
     steps:
@@ -131,6 +148,7 @@ jobs:
             ${{ inputs.binary_name }}-*.zip.sha256
 
   build-macos-x86:
+    needs: guard
     name: "Build macOS x86_64"
     runs-on: macos-15-intel
     steps:
@@ -155,6 +173,7 @@ jobs:
             ${{ inputs.binary_name }}-*.zip.sha256
 
   build-macos-arm:
+    needs: guard
     name: "Build macOS ARM64"
     runs-on: macos-latest
     steps:
@@ -179,6 +198,7 @@ jobs:
             ${{ inputs.binary_name }}-*.zip.sha256
 
   build-windows-x86:
+    needs: guard
     name: "Build Windows x86_64"
     runs-on: windows-2025
     steps:

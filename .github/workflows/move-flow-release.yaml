@@ -96,6 +96,7 @@ jobs:
       source_git_ref_override: ${{ needs.preflight.outputs.source_sha }}
       release_title: ${{ inputs.release_title || format('move-flow v{0}', needs.preflight.outputs.release_version) }}
       dry_run: ${{ inputs.dry_run }}
+      internal_call: true
 
   publish-plugin:
     name: "Publish move-flow plugin PR to aptos-ai"
@@ -118,6 +119,37 @@ jobs:
           else
             echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Orchestration script comes from the TRUSTED workflow ref (github.sha),
+      # never from source_git_ref_override. No credentials.
+      - if: steps.gate.outputs.ok == 'true'
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - if: steps.gate.outputs.ok == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-builds-x86_64-unknown-linux-gnu
+          path: released-bin
+
+      # Run the RELEASED (untrusted) binary with NO credentials reachable:
+      # GH_TOKEN is not in env, the App token is not yet minted, and aptos-ai
+      # (which would persist the token to .git/config) is not yet checked out.
+      # The binary only emits a plugin tree to a scratch dir.
+      - if: steps.gate.outputs.ok == 'true'
+        name: Generate plugin tree
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          cd released-bin
+          unzip -o "move-flow-v${RELEASE_VERSION}-x86_64-unknown-linux-gnu.zip"
+          chmod +x ./move-flow
+          ./move-flow plugin "${RUNNER_TEMP}/plugin"
+          test -f "${RUNNER_TEMP}/plugin/.claude-plugin/plugin.json"
+
+      # Token minted only now — after the untrusted binary has finished.
       - if: steps.gate.outputs.ok == 'true'
         name: Generate aptos-ai token
         id: app-token
@@ -127,11 +159,7 @@ jobs:
           private-key: ${{ secrets.APTOS_AI_PLUGIN_PUBLISHER_APP_KEY }}
           owner: aptos-labs
           repositories: aptos-ai
-      - if: steps.gate.outputs.ok == 'true'
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.preflight.outputs.source_sha }}
-          persist-credentials: false
+
       - if: steps.gate.outputs.ok == 'true'
         uses: actions/checkout@v6
         with:
@@ -139,24 +167,18 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           path: aptos-ai
           ref: main
-      - if: steps.gate.outputs.ok == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-builds-x86_64-unknown-linux-gnu
-          path: released-bin
+
+      # Trusted repo script only. Consumes the pre-generated tree; the released
+      # binary is never invoked here.
       - if: steps.gate.outputs.ok == 'true'
         name: Publish plugin PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          MOVE_FLOW_BIN: ${{ github.workspace }}/released-bin/move-flow
-          APTOS_CORE_SHA: ${{ needs.preflight.outputs.source_sha }}
+          PLUGIN_TREE: ${{ runner.temp }}/plugin
           RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+          APTOS_CORE_SHA: ${{ needs.preflight.outputs.source_sha }}
         run: |
           set -euo pipefail
-          cd released-bin
-          unzip -o "move-flow-v${RELEASE_VERSION}-x86_64-unknown-linux-gnu.zip"
-          chmod +x ./move-flow
-          cd ..
           git config --global user.email "aptos-bot@aptos.dev"
           git config --global user.name "aptos-bot"
           ./aptos-move/flow/scripts/publish-plugin.sh "${{ github.workspace }}/aptos-ai"
