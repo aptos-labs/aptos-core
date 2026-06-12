@@ -1,0 +1,49 @@
+\subsection{Reentrancy}
+\label{sec:reentrancy}
+
+Move on Aptos later gained \emph{function values}: a closure that can be captured, passed around, stored (into the global storage), and invoked.
+This feature greatly enhanced the expressivity of the language (by enabling dynamic dispatch), but also reintroduced a classic challenge -- \emph{reentrancy}.
+
+Prior to this, freedom from reentrancy was a \emph{static} guarantee: a function declares its global resource accesses with the |acquires| annotations, 
+and because module dependencies must be acyclic, no function a module calls can re-enter that module and borrow the same resource twice.
+
+Here is an example demonstrating what a vulnerable pattern may look like, using a withdrawal function that processes the payout through a caller-supplied
+callback:
+
+\subsubsection{Example}
+\begin{MoveBox}
+module 0x42::vault {
+  struct Vault has key { balance: u64 }
+
+  public fun withdraw(owner: address, payout: |u64|) acquires Vault {
+    let amount = Vault[owner].balance;
+    payout(amount);            // dynamic dispatch into unknown code
+    Vault[owner].balance = 0;  // cleared only after the callback
+  }
+}
+\end{MoveBox}
+
+A malicious or poorly written |payout| could call |withdraw| again before the first withdrawal has been completed, resulting in the re-entrant call reading the same non-zero |balance|.
+
+\subsubsection{Runtime Reentrancy Check}
+Our current solution to this problem is a runtime reentrancy check. The VM's runtime maintains a map that for each module, records a count of how many times it has been entered.
+The count is incremented when entered from a different module, or from a function value, even if the underlying function is in the same module, and decremented on return.
+
+A count greater than one is not in itself a violation. A transaction-aborting error is only fired when 
+(1) a global resource defined by the reentered module is accessed, or 
+(2) a module is reentered while previously locked by a \emph{module lock}, which is a stricter mode activated by entering a function with the |#[module_lock]| attribute.
+
+Unlike the type, ability and reference checks, which are redundant safety nets that reassert key properties guaranteed by the bytecode verifier, the reentrancy check is a \emph{required} check,
+crucial for ensuring safety with dynamic dispatch. Its implementation however, shares the same spirit as the other runtime checks.
+
+Because the reentrancy check is invoked on every function entry and return, it sits on the interpreter's hot path.
+The cost is negligible today thanks to two optimizations (fast, non-cryptographic hash + module id interning), but could be further under test with our next-gen VM, 
+which will have much faster function calls, making the per-call overhead more noticeable.
+
+We are also exploring whether the check could instead be deferred to the asynchronous phase (Section~\ref{sec:async}). However its soundness requires more study
+as aborts caused by it are part of a transaction's execution semantics, rather than a redundant post-execution validation.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
