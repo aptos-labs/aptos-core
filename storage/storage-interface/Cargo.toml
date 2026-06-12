@@ -12,6 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["proptest"]
+
+[features]
+default = []
+fuzzing = ["aptos-types/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
@@ -40,10 +47,3 @@ thiserror = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 bytes = { workspace = true }
 lru = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-types/fuzzing"]
-
-[package.metadata.cargo-machete]
-ignored = ["proptest"]
