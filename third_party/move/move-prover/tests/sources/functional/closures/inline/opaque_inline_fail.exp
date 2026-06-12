@@ -1,0 +1,104 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:18:9
+   │
+18 │         ensures result == x + 2; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:14: test_wrong_caller_post
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:15: test_wrong_caller_post
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:18: test_wrong_caller_post (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:23:32
+   │
+23 │         apply(|y| y + 1 spec { ensures result == y + 2; }, x) // error: post-condition does not hold (lifted lambda)
+   │                                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:23: test_wrong_lambda_spec
+   =         y = <redacted>
+   =         result = <redacted>
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:34:9
+   │
+34 │         ensures result == x + 1; // error: post-condition does not hold (no lambda spec to support it)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:30: test_no_spec_lambda
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:31: test_no_spec_lambda
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:34: test_no_spec_lambda (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:52:9
+   │
+52 │         ensures result == 0; // error: post-condition does not hold (x is modified by the lambda)
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:47: test_wrong_mut_capture_post
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:48: test_wrong_mut_capture_post
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:48: test_wrong_mut_capture_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:49: test_wrong_mut_capture_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:46: test_wrong_mut_capture_post
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:52: test_wrong_mut_capture_post (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:58:40
+   │
+58 │         call_once(|i| x = x + i spec { ensures x == old(x) + i + 1; }); // error: post-condition does not hold (lifted lambda)
+   │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:58: test_wrong_mut_capture_lambda_spec
+   =         x = <redacted>
+   =         i = <redacted>
+   =         x = <redacted>
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:79:9
+   │
+79 │         ensures result.y == 7; // error: post-condition does not hold (y is not framed by the lambda spec)
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:73: test_unframed_field
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:74: test_unframed_field
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:74: test_unframed_field
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:75: test_unframed_field
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:72: test_unframed_field
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:78: test_unframed_field (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:79: test_unframed_field (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:108:9
+    │
+108 │         ensures result_1 == 102; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:92: test_swapped_mut_posts
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:105: test_swapped_mut_posts (spec)
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:92: test_swapped_mut_posts
+    =         p = <redacted>
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:93: test_swapped_mut_posts
+    =         count = <redacted>
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:94: test_swapped_mut_posts
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:97: test_swapped_mut_posts
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:95: test_swapped_mut_posts
+    =         count = <redacted>
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:101: test_swapped_mut_posts
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:95: test_swapped_mut_posts
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:102: test_swapped_mut_posts
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:92: test_swapped_mut_posts
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:108: test_swapped_mut_posts (spec)

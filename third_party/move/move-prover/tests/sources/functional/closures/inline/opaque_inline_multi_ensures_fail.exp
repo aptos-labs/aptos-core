@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: the spec of this call's callee constrains a closure with captured mutations through more than one `ensures_of` condition, which cannot be expressed in the call-site model
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_multi_ensures_fail.move:22:9
+   │
+22 │         call_trusted_twice(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one ensures_of
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
