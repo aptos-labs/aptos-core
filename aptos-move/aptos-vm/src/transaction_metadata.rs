@@ -322,6 +322,7 @@ impl TransactionMetadata {
                 .map(|multisig| multisig.as_multisig_payload()),
             self.transaction_index_kind,
             self.is_encrypted_txn,
+            self.is_orderless(),
         )
     }
 
