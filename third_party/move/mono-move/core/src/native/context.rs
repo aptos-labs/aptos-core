@@ -4,10 +4,12 @@
 //! Native function interface — the API surface natives are written against.
 
 use super::{
+    extension::NativeExtension,
     result::VMInternalError,
     value::{VMValue, Vector},
 };
-use crate::types::InternedType;
+use crate::{interner::InternedModuleId, types::InternedType};
+use core::cell::RefMut;
 
 /// Trait that native functions are written generic over.
 ///
@@ -68,8 +70,25 @@ pub trait NativeContext {
     /// The `i`-th type argument.
     fn ty_arg(&self, i: usize) -> Result<InternedType, VMInternalError>;
 
+    /// Returns a copy of the `i`-th argument's raw in-frame bytes -- a low-level
+    /// API for natives that need to operate on generic opaque values.
+    fn arg_raw(&self, i: usize) -> Result<Vec<u8>, VMInternalError>;
+
+    /// Returns the heap-pointer offsets within the `i`-th argument,
+    /// relative to the value's start.
+    fn arg_ptr_offsets(&self, i: usize) -> Result<Vec<u32>, VMInternalError>;
+
+    /// Returns the module of the caller of the function that invoked this native,
+    /// or `None` if the frame is the entry point (which has no caller).
+    fn caller_module(&self) -> Option<InternedModuleId>;
+
     /// Allocates a `vector<u8>` on the VM heap initialized with `bytes` and
     /// returns a handle to it. The vector stays live for the rest of the
     /// native call.
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError>;
+
+    /// Obtains a mutable reference to the extension of type `T`.
+    ///
+    /// Errors if `T` is not installed, or if it is already borrowed.
+    fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError>;
 }

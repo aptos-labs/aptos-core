@@ -10,18 +10,19 @@ use crate::{
     error::RuntimeError,
     global_storage::ResourceReadWriteSet,
     heap::{alloc_vec, is_heap_ptr, Heap, TopFrame},
-    memory::write_u64,
-    types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
+    memory::{read_ptr, write_u64},
+    types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
+    interner::InternedModuleId,
     native::{
-        NativeABI, NativeContext, NativeContextFamily, NativeFunction, NativeRegistry, RootPool,
-        VMInternalError, VMValue, Vector,
+        NativeABI, NativeContext, NativeContextFamily, NativeExtension, NativeExtensions,
+        NativeFunction, NativeRegistry, RootPool, VMInternalError, VMValue, Vector,
     },
     types::InternedType,
-    DescriptorProvider, GasMeter, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorProvider, Function, GasMeter, FRAME_METADATA_SIZE, TRIVIAL_DESCRIPTOR_ID,
 };
-use std::cell::{Cell, UnsafeCell};
+use std::cell::{Cell, RefMut, UnsafeCell};
 
 /// Concrete [`NativeContext`] used by the production runtime.
 ///
@@ -61,6 +62,10 @@ pub struct ProductionNativeContext<'a> {
     heap: UnsafeCell<&'a mut Heap>,
     /// The transaction's read write set -- provides global storage access.
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
+    /// Per-transaction native extensions, shared across native calls. Accessed
+    /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
+    /// the interior mutability.
+    extensions: &'a NativeExtensions,
     /// GC roots backing the references and heap objects the native holds.
     pool: RootPool,
     /// Set after the first [`Self::set_return`]; blocks further `arg` /
@@ -79,6 +84,7 @@ impl<'a> ProductionNativeContext<'a> {
         desc_provider: &'a dyn DescriptorProvider,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
+        extensions: &'a NativeExtensions,
     ) -> Self {
         Self {
             abi,
@@ -88,6 +94,7 @@ impl<'a> ProductionNativeContext<'a> {
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
             rws: UnsafeCell::new(rws),
+            extensions,
             pool: RootPool::new(),
             returns_started: Cell::new(false),
         }
@@ -125,7 +132,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // inside the native's slot region; the interpreter sets `frame_ptr` to the
         // base of that region. Referenced/allocated memory is rooted in `pool`.
         //
-        // `T` is responsible for the correctness of its own `write_to_frame` impl.
+        // `T` is responsible for the correctness of its own `read_from_frame` impl.
         Ok(unsafe { T::read_from_frame(&self.pool, self.frame_ptr, slot.offset as usize) })
     }
 
@@ -174,6 +181,65 @@ impl NativeContext for ProductionNativeContext<'_> {
         })
     }
 
+    fn arg_raw(&self, i: usize) -> Result<Vec<u8>, VMInternalError> {
+        if self.returns_started.get() {
+            return Err(VMInternalError::InvariantViolation(format!(
+                "arg_raw({i}) called after a return value was written",
+            )));
+        }
+        let slot = self.abi.args().get(i).copied().ok_or_else(|| {
+            VMInternalError::InvariantViolation(format!(
+                "arg index {} out of bounds (num_args={})",
+                i,
+                self.abi.args().len(),
+            ))
+        })?;
+        // SAFETY: the ABI keeps `[offset, offset + size)` within the frame, and
+        // the caller wrote the argument's bytes there before the native ran.
+        let bytes = unsafe {
+            std::slice::from_raw_parts(self.frame_ptr.add(slot.offset as usize), slot.size as usize)
+        };
+        Ok(bytes.to_vec())
+    }
+
+    fn arg_ptr_offsets(&self, i: usize) -> Result<Vec<u32>, VMInternalError> {
+        let slot = self.abi.args().get(i).copied().ok_or_else(|| {
+            VMInternalError::InvariantViolation(format!(
+                "arg index {} out of bounds (num_args={})",
+                i,
+                self.abi.args().len(),
+            ))
+        })?;
+        // The ABI's heap-pointer offsets are frame-relative and span all args;
+        // keep the ones inside this arg's slot and rebase them to the arg start.
+        Ok(self
+            .abi
+            .heap_ptr_offsets()
+            .iter()
+            .map(|o| o.0)
+            .filter(|&o| slot.offset <= o && o < slot.offset + slot.size)
+            .map(|o| o - slot.offset)
+            .collect())
+    }
+
+    fn caller_module(&self) -> Option<InternedModuleId> {
+        // Walk two frames up: the native's metadata records its immediate
+        // caller's frame pointer, and that caller's metadata records *its*
+        // caller. A null saved-function pointer marks the entry frame, which
+        // has no caller.
+        unsafe {
+            let caller_fp = read_ptr(
+                self.frame_ptr.sub(FRAME_METADATA_SIZE),
+                META_SAVED_FP_OFFSET,
+            );
+            let caller_caller = read_ptr(
+                caller_fp.sub(FRAME_METADATA_SIZE),
+                META_SAVED_FUNC_PTR_OFFSET,
+            ) as *const Function;
+            caller_caller.as_ref().map(|f| f.module_id)
+        }
+    }
+
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError> {
         if self.returns_started.get() {
             return Err(VMInternalError::InvariantViolation(
@@ -199,6 +265,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             self.desc_provider,
             rws,
             &self.pool,
+            self.extensions,
             self.frame_ptr,
             TopFrame::Native(self.abi),
             TRIVIAL_DESCRIPTOR_ID,
@@ -227,6 +294,10 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {
+        self.extensions.get_mut::<T>()
     }
 }
 

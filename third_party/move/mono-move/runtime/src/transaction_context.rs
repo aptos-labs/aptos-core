@@ -9,6 +9,7 @@
 use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    native::NativeExtensions,
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
     LayoutProvider, ObjectDescriptor, ResourceProvider, ValueLayout,
@@ -33,6 +34,8 @@ pub struct TransactionContext<'guard, 'ctx> {
     // TODO: Enforce that `natives` here and the `NativeResolver` passed
     // to `loader` are the same instance.
     natives: &'guard ProductionNativeRegistry,
+    /// Per-transaction native extensions, shared across native calls.
+    extensions: NativeExtensions,
 }
 
 impl<'guard, 'ctx> TransactionContext<'guard, 'ctx> {
@@ -48,7 +51,15 @@ impl<'guard, 'ctx> TransactionContext<'guard, 'ctx> {
             gas_meter,
             resource_provider,
             natives,
+            extensions: NativeExtensions::new(),
         }
+    }
+
+    /// Install the per-transaction native extensions. Replaces any previously
+    /// installed set.
+    pub fn with_extensions(mut self, extensions: NativeExtensions) -> Self {
+        self.extensions = extensions;
+        self
     }
 
     /// Returns the transaction's read-set.
@@ -66,14 +77,24 @@ impl ExecutionContext for TransactionContext<'_, '_> {
         self.natives
     }
 
-    fn natives_descriptors_and_gas_meter(
+    fn extensions(&self) -> &NativeExtensions {
+        &self.extensions
+    }
+
+    fn native_call_borrows(
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &mut GasMeter,
+        &NativeExtensions,
     ) {
-        (self.natives, self.loader.guard(), &mut self.gas_meter)
+        (
+            self.natives,
+            self.loader.guard(),
+            &mut self.gas_meter,
+            &self.extensions,
+        )
     }
 
     /// Looks up cross-module targets in the read-set, falling back to

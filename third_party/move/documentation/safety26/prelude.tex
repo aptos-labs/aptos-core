@@ -53,6 +53,17 @@
     }
 }
 
+% Inline author comments. Use \tengzhang{...} in prose to leave a colored
+% inline note attributed to an author. Add more authors by defining their
+% own wrapper around \authorcomment, e.g.
+%   \newcommand{\wolfgang}[1]{\authorcomment{teal}{wg: #1}}
+% Toggle for camera-ready: change \commentstrue below to \commentsfalse and
+% every \tengzhang{...} / \wolfgang{...} / ... expands to nothing.
+\newif\ifcomments
+\commentstrue
+\newcommand{\authorcomment}[2]{\ifcomments\textcolor{#1}{\textsf{\small[\textbf{#2}]}}\fi}
+\newcommand{\tengzhang}[1]{\authorcomment{blue}{teng: #1}}
+
 %\setlength{\belowcaptionskip}{-1ex}
 %\setlength{\textfloatsep}{0.2ex}
 \newenvironment{Figure}{

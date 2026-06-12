@@ -34,4 +34,5 @@ pub use native_context::{
 };
 pub use transaction_context::TransactionContext;
 pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
+pub use value_utils::serialize;
 pub use verifier::{verify_function, verify_program, VerificationError};
