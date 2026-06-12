@@ -3,17 +3,42 @@ spec aptos_framework::big_ordered_map {
     spec BigOrderedMap {
         pragma intrinsic = map,
             map_new = new,
+            map_new_with_config = new_with_config,
+            map_new_from = new_from,
             map_destroy_empty = destroy_empty,
             map_has_key = contains,
-            map_add_no_override = add,
+            map_remove_or_none = remove_or_none,
             map_borrow = borrow,
             map_borrow_mut = borrow_mut,
+            map_get = get,
+            map_keys = keys,
+            map_front_key = front_key,
+            map_back_key = back_key,
+            map_borrow_front = borrow_front,
+            map_borrow_back = borrow_back,
+            map_pop_front = pop_front,
+            map_pop_back = pop_back,
+            map_prev_key = prev_key,
+            map_next_key = next_key,
+            map_iter_new_begin = internal_new_begin_iter,
+            map_iter_new_end = internal_new_end_iter,
+            map_iter_is_end = iter_is_end,
+            map_iter_borrow_key = iter_borrow_key,
+            map_internal_find = internal_find,
+            map_internal_lower_bound = internal_lower_bound,
+            map_internal_find_with_path = internal_find_with_path,
+            map_iter_with_path_get_iter = iter_with_path_get_iter,
+            map_len = compute_length,
             map_spec_get = spec_get,
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
             map_spec_has_key = spec_contains_key,
-            map_is_empty = is_empty;
+            map_is_empty = is_empty,
+            map_spec_aborts_new_from = spec_aborts_new_from,
+            map_spec_aborts_new_with_config = spec_aborts_new_with_config,
+            map_spec_aborts_empty_map = spec_aborts_empty_map,
+            map_spec_aborts_iter_borrow_key = spec_aborts_iter_borrow_key;
     }
 
     spec native fun spec_len<K, V>(t: BigOrderedMap<K, V>): num;
@@ -22,16 +47,42 @@ spec aptos_framework::big_ordered_map {
     spec native fun spec_remove<K, V>(t: BigOrderedMap<K, V>, k: K): BigOrderedMap<K, V>;
     spec native fun spec_get<K, V>(t: BigOrderedMap<K, V>, k: K): V;
 
+    // Abort-condition spec functions paired with the corresponding intrinsics.
+    spec native fun spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool;
+    spec native fun spec_aborts_new_with_config<K, V>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): bool;
+    spec native fun spec_aborts_empty_map<K, V>(t: BigOrderedMap<K, V>): bool;
+    spec native fun spec_aborts_iter_borrow_key<K, V>(it: IteratorPtr<K>): bool;
+
+    // Uninterpreted abort predicate for the `validate_dynamic_size_and_init_max_degrees`
+    // check called by both `add` and `upsert`. True iff the call would abort under the
+    // dynamic key/value size validation. Body-less because it depends on hidden map
+    // configuration fields.
+    spec fun spec_aborts_validate_size<K, V>(t: BigOrderedMap<K, V>, k: K, v: V): bool;
+
+    // Uninterpreted abort predicate for stale-iterator operations. The runtime aborts on
+    // any iter use whose cached `node_index`/`child_iter` no longer matches the current
+    // tree state (rebalance, sibling removal, etc.). Body-less because tracking node_index
+    // and child_iter precisely would require modeling BOM's B+-tree state.
+    spec fun spec_iter_op_aborts<K, V>(it: IteratorPtr<K>, m: BigOrderedMap<K, V>): bool;
+
+
+
+    // Uninterpreted abort predicate for `new_with_reusable`: true iff K or V has
+    // non-constant serialized size. Body-less because it depends on
+    // `bcs::constant_serialized_size`, not expressible in the intrinsic-typed spec layer.
+    spec fun spec_aborts_new_with_reusable_runtime<K, V>(): bool;
+
+    // Uninterpreted abort predicate for `new_with_type_size_hints`: true iff any of the
+    // size-hint validations fail (avg > max, division-by-zero on `avg_*_bytes` or
+    // `max_*_bytes`, or derived max-degrees below the minimum).
+    spec fun spec_aborts_new_with_type_size_hints_runtime<K, V>(
+        avg_key_bytes: u64, max_key_bytes: u64,
+        avg_value_bytes: u64, max_value_bytes: u64
+    ): bool;
+
 
     spec new_with_config {
-        pragma verify = false;
-        pragma opaque;
-        aborts_if inner_max_degree != 0
-            && (inner_max_degree < 4 || (inner_max_degree as u64) > 4096);
-        aborts_if leaf_max_degree != 0
-            && (leaf_max_degree < 3 || (leaf_max_degree as u64) > 4096);
-        ensures spec_len(result) == 0;
-        ensures forall k: K: !spec_contains_key(result, k);
+        pragma intrinsic;
     }
 
     spec new {
@@ -39,19 +90,25 @@ spec aptos_framework::big_ordered_map {
     }
 
     spec new_with_reusable {
-        pragma verify = false;
         pragma opaque;
-        aborts_if false;
-        ensures spec_len(result) == 0;
-        ensures forall k: K: !spec_contains_key(result, k);
+        pragma verify = false;
+        aborts_if [abstract] spec_aborts_new_with_reusable_runtime<K, V>();
+        ensures !spec_aborts_new_with_reusable_runtime<K, V>() ==> spec_len(result) == 0;
+        ensures !spec_aborts_new_with_reusable_runtime<K, V>() ==>
+            (forall k: K: !spec_contains_key(result, k));
     }
 
     spec new_with_type_size_hints {
-        pragma verify = false;
         pragma opaque;
-        aborts_if false;
-        ensures spec_len(result) == 0;
-        ensures forall k: K: !spec_contains_key(result, k);
+        pragma verify = false;
+        aborts_if [abstract] spec_aborts_new_with_type_size_hints_runtime<K, V>(
+            avg_key_bytes, max_key_bytes, avg_value_bytes, max_value_bytes);
+        ensures !spec_aborts_new_with_type_size_hints_runtime<K, V>(
+            avg_key_bytes, max_key_bytes, avg_value_bytes, max_value_bytes)
+            ==> spec_len(result) == 0;
+        ensures !spec_aborts_new_with_type_size_hints_runtime<K, V>(
+            avg_key_bytes, max_key_bytes, avg_value_bytes, max_value_bytes)
+            ==> (forall k: K: !spec_contains_key(result, k));
     }
 
     spec borrow {
@@ -59,6 +116,10 @@ spec aptos_framework::big_ordered_map {
     }
 
     spec borrow_mut {
+        pragma intrinsic;
+    }
+
+    spec get {
         pragma intrinsic;
     }
 
@@ -71,7 +132,14 @@ spec aptos_framework::big_ordered_map {
     }
 
     spec add {
-        pragma intrinsic;
+        pragma opaque;
+        pragma verify = false;
+        aborts_if spec_contains_key(self, key);
+        aborts_if [abstract] spec_aborts_validate_size(self, key, value);
+        ensures spec_contains_key(self, key);
+        ensures spec_get(self, key) == value;
+        ensures spec_len(self) == spec_len(old(self)) + 1;
+        ensures spec_unchanged_except_at(self, key);
     }
 
     spec remove {
@@ -82,8 +150,6 @@ spec aptos_framework::big_ordered_map {
         ensures spec_get(old(self), key) == result;
         ensures spec_len(old(self)) == spec_len(self) + 1;
         ensures spec_unchanged_except_at(self, key);
-        // ensures forall k: K where k != key: spec_contains_key(self, k) ==> spec_get(self, k) == spec_get(old(self), k);
-        // ensures forall k: K where k != key: spec_contains_key(old(self), k) == spec_contains_key(self, k);
     }
 
     spec fun spec_unchanged_except_at<K: drop + copy + store, V: store>(
@@ -95,25 +161,8 @@ spec aptos_framework::big_ordered_map {
             spec_get(self, k) == spec_get(old(self), k))
     }
 
-    spec remove_or_none<K: drop + copy + store, V: store>(
-        self: &mut BigOrderedMap<K, V>, key: &K
-    ): Option<V> {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        // Hit: key was present
-        ensures spec_contains_key(old(self), key) ==> (
-            option::is_some(result)
-            && option::spec_borrow(result) == spec_get(old(self), key)
-            && !spec_contains_key(self, key)
-            && spec_len(self) == spec_len(old(self)) - 1
-        );
-        // Miss: key was absent — map unchanged
-        ensures !spec_contains_key(old(self), key) ==> (
-            option::is_none(result)
-            && spec_len(self) == spec_len(old(self))
-        );
-        ensures spec_unchanged_except_at(self, key);
+    spec remove_or_none {
+        pragma intrinsic;
     }
 
     spec is_empty {
@@ -121,17 +170,16 @@ spec aptos_framework::big_ordered_map {
     }
 
     spec iter_is_end {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        ensures result == (self is IteratorPtr::End<K>);
+        pragma intrinsic;
     }
 
     spec iter_borrow {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_end(self, map);
-        ensures result == spec_get(map, self.key);
+        aborts_if [abstract] spec_iter_op_aborts(self, map);
+        // Result is havoc'd: when the iter is stale (cached position no longer matches
+        // tree state) the runtime aborts; the spec does not claim a specific value here.
     }
 
     // Body also asserts constant_kv_size OR bcs::constant_serialized_size<V>().is_some()
@@ -140,46 +188,26 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_end(self, map);
-        ensures result == spec_get(map, self.key);
+        aborts_if [abstract] spec_iter_op_aborts(self, map);
     }
 
+    // `iter_is_begin` is not bound as intrinsic because the runtime checks
+    // `node_index == min_leaf_index && child_iter_at_begin`, which the model cannot
+    // track without representing BOM's tree state. We only pin the End-on-empty case;
+    // for `Some` iters the return is havoc'd (sound but imprecise on stale iters).
     spec iter_is_begin {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
-        // self is End: returns true iff map is empty (End acts as both begin and end on []).
-        ensures (self is IteratorPtr::End<K>) ==> (result <==> spec_len(map) == 0);
-        // self is Some: returns true iff self.key is the smallest key currently in map.
-        ensures !(self is IteratorPtr::End<K>) ==> (result <==>
-            (spec_contains_key(map, self.key)
-                && (forall k: K where spec_contains_key(map, k) && k != self.key:
-                    std::cmp::compare(self.key, k) == std::cmp::Ordering::Less)));
+        ensures (self is IteratorPtr::End<K>) ==> (result == (spec_len(map) == 0));
     }
 
-    // Returns the iterator pointing to the smallest key K in self with K >= input
-    // key (compare not Less), or End if no such key exists.
     spec internal_lower_bound {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        // End iff no key >= input exists (all keys are Less than input).
-        ensures iter_is_end(result, self) <==>
-            (forall k: K where spec_contains_key(self, k):
-                std::cmp::compare(k, key) == std::cmp::Ordering::Less);
-        // Otherwise, result.key is in the map, >= input, and the smallest such.
-        ensures !iter_is_end(result, self) ==> spec_contains_key(self, result.key);
-        ensures !iter_is_end(result, self) ==>
-            std::cmp::compare(result.key, key) != std::cmp::Ordering::Less;
-        ensures !iter_is_end(result, self) ==>
-            (forall k: K where spec_contains_key(self, k) && std::cmp::compare(k, key) != std::cmp::Ordering::Less:
-                std::cmp::compare(result.key, k) != std::cmp::Ordering::Greater);
+        pragma intrinsic;
     }
 
     spec iter_borrow_key {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if self is IteratorPtr::End<K>;
-        ensures result == self.key;
+        pragma intrinsic;
     }
 
     spec allocate_spare_slots {
@@ -203,208 +231,119 @@ spec aptos_framework::big_ordered_map {
     }
 
     spec keys {
-        pragma verify = false;
-        pragma opaque;
-        ensures forall k: K: vector::spec_contains(result, k) <==> spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
-    spec new_from<K: drop + copy + store, V: store>(keys: vector<K>, values: vector<V>): BigOrderedMap<K, V> {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if exists i in 0..len(keys), j in 0..len(keys) where i != j : keys[i] == keys[j];
-        aborts_if len(keys) != len(values);
-        ensures forall k: K {spec_contains_key(result, k)} : vector::spec_contains(keys,k) <==> spec_contains_key(result, k);
-        ensures forall i in 0..len(keys) : spec_get(result, keys[i]) == values[i];
-        ensures spec_len(result) == len(keys);
+    spec new_from {
+        pragma intrinsic;
     }
 
     spec upsert {
         pragma opaque;
         pragma verify = false;
+        aborts_if [abstract] spec_aborts_validate_size(self, key, value);
         ensures !spec_contains_key(old(self), key) ==> option::is_none(result);
+        ensures spec_contains_key(old(self), key) ==>
+            (option::is_some(result) && option::spec_borrow(result) == spec_get(old(self), key));
         ensures spec_contains_key(self, key);
         ensures spec_get(self, key) == value;
-        ensures spec_contains_key(old(self), key) ==> ((option::is_some(result)) && (option::spec_borrow(result) == spec_get(old(
-            self), key)));
         ensures !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
         ensures spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
         ensures spec_unchanged_except_at(self, key);
     }
 
-    spec add_all {
-        pragma opaque;
-        pragma verify = false;
+    spec borrow_front {
+        pragma intrinsic;
     }
 
-    spec borrow_front<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>): (K, &V) {
-        pragma opaque;
-        pragma verify = false;
-        ensures spec_contains_key(self, result_1);
-        ensures spec_get(self, result_1) == result_2;
-        ensures forall k: K where k != result_1: spec_contains_key(self, k) ==>
-        std::cmp::compare(result_1, k) == std::cmp::Ordering::Less;
-    }
-
-    spec front_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>): K {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if spec_len(self) == 0;
-        ensures spec_contains_key(self, result);
-        ensures forall k: K where k != result: spec_contains_key(self, k) ==>
-            std::cmp::compare(result, k) == std::cmp::Ordering::Less;
+    spec front_key {
+        pragma intrinsic;
     }
 
     spec borrow_back {
-        pragma opaque;
-        pragma verify = false;
-        ensures spec_contains_key(self, result_1);
-        ensures spec_get(self, result_1) == result_2;
-        ensures forall k: K where k != result_1: spec_contains_key(self, k) ==>
-        std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
+        pragma intrinsic;
     }
 
-    spec back_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>): K {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if spec_len(self) == 0;
-        ensures spec_contains_key(self, result);
-        ensures forall k: K where k != result: spec_contains_key(self, k) ==>
-            std::cmp::compare(result, k) == std::cmp::Ordering::Greater;
+    spec back_key {
+        pragma intrinsic;
     }
 
-    spec pop_front<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>): (K, V) {
-        pragma opaque;
-        pragma verify = false;
-        ensures spec_contains_key(old(self), result_1);
-        ensures result_2 == spec_get(old(self), result_1);
-        ensures !spec_contains_key(self, result_1);
-        ensures spec_len(self) == spec_len(old(self)) - 1;
-        ensures spec_unchanged_except_at(self, result_1);
-        ensures forall k: K where spec_contains_key(old(self), k) && k != result_1:
-            std::cmp::compare(result_1, k) == std::cmp::Ordering::Less;
+    spec pop_front {
+        pragma intrinsic;
     }
 
-    spec pop_back<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>): (K, V) {
-        pragma opaque;
-        pragma verify = false;
-        ensures spec_contains_key(old(self), result_1);
-        ensures result_2 == spec_get(old(self), result_1);
-        ensures !spec_contains_key(self, result_1);
-        ensures spec_len(self) == spec_len(old(self)) - 1;
-        ensures spec_unchanged_except_at(self, result_1);
-        ensures forall k: K where spec_contains_key(old(self), k) && k != result_1:
-            std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
+    spec pop_back {
+        pragma intrinsic;
     }
 
-    spec prev_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Option<K> {
-        pragma opaque;
-        pragma verify = false;
-        ensures result == std::option::spec_none() <==>
-        (forall k: K {spec_contains_key(self, k)} where spec_contains_key(self, k)
-        && k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
-        ensures result.is_some() <==>
-            spec_contains_key(self, option::spec_borrow(result)) &&
-            (std::cmp::compare(option::spec_borrow(result), key) == std::cmp::Ordering::Less)
-            && (forall k: K {spec_contains_key(self, k), std::cmp::compare(option::spec_borrow(result), k), std::cmp::compare(key, k)} where k != option::spec_borrow(result): ((spec_contains_key(self, k) &&
-            std::cmp::compare(k, key) == std::cmp::Ordering::Less)) ==>
-            std::cmp::compare(option::spec_borrow(result), k) == std::cmp::Ordering::Greater);
+    spec prev_key {
+        pragma intrinsic;
     }
 
-
-    spec next_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Option<K>  {
-        pragma opaque;
-        pragma verify = false;
-        ensures result == std::option::spec_none() <==>
-        (forall k: K {spec_contains_key(self, k)} where spec_contains_key(self, k) && k != key:
-        std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
-        ensures result.is_some() <==>
-            spec_contains_key(self, option::spec_borrow(result)) &&
-            (std::cmp::compare(option::spec_borrow(result), key) == std::cmp::Ordering::Greater)
-            && (forall k: K {spec_contains_key(self, k)} where k != option::spec_borrow(result): ((spec_contains_key(self, k) &&
-            std::cmp::compare(k, key) == std::cmp::Ordering::Greater)) ==>
-            std::cmp::compare(option::spec_borrow(result), k) == std::cmp::Ordering::Less);
+    spec next_key {
+        pragma intrinsic;
     }
 
 
     spec internal_find {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        ensures iter_is_end(result, self) <==> !spec_contains_key(self, key);
-        ensures !iter_is_end(result, self) ==> result.key == key;
+        pragma intrinsic;
     }
 
     spec internal_new_begin_iter {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        ensures iter_is_end(result, self) <==> spec_len(self) == 0;
-        ensures !iter_is_end(result, self) ==> spec_contains_key(self, result.key);
-        // result.key is the smallest key in the map.
-        ensures !iter_is_end(result, self) ==>
-            (forall k: K where spec_contains_key(self, k) && k != result.key:
-                std::cmp::compare(result.key, k) == std::cmp::Ordering::Less);
+        pragma intrinsic;
     }
 
     spec internal_new_end_iter {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        ensures result is IteratorPtr::End<K>;
+        pragma intrinsic;
     }
 
     spec iter_next {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_end(self, map);
+        aborts_if [abstract] spec_iter_op_aborts(self, map);
     }
 
     spec iter_prev {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_begin(self, map);
+        aborts_if [abstract] spec_iter_op_aborts(self, map);
     }
 
     spec compute_length {
-        pragma verify = false;
-        pragma opaque;
-        ensures result == spec_len(self);
+        pragma intrinsic;
     }
 
     spec iter_modify {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_end(self, map);
-        // iter_modify mutates the value at self.key via the closure. Containment is
-        // unchanged for every key; values for keys other than self.key are preserved.
-        ensures spec_contains_key(map, self.key);
+        aborts_if [abstract] spec_iter_op_aborts(self, map);
+        // Closure `f: |&mut V|` can abort at runtime; the model doesn't capture that
+        // condition precisely. The `[abstract]` markers above make the spec partial,
+        // so callers cannot conclude the function returns on any specific input.
+        // The success-path ensure is sound: closure mutates in place, neither adds
+        // nor removes entries. We don't claim which key was mutated.
         ensures spec_len(map) == spec_len(old(map));
-        ensures spec_unchanged_except_at(map, self.key);
     }
 
     spec internal_find_with_path {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        ensures iter_is_end(result.iterator, self) <==> !spec_contains_key(self, key);
-        ensures !iter_is_end(result.iterator, self) ==> result.iterator.key == key;
+        pragma intrinsic;
     }
 
     spec iter_with_path_get_iter {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if false;
-        ensures result == self.iterator;
+        pragma intrinsic;
     }
 
     spec iter_remove {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_end(self.iterator, map);
-        ensures result == spec_get(old(map), self.iterator.key);
-        ensures !spec_contains_key(map, self.iterator.key);
+        aborts_if [abstract] spec_iter_op_aborts(self.iterator, map);
+        // Removal of one entry; we do not claim which key was removed (cached position
+        // may be stale).
         ensures spec_len(map) == spec_len(old(map)) - 1;
-        ensures spec_unchanged_except_at(map, self.iterator.key);
     }
 
     spec internal_leaf_new_begin_iter {

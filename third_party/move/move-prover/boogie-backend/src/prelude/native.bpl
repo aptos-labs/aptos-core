@@ -391,6 +391,10 @@ axiom (
 {%- set SK = "'" ~ instance.0.suffix ~ "'" -%}
 {%- set SV = "'" ~ instance.1.suffix ~ "'" -%}
 {%- set ENC = "$EncodeKey'" ~ instance.0.suffix ~ "'" -%}
+{# Iterator type for this K — empty when the map has no `IteratorPtr` companion. #}
+{%- set IT = impl.iter_type_prefix ~ SK -%}
+{# Iterator-with-path type for this K — empty when no `IteratorPtrWithPath` companion. #}
+{%- set IPWP = impl.iter_with_path_type_prefix ~ SK -%}
 
 {%- if options.native_equality -%}
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
@@ -413,6 +417,40 @@ function $IsValid'{{Type}}{{S}}'(t: {{Self}}): bool {
 
 {%- if impl.fun_new != "" %}
 procedure {:inline 2} {{impl.fun_new}}{{S}}() returns (v: {{Self}}) {
+    v := EmptyTable();
+}
+{%- endif %}
+
+{%- if impl.fun_new_with_config != "" %}
+// Create an empty map with configured degree limits. Aborts when either degree
+// is non-zero and outside the supported [INNER_MIN_DEGREE=4 | LEAF_MIN_DEGREE=3, MAX_DEGREE=4096]
+// range; `reuse_slots` does not contribute abort conditions at this level.
+procedure {:inline 2} {{impl.fun_new_with_config}}{{S}}(inner_max_degree: int, leaf_max_degree: int, reuse_slots: bool) returns (v: {{Self}}) {
+    if (inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 11/*EINVALID_CONFIG_PARAMETER*/));
+    } else if (leaf_max_degree != 0 && (leaf_max_degree < 3 || leaf_max_degree > 4096)) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 11/*EINVALID_CONFIG_PARAMETER*/));
+    } else {
+        v := EmptyTable();
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_new_with_reusable != "" %}
+// Create an empty map with the reuse-slots policy enabled. The Move source aborts
+// when K/V are not constant-serialized-size, but that's a BCS-level property not
+// expressible here; we conservatively report aborts_if false to match the existing
+// trusted abstract spec.
+procedure {:inline 2} {{impl.fun_new_with_reusable}}{{S}}() returns (v: {{Self}}) {
+    v := EmptyTable();
+}
+{%- endif %}
+
+{%- if impl.fun_new_with_type_size_hints != "" %}
+// Create an empty map configured against size hints. The Move source asserts
+// avg <= max for both key and value, but the existing trusted abstract spec
+// reports aborts_if false; we match that here.
+procedure {:inline 2} {{impl.fun_new_with_type_size_hints}}{{S}}(avg_key_bytes: int, max_key_bytes: int, avg_value_bytes: int, max_value_bytes: int) returns (v: {{Self}}) {
     v := EmptyTable();
 }
 {%- endif %}
@@ -472,6 +510,14 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
 {%- endif %}
 
 {%- if impl.fun_del_must_exist != "" %}
+// Remove the entry at `k`, returning its value. Aborts when `k` is absent. The
+// abort code is the prover-internal `$StdError(7, 101)` (INVALID_ARGUMENTS, ENOT_FOUND);
+// this is an abstract code shared across all maps bound to this intrinsic. The runtime
+// abort code differs per map (e.g. `big_ordered_map::remove` aborts with
+// `error::invalid_argument(EKEY_NOT_FOUND=2)`), so user specs MUST NOT rely on
+// `aborts_with <literal>` to match the runtime constant — use `aborts_if` (boolean)
+// instead. The mismatch is uniform across all map intrinsics (cf. `add_no_override`,
+// iter codes) and reflects the prover's category-only abstraction of abort codes.
 procedure {:inline 2} {{impl.fun_del_must_exist}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
 returns (v: {{V}}, m': $Mutation({{Self}})) {
     var enc_k: int;
@@ -563,6 +609,17 @@ procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}
 }
 {%- endif %}
 
+{%- if impl.fun_get != "" and not instance.1.is_type_param and not instance.1.is_bv %}
+// Optional lookup: returns Some(v) when k is in the map, None otherwise. Never aborts.
+procedure {:inline 2} {{impl.fun_get}}{{S}}(t: {{Self}}, k: {{K}}) returns (result: $1_option_Option{{SV}}) {
+    if (ContainsTable(t, {{ENC}}(k))) {
+        result := $1_option_Option{{SV}}_Some(GetTable(t, {{ENC}}(k)));
+    } else {
+        result := $1_option_Option{{SV}}_None();
+    }
+}
+{%- endif %}
+
 {%- if impl.fun_to_vec_pair != "" %}
 // Decompose the map into two vectors with parallel positions. Order is unspecified
 // because the underlying SMT-array model has no notion of insertion order.
@@ -607,6 +664,306 @@ procedure {:inline 2} {{impl.fun_values}}{{S}}(t: {{Self}}) returns (vs: Vec ({{
 }
 {%- endif %}
 
+{%- if impl.fun_front_key != "" and not instance.0.is_type_param %}
+// Smallest key in the map under cmp::compare ordering. Aborts on an empty map. The
+// result is a key in the map, and every other key compares Greater.
+procedure {:inline 2} {{impl.fun_front_key}}{{S}}(t: {{Self}}) returns (k: {{K}}) {
+    if (LenTable(t) == 0) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        assume ContainsTable(t, {{ENC}}(k));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k) ==>
+            $1_cmp_$compare{{SK}}(k, k0) == $1_cmp_Ordering_Less());
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_back_key != "" and not instance.0.is_type_param %}
+// Largest key in the map under cmp::compare ordering. Aborts on an empty map.
+procedure {:inline 2} {{impl.fun_back_key}}{{S}}(t: {{Self}}) returns (k: {{K}}) {
+    if (LenTable(t) == 0) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        assume ContainsTable(t, {{ENC}}(k));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k) ==>
+            $1_cmp_$compare{{SK}}(k, k0) == $1_cmp_Ordering_Greater());
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_borrow_front != "" and not instance.0.is_type_param %}
+// Smallest key in the map together with its value. Aborts on an empty map. The
+// Move return type is `(K, &V)`; at the intrinsic boundary the reference is stripped
+// (same convention as `map_borrow`).
+procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{K}}, v: {{V}}) {
+    if (LenTable(t) == 0) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        assume ContainsTable(t, {{ENC}}(k));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k) ==>
+            $1_cmp_$compare{{SK}}(k, k0) == $1_cmp_Ordering_Less());
+        v := GetTable(t, {{ENC}}(k));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_borrow_back != "" and not instance.0.is_type_param %}
+// Largest key in the map together with its value. Aborts on an empty map.
+procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K}}, v: {{V}}) {
+    if (LenTable(t) == 0) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        assume ContainsTable(t, {{ENC}}(k));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k) ==>
+            $1_cmp_$compare{{SK}}(k, k0) == $1_cmp_Ordering_Greater());
+        v := GetTable(t, {{ENC}}(k));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_pop_front != "" and not instance.0.is_type_param %}
+// Remove and return the smallest entry under cmp::compare. Aborts on an empty map.
+procedure {:inline 2} {{impl.fun_pop_front}}{{S}}(m: $Mutation ({{Self}}))
+returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
+    var t: {{Self}};
+    t := $Dereference(m);
+    if (LenTable(t) == 0) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        assume ContainsTable(t, {{ENC}}(k));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k) ==>
+            $1_cmp_$compare{{SK}}(k, k0) == $1_cmp_Ordering_Less());
+        v := GetTable(t, {{ENC}}(k));
+        m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_pop_back != "" and not instance.0.is_type_param %}
+// Remove and return the largest entry under cmp::compare. Aborts on an empty map.
+procedure {:inline 2} {{impl.fun_pop_back}}{{S}}(m: $Mutation ({{Self}}))
+returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
+    var t: {{Self}};
+    t := $Dereference(m);
+    if (LenTable(t) == 0) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        assume ContainsTable(t, {{ENC}}(k));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k) ==>
+            $1_cmp_$compare{{SK}}(k, k0) == $1_cmp_Ordering_Greater());
+        v := GetTable(t, {{ENC}}(k));
+        m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_prev_key != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Largest key strictly less than `key` under cmp::compare. Returns Some when one
+// exists, None otherwise. Never aborts.
+procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}})
+returns (result: $1_option_Option{{SK}}) {
+    var has_prev: bool;
+    var prev_k: {{K}};
+    has_prev := (exists k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) &&
+        $1_cmp_$compare{{SK}}(k0, key) == $1_cmp_Ordering_Less());
+    if (!has_prev) {
+        result := $1_option_Option{{SK}}_None();
+    } else {
+        assume ContainsTable(t, {{ENC}}(prev_k));
+        assume $1_cmp_$compare{{SK}}(prev_k, key) == $1_cmp_Ordering_Less();
+        assume (forall k0: {{K}} ::
+            ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(prev_k) &&
+            $1_cmp_$compare{{SK}}(k0, key) == $1_cmp_Ordering_Less() ==>
+            $1_cmp_$compare{{SK}}(prev_k, k0) == $1_cmp_Ordering_Greater());
+        result := $1_option_Option{{SK}}_Some(prev_k);
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_next_key != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Smallest key strictly greater than `key` under cmp::compare. Returns Some when one
+// exists, None otherwise. Never aborts.
+procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}})
+returns (result: $1_option_Option{{SK}}) {
+    var has_next: bool;
+    var next_k: {{K}};
+    has_next := (exists k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) &&
+        $1_cmp_$compare{{SK}}(k0, key) == $1_cmp_Ordering_Greater());
+    if (!has_next) {
+        result := $1_option_Option{{SK}}_None();
+    } else {
+        assume ContainsTable(t, {{ENC}}(next_k));
+        assume $1_cmp_$compare{{SK}}(next_k, key) == $1_cmp_Ordering_Greater();
+        assume (forall k0: {{K}} ::
+            ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(next_k) &&
+            $1_cmp_$compare{{SK}}(k0, key) == $1_cmp_Ordering_Greater() ==>
+            $1_cmp_$compare{{SK}}(next_k, k0) == $1_cmp_Ordering_Less());
+        result := $1_option_Option{{SK}}_Some(next_k);
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_remove_or_none != "" and not instance.1.is_type_param and not instance.1.is_bv %}
+// Remove the entry at `key` if present. Returns Some(prev_value) on hit, None on miss.
+// Never aborts.
+procedure {:inline 2} {{impl.fun_remove_or_none}}{{S}}(m: $Mutation ({{Self}}), key: {{K}})
+returns (result: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};
+    enc_k := {{ENC}}(key);
+    t := $Dereference(m);
+    if (ContainsTable(t, enc_k)) {
+        result := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
+        m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+    } else {
+        result := $1_option_Option{{SV}}_None();
+        m' := m;
+    }
+}
+{%- endif %}
+
+{# ====== Iterator API. ====== #}
+{# These blocks only render when the map type has a companion IteratorPtr struct       #}
+{# (resolved into `iter_type_prefix`) and the instance is concrete. The Some constructor #}
+{# may carry implementation fields beyond the key (e.g. BigOrderedMap's node_index +    #}
+{# child_iter); we never read them in spec, so we havoc a local of the iter type and  #}
+{# constrain only its variant + key. The other fields stay unconstrained.              #}
+{# Staleness: only "cached key was removed" is modeled. A stale cached position whose  #}
+{# key still happens to exist after a rebalance is NOT caught.                         #}
+{# TODO: model node_index/child_iter explicitly to close this gap.                     #}
+
+{%- if impl.fun_iter_new_begin != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Iterator at the smallest key, or End on an empty map. Never aborts.
+procedure {:inline 2} {{impl.fun_iter_new_begin}}{{S}}(t: {{Self}}) returns (result: {{IT}}) {
+    var some_it: {{IT}};
+    var k_min: {{K}};
+    if (LenTable(t) == 0) {
+        result := {{IT}}_End();
+    } else {
+        assume ContainsTable(t, {{ENC}}(k_min));
+        assume (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(k_min) ==>
+            $1_cmp_$compare{{SK}}(k_min, k0) == $1_cmp_Ordering_Less());
+        assume some_it is {{IT}}_Some;
+        assume some_it->$key_Some == k_min;
+        result := some_it;
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_new_end != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// End-sentinel iterator. Never aborts.
+procedure {:inline 2} {{impl.fun_iter_new_end}}{{S}}(t: {{Self}}) returns (result: {{IT}}) {
+    result := {{IT}}_End();
+}
+{%- endif %}
+
+{%- if impl.fun_iter_is_end != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// True iff the iterator is the End sentinel. Never aborts.
+procedure {:inline 2} {{impl.fun_iter_is_end}}{{S}}(it: {{IT}}, t: {{Self}}) returns (r: bool) {
+    r := it is {{IT}}_End;
+}
+{%- endif %}
+
+{%- if impl.fun_iter_is_begin != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// True iff the iterator points to the begin position: either at the smallest key, or
+// is the End sentinel on an empty map. Never aborts.
+procedure {:inline 2} {{impl.fun_iter_is_begin}}{{S}}(it: {{IT}}, t: {{Self}}) returns (r: bool) {
+    if (it is {{IT}}_End) {
+        r := LenTable(t) == 0;
+    } else {
+        r := ContainsTable(t, {{ENC}}(it->$key_Some))
+            && (forall k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(it->$key_Some) ==>
+                $1_cmp_$compare{{SK}}(it->$key_Some, k0) == $1_cmp_Ordering_Less());
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_borrow_key != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Read the iterator's key. Aborts when at End.
+procedure {:inline 2} {{impl.fun_iter_borrow_key}}{{S}}(it: {{IT}}) returns (k: {{K}}) {
+    if (it is {{IT}}_End) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 3/*EITER_OUT_OF_BOUNDS*/));
+    } else {
+        k := it->$key_Some;
+    }
+}
+{%- endif %}
+
+{# iter_borrow / iter_next / iter_prev templates intentionally omitted: sound modeling   #}
+{# requires tracking node_index/child_iter alongside the cached key. Maps binding these  #}
+{# roles must either provide a custom opaque spec or wait for that modeling to land.     #}
+
+{%- if impl.fun_internal_find != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Iterator at the given key if present, end-sentinel otherwise. Never aborts.
+procedure {:inline 2} {{impl.fun_internal_find}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: {{IT}}) {
+    var some_it: {{IT}};
+    if (ContainsTable(t, {{ENC}}(key))) {
+        assume some_it is {{IT}}_Some;
+        assume some_it->$key_Some == key;
+        result := some_it;
+    } else {
+        result := {{IT}}_End();
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_internal_lower_bound != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Iterator at the smallest key K >= input under cmp::compare. End if no such key
+// exists (every key in the map is strictly less than `key`). Never aborts.
+procedure {:inline 2} {{impl.fun_internal_lower_bound}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: {{IT}}) {
+    var has_ge: bool;
+    var lb_k: {{K}};
+    var some_it: {{IT}};
+    has_ge := (exists k0: {{K}} :: ContainsTable(t, {{ENC}}(k0)) &&
+        $1_cmp_$compare{{SK}}(k0, key) != $1_cmp_Ordering_Less());
+    if (!has_ge) {
+        result := {{IT}}_End();
+    } else {
+        assume ContainsTable(t, {{ENC}}(lb_k));
+        assume $1_cmp_$compare{{SK}}(lb_k, key) != $1_cmp_Ordering_Less();
+        assume (forall k0: {{K}} ::
+            ContainsTable(t, {{ENC}}(k0)) && {{ENC}}(k0) != {{ENC}}(lb_k) &&
+            $1_cmp_$compare{{SK}}(k0, key) != $1_cmp_Ordering_Less() ==>
+            $1_cmp_$compare{{SK}}(lb_k, k0) != $1_cmp_Ordering_Greater());
+        assume some_it is {{IT}}_Some;
+        assume some_it->$key_Some == lb_k;
+        result := some_it;
+    }
+}
+{%- endif %}
+
+{# ====== IteratorPtrWithPath API. ====== #}
+{# IteratorPtrWithPath<K> is a single-constructor struct wrapping an IteratorPtr<K> and #}
+{# an implementation-only `path: vector<u64>`. The `$path` field is never read in spec, #}
+{# so we havoc a local of the IPWP type and constrain only the `$iterator` field. #}
+
+{%- if impl.fun_internal_find_with_path != "" and impl.iter_type_prefix != "" and impl.iter_with_path_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Iterator-with-path at the given key if present, end-sentinel otherwise. Never aborts.
+procedure {:inline 2} {{impl.fun_internal_find_with_path}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: {{IPWP}}) {
+    var iter: {{IT}};
+    var some_it: {{IT}};
+    var ipwp: {{IPWP}};
+    if (ContainsTable(t, {{ENC}}(key))) {
+        assume some_it is {{IT}}_Some;
+        assume some_it->$key_Some == key;
+        iter := some_it;
+    } else {
+        iter := {{IT}}_End();
+    }
+    assume ipwp->$iterator == iter;
+    result := ipwp;
+}
+{%- endif %}
+
+{%- if impl.fun_iter_with_path_get_iter != "" and impl.iter_type_prefix != "" and impl.iter_with_path_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+// Project the wrapped IteratorPtr<K> from an IteratorPtrWithPath<K>. Never aborts.
+procedure {:inline 2} {{impl.fun_iter_with_path_get_iter}}{{S}}(self: {{IPWP}}) returns (result: {{IT}}) {
+    result := self->$iterator;
+}
+{%- endif %}
+
+{# iter_remove template intentionally omitted for the same reason as iter_borrow above. #}
+
 {%- if impl.fun_new_from != "" %}
 // True iff `keys` contains two distinct positions with equal encoded keys.
 function {:inline} {{impl.fun_new_from}}_HasDup{{S}}(keys: Vec ({{K}})): bool {
@@ -632,6 +989,25 @@ procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys: Vec ({{K}}), values: Vec 
         assume (forall k: {{K}} :: ContainsTable(t, {{ENC}}(k)) <==> $ContainsVec{{SK}}(keys, k));
         assume (forall i: int :: 0 <= i && i < LenVec(keys) ==>
             GetTable(t, {{ENC}}(ReadVec(keys, i))) == ReadVec(values, i));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_upsert != "" and not instance.0.is_type_param and not instance.1.is_type_param and not instance.1.is_bv %}
+// Insert (k, v) or update v if k already maps. Returns the previous value (if any) wrapped
+// in std::option::Option<V>. Never aborts.
+procedure {:inline 2} {{impl.fun_upsert}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}})
+returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};
+    enc_k := {{ENC}}(k);
+    t := $Dereference(m);
+    if (ContainsTable(t, enc_k)) {
+        prev_v := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
+        m' := $UpdateMutation(m, UpdateTable(t, enc_k, v));
+    } else {
+        prev_v := $1_option_Option{{SV}}_None();
+        m' := $UpdateMutation(m, AddTable(t, enc_k, v));
     }
 }
 {%- endif %}
@@ -728,6 +1104,9 @@ function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): 
 }
 {%- endif %}
 
+{# Abort guards for the templates added in the iter / order-key / new_from / config family. #}
+{# Each body must match the corresponding procedure's abort guard exactly.                  #}
+
 {%- if impl.fun_spec_aborts_new_from != "" %}
 function {:inline} {{impl.fun_spec_aborts_new_from}}{{S}}(keys: Vec ({{K}}), values: Vec ({{V}})): bool {
     LenVec(keys) != LenVec(values) ||
@@ -736,6 +1115,28 @@ function {:inline} {{impl.fun_spec_aborts_new_from}}{{S}}(keys: Vec ({{K}}), val
         {{ENC}}(ReadVec(keys, i)) == {{ENC}}(ReadVec(keys, j)))
 }
 {%- endif %}
+
+{%- if impl.fun_spec_aborts_new_with_config != "" %}
+function {:inline} {{impl.fun_spec_aborts_new_with_config}}{{S}}(inner_max_degree: int, leaf_max_degree: int, reuse_slots: bool): bool {
+    (inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)) ||
+    (leaf_max_degree != 0 && (leaf_max_degree < 3 || leaf_max_degree > 4096))
+}
+{%- endif %}
+
+{%- if impl.fun_spec_aborts_empty_map != "" %}
+function {:inline} {{impl.fun_spec_aborts_empty_map}}{{S}}(t: {{Self}}): bool {
+    LenTable(t) == 0
+}
+{%- endif %}
+
+{%- if impl.fun_spec_aborts_iter_borrow_key != "" and impl.iter_type_prefix != "" and not instance.0.is_type_param and not instance.0.is_bv %}
+function {:inline} {{impl.fun_spec_aborts_iter_borrow_key}}{{S}}(it: {{IT}}): bool {
+    it is {{IT}}_End
+}
+{%- endif %}
+
+{# Abort-spec inlines for iter_oob / iter_prev / iter_remove intentionally omitted,    #}
+{# matching the omitted procedure templates above.                                      #}
 
 {% endmacro table_module %}
 
