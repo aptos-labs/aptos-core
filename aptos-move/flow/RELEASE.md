@@ -90,12 +90,11 @@ curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/
 
 1. Go to [Actions → Release move-flow](../../.github/workflows/move-flow-release.yaml)
 2. Click "Run workflow"
-3. Fill in the parameters:
-   - **release_version**: `1.0.4` (must match Cargo.toml version)
+3. Fill in the parameters (the release version is read from
+   `aptos-move/flow/Cargo.toml`):
    - **source_git_ref_override**: (optional) specific branch/commit to build from
-   - **release_title**: (optional) custom title, defaults to "move-flow v1.0.4"
+   - **release_title**: (optional) custom title, defaults to "move-flow v<version>"
    - **dry_run**: Uncheck this for a real release, keep checked for testing
-   - **skip_checks**: Only check if you want to bypass version validation
 
 4. Click "Run workflow"
 
@@ -139,11 +138,14 @@ Always test with `dry_run: true` first:
 
 ### Required Secrets
 
-`APTOS_BOT_GH_PAT_APTOS_AI_PLUGIN_PUBLISHER` — purpose-scoped PAT with
-write access to `aptos-labs/aptos-ai` only. Used by the `publish-plugin`
-job to push the plugin branch and open/refresh the PR. The job skips
-cleanly (emitting a `::notice::`) when the secret is absent, so a missing
-PAT does not block the release.
+`publish-plugin` pushes to `aptos-labs/aptos-ai` via a GitHub App (scoped to
+`aptos-ai`, `contents` + `pull-requests` write). Add to the `move-flow-release`
+environment:
+
+- `APTOS_AI_PLUGIN_PUBLISHER_APP_ID`
+- `APTOS_AI_PLUGIN_PUBLISHER_APP_KEY` (PEM)
+
+Absent → the job skips; the release still ships.
 
 ## Build Profile
 
@@ -156,16 +158,13 @@ move-flow uses the `tool` build profile:
 
 ## Troubleshooting
 
-### Version mismatch error
-Update the version in `aptos-move/flow/Cargo.toml` to match your release version, or use `skip_checks: true` (not recommended).
-
 ### Release already exists
 Check the [releases page](https://github.com/aptos-labs/aptos-core/releases). If the tag `move-flow-v1.0.4` already exists, you need to either:
-- Use a different version number
+- Bump the version in `aptos-move/flow/Cargo.toml`
 - Delete the existing release (requires admin permissions)
 
-The release workflow's pre-flight job now performs an automatic tag-collision
-check before any build runs: if `move-flow-v<release_version>` already exists
+The release workflow's pre-flight job performs an automatic tag-collision
+check before any build runs: if `move-flow-v<version>` already exists
 as a tag or GitHub release, the workflow fails fast with a clear message
 instead of failing later at the publish step.
 

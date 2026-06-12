@@ -18,12 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-artifact `.sha256` files and an aggregated `SHA256SUMS` manifest
   published alongside each release for integrity verification.
 - Pre-flight safety gates in the release workflow:
-  - Version-consistency check that fails the build when the workflow's
-    `release_version` input does not match the `version` in
-    `aptos-move/flow/Cargo.toml`.
-  - Tag-collision check that fails fast when
-    `move-flow-v<release_version>` already exists as a tag or GitHub
-    release, before any platform build runs.
+  - The release version is read directly from the `version` in
+    `aptos-move/flow/Cargo.toml`, so the tag, archives, and plugin PR
+    always reflect the committed version.
+  - Tag-collision check that fails fast when `move-flow-v<version>`
+    already exists as a tag or GitHub release, before any platform
+    build runs.
   - `dry_run` mode that exercises the full build/package path without
     publishing artifacts.
   - Source-SHA pinning: the pre-flight job resolves the requested ref
