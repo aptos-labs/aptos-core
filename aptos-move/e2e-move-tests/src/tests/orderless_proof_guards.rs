@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 
 /// `error::invalid_state(ESEQ_NUM_PROOF_IN_ORDERLESS_TXN)` in `0x1::account`.
 const ESEQ_NUM_PROOF_IN_ORDERLESS_TXN: u64 = 0x3_0000 + 30;
+/// `error::invalid_state(ESEQ_NUM_PROOF_IN_ORDERLESS_TXN)` in `0x1::multisig_account`.
+const EMULTISIG_SEQ_NUM_PROOF_IN_ORDERLESS_TXN: u64 = 0x3_0000 + 26;
 
 #[derive(Serialize, Deserialize)]
 struct SignerCapabilityOfferProofChallengeV2 {
@@ -65,12 +67,13 @@ fn run_as_orderless_txn(
     harness.run(txn)
 }
 
-/// Asserts the transaction aborted, but not with the orderless guard code — used to show the
-/// guard only fires for orderless transactions.
+/// Asserts the transaction aborted, but not with either orderless guard code — used to show the
+/// guards only fire for orderless transactions.
 fn assert_aborted_with_other_code(status: &TransactionStatus) {
     match status {
         TransactionStatus::Keep(ExecutionStatus::MoveAbort { code, .. }) => {
             assert_ne!(*code, ESEQ_NUM_PROOF_IN_ORDERLESS_TXN);
+            assert_ne!(*code, EMULTISIG_SEQ_NUM_PROOF_IN_ORDERLESS_TXN);
         },
         _ => panic!(
             "expected the transaction to abort past the orderless guard, got {:?}",
@@ -192,6 +195,57 @@ fn rotate_authentication_key_with_rotation_capability_rejected_in_orderless_txn(
     assert_abort!(status, ESEQ_NUM_PROOF_IN_ORDERLESS_TXN);
 
     let status = harness.run_transaction_payload(&bob, payload);
+    assert_aborted_with_other_code(&status);
+}
+
+/// `multisig_account::create_with_existing_account` is callable by anyone holding a signed
+/// creation message for the target account, so a captured message must not be executable from
+/// an orderless transaction.
+#[test]
+fn multisig_create_with_existing_account_rejected_in_orderless_txn() {
+    let mut harness = MoveHarness::new();
+    let alice = harness.new_account_with_key_pair();
+    let attacker = harness.new_account_with_key_pair();
+
+    let payload = aptos_stdlib::multisig_account_create_with_existing_account(
+        *alice.address(),
+        vec![*attacker.address()],
+        1,
+        0, // ED25519_SCHEME
+        alice.pubkey.to_bytes(),
+        vec![0u8; 64],
+        vec![],
+        vec![],
+    );
+
+    let status = run_as_orderless_txn(&mut harness, &attacker, payload.clone(), 1234);
+    assert_abort!(status, EMULTISIG_SEQ_NUM_PROOF_IN_ORDERLESS_TXN);
+
+    let status = harness.run_transaction_payload(&attacker, payload);
+    assert_aborted_with_other_code(&status);
+}
+
+#[test]
+fn multisig_create_with_existing_account_and_revoke_auth_key_rejected_in_orderless_txn() {
+    let mut harness = MoveHarness::new();
+    let alice = harness.new_account_with_key_pair();
+    let attacker = harness.new_account_with_key_pair();
+
+    let payload = aptos_stdlib::multisig_account_create_with_existing_account_and_revoke_auth_key(
+        *alice.address(),
+        vec![*attacker.address()],
+        1,
+        0, // ED25519_SCHEME
+        alice.pubkey.to_bytes(),
+        vec![0u8; 64],
+        vec![],
+        vec![],
+    );
+
+    let status = run_as_orderless_txn(&mut harness, &attacker, payload.clone(), 1234);
+    assert_abort!(status, EMULTISIG_SEQ_NUM_PROOF_IN_ORDERLESS_TXN);
+
+    let status = harness.run_transaction_payload(&attacker, payload);
     assert_aborted_with_other_code(&status);
 }
 
