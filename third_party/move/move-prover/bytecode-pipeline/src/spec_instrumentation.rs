@@ -373,6 +373,52 @@ struct Instrumenter<'a> {
     /// Counter for deterministic label freshening across opaque call sites.
     /// Starts at 0 so that freshened labels are independent of the global counter.
     freshen_counter: usize,
+    /// Tracks, per temp, the operands of the `Closure` instruction defining it, for
+    /// resolving captured mutations at retained inline-opaque call sites.
+    closure_defs: BTreeMap<TempIndex, ClosureDef>,
+    /// Tracks, per temp, the local a `BorrowLoc` instruction borrowed from.
+    borrow_local_defs: BTreeMap<TempIndex, TempIndex>,
+    /// Tracks, per reference temp, the root local it transitively borrows from,
+    /// through `BorrowLoc`, field borrows, and `vector::borrow_mut`. Used to
+    /// detect conflicting views of one location across call arguments.
+    borrow_roots: BTreeMap<TempIndex, TempIndex>,
+}
+
+/// The defining `Closure` instruction of a temp.
+#[derive(Clone)]
+struct ClosureDef {
+    mid: ModuleId,
+    fid: FunId,
+    targs: Vec<Type>,
+    mask: ClosureMask,
+    operands: Vec<TempIndex>,
+}
+
+/// Information about a closure-typed argument of an opaque call which captures
+/// mutable references (resulting from lambdas which modify captured variables, see
+/// the lambda lifter). Behavioral predicates over such an argument are translated
+/// by substituting a syntactic closure expression whose captured mutation operands
+/// are replaced by their saved pre-state values, with the havoced post-state values
+/// of the underlying locals appended as result slots.
+struct CapturedMutArg {
+    /// The closure-typed argument temp.
+    arg: TempIndex,
+    /// The capture mask of the closure.
+    mask: ClosureMask,
+    /// The closure expression to substitute for the argument in behavioral
+    /// predicates (captured mutations replaced by pre-state value temps).
+    vehicle_exp: Exp,
+    /// For each captured mutation, the underlying local it borrows from.
+    underlying_locals: Vec<TempIndex>,
+    /// For each captured parameter (in capture order), the underlying local of
+    /// the captured mutation, or None for value captures.
+    captured_posts: Vec<Option<TempIndex>>,
+    /// For each non-captured parameter (in parameter order), whether it is a
+    /// `&mut` parameter (whose post-state clone is carried in the original
+    /// behavioral predicate arguments).
+    non_captured_mut: Vec<bool>,
+    /// Number of declared results of the closure's target function.
+    n_results: usize,
 }
 
 // =================================================================================================
@@ -486,6 +532,9 @@ impl<'a> Instrumenter<'a> {
             mem_info: &mem_info,
             split_points: vec![],
             freshen_counter: 0,
+            closure_defs: BTreeMap::new(),
+            borrow_local_defs: BTreeMap::new(),
+            borrow_roots: BTreeMap::new(),
         };
         // Always inline spec lets in proof actions, independent of the
         // `inline_spec_lets` option. Proof-action exps are recorded in
@@ -656,6 +705,53 @@ impl<'a> Instrumenter<'a> {
         use Bytecode::*;
         use Operation::*;
 
+        // Track definitions needed to resolve captured mutations of closure arguments
+        // at retained inline-opaque call sites. Reassignments conservatively invalidate.
+        for dest in bc.dests() {
+            self.closure_defs.remove(&dest);
+            self.borrow_local_defs.remove(&dest);
+            self.borrow_roots.remove(&dest);
+        }
+        match &bc {
+            Call(_, dests, Closure(mid, fid, targs, mask), srcs, _) if dests.len() == 1 => {
+                self.closure_defs.insert(dests[0], ClosureDef {
+                    mid: *mid,
+                    fid: *fid,
+                    targs: targs.clone(),
+                    mask: *mask,
+                    operands: srcs.clone(),
+                });
+            },
+            Call(_, dests, BorrowLoc, srcs, _) if dests.len() == 1 => {
+                self.borrow_local_defs.insert(dests[0], srcs[0]);
+                self.borrow_roots.insert(dests[0], srcs[0]);
+            },
+            Call(_, dests, BorrowField(..), srcs, _)
+            | Call(_, dests, BorrowVariantField(..), srcs, _)
+                if dests.len() == 1 =>
+            {
+                if let Some(root) = self.borrow_roots.get(&srcs[0]).cloned() {
+                    self.borrow_roots.insert(dests[0], root);
+                }
+            },
+            Call(_, dests, Function(..), srcs, _)
+                if dests.len() == 1
+                    && self.builder.data.local_types[dests[0]].is_mutable_reference() =>
+            {
+                // A returned mutable reference derives from a reference argument
+                // (e.g. `vector::borrow_mut`, table/map intrinsics); propagate the
+                // root of the first reference source.
+                if let Some(root) = srcs
+                    .iter()
+                    .find(|src| self.builder.data.local_types[**src].is_reference())
+                    .and_then(|src| self.borrow_roots.get(src).cloned())
+                {
+                    self.borrow_roots.insert(dests[0], root);
+                }
+            },
+            _ => {},
+        }
+
         // Prefix with modifies checks for builtin memory modifiers. Notice that we assume
         // the BorrowGlobal at this point represents a mutation and immutable references have
         // been removed.
@@ -775,6 +871,21 @@ impl<'a> Instrumenter<'a> {
         callee_spec.freshen_labels(&mut self.freshen_counter);
 
         self.builder.set_loc_from_attr(id);
+
+        // Resolve closure arguments capturing mutable references (from lambdas which
+        // modify captured variables, passed to retained inline-opaque functions).
+        // This saves pre-state values of the captured locations and rewrites the
+        // behavioral predicates in the callee spec to use them; the underlying
+        // locals are havoced on the success path below, with their post-values
+        // constrained by the rewritten `ensures_of` conditions.
+        let captured_mut_args = if callee_opaque {
+            self.collect_captured_mut_args(&srcs)
+        } else {
+            vec![]
+        };
+        if !captured_mut_args.is_empty() {
+            self.rewrite_behavior_preds_for_captured_muts(&mut callee_spec, &captured_mut_args);
+        }
 
         if ProverOptions::get(self.builder.global_env()).inline_spec_lets {
             self.inline_lets(&mut callee_spec, true);
@@ -980,9 +1091,32 @@ impl<'a> Instrumenter<'a> {
                 });
             }
 
+            // Havoc the locals underlying captured mutations of closure arguments;
+            // their post-values are constrained by the rewritten `ensures_of`
+            // conditions assumed below.
+            let captured_mut_locals = captured_mut_args
+                .iter()
+                .flat_map(|info| info.underlying_locals.iter().cloned())
+                .collect_vec();
+            for local in &captured_mut_locals {
+                self.builder.emit_with(|id| {
+                    Call(
+                        id,
+                        vec![*local],
+                        Operation::Havoc(HavocKind::Value),
+                        vec![],
+                        None,
+                    )
+                });
+            }
+
             // Emit placeholders for assuming well-formedness of return values and mutable ref
             // parameters.
-            for idx in mut_srcs.into_iter().chain(dests.iter().cloned()) {
+            for idx in mut_srcs
+                .into_iter()
+                .chain(captured_mut_locals)
+                .chain(dests.iter().cloned())
+            {
                 let exp = self
                     .builder
                     .mk_call(&BOOL_TYPE, ast::Operation::WellFormed, vec![self
@@ -1102,6 +1236,377 @@ impl<'a> Instrumenter<'a> {
 
             // Generate OpaqueCallEnd instruction if invariant_v2.
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
+        }
+    }
+
+    /// Collects information about closure-typed arguments of an opaque call which
+    /// capture mutable references (resulting from lambdas which modify captured
+    /// variables). Emits assignments saving the pre-state values of the captured
+    /// locations. Closures capturing references are restricted by the closure
+    /// checker to be constructed directly as arguments of retained inline-opaque
+    /// calls, so their construction is statically visible here.
+    fn collect_captured_mut_args(&mut self, srcs: &[TempIndex]) -> Vec<CapturedMutArg> {
+        let mut result = vec![];
+        let loc = self.builder.get_current_loc();
+        for arg in srcs {
+            let Some(def) = self.closure_defs.get(arg).cloned() else {
+                continue;
+            };
+            let has_mut_capture = def
+                .operands
+                .iter()
+                .any(|op| self.builder.data.local_types[*op].is_mutable_reference());
+            if !has_mut_capture {
+                continue;
+            }
+            // Compute, for the non-captured parameters in parameter order, which are
+            // `&mut` (their post-state clones are carried in the original behavioral
+            // predicate arguments), and the declared result count. Both are needed to
+            // merge the post-state slots in parameter order (see
+            // `rewrite_behavior_preds_for_captured_muts`).
+            let (non_captured_mut, n_results) = {
+                let env = self.builder.global_env();
+                let fun_env = env.get_function(def.mid.qualified(def.fid));
+                (
+                    fun_env
+                        .get_parameter_types()
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| !def.mask.is_captured(*i))
+                        .map(|(_, ty)| ty.is_mutable_reference())
+                        .collect::<Vec<_>>(),
+                    fun_env.get_return_count(),
+                )
+            };
+            let mut vehicle_args = vec![];
+            let mut underlying_locals = vec![];
+            let mut captured_posts = vec![];
+            let mut ok = true;
+            for op in &def.operands {
+                let ty = self.builder.data.local_types[*op].clone();
+                if ty.is_mutable_reference() {
+                    let Some(local) = self.borrow_local_defs.get(op).cloned() else {
+                        self.builder.global_env().error(
+                            &loc,
+                            "captured mutable reference must be a direct borrow of a \
+                             local variable",
+                        );
+                        ok = false;
+                        break;
+                    };
+                    let value_ty = ty.skip_reference().clone();
+                    let pre = self.builder.new_temp(value_ty);
+                    self.builder
+                        .emit_with(|id| Bytecode::Assign(id, pre, local, AssignKind::Copy));
+                    vehicle_args.push(self.builder.mk_temporary(pre));
+                    underlying_locals.push(local);
+                    captured_posts.push(Some(local));
+                } else {
+                    vehicle_args.push(self.builder.mk_temporary(*op));
+                    captured_posts.push(None);
+                }
+            }
+            if !ok {
+                continue;
+            }
+            let (vehicle_exp, _) =
+                self.builder
+                    .mk_closure(def.mid, def.fid, &def.targs, def.mask, vehicle_args);
+            result.push(CapturedMutArg {
+                arg: *arg,
+                mask: def.mask,
+                vehicle_exp,
+                underlying_locals,
+                captured_posts,
+                non_captured_mut,
+                n_results,
+            });
+        }
+
+        // Reject mutation of the same location through more than one argument of the
+        // call (closure captures or direct `&mut` arguments). This is legal Move —
+        // after inline expansion the mutations happen sequentially, and the prover
+        // can assume compilation including borrow checking succeeded — but it cannot
+        // be expressed by the callee's opaque spec: behavioral predicates relate the
+        // call's entry and exit states, while the actual effects compose through
+        // intermediate states. Assuming them conjunctively about a single havoced
+        // location is unsound (contradictory specs make the context vacuous,
+        // compatible ones assert facts about the wrong state pairs). Expressing such
+        // sequential effects would require state-labeled anchoring of the captured
+        // locations.
+        let mut seen: BTreeSet<TempIndex> = srcs
+            .iter()
+            .filter(|src| self.builder.data.local_types[**src].is_mutable_reference())
+            .filter_map(|src| self.borrow_roots.get(src).cloned())
+            .collect();
+        for info in &result {
+            for local in &info.underlying_locals {
+                if !seen.insert(*local) {
+                    let target = FunctionTarget::new(self.builder.fun_env, &self.builder.data);
+                    let name = if target.has_local_user_name(*local) {
+                        format!(
+                            "local `{}`",
+                            target.get_local_name(*local).display(target.symbol_pool())
+                        )
+                    } else {
+                        target.get_local_name_for_error_message(*local)
+                    };
+                    self.builder.global_env().error_with_notes(
+                        &loc,
+                        &format!(
+                            "{} is mutated through more than one argument of this call",
+                            name
+                        ),
+                        vec![
+                            "the behavioral predicates in the callee's opaque spec relate the \
+                             call's entry and exit states and cannot express sequential effects \
+                             on the same location; combine the mutations in one lambda"
+                                .to_string(),
+                        ],
+                    );
+                }
+            }
+        }
+        result
+    }
+
+    /// Rewrites behavioral predicates over closure arguments with captured
+    /// mutations in the translated callee spec: the function value argument is
+    /// replaced by the vehicle closure expression (with pre-state values for the
+    /// captured mutations), and for `ensures_of`, the havoced post-state values
+    /// of the underlying locals are merged into the post-state result slots in
+    /// parameter order, together with the post-state clones of non-captured
+    /// `&mut` parameters carried in the original arguments. The Boogie backend
+    /// translates the resulting syntactic closure via the per-function behavioral
+    /// spec functions (see `translate_behavior_for_closure`).
+    fn rewrite_behavior_preds_for_captured_muts(
+        &mut self,
+        callee_spec: &mut TranslatedSpec,
+        captured_mut_args: &[CapturedMutArg],
+    ) {
+        /// Rewrite info per closure argument temp.
+        #[derive(Clone)]
+        struct RewriteInfo {
+            /// The original argument temp (saved-param aliases share it).
+            base: TempIndex,
+            vehicle_exp: Exp,
+            mask: ClosureMask,
+            /// Post-state exps for captured parameters (in capture order), None
+            /// for value captures.
+            captured_posts: Vec<Option<Exp>>,
+            non_captured_mut: Vec<bool>,
+            n_results: usize,
+        }
+        struct BehaviorRewriter {
+            infos: BTreeMap<TempIndex, RewriteInfo>,
+            /// Number of `ensures_of` references per closure argument.
+            ensures_refs: BTreeMap<TempIndex, usize>,
+        }
+        impl ExpRewriterFunctions for BehaviorRewriter {
+            fn rewrite_call(
+                &mut self,
+                id: move_model::model::NodeId,
+                oper: &ast::Operation,
+                args: &[Exp],
+            ) -> Option<Exp> {
+                if let ast::Operation::Behavior(kind, _) = oper {
+                    if let Some(ExpData::Temporary(_, t)) = args.first().map(|e| e.as_ref()) {
+                        if let Some(info) = self.infos.get(t) {
+                            let mut new_args = vec![info.vehicle_exp.clone()];
+                            if *kind == ast::BehaviorKind::EnsuresOf {
+                                *self.ensures_refs.entry(info.base).or_default() += 1;
+                                // The original arguments are laid out as
+                                // `[inputs (one per non-captured param), declared
+                                // results, post-state clones of non-captured `&mut`
+                                // params (in param order)]`. The per-function spec
+                                // function expects the post-state slots for ALL
+                                // `&mut` params in parameter order, so merge the
+                                // captured post-states in via the closure mask.
+                                let n_inputs = info.non_captured_mut.len();
+                                let n_results = info.n_results;
+                                let inputs = &args[1..1 + n_inputs];
+                                let results = &args[1 + n_inputs..1 + n_inputs + n_results];
+                                let mut clones = args[1 + n_inputs + n_results..].iter().cloned();
+                                let non_captured_posts: Vec<Option<Exp>> = info
+                                    .non_captured_mut
+                                    .iter()
+                                    .map(|is_mut| if *is_mut { clones.next() } else { None })
+                                    .collect();
+                                let merged_posts = info
+                                    .mask
+                                    .compose(info.captured_posts.clone(), non_captured_posts)
+                                    .expect("closure mask composition")
+                                    .into_iter()
+                                    .flatten();
+                                new_args.extend(inputs.iter().cloned());
+                                new_args.extend(results.iter().cloned());
+                                new_args.extend(merged_posts);
+                            } else {
+                                new_args.extend(args[1..].iter().cloned());
+                            }
+                            return Some(ExpData::Call(id, oper.clone(), new_args).into_exp());
+                        }
+                    }
+                }
+                None
+            }
+        }
+        // The function value may also be referenced through its pre-state save temp
+        // (`saved_params`, for behavioral predicates anchored in the pre-state); the
+        // closure value is immutable, so both temps denote the same closure.
+        let mut infos = BTreeMap::new();
+        for info in captured_mut_args {
+            let captured_posts: Vec<Option<Exp>> = info
+                .captured_posts
+                .iter()
+                .map(|local_opt| local_opt.map(|local| self.builder.mk_temporary(local)))
+                .collect();
+            let mut keys = vec![info.arg];
+            if let Some(saved) = callee_spec.saved_params.get(&info.arg) {
+                keys.push(*saved);
+            }
+            for key in keys {
+                infos.insert(key, RewriteInfo {
+                    base: info.arg,
+                    vehicle_exp: info.vehicle_exp.clone(),
+                    mask: info.mask,
+                    captured_posts: captured_posts.clone(),
+                    non_captured_mut: info.non_captured_mut.clone(),
+                    n_results: info.n_results,
+                });
+            }
+        }
+        // Function values may be aliased through spec `let` bindings; map those
+        // let temps to the same rewrite info (in binding order, so chains of
+        // aliases resolve transitively).
+        for (_, _, let_temp, exp) in &callee_spec.lets {
+            if let ExpData::Temporary(_, t) = exp.as_ref() {
+                if let Some(info) = infos.get(t).cloned() {
+                    infos.insert(*let_temp, info);
+                }
+            }
+        }
+        // Pre-scan (before rewriting consumes the original `Temporary` references):
+        // a single quantified `ensures_of<f>(...)` (e.g. `forall i: ensures_of<f>(v[i])`)
+        // syntactically counts as one occurrence, but expands semantically to N
+        // constraints on the SAME havoced post-state of f's captures — one per
+        // quantifier instance. For distinct args those constraints are inconsistent,
+        // which makes the assumption `assume false` at the call site and lets callers
+        // verify any post-condition vacuously (unsound). Reject the pattern.
+        let captured_args: BTreeSet<TempIndex> = infos.keys().copied().collect();
+        let mut found_quantified_captured_ensures_of = false;
+        for exp in callee_spec
+            .pre
+            .iter()
+            .map(|(_, e)| e)
+            .chain(callee_spec.post.iter().map(|(_, e)| e))
+            .chain(
+                callee_spec
+                    .aborts
+                    .iter()
+                    .flat_map(|(_, e, code)| std::iter::once(e).chain(code.iter())),
+            )
+            .chain(callee_spec.aborts_with.iter().flat_map(|(_, es)| es))
+            .chain(callee_spec.lets.iter().map(|(_, _, _, e)| e))
+            .chain(
+                callee_spec
+                    .updates
+                    .iter()
+                    .flat_map(|(_, lhs, rhs)| [lhs, rhs]),
+            )
+            .chain(callee_spec.emits.iter().flat_map(|(_, msg, handle, cond)| {
+                [msg, handle].into_iter().chain(cond.iter())
+            }))
+            .chain(callee_spec.modifies.iter().map(|(_, e)| e))
+        {
+            let mut quant_depth: usize = 0;
+            exp.visit_pre_post(&mut |is_post, e| {
+                match (is_post, e) {
+                    (false, ExpData::Quant(..)) => quant_depth += 1,
+                    (true, ExpData::Quant(..)) => quant_depth -= 1,
+                    (
+                        false,
+                        ExpData::Call(
+                            _,
+                            ast::Operation::Behavior(ast::BehaviorKind::EnsuresOf, _),
+                            call_args,
+                        ),
+                    ) if quant_depth > 0 => {
+                        if let Some(arg0) = call_args.first() {
+                            if let ExpData::Temporary(_, t) = arg0.as_ref() {
+                                if captured_args.contains(t) {
+                                    found_quantified_captured_ensures_of = true;
+                                }
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+                true
+            });
+        }
+
+        let mut rewriter = BehaviorRewriter {
+            infos,
+            ensures_refs: BTreeMap::new(),
+        };
+        for exp in callee_spec
+            .pre
+            .iter_mut()
+            .map(|(_, e)| e)
+            .chain(callee_spec.post.iter_mut().map(|(_, e)| e))
+            .chain(
+                callee_spec
+                    .aborts
+                    .iter_mut()
+                    .flat_map(|(_, e, code)| std::iter::once(e).chain(code.iter_mut())),
+            )
+            .chain(callee_spec.aborts_with.iter_mut().flat_map(|(_, es)| es))
+            .chain(callee_spec.lets.iter_mut().map(|(_, _, _, e)| e))
+            .chain(
+                callee_spec
+                    .updates
+                    .iter_mut()
+                    .flat_map(|(_, lhs, rhs)| [lhs, rhs]),
+            )
+            .chain(
+                callee_spec
+                    .emits
+                    .iter_mut()
+                    .flat_map(|(_, msg, handle, cond)| {
+                        [msg, handle].into_iter().chain(cond.iter_mut())
+                    }),
+            )
+            .chain(callee_spec.modifies.iter_mut().map(|(_, e)| e))
+        {
+            *exp = rewriter.rewrite_exp(exp.clone());
+        }
+
+        // Each captured location is mutated by at most one application of its
+        // closure in the call-site model: the location is havoced once and
+        // constrained by one `ensures_of`. A spec relating the captured
+        // post-state through more than one `ensures_of` would constrain the
+        // single havoced location with conditions about different applications;
+        // reject this (it can only be written meaningfully with
+        // `pragma verify = false`, where the body check that would otherwise
+        // refute it is skipped).
+        if rewriter.ensures_refs.values().any(|c| *c > 1) {
+            self.builder.global_env().error(
+                &self.builder.get_current_loc(),
+                "the spec of this call's callee constrains a closure with captured \
+                 mutations through more than one `ensures_of` condition, which cannot \
+                 be expressed in the call-site model",
+            );
+        }
+        if found_quantified_captured_ensures_of {
+            self.builder.global_env().error(
+                &self.builder.get_current_loc(),
+                "the spec of this call's callee uses a quantified `ensures_of` over \
+                 a closure with captured mutations; this would over-constrain the \
+                 single havoced post-state across iterations and is unsound at the \
+                 call site (it makes the assumption inconsistent, letting callers \
+                 verify any post-condition vacuously)",
+            );
         }
     }
 }
@@ -2187,6 +2692,12 @@ impl<'a> Instrumenter<'a> {
 /// instrumentation: emitting it only when the enclosing spec already has an
 /// assertion of that predicate ensures `spec.saved_memory` was populated
 /// with the right label for the callee's used memory.
+/// Returns the first pre-state label under which the enclosing spec references the
+/// given callee through behavioral predicates.
+/// TODO(#20069): with references anchored at different labels, sequential calls to
+/// the same callee have different entry snapshots, but the aggregated call-site
+/// assumes all bind to this single label; selecting the label per call site needs
+/// a correlation between calls and the abstract state labels they define.
 fn find_behavior_pre_label_for_callee(
     spec: &TranslatedSpec,
     mid: ModuleId,

@@ -47,7 +47,10 @@ pub fn run_move_prover_v2<W: WriteColor>(
     mut experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    if options.inference.inference {
+    if options.inference.inference || options.prover.infer_lambda_specs {
+        // Lambda spec inference benefits from pure-spec-fun rewriting too: lambda
+        // bodies that call pure user functions then inference cleanly to
+        // `result == helper(args)` instead of `result == result_of<helper>(args)`.
         experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
     }
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;

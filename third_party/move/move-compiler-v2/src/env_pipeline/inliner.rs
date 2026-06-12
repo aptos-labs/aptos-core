@@ -149,8 +149,9 @@ pub fn run_inlining(
         for module in env.get_modules() {
             for func in module.get_functions() {
                 let id = func.get_qualified_id();
-                if func.is_inline() && func.get_def().is_some() {
-                    // Only delete functions with a body.
+                if func.is_inline() && func.get_def().is_some() && !func.is_inline_verified() {
+                    // Only delete functions with a body, and keep verified inline
+                    // functions, whose bodies are checked against their specs.
                     inline_funs.insert(id);
                 }
             }
@@ -526,7 +527,7 @@ impl ExpRewriterFunctions for OuterInlinerRewriter<'_, '_> {
         if let Operation::MoveFunction(module_id, fun_id) = oper {
             let qfid = module_id.qualified(*fun_id);
             let func_env = self.inliner.env.get_function(qfid);
-            if func_env.is_inline() {
+            if func_env.is_inline() && !func_env.is_inline_opaque_retained() {
                 // inline the function call
                 let type_args = self.inliner.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();

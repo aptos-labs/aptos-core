@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:80:9
+   │
+80 │         ensures result == n * (n + 1); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:75: test_sum_wrong
+   =     at tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:79: test_sum_wrong (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:75: test_sum_wrong
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:22: sum (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:76: test_sum_wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:80: test_sum_wrong (spec)

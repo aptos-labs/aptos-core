@@ -1,0 +1,9 @@
+Move prover returns: exiting with bytecode transformation errors
+error: the spec of this call's callee uses a quantified `ensures_of` over a closure with captured mutations; this would over-constrain the single havoced post-state across iterations and is unsound at the call site (it makes the assumption inconsistent, letting callers verify any post-condition vacuously)
+   ┌─ tests/sources/functional/closures/inline/inline_opaque_hof_quantified_ensures_of_fail.move:40:9
+   │
+40 │ ╭         for_each_ref(v, |e| s = s + *e spec { // error: quantified `ensures_of`
+41 │ │             aborts_if s + e > MAX_U64;
+42 │ │             ensures s == old(s) + e;
+43 │ │         });
+   │ ╰──────────^

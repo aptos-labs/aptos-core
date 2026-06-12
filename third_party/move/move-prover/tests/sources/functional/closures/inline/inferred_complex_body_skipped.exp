@@ -1,0 +1,66 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21:15
+   │
+21 │           apply(|y| {
+   │ ╭───────────────^
+22 │ │             let i = 0;
+23 │ │             let s = y;
+24 │ │             while (i < y) {
+   · │
+28 │ │             s
+29 │ │         }, x)
+   │ ╰─────────^
+   │
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21: test
+   =         y = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:22: test
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:23: test
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:24: test
+   =     enter loop, variable(s) i, s havocked and reassigned
+   =         i = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21: test
+   =         result = <redacted>
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21:15
+   │
+21 │           apply(|y| {
+   │ ╭───────────────^
+22 │ │             let i = 0;
+23 │ │             let s = y;
+24 │ │             while (i < y) {
+   · │
+28 │ │             s
+29 │ │         }, x)
+   │ ╰─────────^
+   │
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21: test
+   =         y = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:22: test
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:23: test
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:24: test
+   =     enter loop, variable(s) i, s havocked and reassigned
+   =         i = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21: test
+   =         result = <redacted>
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:33:9
+   │
+33 │         ensures result == 2 * x; // error: post-condition does not hold (silent skip; bp_ensures = true)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:20: test
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:32: test (spec)
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:20: test
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:21: test
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/inferred_complex_body_skipped.move:33: test (spec)
