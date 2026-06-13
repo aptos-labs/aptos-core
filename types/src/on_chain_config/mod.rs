@@ -47,8 +47,9 @@ pub use self::{
     commit_history::CommitHistoryResource,
     consensus_config::{
         AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
-        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
-        ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE, DEFAULT_WINDOW_SIZE,
+        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+        ProposerAndVoterConfigV3, ProposerElectionType, ValidatorTxnConfig,
+        DEFAULT_ENABLED_WINDOW_SIZE, DEFAULT_WINDOW_SIZE,
     },
     epoch_timeout_config::EpochTimeoutConfig,
     execution_config::{
