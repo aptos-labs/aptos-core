@@ -49,7 +49,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         AnchorElectionMode, DagConsensusConfigV1,
-        LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
+        LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2, ProposerAndVoterV3},
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
         ValidatorTxnConfig,
     },
@@ -478,6 +478,24 @@ impl DagBootstrapper {
                             commit_events,
                             self.build_leader_reputation_components(config),
                         )
+                    },
+                    // V3 is V2 plus the latency-weighted gate. The DAG path does not yet
+                    // wire `LatencyWeightedHeuristic` into its anchor-election plumbing,
+                    // so we use the V3 base config and ignore the latency-weighted toggle.
+                    // TODO(consensus): plumb LatencyWeightedHeuristic into DAG when needed.
+                    ProposerAndVoterV3(config) => {
+                        let base = &config.base;
+                        let commit_events = self
+                            .storage
+                            .get_latest_k_committed_events(
+                                std::cmp::max(
+                                    base.proposer_window_num_validators_multiplier,
+                                    base.voter_window_num_validators_multiplier,
+                                ) as u64
+                                    * self.epoch_state.verifier.len() as u64,
+                            )
+                            .expect("Failed to read commit events from storage");
+                        (commit_events, self.build_leader_reputation_components(base))
                     },
                     ProposerAndVoter(_) => unreachable!("unsupported mode"),
                 };
