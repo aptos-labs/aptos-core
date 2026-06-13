@@ -2,8 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    on_chain_config::CurrentTimeMicroseconds, proof::SparseMerkleRangeProof,
-    state_store::state_key::StateKey, transaction::Version,
+    on_chain_config::CurrentTimeMicroseconds,
+    proof::SparseMerkleRangeProof,
+    state_store::{hot_state::HotStateValue, state_key::StateKey},
+    transaction::Version,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -355,6 +357,38 @@ pub struct StateValueChunkWithProof {
 impl StateValueChunkWithProof {
     /// Returns true iff this chunk is the last chunk (i.e., there are no
     /// more state values to write to storage after this chunk).
+    pub fn is_last_chunk(&self) -> bool {
+        let right_siblings = self.proof.right_siblings();
+        right_siblings
+            .iter()
+            .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
+    }
+}
+
+/// A single chunk of all hot state values at a specific version. This is the hot
+/// state counterpart of [`StateValueChunkWithProof`], used to transfer a hot
+/// state snapshot during fast sync.
+///
+/// The hot state Merkle tree hashes a `HotStateValue` (the value together with
+/// its `hot_since_version`) at each leaf rather than a bare `StateValue`, so each
+/// entry carries the full `HotStateValue`. `proof` and `root_hash` are over the
+/// hot state sparse merkle tree (i.e. the `hot_state_checkpoint_hash` committed
+/// in `TransactionInfoV1`), not the main state tree.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct HotStateValueChunkWithProof {
+    pub first_index: u64,     // The first hashed state index in chunk
+    pub last_index: u64,      // The last hashed state index in chunk
+    pub first_key: HashValue, // The first hashed state key in chunk
+    pub last_key: HashValue,  // The last hashed state key in chunk
+    pub raw_values: Vec<(StateKey, HotStateValue)>, // The state key and its hot state value.
+    pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the hot states
+    pub root_hash: HashValue, // The root hash of the hot state sparse merkle tree for this chunk
+}
+
+impl HotStateValueChunkWithProof {
+    /// Returns true iff this chunk is the last chunk (i.e., there are no
+    /// more hot state values to write to storage after this chunk).
     pub fn is_last_chunk(&self) -> bool {
         let right_siblings = self.proof.right_siblings();
         right_siblings

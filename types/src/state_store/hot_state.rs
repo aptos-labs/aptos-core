@@ -46,6 +46,7 @@ pub trait THotStateSlot {
 
 /// `HotStateValue` is what gets hashed into the hot state Merkle tree.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, BCSCryptoHash, CryptoHasher)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct HotStateValue {
     /// `Some` means occupied and `None` means vacant.
     value: Option<StateValue>,

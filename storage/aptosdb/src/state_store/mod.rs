@@ -73,7 +73,10 @@ use aptos_types::{
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
-        state_value::{StaleStateValueByKeyHashIndex, StateValue, StateValueChunkWithProof},
+        state_value::{
+            HotStateValueChunkWithProof, StaleStateValueByKeyHashIndex, StateValue,
+            StateValueChunkWithProof,
+        },
         NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -1497,6 +1500,81 @@ impl StateStore {
             first_index,
             state_key_values,
         )
+    }
+
+    /// Hot state counterpart of [`Self::get_value_chunk_with_proof`]. Reads from the hot state
+    /// Merkle tree and KV; the proof and root hash are over the hot state tree.
+    pub fn get_hot_value_chunk_with_proof(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<HotStateValueChunkWithProof> {
+        let state_key_values: Vec<(StateKey, HotStateValue)> = self
+            .get_hot_value_chunk_iter(version, first_index, chunk_size)?
+            .collect::<Result<Vec<_>>>()?;
+        self.get_hot_value_chunk_proof(version, first_index, state_key_values)
+    }
+
+    pub fn get_hot_value_chunk_iter(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, HotStateValue)>> + Send + Sync + use<>> {
+        let store = Arc::clone(self);
+        let hot_state_merkle_db = self
+            .hot_state_merkle_db
+            .as_ref()
+            .ok_or(AptosDbError::HotStateError)?;
+        let value_chunk_iter = JellyfishMerkleIterator::new_by_index(
+            Arc::clone(hot_state_merkle_db),
+            version,
+            first_index,
+        )?
+        .take(chunk_size)
+        .map(move |res| {
+            res.and_then(|(key_hash, (key, version))| {
+                Ok((
+                    key.clone(),
+                    store.expect_hot_state_value_by_version(key_hash, version)?,
+                ))
+            })
+        });
+
+        Ok(value_chunk_iter)
+    }
+
+    pub fn get_hot_value_chunk_proof(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        state_key_values: Vec<(StateKey, HotStateValue)>,
+    ) -> Result<HotStateValueChunkWithProof> {
+        ensure!(
+            !state_key_values.is_empty(),
+            "Hot state chunk starting at {}",
+            first_index,
+        );
+        let last_index = (state_key_values.len() - 1 + first_index) as u64;
+        let first_key = state_key_values.first().expect("checked to exist").0.hash();
+        let last_key = state_key_values.last().expect("checked to exist").0.hash();
+        let hot_state_merkle_db = self
+            .hot_state_merkle_db
+            .as_ref()
+            .ok_or(AptosDbError::HotStateError)?;
+        let proof = hot_state_merkle_db.get_range_proof(last_key, version)?;
+        let root_hash = hot_state_merkle_db.get_root_hash(version)?;
+
+        Ok(HotStateValueChunkWithProof {
+            first_index: first_index as u64,
+            last_index,
+            first_key,
+            last_key,
+            raw_values: state_key_values,
+            proof,
+            root_hash,
+        })
     }
 
     // state sync doesn't query for the progress, but keeps its record by itself.
