@@ -1,12 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::utils::CONTENT_TYPE_JSON;
-use aptos_logger::error;
-use prometheus::{
-    proto::{LabelPair, Metric, MetricFamily, MetricType},
-    Encoder, Result,
+use crate::utils::{
+    flatten_metric_with_labels, for_each_flattened_metric, FlattenedMetricValue, CONTENT_TYPE_JSON,
 };
+use aptos_logger::error;
+use prometheus::{proto::MetricFamily, Encoder, Result};
 use std::{collections::HashMap, io::Write};
 
 // TODO: figure out if we really need all metric endpoints...
@@ -24,42 +23,21 @@ impl Encoder for JsonEncoder {
     fn encode<W: Write>(&self, metric_families: &[MetricFamily], writer: &mut W) -> Result<()> {
         let mut encoded_metrics: HashMap<String, f64> = HashMap::new();
 
-        // Go through each metric family and encode it
-        for metric_family in metric_families {
-            let name = metric_family.get_name();
-            let metric_type = metric_family.get_field_type();
-            for metric in metric_family.get_metric() {
-                match metric_type {
-                    MetricType::COUNTER => {
-                        encoded_metrics.insert(
-                            flatten_metric_with_labels(name, metric),
-                            metric.get_counter().get_value(),
-                        );
-                    },
-                    MetricType::GAUGE => {
-                        encoded_metrics.insert(
-                            flatten_metric_with_labels(name, metric),
-                            metric.get_gauge().get_value(),
-                        );
-                    },
-                    MetricType::HISTOGRAM => {
-                        // write the sum and counts
-                        let h = metric.get_histogram();
-                        encoded_metrics.insert(
-                            flatten_metric_with_labels(&format!("{}_count", name), metric),
-                            h.get_sample_count() as f64,
-                        );
-                        encoded_metrics.insert(
-                            flatten_metric_with_labels(&format!("{}_sum", name), metric),
-                            h.get_sample_sum(),
-                        );
-                    },
-                    _ => {
-                        // Do nothing (not supported)
-                    },
-                }
-            }
-        }
+        for_each_flattened_metric(metric_families, |name, metric, value| match value {
+            FlattenedMetricValue::Single(value) => {
+                encoded_metrics.insert(flatten_metric_with_labels(name, metric), value);
+            },
+            FlattenedMetricValue::Histogram { count, sum } => {
+                encoded_metrics.insert(
+                    flatten_metric_with_labels(&format!("{}_count", name), metric),
+                    count as f64,
+                );
+                encoded_metrics.insert(
+                    flatten_metric_with_labels(&format!("{}_sum", name), metric),
+                    sum,
+                );
+            },
+        });
 
         // Write the encoded metrics to the writer
         match serde_json::to_string(&encoded_metrics) {
@@ -77,46 +55,6 @@ impl Encoder for JsonEncoder {
     fn format_type(&self) -> &str {
         CONTENT_TYPE_JSON
     }
-}
-
-/**
-This method takes Prometheus metrics with dimensions (represented as label:value tags)
-and converts it into a dot-separated string.
-
-Example:
-Prometheus metric: error_count{method: "get_account", error="connection_error"}
-Result: error_count.get_account.connection_error
-
-If the set of labels is empty, only the name is returned
-Example:
-Prometheus metric: errors
-Result: errors
-
-This is useful when exporting metric data to flat time series.
-*/
-fn flatten_metric_with_labels(name: &str, metric: &Metric) -> String {
-    // If the metric has no labels, return the name
-    let name_string = String::from(name);
-    if metric.get_label().is_empty() {
-        return name_string;
-    }
-
-    // Join the values of the labels with "."
-    let values: Vec<&str> = metric
-        .get_label()
-        .iter()
-        .map(LabelPair::get_value)
-        .filter(|&x| !x.is_empty())
-        .collect();
-    let values = values.join(".");
-
-    // If the values are empty, return the name
-    if values.is_empty() {
-        return name_string;
-    }
-
-    // Otherwise, return the name with the values
-    format!("{}.{}", name_string, values)
 }
 
 #[cfg(test)]
@@ -158,12 +96,11 @@ mod tests {
         assert_eq!(flattened_metric, "counter_2.hello".to_string());
 
         // Generate another counter for testing
-        let another_counter_2 =
-            IntCounterVec::new(Opts::new(counter_name_2, "Example counter for testing"), &[
-                "label_me",
-                "label_me_too",
-            ])
-            .unwrap();
+        let another_counter_2 = IntCounterVec::new(
+            Opts::new(counter_name_2, "Example counter for testing"),
+            &["label_me", "label_me_too"],
+        )
+        .unwrap();
 
         // Flatten a mismatched metric (without a label) and check the result
         let counter_name_3 = "counter_3";
@@ -186,9 +123,10 @@ mod tests {
     #[test]
     fn test_encoder() {
         // Generate a counter for testing
-        let counter = IntCounterVec::new(Opts::new("testing_count", "Test Counter"), &[
-            "method", "result",
-        ])
+        let counter = IntCounterVec::new(
+            Opts::new("testing_count", "Test Counter"),
+            &["method", "result"],
+        )
         .unwrap();
 
         // Add test data to the counter

@@ -1,0 +1,5 @@
+error: must be of the form #[num_variants = "FOO"]
+ --> tests/fail/bad_attr.rs:4:1
+  |
+4 | #[num_variants = 123] // invalid (must be string)
+  | ^
