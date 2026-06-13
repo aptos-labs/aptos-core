@@ -10,7 +10,8 @@ use mono_move_core::{
     native::{NativeExtensions, NativeRegistry},
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
-    ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, NO_DESCRIPTOR_PROVIDER,
+    ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, LayoutProvider,
+    NO_DESCRIPTOR_PROVIDER, NO_LAYOUT_PROVIDER,
 };
 use mono_move_loader::LoaderResult;
 
@@ -33,6 +34,7 @@ pub trait ExecutionContext {
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
+        &dyn LayoutProvider,
         &mut GasMeter,
         &NativeExtensions,
     );
@@ -137,12 +139,14 @@ impl ExecutionContext for LocalExecutionContext<'_> {
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
+        &dyn LayoutProvider,
         &mut GasMeter,
         &NativeExtensions,
     ) {
         (
             &self.natives,
             &NO_DESCRIPTOR_PROVIDER,
+            &NO_LAYOUT_PROVIDER,
             &mut self.gas_meter,
             &self.extensions,
         )

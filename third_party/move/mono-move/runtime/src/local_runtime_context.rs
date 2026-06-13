@@ -111,11 +111,18 @@ impl ExecutionContext for LocalRuntimeContext<'_> {
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
+        &dyn LayoutProvider,
         &mut GasMeter,
         &NativeExtensions,
     ) {
-        let (natives, _, gas_meter, extensions) = self.inner.native_call_borrows();
-        (natives, &self.descriptors, gas_meter, extensions)
+        let (natives, _, _, gas_meter, extensions) = self.inner.native_call_borrows();
+        (
+            natives,
+            &self.descriptors,
+            &self.layouts,
+            gas_meter,
+            extensions,
+        )
     }
 
     fn load_function(

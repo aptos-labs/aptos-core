@@ -90,7 +90,7 @@ impl NativeExtension for EventStore {
 
     fn on_rollback(&mut self, n: usize) -> Result<(), VMInternalError> {
         if n > self.checkpoints.len() {
-            return Err(VMInternalError::InvariantViolation(format!(
+            return Err(VMInternalError::invariant_violation(format!(
                 "event rollback({n}): only {} checkpoint(s)",
                 self.checkpoints.len(),
             )));
@@ -114,17 +114,17 @@ pub fn native_write_module_event_to_store<C: NativeContext>(
     // one that defines it. Enums are admitted here; an unsupported enum layout
     // is rejected later, when its pointer offsets are computed.
     let Type::Nominal { module_id, .. } = view_type(msg_ty) else {
-        return Err(VMInternalError::InvariantViolation(
+        return Err(VMInternalError::invariant_violation(
             "write_module_event_to_store: event type must be a struct or enum".into(),
         ));
     };
     let caller = ctx.caller_module().ok_or_else(|| {
-        VMInternalError::InvariantViolation(
+        VMInternalError::invariant_violation(
             "write_module_event_to_store: scripts cannot emit module events".into(),
         )
     })?;
     if caller != *module_id {
-        return Err(VMInternalError::InvariantViolation(
+        return Err(VMInternalError::invariant_violation(
             "write_module_event_to_store: caller module does not define the event type".into(),
         ));
     }
