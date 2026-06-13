@@ -181,13 +181,9 @@ impl GlobalArenaPool {
     ///
     /// # Safety
     ///
-    /// 1. The caller **must** ensure there are no live pointers pointing to
-    ///    the data allocated in the arena that is about to be cleared.
-    /// 2. During iteration, arenas are not locked at the same time. The caller
-    ///    **must** ensure that the access is exclusive and there are no race
-    ///    conditions.
-    // TODO: Consider using &mut to enforce exclusive access at compile-time.
-    pub unsafe fn reset_all_arenas_unchecked(&self) {
+    /// The caller **must** ensure there are no live pointers pointing to the
+    /// data allocated in the arena that is about to be cleared.
+    pub unsafe fn reset_all_arenas_unchecked(&mut self) {
         for arena in self.arenas.iter() {
             arena.lock().reset();
         }
