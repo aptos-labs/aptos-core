@@ -186,6 +186,7 @@ fn make_options(path: &Path, extra_sources: &[PathBuf]) -> anyhow::Result<Option
     let mut flags: Vec<String> = vec![
         "mvp_test".to_string(),
         "--verbose=warn".to_string(),
+        "--aptos".to_string(),
         "--dependency=../../../aptos-move/framework/move-stdlib/sources".to_string(),
         "--dependency=../../../aptos-move/framework/aptos-stdlib/sources".to_string(),
         "--dependency=../../../aptos-move/framework/aptos-framework/sources".to_string(),

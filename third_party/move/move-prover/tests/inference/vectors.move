@@ -8,7 +8,6 @@
 // with `Verification: Succeeded.`.
 //
 // flag: -T=20
-// flag: --aptos
 module 0x42::vectors {
     use std::vector;
 

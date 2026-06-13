@@ -2,7 +2,6 @@
 // predicate, using behavioral predicates (`result_of`, `aborts_of`) in the
 // agent-supplied loop invariants.
 // flag: -T=20
-// flag: --aptos
 module 0x42::find_closure {
     use std::vector;
 

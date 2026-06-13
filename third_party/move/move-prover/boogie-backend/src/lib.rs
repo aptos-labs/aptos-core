@@ -24,12 +24,14 @@ use move_model::{
         INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
         INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
         INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY,
-        INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW,
+        INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_DEL,
-        INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+        INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW,
-        INTRINSIC_FUN_MAP_SPEC_SET,
+        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT_KV,
+        INTRINSIC_FUN_MAP_VALUES,
     },
     ty::{PrimitiveType, Type},
 };
@@ -70,6 +72,15 @@ struct TypeInfo {
     name: String,
     suffix: String,
     has_native_equality: bool,
+    // True when this is a polymorphic type parameter slot (e.g. `#0`). Used by prelude
+    // templates that reference concrete Move-struct mangled names — those references are
+    // only meaningful for concrete instantiations.
+    is_type_param: bool,
+    // True when the suffix denotes a bitvector specialization (e.g. `bv64`). Prelude
+    // templates that reach into Move-translated companion types (e.g. `Option<V>`,
+    // `IteratorPtr<K>`) must skip the bv variant because the struct translator only
+    // emits the non-bv form of those datatypes.
+    is_bv: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -103,6 +114,11 @@ struct MapImpl {
     fun_borrow_mut: String,
     fun_borrow_mut_with_default: String,
     fun_borrow_with_default: String,
+    fun_new_from: String,
+    fun_to_vec_pair: String,
+    fun_upsert_kv: String,
+    fun_keys: String,
+    fun_values: String,
     // spec functions
     fun_spec_new: String,
     fun_spec_get: String,
@@ -116,6 +132,7 @@ struct MapImpl {
     fun_spec_aborts_add: String,
     fun_spec_aborts_del: String,
     fun_spec_aborts_borrow: String,
+    fun_spec_aborts_new_from: String,
 }
 
 /// Help generating vector functions for bv types
@@ -442,10 +459,14 @@ pub fn add_prelude(
 
 impl TypeInfo {
     fn new(env: &GlobalEnv, options: &BoogieOptions, ty: &Type, bv_flag: bool) -> Self {
+        let suffix = boogie_type_suffix(env, ty, bv_flag);
+        let is_bv = suffix.starts_with("bv");
         Self {
             name: boogie_type(env, ty, bv_flag),
-            suffix: boogie_type_suffix(env, ty, bv_flag),
+            suffix,
             has_native_equality: has_native_equality(env, options, ty),
+            is_type_param: matches!(ty, Type::TypeParameter(_)),
+            is_bv,
         }
     }
 }
@@ -543,6 +564,26 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT),
             ),
+            fun_new_from: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW_FROM),
+            ),
+            fun_to_vec_pair: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_TO_VEC_PAIR),
+            ),
+            fun_upsert_kv: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_UPSERT_KV),
+            ),
+            fun_keys: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_KEYS),
+            ),
+            fun_values: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_VALUES),
+            ),
             fun_spec_new: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_NEW),
@@ -586,6 +627,10 @@ impl MapImpl {
             fun_spec_aborts_borrow: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW),
+            ),
+            fun_spec_aborts_new_from: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM),
             ),
         }
     }
