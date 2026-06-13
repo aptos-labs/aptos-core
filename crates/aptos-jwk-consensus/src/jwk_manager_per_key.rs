@@ -196,6 +196,15 @@ impl KeyLevelConsensusManager {
         let issuer_level_repr = update
             .try_as_issuer_level_repr()
             .context("initiate_key_level_consensus failed at repr conversion")?;
+        // NOTE: signing `&issuer_level_repr` does not bind
+        // `self.epoch_state.epoch`, so partials collected here remain
+        // verifiable in any later epoch whose validator set still maps the
+        // signer addresses to the same consensus pubkeys. See the
+        // residual-risk note in
+        // `validator_txns::jwk::process_jwk_update_inner` (the shared VM
+        // verification path for both per-issuer and per-key modes).
+        // TODO: sign `(self.epoch_state.epoch, issuer_level_repr)` once the
+        // verification path is updated to match.
         let signature = self
             .consensus_key
             .sign(&issuer_level_repr)
