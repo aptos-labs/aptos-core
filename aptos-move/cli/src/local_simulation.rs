@@ -5,9 +5,11 @@ use crate::MoveDebugger;
 use aptos_cli_common::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::FrameName;
-use aptos_types::transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction};
+use aptos_types::transaction::{
+    AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, TransactionOutput,
+};
 use aptos_validator_interface::LocalModuleOverrides;
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
 use aptos_vm_environment::{environment::AptosEnvironment, prod_configs};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
@@ -16,6 +18,26 @@ use aptos_vm_types::{
 use move_core_types::vm_status::VMStatus;
 use move_vm_runtime::source_locator::{self, SourceLocator};
 use std::{path::Path, sync::Arc, time::Instant};
+
+/// Simulate a transaction using the debugger with simulation mode enabled.
+/// This skips signature verification and authorization checks, making it
+/// suitable for replaying failed transactions or simulating multisig
+/// transactions as if they were normal transactions.
+///
+/// The transaction must NOT have a valid signature (use `NoAccountAuthenticator`).
+pub fn simulate_transaction_using_debugger(
+    debugger: &dyn MoveDebugger,
+    version: u64,
+    transaction: SignedTransaction,
+) -> CliTypedResult<(VMStatus, TransactionOutput)> {
+    prod_configs::set_debugging_enabled(true);
+
+    let state_view = debugger.state_view_at_version(version);
+    let (vm_status, txn_output) =
+        AptosSimulationVM::create_vm_and_simulate_signed_transaction(&transaction, &state_view);
+
+    Ok((vm_status, txn_output))
+}
 
 pub fn run_transaction_using_debugger(
     debugger: &dyn MoveDebugger,

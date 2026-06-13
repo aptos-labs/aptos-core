@@ -129,6 +129,7 @@ pub enum MoveTool {
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
     Replay(Replay),
+    ReplaySimulate(ReplaySimulate),
     Fmt(Fmt),
     #[clap(subcommand)]
     Sim(Sim),
@@ -154,6 +155,7 @@ impl MoveTool {
             MoveTool::Run(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::RunScript(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Replay(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::ReplaySimulate(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Simulate(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::View(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::BuildPublishPayload(tool) => tool.attach_env(env).execute_serialized().await,
@@ -2842,6 +2844,267 @@ impl CliCommand<TransactionSummary> for Replay {
             deployed_object_address: None,
             events: None,
             changes: None,
+        };
+
+        Ok(summary)
+    }
+}
+
+/// Simulate a committed transaction locally, skipping all authorization and gas checks.
+///
+/// This is useful for debugging failed on-chain transactions. For multisig transactions,
+/// the inner payload is extracted and simulated as a normal transaction with the
+/// multisig account as the sender, bypassing the multisig approval flow.
+#[derive(Parser, Debug)]
+pub struct ReplaySimulate {
+    /// The network to replay on.
+    ///
+    /// Possible values:
+    ///     mainnet, testnet, <REST_ENDPOINT_URL>
+    #[clap(long)]
+    pub(crate) network: ReplayNetworkSelection,
+
+    /// The id of the transaction to simulate. Also being referred to as "version" in some contexts.
+    #[clap(long)]
+    pub(crate) txn_id: u64,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`
+    #[clap(long)]
+    pub(crate) node_api_key: Option<String>,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
+}
+
+impl WithMoveEnv for ReplaySimulate {
+    fn attach_env(mut self, env: Arc<MoveEnv>) -> Self {
+        self.env = env;
+        self
+    }
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for ReplaySimulate {
+    fn command_name(&self) -> &'static str {
+        "ReplaySimulate"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        // Build the client.
+        let client = Client::builder(self.network.to_base_url()?);
+        let client = if let Some(api_key) = self.node_api_key {
+            client.api_key(&api_key).unwrap().build()
+        } else {
+            client.build()
+        };
+
+        let debugger = self.env.create_move_debugger(client.clone())?;
+
+        // Fetch the transaction to simulate.
+        let (txn, _txn_info, _aux_info) = debugger
+            .get_committed_transaction_at_version(self.txn_id)
+            .await?;
+
+        let txn = match txn {
+            Transaction::UserTransaction(txn) => txn,
+            _ => {
+                return Err(CliError::UnexpectedError(
+                    "Unsupported transaction type. Only user transactions are supported."
+                        .to_string(),
+                ))
+            },
+        };
+
+        // Determine the sender and payload for simulation.
+        // For multisig transactions, unwrap the inner payload and use the multisig
+        // address as the sender so it simulates as a normal transaction.
+        let (sender, payload) = match txn.payload() {
+            TransactionPayload::Multisig(multisig) => {
+                let inner_payload = match &multisig.transaction_payload {
+                    Some(
+                        aptos_types::transaction::MultisigTransactionPayload::EntryFunction(ef),
+                    ) => TransactionPayload::EntryFunction(ef.clone()),
+                    Some(aptos_types::transaction::MultisigTransactionPayload::Script(script)) => {
+                        TransactionPayload::Script(script.clone())
+                    },
+                    None => {
+                        return Err(CliError::UnexpectedError(
+                            "Multisig transaction has no payload stored. \
+                             The payload may be stored on-chain only."
+                                .to_string(),
+                        ))
+                    },
+                };
+                (multisig.multisig_address, inner_payload)
+            },
+            other => (txn.sender(), other.clone()),
+        };
+
+        // Use the state at the version just before this transaction so simulation
+        // sees the same world state.
+        let version = self.txn_id.saturating_sub(1);
+
+        // Fetch sequence number for the sender at the relevant version.
+        let sequence_number: u64 = {
+            let account: aptos_types::account_config::AccountResource = client
+                .get_account_resource_at_version_bcs(
+                    sender,
+                    "0x1::account::Account",
+                    version,
+                )
+                .await
+                .map_err(|e| {
+                    CliError::ApiError(format!(
+                        "Failed to fetch account {} at version {}: {}",
+                        sender, version, e
+                    ))
+                })?
+                .into_inner();
+            account.sequence_number()
+        };
+
+        // Get chain ID from the original transaction.
+        let chain_id = txn.chain_id();
+
+        // Build a new RawTransaction with generous gas settings.
+        // Use the original transaction's gas unit price (which was valid on-chain).
+        // Cap max_gas to what the sender can afford so the prologue balance check passes.
+        let gas_unit_price = txn.gas_unit_price();
+        let max_gas = {
+            const DEFAULT_MAX_GAS: u64 = 2_000_000;
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                // Fetch APT balance to compute affordable max gas.
+                let balance: u64 = client
+                    .view_apt_account_balance_at_version(sender, version)
+                    .await
+                    .map(|r| r.into_inner())
+                    .unwrap_or(0);
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        };
+        let raw_txn = aptos_types::transaction::RawTransaction::new(
+            sender,
+            sequence_number,
+            payload,
+            max_gas,
+            gas_unit_price,
+            // Set expiration far in the future so it never expires during simulation.
+            u64::MAX,
+            chain_id,
+        );
+
+        // Sign with a dummy authenticator (no real signature) so the simulation VM
+        // can skip signature verification.
+        let signed_txn = aptos_types::transaction::SignedTransaction::new_signed_transaction(
+            raw_txn,
+            aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender {
+                sender: aptos_types::transaction::authenticator::AccountAuthenticator::NoAccountAuthenticator,
+            },
+        );
+
+        println!(
+            "Simulating transaction {} as sender {}...",
+            self.txn_id, sender
+        );
+
+        let (vm_status, txn_output) =
+            local_simulation::simulate_transaction_using_debugger(&*debugger, version, signed_txn)?;
+
+        // Print detailed error information for failed transactions.
+        match &vm_status {
+            move_core_types::vm_status::VMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            } => {
+                let category = code >> 16;
+                let reason = code & 0xFFFF;
+                let category_name = match category {
+                    0x1 => "INVALID_ARGUMENT",
+                    0x2 => "OUT_OF_RANGE",
+                    0x3 => "INVALID_STATE",
+                    0x4 => "UNAUTHENTICATED",
+                    0x5 => "PERMISSION_DENIED",
+                    0x6 => "NOT_FOUND",
+                    0x7 => "ABORTED",
+                    0x8 => "ALREADY_EXISTS",
+                    0x9 => "RESOURCE_EXHAUSTED",
+                    0xA => "CANCELLED",
+                    0xB => "INTERNAL",
+                    0xC => "NOT_IMPLEMENTED",
+                    0xD => "UNAVAILABLE",
+                    _ => "UNKNOWN",
+                };
+                println!();
+                println!("Transaction aborted!");
+                println!("  Location: {}", location);
+                println!(
+                    "  Abort code: {} (category: {} [{}], reason: {})",
+                    code, category, category_name, reason
+                );
+                if let Some(msg) = message {
+                    println!("  Message: {}", msg);
+                }
+                println!();
+            },
+            move_core_types::vm_status::VMStatus::ExecutionFailure {
+                location,
+                function,
+                code_offset,
+                status_code,
+                message,
+                ..
+            } => {
+                println!();
+                println!("Transaction execution failed!");
+                println!("  Location: {}", location);
+                println!("  Function index: {}, code offset: {}", function, code_offset);
+                println!("  Status: {:?}", status_code);
+                if let Some(msg) = message {
+                    println!("  Message: {}", msg);
+                }
+                println!();
+            },
+            move_core_types::vm_status::VMStatus::Error {
+                status_code,
+                message,
+                ..
+            } => {
+                println!();
+                println!("VM error: {:?}", status_code);
+                if let Some(msg) = message {
+                    println!("  Message: {}", msg);
+                }
+                println!();
+            },
+            move_core_types::vm_status::VMStatus::Executed => {
+                println!();
+                println!("Transaction succeeded!");
+                println!();
+            },
+        }
+
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        let summary = TransactionSummary {
+            transaction_hash: txn.committed_hash().into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender),
+            sequence_number: Some(sequence_number),
+            replay_protector: None,
+            success,
+            timestamp_us: None,
+            version: Some(self.txn_id),
+            vm_status: Some(vm_status.to_string()),
+            deployed_object_address: None,
         };
 
         Ok(summary)
