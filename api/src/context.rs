@@ -1191,9 +1191,11 @@ impl Context {
             None
         };
 
+        let limit = last.checked_sub(first).map(|delta| delta + 1).unwrap_or(0);
+
         match self.get_gas_prices_and_used(
             first,
-            last - first,
+            limit,
             ledger_info.ledger_version.0,
             user_use_case_spread_factor.is_some(),
         ) {
@@ -1724,5 +1726,145 @@ impl FunctionStats {
 
             stats.invalidate_all();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Context;
+    use aptos_api_test_context::{current_function_name, new_test_context_inner, TestContext};
+    use aptos_api_types::LedgerInfo as ApiLedgerInfo;
+    use aptos_config::config::NodeConfig;
+    use aptos_crypto::HashValue;
+    use aptos_types::write_set::WriteSet;
+    use aptos_types::{
+        chain_id::ChainId,
+        transaction::{
+            block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData,
+            TransactionInfo, TransactionToCommit,
+        },
+    };
+
+    fn gas_estimation_test_config() -> NodeConfig {
+        let mut node_config = NodeConfig::default();
+        node_config.api.gas_estimation.enabled = true;
+        node_config.api.gas_estimation.full_block_txns = 2;
+        node_config
+            .api
+            .gas_estimation
+            .incorporate_reordering_effects = false;
+        node_config
+    }
+
+    fn new_gas_estimation_test_context(test_name: String) -> TestContext {
+        new_test_context_inner(
+            test_name,
+            gas_estimation_test_config(),
+            false,
+            None,
+            false,
+            false,
+        )
+    }
+
+    fn txn_info(gas_used: u64) -> TransactionInfo {
+        TransactionInfo::new(
+            HashValue::zero(),
+            HashValue::zero(),
+            HashValue::zero(),
+            None,
+            gas_used,
+            ExecutionStatus::Success,
+            None,
+        )
+    }
+
+    fn txn_to_commit(transaction: Transaction, gas_used: u64) -> TransactionToCommit {
+        TransactionToCommit::new(
+            transaction,
+            txn_info(gas_used),
+            WriteSet::default(),
+            vec![],
+            false,
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_block_min_inclusion_price_should_read_trailing_block_epilogue_if_output_limit_is_hit(
+    ) {
+        let mut context = new_gas_estimation_test_context(current_function_name!());
+        let local_context = Context::new(
+            ChainId::test(),
+            context.db.clone(),
+            context.mempool.ac_client.clone(),
+            gas_estimation_test_config(),
+            None,
+        );
+        let latest_ledger_info = local_context
+            .get_latest_ledger_info::<crate::response::BasicError>()
+            .unwrap();
+        let execution_config = local_context
+            .execution_onchain_config::<crate::response::BasicError>(&latest_ledger_info)
+            .unwrap();
+        let first = latest_ledger_info.version() + 1;
+
+        let mut sender = context.gen_account();
+        let receiver = context.gen_account();
+        let user_txn = context.account_transfer(&mut sender, &receiver, 1);
+        let gas_price = user_txn.gas_unit_price();
+        let block_end_info = BlockEndInfo::V0 {
+            block_gas_limit_reached: false,
+            block_output_limit_reached: true,
+            block_effective_block_gas_units: 1,
+            block_approx_output_size: 1,
+        };
+        context
+            .db
+            .save_transactions_for_test(
+                &[
+                    txn_to_commit(Transaction::UserTransaction(user_txn), 1),
+                    txn_to_commit(
+                        Transaction::block_epilogue_v0(HashValue::random(), block_end_info.clone()),
+                        0,
+                    ),
+                ],
+                first,
+                None,
+                true,
+            )
+            .unwrap();
+        let last = first + 1;
+        let ledger_info = ApiLedgerInfo::new_ledger_info(
+            &ChainId::test(),
+            latest_ledger_info.epoch(),
+            last,
+            latest_ledger_info.oldest_version(),
+            0,
+            latest_ledger_info.block_height.into(),
+            latest_ledger_info.timestamp(),
+            latest_ledger_info.txn_encryption_key.clone(),
+        );
+
+        let (prices_and_used, block_end_infos, _) = local_context
+            .get_gas_prices_and_used(first, last - first + 1, ledger_info.version(), false)
+            .unwrap();
+        assert_eq!(prices_and_used.len(), 1);
+        assert_eq!(prices_and_used[0].0, gas_price);
+        assert_eq!(block_end_infos.len(), 1);
+        assert!(block_end_infos[0].limit_reached());
+        assert_eq!(block_end_infos[0], block_end_info);
+
+        let min_inclusion_price = local_context.block_min_inclusion_price(
+            &ledger_info,
+            first,
+            last,
+            &local_context.node_config.api.gas_estimation,
+            &execution_config,
+        );
+        assert_eq!(
+            min_inclusion_price,
+            Some(local_context.next_bucket(gas_price))
+        );
     }
 }
