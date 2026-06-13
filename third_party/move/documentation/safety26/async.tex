@@ -5,12 +5,16 @@ Aptos executes blocks of transactions in parallel using \emph{Block-STM}~\cite{B
 In practice most blocks do not saturate the worker pool, and aborted-and-restarted incarnations leave threads idle for non-trivial windows, so a substantial slice of worker capacity remains unused during normal operation.
 
 We use that idle capacity to run the runtime safety checks \emph{asynchronously}.
-During execution the interpreter trails a compact \emph{execution trace} for each transaction: a count of successfully executed instructions, a fingerprint hash of the executed opcodes (used as an integrity tag), the bit-vector of conditional-branch outcomes, and the list of dynamically dispatched calls (closures and entry points; static calls are reconstructable from the bytecode and are not recorded).
-The trace contains no values, only control-flow shape, so it stays small.
+During execution the interpreter trails a compact \emph{execution trace} for each transaction, containing no values, only control-flow shape.
+%: a count of successfully executed instructions, a fingerprint hash of the executed opcodes (used as an integrity tag), the bit-vector of conditional-branch outcomes, and the list of dynamically dispatched calls (closures and entry points; static calls are reconstructable from the bytecode and are not recorded).
+%The trace contains no values, only control-flow shape, so it stays small.
 
-When a transaction's commit-time incarnation finalizes, an idle worker replays its trace by abstractly interpreting the bytecode along the recorded path --- following the recorded branches, dispatching the recorded closures --- and runs the type and ability checks of Sections~\ref{sec:type} and~\ref{sec:ability} on the fully-substituted types.
-Because the trace records only \emph{successful} instructions, gas need not be re-charged; the async checker uses an unmetered gas meter, and the recorded fingerprint catches any divergence between the original and the replayed instruction streams.
+When a transaction's commit-time incarnation finalizes, an idle worker replays its trace by abstractly interpreting the bytecode along the recorded path --- following the recorded branches, dispatching the recorded closures --- and runs the type and ability checks of \S\ref{sec:type} and \S\ref{sec:ability} on the fully-substituted types.
+% Because the trace records only \emph{successful} instructions, gas need not be re-charged; the async checker uses an unmetered gas meter.
+%, and the recorded fingerprint catches any divergence between the original and the replayed instruction streams.
 A violation found during replay aborts the block before its writes become observable to subsequent blocks.
+Because asynchronous checks are run on successful transactions only, speculative executions and aborted transactions do not pay the cost of these checks.
+Because the checks are almost always expected to pass on the static verifier admitted bytecode, except in the low probability event of a latent bug identified in the verifier being exploited, computation done while executing a transaction is not wasted because of failed checks.
 
 %%% Local Variables:
 %%% mode: latex

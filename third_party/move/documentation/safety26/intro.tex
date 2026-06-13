@@ -1,24 +1,29 @@
 \section{Introduction}
 \label{sec:intro}
 
-Move is a smart-contract language originally developed for the Libra/Diem blockchain at Meta~\cite{libra_blockchain_white,OLD_MOVE_LANG,blackshear2020resources} and now deployed at scale on Aptos~\cite{MoveOnAptosBook}, a high-throughput Layer-1 platform that settles transactions for hundreds of millions of dollars in user assets on chain.
+The Move on Aptos programming language was originally developed for the Libra/Diem blockchain at Meta~\cite{libra_blockchain_white,OLD_MOVE_LANG,blackshear2020resources} and is now deployed at scale on Aptos~\cite{MoveOnAptosBook}, a high-throughput Layer-1 blockchain that settles transactions for billions of dollars in user assets on chain.
 A defining trait of the language is its resource-oriented type discipline: digital assets are represented as Move \emph{resources} whose ownership and movement are tracked by linear-style abilities (|copy|, |drop|, |store|, |key|), ruling out accidental duplication or destruction at compile time.
 The Aptos platform builds on this foundation with a system of objects, parallel execution, and a rich on-chain framework written in Move itself~\cite{AptosFrameworkBook,ParkZGXGCLC24}.
 
-Beyond its type discipline, Move has been designed from the outset to admit \emph{offline formal verification}: the Move Prover translates Move programs and their specifications, written in the Move Specification Language, into verification conditions discharged by SMT solvers~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
-These techniques are powerful but inherently offline: they apply prior to deployment, depend on hand-written specifications, and produce no signal once the code is running on chain.
+Beyond its type discipline, Move has been designed for \emph{offline formal verification}: the Move Prover translates Move programs and their specifications, written in the Move Specification Language, into verification conditions discharged by SMT solvers~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
+The Move Prover can verify rich properties about the smart contracts themselves, but it is inherently offline, applied prior to deployment of the contracts.
 
-Closer to the execution path, the Move VM also performs \emph{static bytecode verification} every time a module is loaded, enforcing well-formedness, typing, and Move's reference discipline --- a Rust-like~\cite{rust,rustbelt} aliasing and lifetime regime detailed in Section~\ref{sec:move}.
-The reference analysis in particular is intricate: the verifier maintains a borrow graph that conservatively approximates the aliasing relationships entailed by control- and data-flow.
-Implementing this correctly is a delicate engineering task, and the Aptos bug bounty program has surfaced verifier bugs in the past.
-In a security-oriented architecture, the cost of trusting a single intricate static analysis as the sole gate is too high.
+Move source programs are compiled into typed bytecode executed by the Move VM.
+The Move VM performs \emph{static bytecode verification} every time a module is loaded, enforcing well-formedness, typing, and Move's reference discipline --- a Rust-like~\cite{rust,rustbelt} aliasing regime detailed in \S\ref{sec:move}.
+The reference safety verifier~\cite{MoveBorrowChecker} is particularly intricate: it maintains a borrow graph that conservatively approximates the aliasing relationships entailed by control- and data-flow using abstract interpretation.
+Implementing and maintaining the correctness of various static bytecode verification passes is a delicate engineering task, especially with the rapid evolution of the Move language.
+Since the public launch of Aptos, Move has been extended to include enums, closures, and public structs, among other features.
+These language features interact non-trivially with the static verifier.
+Given the high stakes, Aptos runs a bug bounty program, which has surfaced verifier bugs in the past.
 
-The Aptos runtime therefore carries a second layer of \emph{runtime safety checks} that re-establish the critical invariants during execution.
-The checks described in this paper fall into three groups.
-\emph{Type checks} verify that the dynamic type of every value matches the static type the bytecode expects to consume.
-\emph{Ability checks} verify that operations such as copy, drop, or storage in global state are only performed on values whose declared abilities permit them.
-\emph{Reference checks} verify, at runtime, the same dangling- and aliasing-freedom properties that the static verifier is supposed to enforce.
+In a blockchain setting, executed transactions cannot be reversed, hand-crafted compiler-bypassed bytecode can be deployed by adversaries.
+Static verification is thus a single point of failure: one exploited bug can have irreversible and catastrophic consequences.
+Therefore, as a practical security measure, the Move VM implements defense-in-depth \emph{runtime safety checks} that independently verify the critical invariants during execution, after the bytecode has passed static verification.
 
-Since these checks are costly, the runtime supports \emph{trusted code} that waives them under certain conditions, and an \emph{asynchronous} checking mode that leverages idle workers in Block-STM~\cite{BlockSTM}, Aptos's speculative parallel executor.
+In this paper, motivated by real-world examples, we describe three groups of runtime checks.
+\emph{Type checks} (\S\ref{sec:type}) verify that the dynamically tracked type of every value matches the static type the bytecode expects to consume.
+\emph{Ability checks} (\S\ref{sec:ability}) verify that operations such as copy, drop, or storage in global state are only performed on values whose declared abilities permit them.
+\emph{Reference checks} (\S\ref{sec:ref}) verify the same freedom from dangling references and aliased mutable access that the static verifier is supposed to enforce.
 
-\tengzhang{I think we should explicitly state the contribution: 1) propose a second layer of in-depth-defense for blockchain which potentially holds millions of dollars, 2) present a set of dynamic checks that are necessary for the second layer to be effective, 3) present a mechanism for async check by leveraging block-STM, which is originally designed for throughput.}
+We then describe two techniques employed to reduce the runtime costs of these checks: the VM supports \emph{trusted code} (\S\ref{sec:trusted}) that waives them under certain conditions, and an \emph{asynchronous} checking mode (\S\ref{sec:async}) leverages idle workers in Block-STM~\cite{BlockSTM} (Aptos's speculative parallel executor).
+We present an evaluation of the performance impact of the checks on real-world benchmarks in \S\ref{sec:perf}.
