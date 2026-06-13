@@ -27,7 +27,7 @@ use aptos_network::{
 use aptos_peer_monitoring_service_types::{
     response::NetworkInformationResponse, PeerMonitoringMetadata,
 };
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, StateKind};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
 use aptos_storage_service_types::{
@@ -305,6 +305,7 @@ mock! {
             &self,
             version: Version,
             request_timeout_ms: u64,
+            kind: StateKind,
         ) -> Result<Response<u64>>;
 
         async fn get_state_values_with_proof(
@@ -313,6 +314,7 @@ mock! {
             start_index: u64,
             end_index: u64,
             request_timeout_ms: u64,
+            kind: StateKind,
         ) -> Result<Response<StateValueChunkWithProof>>;
 
         async fn get_transaction_outputs_with_proof(

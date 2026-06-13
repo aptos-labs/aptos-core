@@ -61,6 +61,7 @@ fn create_client_requests_state_values_stream() {
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index,
+        state_kind: aptos_storage_interface::StateKind::MainState,
     });
 
     // Create a global data summary with a single state range

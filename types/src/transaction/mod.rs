@@ -2339,6 +2339,15 @@ impl TransactionInfo {
             .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
     }
 
+    /// The native-position state root committed at this version (a reserved
+    /// `TransactionInfoV1` slot). `None` on `V0` and until the executor sets it.
+    pub fn position_state_root(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.placeholder0,
+        }
+    }
+
     pub fn hot_state_checkpoint_hash(&self) -> Option<HashValue> {
         match self {
             Self::V0(_) => None,
