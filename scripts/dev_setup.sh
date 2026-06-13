@@ -598,9 +598,17 @@ function install_z3 {
     echo "but this install will go to ${INSTALL_DIR}/z3."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if command -v "${INSTALL_DIR}z3" &>/dev/null && [[ "$("${INSTALL_DIR}z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
-    echo "Z3 ${Z3_VERSION} already installed"
-    return
+  # Verify the existing z3 can actually run and reports the right version.
+  # A broken binary (wrong glibc, corrupt download) will fail this check and be reinstalled.
+  if command -v "${INSTALL_DIR}z3" &>/dev/null; then
+    Z3_OUTPUT="$("${INSTALL_DIR}z3" --version 2>/dev/null || true)"
+    if [[ "$Z3_OUTPUT" =~ .*${Z3_VERSION}.* ]]; then
+      echo "Z3 ${Z3_VERSION} already installed and working"
+      return
+    else
+      echo "Z3 binary exists but version check failed (output: '${Z3_OUTPUT}'). Reinstalling."
+      rm -f "${INSTALL_DIR}z3"
+    fi
   fi
   if [[ "$(uname)" == "Linux" ]]; then
     Z3_PKG="z3-$Z3_VERSION-x64-glibc-2.31"
@@ -625,6 +633,11 @@ function install_z3 {
     chmod +x "${INSTALL_DIR}z3"
   )
   rm -rf "$TMPFILE"
+  # Verify the installed binary actually works
+  if ! "${INSTALL_DIR}z3" --version 2>/dev/null | grep -q "${Z3_VERSION}"; then
+    echo "WARNING: z3 installation may be broken. '${INSTALL_DIR}z3 --version' failed."
+    echo "Move Prover tests will likely fail. Check glibc compatibility."
+  fi
 }
 
 function install_cvc5 {
