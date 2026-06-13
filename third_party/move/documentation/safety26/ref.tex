@@ -109,9 +109,9 @@ Overlapping references that never destructively interact are never flagged at al
 \paragraph{Function modular.} The checker is modular and compositional across function boundaries.
 A call consumes its reference arguments, checks at the call site that the places reachable from each mutable argument are disjoint from those reachable from every other reference argument, and hands the callee fresh trees rooted at its own reference parameters.
 Passing a mutable reference into a call counts as a destructive operation, since the callee may mutate arbitrarily through it.
-Upon return, every returned reference must denote a place inside the tree of some reference parameter; its access path is replayed into the corresponding tree of the caller.
+On return, every returned reference must denote a place inside the tree of some reference parameter; its access path is replayed into the corresponding tree of the caller.
 Returned mutable references must also denote mutually disjoint places.
-The checker thereby learns precisely which parameter each returned reference derives from, along the executed path, whereas the static analysis must conservatively assume that a returned reference may borrow from every reference argument.
+Hence, the checker learns precisely which parameter each returned reference derives from, along the executed path, while the static analysis conservatively assumes that a returned reference may borrow from every reference argument.
 
 Taken together, these ideas yield a \emph{relaxed dynamic semantics} of the static borrow analysis: bytecode accepted by a correct verifier is expected to pass the runtime checks on every execution, while the checker, observing only the executed path, does not have the join and call-summary over-approximations of the static analysis and thus admits strictly more behaviors.
 

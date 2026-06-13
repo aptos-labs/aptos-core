@@ -1,20 +1,18 @@
 \section{Asynchronous Checking}
 \label{sec:async}
 
-Aptos executes blocks of transactions in parallel using \emph{Block-STM}~\cite{BlockSTM}, an optimistic concurrency-control protocol in which a pool of worker threads speculatively runs transactions out of order and re-validates them against later-published writes; incarnations that lose a race are aborted and replayed.
-In practice most blocks do not saturate the worker pool, and aborted-and-restarted incarnations leave threads idle for non-trivial windows, so a substantial slice of worker capacity remains unused during normal operation.
+Aptos executes blocks of transactions in parallel using \emph{Block-STM}~\cite{BlockSTM}, an optimistic concurrency-control protocol in which a pool of worker threads speculatively runs transactions out of order and re-validates them against later-published writes; executions that lose a race are aborted and re-executed.
+Block-STM also tracks when each transaction is committed (i.e., can no longer be speculatively re-executed due to some previous transaction abort).
+If there is not enough parallelism in the block (e.g., due to read-write conflicts), some threads remain idle, leaving a substantial slice of worker capacity unused.
+That idle capacity can be used to run the runtime safety checks \emph{asynchronously}.
 
-We use that idle capacity to run the runtime safety checks \emph{asynchronously}.
-During execution the interpreter trails a compact \emph{execution trace} for each transaction, containing no values, only control-flow shape.
-%: a count of successfully executed instructions, a fingerprint hash of the executed opcodes (used as an integrity tag), the bit-vector of conditional-branch outcomes, and the list of dynamically dispatched calls (closures and entry points; static calls are reconstructable from the bytecode and are not recorded).
-%The trace contains no values, only control-flow shape, so it stays small.
+During execution the VM performs no runtime checks but logs a compact \emph{execution trace} for each transaction, containing only control-flow shape.
+When a transaction is committed, an idle worker replays transaction's trace by abstractly interpreting the bytecode along the recorded path and runs the checks of \S\ref{sec:type} and \S\ref{sec:ability}.
+A violation found during replay aborts the block before its writes are persisted on-chain.
 
-When a transaction's commit-time incarnation finalizes, an idle worker replays its trace by abstractly interpreting the bytecode along the recorded path --- following the recorded branches, dispatching the recorded closures --- and runs the type and ability checks of \S\ref{sec:type} and \S\ref{sec:ability} on the fully-substituted types.
-% Because the trace records only \emph{successful} instructions, gas need not be re-charged; the async checker uses an unmetered gas meter.
-%, and the recorded fingerprint catches any divergence between the original and the replayed instruction streams.
-A violation found during replay aborts the block before its writes become observable to subsequent blocks.
-Because asynchronous checks are run on successful transactions only, speculative executions and aborted transactions do not pay the cost of these checks.
-Because the checks are almost always expected to pass on the static verifier admitted bytecode, except in the low probability event of a latent bug identified in the verifier being exploited, computation done while executing a transaction is not wasted because of failed checks.
+Because asynchronous checks are run on committed transactions only, speculative executions do not pay the cost of these checks.
+The checks are also expected to pass with high probability: they fail only if there is a bug in static verifier that is being exploited.
+Hence, it is not feasible for an attacker to consistently slow down the network by triggering failures in asynchronous runtime checks.
 
 %%% Local Variables:
 %%% mode: latex

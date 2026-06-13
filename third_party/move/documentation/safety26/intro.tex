@@ -16,14 +16,15 @@ Since the public launch of Aptos, Move has been extended to include enums, closu
 These language features interact non-trivially with the static verifier.
 Given the high stakes, Aptos runs a bug bounty program, which has surfaced verifier bugs in the past.
 
-In a blockchain setting, executed transactions cannot be reversed, hand-crafted compiler-bypassed bytecode can be deployed by adversaries.
+In a permissionless blockchain setting, executed transactions cannot be reversed.
+Also, anyone can deploy hand-crafted compiler-bypassed bytecode.
 Static verification is thus a single point of failure: one exploited bug can have irreversible and catastrophic consequences.
 Therefore, as a practical security measure, the Move VM implements defense-in-depth \emph{runtime safety checks} that independently verify the critical invariants during execution, after the bytecode has passed static verification.
 
 In this paper, motivated by real-world examples, we describe three groups of runtime checks.
 \emph{Type checks} (\S\ref{sec:type}) verify that the dynamically tracked type of every value matches the static type the bytecode expects to consume.
-\emph{Ability checks} (\S\ref{sec:ability}) verify that operations such as copy, drop, or storage in global state are only performed on values whose declared abilities permit them.
+\emph{Ability checks} (\S\ref{sec:ability}) verify that operations such as copy, drop, or store to the global state are only performed on values whose declared abilities permit them.
 \emph{Reference checks} (\S\ref{sec:ref}) verify the same freedom from dangling references and aliased mutable access that the static verifier is supposed to enforce.
 
-We then describe two techniques employed to reduce the runtime costs of these checks: the VM supports \emph{trusted code} (\S\ref{sec:trusted}) that waives them under certain conditions, and an \emph{asynchronous} checking mode (\S\ref{sec:async}) leverages idle workers in Block-STM~\cite{BlockSTM} (Aptos's speculative parallel executor).
+We then describe two techniques used to reduce the runtime costs of these checks in the VM: \emph{trusted code} (\S\ref{sec:trusted}) that waives them under certain conditions, and an \emph{asynchronous mode} (\S\ref{sec:async}) that leverages idle threads in Block-STM~\cite{BlockSTM} (Aptos's parallel transaction execution engine).
 We present an evaluation of the performance impact of the checks on real-world benchmarks in \S\ref{sec:perf}.
