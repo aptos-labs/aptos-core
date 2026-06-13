@@ -255,6 +255,8 @@ impl AptosDB {
                         .maybe_set_pruner_target_db_version(version);
                 }
             }
+
+            crate::version_data_backfill::spawn(Arc::clone(&myself.ledger_db));
         }
 
         Ok(myself)

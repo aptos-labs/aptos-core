@@ -54,4 +54,5 @@ mod state_merkle_db;
 mod state_store;
 mod state_value_chunk;
 mod transaction_store;
+mod version_data_backfill;
 mod versioned_node_cache;
