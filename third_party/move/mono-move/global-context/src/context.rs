@@ -638,6 +638,17 @@ impl<'ctx> ExecutionGuard<'ctx> {
             .map(|r| *r)
     }
 
+    /// Returns the already-published struct-descriptor id for `struct_ty` (the
+    /// inline resource laid out as a heap object), or `None` if no descriptor
+    /// has been published yet. Lock-free.
+    pub fn struct_descriptor_for(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .struct_by_ty
+            .get(&struct_ty)
+            .map(|r| *r)
+    }
+
     /// Materializes a vector-object descriptor for `elem_ty` into the
     /// shared arena and returns its assigned [`DescriptorId`]. Idempotent:
     /// subsequent calls with the same `elem_ty` return the same id without
