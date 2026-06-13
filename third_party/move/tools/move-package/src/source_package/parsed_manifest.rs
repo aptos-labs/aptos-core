@@ -26,6 +26,15 @@ pub struct SourceManifest {
     pub build: Option<BuildInfo>,
     pub dependencies: Dependencies,
     pub dev_dependencies: Dependencies,
+    /// Cargo-style overrides keyed by package name. Only honored on the *root*
+    /// manifest. Whenever a dependency edge with a matching package name is
+    /// processed during graph resolution, its [`Dependency`] is replaced with
+    /// the entry from this map. This applies both to direct dependencies of
+    /// the root package and to any transitive dependencies fetched (e.g.
+    /// from a git or on-chain package). Local paths inside a patched
+    /// dependency are interpreted relative to the root package's manifest
+    /// directory.
+    pub patches: Dependencies,
 }
 
 impl fmt::Display for SourceManifest {

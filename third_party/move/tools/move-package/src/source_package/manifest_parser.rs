@@ -23,6 +23,7 @@ const ADDRESSES_NAME: &str = "addresses";
 const DEV_ADDRESSES_NAME: &str = "dev-addresses";
 const DEPENDENCY_NAME: &str = "dependencies";
 const DEV_DEPENDENCY_NAME: &str = "dev-dependencies";
+const PATCH_NAME: &str = "patch";
 
 const KNOWN_NAMES: &[&str] = &[
     PACKAGE_NAME,
@@ -31,6 +32,7 @@ const KNOWN_NAMES: &[&str] = &[
     DEV_ADDRESSES_NAME,
     DEPENDENCY_NAME,
     DEV_DEPENDENCY_NAME,
+    PATCH_NAME,
 ];
 
 const REQUIRED_FIELDS: &[&str] = &[PACKAGE_NAME];
@@ -87,6 +89,12 @@ pub fn parse_source_manifest(tval: TV) -> Result<PM::SourceManifest> {
                 .transpose()
                 .context("Error parsing '[dev-dependencies]' section of manifest")?
                 .unwrap_or_default();
+            let patches = table
+                .remove(PATCH_NAME)
+                .map(parse_dependencies)
+                .transpose()
+                .context("Error parsing '[patch]' section of manifest")?
+                .unwrap_or_default();
             Ok(PM::SourceManifest {
                 package,
                 addresses,
@@ -94,6 +102,7 @@ pub fn parse_source_manifest(tval: TV) -> Result<PM::SourceManifest> {
                 build,
                 dependencies,
                 dev_dependencies,
+                patches,
             })
         },
         x => {

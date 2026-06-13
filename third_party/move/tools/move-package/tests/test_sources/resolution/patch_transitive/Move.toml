@@ -1,0 +1,9 @@
+[package]
+name = "Root"
+version = "0.0.0"
+
+[dependencies]
+Middle = { local = "./deps_only/middle" }
+
+[patch]
+Leaf = { local = "./deps_only/leaf_real" }

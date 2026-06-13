@@ -4,5 +4,6 @@
 mod error_syntax;
 mod error_type;
 mod fetch_deps_only;
+mod online_onchain_deps;
 mod save_metadata;
 mod success;

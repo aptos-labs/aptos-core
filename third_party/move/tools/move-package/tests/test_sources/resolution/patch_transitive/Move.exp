@@ -1,5 +1,5 @@
 ResolutionGraph {
-    root_package_path: "tests/test_sources/resolution/dep_good_digest",
+    root_package_path: "tests/test_sources/resolution/patch_transitive",
     build_options: BuildConfig {
         dev_mode: true,
         test_mode: false,
@@ -52,50 +52,61 @@ ResolutionGraph {
             license: None,
             custom_properties: {},
         },
-        addresses: Some(
-            {
-                "A": Some(
-                    0000000000000000000000000000000000000000000000000000000000000001,
-                ),
-            },
-        ),
+        addresses: None,
         dev_address_assignments: None,
         build: None,
         dependencies: {
-            "OtherDep": Dependency {
-                local: "./deps_only/other_dep",
+            "Middle": Dependency {
+                local: "./deps_only/middle",
                 subst: None,
                 version: None,
-                digest: Some(
-                    "9579E199DEA13003E65116DB9490364A5CCB445349164373B58E0B363FC75A5A",
-                ),
+                digest: None,
                 git_info: None,
                 node_info: None,
             },
         },
         dev_dependencies: {},
-        patches: {},
+        patches: {
+            "Leaf": Dependency {
+                local: "./deps_only/leaf_real",
+                subst: None,
+                version: None,
+                digest: None,
+                git_info: None,
+                node_info: None,
+            },
+        },
     },
     graph: {
         "Root": [
             (
-                "OtherDep",
+                "Middle",
                 Outgoing,
             ),
         ],
-        "OtherDep": [
+        "Middle": [
             (
                 "Root",
+                Incoming,
+            ),
+            (
+                "Leaf",
+                Outgoing,
+            ),
+        ],
+        "Leaf": [
+            (
+                "Middle",
                 Incoming,
             ),
         ],
     },
     package_table: {
-        "OtherDep": ResolutionPackage {
-            resolution_graph_index: "OtherDep",
+        "Leaf": ResolutionPackage {
+            resolution_graph_index: "Leaf",
             source_package: SourceManifest {
                 package: PackageInfo {
-                    name: "OtherDep",
+                    name: "Leaf",
                     version: (
                         0,
                         0,
@@ -107,8 +118,8 @@ ResolutionGraph {
                 },
                 addresses: Some(
                     {
-                        "B": Some(
-                            0000000000000000000000000000000000000000000000000000000000000002,
+                        "leaf": Some(
+                            0000000000000000000000000000000000000000000000000000000000c0ffee,
                         ),
                     },
                 ),
@@ -120,7 +131,43 @@ ResolutionGraph {
             },
             package_path: "ELIDED_FOR_TEST",
             resolution_table: {
-                "B": 0000000000000000000000000000000000000000000000000000000000000002,
+                "leaf": 0000000000000000000000000000000000000000000000000000000000c0ffee,
+            },
+            source_digest: "ELIDED_FOR_TEST",
+        },
+        "Middle": ResolutionPackage {
+            resolution_graph_index: "Middle",
+            source_package: SourceManifest {
+                package: PackageInfo {
+                    name: "Middle",
+                    version: (
+                        0,
+                        0,
+                        0,
+                    ),
+                    authors: [],
+                    license: None,
+                    custom_properties: {},
+                },
+                addresses: None,
+                dev_address_assignments: None,
+                build: None,
+                dependencies: {
+                    "Leaf": Dependency {
+                        local: "./does_not_exist",
+                        subst: None,
+                        version: None,
+                        digest: None,
+                        git_info: None,
+                        node_info: None,
+                    },
+                },
+                dev_dependencies: {},
+                patches: {},
+            },
+            package_path: "ELIDED_FOR_TEST",
+            resolution_table: {
+                "leaf": 0000000000000000000000000000000000000000000000000000000000c0ffee,
             },
             source_digest: "ELIDED_FOR_TEST",
         },
@@ -138,55 +185,56 @@ ResolutionGraph {
                     license: None,
                     custom_properties: {},
                 },
-                addresses: Some(
-                    {
-                        "A": Some(
-                            0000000000000000000000000000000000000000000000000000000000000001,
-                        ),
-                    },
-                ),
+                addresses: None,
                 dev_address_assignments: None,
                 build: None,
                 dependencies: {
-                    "OtherDep": Dependency {
-                        local: "./deps_only/other_dep",
+                    "Middle": Dependency {
+                        local: "./deps_only/middle",
                         subst: None,
                         version: None,
-                        digest: Some(
-                            "9579E199DEA13003E65116DB9490364A5CCB445349164373B58E0B363FC75A5A",
-                        ),
+                        digest: None,
                         git_info: None,
                         node_info: None,
                     },
                 },
                 dev_dependencies: {},
-                patches: {},
+                patches: {
+                    "Leaf": Dependency {
+                        local: "./deps_only/leaf_real",
+                        subst: None,
+                        version: None,
+                        digest: None,
+                        git_info: None,
+                        node_info: None,
+                    },
+                },
             },
             package_path: "ELIDED_FOR_TEST",
             resolution_table: {
-                "A": 0000000000000000000000000000000000000000000000000000000000000001,
-                "B": 0000000000000000000000000000000000000000000000000000000000000002,
+                "leaf": 0000000000000000000000000000000000000000000000000000000000c0ffee,
             },
             source_digest: "ELIDED_FOR_TEST",
         },
     },
     global_named_address_pool: {
-        "A": ResolvingNamedAddress {
+        "leaf": ResolvingNamedAddress {
             value: RefCell {
                 value: Some(
-                    0000000000000000000000000000000000000000000000000000000000000001,
-                ),
-            },
-            forced: false,
-        },
-        "B": ResolvingNamedAddress {
-            value: RefCell {
-                value: Some(
-                    0000000000000000000000000000000000000000000000000000000000000002,
+                    0000000000000000000000000000000000000000000000000000000000c0ffee,
                 ),
             },
             forced: false,
         },
     },
-    patches: {},
+    patches: {
+        "Leaf": Dependency {
+            local: "./deps_only/leaf_real",
+            subst: None,
+            version: None,
+            digest: None,
+            git_info: None,
+            node_info: None,
+        },
+    },
 }
