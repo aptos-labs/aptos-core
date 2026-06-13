@@ -39,6 +39,16 @@ pub static TXN_EMITTER_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for total transactions whose final state we couldn't determine
+/// (e.g., over the per-cycle per-hash lookup budget).
+pub static TXN_EMITTER_UNRESOLVED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_txn_emitter_unresolved_total",
+        "Total number of transactions whose final state could not be determined"
+    )
+    .unwrap()
+});
+
 /// Counter for total failed transaction submissions.
 pub static TXN_EMITTER_FAILED_SUBMISSION: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -85,9 +95,10 @@ pub fn record_submission_stats(submitted: u64, failed: u64) {
 }
 
 /// Records transaction commit stats.
-pub fn record_commit_stats(committed: u64, expired: u64) {
+pub fn record_commit_stats(committed: u64, expired: u64, unresolved: u64) {
     TXN_EMITTER_COMMITTED.inc_by(committed);
     TXN_EMITTER_EXPIRED.inc_by(expired);
+    TXN_EMITTER_UNRESOLVED.inc_by(unresolved);
 }
 
 /// Records transaction latency in milliseconds for a batch of transactions.
@@ -120,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_record_commit_stats() {
-        record_commit_stats(95, 5);
+        record_commit_stats(95, 5, 0);
     }
 
     #[test]
