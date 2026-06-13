@@ -81,6 +81,10 @@ use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
+mod behavioral_tests;
+#[cfg(test)]
+mod cli_runner;
+#[cfg(test)]
 mod tests;
 
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
