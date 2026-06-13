@@ -20,8 +20,9 @@ use aptos_forge::{
     TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-    OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    BlockGasLimitType, ConsensusAlgorithmConfig, FeatureFlag, Features, LeaderReputationType,
+    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+    OnChainRandomnessConfig, ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType,
 };
 use aptos_testcases::{
     chunky_dkg_quorum_loss_test::ChunkyDkgQuorumLossTest,
@@ -448,33 +449,45 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 14000 } else { 19000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_vfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                .mode(EmitJobMode::ConstTps { tps: 4000 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    7000
-                } else if long_running {
-                    // This is for forge stable
-                    11000
-                } else {
-                    // During land time we want to be less strict, otherwise we flaky fail
-                    10000
-                },
-            ),
+            inner_success_criteria: SuccessCriteria::new(3500),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-            // Have single epoch change in land blocking, and a few on long-running
-            helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+            // No epoch change so measurements are stable.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            // Window-only experiment: bump proposer_window_num_validators_multiplier
+            // from 10 to 100 so the larger observation window stabilizes the
+            // failure-rate estimate. All other classifier parameters left at
+            // their defaults (failed_weight=1, failure_threshold_percent=10) to
+            // isolate the window's contribution from the threshold/weight changes
+            // tested in companion PRs.
+            let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
+            if let OnChainConsensusConfig::V5 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 { ref mut main, .. },
+                ..
+            } = consensus_config
+            {
+                main.proposer_election_type = ProposerElectionType::LeaderReputation(
+                    LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+                        active_weight: 1000,
+                        inactive_weight: 10,
+                        failed_weight: 1,
+                        failure_threshold_percent: 10,
+                        proposer_window_num_validators_multiplier: 100, // bumped from 10
+                        voter_window_num_validators_multiplier: 1,
+                        weight_by_voting_power: true,
+                        use_history_from_previous_epoch_max_count: 5,
+                    }),
+                );
+            }
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(consensus_config).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
