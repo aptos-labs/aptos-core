@@ -184,6 +184,7 @@ pub mod tests {
         schemes::fptx::FPTX,
         shared::{
             ciphertext::bibe::InnerCiphertext as _,
+            digest::DigestKeyView as _,
             ids::{Id, IdSet},
             key_derivation::BIBEDecryptionKey,
         },

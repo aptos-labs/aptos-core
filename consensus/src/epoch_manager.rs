@@ -1202,7 +1202,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             bcs::from_bytes::<AggregatedSubtranscript>(dkg_session_state.transcript.as_slice())
                 .map_err(NoSecretSharingReason::TranscriptDeserializationError)?;
 
-        let digest_key = DIGEST_KEY
+        let digest_key_handle = DIGEST_KEY
             .as_ref()
             .ok_or(NoSecretSharingReason::NoTrustedSetupAvailable)?
             .clone();
@@ -1210,7 +1210,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let current_player = Player { id: my_index };
 
         let (encryption_key, verification_keys, msk_share) = FPTXWeighted::setup(
-            &digest_key,
+            &*digest_key_handle,
             &dkg_session.public_parameters,
             &subtranscript.subtranscript,
             &dkg_session.threshold_config,
@@ -1221,7 +1221,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         Ok(SecretShareConfig::new(
             new_epoch_state.verifier.clone(),
-            digest_key,
+            digest_key_handle,
             msk_share,
             verification_keys,
             dkg_session.threshold_config.clone(),

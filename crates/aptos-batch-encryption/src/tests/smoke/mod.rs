@@ -3,6 +3,7 @@
 
 use crate::{
     errors::MissingEvalProofError,
+    shared::digest::DigestKey,
     traits::{BatchThresholdEncryption, DecryptionKeyShare},
 };
 use anyhow::Result;
@@ -30,7 +31,7 @@ fn associated_data() -> String {
 pub struct SmokeTest<Scheme: BatchThresholdEncryption> {
     tc: <Scheme as BatchThresholdEncryption>::ThresholdConfig,
     ek: <Scheme as BatchThresholdEncryption>::EncryptionKey,
-    dk: <Scheme as BatchThresholdEncryption>::DigestKey,
+    dk: DigestKey,
     vks: Vec<<Scheme as BatchThresholdEncryption>::VerificationKey>,
     msk_shares: Vec<<Scheme as BatchThresholdEncryption>::MasterSecretKeyShare>,
 }
@@ -58,7 +59,7 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
     pub fn new(
         tc: <Scheme as BatchThresholdEncryption>::ThresholdConfig,
         ek: <Scheme as BatchThresholdEncryption>::EncryptionKey,
-        dk: <Scheme as BatchThresholdEncryption>::DigestKey,
+        dk: DigestKey,
         vks: Vec<<Scheme as BatchThresholdEncryption>::VerificationKey>,
         msk_shares: Vec<<Scheme as BatchThresholdEncryption>::MasterSecretKeyShare>,
     ) -> Self {

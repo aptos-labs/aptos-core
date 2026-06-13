@@ -374,7 +374,7 @@ async fn decrypt_validator_path(
         monitor!(
             "decryption_digest",
             DIGEST_POOL.install(|| {
-                FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)
+                FPTXWeighted::digest(&*digest_key, &txn_ciphertexts, encryption_round)
                     .map(|(digest, proofs_promise)| (txn_ciphertexts, digest, proofs_promise))
             })
         )
@@ -415,7 +415,7 @@ async fn decrypt_validator_path(
         "decryption_eval_proofs",
         tokio::task::spawn_blocking(move || {
             EVAL_PROOFS_POOL
-                .install(|| FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key))
+                .install(|| FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &*digest_key))
         })
         .await
         .map_err(|e| anyhow!("proof computation panicked: {e}"))?

@@ -182,7 +182,7 @@ pub mod tests {
         schemes::fptx::FPTX,
         shared::{
             ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext},
-            digest::DigestKey,
+            digest::{DigestKey, DigestKeyView as _},
             encryption_key::AugmentedEncryptionKey,
             ids::{Id, IdSet},
             key_derivation::{self, BIBEDecryptionKey},
@@ -230,7 +230,7 @@ pub mod tests {
         let msk = Fr::rand(&mut rng);
         let (mpk, _, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, &tc);
 
-        let ek = AugmentedEncryptionKey::new(mpk, dk.tau_g2, (dk.tau_g2 * msk).into());
+        let ek = AugmentedEncryptionKey::new(mpk, dk.tau_g2(), (dk.tau_g2() * msk).into());
 
         let plaintext = String::from("hi");
         let associated_data = String::from("");

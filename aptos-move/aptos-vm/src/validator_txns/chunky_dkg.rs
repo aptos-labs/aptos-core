@@ -158,7 +158,7 @@ impl AptosVM {
         // and trust consensus.
         if let Some(digest_key) = DIGEST_KEY.as_ref() {
             let derived_key_bytes = trx
-                .derive_encryption_key_bytes(digest_key.tau_g2)
+                .derive_encryption_key_bytes(digest_key.tau_g2())
                 .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::EncryptionKeyMismatch))?;
             if derived_key_bytes != encryption_key {
                 return Err(ExecutionFailure::Expected(

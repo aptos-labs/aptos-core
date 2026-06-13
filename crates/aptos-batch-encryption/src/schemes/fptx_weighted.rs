@@ -6,7 +6,7 @@ use crate::{
     schemes::fptx::FPTX,
     shared::{
         ciphertext::{PreparedCiphertext, StandardCiphertext},
-        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
+        digest::{Digest, DigestKey, DigestKeyView, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
         ids::Id,
         key_derivation::{
@@ -224,7 +224,6 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = WeightedBIBEDecryptionKeyShare;
     type Digest = Digest;
-    type DigestKey = DigestKey;
     type EncryptionKey = EncryptionKey;
     type EvalProof = EvalProof;
     type EvalProofs = EvalProofs;
@@ -237,7 +236,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type VerificationKey = WeightedBIBEVerificationKey;
 
     fn setup(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         subtranscript: &Self::SubTranscript,
         threshold_config: &Self::ThresholdConfig,
@@ -250,7 +249,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     )> {
         let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
 
-        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2());
 
         let vks: Vec<Self::VerificationKey> = threshold_config
             .get_players()
@@ -296,11 +295,11 @@ impl BatchThresholdEncryption for FPTXWeighted {
     }
 
     fn extract_encryption_key(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         subtranscript: &Self::SubTranscript,
     ) -> Result<Self::EncryptionKey> {
         let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
-        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2))
+        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2()))
     }
 
     fn setup_for_testing(
@@ -310,7 +309,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         threshold_config: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
-        Self::DigestKey,
+        DigestKey,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -320,16 +319,16 @@ impl BatchThresholdEncryption for FPTXWeighted {
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_weighted_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2());
 
         Ok((ek, digest_key, vks, msk_shares))
     }
 
-    fn max_batch_size(dk: &Self::DigestKey) -> usize {
+    fn max_batch_size(dk: &dyn DigestKeyView) -> usize {
         dk.max_batch_size()
     }
 
-    fn num_rounds(dk: &Self::DigestKey) -> usize {
+    fn num_rounds(dk: &dyn DigestKeyView) -> usize {
         dk.num_rounds()
     }
 
@@ -343,7 +342,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     }
 
     fn digest(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         cts: &[Self::Ciphertext],
         round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
@@ -363,14 +362,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
 
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
-        digest_key: &DigestKey,
+        digest_key: &dyn DigestKeyView,
     ) -> Self::EvalProofs {
         FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
-        digest_key: &DigestKey,
+        digest_key: &dyn DigestKeyView,
     ) -> Self::EvalProofs {
         FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }

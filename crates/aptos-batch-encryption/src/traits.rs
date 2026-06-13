@@ -1,6 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use crate::errors::MissingEvalProofError;
+use crate::{errors::MissingEvalProofError, shared::digest::DigestKeyView};
 use anyhow::Result;
 use aptos_crypto::player::Player;
 use aptos_dkg::pvss::traits::TranscriptCore;
@@ -14,10 +14,6 @@ pub trait BatchThresholdEncryption {
 
     /// An encryption key for the scheme. Allows for generating ciphertexts.
     type EncryptionKey: Send + Sync;
-
-    /// A digest key for the scheme. Allows for generating digests given a list of ciphertexts.
-    /// Internally, this is a modified KZG setup.
-    type DigestKey: Send + Sync;
 
     /// A ciphertext for the scheme.
     type Ciphertext: Serialize
@@ -73,7 +69,7 @@ pub trait BatchThresholdEncryption {
     /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share
     /// the secret key according to the [`ThresholdConfig`] given as input. In production,
     fn setup(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         subtranscript: &Self::SubTranscript,
         threshold_config: &Self::ThresholdConfig,
@@ -86,12 +82,12 @@ pub trait BatchThresholdEncryption {
     )>;
 
     fn extract_encryption_key(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         subtranscript: &Self::SubTranscript,
     ) -> Result<Self::EncryptionKey>;
 
     /// Generates an (insecure) setup for the batch threshold encryption scheme. In production,
-    /// a DKG will be used to produce all parts of this setup except for [`DigestKey`], which will
+    /// a DKG will be used to produce all parts of this setup except for the digest key, which will
     /// be produced using a single-time trusted setup ceremony.
     fn setup_for_testing(
         seed: u64,
@@ -100,16 +96,16 @@ pub trait BatchThresholdEncryption {
         threshold_config: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
-        Self::DigestKey,
+        crate::shared::digest::DigestKey,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )>;
 
     /// Gets the max batch size that the given digest key supports.
-    fn max_batch_size(dk: &Self::DigestKey) -> usize;
+    fn max_batch_size(dk: &dyn DigestKeyView) -> usize;
 
     /// Gets the number of rounds that the given digest key supports.
-    fn num_rounds(dk: &Self::DigestKey) -> usize;
+    fn num_rounds(dk: &dyn DigestKeyView) -> usize;
 
     /// Encrypt a plaintext with respect to any arbitrary associated data. This associated data is
     /// "bound" to the resulting CT, such that it will only verify with respect to the same
@@ -121,9 +117,9 @@ pub trait BatchThresholdEncryption {
         associated_data: &impl AssociatedData,
     ) -> Result<Self::Ciphertext>;
 
-    /// Derive a digest from a [`DigestKey`] and a slice of ciphertexts.
+    /// Derive a digest from a digest key and a slice of ciphertexts.
     fn digest(
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
         cts: &[Self::Ciphertext],
         round: u64,
     ) -> Result<(Self::Digest, Self::EvalProofsPromise)>;
@@ -140,7 +136,7 @@ pub trait BatchThresholdEncryption {
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme.
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
     ) -> Self::EvalProofs;
 
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme. This
@@ -148,7 +144,7 @@ pub trait BatchThresholdEncryption {
     /// from von zur Gathen and Gerhardt. Currently for benchmarking only, not for production use.
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
-        digest_key: &Self::DigestKey,
+        digest_key: &dyn DigestKeyView,
     ) -> Self::EvalProofs;
 
     fn eval_proof_for_ct(
