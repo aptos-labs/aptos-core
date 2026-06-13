@@ -164,9 +164,17 @@ struct Context {
 struct Descriptors {
     /// Vector-descriptor idempotency cache: `elem_ty -> id`. Lock-free reads
     /// via DashMap; the first publisher for a given `elem_ty` takes a shard
-    /// write-lock once. Future descriptor kinds can share this cache by
-    /// keying on the full `InternedType` (e.g. `vector<T>`, `struct<...>`).
+    /// write-lock once.
+    //
+    // TODO: unify the per-kind type-keyed caches (`vector_by_elem`,
+    // `enum_by_type`, `struct_by_ty`) into one map keyed on the full
+    // `InternedType` (`vector<T>` instead of `T`).
+    // `captured_data_by_pointer_offsets` is keyed by shape, not type, and
+    // stays separate.
     vector_by_elem: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// Enum-descriptor idempotency cache: `enum_ty -> id`. Mirrors
+    /// `vector_by_elem` but keyed on the concrete enum type.
+    enum_by_type: DashMap<InternedType, DescriptorId, ahash::RandomState>,
     /// Captured-data idempotency cache: pointer-offset shape -> id. Captures
     /// sharing a pointer shape share one descriptor. Pointer-free captures
     /// bypass this cache for `TRIVIAL_DESCRIPTOR_ID`.
@@ -184,6 +192,7 @@ impl Default for Descriptors {
     fn default() -> Self {
         Self {
             vector_by_elem: DashMap::default(),
+            enum_by_type: DashMap::default(),
             captured_data_by_pointer_offsets: DashMap::default(),
             struct_by_ty: DashMap::default(),
             table: ArcSwap::from_pointee(initial_descriptors()),
@@ -199,11 +208,13 @@ impl Descriptors {
         // compile-time error here.
         let Self {
             vector_by_elem,
+            enum_by_type,
             captured_data_by_pointer_offsets,
             struct_by_ty,
             table,
         } = self;
         vector_by_elem.clear();
+        enum_by_type.clear();
         captured_data_by_pointer_offsets.clear();
         struct_by_ty.clear();
         table.store(Arc::new(initial_descriptors()));
@@ -707,6 +718,43 @@ impl<'ctx> ExecutionGuard<'ctx> {
                 let desc = Arc::new(
                     ObjectDescriptor::new_struct(size, offsets)
                         .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}")),
+                );
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Materializes an enum-object descriptor for `enum_ty` into the shared
+    /// arena and returns its assigned [`DescriptorId`]. Idempotent on
+    /// `enum_ty`. `variant_pointer_offsets[v]` are the heap-pointer byte
+    /// offsets (relative to the data region after the tag) for variant `v`.
+    ///
+    /// TODO: `enum_by_type` (and the sibling `vector_by_elem` /
+    /// captured-data caches) key on a version-agnostic `InternedType`. This is
+    /// sound only while the interner, descriptor table, and module cache are
+    /// reset together (`reset_all_caches`) and no in-place module-version
+    /// replacement exists. When multi-version module upgrade lands, make these
+    /// caches version-aware or clear them on every version switch — otherwise a
+    /// changed enum layout could reuse a stale descriptor.
+    pub fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> DescriptorId {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(id) = self.ctx.descriptors.enum_by_type.get(&enum_ty) {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .enum_by_type
+            .entry(enum_ty)
+            .or_insert_with(|| {
+                let desc = Arc::new(
+                    ObjectDescriptor::new_enum(size, variant_pointer_offsets)
+                        .unwrap_or_else(|e| panic!("publish_enum_descriptor: {e}")),
                 );
                 self.append_descriptor(desc)
             })

@@ -1,0 +1,58 @@
+=== micro-ops ===
+// module 0x42::enum_copy_lowering
+
+fun enum_copy() {
+  frame_data_size: 72
+  entry_gas: 109
+  code:
+    0: StoreImm8 [16] <- #1
+    1: EnumNew [0] desc=2 tag #0
+    2: HeapMoveTo8 [0]+8 <- [16]
+    3: Move8 [8] <- [0]
+    4: DeepCopy [8] deep-copy ptrs at [0]
+    5: SlotBorrow [24] <- &[0]
+    6: EnumReadVariantField(8) [16] <- (*[24]).8
+    7: SlotBorrow [24] <- &[8]
+    8: EnumReadVariantField(8) [40] <- (*[24]).8
+    9: AddU64 [40] <- [16] + [40]
+    10: Move8 [0] <- [40]
+    11: Return
+  safe_point_layouts:
+    1: []
+    4: []
+}
+
+fun scalar_copy() {
+  frame_data_size: 8
+  entry_gas: 56
+  code:
+    0: StoreImm8 [0] <- #14
+    1: Return
+}
+
+fun struct_copy() {
+  frame_data_size: 104
+  entry_gas: 193
+  code:
+    0: StoreImm8 [32] <- #1
+    1: EnumNew [40] desc=2 tag #0
+    2: HeapMoveTo8 [40]+8 <- [32]
+    3: StoreImm8 [32] <- #2
+    4: EnumNew [48] desc=2 tag #0
+    5: HeapMoveTo8 [48]+8 <- [32]
+    6: Move8 [8] <- [48]
+    7: Move8 [0] <- [40]
+    8: Move(16) [16] <- [0]
+    9: DeepCopy [16] deep-copy ptrs at [0, 8]
+    10: SlotBorrow [56] <- &[0]
+    11: EnumReadVariantField(8) [32] <- (*[56]).8
+    12: SlotBorrow [56] <- &[24]
+    13: EnumReadVariantField(8) [72] <- (*[56]).8
+    14: AddU64 [72] <- [32] + [72]
+    15: Move8 [0] <- [72]
+    16: Return
+  safe_point_layouts:
+    1: []
+    4: []
+    9: []
+}
