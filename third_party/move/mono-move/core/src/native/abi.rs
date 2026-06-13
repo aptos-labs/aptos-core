@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::FrameOffset;
+use crate::{DescriptorId, FrameOffset};
 use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
@@ -32,6 +32,10 @@ pub struct NativeABI {
     /// Frame offsets of the pointer slots among the args, sorted ascending. The
     /// GC scans these when a native is the top frame.
     heap_ptr_offsets: Vec<FrameOffset>,
+    /// GC descriptor for each argument that a native heap-allocates from, set by
+    /// the specializer for the natives that need it (e.g. `table::add_box`'s
+    /// value). Empty, or `None` per arg, when not needed.
+    arg_descriptors: Vec<Option<DescriptorId>>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -61,7 +65,21 @@ impl NativeABI {
             args_end,
             total_frame_size: args_end.max(returns_end),
             heap_ptr_offsets,
+            arg_descriptors: Vec::new(),
         })
+    }
+
+    /// Attaches per-argument GC descriptors (parallel to `args`). Used by the
+    /// specializer for natives that heap-allocate from an argument.
+    pub fn with_arg_descriptors(mut self, arg_descriptors: Vec<Option<DescriptorId>>) -> Self {
+        self.arg_descriptors = arg_descriptors;
+        self
+    }
+
+    /// GC descriptor the `i`-th argument should be heap-allocated with, if the
+    /// specializer recorded one.
+    pub fn arg_descriptor(&self, i: usize) -> Option<DescriptorId> {
+        self.arg_descriptors.get(i).copied().flatten()
     }
 
     pub fn args(&self) -> &[FrameSlot] {

@@ -5,11 +5,12 @@
 
 use super::{
     extension::NativeExtension,
-    result::VMInternalError,
+    result::{BcsError, VMInternalError},
     value::{VMValue, Vector},
 };
 use crate::{interner::InternedModuleId, types::InternedType};
 use core::cell::RefMut;
+use move_core_types::account_address::AccountAddress;
 
 /// Trait that native functions are written generic over.
 ///
@@ -64,6 +65,15 @@ pub trait NativeContext {
     where
         T: VMValue<'a>;
 
+    /// Writes `bytes` as the in-frame representation of the `i`-th return value.
+    /// `bytes.len()` must equal the slot's size.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be a valid in-frame representation of the slot's Move-level
+    /// type. Any heap pointers it embeds must reference live objects.
+    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> Result<(), VMInternalError>;
+
     /// Number of type arguments.
     fn num_ty_args(&self) -> usize;
 
@@ -86,6 +96,69 @@ pub trait NativeContext {
     /// returns a handle to it. The vector stays live for the rest of the
     /// native call.
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError>;
+
+    /// BCS-serializes the value of type `ty` stored at `base`.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` that stays
+    /// live for the duration of the call.
+    unsafe fn bcs_serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> Result<Result<Vec<u8>, BcsError>, VMInternalError>;
+
+    /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
+    /// representation.
+    ///
+    /// The returned bytes may embed pointers to freshly allocated, unrooted heap
+    /// objects, so they must be written into a frame slot before any further
+    /// heap allocation.
+    fn bcs_deserialize_value(
+        &self,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> Result<Result<Vec<u8>, BcsError>, VMInternalError>;
+
+    /// Whether a resource of type `ty` exists at `address` in global storage.
+    fn resource_exists(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> Result<bool, VMInternalError>;
+
+    /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
+    /// The inner `Err` is an argument-caused serialization failure.
+    fn bcs_serialize_arg(
+        &self,
+        i: usize,
+        ty: InternedType,
+    ) -> Result<Result<Vec<u8>, BcsError>, VMInternalError>;
+
+    /// Whether a table entry exists at `(handle, key)`.
+    fn table_contains(&self, handle: AccountAddress, key: &[u8]) -> Result<bool, VMInternalError>;
+
+    /// Borrows the table entry at `(handle, key)`, writing a reference to it
+    /// into return slot `i`; `mutable` requests a mutable borrow. Returns
+    /// `false` (writing nothing) if the entry does not exist.
+    fn table_borrow(
+        &self,
+        handle: AccountAddress,
+        key: &[u8],
+        i: usize,
+        mutable: bool,
+    ) -> Result<bool, VMInternalError>;
+
+    /// Adds the value in argument `value_arg` to the table at `(handle, key)`,
+    /// boxing it on the heap with the descriptor the specializer recorded for
+    /// that argument. Returns `false` if an entry already exists.
+    fn table_add(
+        &self,
+        handle: AccountAddress,
+        key: &[u8],
+        value_arg: usize,
+    ) -> Result<bool, VMInternalError>;
 
     /// Obtains a mutable reference to the extension of type `T`.
     ///

@@ -3,7 +3,10 @@
 
 //! Natives for the `object` module, plus the extension backing them.
 
-use crate::{address_derivation::object_address_from_object, monomorphic_natives, NativeEntry};
+use crate::{
+    address_derivation::object_address_from_object, monomorphic_natives, polymorphic_natives,
+    NativeEntry,
+};
 use mono_move_core::native::{
     NativeContext, NativeContextFamily, NativeExtension, NativeStatus, VMInternalError,
 };
@@ -56,10 +59,29 @@ pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
     Ok(NativeStatus::Success)
 }
 
+/// `0x1::object::exists_at<T>(object: address): bool`
+///
+/// Whether a resource of type `T` exists at `object`.
+//
+// TODO: charge gas (base + per-byte-loaded) once the gas API lands.
+pub fn native_exists_at<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+    // SAFETY: arg 0 is `address`.
+    let address: AccountAddress = unsafe { ctx.arg(0)? };
+    let exists = ctx.resource_exists(address, ctx.ty_arg(0)?)?;
+    // SAFETY: return 0 is `bool`.
+    unsafe { ctx.set_return(0, exists)? };
+    Ok(NativeStatus::Success)
+}
+
 /// Natives for the `object` module.
 pub fn make_all_object_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
-    monomorphic_natives![(
+    let mut natives = monomorphic_natives![(
         "0x1::object::create_user_derived_object_address_impl",
         native_create_user_derived_object_address_impl
-    ),]
+    ),];
+    natives.extend(polymorphic_natives![(
+        "0x1::object::exists_at",
+        native_exists_at
+    )]);
+    natives
 }

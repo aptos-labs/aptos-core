@@ -3,10 +3,14 @@
 
 //! Natives for the `transaction_context` module, plus the extension backing them.
 
-use crate::{address_derivation::auid_address, monomorphic_natives, NativeEntry};
+use crate::{
+    address_derivation::{auid_address, table_handle},
+    monomorphic_natives, NativeEntry,
+};
 use mono_move_core::native::{
     NativeContext, NativeContextFamily, NativeExtension, NativeStatus, VMInternalError,
 };
+use move_core_types::account_address::AccountAddress;
 
 /// Per-transaction context backing the `transaction_context` natives.
 //
@@ -26,6 +30,8 @@ pub struct TransactionContextExtension {
     /// Top byte of the monotonic counter (0 for block execution, 1 for
     /// validation/simulation).
     reserved_byte: u8,
+    /// Tables created so far in this transaction; seeds the next table handle.
+    table_counter: u32,
 }
 
 impl TransactionContextExtension {
@@ -42,7 +48,15 @@ impl TransactionContextExtension {
             session_counter,
             transaction_index,
             reserved_byte,
+            table_counter: 0,
         }
+    }
+
+    /// Derives a fresh, deterministic table handle and advances the counter.
+    pub fn next_table_handle(&mut self) -> AccountAddress {
+        let handle = table_handle(&self.txn_hash, self.table_counter);
+        self.table_counter += 1;
+        handle
     }
 }
 

@@ -73,13 +73,13 @@ impl NativeExtensions {
     /// Errors if `T` is not installed, or if it is already borrowed.
     pub fn get_mut<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {
         let cell = self.map.get(&TypeId::of::<T>()).ok_or_else(|| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "native extension {} not installed for this transaction",
                 std::any::type_name::<T>(),
             ))
         })?;
         let guard = cell.try_borrow_mut().map_err(|_| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "native extension {} is already borrowed",
                 std::any::type_name::<T>(),
             ))
@@ -108,7 +108,7 @@ impl NativeExtensions {
     ) -> Result<(), VMInternalError> {
         for ext in self.map.values() {
             let mut ext = ext.try_borrow_mut().map_err(|_| {
-                VMInternalError::InvariantViolation(
+                VMInternalError::invariant_violation(
                     "a native extension is borrowed during GC (held across an allocation?)".into(),
                 )
             })?;
@@ -123,7 +123,7 @@ impl NativeExtensions {
         for ext in self.map.values() {
             ext.try_borrow_mut()
                 .map_err(|_| {
-                    VMInternalError::InvariantViolation(
+                    VMInternalError::invariant_violation(
                         "cannot checkpoint: a native extension is unexpectedly still borrowed"
                             .into(),
                     )
@@ -142,7 +142,7 @@ impl NativeExtensions {
         for ext in self.map.values() {
             ext.try_borrow_mut()
                 .map_err(|_| {
-                    VMInternalError::InvariantViolation(
+                    VMInternalError::invariant_violation(
                         "cannot roll back: a native extension is unexpectedly still borrowed"
                             .into(),
                     )
@@ -249,7 +249,7 @@ mod tests {
 
         fn on_rollback(&mut self, n: usize) -> Result<(), VMInternalError> {
             let keep = self.snapshots.len().checked_sub(n).ok_or_else(|| {
-                VMInternalError::InvariantViolation("rollback past the first checkpoint".into())
+                VMInternalError::invariant_violation("rollback past the first checkpoint".into())
             })?;
             self.value = self.snapshots[keep];
             self.snapshots.truncate(keep);

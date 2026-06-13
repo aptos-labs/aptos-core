@@ -24,12 +24,15 @@
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
-    heap::{heap_alloc, AllocationResult, Heap},
+    global_storage::ResourceReadWriteSet,
+    heap::{gc_collect, heap_alloc, AllocationError, AllocationResult, Heap, TopFrame},
     memory::{read_ptr, read_vec_len, write_ptr, write_u64},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
+    native::{NativeExtensions, RootPool},
+    types::InternedType,
+    DescriptorProvider, LayoutId, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use std::cmp::Ordering;
@@ -498,6 +501,51 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
         .into());
     }
     Ok(())
+}
+
+/// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
+/// runs out of heap, collects garbage once (with the given roots) and retries.
+///
+/// # Safety
+///
+/// `dst` must be writable for `ty`'s layout size, and `bytes` must not alias the
+/// heap, since a GC may relocate heap objects.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn deserialize_or_gc<
+    L: LayoutProvider + ?Sized,
+    P: DescriptorProvider + ?Sized,
+>(
+    layouts: &L,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    frame_ptr: *mut u8,
+    top_frame: TopFrame<'_>,
+) -> RuntimeResult<()> {
+    // SAFETY: forwarded from this function's contract.
+    match unsafe { deserialize(layouts, heap, ty, bytes, dst) } {
+        Ok(()) => Ok(()),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(
+                heap,
+                provider,
+                rws,
+                extra_roots,
+                extensions,
+                frame_ptr,
+                top_frame,
+            )?;
+            // SAFETY: as above.
+            unsafe { deserialize(layouts, heap, ty, bytes, dst) }
+                .map_err(AllocationError::into_runtime_error)
+        },
+    }
 }
 
 /// # Safety
