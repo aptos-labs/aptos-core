@@ -409,7 +409,7 @@ impl CliCommand<()> for RunLocalnet {
                 run_shutdown_steps(shutdown_steps).await?;
                 eprintln!("Ran shutdown steps");
                 return Err(CliError::UnexpectedError(format!(
-                    "\nOne of the services crashed on startup:\n{:#?}\nPlease check the logs in {}",
+                    "\nOne of the services crashed on startup. \n\nPossible causes: \n- Port already in use (try a different port with --test-dir) \n- Missing dependencies \n- Insufficient disk space \n- Permission denied on log directory \n\nError details:\n{:#?}\n\nPlease check the logs in {}",
                     // We can unwrap because we know for certain that the JoinSet is
                     // not empty.
                     res.unwrap(),

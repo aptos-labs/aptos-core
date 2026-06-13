@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::Context;
 use dashmap::DashMap;
 use std::{
     fs::{create_dir_all, File},
@@ -46,22 +47,29 @@ impl<'a> MakeWriter<'a> for ThreadNameMakeWriter {
         let log_file = self
             .file_handles
             .entry(thread_name_no_number.clone())
-            .or_insert_with(|| FileLock::new(create_file(base_dir, thread_name_no_number)))
+            .or_insert_with(|| {
+                FileLock::new(
+                    create_file(base_dir, thread_name_no_number)
+                        .expect("Failed to create tracing log file"),
+                )
+            })
             .value()
             .clone();
         Box::new(log_file)
     }
 }
 
-fn create_file(base_dir: PathBuf, thread_name_no_number: String) -> File {
+fn create_file(base_dir: PathBuf, thread_name_no_number: String) -> anyhow::Result<File> {
     let dir_path = base_dir.join(thread_name_no_number);
-    create_dir_all(&dir_path).expect("Failed to create log directory");
+    create_dir_all(&dir_path)
+        .with_context(|| format!("Failed to create log directory at {:?}", dir_path))?;
+
     let log_path = dir_path.join("tracing.log");
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(log_path)
-        .unwrap()
+        .open(&log_path)
+        .with_context(|| format!("Failed to open tracing log file at {:?}", log_path))
 }
 
 fn truncate_last_segment(s: &str, delimiter: char) -> String {
