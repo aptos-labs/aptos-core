@@ -677,6 +677,7 @@ impl PipelineBuilder {
                 self.payload_manager.clone(),
                 block_store_callback,
                 block.clone(),
+                self.signer.author(),
             ),
             None,
         );
@@ -1329,6 +1330,7 @@ impl PipelineBuilder {
             dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
         >,
         block: Arc<Block>,
+        my_author: Author,
     ) -> TaskResult<PostCommitResult> {
         let mut tracker = Tracker::start_waiting("post_commit_ledger", &block);
         parent_post_commit.await?;
@@ -1337,7 +1339,7 @@ impl PipelineBuilder {
         notify_state_sync_fut.await?;
 
         tracker.start_working();
-        update_counters_for_block(&block);
+        update_counters_for_block(&block, my_author);
         update_counters_for_compute_result(&compute_result);
 
         let payload = block.payload().cloned();
