@@ -192,10 +192,7 @@ pub fn verify_pack_closure(
     let expected_capture_tys = mask.extract(func.param_tys(), true);
 
     let given_capture_tys = operand_stack.popn_tys(expected_capture_tys.len() as u16)?;
-    for (expected, given) in expected_capture_tys
-        .into_iter()
-        .zip(given_capture_tys.into_iter())
-    {
+    for (expected, given) in expected_capture_tys.into_iter().zip(given_capture_tys) {
         expected.paranoid_check_is_no_ref("Captured argument type")?;
         with_instantiation(ty_builder, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities

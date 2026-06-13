@@ -5414,11 +5414,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             let mut conditions: Vec<Exp> = vec![];
             let mut block = def_block;
 
-            loop {
-                let Some(idom) = dom.immediate_dominator(block) else {
-                    break; // reached entry
-                };
-
+            while let Some(idom) = dom.immediate_dominator(block) {
                 // Check if the dominator block ends with a Branch
                 let idom_range = fwd_cfg.code_range(idom);
                 if !idom_range.is_empty() {

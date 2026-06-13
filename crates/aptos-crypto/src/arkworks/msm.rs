@@ -20,7 +20,7 @@ use std::{collections::HashMap, fmt::Debug};
 /// An MSM input consists of:
 /// * a list of base elements, and
 /// * a list of scalar elements,
-/// which are coupled pairwise.
+///   which are coupled pairwise.
 ///
 /// Implementations that construct an `MsmInput` should ensure that
 /// `bases.len() == scalars.len()`

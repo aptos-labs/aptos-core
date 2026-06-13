@@ -320,13 +320,12 @@ impl<'a> SourceCoverageBuilder<'a> {
                                 minimize_locations(fun_uncov.iter().map(|(loc, _)| *loc).collect());
                             // If any uncovered locations are the same as covered locations,
                             // remove them from uncovered locations.
-                            let uncovered_locations =
-                                BTreeSet::from_iter(uncovered_locations.into_iter())
-                                    .difference(&BTreeSet::from_iter(
-                                        covered_locations.iter().cloned(),
-                                    ))
-                                    .cloned()
-                                    .collect();
+                            let uncovered_locations = BTreeSet::from_iter(uncovered_locations)
+                                .difference(&BTreeSet::from_iter(
+                                    covered_locations.iter().cloned(),
+                                ))
+                                .cloned()
+                                .collect();
                             // Covered locations may be an over-approximation, so uncovered
                             // locations are subtracted from covered locations.
                             let covered_locations = subtract_locations(

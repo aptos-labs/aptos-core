@@ -479,7 +479,7 @@ impl BoogieOptions {
             ));
         }
 
-        for (l, g) in lesser_parts.into_iter().zip(greater_parts.into_iter()) {
+        for (l, g) in lesser_parts.into_iter().zip(greater_parts) {
             let ln = l.parse::<usize>()?;
             let gn = g.parse::<usize>()?;
             if gn < ln {

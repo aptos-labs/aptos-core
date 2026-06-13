@@ -103,8 +103,8 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // messages.
     let dep_file_map: HashMap<_, _> = resolution_graph
         .package_table
-        .iter()
-        .flat_map(|(_, rpkg)| {
+        .values()
+        .flat_map(|rpkg| {
             rpkg.get_sources(&resolution_graph.build_options)
                 .unwrap()
                 .iter()

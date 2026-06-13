@@ -54,13 +54,13 @@ fn mock_mget_transactions(starting_version: u64, count: usize, txn_size: usize) 
         .collect();
     let values = (0..count)
         .map(|i| {
-            redis::Value::Data(generate_transaction_bytes(
+            redis::Value::BulkString(generate_transaction_bytes(
                 starting_version + i as u64,
                 txn_size,
             ))
         })
         .collect();
-    let redis_resp = redis::Value::Bulk(values);
+    let redis_resp = redis::Value::Array(values);
     MockCmd::new(redis::cmd("MGET").arg(keys), Ok(redis_resp))
 }
 

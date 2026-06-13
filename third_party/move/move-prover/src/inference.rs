@@ -482,7 +482,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             // multiple new spec blocks all targeting `module_close_insert_pos`),
             // stable sort preserves declaration order — concatenate them into a
             // single insertion so `insert_str` produces the correct order.
-            insertions.sort_by(|a, b| b.0.cmp(&a.0));
+            insertions.sort_by_key(|b| std::cmp::Reverse(b.0));
             let mut merged = source;
             let mut i = 0;
             while i < insertions.len() {
@@ -803,7 +803,7 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
 
         // Sort insertions by byte offset in reverse order so earlier offsets
         // aren't invalidated by prior insertions.
-        insertions.sort_by(|a, b| b.0.cmp(&a.0));
+        insertions.sort_by_key(|b| std::cmp::Reverse(b.0));
 
         let mut result = source;
         for (offset, text) in &insertions {

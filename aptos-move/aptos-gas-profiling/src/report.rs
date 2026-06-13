@@ -252,7 +252,7 @@ impl TransactionGasLog {
 
         // Dependencies (execution category - loading modules is CPU work)
         let mut deps = self.exec_io.dependencies.clone();
-        deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
+        deps.sort_by_key(|dep| std::cmp::Reverse(dep.cost));
         data.insert(
             "deps".to_string(),
             Value::Array(
@@ -394,7 +394,7 @@ impl TransactionGasLog {
 
         // Storage fees & refunds for state changes
         let mut storage_writes = self.storage.write_set_storage.clone();
-        storage_writes.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
+        storage_writes.sort_by_key(|write| std::cmp::Reverse(write.cost));
         data.insert(
             "storage-writes".to_string(),
             Value::Array(
@@ -425,7 +425,7 @@ impl TransactionGasLog {
 
         // Storage fees for events
         let mut storage_events = self.storage.events.clone();
-        storage_events.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
+        storage_events.sort_by_key(|event| std::cmp::Reverse(event.cost));
         data.insert(
             "storage-events".to_string(),
             Value::Array(

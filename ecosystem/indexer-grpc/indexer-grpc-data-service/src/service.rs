@@ -387,7 +387,7 @@ async fn data_fetcher_task(
     let mut transactions_count = transactions_count;
 
     // Establish redis connection
-    let conn = match redis_client.get_tokio_connection_manager().await {
+    let conn = match redis_client.get_connection_manager().await {
         Ok(conn) => conn,
         Err(e) => {
             ERROR_COUNT

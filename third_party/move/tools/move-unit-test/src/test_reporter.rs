@@ -480,15 +480,15 @@ impl TestStatistics {
     pub fn combine(mut self, other: Self) -> Self {
         for (module_id, test_result) in other.passed {
             let entry = self.passed.entry(module_id).or_default();
-            entry.extend(test_result.into_iter());
+            entry.extend(test_result);
         }
         for (module_id, test_result) in other.failed {
             let entry = self.failed.entry(module_id).or_default();
-            entry.extend(test_result.into_iter());
+            entry.extend(test_result);
         }
         for (module_id, test_output) in other.output {
             let entry = self.output.entry(module_id).or_default();
-            entry.extend(test_output.into_iter());
+            entry.extend(test_output);
         }
         self
     }
