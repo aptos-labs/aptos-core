@@ -3,9 +3,7 @@
 
 use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
-use aptos_resource_viewer::{
-    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, RawMoveStruct,
-};
+use aptos_resource_viewer::{AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
@@ -278,27 +276,6 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     }
 }
 
-impl TryFrom<RawMoveStruct> for MoveStructValue {
-    type Error = anyhow::Error;
-
-    fn try_from(s: RawMoveStruct) -> anyhow::Result<Self> {
-        let mut map = BTreeMap::new();
-        if let Some(tag) = s.variant_info {
-            map.insert(
-                IdentifierWrapper::from_str("__variant_tag__")?,
-                MoveValue::U16(tag).json()?,
-            );
-        }
-        for (pos, val) in s.field_values.into_iter().enumerate() {
-            map.insert(
-                IdentifierWrapper::from_str(format!("_{}", pos).as_str())?,
-                MoveValue::try_from(val)?.json()?,
-            );
-        }
-        Ok(Self(map))
-    }
-}
-
 impl TryFrom<AnnotatedMoveClosure> for MoveStructValue {
     type Error = anyhow::Error;
 
@@ -441,7 +418,6 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
                     MoveValue::Struct(v.try_into()?)
                 }
             },
-            AnnotatedMoveValue::RawStruct(v) => MoveValue::Struct(v.try_into()?),
             AnnotatedMoveValue::Closure(c) => MoveValue::Struct(c.try_into()?),
         })
     }
