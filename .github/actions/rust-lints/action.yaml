@@ -13,6 +13,13 @@ runs:
     # Run the pre-commit checks
     - uses: pre-commit/action@v3.0.0
 
+    # Install a recent nightly toolchain with rustfmt (the pre-built image may have
+    # an older nightly that doesn't support edition2024).
+    - name: Install nightly toolchain with rustfmt
+      shell: bash
+      run: |
+        rustup toolchain install nightly -c rustfmt
+
     # Run the rust linters and cargo checks
     - name: Run cargo sort and rust lint checks
       shell: bash
