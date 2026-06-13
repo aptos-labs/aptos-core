@@ -20,8 +20,10 @@ use aptos_forge::{
     TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-    OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    BlockGasLimitType, ConsensusAlgorithmConfig, FeatureFlag, Features, LeaderReputationType,
+    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+    OnChainRandomnessConfig, ProposerAndVoterConfig, ProposerAndVoterConfigV3,
+    ProposerElectionType, TransactionShufflerType,
 };
 use aptos_testcases::{
     chunky_dkg_quorum_loss_test::ChunkyDkgQuorumLossTest,
@@ -448,33 +450,53 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 14000 } else { 19000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_vfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                .mode(EmitJobMode::ConstTps { tps: 4000 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    7000
-                } else if long_running {
-                    // This is for forge stable
-                    11000
-                } else {
-                    // During land time we want to be less strict, otherwise we flaky fail
-                    10000
-                },
-            ),
+            inner_success_criteria: SuccessCriteria::new(3500),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-            // Have single epoch change in land blocking, and a few on long-running
-            helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+            // No epoch change so measurements are stable.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            // Use ProposerAndVoterV3 to enable the latency-weighted heuristic via on-chain
+            // config (so all validators deterministically agree on the leader schedule —
+            // node-local toggles would fork during partial rollout).
+            // Window bumped to 100× (700 blocks / 35s with 7 validators) for statistical
+            // stability: 100 proposals per validator gives reliable latency mean estimates.
+            let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
+            if let OnChainConsensusConfig::V5 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 { ref mut main, .. },
+                ..
+            } = consensus_config
+            {
+                main.proposer_election_type = ProposerElectionType::LeaderReputation(
+                    LeaderReputationType::ProposerAndVoterV3(ProposerAndVoterConfigV3 {
+                        base: ProposerAndVoterConfig {
+                            active_weight: 1000,
+                            inactive_weight: 10,
+                            failed_weight: 1,
+                            failure_threshold_percent: 10,
+                            proposer_window_num_validators_multiplier: 100, // bumped from 10 for statistical stability
+                            voter_window_num_validators_multiplier: 1,
+                            weight_by_voting_power: true,
+                            use_history_from_previous_epoch_max_count: 5,
+                        },
+                        use_latency_weighted: true,
+                        latency_weight_multiplier_milli: 3000, // 3.0× — aggressive V6 suppression (safe with warmup)
+                        // A/B verification: skip the heuristic until round 10,000
+                        // (~5 min at ~32 rounds/sec). Lets us observe baseline behavior
+                        // first, then watch whether spikes appear when the heuristic
+                        // activates. Set to 0 in production.
+                        latency_warmup_rounds: 10_000,
+                    }),
+                );
+            }
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(consensus_config).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
@@ -482,6 +504,12 @@ pub(crate) fn realistic_env_max_load_test(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Allow validator-PFN connections
             config.base.enable_validator_pfn_connections = true;
+            // EXPERIMENT: disable chain-health backoff entirely to isolate whether
+            // the spike we observe at multiplier=3.0× is caused by the
+            // chain-health-backoff cascade (vs. the heuristic itself). With this
+            // empty, the chain never throttles block size based on participation.
+            // Keep this off in production.
+            config.consensus.chain_health_backoff = vec![];
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds
