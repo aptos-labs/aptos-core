@@ -14,7 +14,19 @@ TB/SB can also tolerate two orders or more of magnitude in performance overhead:
 Unlike DRSC, they maintain provenance genealogies among references and are not function-modular.
 Also see the difference in Move and Rust's references in \S\ref{sec:move}.
 
+\george{3 sentences below seem a bit out of context, like future work, maybe cut?}
 The dynamic semantics is also interesting as a reference model for what reference safety means, as most static analyses are over-approximations determined by the particular method chosen, and a canonical semantics does not exist.
 More work is needed to fully formalize and categorize dynamic reference safety.
 
 In addition to providing a second layer of defense against latent bugs in the static verifier, the runtime checks also have a valuable role in fuzzing the VM: they provide a semantic and precise oracle for finding bugs in the static verifier.
+
+Deferring runtime checks off the execution path and replaying a recorded trace to perform them later is a well-known idea.
+Decoupled dynamic analysis~\cite{aftersight,shadowreplica,straighttaint} and offline runtime verification~\cite{rvsurvey} move expensive monitoring onto spare cores.
+Asynchronous checks we present differ in that the parallel blockchain execution model itself supplies the idle capacity (from workers waiting on read-write conflicts) and runs all checks online so offending transaction can be detected automatically.
+
+\george{should be tightened, and connected to novel ref-checks work}
+In this paper we presented the runtime safety checks that Aptos uses in production as a second line of defense to guard against Move bytecode verifier bugs.
+We presented examples of real verifier bugs surfaced during addition of new features to the Move language which were all caught by the runtime verifier.
+We presented two techniques to reduce the performance cost of such checks which apply under the blockchain setting:
+1) trusted code waiving the checks, agreed by the blockchain governance protocol and 2) asynchronous type checks using idle capacity in parallel transaction execution engines.
+Our results show that runtime checks introduce not more than 10\% overhead on production workloads on the Aptos blockchain.

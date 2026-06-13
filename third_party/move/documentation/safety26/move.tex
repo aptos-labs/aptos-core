@@ -10,7 +10,7 @@ We briefly summarize key aspects of Move on Aptos~\cite{MoveOnAptosBook,blackshe
     Substitution is carried through transitively: accesses to type-indexed global storage (below) are keyed by concrete types at runtime.
 
     \item \emph{Abilities.}
-    Each type carries a subset of the four abilities |copy|, |drop|, |store|, and |key|, which gate the corresponding operations.
+    Each type carries a subset of the four abilities: |copy|, |drop|, |store|, and |key|.
     Types without |drop| or |copy| are linear: every value of such a type must be moved, globally stored, or explicitly destructured.
 
     \item \emph{Algebraic data types.}
@@ -26,7 +26,8 @@ We briefly summarize key aspects of Move on Aptos~\cite{MoveOnAptosBook,blackshe
 
     \item \emph{Global storage.}
     Global state is a map indexed by (resource type, address) pairs.
-    Resources of types with the |key| ability are accessed through |T[addr]|, |&T[addr]|, and |&mut T[addr]|, with the same linear-ownership discipline as for local values.
+    Resources are types with the |key| ability.
+    They are accessed through |T[addr]|, |&T[addr]|, and |&mut T[addr]|, with the same linear-ownership discipline as for local values.
 \end{Itemize}
 
 %%% Local Variables:
