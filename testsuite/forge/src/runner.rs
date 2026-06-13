@@ -311,7 +311,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
-                self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                self.tests.duration_override.unwrap_or(self.global_duration) + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
                 self.tests.genesis_helm_config_fn.clone(),
                 self.tests.build_node_helm_config_fn(retain_debug_logs),
                 self.tests.existing_db_tag.clone(),
@@ -343,12 +343,16 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             let logs_location = swarm.logs_location();
             let swarm = Arc::new(tokio::sync::RwLock::new(swarm));
+            let effective_duration = self
+                .tests
+                .duration_override
+                .unwrap_or(self.global_duration);
             for test in self.filter_tests(&self.tests.network_tests) {
                 let network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.clone(),
                     &mut report,
-                    self.global_duration,
+                    effective_duration,
                     self.tests.emit_job_request.clone(),
                     self.tests.success_criteria.clone(),
                 );
