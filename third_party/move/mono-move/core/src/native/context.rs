@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{interner::InternedModuleId, types::InternedType};
 use core::cell::RefMut;
+use move_core_types::account_address::AccountAddress;
 
 /// Trait that native functions are written generic over.
 ///
@@ -119,6 +120,13 @@ pub trait NativeContext {
         ty: InternedType,
         bytes: &[u8],
     ) -> Result<Result<Vec<u8>, BcsError>, VMInternalError>;
+
+    /// Whether a resource of type `ty` exists at `address` in global storage.
+    fn resource_exists(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> Result<bool, VMInternalError>;
 
     /// Obtains a mutable reference to the extension of type `T`.
     ///

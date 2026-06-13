@@ -2249,7 +2249,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = self.frame_ptr;
         self.frame_ptr = new_fp;
         let result = {
-            let (registry, provider, layouts, gas_meter, extensions) =
+            let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
                 self.exec_ctx.native_call_borrows();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
@@ -2270,6 +2270,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 gas_meter,
                 provider,
                 layouts,
+                resource_provider,
                 &mut self.heap,
                 &mut self.read_write_set,
                 extensions,

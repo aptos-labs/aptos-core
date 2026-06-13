@@ -87,6 +87,7 @@ impl ExecutionContext for TransactionContext<'_, '_> {
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &dyn LayoutProvider,
+        &dyn ResourceProvider,
         &mut GasMeter,
         &NativeExtensions,
     ) {
@@ -94,6 +95,7 @@ impl ExecutionContext for TransactionContext<'_, '_> {
             self.natives,
             self.loader.guard(),
             self.loader.guard(),
+            self.resource_provider,
             &mut self.gas_meter,
             &self.extensions,
         )

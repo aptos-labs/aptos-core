@@ -19,10 +19,12 @@ use mono_move_core::{
         BcsError, NativeABI, NativeContext, NativeContextFamily, NativeExtension, NativeExtensions,
         NativeFunction, NativeRegistry, RootPool, VMInternalError, VMValue, Vector,
     },
+    storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
-    DescriptorProvider, Function, GasMeter, LayoutProvider, FRAME_METADATA_SIZE,
+    DescriptorProvider, Function, GasMeter, LayoutProvider, ResourceProvider, FRAME_METADATA_SIZE,
     TRIVIAL_DESCRIPTOR_ID,
 };
+use move_core_types::account_address::AccountAddress;
 use std::cell::{Cell, RefMut, UnsafeCell};
 
 /// Concrete [`NativeContext`] used by the production runtime.
@@ -66,6 +68,8 @@ pub struct ProductionNativeContext<'a> {
     heap: UnsafeCell<&'a mut Heap>,
     /// The transaction's read write set -- provides global storage access.
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
+    /// Resource provider backing global-storage reads on a read-set cache miss.
+    resource_provider: &'a dyn ResourceProvider,
     /// Per-transaction native extensions, shared across native calls. Accessed
     /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
     /// the interior mutability.
@@ -87,6 +91,7 @@ impl<'a> ProductionNativeContext<'a> {
         gas_meter: &'a mut GasMeter,
         desc_provider: &'a dyn DescriptorProvider,
         layouts: &'a dyn LayoutProvider,
+        resource_provider: &'a dyn ResourceProvider,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
@@ -96,6 +101,7 @@ impl<'a> ProductionNativeContext<'a> {
             ty_args,
             desc_provider,
             layouts,
+            resource_provider,
             frame_ptr,
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
@@ -368,6 +374,17 @@ impl NativeContext for ProductionNativeContext<'_> {
             Ok(()) => Ok(Ok(out)),
             Err(e) => classify_serde_error(e).map(Err),
         }
+    }
+
+    fn resource_exists(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> Result<bool, VMInternalError> {
+        // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
+        let rws = unsafe { &mut **self.rws.get() };
+        let key = InMemoryStorageKey::resource(address, ty);
+        Ok(rws.exists(self.resource_provider, &key)?)
     }
 
     fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {

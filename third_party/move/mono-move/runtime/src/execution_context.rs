@@ -35,6 +35,7 @@ pub trait ExecutionContext {
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &dyn LayoutProvider,
+        &dyn ResourceProvider,
         &mut GasMeter,
         &NativeExtensions,
     );
@@ -140,6 +141,7 @@ impl ExecutionContext for LocalExecutionContext<'_> {
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
         &dyn LayoutProvider,
+        &dyn ResourceProvider,
         &mut GasMeter,
         &NativeExtensions,
     ) {
@@ -147,6 +149,7 @@ impl ExecutionContext for LocalExecutionContext<'_> {
             &self.natives,
             &NO_DESCRIPTOR_PROVIDER,
             &NO_LAYOUT_PROVIDER,
+            self.resource_provider,
             &mut self.gas_meter,
             &self.extensions,
         )
