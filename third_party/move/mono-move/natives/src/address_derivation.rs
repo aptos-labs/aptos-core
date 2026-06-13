@@ -42,6 +42,15 @@ pub(crate) fn object_address_from_object(
     address_from_preimage(preimage, DERIVE_OBJECT_FROM_OBJECT_SCHEME)
 }
 
+/// Table handle: `sha3_256(txn_hash || table_count_be_u32)`. Unlike the AUID and
+/// object derivations, no scheme byte is appended.
+pub(crate) fn table_handle(txn_hash: &[u8], table_count: u32) -> AccountAddress {
+    let mut hasher = Sha3_256::new();
+    hasher.update(txn_hash);
+    hasher.update(table_count.to_be_bytes());
+    AccountAddress::new(hasher.finalize().into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -128,6 +128,38 @@ pub trait NativeContext {
         ty: InternedType,
     ) -> Result<bool, VMInternalError>;
 
+    /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
+    /// The inner `Err` is an argument-caused serialization failure.
+    fn bcs_serialize_arg(
+        &self,
+        i: usize,
+        ty: InternedType,
+    ) -> Result<Result<Vec<u8>, BcsError>, VMInternalError>;
+
+    /// Whether a table entry exists at `(handle, key)`.
+    fn table_contains(&self, handle: AccountAddress, key: &[u8]) -> Result<bool, VMInternalError>;
+
+    /// Borrows the table entry at `(handle, key)`, writing a reference to it
+    /// into return slot `i`; `mutable` requests a mutable borrow. Returns
+    /// `false` (writing nothing) if the entry does not exist.
+    fn table_borrow(
+        &self,
+        handle: AccountAddress,
+        key: &[u8],
+        i: usize,
+        mutable: bool,
+    ) -> Result<bool, VMInternalError>;
+
+    /// Adds the value in argument `value_arg` to the table at `(handle, key)`,
+    /// boxing it on the heap with the descriptor the specializer recorded for
+    /// that argument. Returns `false` if an entry already exists.
+    fn table_add(
+        &self,
+        handle: AccountAddress,
+        key: &[u8],
+        value_arg: usize,
+    ) -> Result<bool, VMInternalError>;
+
     /// Obtains a mutable reference to the extension of type `T`.
     ///
     /// Errors if `T` is not installed, or if it is already borrowed.

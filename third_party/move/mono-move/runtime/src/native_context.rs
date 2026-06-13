@@ -8,9 +8,9 @@
 
 use crate::{
     error::RuntimeError,
-    global_storage::ResourceReadWriteSet,
-    heap::{alloc_vec, is_heap_ptr, Heap, TopFrame},
-    memory::{read_ptr, write_u64},
+    global_storage::{EntryPtr, ResourceReadWriteSet},
+    heap::{alloc_obj, alloc_vec, is_heap_ptr, Heap, TopFrame},
+    memory::{read_ptr, write_fat_ptr, write_u64},
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
@@ -25,7 +25,10 @@ use mono_move_core::{
     TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
-use std::cell::{Cell, RefMut, UnsafeCell};
+use std::{
+    cell::{Cell, RefMut, UnsafeCell},
+    ptr::NonNull,
+};
 
 /// Concrete [`NativeContext`] used by the production runtime.
 ///
@@ -385,6 +388,127 @@ impl NativeContext for ProductionNativeContext<'_> {
         let rws = unsafe { &mut **self.rws.get() };
         let key = InMemoryStorageKey::resource(address, ty);
         Ok(rws.exists(self.resource_provider, &key)?)
+    }
+
+    fn bcs_serialize_arg(
+        &self,
+        i: usize,
+        ty: InternedType,
+    ) -> Result<Result<Vec<u8>, BcsError>, VMInternalError> {
+        let slot = self.abi.args().get(i).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!("arg index {i} out of bounds"))
+        })?;
+        // SAFETY: the ABI keeps arg `i` within the frame; it holds a value of
+        // type `ty`, and serialization performs no VM-heap allocation.
+        let base = unsafe { self.frame_ptr.add(slot.offset as usize) };
+        match unsafe { crate::value_utils::serialize(self.layouts, base, ty) } {
+            Ok(bytes) => Ok(Ok(bytes)),
+            Err(e) => classify_serde_error(e).map(Err),
+        }
+    }
+
+    fn table_contains(&self, handle: AccountAddress, key: &[u8]) -> Result<bool, VMInternalError> {
+        // SAFETY: `rws` is reborrowed exclusively here.
+        let rws = unsafe { &mut **self.rws.get() };
+        let storage_key = InMemoryStorageKey::table_item(handle, key.into());
+        Ok(rws.exists(self.resource_provider, &storage_key)?)
+    }
+
+    fn table_borrow(
+        &self,
+        handle: AccountAddress,
+        key: &[u8],
+        i: usize,
+        mutable: bool,
+    ) -> Result<bool, VMInternalError> {
+        let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!("return index {i} out of bounds"))
+        })?;
+        let storage_key = InMemoryStorageKey::table_item(handle, key.into());
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = if mutable {
+            match rws.try_borrow_global_mut(self.resource_provider, &storage_key) {
+                Ok(EntryPtr::Writable(ptr)) => ptr,
+                Ok(EntryPtr::NonWritable(ptr)) => {
+                    // Copy-on-write: an external or stale value must be copied
+                    // into the local heap before it can be mutated.
+                    // TODO: GC-and-retry the deep copy on out-of-heap, like the
+                    // interpreter's BorrowGlobalMut.
+                    let heap = unsafe { &mut **self.heap.get() };
+                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
+                    let copied = unsafe { heap.try_deep_copy(self.desc_provider, ptr) }
+                        .map_err(|e| VMInternalError::from(e.into_runtime_error()))?;
+                    rws.commit_borrow_global_mut(&storage_key, copied);
+                    copied
+                },
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(false),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            match rws.borrow_global(self.resource_provider, &storage_key) {
+                Ok(ptr) => ptr,
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(false),
+                Err(e) => return Err(e.into()),
+            }
+        };
+        // A reference is a 16-byte fat pointer; the borrow points at the start
+        // of the value, so the offset half is 0.
+        // SAFETY: the ABI keeps the return slot within the frame.
+        unsafe { write_fat_ptr(self.frame_ptr, slot.offset as usize, ptr.as_ptr(), 0) };
+        self.returns_started.set(true);
+        Ok(true)
+    }
+
+    fn table_add(
+        &self,
+        handle: AccountAddress,
+        key: &[u8],
+        value_arg: usize,
+    ) -> Result<bool, VMInternalError> {
+        let descriptor = self.abi.arg_descriptor(value_arg).ok_or_else(|| {
+            VMInternalError::invariant_violation(
+                "table_add: no descriptor recorded for the value argument".into(),
+            )
+        })?;
+        let slot = self.abi.args().get(value_arg).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!("arg index {value_arg} out of bounds"))
+        })?;
+        let storage_key = InMemoryStorageKey::table_item(handle, key.into());
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        // Box the value on the heap. `alloc_obj` may GC; the value argument's
+        // heap pointers are listed in the ABI and relocated in place, so the
+        // copy below reads the relocated value (as `move_to` lowering relies on).
+        let obj = alloc_obj(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            descriptor,
+        )
+        .map_err(VMInternalError::from)?;
+        // SAFETY: `obj` has room for the value's `slot.size` payload, and the
+        // value argument lies at `slot.offset` within the frame.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.frame_ptr.add(slot.offset as usize),
+                obj,
+                slot.size as usize,
+            );
+        }
+        let obj = NonNull::new(obj).ok_or_else(|| {
+            VMInternalError::invariant_violation("table_add: null allocation".into())
+        })?;
+        match rws.move_to(self.resource_provider, &storage_key, obj) {
+            Ok(()) => Ok(true),
+            Err(RuntimeError::ResourceAlreadyExists { .. }) => Ok(false),
+            Err(e) => Err(e.into()),
+        }
     }
 
     fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {

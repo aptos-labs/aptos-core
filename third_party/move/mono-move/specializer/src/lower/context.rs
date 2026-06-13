@@ -32,7 +32,7 @@ use mono_move_core::{
     ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use move_binary_format::{access::ModuleAccess, file_format::FunctionHandleIndex};
-use move_core_types::function::ClosureMask;
+use move_core_types::{account_address::AccountAddress, function::ClosureMask, ident_str};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
@@ -76,6 +76,24 @@ pub struct CallSiteInfo {
     pub ty_args: InternedTypeList,
     /// `Some(idx)` when the callee resolves to a registered native.
     pub native_idx: Option<NativeIdx>,
+    /// GC descriptor for each argument that the native heap-allocates from
+    /// (parallel to `arg_slots`). Empty unless the native needs it (currently
+    /// only `table::add_box`'s value argument).
+    pub arg_descriptors: Vec<Option<DescriptorId>>,
+}
+
+/// `Some(arg_index)` if the native identified by `(module_id, func_name)`
+/// heap-allocates an argument's value and so needs that argument's GC
+/// descriptor recorded in the ABI. Temporary: hardcoded to `table::add_box`'s
+/// value argument.
+fn descriptor_arg_for_native(
+    interner: &impl Interner,
+    module_id: InternedModuleId,
+    func_name: InternedIdentifier,
+) -> Option<usize> {
+    let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
+    let add_box = interner.identifier_of(ident_str!("add_box"));
+    (module_id == table && func_name == add_box).then_some(2)
 }
 
 /// Pre-resolved data for one `PackClosure`, consumed in IR order.
@@ -452,6 +470,19 @@ pub fn try_build_context<'a>(
         // against the callee module's `is_native` flag so a registered impl cannot
         // shadow a Move-body function with the same qualified name.
         let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
+        // Record the GC descriptor for any argument the native heap-allocates
+        // from; the discovery pass published it keyed on the concrete arg type.
+        let arg_descriptors =
+            match descriptor_arg_for_native(interner, callee_module_id, callee_func_name) {
+                Some(idx) => {
+                    let mut descs = vec![None; arg_slots.len()];
+                    if let Some(slot) = arg_slots.get(idx) {
+                        descs[idx] = descriptors.vec.get(&slot.ty).copied();
+                    }
+                    descs
+                },
+                None => Vec::new(),
+            };
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
@@ -459,6 +490,7 @@ pub fn try_build_context<'a>(
             ret_slots,
             ty_args: call_ty_args,
             native_idx,
+            arg_descriptors,
         });
     }
 
@@ -808,16 +840,17 @@ fn try_discover_types_for_lowering_in_function_impl(
         // type reached only through a closure signature's args/results misses
         // its descriptor and skips lowering. Recurse into `Type::Function` and
         // feed closure-call signatures here.
-        let (params, returns) = match instr {
+        let (params, returns, handle_idx) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns))
+                (Some(sig.params), Some(sig.returns), Some(*idx))
             },
             Instr::CallGeneric(_, idx, _) => {
+                let inst = module_ir.module.function_instantiation_at(*idx);
                 let sig = module_ir.module.function_instantiation_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns))
+                (Some(sig.params), Some(sig.returns), Some(inst.handle))
             },
-            _ => (None, None),
+            _ => (None, None, None),
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
@@ -827,6 +860,25 @@ fn try_discover_types_for_lowering_in_function_impl(
         if let Some(returns) = returns {
             for &ty in view_type_list(returns) {
                 discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+            }
+        }
+
+        // A native that heap-allocates an argument (e.g. `table::add_box`'s
+        // value) needs a struct descriptor for that argument's concrete type,
+        // published here so the build pass can record it in the ABI.
+        if let Some(handle_idx) = handle_idx {
+            let (module_id, func_name) = callee_identity(&module_ir.module, handle_idx);
+            if let Some(arg_idx) = descriptor_arg_for_native(interner, module_id, func_name)
+                && let Some(&param_ty) = view_type_list(params.unwrap()).get(arg_idx)
+            {
+                let value_ty = ctx.subst_type(param_ty, ty_args)?;
+                if let Some((size, _)) = type_size_and_align(value_ty)
+                    && let Ok(ptr_offsets) = type_pointer_offsets(value_ty)
+                {
+                    let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
+                    let id = ctx.publish_struct_descriptor(value_ty, size, &ptr_offsets)?;
+                    descriptors.vec.insert(value_ty, id);
+                }
             }
         }
 
