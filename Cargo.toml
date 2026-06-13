@@ -258,6 +258,7 @@ members = [
     "third_party/move/tools/move-coverage",
     "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-docgen",
+    "third_party/move/tools/move-fuzz",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-package-cache",
@@ -917,6 +918,7 @@ move-core-types = { path = "third_party/move/move-core/types" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
+move-fuzz = { path = "third_party/move/tools/move-fuzz" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
