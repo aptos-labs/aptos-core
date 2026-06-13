@@ -6,7 +6,7 @@ use crate::{
     native_state_committer::NativeStateCommitter,
     position_buffered_state::{
         new_empty_position_state, position_state_at_version, PositionLedgerStateWithSummary,
-        PositionProofReader, PositionSlot,
+        PositionPersistedState, PositionProofReader, PositionSlot,
     },
     position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_merkle_db::PositionMerkleDb,
@@ -38,12 +38,12 @@ pub struct PositionBundle {
     pub(crate) position_pruner: Option<Arc<PositionPruner>>,
     /// `None` in readonly mode.
     pub(crate) state_store: Option<Arc<PositionStateStore>>,
-    /// JMT version the in-memory MapLayer chain is rooted at — the
-    /// version `PositionProofReader` queries. Stays at init time
-    /// because the chain doesn't rebase as new snapshots are taken
-    /// (the chain just grows). When chain-rebasing lands, update
-    /// this alongside the rebase.
-    pub(crate) snapshot_version: Option<Version>,
+    /// Latest persisted in-memory snapshot — the base the in-memory
+    /// chain rebases onto each chunk (SMT freeze base + proof
+    /// version). Advanced by the merkle batch committer as snapshots
+    /// persist, so the proof base tracks the JMT forward and the
+    /// in-memory tree sheds nodes below it. `None` in readonly mode.
+    pub(crate) persisted: Option<PositionPersistedState>,
 }
 
 impl AptosDB {
@@ -118,8 +118,8 @@ impl AptosDB {
             )))
         };
 
-        let state_store = if readonly {
-            None
+        let (state_store, persisted) = if readonly {
+            (None, None)
         } else {
             let last_snapshot = match merkle_progress {
                 Some(version) => {
@@ -128,7 +128,11 @@ impl AptosDB {
                 },
                 None => new_empty_position_state(),
             };
-            Some(Arc::new(PositionStateStore::new_at_snapshot(
+            // Seed the persisted base with the exact snapshot used for
+            // `current_state` so the first rebase freezes against an
+            // in-family ancestor (the chain descends from this seed).
+            let persisted = PositionPersistedState::new(last_snapshot.clone());
+            let store = Arc::new(PositionStateStore::new_at_snapshot(
                 Arc::clone(&merkle_db),
                 Arc::clone(&self.ledger_db),
                 last_snapshot,
@@ -137,7 +141,9 @@ impl AptosDB {
                         .as_ref()
                         .expect("position_pruner present in non-readonly mode"),
                 ),
-            )))
+                persisted.clone(),
+            ));
+            (Some(store), Some(persisted))
         };
 
         // Replay write sets between the JMT snapshot and the chain
@@ -162,7 +168,7 @@ impl AptosDB {
             merkle_db,
             position_pruner,
             state_store,
-            snapshot_version: merkle_progress,
+            persisted,
         }));
 
         info!(
@@ -262,7 +268,11 @@ impl AptosDB {
             merkle_db: Arc::clone(merkle_db),
             version: snapshot_version,
         };
-        let new_latest = pipeline_latest.extend(target_version, updates, &proof_reader)?;
+        // At replay start the persisted base equals the seed, which is
+        // `pipeline_latest` itself — freeze against it.
+        let base_summary = pipeline_latest.summary().clone();
+        let new_latest =
+            pipeline_latest.extend(target_version, updates, &base_summary, &proof_reader)?;
 
         // Treat the target as a checkpoint so the buffered_state
         // sync-commits the JMT snapshot before we return.

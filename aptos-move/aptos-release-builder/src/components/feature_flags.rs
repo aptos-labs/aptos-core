@@ -168,6 +168,7 @@ pub enum FeatureFlag {
     AllowFriendEntryVisibilityDowngrade,
     HotnessInEpilogue,
     TransactionInfoV1,
+    ComputeTradingNativeStateRoots,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -439,6 +440,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::HotnessInEpilogue => AptosFeatureFlag::HOTNESS_IN_EPILOGUE,
             FeatureFlag::TransactionInfoV1 => AptosFeatureFlag::TRANSACTION_INFO_V1,
+            FeatureFlag::ComputeTradingNativeStateRoots => {
+                AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS
+            },
         }
     }
 }
@@ -637,6 +641,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::HOTNESS_IN_EPILOGUE => FeatureFlag::HotnessInEpilogue,
             AptosFeatureFlag::TRANSACTION_INFO_V1 => FeatureFlag::TransactionInfoV1,
+            AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS => {
+                FeatureFlag::ComputeTradingNativeStateRoots
+            },
         }
     }
 }

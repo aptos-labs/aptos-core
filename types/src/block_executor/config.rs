@@ -91,6 +91,7 @@ pub struct BlockExecutorConfigFromOnchain {
     gas_price_to_burn: Option<u64>,
     hotness_in_epilogue: bool,
     transaction_info_v1: bool,
+    compute_trading_native_state_roots: bool,
 }
 
 impl BlockExecutorConfigFromOnchain {
@@ -106,6 +107,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -117,6 +119,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn: None,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -129,6 +132,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn: None,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -152,6 +156,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn: None,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -163,6 +168,17 @@ impl BlockExecutorConfigFromOnchain {
     pub fn with_features(mut self, features: &Features) -> Self {
         self.hotness_in_epilogue = features.is_hotness_in_epilogue_enabled();
         self.transaction_info_v1 = features.is_transaction_info_v1_enabled();
+        // The position state root rides in TransactionInfoV1, so it requires
+        // transaction_info_v1. It also requires hotness_in_epilogue: that flag
+        // upgrades transaction outputs to the V1 write-set format, and only V1
+        // write sets serialize the native-position `extensions` bucket (V0
+        // skips it). Without it, output-replay / state-sync nodes would see
+        // empty position writes and compute a diverging root. If either
+        // prerequisite is missing the feature degrades to off.
+        self.compute_trading_native_state_roots = features
+            .is_compute_trading_native_state_roots_enabled()
+            && features.is_transaction_info_v1_enabled()
+            && features.is_hotness_in_epilogue_enabled();
         self
     }
 
@@ -172,6 +188,10 @@ impl BlockExecutorConfigFromOnchain {
 
     pub fn transaction_info_v1(&self) -> bool {
         self.transaction_info_v1
+    }
+
+    pub fn compute_trading_native_state_roots(&self) -> bool {
+        self.compute_trading_native_state_roots
     }
 
     pub fn block_gas_limit_override(&self) -> Option<u64> {

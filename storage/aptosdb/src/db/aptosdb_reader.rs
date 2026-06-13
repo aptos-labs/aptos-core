@@ -7,14 +7,17 @@ use crate::{
         aptosdb_internal::{error_if_too_many_requested, gauged_api},
         AptosDB,
     },
+    position_buffered_state::PositionStateWithSummary,
     pruner::PrunerManager,
     schema::block_info::BlockInfoSchema,
 };
 use aptos_crypto::HashValue;
+use aptos_jellyfish_merkle::JellyfishMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
         state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
+        state_with_summary::LedgerWithSummary,
     },
     AptosDbError, BlockHeight, DbReader, LedgerSummary, Result, MAX_REQUEST_LIMIT,
 };
@@ -59,6 +62,61 @@ impl DbReader for AptosDB {
     fn get_persisted_state_summary(&self) -> Result<StateSummary> {
         gauged_api("get_persisted_state_summary", || {
             self.state_store.get_persisted_state_summary()
+        })
+    }
+
+    fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary> {
+        gauged_api("get_persisted_position_state_summary", || {
+            // Only reached when COMPUTE_TRADING_NATIVE_STATE_ROOTS is on. Fail
+            // fast (rather than fabricate an empty base) if native-position
+            // storage isn't initialized — otherwise execution would commit a
+            // root over a phantom base and halt later on the freeze() family
+            // assertion. This guards enabling the flag without
+            // ENABLE_TRADING_NATIVE.
+            self.position
+                .as_ref()
+                .and_then(|bundle| bundle.persisted.as_ref())
+                .map(|persisted| persisted.get())
+                .ok_or_else(|| {
+                    AptosDbError::Other(
+                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
+                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
+                            .to_string(),
+                    )
+                })
+        })
+    }
+
+    fn get_pre_committed_position_state_summary(
+        &self,
+    ) -> Result<Option<LedgerWithSummary<PositionStateWithSummary>>> {
+        gauged_api("get_pre_committed_position_state_summary", || {
+            Ok(self
+                .position
+                .as_ref()
+                .and_then(|bundle| bundle.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone()))
+        })
+    }
+
+    fn get_position_state_proof_by_version_ext(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<SparseMerkleProofExt> {
+        gauged_api("get_position_state_proof_by_version_ext", || {
+            let bundle = self
+                .position
+                .as_ref()
+                .ok_or_else(|| AptosDbError::Other("native position is not enabled".to_string()))?;
+            // Safe against the merkle pruner: the only `version` requested
+            // here is the persisted base version, which equals the pruner's
+            // target (both advanced together by the merkle batch committer),
+            // so the nodes live at that version are never pruned.
+            let tree = JellyfishMerkleTree::new(bundle.merkle_db.as_ref());
+            let (_value, proof) = tree.get_with_proof_ext(key_hash, version, root_depth)?;
+            Ok(proof)
         })
     }
 

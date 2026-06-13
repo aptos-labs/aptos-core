@@ -7,7 +7,8 @@ use crate::types::partial_state_compute_result::PartialStateComputeResult;
 use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::{
-    state_store::state_summary::ProvableStateSummary, DbReader, LedgerSummary,
+    state_store::state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+    DbReader, LedgerSummary,
 };
 use do_ledger_update::DoLedgerUpdate;
 use do_state_checkpoint::DoStateCheckpoint;
@@ -24,11 +25,20 @@ impl ApplyExecutionOutput {
         base_view: LedgerSummary,
         reader: &(dyn DbReader + Sync),
     ) -> Result<PartialStateComputeResult> {
+        let position_persisted = execution_output
+            .compute_trading_native_state_roots
+            .then(|| ProvablePositionStateSummary::new_persisted(reader))
+            .transpose()?;
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
             &base_view.state_summary,
             &ProvableStateSummary::new_persisted(reader)?,
             None,
+            None,
+            // Bootstrap/replay path: seed the parent position summary from the
+            // persisted base (no in-memory parent here).
+            None,
+            position_persisted.as_ref(),
             None,
         )?;
         let ledger_update_output = DoLedgerUpdate::run(

@@ -4,6 +4,7 @@
 use crate::{
     metrics::TIMER,
     state_store::{
+        sharded_jmt_state::PositionStateWithSummary,
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         HotStateShardUpdates, HotStateUpdates,
@@ -401,6 +402,52 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
             inner
                 .get_proof(key, ver, root_depth, /* use_hot_state = */ false)
                 .expect("Failed to get account state with proof by version.")
+        })
+    }
+}
+
+/// Holds the persisted position summary as the freeze base and resolves
+/// cold-key proofs through `DbReader` against the position JMT at the
+/// persisted version. Used by execution as the freeze base (`summary()`)
+/// and the `ProofRead` for `ShardedJmtState::extend`.
+pub struct ProvablePositionStateSummary<'db> {
+    persisted: PositionStateWithSummary,
+    db: &'db (dyn DbReader + Sync),
+}
+
+impl<'db> ProvablePositionStateSummary<'db> {
+    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_position_state_summary()?,
+            db,
+        })
+    }
+
+    pub fn new(persisted: PositionStateWithSummary, db: &'db (dyn DbReader + Sync)) -> Self {
+        Self { persisted, db }
+    }
+
+    pub fn summary(&self) -> &StateSummary {
+        self.persisted.summary()
+    }
+
+    /// The persisted position summary itself — used to seed the in-memory
+    /// parent at genesis or when the feature has just been enabled.
+    pub fn base(&self) -> &PositionStateWithSummary {
+        &self.persisted
+    }
+
+    pub fn version(&self) -> Option<Version> {
+        self.persisted.version()
+    }
+}
+
+impl ProofRead for ProvablePositionStateSummary<'_> {
+    fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
+        self.version().map(|version| {
+            self.db
+                .get_position_state_proof_by_version_ext(key, version, root_depth)
+                .expect("Failed to get position state proof by version.")
         })
     }
 }

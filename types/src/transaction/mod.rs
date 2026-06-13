@@ -2259,6 +2259,7 @@ impl TransactionInfo {
         gas_used: u64,
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
+        position_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self::V1(TransactionInfoV1::new(
             transaction_hash,
@@ -2269,6 +2270,7 @@ impl TransactionInfo {
             gas_used,
             status,
             auxiliary_info_hash,
+            position_state_checkpoint_hash,
         ))
     }
 
@@ -2343,6 +2345,13 @@ impl TransactionInfo {
         match self {
             Self::V0(_) => None,
             Self::V1(v) => v.hot_state_checkpoint_hash,
+        }
+    }
+
+    pub fn position_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.position_state_checkpoint_hash,
         }
     }
 
@@ -2432,8 +2441,11 @@ pub struct TransactionInfoV1 {
     hot_state_checkpoint_hash: Option<HashValue>,
     auxiliary_info_hash: Option<HashValue>,
 
-    // Reserved for future changes.
-    placeholder0: Option<HashValue>,
+    /// Native-position state root at this version, committed to the ledger so
+    /// it is consensus-verified. Populated only when the
+    /// `COMPUTE_TRADING_NATIVE_STATE_ROOTS` feature is on (was a reserved placeholder;
+    /// `None` keeps the BCS encoding identical to pre-feature V1 infos).
+    position_state_checkpoint_hash: Option<HashValue>,
     placeholder1: Option<HashValue>,
     placeholder2: Option<HashValue>,
     placeholder3: Option<HashValue>,
@@ -2453,6 +2465,7 @@ impl TransactionInfoV1 {
         gas_used: u64,
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
+        position_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -2463,7 +2476,7 @@ impl TransactionInfoV1 {
             state_checkpoint_hash,
             hot_state_checkpoint_hash,
             auxiliary_info_hash,
-            placeholder0: None,
+            position_state_checkpoint_hash,
             placeholder1: None,
             placeholder2: None,
             placeholder3: None,
