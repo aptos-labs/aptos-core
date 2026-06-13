@@ -13,7 +13,11 @@ use crate::{
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_temppath::TempPath;
-use aptos_types::{state_store::state_key::StateKey, transaction::Version, write_set::WriteOp};
+use aptos_types::{
+    state_store::{native_position::NativePosition, state_key::StateKey},
+    transaction::Version,
+    write_set::WriteOp,
+};
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
 
@@ -40,7 +44,7 @@ fn exchange(byte: u8) -> AccountAddress {
     AccountAddress::new(a)
 }
 
-fn user(byte: u8) -> AccountAddress {
+fn account(byte: u8) -> AccountAddress {
     exchange(byte)
 }
 
@@ -49,11 +53,30 @@ fn market(byte: u8) -> AccountAddress {
 }
 
 fn position_key(byte: u8) -> StateKey {
-    StateKey::position(exchange(1), user(byte), market(1))
+    StateKey::position(exchange(1), account(byte), market(1))
 }
 
-fn upsert(bytes: &[u8]) -> WriteOp {
-    WriteOp::legacy_modification(bytes.to_vec().into())
+/// Build a valid BCS-encoded `NativePosition` whose `size` carries
+/// `tag` — lets tests distinguish writes without needing the bytes
+/// to look like a particular string.
+fn position_bytes(tag: u64) -> Vec<u8> {
+    NativePosition::PerpV1 {
+        size: tag,
+        is_long: true,
+        entry_px_times_size_sum: 0,
+        avg_acquire_entry_px: 0,
+        user_leverage: 1,
+        is_isolated: false,
+        funding_index_at_last_update: 0,
+        unrealized_funding_amount_before_last_update: 0,
+        timestamp: 0,
+    }
+    .serialize()
+    .expect("NativePosition serialize")
+}
+
+fn upsert(tag: u64) -> WriteOp {
+    WriteOp::legacy_modification(position_bytes(tag).into())
 }
 
 fn delete() -> WriteOp {
@@ -79,7 +102,7 @@ fn commit_one(
             &mut in_chunk_prior,
         )
         .expect("apply")
-        .position;
+        .jmt_updates;
     db.commit(version, None, sharded_kv_batches)
         .expect("position_db commit");
     updates
@@ -98,9 +121,9 @@ fn find_prior_version_returns_latest_below_target() {
     let key = position_key(1);
     let hash = key.hash();
 
-    commit_one(&db, 0, key.clone(), upsert(b"v0"));
-    commit_one(&db, 5, key.clone(), upsert(b"v5"));
-    commit_one(&db, 10, key.clone(), upsert(b"v10"));
+    commit_one(&db, 0, key.clone(), upsert(0));
+    commit_one(&db, 5, key.clone(), upsert(5));
+    commit_one(&db, 10, key.clone(), upsert(10));
 
     assert_eq!(db.find_prior_version(hash, 11).unwrap(), Some(10));
     assert_eq!(db.find_prior_version(hash, 10).unwrap(), Some(5));
@@ -116,7 +139,7 @@ fn apply_emits_no_prev_version_sentinel_for_first_write() {
     let key = position_key(1);
     let hash = key.hash();
 
-    commit_one(&db, 7, key.clone(), upsert(b"v7"));
+    commit_one(&db, 7, key.clone(), upsert(7));
 
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
@@ -145,8 +168,8 @@ fn apply_emits_prior_version_on_overwrite() {
     let key = position_key(1);
     let hash = key.hash();
 
-    commit_one(&db, 0, key.clone(), upsert(b"v0"));
-    commit_one(&db, 5, key.clone(), upsert(b"v5"));
+    commit_one(&db, 0, key.clone(), upsert(0));
+    commit_one(&db, 5, key.clone(), upsert(5));
 
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
@@ -184,7 +207,7 @@ fn apply_tombstone_carries_no_value_hash() {
     let (_tmp, db) = open_position_db();
     let key = position_key(1);
 
-    let upserts = commit_one(&db, 0, key.clone(), upsert(b"v0"));
+    let upserts = commit_one(&db, 0, key.clone(), upsert(0));
     assert!(upserts[0].value_hash.is_some());
 
     let deletes = commit_one(&db, 1, key.clone(), delete());
@@ -197,8 +220,8 @@ fn truncate_advances_overall_position_commit_progress() {
     let key = position_key(1);
     let hash = key.hash();
 
-    commit_one(&db, 3, key.clone(), upsert(b"v3"));
-    commit_one(&db, 7, key.clone(), upsert(b"v7"));
+    commit_one(&db, 3, key.clone(), upsert(3));
+    commit_one(&db, 7, key.clone(), upsert(7));
     assert_eq!(get_position_commit_progress(&db).unwrap(), Some(7));
 
     truncate_position_db_shards(&db, 3).unwrap();
@@ -234,14 +257,11 @@ fn in_chunk_writes_chain_stale_index_versions() {
     let mut in_chunk_prior = InChunkPriorVersions::new();
 
     // Three writes to the same key inside a single chunk.
-    for (i, payload) in [b"a".as_slice(), b"b".as_slice(), b"c".as_slice()]
-        .iter()
-        .enumerate()
-    {
+    for (i, tag) in [11u64, 12, 13].iter().enumerate() {
         committer
             .apply(
                 i as Version,
-                std::iter::once((key.clone(), upsert(payload))),
+                std::iter::once((key.clone(), upsert(*tag))),
                 &mut sharded_kv_batches,
                 &mut in_chunk_prior,
             )

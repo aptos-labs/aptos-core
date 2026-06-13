@@ -2,8 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    db::AptosDB,
-    native_state_committer::NativeStateCommitter,
+    db::{aptosdb_writer::materialize_user_position_updates, AptosDB},
+    native_state_committer::{PositionWrite, NativeStateCommitter},
+    native_state_reader::{install_global_reader, InMemoryNativeStateReader},
+    native_state_store::{decode_rows_to_user_position_states, UserPositionKey, UserPositions},
     position_buffered_state::{
         new_empty_position_state, position_state_at_version, PositionLedgerStateWithSummary,
         PositionProofReader, PositionSlot,
@@ -21,10 +23,14 @@ use aptos_config::config::{
     LedgerPrunerConfig, RocksdbConfig, StateMerklePrunerConfig, StorageDirPaths,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::{native_position::NativePosition, state_value::StateValue},
+    transaction::Version,
+};
 use std::{collections::HashMap, sync::Arc};
 
 pub struct PositionBundle {
@@ -36,6 +42,11 @@ pub struct PositionBundle {
     /// driven from `commit_native_position`, the merkle pruners from the
     /// committer, and all are re-activated on restart from `open_internal`.
     pub(crate) position_pruner: Option<Arc<PositionPruner>>,
+    /// Per-account committed-state cache for validator-side scanners.
+    /// Sits at the bundle level — separate from the JMT pipeline state
+    /// — and is extended only after `position_db.commit(...)` succeeds.
+    /// In readonly mode it stays at cold-load.
+    pub user_positions: Arc<Mutex<UserPositions>>,
     /// `None` in readonly mode.
     pub(crate) state_store: Option<Arc<PositionStateStore>>,
     /// JMT version the in-memory MapLayer chain is rooted at — the
@@ -54,6 +65,11 @@ impl AptosDB {
     pub fn native_state_committer(&self) -> Option<NativeStateCommitter> {
         let bundle = self.position.as_ref()?;
         Some(NativeStateCommitter::new(bundle.kv_db.clone()))
+    }
+
+    pub fn native_state_reader(&self) -> Option<InMemoryNativeStateReader> {
+        let bundle = self.position.as_ref()?;
+        Some(InMemoryNativeStateReader::new(Arc::clone(&bundle.user_positions)))
     }
 
     /// Called automatically from `open_internal` when
@@ -91,7 +107,7 @@ impl AptosDB {
             /* max_nodes_per_lru_cache_shard */ 0,
         )?;
 
-        // Mirror `StateStore::sync_commit_progress`: align both
+        // Match `StateStore::sync_commit_progress`: align both
         // position DBs with the ledger's `OverallCommitProgress`
         // (truncating ahead-of-chain rows from a crash) and find the
         // latest JMT snapshot at or before that point.
@@ -103,6 +119,38 @@ impl AptosDB {
 
         let kv_db = Arc::new(position_db);
         let merkle_db = Arc::new(merkle_db);
+
+        // Cold-load: stream the durable JMT snapshot into a decoded
+        // `(UserPositionKey, UserPositionState)` seed and hydrate the `UserPositions`
+        // base layer. Memory is bounded by the live position set, not
+        // by the on-disk snapshot. The gap
+        // `[snapshot_version + 1, chain_tip]` from a crash between
+        // JMT-snapshot and chain commit is closed by
+        // `replay_position_after_snapshot`.
+        let user_positions = match merkle_progress {
+            Some(snapshot_version) => {
+                let iter = merkle_db.iter_active_leaves_with_values(
+                    Arc::clone(&kv_db),
+                    snapshot_version,
+                    0,
+                )?;
+                let seed = decode_rows_to_user_position_states(iter).map_err(|e| {
+                    AptosDbError::Other(format!("decode_rows_to_user_position_states: {e}"))
+                })?;
+                info!(
+                    snapshot_version = snapshot_version,
+                    n_accounts = seed.len(),
+                    "Native-position cold-load complete."
+                );
+                UserPositions::new_at_version(Some(snapshot_version), "position")
+                    .with_seeded_base(snapshot_version, seed)
+            },
+            None => UserPositions::new_empty("position"),
+        };
+        let user_positions = Arc::new(Mutex::new(user_positions));
+        install_global_reader(Arc::new(InMemoryNativeStateReader::new(Arc::clone(
+            &user_positions,
+        ))));
 
         // Pruner managers (value + merkle), grouped like main state's
         // `StatePruner`. Shared with the merkle batch committer via `Arc`.
@@ -153,6 +201,7 @@ impl AptosDB {
                     &merkle_db,
                     snapshot_next_version,
                     v_overall + 1,
+                    &user_positions,
                 )?;
             }
         }
@@ -161,6 +210,7 @@ impl AptosDB {
             kv_db,
             merkle_db,
             position_pruner,
+            user_positions,
             state_store,
             snapshot_version: merkle_progress,
         }));
@@ -200,29 +250,60 @@ impl AptosDB {
             truncate_position_db_shards(position_db, target)?;
         }
 
+        // If a crash interleaves between `bufstate.update(..)` (which
+        // schedules the merkle snapshot commit on its own thread) and
+        // `commit_ledger()` (which advances `OverallCommitProgress`),
+        // restart can find `v_merkle > v_overall`. Truncate the merkle
+        // db down to the latest snapshot at or before `v_overall`
+        // instead of panicking — the layered chain on top of that
+        // snapshot gets rebuilt by `replay_position_after_snapshot`.
         let progress = get_position_merkle_commit_progress(merkle_db)?;
-        if let Some(v_merkle) = progress {
-            if let Some(v) = v_overall {
-                assert!(
-                    v_merkle <= v,
-                    "position_merkle_db at version {v_merkle} is ahead of chain {v}"
+        let recovered_progress = match (progress, v_overall) {
+            (Some(v_merkle), Some(v)) if v_merkle > v => {
+                let recoverable = merkle_db.latest_snapshot_version_at_or_before(v)?;
+                info!(
+                    v_merkle = v_merkle,
+                    v_overall = v,
+                    recoverable = ?recoverable,
+                    "position_merkle_db is ahead of OverallCommitProgress; \
+                     truncating to the latest recoverable snapshot."
                 );
-            }
-            truncate_position_merkle_db(merkle_db, v_merkle)?;
-        }
-        Ok(progress)
+                match recoverable {
+                    Some(target) => {
+                        truncate_position_merkle_db(merkle_db, target)?;
+                        Some(target)
+                    },
+                    None => {
+                        // No snapshot at or before v_overall; the
+                        // merkle db has nothing recoverable. Truncate
+                        // away everything ahead of the chain and
+                        // re-seed from genesis.
+                        truncate_position_merkle_db(merkle_db, 0)?;
+                        None
+                    },
+                }
+            },
+            (Some(v_merkle), _) => {
+                truncate_position_merkle_db(merkle_db, v_merkle)?;
+                Some(v_merkle)
+            },
+            (None, _) => None,
+        };
+        Ok(recovered_progress)
     }
 
     /// Replay `WriteSet`s in `[snapshot_next_version, num_transactions)`
     /// — the gap between the persisted JMT snapshot and the chain
-    /// tip. Coalesces latest-wins-per-key, extends in one shot, and
-    /// sync-commits the resulting snapshot before returning.
+    /// tip. Coalesces latest-wins-per-key, extends the JMT pipeline
+    /// state in one shot, and folds the per-account updates into the
+    /// `UserPositions` before returning.
     fn replay_position_after_snapshot(
         &self,
         store: &PositionStateStore,
         merkle_db: &Arc<PositionMerkleDb>,
         snapshot_next_version: Version,
         num_transactions: u64,
+        user_positions: &Arc<Mutex<UserPositions>>,
     ) -> Result<()> {
         info!(
             snapshot_next_version = snapshot_next_version,
@@ -236,14 +317,42 @@ impl AptosDB {
             .get_write_sets(snapshot_next_version, num_transactions)?;
 
         let mut pending_leaf_updates: HashMap<HashValue, PositionSlot> = HashMap::new();
+        let mut pending_position_writes: Vec<PositionWrite> = Vec::new();
         for write_set in &write_sets {
             for (key, op) in write_set.native_position_iter() {
                 let maybe_value = op.as_write_op().as_state_value_opt().cloned();
                 let value_hash = maybe_value.as_ref().map(StateValue::hash);
+                let (exchange, account, market) = match key.inner() {
+                    aptos_types::state_store::state_key::inner::StateKeyInner::TradingNative(
+                        aptos_types::state_store::state_key::inner::TradingNativeKey::Position {
+                            exchange,
+                            account,
+                            market,
+                        },
+                    ) => (*exchange, *account, *market),
+                    other => {
+                        return Err(AptosDbError::Other(format!(
+                            "non-Position native key in replay write set: {other:?}"
+                        )));
+                    },
+                };
+                let typed = match maybe_value.as_ref() {
+                    Some(sv) => Some(NativePosition::deserialize(sv.bytes()).map_err(|e| {
+                        AptosDbError::Other(format!(
+                            "position value decode failed during replay: {e}"
+                        ))
+                    })?),
+                    None => None,
+                };
                 pending_leaf_updates.insert(key.hash(), PositionSlot {
                     state_key: key.clone(),
                     value_hash,
                     value: None,
+                });
+                pending_position_writes.push(PositionWrite {
+                    position_key: UserPositionKey { exchange, account },
+                    market,
+                    value: typed,
                 });
             }
         }
@@ -257,12 +366,20 @@ impl AptosDB {
         let snapshot_version = pipeline_latest.version();
 
         let target_version = num_transactions - 1;
-        let updates: Vec<_> = pending_leaf_updates.into_iter().collect();
+        let jmt_updates: Vec<_> = pending_leaf_updates.into_iter().collect();
         let proof_reader = PositionProofReader {
             merkle_db: Arc::clone(merkle_db),
             version: snapshot_version,
         };
-        let new_latest = pipeline_latest.extend(target_version, updates, &proof_reader)?;
+        let new_latest = pipeline_latest.extend(target_version, jmt_updates, &proof_reader)?;
+
+        // Fold the replayed account-level updates into `UserPositions`;
+        // this matches the durable JMT state we just extended to.
+        {
+            let mut user_pos = user_positions.lock();
+            let updates = materialize_user_position_updates(&user_pos, pending_position_writes);
+            *user_pos = user_pos.extend(target_version, updates);
+        }
 
         // Treat the target as a checkpoint so the buffered_state
         // sync-commits the JMT snapshot before we return.
