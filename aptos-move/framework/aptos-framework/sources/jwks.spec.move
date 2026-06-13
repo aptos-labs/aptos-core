@@ -47,6 +47,7 @@ spec aptos_framework::jwks {
     }
 
     spec upsert_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         pragma opaque;
         pragma aborts_if_is_partial;
         aborts_if std::signer::address_of(fx) != @aptos_framework;
