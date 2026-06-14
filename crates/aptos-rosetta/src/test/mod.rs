@@ -4,9 +4,9 @@
 use crate::{
     common::native_coin,
     types::{
-        AccountIdentifier, Currency, CurrencyMetadata, OperationType, Transaction,
-        FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE,
-        OBJECT_RESOURCE_GROUP,
+        AccountIdentifier, Amount, Currency, CurrencyMetadata, Operation, OperationType,
+        Transaction, Transfer, FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE,
+        OBJECT_CORE_RESOURCE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
     },
     RosettaContext,
 };
@@ -52,6 +52,61 @@ async fn test_rosetta_context() -> RosettaContext {
     currencies.insert(OTHER_CURRENCY.clone());
 
     RosettaContext::new(None, ChainId::test(), None, currencies).await
+}
+
+#[tokio::test]
+async fn test_extract_transfer_rejects_sign_confused_amounts() {
+    let context = test_rosetta_context().await;
+    let sender = AccountAddress::random();
+    let receiver = AccountAddress::random();
+
+    let mut ops = vec![
+        Operation::withdraw(
+            0,
+            None,
+            AccountIdentifier::base_account(sender),
+            native_coin(),
+            1,
+        ),
+        Operation::deposit(
+            1,
+            None,
+            AccountIdentifier::base_account(receiver),
+            native_coin(),
+            1,
+        ),
+    ];
+
+    // A well-formed transfer of 1 unit is accepted with the right amount.
+    let transfer = Transfer::extract_transfer(&context, &ops).expect("valid transfer");
+    assert_eq!(transfer.amount.0, 1);
+
+    // Flip the signs: withdraw "1", deposit "-1". -(1) == -1 satisfies the
+    // negation check and -1 <= u64::MAX, but casting -1 to u64 wraps to
+    // u64::MAX. This must be rejected, not silently turned into a huge amount.
+    ops[0].amount = Some(Amount {
+        value: "1".to_string(),
+        currency: native_coin(),
+    });
+    ops[1].amount = Some(Amount {
+        value: "-1".to_string(),
+        currency: native_coin(),
+    });
+    assert!(
+        Transfer::extract_transfer(&context, &ops).is_err(),
+        "transfer with a negative deposit amount must be rejected"
+    );
+
+    // An i128::MIN withdraw must not panic or wrap while negating.
+    ops[0].amount = Some(Amount {
+        value: i128::MIN.to_string(),
+        currency: native_coin(),
+    });
+    ops[1].amount = Some(Amount {
+        value: "1".to_string(),
+        currency: native_coin(),
+    });
+    assert!(Transfer::extract_transfer(&context, &ops).is_err());
 }
 
 fn primary_store_address(owner: AccountAddress, metadata: AccountAddress) -> AccountAddress {
