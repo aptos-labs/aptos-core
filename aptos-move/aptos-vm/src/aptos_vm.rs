@@ -2724,6 +2724,35 @@ impl AptosVM {
                 ];
                 (BLOCK_PROLOGUE_EXT_V2, args)
             },
+            BlockMetadataExt::V3(v3) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
+                    MoveValue::U64(v3.epoch),
+                    MoveValue::U64(v3.round),
+                    MoveValue::Address(v3.proposer),
+                    v3.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v3.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v3.timestamp_usecs),
+                    v3.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                    v3.decryption_payload
+                        .as_ref()
+                        .map(|p| p.key.decryption_key_cloned())
+                        .as_move_value(),
+                    v3.decryption_payload
+                        .as_ref()
+                        .map(|p| p.encryption_round)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT_V3, args)
+            },
         };
 
         let traversal_storage = TraversalStorage::new();

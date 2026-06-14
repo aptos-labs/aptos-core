@@ -697,6 +697,13 @@ pub struct BlockMetadataExtensionRandomnessAndDecKey {
     decryption_key: Option<HexEncodedBytes>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionRandomnessAndDecPayload {
+    randomness: Option<HexEncodedBytes>,
+    decryption_key: Option<HexEncodedBytes>,
+    encryption_round: Option<U64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
@@ -704,6 +711,7 @@ pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
     V2(BlockMetadataExtensionRandomnessAndDecKey),
+    V3(BlockMetadataExtensionRandomnessAndDecPayload),
 }
 
 impl BlockMetadataExtension {
@@ -726,6 +734,22 @@ impl BlockMetadataExtension {
                     .as_ref()
                     .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
+            BlockMetadataExt::V3(payload) => {
+                Self::V3(BlockMetadataExtensionRandomnessAndDecPayload {
+                    randomness: payload
+                        .randomness
+                        .as_ref()
+                        .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+                    decryption_key: payload
+                        .decryption_payload
+                        .as_ref()
+                        .map(|p| HexEncodedBytes::from(p.key.decryption_key_cloned())),
+                    encryption_round: payload
+                        .decryption_payload
+                        .as_ref()
+                        .map(|p| U64::from(p.encryption_round)),
+                })
+            },
         }
     }
 }
@@ -775,6 +799,7 @@ impl BlockMetadataTransaction {
             Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
             Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
             Some(BlockMetadataExtension::V2(_)) => "block_metadata_ext_transaction__v2",
+            Some(BlockMetadataExtension::V3(_)) => "block_metadata_ext_transaction__v3",
         }
     }
 }
