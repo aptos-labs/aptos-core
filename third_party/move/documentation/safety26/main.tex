@@ -23,14 +23,13 @@
 \begin{abstract}
 Move is a smart-contract language used to execute transactions on the Aptos blockchain.
 Move programs execute in a sandboxed VM as typed bytecode.
-The VM statically verifies a few foundational safety properties --- in particular type safety and reference safety --- ahead of execution, during code loading time.
+The VM statically verifies foundational safety properties like type safety and reference safety at code loading time.
 In principle, this design gives strong guarantees for Move.
-However, the static verification logic is complex and continually evolving with changes in the language.
-Just like any other software, the static verifier is not immune to bugs: historically, there have been subtle errors in the verifier that can let rule-violating bytecode through.
-In a live blockchain setting, such bugs are not academic: a missed type or reference rule violation can translate directly into loss of assets, forged authority, or unrecoverable corruption of on-chain state.
-For this reason, Aptos relies on defense in depth, in the form of \emph{runtime safety checks} that independently verify the critical invariants during execution, providing protection against both compromised bytecode and latent verifier bugs.
-This paper describes the runtime safety checks in place for Move on Aptos.
-\keywords{Move \and Smart contracts \and Runtime verification \and Type safety \and Reference safety.}
+However, the static verification logic is complex and continually evolving with the language; like any software, it is not immune to bugs.
+In a live blockchain setting, a missed rule violation can translate directly into loss of assets, forged authority, or unrecoverable corruption of on-chain state.
+For this reason, Aptos relies on defense-in-depth \emph{runtime safety checks} that independently verify the critical invariants during execution, providing protection against latent verifier bugs and malicious bytecode.
+This paper motivates and describes the runtime safety checks for Move on Aptos.
+\keywords{Move \and Smart contracts \and Type safety \and Reference safety.}
 \end{abstract}
 
 \input{intro}

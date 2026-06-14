@@ -5,40 +5,49 @@ Move has nominal typing: two structs with identical layout but different names a
 A \emph{type-confusion} exploit breaks that distinction, and can be catastrophic when one of the two types is privileged.
 Consider the example:
 
-\begin{MoveBox}
+\noindent
+\begin{minipage}[t]{0.53\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
 module 0x1::admin {
-  struct Capability(address);
-  public fun admin_action(c: &Capability) {
-    /* Capability gated action */
-  }
+ struct Capability(address);
+ public fun admin_action(c: &Capability) {
+  /* Capability gated action */
+ }
 }
-
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.43\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
 module 0xdeadbeef::attacker {
-  struct FakedCapability(address);
+ struct FakedCapability(address);
 }
-\end{MoveBox}
+\end{lstlisting}
+\end{minipage}
 
-The attacker can freely construct a |FakedCapability| (they own the type); a type confusion exploit would allow passing it to |admin_action| as if it were a |Capability|.
+\noindent The attacker can freely construct their owned type |FakedCapability|; a type confusion exploit would allow passing it to |admin_action| as if it were a |Capability|.
 
 \subsubsection{Example}
-When vector operations were added to the VM during Move's original development at Meta, the bytecode verifier was not extended with the check on the vector element type for push.
-The compiler did perform this check, so no input source program could reach the problem.
-However, an attacker could bypass the compiler and directly construct bytecode, conceptually doing the following:
+When vector operations were added to the VM during Move's original development at Meta, the bytecode verifier missed an element-type check for push.
+The compiler performed this check; no input source program could reach the bug.
+But an attacker could directly construct bytecode, conceptually doing:
 
-\begin{MoveBox}
+\noindent\hfil\begin{minipage}{0.78\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
 let v: vector<Capability> = vector::empty();
 v.push_back(FakedCapability(victim)); // should be rejected
 admin_action(&v[0]);  // runs on a faked type
-\end{MoveBox}
+\end{lstlisting}
+\end{minipage}\hfil
 
 \noindent The two types share a layout, so program runs without corruption, but the gated action runs on a faked type.
 This bug was found as part of the Aptos bug bounty program before going into production.
 
 \subsubsection{Performing the Checks}
 To prevent type confusion, in addition to the bytecode verifier, type checks are performed at runtime.
-A type stack is maintained in parallel to the operand stack of the VM.
-Because the VM's locals are typed, the type of every value is known: whenever a value is pushed on the operand stack, its type is pushed on the type stack.
-Whenever a value is consumed, by being stored into a local or used by an operation, the corresponding type is popped and compared with the expected type of the local or operation; a mismatch is type confusion and raises a runtime error.
+A type stack is maintained shadowing the operand stack of the VM.
+The VM's locals are typed, so every value's type is known. 
+When a value is pushed on the operand stack, its type is pushed on the type stack.
+When a value is popped, by being stored into a local or used by an operation, its type is popped and compared with the expected type of the local or operation; a mismatch is type confusion and raises a runtime error.
 
 %$\theta ::= \epsilon \mid \theta \cdot \tau$ is added to the execution environment in Fig.~\ref{fig:semantics}.
 %Let $r$ be a reference such that $r = (\textrm{index}(F), l)$ on $\COPYLOC l$ and $\MOVELOC l$, and the reference %on the stack for $\READREF$, then $\tau(r)$ is pushed on the type stack.
