@@ -2,17 +2,17 @@
 \label{sec:async}
 
 Aptos executes blocks of transactions in parallel using \emph{Block-STM}~\cite{BlockSTM}, an optimistic concurrency-control protocol in which a pool of worker threads speculatively runs transactions out of order and re-validates them against later-published writes; executions that lose a race are aborted and re-executed.
-Block-STM also tracks when each transaction is committed (i.e., can no longer be speculatively re-executed due to some previous transaction abort).
-If there is not enough parallelism in the block (e.g., due to read-write conflicts), some threads remain idle, leaving a substantial slice of worker capacity unused.
-That idle capacity can be used to run the runtime safety checks \emph{asynchronously}.
+Block-STM also tracks when each transaction is committed.
+If there is not enough parallelism in the block due to read-write conflicts, worker capacity remains unused.
 
-During execution the VM performs no runtime checks but logs a compact \emph{execution trace} for each transaction, containing only control-flow shape.
+That idle capacity can be used to run the runtime safety checks \emph{asynchronously}.
+The VM performs no runtime checks but logs a compact \emph{execution trace} for each transaction, containing only control-flow shape.
 When a transaction is committed, an idle worker replays transaction's trace by abstractly interpreting the bytecode along the recorded path and runs the checks of \S\ref{sec:type} and \S\ref{sec:ability}.
 A violation found during replay aborts the block before its writes are persisted on-chain.
 
-Because asynchronous checks are run on committed transactions only, speculative executions do not pay the cost of these checks.
-The checks are also expected to pass with high probability: they fail only if there is a bug in static verifier that is being exploited.
-Hence, it is not feasible for an attacker to consistently slow down the network by triggering failures in asynchronous runtime checks.
+Asynchronous checks are run on committed transactions only; speculative executions do not pay the cost of these checks.
+The checks are expected to pass with high probability: they fail only if there is a bug in static verifier that is being exploited.
+Hence, an attacker cannot consistently slow down the network by triggering failures in asynchronous runtime checks.
 
 %%% Local Variables:
 %%% mode: latex

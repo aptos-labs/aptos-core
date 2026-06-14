@@ -6,35 +6,45 @@ A value whose type lacks |copy| is meant to be unique: this is what makes the |C
 A runtime that produces a fresh value of a no-|copy| type silently duplicates that resource.
 
 \subsubsection{Example}
-
 Move's ability system permits an assignment to downgrade a value's abilities (i.e., width subtyping over the ability set, which is sound).
 But due to the classic invariance of mutable references~\cite{pierce2002tapl}, applying this rule through a mutable reference is unsound.
-When Move was extended with closures, there was a corner case (see example below) which did not enforce invariance.
-An exploit could capture a no-|copy| resource |r| inside a no-|copy| closure |h|, store that closure into a variable |f| of |copy|-able closure type, and then copy |f| freely, calling it multiple times to duplicate the no-|copy| resource |r|.
+When Move was extended with closures, a corner case (see example below) did not enforce invariance.
+An exploit could capture a no-|copy| resource |r| inside a no-|copy| closure |h|, store that closure into a variable |f| of |copy|-able closure type, and then copy |f| freely, calling it multiple times, duplicating the no-|copy| resource |r|.
 
-\begin{MoveBox}
+\noindent
+\begin{minipage}[t]{0.46\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
 struct NoCopy(u64) has drop;
-public fun assign<T: drop>(ref: &mut T, x: T) {
-    *ref = x; // drops the old value
+
+public fun assign<T: drop>(
+    ref: &mut T, x: T
+) {
+ // old ref value dropped
+ *ref = x;
 }
-// --- entry point for the attack ---
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.50\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
 let r = NoCopy(42);
 let h: || has drop = || {
-    // capture and use `r`, valid in a no-copy closure
+    // capture and use `r`
 };
-let f: || has drop + copy = || {}; // no-op closure
-assign<|| has drop>(&mut f, h); // bug: not invariant
+let f: || has drop + copy = || {};
+assign<|| has drop>(&mut f, h);
+// ^ bug if not rejected: covariant
 let g = copy f; f(); g();
-\end{MoveBox}
+\end{lstlisting}
+\end{minipage}
 
 \noindent This bug was found as part of pre-production security auditing.
 
 \subsubsection{Performing the Checks}
 
 The VM performs runtime checks for violations of each of the abilities |copy|, |drop|, |key|, and |store|.
-Most of those checks are relatively straightforward and can be directly performed when the corresponding instruction is executed.
-The exception is |drop|, which requires the VM to track which values have not been consumed on function exit.
-The runtime checks for |drop| are more precise (thus would allow more programs to pass) than the static checks, as the latter has to conservatively reject if a no-|drop| local is maybe not consumed on some control flow path (even if that path is infeasible), while the former only checks the actually executed path.
+These checks are performed when the corresponding instruction is executed.
+For |drop|, the VM tracks which values have not been consumed on function exit.
+The runtime checks for |drop| are more precise than the static checks, as the latter conservatively rejects if a no-|drop| local is maybe not consumed on some control flow path (including infeasible paths), while the former only checks the real executed path.
 
 
 %%% Local Variables:

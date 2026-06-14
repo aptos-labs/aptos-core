@@ -1,17 +1,14 @@
 \section{Trusted Code}
 \label{sec:trusted}
 
-Runtime safety checks impose a performance overhead.
-The Move VM supports the concept of \emph{trusted code} which waives those checks.
-Currently, trusted code deployment underlies Aptos Foundation governance, and is only allowed for the Aptos framework, whose deployment needs to be approved by the Aptos operators.
-We are also investigating staking-based models for trusted code.
+Because runtime checks impose a performance overhead, the VM supports \emph{trusted code}: modules for which these checks are waived.
+Trusted deployment is currently under Aptos Foundation governance and limited to the Aptos framework; each deployment is approved by the Aptos operators.
+While this does not rule out VM bugs, it reduces the chance of maliciously engineered trusted code, raising confidence in its integrity.
+We are also investigating staking-based models.
 
-The main property of trusted code is that the governance model gives higher confidence in the integrity of the code.
-This does not exclude bugs in the VM, but it does reduce the likelihood of maliciously engineered exploits.
-
-When executing trusted code, the checks discussed in the previous section are disabled.
-Since checks like type safety collect information during execution, care must be taken to correctly model the transitions from untrusted into trusted code and vice versa.
-For example, trusted code does not use the type stack, but untrusted code expects the type of a return value from a function call on the type stack, so this information needs to be synthesized when returning from a call to a trusted function into untrusted code.
+Executing trusted code disables the checks of \S\ref{sec:type} and \S\ref{sec:ability}.
+Because checks like type safety accumulate state during execution, the transitions between untrusted and trusted code must be modeled carefully.
+For example, trusted code does not maintain the type stack, so when returning from a trusted function the return value's type must be synthesized for the untrusted caller from the type signature.
 
 %\begin{itemize}
 %\item $\CALL trusted$ from untrusted code:
