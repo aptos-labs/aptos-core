@@ -130,6 +130,8 @@ return true.
 -  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
 -  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
 -  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
+-  [Function `get_allow_serialized_script_args_feature`](#0x1_features_get_allow_serialized_script_args_feature)
+-  [Function `allow_serialized_script_args_enabled`](#0x1_features_allow_serialized_script_args_enabled)
 -  [Function `get_atomic_bridge_feature`](#0x1_features_get_atomic_bridge_feature)
 -  [Function `abort_atomic_bridge_enabled`](#0x1_features_abort_atomic_bridge_enabled)
 -  [Function `get_native_bridge_feature`](#0x1_features_get_native_bridge_feature)
@@ -291,6 +293,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>: u64 = 66;
+</code></pre>
+
+
+
+<a id="0x1_features_ALLOW_SERIALIZED_SCRIPT_ARGS"></a>
+
+Whether to allow serialized script arguments in the transaction payload.
+Lifetime: permanent
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ALLOW_SERIALIZED_SCRIPT_ARGS">ALLOW_SERIALIZED_SCRIPT_ARGS</a>: u64 = 72;
 </code></pre>
 
 
@@ -1117,6 +1130,9 @@ Lifetime: transient
 
 <a id="0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT"></a>
 
+Whether to enhance the transaction simulation with additional checks and features.
+This is needed because of the introduction of new features in transaction simulation.
+Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a>: u64 = 78;
@@ -3443,6 +3459,52 @@ We do not expect use from Move, so for now only for documentation purposes here
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_allow_serialized_script_args_feature"></a>
+
+## Function `get_allow_serialized_script_args_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_allow_serialized_script_args_feature">get_allow_serialized_script_args_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_allow_serialized_script_args_feature">get_allow_serialized_script_args_feature</a>(): u64 { <a href="features.md#0x1_features_ALLOW_SERIALIZED_SCRIPT_ARGS">ALLOW_SERIALIZED_SCRIPT_ARGS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_allow_serialized_script_args_enabled"></a>
+
+## Function `allow_serialized_script_args_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_allow_serialized_script_args_enabled">allow_serialized_script_args_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_allow_serialized_script_args_enabled">allow_serialized_script_args_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ALLOW_SERIALIZED_SCRIPT_ARGS">ALLOW_SERIALIZED_SCRIPT_ARGS</a>)
 }
 </code></pre>
 

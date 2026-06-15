@@ -267,7 +267,7 @@ module std::features {
     }
 
     /// Whether we refund storage costs to the user upon deletion
-    /// 
+    ///
     /// Lifetime: transient
     const STORAGE_DELETION_REFUND: u64 = 28;
 
@@ -593,6 +593,20 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    /// Whether to allow serialized script arguments in the transaction payload.
+    /// Lifetime: permanent
+    const ALLOW_SERIALIZED_SCRIPT_ARGS: u64 = 72;
+
+    public fun get_allow_serialized_script_args_feature(): u64 { ALLOW_SERIALIZED_SCRIPT_ARGS }
+
+    public fun allow_serialized_script_args_enabled(): bool acquires Features {
+        is_enabled(ALLOW_SERIALIZED_SCRIPT_ARGS)
+    }
+
+     /// Whether to enhance the transaction simulation with additional checks and features.
+     /// This is needed because of the introduction of new features in transaction simulation.
+     /// Lifetime: transient
+
     const TRANSACTION_SIMULATION_ENHANCEMENT: u64 = 78;
     /// Whether the Atomic bridge is available
     /// Lifetime: transient
@@ -606,9 +620,9 @@ module std::features {
         true
     }
 
-
     /// Whether the Atomic bridge is available
     /// Lifetime: transient
+    /// Deprecated in favor of `ALLOW_SERIALIZED_SCRIPT_ARGS` as feature flag 72
     const NATIVE_BRIDGE: u64 = 72;
 
     #[deprecated]
@@ -779,7 +793,7 @@ module std::features {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
 
-    /// Whether the staking rewards are mint (diseable) or withdraw from the gouverned gas pool treasury (enable). 
+    /// Whether the staking rewards are mint (diseable) or withdraw from the gouverned gas pool treasury (enable).
     ///
     /// Lifetime: permanent
     const STAKE_REWARD_USING_TREASURY: u64 = 224;
