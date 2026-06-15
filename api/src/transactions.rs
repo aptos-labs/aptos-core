@@ -531,6 +531,22 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
     ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        // Verify that the batch is not too large (for JSON requests)
+        let max_transaction_batch_size = self.context.max_submit_transaction_batch_size();
+        if let SubmitTransactionsBatchPost::Json(batch_submission_request) = &data {
+            let num_submitted_transactions = batch_submission_request.0.len();
+            if num_submitted_transactions > max_transaction_batch_size {
+                return Err(SubmitTransactionError::bad_request_with_code_no_info(
+                    anyhow::anyhow!(
+                        "Submitted too many transactions: {}, while limit is {}",
+                        num_submitted_transactions,
+                        max_transaction_batch_size,
+                    ),
+                    AptosErrorCode::InvalidInput,
+                ));
+            }
+        }
+
         data.verify()
             .context("Submitted transactions invalid")
             .map_err(|err| {
@@ -545,9 +561,12 @@ impl TransactionsApi {
         }
         self.context
             .check_api_output_enabled("Submit batch transactions", &accept_type)?;
+
+        // Verify that the batch is not too large (for BCS requests). We have to do this after
+        // parsing, since we don't know how many transactions there are until we parse it.
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
-        if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
+        if max_transaction_batch_size < signed_transactions_batch.len() {
             return Err(SubmitTransactionError::bad_request_with_code(
                 format!(
                     "Submitted too many transactions: {}, while limit is {}",
@@ -558,6 +577,7 @@ impl TransactionsApi {
                 &ledger_info,
             ));
         }
+
         self.create_batch(&accept_type, &ledger_info, signed_transactions_batch)
             .await
     }
