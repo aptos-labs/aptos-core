@@ -322,8 +322,11 @@ spec aptos_framework::object {
     }
 
     spec create_sticky_object_at_address(owner_address: address, object_address: address): ConstructorRef {
-        // TODO(fa_migration)
-        pragma verify = false;
+        /// [high-level-req-1]
+        aborts_if exists<ObjectCore>(object_address);
+        ensures exists<ObjectCore>(object_address);
+        ensures global<ObjectCore>(object_address).guid_creation_num == INIT_GUID_CREATION_NUM + 1;
+        ensures result == ConstructorRef { self: object_address, can_delete: false };
     }
 
     spec create_object_internal(

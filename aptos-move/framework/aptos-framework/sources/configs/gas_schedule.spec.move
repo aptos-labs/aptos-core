@@ -54,8 +54,6 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::staking_config;
         use aptos_framework::chain_status;
 
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 600;
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires chain_status::is_genesis();
         include staking_config::StakingRewardsConfigRequirement;
@@ -77,7 +75,6 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
 
-        // TODO: set because of timeout (property proved).
         pragma verify_duration_estimate = 600;
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
