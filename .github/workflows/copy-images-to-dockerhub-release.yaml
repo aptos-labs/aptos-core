@@ -22,9 +22,159 @@ permissions:
   id-token: write #required for GCP Workload Identity federation
 
 jobs:
+  # Pre-flight gate for aptos-node-v* tag pushes: aptos-node/Cargo.toml at
+  # the tagged commit must match the tag's version portion EXACTLY (including
+  # any -rc suffix), so the build_info version metric agrees with the tag and
+  # docker image. On mismatch, this job opens a bump PR against the release
+  # branch and fails — which gates copy-images-to-docker-hub via `needs`.
+  #
+  # Skipped on non-aptos-node-v* refs (network branches, indexer tags); the
+  # copy job's `if:` lets a skipped result fall through.
+  validate-aptos-node-version:
+    if: startsWith(github.ref, 'refs/tags/aptos-node-v') && !contains(github.ref_name, 'hotfix')
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v4
+
+      - name: Compare tag to aptos-node/Cargo.toml
+        id: compare
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          expected="${RELEASE_TAG#aptos-node-v}"
+          actual=$(grep -m1 '^version = ' aptos-node/Cargo.toml | sed -E 's/^version = "([^"]+)".*/\1/')
+          echo "tag version:    $expected"
+          echo "cargo version:  $actual"
+          echo "expected=${expected}" >> "$GITHUB_OUTPUT"
+          echo "actual=${actual}" >> "$GITHUB_OUTPUT"
+          if [ "$expected" = "$actual" ]; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Version check passed"
+              echo ""
+              echo "| Field | Value |"
+              echo "| --- | --- |"
+              echo "| Tag | \`$RELEASE_TAG\` |"
+              echo "| \`aptos-node/Cargo.toml\` version | \`$actual\` |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "match=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Version mismatch"
+              echo ""
+              echo "| Field | Value |"
+              echo "| --- | --- |"
+              echo "| Tag | \`$RELEASE_TAG\` |"
+              echo "| Expected \`aptos-node/Cargo.toml\` version | \`$expected\` |"
+              echo "| Actual \`aptos-node/Cargo.toml\` version | \`$actual\` |"
+              echo ""
+              echo "Opening a bump PR against the release branch; the workflow will fail to block image promotion."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::aptos-node/Cargo.toml version '$actual' at tag $RELEASE_TAG does not match expected '$expected'. Opening bump PR against the release branch."
+          fi
+
+      - name: Derive release branch from tag
+        if: steps.compare.outputs.match == 'false'
+        id: derive
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          # aptos-node-vX.Y.Z[-rc[.N]]  ->  aptos-release-vX.Y
+          if [[ "$RELEASE_TAG" =~ ^aptos-node-v([0-9]+)\.([0-9]+)\.[0-9]+(-rc(\.[0-9]+)?)?$ ]]; then
+            release_branch="aptos-release-v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+            echo "release_branch=${release_branch}" >> "$GITHUB_OUTPUT"
+            echo "release branch: ${release_branch}"
+          else
+            echo "::error::Tag '$RELEASE_TAG' does not match aptos-node-vX.Y.Z[-rc[.N]]"
+            exit 1
+          fi
+
+      - name: Checkout release branch for PR
+        if: steps.compare.outputs.match == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.derive.outputs.release_branch }}
+
+      - name: Bump aptos-node/Cargo.toml on release branch
+        if: steps.compare.outputs.match == 'false'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          expected="${RELEASE_TAG#aptos-node-v}"
+          # Replace the package version line in aptos-node/Cargo.toml.
+          # Inlined here (not via the bump action) so the workflow does not
+          # depend on the release branch having this PR's version of the
+          # action checked in.
+          sed -i -E "s|^version = \"[^\"]*\"|version = \"${expected}\"|" aptos-node/Cargo.toml
+          echo "bumped to:"
+          grep -m1 '^version = ' aptos-node/Cargo.toml
+
+      - name: Open bump PR
+        id: openpr
+        if: steps.compare.outputs.match == 'false'
+        uses: peter-evans/create-pull-request@a4f52f8033a6168103c2538976c07b467e8163bc # pin@v6.0.1
+        with:
+          add-paths: aptos-node/Cargo.toml
+          base: ${{ steps.derive.outputs.release_branch }}
+          title: "[aptos-node] bump version for ${{ github.ref_name }}"
+          body: |
+            Tag `${{ github.ref_name }}` was pushed but `aptos-node/Cargo.toml`
+            on `${{ steps.derive.outputs.release_branch }}` does not match. The
+            `copy-images-to-dockerhub-release` workflow blocked image promotion
+            and opened this PR.
+
+            **To unblock the release:**
+            1. Merge this PR into `${{ steps.derive.outputs.release_branch }}`.
+            2. Re-point the tag at the merge commit and force-push it:
+               ```
+               git fetch origin ${{ steps.derive.outputs.release_branch }}
+               git tag -fa ${{ github.ref_name }} origin/${{ steps.derive.outputs.release_branch }}
+               git push --force-with-lease origin ${{ github.ref_name }}
+               ```
+               The re-push retriggers this workflow; with the bump merged,
+               validation passes and images are copied to Docker Hub.
+          commit-message: "[aptos-node] bump version for ${{ github.ref_name }}"
+          branch: auto-release-${{ github.ref_name }}
+          delete-branch: true
+
+      - name: Append PR link to summary
+        if: steps.compare.outputs.match == 'false'
+        env:
+          PR_NUMBER: ${{ steps.openpr.outputs.pull-request-number }}
+          PR_URL: ${{ steps.openpr.outputs.pull-request-url }}
+          PR_OP: ${{ steps.openpr.outputs.pull-request-operation }}
+          RELEASE_BRANCH: ${{ steps.derive.outputs.release_branch }}
+        run: |
+          {
+            echo ""
+            echo "### Bump PR"
+            echo ""
+            if [ -n "$PR_NUMBER" ]; then
+              echo "- PR: [#${PR_NUMBER}](${PR_URL})"
+              echo "- operation: \`${PR_OP}\`"
+              echo "- base: \`${RELEASE_BRANCH}\`"
+            else
+              echo "No PR was opened. Either the branch already had the correct version,"
+              echo "or PR creation is disabled at the org/repo level — see workflow logs."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail workflow on version mismatch
+        if: steps.compare.outputs.match == 'false'
+        run: exit 1
+
   copy-images-to-docker-hub:
-    # Skip hotfix branches/tags; same substring rule as before, without shell interpolation.
-    if: ${{ !contains(github.ref_name, 'hotfix') }}
+    needs: [validate-aptos-node-version]
+    # Skip hotfix; for non-aptos-node-v* refs, validate is skipped — let those
+    # fall through (the skipped-result clause).
+    if: |
+      !contains(github.ref_name, 'hotfix') &&
+      (needs.validate-aptos-node-version.result == 'success' ||
+       needs.validate-aptos-node-version.result == 'skipped')
     uses: ./.github/workflows/copy-images-to-dockerhub.yaml
     with:
       image_tag_prefix: ${{ github.ref_name }}
