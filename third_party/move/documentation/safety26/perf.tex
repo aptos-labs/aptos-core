@@ -1,55 +1,60 @@
 \section{Performance}
 \label{sec:perf}
 
-We benchmark on a perpetual-futures DEX with 100 markets, driven by a weighted mix of oracle price updates, bulk market-maker orders, and retail taker orders, executed by Block-STM~\cite{BlockSTM} on a 60-vCPU Google Cloud instance with 235\,GB of RAM as the worker pool varies from 2 to 32 threads.
+Our real-world benchmark\footnote{Derived from Decibel~\cite{Decibel}, the benchmark simulates a perpetual-futures DEX with 100 markets, driven by a weighted mix of oracle price updates, bulk market-maker orders, and retail taker orders.} is executed by Block-STM~\cite{BlockSTM} on a 60-vCPU GCP instance with 235\,GB of RAM, worker pool varies from 2 to 32 threads.
 Each reported number is the mean of three runs; run-to-run spread is below 1.3\%.
 
 \begin{table}[t]
-\caption{Throughput (tx/s) under type and ability checking, slowdown vs the no-checks baseline.
-``Waiver'' skips trusted framework code (Section~\ref{sec:trusted}); ``async'' defers checks to trace replay (Section~\ref{sec:async}).}
+\caption{Throughput (txns/sec, higher is better) under type and ability checking.
+Slowdown vs the no-checks baseline presented in parentheses, ``waiver'' skips trusted framework code (\S\ref{sec:trusted}); ``asynchronous'' defers checks to trace replay (\S\ref{sec:async}).}
 \label{tab:perf:type}
 \centering
-\footnotesize
+\scriptsize
+\renewcommand{\arraystretch}{0.9}
 \setlength{\tabcolsep}{2pt}
-\begin{tabular}{rrcccc}
-\hline
+\begin{tabular}{rrrrrr}
+\toprule
         & baseline & \multicolumn{2}{c}{synchronous} & \multicolumn{2}{c}{asynchronous} \\
-workers & (no checks) & all code & waiver & all code & waiver \\
-\hline
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+workers & & no-waiver & waiver & no-waiver & waiver \\
+\midrule
 2  & 864  & 611 ($-$29.3\%)  & 739 ($-$14.5\%)  & 513 ($-$40.6\%)  & 624 ($-$27.7\%) \\
 4  & 1427 & 1026 ($-$28.1\%) & 1236 ($-$13.4\%) & 914 ($-$35.9\%)  & 1088 ($-$23.7\%) \\
 8  & 1915 & 1350 ($-$29.5\%) & 1620 ($-$15.4\%) & 1427 ($-$25.5\%) & 1598 ($-$16.5\%) \\
 16 & 2019 & 1427 ($-$29.3\%) & 1691 ($-$16.2\%) & 1690 ($-$16.3\%) & 1799 ($-$10.9\%) \\
-32 & 1904 & 1363 ($-$28.4\%) & 1621 ($-$14.9\%) & 1633 ($-$14.2\%) & 1716 ($-$9.9\%) \\
-\hline
+32 & 1904 & 1363 ($-$28.4\%) & 1621 ($-$14.9\%) & 1633 ($-$14.2\%) & 1716 ($-$09.9\%) \\
+\bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[t]
-\caption{Throughput (tx/s) under reference safety checking, all code, synchronous, in isolation (type and ability checks disabled).}
+\caption{Throughput (txns/sec) with isolated runtime reference safety checking.}
 \label{tab:perf:ref}
 \centering
-\footnotesize
+\scriptsize
+\renewcommand{\arraystretch}{0.9}
+\setlength{\tabcolsep}{2pt}
 \begin{tabular}{rrrr}
-\hline
-workers & checks off & checks on & slowdown \\
-\hline
+\toprule
+workers & ref checks off & ref checks on & slowdown \\
+\midrule
 2  & 858  & 630  & $-$26.5\% \\
 4  & 1430 & 1054 & $-$26.3\% \\
 8  & 1918 & 1370 & $-$28.6\% \\
 16 & 2011 & 1450 & $-$27.9\% \\
 32 & 1893 & 1375 & $-$27.4\% \\
-\hline
+\bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:perf:type} reports the cost of type and ability checking, which share a single per-instruction layer.
-Synchronously, the combined checks cost 28--29\% of throughput, uniformly across worker counts.
-The trusted-code waiver of Section~\ref{sec:trusted} roughly halves this to 13--16\%, as about two thirds of executed instructions on this workload fall into trusted framework code.
-The asynchronous mode of Section~\ref{sec:async} trades a small tracing overhead for deferred checking on idle workers: it is slower than synchronous below 8 workers, reaches parity at 8, and at 16--32 brings the cost to 10--11\%, the preferred configuration at production concurrency.
+Table~\ref{tab:perf:type} reports the cost of type and ability checking.
+The combined checks cost 28--29\% of throughput, uniformly across worker counts.
+The trusted-code waiver (\S\ref{sec:trusted}) roughly halves this to 13--16\%, as about two thirds of executed instructions on this workload fall into trusted framework code.
+The asynchronous mode (\S\ref{sec:async}) trades a small tracing overhead for deferred checking on idle workers: it is slower than synchronous below 8 workers (no idle threads available), reaches parity at 8, and at 16--32 brings the cost to 10--11\%, the preferred configuration at production concurrency.
 
-Table~\ref{tab:perf:ref} reports reference safety checking in isolation: 26--29\%, again uniform across worker counts.
-The reference checker does not yet support the trusted-code waiver or asynchronous deferral; the type-check numbers above set a reasonable expectation for what extending these mechanisms should recover.
+Table~\ref{tab:perf:ref} reports isolated (type and ability checks disabled) reference safety checking: 26--29\% slowdown, uniform across worker counts.
+The reference checking is fully functional, but it is not yet optimized and does not yet support the trusted-code waiver or asynchronous deferral, and thus not yet live in production.
+The type-check numbers above set a reasonable expectation for what optimizing and extending with these mechanisms could recover.
 
 %%% Local Variables:
 %%% mode: latex

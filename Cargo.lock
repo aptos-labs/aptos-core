@@ -12817,7 +12817,6 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
- "arc-swap",
  "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",

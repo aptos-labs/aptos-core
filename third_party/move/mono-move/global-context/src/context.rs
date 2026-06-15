@@ -33,10 +33,11 @@
 //!    Pointers returned from the guard are valid for the guard's lifetime.
 //!
 //! 2. **Maintenance Phase**
-//!    A single exclusive [`MaintenanceGuard`] guard exists with write access
-//!    via [`RwLockWriteGuard`]. During this phase caches can be reset. Because
-//!    no execution contexts can co-exist, there can be no dangling pointers,
-//!    making deallocation safe.
+//!    A single exclusive [`MaintenanceGuard`] guard exists. It is obtained
+//!    through `&mut GlobalContext`, so the borrow checker guarantees no
+//!    [`ExecutionGuard`] can co-exist. During this phase caches can be reset.
+//!    Because no execution contexts can co-exist, there can be no dangling
+//!    pointers, making deallocation safe.
 //!
 //! ## Global Allocation Race Window
 //!
@@ -50,7 +51,6 @@
 
 use crate::maintenance_config::MaintenanceConfig;
 use anyhow::{bail, Result};
-use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
@@ -59,11 +59,10 @@ use mono_move_core::{
     ValueLayout, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::{Arc, OnceLock},
+    sync::OnceLock,
 };
 
 // Submodules: to split implementation into smaller pieces.
@@ -109,11 +108,6 @@ pub struct GlobalContext {
     global_arena: GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     maintenance_config: MaintenanceConfig,
-    /// Lock to switch between execution and maintenance modes:
-    ///   - Read lock: execution phase.
-    ///   - Write lock: maintenance phase.
-    // TODO: Consider removing since maintenance context requires &mut GlobalContext.
-    phase: RwLock<()>,
 }
 
 /// Shared context containing interned data structures. Global arena where the
@@ -152,15 +146,8 @@ struct Context {
 ///   `Vector` descriptor with that element type.
 /// - Entries are appended but never removed or reordered during the
 ///   execution phase; only [`MaintenanceGuard::reset_arena_pool`] clears
-///   the table.
-/// - Descriptors are held behind `Arc` so the table's `store` on reset
-///   drops their heap-owning payloads (e.g. `Vec<u32>` offset lists).
-//
-// TODO(perf): if the per-lookup `Arc` deref or the per-append `Vec` clone
-// shows up in profiles, switch to arena-allocated descriptors with POD
-// payloads (`&'arena [u32]` instead of `Vec<u32>`). Eliminates the `Arc`
-// indirection and the clone-per-append at the cost of changing
-// `ObjectDescriptorInner`'s payload shape.
+///   the table. Reset drops every descriptor, freeing their heap-owning
+///   payloads (e.g. `Vec<u32>` offset lists).
 struct Descriptors {
     /// Vector-descriptor idempotency cache: `elem_ty -> id`. Lock-free reads
     /// via DashMap; the first publisher for a given `elem_ty` takes a shard
@@ -174,10 +161,11 @@ struct Descriptors {
     /// Struct-object idempotency cache: `struct_ty -> id`. Inline resources
     /// laid out as heap objects share one descriptor per type.
     struct_by_ty: DashMap<InternedType, DescriptorId, ahash::RandomState>,
-    /// All descriptors (reserved + user) in id order. Replaced atomically
-    /// on append via `ArcSwap::rcu` (CAS loop). Readers `load()` without
-    /// locking.
-    table: ArcSwap<Vec<Arc<ObjectDescriptor>>>,
+    /// All descriptors (reserved + user) in id order. `boxcar::Vec` is an
+    /// append-only concurrent vector: entries are pushed through a shared `&`
+    /// reference and are never moved, so [`DescriptorId`] indices stay stable
+    /// and concurrent reads need no lock.
+    table: boxcar::Vec<ObjectDescriptor>,
 }
 
 impl Default for Descriptors {
@@ -186,7 +174,7 @@ impl Default for Descriptors {
             vector_by_elem: DashMap::default(),
             captured_data_by_pointer_offsets: DashMap::default(),
             struct_by_ty: DashMap::default(),
-            table: ArcSwap::from_pointee(initial_descriptors()),
+            table: initial_descriptors(),
         }
     }
 }
@@ -194,7 +182,7 @@ impl Default for Descriptors {
 impl Descriptors {
     /// Drop user descriptors and idempotency caches; reinstall the
     /// reserved-slot table.
-    fn reset(&self) {
+    fn reset(&mut self) {
         // Exhaustive destructuring so that adding a new field forces a
         // compile-time error here.
         let Self {
@@ -206,16 +194,16 @@ impl Descriptors {
         vector_by_elem.clear();
         captured_data_by_pointer_offsets.clear();
         struct_by_ty.clear();
-        table.store(Arc::new(initial_descriptors()));
+        *table = initial_descriptors();
     }
 }
 
 /// Initial descriptor table: the two reserved entries.
-fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
-    vec![
-        Arc::new(ObjectDescriptor::trivial()),
-        Arc::new(ObjectDescriptor::closure()),
-    ]
+fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
+    let table = boxcar::Vec::new();
+    table.push(ObjectDescriptor::trivial());
+    table.push(ObjectDescriptor::closure());
+    table
 }
 
 /// Table of type layouts.
@@ -271,21 +259,15 @@ fn initial_layouts() -> boxcar::Vec<ValueLayout> {
 /// RAII guard for the maintenance phase providing exclusive write access.
 ///
 /// Only one maintenance context can exist at a time, ensuring exclusive
-/// access to the internal state for maintenance operations. The write lock
-/// is held for the lifetime of this guard and automatically released when
-/// dropped.
+/// access to the internal state for maintenance operations.
 pub struct MaintenanceGuard<'ctx> {
     /// Exclusive reference to the caches stored in context.
     ctx: &'ctx mut Context,
     /// Pool of all arenas managing global allocations.
-    global_arena: &'ctx GlobalArenaPool,
+    global_arena: &'ctx mut GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     #[allow(dead_code)]
     maintenance_config: &'ctx MaintenanceConfig,
-
-    /// Write guard that disallows obtaining concurrent execution
-    /// guard. **Must** be dropped last.
-    _guard: RwLockWriteGuard<'ctx, ()>,
 }
 
 /// RAII guard for the execution phase providing concurrent read access
@@ -297,10 +279,6 @@ pub struct ExecutionGuard<'ctx> {
     /// Arena dedicated for this execution guard with exclusive access.
     /// During execution, data can be allocated here without contention.
     global_arena: GlobalArenaShard<'ctx>,
-
-    /// Read guard preventing maintenance phase, but allowing concurrent
-    /// execution phases. **Must** be dropped last.
-    _guard: RwLockReadGuard<'ctx, ()>,
 }
 
 /// A scoped reference to data obtained from [`ExecutionGuard`] and is guaranteed
@@ -364,36 +342,27 @@ impl GlobalContext {
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
-            phase: RwLock::new(()),
         }
     }
 
     /// Transitions to maintenance mode by obtaining a [`MaintenanceGuard`]
-    /// guard. Only one maintenance context can be held at a time, providing
-    /// exclusive access to the internal state for maintenance operations. No
-    /// execution context can be held concurrently.
-    ///
-    /// Returns [`None`] if [`ExecutionGuard`] is currently held or there is
-    /// an ongoing maintenance.
+    /// guard, providing exclusive access to the internal state for maintenance
+    /// operations. The `&mut self` receiver guarantees no [`ExecutionGuard`]
+    /// can be held concurrently.
     #[must_use]
-    pub fn try_maintenance_context(&mut self) -> Option<MaintenanceGuard<'_>> {
-        let _guard = self.phase.try_write()?;
-
-        Some(MaintenanceGuard {
+    pub fn maintenance_context(&mut self) -> MaintenanceGuard<'_> {
+        MaintenanceGuard {
             ctx: &mut self.ctx,
-            global_arena: &self.global_arena,
+            global_arena: &mut self.global_arena,
             maintenance_config: &self.maintenance_config,
-            _guard,
-        })
+        }
     }
 
     /// Transitions to execution mode by obtaining an [`ExecutionGuard`] guard
     /// and locking the arena for the given worker. Multiple execution contexts
     /// can be held concurrently across threads for different workers.
     ///
-    /// Returns [`None`] if
-    ///   - there is an ongoing maintenance phase,
-    ///   - the arena for this worker has already been locked.
+    /// Returns [`None`] if the arena for this worker has already been locked.
     ///
     /// # Panics
     ///
@@ -401,12 +370,9 @@ impl GlobalContext {
     /// from the pool.
     #[must_use]
     pub fn try_execution_context(&self, worker_id: usize) -> Option<ExecutionGuard<'_>> {
-        let _guard = self.phase.try_read()?;
-
         Some(ExecutionGuard {
             ctx: &self.ctx,
             global_arena: self.global_arena.try_lock_arena(worker_id)?,
-            _guard,
         })
     }
 }
@@ -643,16 +609,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// subsequent calls with the same `elem_ty` return the same id without
     /// re-allocating.
     //
-    // TODO(perf): the slow path takes a DashMap shard write-lock (`entry`)
-    // and clones the descriptor table on each append; the `rcu` loop
-    // additionally re-clones on conflict. Profile, then revisit. Two
-    // candidates:
-    //   1. Preallocate the table in chunks so most appends are O(1) and
-    //      only chunk-boundary crossings clone (a small Vec of chunk
-    //      pointers).
-    //   2. Replace `ArcSwap<Vec<_>>` with `DashMap<DescriptorId, Arc<_>>`
-    //      + `AtomicU32` counter — O(1) appends, but reads (hot path)
-    //      pay a hashed lookup instead of array indexing.
+    // TODO(perf): the slow path takes a DashMap shard write-lock (`entry`) on
+    // the idempotency cache. The `boxcar::Vec` append itself is lock-free and
+    // O(1). Profile before optimizing the shard lock further.
     pub fn publish_vec_descriptor(
         &self,
         elem_ty: InternedType,
@@ -674,10 +633,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
             .entry(elem_ty)
             .or_insert_with(|| {
                 let offsets: Vec<u32> = elem_ptr_offsets.iter().map(|o| o.0).collect();
-                let desc = Arc::new(
-                    ObjectDescriptor::new_vector(elem_size, offsets)
-                        .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}")),
-                );
+                let desc = ObjectDescriptor::new_vector(elem_size, offsets)
+                    .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
     }
@@ -704,28 +661,17 @@ impl<'ctx> ExecutionGuard<'ctx> {
             .entry(struct_ty)
             .or_insert_with(|| {
                 let offsets: Vec<u32> = ptr_offsets.iter().map(|o| o.0).collect();
-                let desc = Arc::new(
-                    ObjectDescriptor::new_struct(size, offsets)
-                        .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}")),
-                );
+                let desc = ObjectDescriptor::new_struct(size, offsets)
+                    .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
     }
 
     /// Appends `desc` to the shared descriptor table and returns its assigned
-    /// [`DescriptorId`]. `rcu` retries on CAS conflict; the closure re-reads
-    /// `next.len()` so the id always matches the table state at the store.
-    fn append_descriptor(&self, desc: Arc<ObjectDescriptor>) -> DescriptorId {
-        let mut assigned_id = DescriptorId(0);
-        self.ctx.descriptors.table.rcu(|cur| {
-            let mut next = cur.as_ref().clone();
-            assigned_id = DescriptorId(
-                u32::try_from(next.len()).expect("published descriptor count exceeds u32::MAX"),
-            );
-            next.push(desc.clone());
-            Arc::new(next)
-        });
-        assigned_id
+    /// [`DescriptorId`].
+    fn append_descriptor(&self, desc: ObjectDescriptor) -> DescriptorId {
+        let idx = self.ctx.descriptors.table.push(desc);
+        DescriptorId(u32::try_from(idx).expect("published descriptor count exceeds u32::MAX"))
     }
 
     /// Returns the GC trace descriptor for a closure's captured-data object.
@@ -759,10 +705,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
             .captured_data_by_pointer_offsets
             .entry(offsets.clone())
             .or_insert_with(move || {
-                let desc = Arc::new(
-                    ObjectDescriptor::new_captured_data(values_size, offsets)
-                        .unwrap_or_else(|e| panic!("publish_captured_data_descriptor: {e}")),
-                );
+                let desc = ObjectDescriptor::new_captured_data(values_size, offsets)
+                    .unwrap_or_else(|e| panic!("publish_captured_data_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
     }
@@ -811,18 +755,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
 impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
-        let guard = self.ctx.descriptors.table.load();
-        let arc = guard.get(id.as_usize())?;
-        let ptr: *const ObjectDescriptor = Arc::as_ptr(arc);
-        drop(guard);
-        // SAFETY: Descriptor `Arc`s are dropped only when the table is
-        // replaced on maintenance reset, which requires the phase write-lock
-        // and therefore the absence of any live `ExecutionGuard`. This
-        // `ExecutionGuard` holds the phase read-lock, so no maintenance can
-        // run while `&self` lives — the `Arc<ObjectDescriptor>` for any id
-        // that resolved here stays alive for the returned reference's
-        // lifetime, which is tied to `&self`.
-        Some(unsafe { &*ptr })
+        self.ctx.descriptors.table.get(id.as_usize())
     }
 }
 
