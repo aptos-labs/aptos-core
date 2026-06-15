@@ -478,6 +478,12 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        fail_point_poem("endpoint_submit_transaction")?;
+        if !self.context.node_config.api.transaction_submission_enabled {
+            return Err(api_disabled("Submit transaction"));
+        }
+        self.context
+            .check_api_output_enabled("Submit transaction", &accept_type)?;
         data.verify()
             .context("Submitted transaction invalid'")
             .map_err(|err| {
@@ -486,12 +492,6 @@ impl TransactionsApi {
                     AptosErrorCode::InvalidInput,
                 )
             })?;
-        fail_point_poem("endpoint_submit_transaction")?;
-        if !self.context.node_config.api.transaction_submission_enabled {
-            return Err(api_disabled("Submit transaction"));
-        }
-        self.context
-            .check_api_output_enabled("Submit transaction", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         self.create(&accept_type, &ledger_info, signed_transaction)
@@ -531,6 +531,13 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
     ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        fail_point_poem("endpoint_submit_batch_transactions")?;
+        if !self.context.node_config.api.transaction_submission_enabled {
+            return Err(api_disabled("Submit batch transaction"));
+        }
+        self.context
+            .check_api_output_enabled("Submit batch transactions", &accept_type)?;
+
         // Verify that the batch is not too large (for JSON requests)
         let max_transaction_batch_size = self.context.max_submit_transaction_batch_size();
         if let SubmitTransactionsBatchPost::Json(batch_submission_request) = &data {
@@ -555,12 +562,6 @@ impl TransactionsApi {
                     AptosErrorCode::InvalidInput,
                 )
             })?;
-        fail_point_poem("endpoint_submit_batch_transactions")?;
-        if !self.context.node_config.api.transaction_submission_enabled {
-            return Err(api_disabled("Submit batch transaction"));
-        }
-        self.context
-            .check_api_output_enabled("Submit batch transactions", &accept_type)?;
 
         // Verify that the batch is not too large (for BCS requests). We have to do this after
         // parsing, since we don't know how many transactions there are until we parse it.
@@ -615,6 +616,12 @@ impl TransactionsApi {
         estimate_prioritized_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
+        fail_point_poem("endpoint_simulate_transaction")?;
+        if !self.context.node_config.api.transaction_simulation_enabled {
+            return Err(api_disabled("Simulate transaction"));
+        }
+        self.context
+            .check_api_output_enabled("Simulate transaction", &accept_type)?;
         data.verify()
             .context("Simulated transaction invalid")
             .map_err(|err| {
@@ -623,12 +630,6 @@ impl TransactionsApi {
                     AptosErrorCode::InvalidInput,
                 )
             })?;
-        fail_point_poem("endpoint_simulate_transaction")?;
-        if !self.context.node_config.api.transaction_simulation_enabled {
-            return Err(api_disabled("Simulate transaction"));
-        }
-        self.context
-            .check_api_output_enabled("Simulate transaction", &accept_type)?;
 
         let api = self.clone();
         let context = self.context.clone();
@@ -780,12 +781,6 @@ impl TransactionsApi {
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
-        data.0
-            .verify()
-            .context("'UserTransactionRequest' invalid")
-            .map_err(|err| {
-                BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-            })?;
         fail_point_poem("endpoint_encode_submission")?;
         if !self.context.node_config.api.encode_submission_enabled {
             return Err(api_forbidden(
@@ -795,6 +790,12 @@ impl TransactionsApi {
         }
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
+        data.0
+            .verify()
+            .context("'UserTransactionRequest' invalid")
+            .map_err(|err| {
+                BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         let api = self.clone();
         api_spawn_blocking(move || api.get_signing_message(&accept_type, data.0)).await
     }
