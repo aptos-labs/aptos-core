@@ -44,9 +44,8 @@
 //! execution phase, it is guaranteed that:
 //!
 //!   1. Global arena is not reset.
-//!   2. Executables and their arenas are not dropped.
-//!   3. Leaked pointers are not freed.
-//!   4. No pointers outlive execution phase.
+//!   2. Leaked pointers are not freed.
+//!   3. No pointers outlive execution phase.
 //!
 //! During maintenance phase there is exclusive access to all arenas and data.
 //! Maintenance phase can reset or drop arenas, and free leaked pointers.

@@ -259,9 +259,7 @@ fn initial_layouts() -> boxcar::Vec<ValueLayout> {
 /// RAII guard for the maintenance phase providing exclusive write access.
 ///
 /// Only one maintenance context can exist at a time, ensuring exclusive
-/// access to the internal state for maintenance operations. The write lock
-/// is held for the lifetime of this guard and automatically released when
-/// dropped.
+/// access to the internal state for maintenance operations.
 pub struct MaintenanceGuard<'ctx> {
     /// Exclusive reference to the caches stored in context.
     ctx: &'ctx mut Context,

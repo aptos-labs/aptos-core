@@ -184,8 +184,8 @@ impl GlobalArenaPool {
     /// The caller **must** ensure there are no live pointers pointing to the
     /// data allocated in the arena that is about to be cleared.
     pub unsafe fn reset_all_arenas_unchecked(&mut self) {
-        for arena in self.arenas.iter() {
-            arena.lock().reset();
+        for arena in self.arenas.iter_mut() {
+            arena.get_mut().reset();
         }
     }
 }
