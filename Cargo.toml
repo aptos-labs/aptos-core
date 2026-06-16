@@ -44,6 +44,7 @@ members = [
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
     "aptos-move/framework/natives",
+    "aptos-move/framework/position-natives",
     "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
@@ -892,6 +893,7 @@ z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
