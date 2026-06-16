@@ -1,0 +1,46 @@
+=== micro-ops ===
+// module 0x42::enum_by_ref_param
+
+fun read_x() {
+  frame_data_size: 40
+  entry_gas: 17
+  code:
+    0: EnumBorrowVariantField [24] <- &(*[0]) by tag [Some(9), Some(16)]
+    1: ReadRef [16] <- *[24] (size=1)
+    2: Move(1) [0] <- [16]
+    3: Return
+}
+
+fun read_x_a() {
+  frame_data_size: 24
+  entry_gas: 86
+  code:
+    0: StoreImm1 [8] <- #0
+    1: StoreImm1 [9] <- #7
+    2: EnumNew [0] desc=2 tag #0
+    3: HeapMoveTo [0]+8 <- [8] (size=1)
+    4: HeapMoveTo [0]+9 <- [9] (size=1)
+    5: SlotBorrow [48] <- &[0]
+    6: CallIndirect 0x42::enum_by_ref_param::read_x
+    7: Move(1) [0] <- [48]
+    8: Return
+  safe_point_layouts:
+    2: []
+}
+
+fun read_x_b() {
+  frame_data_size: 32
+  entry_gas: 86
+  code:
+    0: StoreImm8 [8] <- #256
+    1: StoreImm1 [16] <- #9
+    2: EnumNew [0] desc=2 tag #1
+    3: HeapMoveTo8 [0]+8 <- [8]
+    4: HeapMoveTo [0]+16 <- [16] (size=1)
+    5: SlotBorrow [56] <- &[0]
+    6: CallIndirect 0x42::enum_by_ref_param::read_x
+    7: Move(1) [0] <- [56]
+    8: Return
+  safe_point_layouts:
+    2: []
+}

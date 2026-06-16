@@ -10,10 +10,12 @@ use crate::{
         HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
     },
     state_kv_db::{LoadedHotStateShard, StateKvDb},
+    state_restore::{StateValueBatch, StateValueWriter},
     state_store::StateStore,
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_schemadb::batch::WriteBatch;
 use aptos_storage_interface::state_store::{
     empty_hot_state_updates, HotEvictionOp, HotInsertionOp, HotStateUpdates,
@@ -24,6 +26,7 @@ use aptos_types::{
         hot_state::{HotStateValue, THotStateSlot},
         state_key::StateKey,
         state_slot::StateSlotKind,
+        state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueByKeyHashIndex, StateValue},
         NUM_STATE_SHARDS,
     },
@@ -97,6 +100,39 @@ fn get_hot_state_entry(db: &StateKvDb, key: &StateKey, version: Version) -> Opti
         .get::<HotStateValueByKeyHashSchema>(&(CryptoHash::hash(key), version))
         .unwrap()
         .unwrap()
+}
+
+#[test]
+fn test_hot_snapshot_writer_reconstructs_value_version_from_cold_state() {
+    let tmp = TempPath::new();
+    let aptos_db = AptosDB::new_for_test(&tmp);
+    let store = aptos_db.state_store.as_ref();
+
+    let key = make_state_key(7);
+    let value = make_state_value(9);
+    super::put_value_set(store, vec![(key.clone(), value.clone())], 0);
+    super::put_value_set(store, Vec::<(StateKey, StateValue)>::new(), 1);
+
+    let mut hot_batch = StateValueBatch::new();
+    hot_batch.insert(
+        (key.clone(), 1),
+        Some(HotStateValue::new(Some(value.clone()), 1)),
+    );
+    <StateStore as StateValueWriter<StateKey, HotStateValue>>::write_kv_batch(
+        store,
+        1,
+        &hot_batch,
+        StateSnapshotProgress::new(key.hash(), StateStorageUsage::zero()),
+    )
+    .unwrap();
+
+    assert_eq!(
+        get_hot_state_entry(&aptos_db.hot_state_kv_db, &key, 1),
+        Some(HotStateEntry::Occupied {
+            value,
+            value_version: 0,
+        })
+    );
 }
 
 #[test]

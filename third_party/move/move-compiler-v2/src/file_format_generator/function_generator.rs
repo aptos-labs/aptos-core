@@ -1938,7 +1938,7 @@ impl<'a> FunctionGenerator<'a> {
                 // The lowest point in the stack we need to flush.
                 stack_to_flush = std::cmp::min(offs, stack_to_flush);
                 // Unfortunately, whatever is on the stack already, needs to be flushed out and
-                // pushed again. (We really should introduce a ROTATE opcode to the Move VM)
+                // pushed again.
                 temps_to_push = temps;
             }
         }

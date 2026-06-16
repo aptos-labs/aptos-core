@@ -299,6 +299,13 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             Ok(true)
         },
         LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
+            // TODO(enums): implement enum equality. Resolve the open enum's
+            // variants lazily (read the u64 tag at `ENUM_TAG_OFFSET` from each
+            // operand's heap object; if the tags differ return `false`, else
+            // recurse over the active variant's field layouts). `gc_layout`
+            // now lets functions that compare enums lower, so until this lands
+            // enum `==` (and equality of any value containing an enum) panics
+            // here. Same for function values.
             todo!("enums or function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Equality runs on pointee types only")),

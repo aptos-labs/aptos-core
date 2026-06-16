@@ -11,8 +11,12 @@
 //! and the numbers are placeholders.
 //!
 //! A cost may also have a runtime-dependent component, knowable only during
-//! execution (e.g. the IO of a global-storage operation). Only the fixed and
-//! size-dependent parts are computed here; the runtime charges the rest.
+//! execution (e.g. the IO of a global-storage operation, or the size of the
+//! deep-copies). Only the fixed and size-dependent parts are computed here; the
+//! runtime charges the rest.
+//!
+//! TODO(gas): the deep-copy component of heap-backed copies/reads is uncharged
+//! — these arms charge only the shallow byte move.
 //!
 //! TODO: split cost computation from resolution. Emit size-dependent costs as
 //! formulas (e.g. `a + b * size(T)`) and resolve them later, rather than
