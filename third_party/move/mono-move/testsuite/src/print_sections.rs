@@ -242,6 +242,17 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         self.guard.vec_descriptor_for(elem_ty)
     }
 
+    fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> Result<DescriptorId> {
+        Ok(self
+            .guard
+            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets))
+    }
+
     fn publish_captured_data_descriptor(
         &self,
         values_size: u32,

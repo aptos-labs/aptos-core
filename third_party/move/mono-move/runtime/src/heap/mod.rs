@@ -375,6 +375,17 @@ pub(crate) fn heap_alloc(
     unsafe {
         let header_start = heap.bump_ptr;
         heap.bump_ptr = header_start.add(aligned_size);
+        // TODO(perf): this O(size) memset is redundant for `EnumNew` /
+        // `PackVariant`, which immediately overwrite the tag and every field of
+        // the active variant. A pack-aware non-zeroing path could skip it (a
+        // material win for large/wide-variant enums). It is not a drop-in
+        // change: `gc_copy_object` / `deep_copy` copy the full object image
+        // including dead-variant tail and inter-field padding, which is
+        // deterministically zero today; leaving it uninitialized makes that
+        // image carry stale heap bytes. Prefer zeroing only the
+        // tail/padding the active variant does not write (still skipping the
+        // large active body), or audit that no byte-image consumer
+        // (state commit / hashing) depends on those bytes first.
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
@@ -936,7 +947,12 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         } => unsafe {
             let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET) as usize;
             if tag >= variant_pointer_offsets.len() {
-                return Ok(());
+                // A tag past the variant count means a corrupt object; surface
+                // it as an invariant violation.
+                return Err(RuntimeInvariantViolation::EnumTagOutOfRange {
+                    tag: tag as u64,
+                    variant_count: variant_pointer_offsets.len(),
+                });
             }
             let pointer_offsets = &variant_pointer_offsets[tag];
             if pointer_offsets.is_empty() {
