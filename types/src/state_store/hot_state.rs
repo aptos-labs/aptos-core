@@ -3,6 +3,7 @@
 
 use crate::{
     state_store::{
+        state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_value::StateValue,
     },
@@ -123,6 +124,21 @@ impl CryptoHash for HotStateValueRef<'_> {
             .expect("BCS serialization of HotStateValueRef should not fail");
         state.finish()
     }
+}
+
+/// One item of a hot state value chunk: a key together with its persisted hot state. Carries
+/// everything a fast-syncing node needs to rebuild a single hot state KV DB entry and the
+/// corresponding hot state Merkle leaf.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HotStateValueChunkItem {
+    /// Full state key. Hashed to locate the leaf in the hot state Merkle tree and to key the hot
+    /// state KV DB.
+    pub key: StateKey,
+    /// The value (`None` when vacant) and `hot_since_version` — exactly what is hashed into the
+    /// hot state Merkle tree, so a syncing node can hash it directly.
+    pub value: HotStateValue,
+    /// Version at which the value last changed. `Some` iff `value` is occupied.
+    pub value_version: Option<Version>,
 }
 
 #[cfg(test)]
