@@ -20,7 +20,7 @@ fn test_contexts() {
         let _guard = ctx.try_execution_context(0).unwrap();
     }
     {
-        let _guard = ctx.try_maintenance_context().unwrap();
+        let _guard = ctx.maintenance_context();
     }
     {
         let _guard1 = ctx.try_execution_context(0).unwrap();
@@ -83,7 +83,7 @@ fn test_block_execution_simulation() {
 
         // Maintenance phase: single thread with exclusive access.
         let ctx = Arc::get_mut(&mut ctx).unwrap();
-        let _guard = ctx.try_maintenance_context().unwrap();
+        let _guard = ctx.maintenance_context();
         thread::sleep(Duration::from_millis(100));
     }
 }
@@ -98,7 +98,7 @@ fn test_global_arena_reset() {
         guard.intern_address_name(&AccountAddress::ZERO, ident_str!("bar"));
     }
 
-    let mut guard = ctx.try_maintenance_context().unwrap();
+    let mut guard = ctx.maintenance_context();
     assert_eq!(guard.interned_identifiers_count(), 2);
     assert_eq!(guard.interned_module_ids_count(), 1);
 

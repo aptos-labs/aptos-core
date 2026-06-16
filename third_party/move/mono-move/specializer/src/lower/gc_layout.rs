@@ -87,13 +87,15 @@ pub fn gc_layout_supports(ty: InternedType) -> bool {
         | Type::Vector { .. }
         | Type::Function { .. } => true,
         Type::Nominal { .. } => {
-            // Mirrors the bails in `type_pointer_offsets`'s Nominal arm:
-            // unpopulated layout, enum (no field_layouts), or unsupported field.
+            // Mirror `type_pointer_offsets`'s Nominal arm: an unpopulated
+            // layout is unsupported (an `Err` there); an enum (populated
+            // layout, no `field_layouts`) is an 8-byte heap pointer
+            // (`Ok(vec![0])` there); otherwise every field must be supported.
             let Some(layout) = view_type(ty).layout() else {
                 return false;
             };
             let Some(fields) = layout.field_layouts() else {
-                return false;
+                return true;
             };
             fields.iter().all(|f| gc_layout_supports(f.ty()))
         },
@@ -135,8 +137,9 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
         Type::Vector { .. } | Type::Function { .. } => vec![0],
 
         // Inline structs: walk each field's pointer offsets and shift
-        // by the field's byte offset within the struct.
-        // TODO: Enums.
+        // by the field's byte offset within the struct. Enums are
+        // 8-byte heap pointers (variant fields live on the heap object,
+        // traced via the enum descriptor, not the frame).
         //
         // TODO: rewrite without recursion or add a depth/visited bound;
         // a malformed or racing `NominalLayout` publisher could otherwise
@@ -146,22 +149,10 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
                 .layout()
                 .ok_or_else(|| anyhow::anyhow!("nominal type has no layout populated"))?;
             let Some(fields) = layout.field_layouts() else {
-                bail!("enum type in frame slot not yet supported by gc_layout");
+                // Enum: an 8-byte heap pointer.
+                return Ok(vec![0]);
             };
-            let mut out = vec![];
-            for field in fields {
-                for rel in type_pointer_offsets(field.ty())? {
-                    let abs = field.offset.checked_add(rel).ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "gc_layout: field.offset {} + inner offset {} overflows u32",
-                            field.offset,
-                            rel,
-                        )
-                    })?;
-                    out.push(abs);
-                }
-            }
-            out
+            shifted_field_pointer_offsets(fields.iter().map(|field| (field.offset, field.ty())))?
         },
 
         Type::TypeParam { .. } => {
@@ -169,4 +160,27 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
         },
     };
     Ok(offsets)
+}
+
+/// Heap-pointer byte offsets for a sequence of `(field_offset, field_type)`
+/// pairs: each field's own pointer offsets shifted by the field's offset within
+/// the enclosing region.
+/// Errors on a non-GC-walkable field type or a `u32` offset overflow.
+pub fn shifted_field_pointer_offsets(
+    fields: impl IntoIterator<Item = (u32, InternedType)>,
+) -> Result<Vec<u32>> {
+    let mut out = vec![];
+    for (field_offset, field_ty) in fields {
+        for rel in type_pointer_offsets(field_ty)? {
+            let abs = field_offset.checked_add(rel).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gc_layout: field offset {} + inner offset {} overflows u32",
+                    field_offset,
+                    rel,
+                )
+            })?;
+            out.push(abs);
+        }
+    }
+    Ok(out)
 }

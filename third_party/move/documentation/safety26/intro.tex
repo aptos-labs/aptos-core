@@ -1,22 +1,31 @@
 \section{Introduction}
 \label{sec:intro}
 
-Move is a smart-contract language originally developed for the Libra/Diem blockchain at Meta~\cite{libra_blockchain_white,OLD_MOVE_LANG,blackshear2020resources} and now deployed at scale on Aptos~\cite{MoveOnAptosBook}, a high-throughput Layer-1 platform that settles transactions for hundreds of millions of dollars in user assets on chain.
+The Move on Aptos language~\cite{MoveOnAptosBook} was originally developed for the Libra/Diem blockchain at Meta~\cite{libra_blockchain_white,OLD_MOVE_LANG,blackshear2020resources} and is now deployed at scale on Aptos~\cite{Aptos}, a high-throughput Layer-1 blockchain that settles transactions for billions of dollars in user assets on chain.
 A defining trait of the language is its resource-oriented type discipline: digital assets are represented as Move \emph{resources} whose ownership and movement are tracked by linear-style abilities (|copy|, |drop|, |store|, |key|), ruling out accidental duplication or destruction at compile time.
 The Aptos platform builds on this foundation with a system of objects, parallel execution, and a rich on-chain framework written in Move itself~\cite{AptosFrameworkBook,ParkZGXGCLC24}.
 
-Beyond its type discipline, Move has been designed from the outset to admit \emph{offline formal verification}: the Move Prover translates Move programs and their specifications, written in the Move Specification Language, into verification conditions discharged by SMT solvers~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
-These techniques are powerful but inherently offline: they apply prior to deployment, depend on hand-written specifications, and produce no signal once the code is running on chain.
+Move has been designed for \emph{offline formal verification}: the Move Prover translates Move programs and their specifications, written in the Move Specification Language, into verification conditions discharged by SMT solvers~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
+The Move Prover can verify rich properties about the smart contracts themselves, but it is inherently offline, applied prior to deployment of the contracts.
 
-Closer to the execution path, the Move VM also performs \emph{static bytecode verification} every time a module is loaded, enforcing well-formedness, typing, and Move's reference discipline --- a Rust-like~\cite{rust,rustbelt} aliasing and lifetime regime detailed in Section~\ref{sec:move}.
-The reference analysis in particular is intricate: the verifier maintains a borrow graph that conservatively approximates the aliasing relationships entailed by control- and data-flow.
-Implementing this correctly is a delicate engineering task, and the Aptos bug bounty program has surfaced verifier bugs in the past.
-In a security-oriented architecture, the cost of trusting a single intricate static analysis as the sole gate is too high.
+Move programs are compiled into typed bytecode executed by the Move VM.
+The VM performs \emph{static bytecode verification} when a module is loaded, enforcing well-formedness, typing, and Move's reference (\S\ref{sec:move}) discipline.
+The reference safety verifier~\cite{MoveBorrowChecker} is particularly intricate: it maintains a borrow graph that conservatively approximates the aliasing relationships entailed by control- and data-flow using abstract interpretation.
+Implementing and maintaining the correctness of various static bytecode verification analyses is a delicate engineering task, especially with the rapid evolution of the Move language.
+Since the public launch of Aptos, Move has been extended to include enums, closures, and public structs, among other features.
+These language features interact non-trivially with the static verifier.
+Given the high stakes, Aptos runs a bug bounty program, which has surfaced verifier bugs in the past.
 
-The Aptos runtime therefore carries a second layer of \emph{runtime safety checks} that re-establish the critical invariants during execution.
-The checks described in this paper fall into three groups.
-\emph{Type checks} verify that the dynamic type of every value matches the static type the bytecode expects to consume.
-\emph{Ability checks} verify that operations such as copy, drop, or storage in global state are only performed on values whose declared abilities permit them.
-\emph{Reference checks} verify, at runtime, the same dangling- and aliasing-freedom properties that the static verifier is supposed to enforce.
+In a permissionless blockchain setting, executed transactions cannot be reversed.
+Anyone can deploy hand-crafted compiler-bypassed bytecode.
+Static verification is thus a single point of failure: one exploited bug can have catastrophic consequences.
+As a practical security measure, the Move VM implements defense-in-depth \emph{runtime safety checks} that independently verify the critical invariants during execution, after the bytecode has passed static verification.
 
-Since these checks are costly, the runtime supports \emph{trusted code} that waives them under certain conditions, and an \emph{asynchronous} checking mode that leverages idle workers in Block-STM~\cite{BlockSTM}, Aptos's speculative parallel executor.
+In this paper, we describe three groups of runtime checks, each motivated by real-world examples.
+\emph{Type checks} (\S\ref{sec:type}) verify that the dynamically tracked type of every value matches the static type the bytecode expects to consume.
+\emph{Ability checks} (\S\ref{sec:ability}) verify that operations such as copy, drop, or store to the global state are only performed on values whose declared abilities permit them.
+\emph{Reference checks} (\S\ref{sec:ref}) verify the same freedom from dangling references and aliased mutable access that the static verifier is supposed to enforce.
+
+We then describe two techniques for reducing the runtime costs of these checks: \emph{trusted code} (\S\ref{sec:trusted}) that waives them under certain conditions, and an \emph{asynchronous mode} (\S\ref{sec:async}) that leverages idle threads in Block-STM~\cite{BlockSTM} (Aptos's parallel transaction execution engine).
+We present an evaluation of the performance impact of the checks on real-world benchmarks (\S\ref{sec:perf}).
+Our implementations are openly available~\cite{AptosCore}.

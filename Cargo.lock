@@ -12802,6 +12802,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.11.0",
  "bytes",
+ "fxhash",
  "mono-move-alloc",
  "move-binary-format",
  "move-core-types",
@@ -12816,7 +12817,6 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
- "arc-swap",
  "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
@@ -12849,6 +12849,7 @@ version = "0.1.0"
 dependencies = [
  "mono-move-core",
  "move-core-types",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -12886,9 +12887,11 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "codespan-reporting",

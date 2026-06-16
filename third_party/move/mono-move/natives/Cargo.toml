@@ -14,3 +14,4 @@ rust-version = { workspace = true }
 [dependencies]
 mono-move-core = { workspace = true }
 move-core-types = { workspace = true }
+sha3 = { workspace = true }

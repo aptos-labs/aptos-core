@@ -66,6 +66,9 @@ pub enum RuntimeError {
     #[error("MoveTo: resource already exists at {addr}")]
     ResourceAlreadyExists { addr: AccountAddress },
 
+    #[error("enum variant mismatch: runtime variant tag {tag} is not the expected variant (STRUCT_VARIANT_MISMATCH)")]
+    EnumVariantMismatch { tag: u64 },
+
     #[error("stack overflow")]
     StackOverflow,
 
@@ -127,7 +130,8 @@ impl IntoExecutionError for RuntimeError {
             | VectorIndexOutOfBounds { .. }
             | InvalidAbortMessage
             | ResourceDoesNotExist { .. }
-            | ResourceAlreadyExists { .. } => ExecutionErrorKind::InvalidOperation,
+            | ResourceAlreadyExists { .. }
+            | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -318,6 +322,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("CallNative: native_idx {idx} out of bounds in registry of size {registry_size}")]
     NativeIdxOutOfBounds { idx: u32, registry_size: usize },
+
+    #[error("a native extension was borrowed when the GC tried to scan its roots")]
+    ExtensionBorrowedDuringGC,
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

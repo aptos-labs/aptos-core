@@ -71,6 +71,9 @@ pub type Alignment = u32;
 /// Offset in bytes of struct fields in flat memory.
 pub type FieldOffset = u32;
 
+/// An enum variant's discriminant (the tag stored at `ENUM_TAG_OFFSET`).
+pub type VariantTag = u64;
+
 /// Pointer to an arena-interned [`Type`]. Pointer equality implies structural
 /// equality because the global interner deduplicates types. The alias hides
 /// the raw `GlobalArenaPtr<Type>` form throughout the codebase.

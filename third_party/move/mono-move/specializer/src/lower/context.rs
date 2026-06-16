@@ -8,17 +8,20 @@
 
 use crate::{
     lower::{
-        gc_layout::{derive_frame_layout, gc_layout_supports, type_pointer_offsets},
+        gc_layout::{
+            derive_frame_layout, gc_layout_supports, shifted_field_pointer_offsets,
+            type_pointer_offsets,
+        },
         translate::{lower_function, LoweredFunction},
     },
     stackless_exec_ir::{
-        instr_utils::{nominal_type_in_instr, resource_type_in_instr},
+        instr_utils::{nominal_type_in_instr, resource_type_in_instr, NominalKind},
         FunctionIR, Instr, ModuleIR,
     },
 };
 use anyhow::{bail, Result};
 use mono_move_core::{
-    align_up_u32,
+    align_up_u32, checked_align_up_u32,
     interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
@@ -31,12 +34,24 @@ use mono_move_core::{
     Interner, LayoutFlags, LayoutId, PreparedModule, SizedSlot, SortedSafePointEntries,
     ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
 };
-use move_binary_format::{access::ModuleAccess, file_format::FunctionHandleIndex};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{FunctionHandleIndex, VariantFieldHandleIndex},
+};
 use move_core_types::function::ClosureMask;
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
 const FRAME_ALIGN: u32 = MAX_ALIGN as u32;
+
+/// Reserves `size` bytes for a scratch/box slot at the current end of the frame
+/// data region (rounded up to [`FRAME_ALIGN`]), advances `frame_data_size` past
+/// it, and returns the slot's offset.
+fn reserve_slot(frame_data_size: &mut u32, size: u32) -> FrameOffset {
+    let offset = align_up_u32(*frame_data_size, FRAME_ALIGN);
+    *frame_data_size = offset + size;
+    FrameOffset(offset)
+}
 
 /// Returns the (size, alignment) of a concrete interned type, or None if the
 /// type is not concrete (e.g., contains type parameters or unresolved structs).
@@ -111,6 +126,85 @@ pub enum CapturedDataLayout {
     NotDerivable,
 }
 
+/// One variant field's location within the enum data region. Offset is
+/// data-region-relative (0-based after the tag).
+#[derive(Copy, Clone)]
+pub struct VariantFieldLayout {
+    pub offset: u32,
+    pub size: u32,
+    pub ty: InternedType,
+}
+
+/// Lowering layout for one concrete enum type: its published descriptor and,
+/// per variant, the field layout within the data region.
+pub struct EnumLayout {
+    pub descriptor_id: DescriptorId,
+    pub variants: Vec<Vec<VariantFieldLayout>>,
+}
+
+/// Resolved plan for a variant-field access. Move semantics require the
+/// access to abort unless the runtime variant is one the handle names;
+/// variants are byte-packed, so the field's byte offset can differ per
+/// variant and must be selected by the runtime tag.
+pub(crate) struct VariantFieldAccess {
+    /// Field byte size, uniform across the handle's variants (same field type).
+    pub field_size: u32,
+    /// Data-region-relative field offset per variant tag; `None` where that
+    /// variant does not declare the field (accessing it must abort). Indexed by
+    /// variant tag; length is the enum's variant count.
+    pub offsets: Vec<Option<u32>>,
+    /// `Some(off)` when every variant declares the field at the same offset:
+    /// the static fast path (no tag dispatch, membership check, or scratch
+    /// reference needed).
+    pub uniform_offset: Option<u32>,
+}
+
+/// Resolve a `VariantFieldHandleIndex` against the owning enum's derived layout.
+/// Move groups variants in a handle by field index, not byte layout, so a shared
+/// field can sit at different byte offsets across the handle's variants; the
+/// access selects the offset by the runtime tag (and aborts for variants that
+/// lack the field).
+pub(crate) fn resolve_variant_field_access(
+    module: &PreparedModule,
+    enum_layouts: &UnorderedMap<InternedType, EnumLayout>,
+    vfh: VariantFieldHandleIndex,
+) -> Result<VariantFieldAccess> {
+    let handle = module.variant_field_handle_at(vfh);
+    let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
+    let field_pos = handle.field as usize;
+    let layout = enum_layouts
+        .get(&enum_ty)
+        .ok_or_else(|| anyhow::anyhow!("variant field: no derived layout for enum"))?;
+    let mut offsets = vec![None; layout.variants.len()];
+    let mut field_size = None;
+    for &variant in &handle.variants {
+        let field = layout
+            .variants
+            .get(variant as usize)
+            .and_then(|fields| fields.get(field_pos))
+            .ok_or_else(|| anyhow::anyhow!("variant field index out of range"))?;
+        offsets[variant as usize] = Some(field.offset);
+        // The field type is identical across the handle's variants
+        // (verifier-enforced), so its size is uniform.
+        field_size = Some(field.size);
+    }
+    let field_size =
+        field_size.ok_or_else(|| anyhow::anyhow!("variant field handle has no variants"))?;
+    // Fast path: field present in every variant at the same offset -> no runtime
+    // tag dispatch or membership check needed. A `None` hole (a variant that
+    // lacks the field) correctly rejects the fast path.
+    let uniform_offset = offsets.first().copied().flatten().filter(|&first| {
+        offsets
+            .iter()
+            .all(|maybe_offset| *maybe_offset == Some(first))
+    });
+    Ok(VariantFieldAccess {
+        field_size,
+        offsets,
+        uniform_offset,
+    })
+}
+
 /// Descriptors discovered for a function's type/closure set, threaded from the
 /// discovery pass into lowering.
 #[derive(Default)]
@@ -121,6 +215,8 @@ pub struct LoweringDescriptors {
     /// TODO: rename to a type-generic name now that it also holds struct
     /// descriptors, and extend to enum descriptors.
     pub vec: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete enum type -> its descriptor + per-variant field layout.
+    pub enum_layouts: UnorderedMap<InternedType, EnumLayout>,
     /// Captured-data layout per `PackClosure`, in IR order; consumed
     /// positionally by the build pass.
     pub closure_captured: Vec<CapturedDataLayout>,
@@ -142,6 +238,9 @@ pub struct LoweringContext<'a> {
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
     pub num_xfer_positions: u16,
+    /// TODO: we should consider unifying the various scratch slots below,
+    /// even though they are used for different purposes, only one is ever
+    /// live at a time, and they have the same GC invariant.
     /// Frame offset of the cycle-breaking scratch slot used by
     /// `parallel_copy::emit_parallel_copy` for `Instr::Ret`.
     /// Reserved at the end of the home region (sized to fit the widest
@@ -163,6 +262,26 @@ pub struct LoweringContext<'a> {
     /// deep copy for [`Instr::MoveFrom`]) collects *before* the write, so it
     /// does not need GC tracking.
     pub resource_box_slot: Option<FrameOffset>,
+    /// 16-byte scratch fat-pointer slot for by-reference variant-field
+    /// read/write (`ReadVariantField`/`WriteVariantField`): the `enum_borrow`
+    /// (a heap deref) writes the field reference here, then `ReadRef`/
+    /// `WriteRef` consumes it. `None` when the function has no such ops.
+    ///
+    /// Invariant: like `scratch`, its live range (borrow → deref) never spans
+    /// an allocating micro-op, so it needs no GC tracking.
+    pub variant_field_scratch: Option<FrameOffset>,
+    /// 8-byte scratch heap-pointer slot for enum `PackVariant`/`UnpackVariant`
+    /// when the slot-allocator aliases the enum-pointer slot with a field slot.
+    /// `PackVariant` stages the freshly allocated pointer here and publishes it
+    /// to `dst` only after the field stores; `UnpackVariant` copies the pointer
+    /// here and loads every field from it. Both keep the slot allocator's
+    /// read-before-write contract intact. `None` when the function packs/unpacks
+    /// no enums.
+    ///
+    /// Invariant: like `scratch`, its live range never spans an allocating
+    /// micro-op (`EnumNew` is the only allocator and writes the pointer here
+    /// after allocating), so it needs no GC tracking.
+    pub enum_ptr_scratch: Option<FrameOffset>,
     /// Maps a type to the [`DescriptorId`] published for it: a `vector<T>` for
     /// vector descriptors, or the resource struct type for `move_to`/`move_from`
     /// descriptors.
@@ -170,6 +289,12 @@ pub struct LoweringContext<'a> {
     /// Invariant: contains an entry for every vector or resource type used in
     /// this function.
     pub descriptors: UnorderedMap<InternedType, DescriptorId>,
+    /// TODO: consider reconciling with the descriptors map above.
+    /// Concrete enum type -> its descriptor + per-variant field layout.
+    ///
+    /// Invariant: contains an entry for every enum type whose concrete
+    /// variant ops this function lowers (enforced in `try_build_context`).
+    pub enum_layouts: UnorderedMap<InternedType, EnumLayout>,
     /// Per-`PackClosure` resolved data, in IR order.
     pub closure_pack_sites: Vec<ClosurePackInfo>,
     /// Per-`CallClosure` return-slot layout (caller-frame addresses laid out
@@ -183,6 +308,12 @@ impl LoweringContext<'_> {
     /// struct type for `move_to`/`move_from` descriptors.
     pub fn descriptor_id(&self, ty: InternedType) -> Option<DescriptorId> {
         self.descriptors.get(&ty).copied()
+    }
+
+    /// Layout published for the concrete enum type `enum_ty`, or `None` if
+    /// no entry exists.
+    pub fn enum_layout(&self, enum_ty: InternedType) -> Option<&EnumLayout> {
+        self.enum_layouts.get(&enum_ty)
     }
 }
 
@@ -324,14 +455,12 @@ pub fn try_build_context<'a>(
     //    We may also want to consider stricter bounding on number of
     //    return values in the bytecode verifier.
     let max_value_width: u32 = return_slots.iter().map(|s| s.size).max().unwrap_or(0);
-    let scratch = if return_slots.len() >= 2 && max_value_width > 0 {
-        let offset = align_up_u32(frame_data_size, FRAME_ALIGN);
-        let size = align_up_u32(max_value_width, FRAME_ALIGN);
-        frame_data_size = offset + size;
-        Some(FrameOffset(offset))
-    } else {
-        None
-    };
+    let scratch = (return_slots.len() >= 2 && max_value_width > 0).then(|| {
+        reserve_slot(
+            &mut frame_data_size,
+            align_up_u32(max_value_width, FRAME_ALIGN),
+        )
+    });
 
     // 4. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
     //    lowering, when the body uses either. It holds the intermediate heap
@@ -340,17 +469,49 @@ pub fn try_build_context<'a>(
     let needs_resource_box_slot = func_ir
         .instrs()
         .any(|instr| matches!(instr, Instr::MoveTo(..) | Instr::MoveFrom(..)));
-    let resource_box_slot = if needs_resource_box_slot {
-        let offset = align_up_u32(frame_data_size, FRAME_ALIGN);
-        frame_data_size = offset + 8;
-        Some(FrameOffset(offset))
-    } else {
-        None
-    };
+    let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
+
+    // 5. Single IR pass over the function's enum ops: (1) verify each one's enum
+    //    layout was derivable during discovery, and (2) detect which scratch
+    //    slots the lowering needs.
+    let mut needs_variant_field_scratch = false;
+    let mut needs_enum_ptr_scratch = false;
+    for instr in func_ir.instrs() {
+        let Some((enum_ty, NominalKind::Enum)) = nominal_type_in_instr(&module_ir.module, instr)
+        else {
+            continue;
+        };
+        if !descriptors.enum_layouts.contains_key(&enum_ty) {
+            // Skip the whole function when any enum op references an enum whose
+            // layout was not derivable.
+            return Ok(BuildContextOutcome::Skipped("enum layout not derivable"));
+        }
+        // A by-reference variant-field read/write may need the 16-byte scratch
+        // fat-pointer slot: only the divergent-offset path uses it (the
+        // tag-dispatched borrow writes the field reference there for the
+        // following `ReadRef`/`WriteRef`, both non-allocating, so it never spans
+        // a safe point), but reserve conservatively for any such op rather than
+        // re-resolving each access here just to learn whether it is uniform.
+        if matches!(
+            instr,
+            Instr::ReadVariantField(..) | Instr::WriteVariantField(..)
+        ) {
+            needs_variant_field_scratch = true;
+        }
+        // Pack/unpack may need an 8-byte scratch to keep the enum pointer out of
+        // an aliased field slot (resolved per-instruction in lowering; the exact
+        // alias depends on final slot offsets, which aren't known yet here).
+        if matches!(instr, Instr::PackVariant(..) | Instr::UnpackVariant(..)) {
+            needs_enum_ptr_scratch = true;
+        }
+    }
+    let variant_field_scratch =
+        needs_variant_field_scratch.then(|| reserve_slot(&mut frame_data_size, 16));
+    let enum_ptr_scratch = needs_enum_ptr_scratch.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // TODO: we need to revisit the complexity and performance of this function
     // after support for generic monomorphization is in place.
-    // 5. Lay out every callee-frame region in a single IR-order pass: regular
+    // 6. Lay out every callee-frame region in a single IR-order pass: regular
     //    calls (`Call`/`CallGeneric`) and closures (`PackClosure`/`CallClosure`)
     //    are disjoint instruction kinds writing disjoint outputs, so one walk
     //    serves both.
@@ -479,7 +640,10 @@ pub fn try_build_context<'a>(
         num_xfer_positions: func_ir.num_xfer_positions,
         scratch,
         resource_box_slot,
+        variant_field_scratch,
+        enum_ptr_scratch,
         descriptors: descriptors.vec,
+        enum_layouts: descriptors.enum_layouts,
         closure_pack_sites,
         closure_call_sites,
     }))
@@ -590,6 +754,17 @@ pub trait SpecializerContext {
     /// Returns the already-published vector-descriptor id for `elem_ty`,
     /// or `None` if no descriptor has been published yet.
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId>;
+
+    /// Publishes an enum descriptor for `enum_ty` (byte width `size` and
+    /// per-variant heap-pointer offsets `variant_pointer_offsets`, each
+    /// relative to the data region after the 8-byte tag), returning the
+    /// assigned [`DescriptorId`]. Idempotent on `enum_ty`.
+    fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> Result<DescriptorId>;
 
     /// GC trace descriptor for a captured-data object with values-region size
     /// `values_size` and intra-values heap-pointer offsets `pointer_offsets`.
@@ -794,11 +969,11 @@ fn try_discover_types_for_lowering_in_function_impl(
     descriptors: &mut LoweringDescriptors,
 ) -> Result<()> {
     for &ty in func_ir.home_slot_types.iter() {
-        discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+        discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
     }
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     for &ty in module_ir.module.interned_types_at(own_handle.return_) {
-        discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+        discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
     }
     for instr in func_ir.instrs() {
         // Calls: walk param + return signature lists.
@@ -821,19 +996,19 @@ fn try_discover_types_for_lowering_in_function_impl(
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
-                discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+                discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
             }
         }
         if let Some(returns) = returns {
             for &ty in view_type_list(returns) {
-                discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+                discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
             }
         }
 
         // Catch nominal types an instruction references directly but
         // that aren't reached by the home/call walks above.
-        if let Some(ty) = nominal_type_in_instr(&module_ir.module, instr) {
-            discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+        if let Some((ty, _kind)) = nominal_type_in_instr(&module_ir.module, instr) {
+            discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
         }
 
         // `PackClosure`: resolve the captured-data layout and record it
@@ -853,7 +1028,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // here, mirroring vector descriptors. Handle it once generic
         // global-storage ops are lowered.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
-            discover_type_metadata(ctx, resource_ty, ty_args, visited, &mut descriptors.vec)?;
+            discover_type_metadata(ctx, resource_ty, ty_args, visited, descriptors)?;
             let resource_ty = ctx.subst_type(resource_ty, ty_args)?;
             if let Some((size, _)) = type_size_and_align(resource_ty)
                 && let Ok(ptr_offsets) = type_pointer_offsets(resource_ty)
@@ -870,7 +1045,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // constant's type here.
         if let Instr::LdConst(_, idx) = instr {
             let ty = module_ir.module.interned_constant_type_at(*idx);
-            discover_type_metadata(ctx, ty, ty_args, visited, &mut descriptors.vec)?;
+            discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
         }
     }
 
@@ -919,6 +1094,28 @@ fn discover_captured_data_descriptor(
     }))
 }
 
+/// Accumulate the inline byte layout of `field_types` (in declaration order):
+/// (each field's variant field layout, the region's total size, and its max
+/// alignment).
+/// Returns `None` if any field type lacks a concrete size or the running
+/// offset/total overflows `u32`.
+fn layout_inline_fields(
+    field_types: &[InternedType],
+) -> Option<(Vec<VariantFieldLayout>, u32, u32)> {
+    let mut offset = 0u32;
+    let mut max_align = 1u32;
+    let mut fields = Vec::with_capacity(field_types.len());
+    for &ty in field_types {
+        let (size, align) = view_type(ty).size_and_align()?;
+        offset = checked_align_up_u32(offset, align)?;
+        max_align = max_align.max(align);
+        fields.push(VariantFieldLayout { offset, size, ty });
+        offset = offset.checked_add(size)?;
+    }
+    let total = checked_align_up_u32(offset, max_align)?;
+    Some((fields, total, max_align))
+}
+
 /// Recursive post-order DFS that visits every nominal reachable from the given
 /// type and, as a side effect, publishes its GC vector descriptors,
 /// `NominalLayout`s, and `ValueLayout`s. Returns the type's [`LayoutId`] when one
@@ -936,7 +1133,7 @@ fn discover_type_metadata(
     ty: InternedType,
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
-    vec_descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
+    descriptors: &mut LoweringDescriptors,
 ) -> Result<Option<LayoutId>> {
     let ty = ctx.subst_type(ty, ty_args)?;
     if !visited.insert(ty) {
@@ -971,12 +1168,12 @@ fn discover_type_metadata(
             // types still need discovery. `ty` was already substituted above,
             // so any  type params in `inner` are concrete, not type arguments
             // to pass here.
-            discover_type_metadata(ctx, *inner, EMPTY_TYPE_LIST, visited, vec_descriptors)?;
+            discover_type_metadata(ctx, *inner, EMPTY_TYPE_LIST, visited, descriptors)?;
             Ok(Some(REF_LAYOUT_ID))
         },
         Type::Vector { elem } => {
             let elem_id =
-                discover_type_metadata(ctx, *elem, EMPTY_TYPE_LIST, visited, vec_descriptors)?;
+                discover_type_metadata(ctx, *elem, EMPTY_TYPE_LIST, visited, descriptors)?;
             // Get or publish the GC descriptor for the element.
             let descriptor_id = if let Some(id) = ctx.vec_descriptor_for(*elem) {
                 Some(id)
@@ -989,7 +1186,7 @@ fn discover_type_metadata(
                 None
             };
             if let Some(id) = descriptor_id {
-                vec_descriptors.insert(ty, id);
+                descriptors.vec.insert(ty, id);
             }
             // Publish the vector layout only when both the element layout and
             // the descriptor are available (the same condition the descriptor
@@ -1031,26 +1228,24 @@ fn discover_type_metadata(
                             ft,
                             EMPTY_TYPE_LIST,
                             visited,
-                            vec_descriptors,
+                            descriptors,
                         )?);
                     }
 
                     // Best-effort layout computation. If any field is still
                     // not sized (or has no published layout), so is the
-                    // nominal type: defer.
-                    let mut offset = 0u32;
-                    let mut max_align = 1u32;
+                    // nominal type: defer. `None` means a field is not sized.
+                    let Some((field_layouts, total, max_align)) = layout_inline_fields(&fields)
+                    else {
+                        return Ok(None);
+                    };
                     // TODO: remove legacy size/layout.
                     let mut nominal_fields = Vec::with_capacity(fields.len());
-
                     let mut layout_fields = Vec::with_capacity(fields.len());
                     let mut fixed_bcs_total: u64 = 0;
                     let mut data_dependent = false;
 
-                    for (&ft, &fid) in fields.iter().zip(&field_ids) {
-                        let Some((sz, al)) = view_type(ft).size_and_align() else {
-                            return Ok(None);
-                        };
+                    for (field, &fid) in field_layouts.iter().zip(&field_ids) {
                         // A field can be sized yet still lack a published layout:
                         // `vector<T>` always reports an 8-byte pointer, but its
                         // layout is deferred until the element layout and vector
@@ -1062,19 +1257,18 @@ fn discover_type_metadata(
                         let Some(child) = ctx.layout(id) else {
                             bail!("published layout id does not resolve to a layout");
                         };
-                        offset = align_up_u32(offset, al);
-                        max_align = max_align.max(al);
-                        nominal_fields.push(FieldLayout::new(offset, ft));
-                        layout_fields.push(FieldValueLayout { offset, id });
+                        nominal_fields.push(FieldLayout::new(field.offset, field.ty));
+                        layout_fields.push(FieldValueLayout {
+                            offset: field.offset,
+                            id,
+                        });
                         match child.fixed_bcs_size {
                             Some(bcs_sz) => {
                                 fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64)
                             },
                             None => data_dependent = true,
                         }
-                        offset += sz;
                     }
-                    let total = align_up_u32(offset, max_align);
                     ctx.set_nominal_layout(ty, total, max_align, Some(&nominal_fields))?;
 
                     let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
@@ -1099,11 +1293,82 @@ fn discover_type_metadata(
                     );
                     Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },
-                Some(FieldTypes::Enum(_)) => {
-                    // Enum size is fixed (heap pointer) regardless of variant
-                    // fields. We do not walk variants here because their types
-                    // are only needed for pack/unpack/test.
+                Some(FieldTypes::Enum(variants)) => {
+                    // An enum is an 8-byte heap pointer at the type level.
+                    //
+                    // TODO(correctness): this records only the 8-byte nominal
+                    // pointer — no per-variant nominal field layout and no fixed
+                    // BCS size — so the loading and gas-metering paths that rely
+                    // on nominal layout / serialized size do not yet account for
+                    // enums.
                     ctx.set_nominal_layout(ty, 8, 8, None)?;
+
+                    let mut variant_layouts: Vec<Vec<VariantFieldLayout>> =
+                        Vec::with_capacity(variants.len());
+                    let mut variant_ptr_offsets: Vec<Vec<u32>> = Vec::with_capacity(variants.len());
+                    let mut max_data_size = 0u32;
+                    let mut all_sized = true;
+
+                    'variants: for variant_fields in &variants {
+                        // Substitute each field type by the enum's own type
+                        // args (mirrors the Struct arm), then recurse so nested
+                        // vec/struct/enum descriptors get published.
+                        let fields = variant_fields
+                            .iter()
+                            .map(|field_ty| ctx.subst_type(*field_ty, *nominal_ty_args))
+                            .collect::<Result<Vec<_>>>()?;
+                        for &field_ty in &fields {
+                            discover_type_metadata(
+                                ctx,
+                                field_ty,
+                                EMPTY_TYPE_LIST,
+                                visited,
+                                descriptors,
+                            )?;
+                        }
+
+                        // Per-variant layout: offsets are data-region-relative
+                        // (0-based after the tag).
+                        let Some((variant_layout, variant_size, _)) = layout_inline_fields(&fields)
+                        else {
+                            all_sized = false;
+                            break 'variants;
+                        };
+                        // GC pointer offsets: each field's inner pointer offsets
+                        // shifted by the field's offset within the data region.
+                        let Ok(ptr_offsets) = shifted_field_pointer_offsets(
+                            variant_layout.iter().map(|field| (field.offset, field.ty)),
+                        ) else {
+                            all_sized = false;
+                            break 'variants;
+                        };
+                        max_data_size = max_data_size.max(variant_size);
+                        variant_layouts.push(variant_layout);
+                        variant_ptr_offsets.push(ptr_offsets);
+                    }
+
+                    // Best-effort: only publish the enum descriptor + field
+                    // layout when every variant field is sized + GC-walkable and
+                    // the total size fits `u32`. Otherwise the 8-byte nominal
+                    // layout above remains and `try_build_context` skips the
+                    // function.
+                    if all_sized
+                        && let Some(size) = 8u32
+                            .checked_add(max_data_size)
+                            .and_then(|data_end| checked_align_up_u32(data_end, 8))
+                    {
+                        let descriptor_id =
+                            ctx.publish_enum_descriptor(ty, size, variant_ptr_offsets)?;
+                        descriptors.enum_layouts.insert(ty, EnumLayout {
+                            descriptor_id,
+                            variants: variant_layouts,
+                        });
+                    }
+
+                    // TODO: consider reconciling `EnumLayout`, `ValueLayout::open_enum`, and the enum descriptor.
+                    // The enum's `ValueLayout` is the open-enum shape regardless
+                    // of whether the variant field layout was derivable; the
+                    // value-traversal walk resolves variants lazily.
                     let value_layout = ValueLayout::open_enum(ty, *nominal_ty_args);
                     Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },

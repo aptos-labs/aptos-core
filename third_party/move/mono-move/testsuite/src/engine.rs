@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
-    native::NativeName, types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, NO_RESOURCE_PROVIDER,
+    native::{NativeExtensions, NativeName},
+    types::EMPTY_TYPE_LIST,
+    Function, GasMeter, Interner, NO_RESOURCE_PROVIDER,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
@@ -112,14 +114,15 @@ impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
 }
 
 /// Build the loader/native/transaction stack over an existing guard and module
-/// provider, load `address::module_name::function_name`, and hand a
-/// [`MonoRunner`] to `body`.
+/// provider, install `extensions`, load `address::module_name::function_name`,
+/// and hand a [`MonoRunner`] to `body`.
 pub fn with_mono_function<'guard, 'ctx, R>(
     guard: &'guard ExecutionGuard<'ctx>,
     module_provider: &'guard InMemoryModuleProvider,
     address: AccountAddress,
     module_name: &IdentStr,
     function_name: &IdentStr,
+    extensions: NativeExtensions,
     body: impl FnOnce(&mut MonoRunner<'_, '_, 'ctx>) -> R,
 ) -> Result<R> {
     let mut natives = ProductionNativeRegistry::new();
@@ -155,7 +158,8 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         GasMeter::new(GAS_BUDGET),
         &NO_RESOURCE_PROVIDER,
         &natives,
-    );
+    )
+    .with_extensions(extensions);
 
     let id = guard
         .intern_address_name(&address, module_name)
@@ -205,6 +209,7 @@ pub fn with_loaded_mono_function<R>(
         address,
         module_name,
         function_name,
+        NativeExtensions::new(),
         body,
     )
 }

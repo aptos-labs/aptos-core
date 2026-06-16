@@ -1,34 +1,32 @@
 \section{Move on Aptos}
 \label{sec:move}
 
-We briefly summarize the aspects of Move on Aptos~\cite{MoveOnAptosBook,blackshear2020resources} that the rest of the paper builds on.
+We briefly summarize key aspects of Move on Aptos~\cite{MoveOnAptosBook,blackshear2020resources}.
 
-\begin{Itemize}
-    \item \emph{Typing and generics.}
-    Move is strongly statically typed.
-    Generic functions and types are instantiated by substitution at the call site and tracked through the bytecode verifier.
-    The substitution must reach every leaf expression, since accesses to type-indexed global storage (below) need the concrete instantiated type at runtime.
+\paragraph{Typing and generics.}
+Move is strongly statically typed.
+Generic functions and types are instantiated by substitution at the call site.
+Substitution is carried through transitively: accesses to type-indexed global storage (below) are keyed by concrete types at runtime.
 
-    \item \emph{Abilities.}
-    Each type carries a subset of the four abilities |copy|, |drop|, |store|, and |key|, which gate the corresponding operations.
-    Types without |drop| or |copy| are linear: the compiler refuses to discard or duplicate them, and every value of such a type must be moved, stored, or explicitly destructured.
+\paragraph{Abilities.}
+Each type carries a subset of the four abilities: |copy|, |drop|, |store|, and |key|.
+Types without |drop| or |copy| are linear: every value of such a type must be moved, globally stored, or explicitly destructured.
 
-    \item \emph{Algebraic data types.}
-    Structs are nominal product types; enums are nominal sums whose variants carry payloads.
-    Pattern matching may bind references directly into a variant's fields.
+\paragraph{Algebraic data types.}
+Structs are nominal product types; enums are nominal sums whose variants carry payloads.
+Pattern matching may bind references directly into a variant's fields.
 
-    \item \emph{References.}
-    Immutable (|&T|) and mutable (|&mut T|) references obey a static aliasing discipline comparable to Rust's~\cite{rust,rustbelt}: two live mutable references cannot point to overlapping memory, and references cannot outlive the values they borrow.
+\paragraph{Modular encapsulation.}
+Privileged operations (construction, destruction, and field access) on a private type are confined to its defining module, so module-external code can manipulate values only through module provided functions.
 
-    \item \emph{Global storage.}
-    Global state is a map indexed by (resource type, address) pairs.
-    Resources of types with the |key| ability are accessed through |T[addr]|, |&T[addr]|, and |&mut T[addr]|, with the same linear-ownership discipline as for local values.
+\paragraph{References.}
+Immutable (|&T|) and mutable (|&mut T|) references obey a static aliasing discipline comparable to Rust's~\cite{rust,rustbelt}: two live mutable references cannot point to overlapping memory, and references cannot outlive the values they borrow.
+In contrast to Rust, Move (a) does allow mutable references to global storage, but (b) has no reference lifetimes and does not allow references to be stored in structs or enums or captured by closures.
 
-    \item \emph{Bytecode and bytecode verification.}
-    Move source compiles to a typed bytecode that the Move VM~\cite{OLD_MOVE_LANG} executes.
-    At module-load time, a bytecode verifier checks well-formedness, typing, abilities, and the reference discipline above.
-    The runtime safety checks of this paper run during execution, after the verifier has accepted the bytecode.
-\end{Itemize}
+\paragraph{Global storage.}
+Global state is a map indexed by (resource type, address) pairs.
+Resources are types with the |key| ability.
+They are accessed through |T[addr]|, |&T[addr]|, and |&mut T[addr]|.
 
 %%% Local Variables:
 %%% mode: latex

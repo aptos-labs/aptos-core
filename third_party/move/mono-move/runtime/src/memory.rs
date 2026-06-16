@@ -7,7 +7,7 @@
 
 use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use mono_move_core::memory::*;
-use mono_move_core::{DescriptorId, MAX_ALIGN};
+use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET, MAX_ALIGN};
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,28 @@ pub unsafe fn read_vec_len(ptr: *mut u8) -> u64 {
         // SAFETY: caller guarantees this is a vector.
         unsafe { read_u64(ptr, VEC_LENGTH_OFFSET) }
     }
+}
+
+/// Reads an enum heap object's variant tag.
+///
+/// # Safety
+///
+/// `obj_ptr` points to the data region of an enum heap object.
+#[inline(always)]
+pub unsafe fn read_enum_tag(obj_ptr: *const u8) -> u64 {
+    // SAFETY: caller guarantees this is an enum object.
+    unsafe { read_u64(obj_ptr, ENUM_TAG_OFFSET) }
+}
+
+/// Writes an enum heap object's variant tag.
+///
+/// # Safety
+///
+/// `obj_ptr` points to the data region of an enum heap object.
+#[inline(always)]
+pub unsafe fn write_enum_tag(obj_ptr: *mut u8, tag: u64) {
+    // SAFETY: caller guarantees this is an enum object.
+    unsafe { write_u64(obj_ptr, ENUM_TAG_OFFSET, tag) }
 }
 
 /// Pointer to the `idx`-th element inside a vector's data region.
