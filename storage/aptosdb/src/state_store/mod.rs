@@ -96,6 +96,7 @@ mod persisted_state;
 mod tests;
 
 type StateValueBatch = crate::state_restore::StateValueBatch<StateKey, Option<StateValue>>;
+type HotStateValueBatch = crate::state_restore::StateValueBatch<StateKey, Option<HotStateValue>>;
 
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
 const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT_INTERVAL_IN_VERSION
@@ -1516,6 +1517,24 @@ impl StateStore {
         )?))
     }
 
+    // The state-sync protocol does not request hot-state snapshot chunks yet; this is the
+    // storage-side receiver that path will call once the wire format exists.
+    #[allow(dead_code)]
+    pub fn get_hot_state_snapshot_receiver(
+        self: &Arc<Self>,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
+        Ok(Box::new(StateSnapshotRestore::new(
+            &self.hot_state_merkle_db,
+            self,
+            version,
+            expected_root_hash,
+            false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
+        )?))
+    }
+
     #[cfg(test)]
     pub fn get_all_jmt_nodes_referenced(
         &self,
@@ -1694,6 +1713,93 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         }
 
         Ok(main_db_progress)
+    }
+}
+
+impl StateValueWriter<StateKey, HotStateValue> for StateStore {
+    fn write_kv_batch(
+        &self,
+        version: Version,
+        hot_kv_batch: &HotStateValueBatch,
+        progress: StateSnapshotProgress,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_value_writer_write_chunk"]);
+        let mut batch = SchemaBatch::new();
+        let mut sharded_schema_batch = self.hot_state_kv_db.new_sharded_native_batches();
+
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateSnapshotKvRestoreProgress(version),
+            &DbMetadataValue::StateSnapshotProgress(progress),
+        )?;
+
+        for ((key, restore_version), hot_value_opt) in hot_kv_batch {
+            ensure!(
+                *restore_version == version,
+                "Hot state snapshot row version {} does not match target version {}",
+                restore_version,
+                version,
+            );
+            let Some(hot_value) = hot_value_opt else {
+                continue;
+            };
+            ensure!(
+                hot_value.hot_since_version() <= version,
+                "Hot state entry has hot_since_version {} after snapshot version {}",
+                hot_value.hot_since_version(),
+                version,
+            );
+
+            let key_hash = key.hash();
+            let schema_value = match hot_value.value_opt() {
+                Some(value) => {
+                    let (leaf_data, _proof) = self
+                        .state_merkle_db
+                        .get_with_proof_ext(&key_hash, version, 0)?;
+                    let Some((value_hash, (jmt_key, value_version))) = leaf_data else {
+                        return Err(AptosDbError::NotFound(format!(
+                            "Cold state leaf is missing for hot state key {key_hash} at version {version}"
+                        )));
+                    };
+                    ensure!(
+                        jmt_key == *key,
+                        "Cold state key mismatch for hot state key hash {} at version {}",
+                        key_hash,
+                        version,
+                    );
+                    ensure!(
+                        value_hash == value.hash(),
+                        "Cold state value hash mismatch for hot state key hash {} at version {}",
+                        key_hash,
+                        version,
+                    );
+                    HotStateEntry::Occupied {
+                        value: value.clone(),
+                        value_version,
+                    }
+                },
+                None => HotStateEntry::Vacant,
+            };
+
+            sharded_schema_batch[key.get_shard_id()].put::<HotStateValueByKeyHashSchema>(
+                &(key_hash, hot_value.hot_since_version()),
+                &Some(schema_value),
+            )?;
+        }
+
+        self.hot_state_kv_db
+            .commit(version, Some(batch), sharded_schema_batch)
+    }
+
+    fn kv_finish(&self, _version: Version, _usage: StateStorageUsage) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
+        Ok(self
+            .hot_state_kv_db
+            .metadata_db()
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotKvRestoreProgress(version))?
+            .map(|v| v.expect_state_snapshot_progress()))
     }
 }
 
