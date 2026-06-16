@@ -1398,28 +1398,10 @@ fn invalid_variant_access(context: &mut Context, loc: Loc) {
 }
 
 fn access_specifier(context: &mut Context, specifier: P::AccessSpecifier) -> E::AccessSpecifier {
-    let (negated, kind, chain, type_args, address) = match specifier.value {
-        AccessSpecifier_::Acquires(negated, chain, type_args, address) => (
-            negated,
-            AccessSpecifierKind::LegacyAcquires,
-            chain,
-            type_args,
-            address,
-        ),
-        AccessSpecifier_::Reads(negated, chain, type_args, address) => (
-            negated,
-            AccessSpecifierKind::Reads,
-            chain,
-            type_args,
-            address,
-        ),
-        AccessSpecifier_::Writes(negated, chain, type_args, address) => (
-            negated,
-            AccessSpecifierKind::Writes,
-            chain,
-            type_args,
-            address,
-        ),
+    let (kind, chain, type_args, address) = match specifier.value {
+        AccessSpecifier_::Acquires(chain, type_args, address) => {
+            (AccessSpecifierKind::LegacyAcquires, chain, type_args, address)
+        },
     };
     let (module_address, module_name, resource_name) =
         access_specifier_name_access_chain(context, chain);
@@ -1427,7 +1409,6 @@ fn access_specifier(context: &mut Context, specifier: P::AccessSpecifier) -> E::
     let address = address_specifier(context, address);
     sp(specifier.loc, E::AccessSpecifier_ {
         kind,
-        negated,
         module_address,
         module_name,
         resource_name,

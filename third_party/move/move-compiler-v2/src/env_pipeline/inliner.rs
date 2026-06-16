@@ -208,7 +208,7 @@ fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets)
                 if func.get_access_specifiers().is_some() {
                     env.warning(
                         &func.get_id_loc(),
-                        "acquires and access specifiers are not applicable to inline functions and should be removed",
+                        "acquires annotations are not applicable to inline functions and should be removed",
                     );
                 }
 

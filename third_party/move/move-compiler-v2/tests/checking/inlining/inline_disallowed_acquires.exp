@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: acquires and access specifiers are not applicable to inline functions and should be removed
+warning: acquires annotations are not applicable to inline functions and should be removed
   ┌─ tests/checking/inlining/inline_disallowed_acquires.move:6:16
   │
 6 │     inline fun test() acquires R {}

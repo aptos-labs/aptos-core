@@ -503,14 +503,7 @@ impl<'a> Sourcifier<'a> {
         let mut acc_spec_map = BTreeMap::new();
 
         // gather resources together under each spec kind
-        for spec_kind in [
-            "!reads",
-            "!writes",
-            "!acquires",
-            "reads",
-            "writes",
-            "acquires",
-        ] {
+        for spec_kind in ["acquires"] {
             acc_spec_map.insert(spec_kind.to_string(), BTreeSet::new());
         }
 
@@ -547,20 +540,12 @@ impl<'a> Sourcifier<'a> {
                 },
             };
 
-            let spec_kind = match spec.kind {
-                AccessSpecifierKind::Reads => "reads",
-                AccessSpecifierKind::Writes => "writes",
+            let spec_key = match spec.kind {
                 AccessSpecifierKind::LegacyAcquires => "acquires",
             };
 
-            let spec_key = if spec.negated {
-                format!("!{}", spec_kind)
-            } else {
-                spec_kind.to_string()
-            };
-
             acc_spec_map
-                .get_mut(&spec_key)
+                .get_mut(spec_key)
                 .expect("spec kind key expected")
                 .insert(format!("{}{}", resource, address));
         }
