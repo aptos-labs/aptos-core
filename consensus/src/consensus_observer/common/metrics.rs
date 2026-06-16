@@ -46,6 +46,16 @@ pub static OBSERVER_CLEARED_BLOCK_STATE: Lazy<IntCounter> = Lazy::new(|| {
     ).unwrap()
 });
 
+/// Counter for tracking ignored (direct send) messages by the consensus observer
+pub static OBSERVER_IGNORED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_ignored_messages",
+        "Counters related to ignored (direct send) messages by the consensus observer",
+        &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
 /// Counter for tracking dropped (direct send) messages by the consensus observer
 pub static OBSERVER_DROPPED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
