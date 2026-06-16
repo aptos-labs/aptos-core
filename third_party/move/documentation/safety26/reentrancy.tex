@@ -10,7 +10,7 @@ and because module dependencies must be acyclic, no function a module calls can 
 Here is an example demonstrating what a vulnerable pattern may look like, using a withdrawal function that processes the payout through a caller-supplied
 callback:
 
-\subsubsection{Example}
+\paragraph{Example.}
 \begin{MoveBox}
 module 0x42::vault {
   struct Vault has key { balance: u64 }
@@ -25,7 +25,7 @@ module 0x42::vault {
 
 A malicious or poorly written |payout| could call |withdraw| again before the first withdrawal has been completed, resulting in the re-entrant call reading the same non-zero |balance|.
 
-\subsubsection{Runtime Reentrancy Check}
+\paragraph{Runtime Reentrancy Check.}
 Our current solution to this problem is a runtime reentrancy check. The VM's runtime maintains a map that for each module, records a count of how many times it has been entered.
 The count is incremented when entered from a different module, or from a function value, even if the underlying function is in the same module, and decremented on return.
 
