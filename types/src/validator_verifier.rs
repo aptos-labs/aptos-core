@@ -370,10 +370,11 @@ impl ValidatorVerifier {
                 return Ok(());
             }
         }
-        // Verify empty multi signature
+        // Verify empty multi signature. Decompression of the G2 point is
+        // deferred to here, after the cheap structural checks above.
         let multi_sig = multi_signature
-            .sig()
-            .as_ref()
+            .decompressed_sig()
+            .map_err(|_| VerifyError::InvalidMultiSignature)?
             .ok_or(VerifyError::EmptySignature)?;
         // Verify the optimistically aggregated signature.
         let aggregated_key =
@@ -404,10 +405,11 @@ impl ValidatorVerifier {
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter(), true)?;
-        // Verify empty aggregated signature
+        // Verify empty aggregated signature. Decompression of the G2 point is
+        // deferred to here, after the cheap structural checks above.
         let aggregated_sig = aggregated_signature
-            .sig()
-            .as_ref()
+            .decompressed_sig()
+            .map_err(|_| VerifyError::InvalidAggregatedSignature)?
             .ok_or(VerifyError::EmptySignature)?;
 
         aggregated_sig

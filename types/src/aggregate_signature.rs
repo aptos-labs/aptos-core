@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::lazy_bls::LazyBlsSignature;
 use aptos_bitvec::BitVec;
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, CryptoMaterialError};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -12,10 +13,17 @@ use std::collections::BTreeMap;
 /// it stores a bit mask representing the set of validators participating in the signing process
 /// and the multi-signature/aggregated signature itself,
 /// which was aggregated from these validators' partial BLS signatures.
+///
+/// The aggregated signature is stored lazily as compressed bytes
+/// ([`LazyBlsSignature`]): its G2 point is only decompressed when actually
+/// needed for verification (via [`AggregateSignature::decompressed_sig`]), after
+/// cheaper structural checks have run. This bounds the per-message CPU work a
+/// peer-supplied payload can force on the receiver. The on-wire encoding is
+/// byte-identical to storing a `bls12381::Signature` directly.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregateSignature {
     validator_bitmask: BitVec,
-    sig: Option<bls12381::Signature>,
+    sig: Option<LazyBlsSignature>,
 }
 
 impl AggregateSignature {
@@ -25,7 +33,9 @@ impl AggregateSignature {
     ) -> Self {
         Self {
             validator_bitmask,
-            sig: aggregated_signature,
+            sig: aggregated_signature
+                .as_ref()
+                .map(LazyBlsSignature::from_signature),
         }
     }
 
@@ -61,8 +71,19 @@ impl AggregateSignature {
         self.validator_bitmask.count_ones() as usize
     }
 
-    pub fn sig(&self) -> &Option<bls12381::Signature> {
+    /// The aggregated signature in its lazy, still-compressed form. Callers that
+    /// only need the raw bytes (e.g. API hex export) can use this without paying
+    /// for decompression.
+    pub fn sig(&self) -> &Option<LazyBlsSignature> {
         &self.sig
+    }
+
+    /// Decompress the aggregated signature into a `bls12381::Signature`,
+    /// performing the deferred G2-point decompression. Returns `Ok(None)` if no
+    /// signature is present. This is the verification entry point — call it only
+    /// after cheaper structural checks (bitmask, voting power) have passed.
+    pub fn decompressed_sig(&self) -> Result<Option<bls12381::Signature>, CryptoMaterialError> {
+        self.sig.as_ref().map(|s| s.decompress()).transpose()
     }
 }
 
