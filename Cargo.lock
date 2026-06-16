@@ -492,7 +492,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "warp",
 ]
 
 [[package]]
@@ -525,10 +524,10 @@ dependencies = [
  "hyper 0.14.28",
  "rand 0.7.3",
  "regex",
+ "reqwest 0.11.23",
+ "serde",
  "serde_json",
  "tokio",
- "warp",
- "warp-reverse-proxy",
 ]
 
 [[package]]
@@ -581,6 +580,21 @@ dependencies = [
  "poem-openapi-derive",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "aptos-axum-webserver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-logger",
+ "axum 0.7.5",
+ "axum-server",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -4072,6 +4086,7 @@ name = "aptos-rosetta"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "aptos-axum-webserver",
  "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
@@ -4082,7 +4097,7 @@ dependencies = [
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-types",
- "aptos-warp-webserver",
+ "axum 0.7.5",
  "bcs 0.1.4",
  "clap 4.5.60",
  "futures",
@@ -4094,8 +4109,9 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tower",
+ "tower-http 0.5.2",
  "url",
- "warp",
 ]
 
 [[package]]
@@ -6199,6 +6215,29 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "axum-server"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1ad46c3ec4e12f4a4b6835e173ba21c25e484c9d02b49770bf006ce5367c036"
+dependencies = [
+ "arc-swap",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "pin-project-lite",
+ "rustls 0.21.12",
+ "rustls-pemfile 2.1.1",
+ "tokio",
+ "tokio-rustls 0.24.1",
+ "tower",
+ "tower-service",
 ]
 
 [[package]]
@@ -11963,7 +12002,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.6.10",
  "tower",
- "tower-http",
+ "tower-http 0.2.5",
  "tracing",
 ]
 
@@ -19782,6 +19821,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower-http"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
+dependencies = [
+ "bitflags 2.11.0",
+ "bytes",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
 name = "tower-layer"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -20548,20 +20603,6 @@ dependencies = [
  "tokio-util 0.7.10",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "warp-reverse-proxy"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "948552bbb7a5fb4ba3169fd09b6c1ab53c1b2fdd82603295df550f7a1ec644c0"
-dependencies = [
- "hyper 0.14.28",
- "once_cell",
- "reqwest 0.11.23",
- "thiserror 1.0.69",
- "unicase",
- "warp",
 ]
 
 [[package]]
