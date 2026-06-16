@@ -239,10 +239,6 @@ fn main() {
         }),
         (
             LANDBLOCKING_AND_CONTINUOUS,
-            EntryPoints::APTTransferWithPermissionedSigner,
-        ),
-        (
-            LANDBLOCKING_AND_CONTINUOUS,
             EntryPoints::APTTransferWithMasterSigner,
         ),
         // long vectors with small elements

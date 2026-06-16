@@ -113,10 +113,8 @@ spec aptos_framework::vesting {
     }
 
     spec schema AbortsIfPermissionedSigner {
-        use aptos_framework::permissioned_signer;
+        // Deprecated: permissioned signers were never enabled, so there is no permission to check.
         s: signer;
-        let perm = VestPermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec stake_pool_address(vesting_contract_address: address): address {
@@ -540,10 +538,8 @@ spec aptos_framework::vesting {
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
         pragma verify_duration_estimate = 120;
-        aborts_if permissioned_signer::spec_is_permissioned_signer(admin);
         /// [high-level-req-9]
         aborts_if signer::address_of(admin) != vesting_contract.admin;
-        // include AbortsIfPermissionedSigner { s: admin };
     }
 
     spec assert_vesting_contract_exists(contract_address: address) {
@@ -642,7 +638,6 @@ spec aptos_framework::vesting {
         contract_address: address;
         admin: signer;
 
-        aborts_if permissioned_signer::spec_is_permissioned_signer(admin);
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if signer::address_of(admin) != vesting_contract.admin;

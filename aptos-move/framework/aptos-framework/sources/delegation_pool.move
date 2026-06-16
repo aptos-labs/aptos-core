@@ -124,7 +124,6 @@ module aptos_framework::delegation_pool {
     use aptos_framework::aptos_governance;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle, emit};
-    use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
     use aptos_framework::stake::get_operator;
     use aptos_framework::staking_config;
@@ -353,6 +352,7 @@ module aptos_framework::delegation_pool {
         allowlist: SmartTable<address, bool>,
     }
 
+    #[deprecated]
     enum DelegationPermission has copy, drop, store {
         DelegationPoolManagementPermission,
         StakeManagementPermission,
@@ -834,26 +834,20 @@ module aptos_framework::delegation_pool {
     }
 
     /// Permissions
-    inline fun check_delegation_pool_management_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, DelegationPermission::DelegationPoolManagementPermission {}),
-            error::permission_denied(ENO_DELEGATION_PERMISSION),
-        );
+    /// Deprecated. Permissioned signers were never enabled, so every signer has this permission.
+    inline fun check_delegation_pool_management_permission(_s: &signer) {}
+
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_delegation_pool_management_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_DELEGATION_PERMISSION)
     }
 
-    public fun grant_delegation_pool_management_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, DelegationPermission::DelegationPoolManagementPermission {})
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer has this permission.
+    inline fun check_stake_management_permission(_s: &signer) {}
 
-    inline fun check_stake_management_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, DelegationPermission::StakeManagementPermission {}),
-            error::permission_denied(ENO_DELEGATION_PERMISSION),
-        );
-    }
-
-    public fun grant_stake_management_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, DelegationPermission::StakeManagementPermission {})
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_stake_management_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_DELEGATION_PERMISSION)
     }
 
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.

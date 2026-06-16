@@ -33,10 +33,8 @@ spec aptos_framework::aptos_governance {
     }
 
     spec schema AbortsIfPermissionedSigner {
-        use aptos_framework::permissioned_signer;
+        // Deprecated: permissioned signers were never enabled, so there is no permission to check.
         s: signer;
-        let perm = GovernancePermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec store_signer_cap(

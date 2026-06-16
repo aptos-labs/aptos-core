@@ -1,27 +1,23 @@
 module aptos_framework::staking_proxy {
     use std::error;
     use std::signer;
-    use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::vesting;
 
+    #[deprecated]
     struct StakeProxyPermission has copy, drop, store {}
 
     /// Signer does not have permission to perform stake proxy logic.
     const ENO_STAKE_PERMISSION: u64 = 28;
 
     /// Permissions
-    inline fun check_stake_proxy_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, StakeProxyPermission {}),
-            error::permission_denied(ENO_STAKE_PERMISSION),
-        );
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer has this permission.
+    inline fun check_stake_proxy_permission(_s: &signer) {}
 
-    /// Grant permission to mutate staking on behalf of the master signer.
-    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, StakeProxyPermission {})
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_STAKE_PERMISSION)
     }
 
     public entry fun set_operator(owner: &signer, old_operator: address, new_operator: address) {

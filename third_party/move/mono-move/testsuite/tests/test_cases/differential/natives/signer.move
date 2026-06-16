@@ -7,20 +7,10 @@
 module 0x1::create_signer {
     public native fun create_signer(addr: address): signer;
 }
-module 0x1::permissioned_signer {
-    public native fun is_permissioned_signer_impl(s: &signer): bool;
-}
 module 0x1::main {
     public fun roundtrip(addr: address): address {
         let s = 0x1::create_signer::create_signer(addr);
         *std::signer::borrow_address(&s)
-    }
-
-    // A signer made by `create_signer` is a master (non-permissioned) signer,
-    // so this is always false.
-    public fun is_permissioned(addr: address): bool {
-        let s = 0x1::create_signer::create_signer(addr);
-        0x1::permissioned_signer::is_permissioned_signer_impl(&s)
     }
 
     public fun eq(a: address, b: address): bool {
@@ -50,9 +40,6 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::roundtrip --args 0x123456789abcdef
 // CHECK: results: 0x123456789abcdef
-
-// RUN: execute 0x1::main::is_permissioned --args 0xcafe
-// CHECK: results: false
 
 // RUN: execute 0x1::main::eq --args 0xcafe, 0xcafe
 // CHECK: results: true

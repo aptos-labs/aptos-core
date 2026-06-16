@@ -35,7 +35,6 @@ module aptos_framework::voting {
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
-    use aptos_framework::permissioned_signer;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
     use aptos_std::from_bcs;
@@ -192,19 +191,16 @@ module aptos_framework::voting {
         num_votes: u64,
     }
 
+    #[deprecated]
     struct VotePermission has copy, drop, store {}
 
     /// Permissions
-    inline fun check_vote_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, VotePermission {}),
-            error::permission_denied(ENO_VOTE_PERMISSION),
-        );
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer can vote.
+    inline fun check_vote_permission(_s: &signer) {}
 
-    /// Grant permission to vote on behalf of the master signer.
-    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, VotePermission {})
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_VOTE_PERMISSION)
     }
 
     public fun register<ProposalType: store>(account: &signer) {

@@ -45,7 +45,7 @@ module aptos_framework::object_code_deployment {
     const ENOT_CODE_OBJECT_OWNER: u64 = 2;
     /// `code_object` does not exist.
     const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 3;
-    /// Current permissioned signer cannot deploy object code.
+    /// Deprecated. Code publishing permission (permissioned signer) was never enabled.
     const ENO_CODE_PERMISSION: u64 = 4;
 
     const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: vector<u8> = b"aptos_framework::object_code_deployment";

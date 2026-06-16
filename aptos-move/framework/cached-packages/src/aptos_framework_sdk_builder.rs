@@ -959,13 +959,12 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
-    /// Revoke all storable permission handle of the signer immediately.
+    /// Deprecated. Permissioned signers were never enabled. Aborts.
     PermissionedSignerRevokeAllHandles {},
 
-    /// Revoke a specific storable permission handle immediately. This will disallow owner of
-    /// the storable permission handle to derive signer from it anymore.
+    /// Deprecated. Permissioned signers were never enabled. Aborts.
     PermissionedSignerRevokePermissionStorageAddress {
-        permissions_storage_addr: AccountAddress,
+        _permissions_storage_addr: AccountAddress,
     },
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -1849,8 +1848,8 @@ impl EntryFunctionCall {
             } => object_code_deployment_publish(metadata_serialized, code),
             PermissionedSignerRevokeAllHandles {} => permissioned_signer_revoke_all_handles(),
             PermissionedSignerRevokePermissionStorageAddress {
-                permissions_storage_addr,
-            } => permissioned_signer_revoke_permission_storage_address(permissions_storage_addr),
+                _permissions_storage_addr,
+            } => permissioned_signer_revoke_permission_storage_address(_permissions_storage_addr),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -4546,7 +4545,7 @@ pub fn object_code_deployment_publish(
     ))
 }
 
-/// Revoke all storable permission handle of the signer immediately.
+/// Deprecated. Permissioned signers were never enabled. Aborts.
 pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4562,10 +4561,9 @@ pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
     ))
 }
 
-/// Revoke a specific storable permission handle immediately. This will disallow owner of
-/// the storable permission handle to derive signer from it anymore.
+/// Deprecated. Permissioned signers were never enabled. Aborts.
 pub fn permissioned_signer_revoke_permission_storage_address(
-    permissions_storage_addr: AccountAddress,
+    _permissions_storage_addr: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4577,7 +4575,7 @@ pub fn permissioned_signer_revoke_permission_storage_address(
         ),
         ident_str!("revoke_permission_storage_address").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&permissions_storage_addr).unwrap()],
+        vec![bcs::to_bytes(&_permissions_storage_addr).unwrap()],
     ))
 }
 
@@ -7102,7 +7100,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::PermissionedSignerRevokePermissionStorageAddress {
-                    permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
         } else {

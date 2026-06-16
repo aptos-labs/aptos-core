@@ -23,10 +23,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
     int256,
-    value::{
-        self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
-        PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
-    },
+    value::{self, MoveStructLayout, MoveTypeLayout},
     vm_status::{
         sub_status::{
             unknown_invariant_violation::EINDEXED_REF_TAG_MISMATCH, NFE_VECTOR_ERROR_BASE,
@@ -392,9 +389,10 @@ pub struct StructRef(ContainerRef);
 pub struct Reference(ReferenceImpl);
 
 // A reference to a signer. Clients can attempt a cast to this struct if they are
-// expecting a Signer on the stack or as an argument.
+// expecting a Signer on the stack or as an argument. A signer is represented as a bare address,
+// so a reference to it is an indexed reference into the containing locals/vector.
 #[derive(Debug)]
-pub struct SignerRef(ContainerRef);
+pub struct SignerRef(IndexedRef);
 
 // A reference to a vector. This is an alias for a ContainerRef for now but we may change
 // it once Containers are restructured.
@@ -593,13 +591,6 @@ impl Container {
                     .with_message("expected struct enum container".to_string()),
             ),
         }
-    }
-
-    fn master_signer(x: AccountAddress) -> Self {
-        Container::Struct(NestedValues::new(vec![
-            Value::U16(MASTER_SIGNER_VARIANT),
-            Value::Address(Box::new(x)),
-        ]))
     }
 }
 
@@ -2509,42 +2500,9 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        // The signer is internally represented as an enum (Master or Permissioned), but both
-        // variants store the account address at index 1. Thus, we can access it without checking
-        // the variant tag.
-        self.0.borrow_elem(MASTER_ADDRESS_FIELD_OFFSET, None)
-    }
-
-    pub fn is_permissioned(&self) -> PartialVMResult<bool> {
-        match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => {
-                Ok(*s.borrow()[0].as_value_ref::<u16>()? == PERMISSIONED_SIGNER_VARIANT)
-            },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("unexpected signer value: {:?}", self)),
-            ),
-        }
-    }
-
-    /// Get the permission address associated with a signer.
-    /// Needs to make sure the signer passed in is a permissioned signer.
-    pub fn permission_address(&self) -> PartialVMResult<Value> {
-        match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
-                *s.borrow()
-                    .get(PERMISSION_ADDRESS_FIELD_OFFSET)
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(format!("unexpected signer value: {:?}", self))
-                    })?
-                    .as_value_ref::<AccountAddress>()?,
-            )),
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("unexpected signer value: {:?}", self)),
-            ),
-        }
+        // A signer is a bare address, so a reference to the signer is already a reference to its
+        // address.
+        Ok(Value::IndexedRef(self.0.copy_by_ref()))
     }
 }
 
@@ -2725,20 +2683,20 @@ impl Value {
     }
 
     pub fn master_signer(x: AccountAddress) -> Self {
-        Value::Container(Container::master_signer(x))
-    }
-
-    pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
-            Value::address(x),
-            Value::address(perm_storage_address),
-        ]))
+        Value::Address(Box::new(x))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
-    /// execute function
+    /// execute function. A signer is a bare address, so this is an indexed reference into a fresh
+    /// single-element locals container holding the address.
     pub fn master_signer_reference(x: AccountAddress) -> Self {
-        Value::ContainerRef(ContainerRef::Local(Container::master_signer(x)))
+        Value::IndexedRef(IndexedRef {
+            idx: 0,
+            container_ref: ContainerRef::Local(Container::Locals(NestedValues::new(vec![
+                Value::Address(Box::new(x)),
+            ]))),
+            tag: None,
+        })
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -3072,7 +3030,7 @@ impl VMValueCast<SignerRef> for Value {
     #[cfg_attr(feature = "inline-vm-casts", inline)]
     fn cast(self) -> PartialVMResult<SignerRef> {
         match self {
-            Value::ContainerRef(r) => Ok(SignerRef(r)),
+            Value::IndexedRef(r) => Ok(SignerRef(r)),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to Signer reference", v,))),
         }
@@ -3873,12 +3831,11 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::I256, Container::VecI256(_))
         | (Type::Bool, Container::VecBool(_))
         | (Type::Address, Container::VecAddress(_))
-        | (Type::Signer, Container::Struct(_)) => Ok(()),
+        | (Type::Signer, Container::VecAddress(_)) => Ok(()),
 
         (Type::Vector(_), Container::Vec(_)) => Ok(()),
 
         (Type::Struct { .. }, Container::Vec(_))
-        | (Type::Signer, Container::Vec(_))
         | (Type::StructInstantiation { .. }, Container::Vec(_))
         | (Type::Function { .. }, Container::Vec(_)) => Ok(()),
 
@@ -5357,45 +5314,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                 }
             },
 
-            // Signer.
-            (L::Signer, Value::Container(Container::Struct(r))) => {
-                if self.ctx.legacy_signer {
-                    // Only allow serialization of master signer.
-                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
-                        invariant_violation::<S>(format!(
-                            "First field of a signer needs to be an enum descriminator, got {:?}",
-                            self.value
-                        ))
-                    })? != MASTER_SIGNER_VARIANT
-                    {
-                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
-                    }
-                    r.borrow()
-                        .get(MASTER_ADDRESS_FIELD_OFFSET)
-                        .ok_or_else(|| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .as_value_ref::<AccountAddress>()
-                        .map_err(|_| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .serialize(serializer)
-                } else {
-                    (SerializationReadyValue {
-                        ctx: self.ctx,
-                        layout: &MoveStructLayout::signer_serialization_layout(),
-                        value: &*r.borrow(),
-                        depth: self.depth,
-                    })
-                    .serialize(serializer)
-                }
-            },
+            // Signer. A signer is a bare address and serializes identically to one.
+            (L::Signer, Value::Address(a)) => a.serialize(serializer),
 
             // Delayed values. For their serialization, we must have custom
             // serialization available, otherwise an error is returned.
@@ -5558,15 +5478,14 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
             L::Address => AccountAddress::deserialize(deserializer).map(Value::address),
             L::Signer => {
                 if self.ctx.legacy_signer {
+                    // Preserve the legacy behaviour where signers cannot be deserialized from
+                    // bytes (e.g. `aptos_std::from_bytes<signer>` aborts).
                     Err(D::Error::custom(
                         "Cannot deserialize signer into value".to_string(),
                     ))
                 } else {
-                    let seed = DeserializationSeed {
-                        ctx: self.ctx,
-                        layout: &MoveStructLayout::signer_serialization_layout(),
-                    };
-                    Ok(Value::struct_(seed.deserialize(deserializer)?))
+                    // A signer is a bare address.
+                    AccountAddress::deserialize(deserializer).map(Value::address)
                 }
             },
 
@@ -6550,13 +6469,7 @@ impl Value {
                 Container::Locals(_) => panic!("got locals container when converting vec"),
             }),
 
-            (L::Signer, Value::Container(Container::Struct(r))) => {
-                let v = r.borrow();
-                match &v[MASTER_ADDRESS_FIELD_OFFSET] {
-                    Value::Address(a) => MoveValue::Signer(**a),
-                    v => panic!("Unexpected non-address while converting signer: {:?}", v),
-                }
-            },
+            (L::Signer, Value::Address(a)) => MoveValue::Signer(**a),
 
             (L::Function, Value::ClosureValue(closure)) => {
                 use better_any::TidExt;

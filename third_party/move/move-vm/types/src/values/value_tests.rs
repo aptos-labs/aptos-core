@@ -176,8 +176,8 @@ fn test_mem_swap() -> PartialVMResult<()> {
     // -- Container of container
     locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])))?;
     locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])))?;
-    locals.store_loc(10, Value::master_signer(AccountAddress::ZERO))?;
-    locals.store_loc(11, Value::master_signer(AccountAddress::ONE))?;
+    locals.store_loc(10, Value::struct_(Struct::pack(vec![Value::u16(6)])))?;
+    locals.store_loc(11, Value::struct_(Struct::pack(vec![Value::u16(7)])))?;
 
     // -- Container of vector
     locals.store_loc(
@@ -194,11 +194,11 @@ fn test_mem_swap() -> PartialVMResult<()> {
     )?;
     locals.store_loc(
         14,
-        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ZERO)]).unwrap(),
+        Value::vector_unchecked(vec![Value::struct_(Struct::pack(vec![Value::u16(8)]))]).unwrap(),
     )?;
     locals.store_loc(
         15,
-        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ONE)]).unwrap(),
+        Value::vector_unchecked(vec![Value::struct_(Struct::pack(vec![Value::u16(9)]))]).unwrap(),
     )?;
 
     let mut locals2 = Locals::new(2);

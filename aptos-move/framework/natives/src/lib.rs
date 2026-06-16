@@ -18,7 +18,6 @@ pub mod function_info;
 pub mod hash;
 pub mod object;
 pub mod object_code_deployment;
-pub mod permissioned_signer;
 pub mod randomness;
 pub mod state_storage;
 pub mod storage_slot;
@@ -102,10 +101,6 @@ pub fn all_natives(
     add_natives_from_module!(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)
-    );
-    add_natives_from_module!(
-        "permissioned_signer",
-        permissioned_signer::make_all(builder)
     );
     add_natives_from_module!(
         "account_abstraction",

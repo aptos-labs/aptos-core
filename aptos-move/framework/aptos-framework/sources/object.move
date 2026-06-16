@@ -26,7 +26,6 @@ module aptos_framework::object {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
     use aptos_framework::guid;
-    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
@@ -164,7 +163,8 @@ module aptos_framework::object {
         self: address,
     }
 
-    /// Permission to transfer object with permissioned signer.
+    #[deprecated]
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed.
     struct TransferPermission has copy, drop, store {
         object: address,
     }
@@ -571,10 +571,6 @@ module aptos_framework::object {
         to: address,
     ) {
         let owner_address = signer::address_of(owner);
-        assert!(
-            permissioned_signer::check_permission_exists(owner, TransferPermission { object }),
-            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
-        );
         verify_ungated_and_descendant(owner_address, object);
         transfer_raw_inner(object, to);
     }
@@ -657,10 +653,6 @@ module aptos_framework::object {
     ) {
         let object_addr = object.inner;
         assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
-        assert!(
-            permissioned_signer::check_permission_exists(original_owner, TransferPermission { object: object_addr }),
-            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
-        );
 
         // The new owner of the object can always unburn it, but if it's the burn address, we go to the old functionality
         let object_core = borrow_global<ObjectCore>(object_addr);
@@ -751,28 +743,21 @@ module aptos_framework::object {
         obj_owner
     }
 
-    /// Master signer offers a transfer permission of an object to a permissioned signer.
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
     public fun grant_permission<T>(
-        master: &signer,
-        permissioned_signer: &signer,
-        object: Object<T>,
+        _master: &signer,
+        _permissioned_signer: &signer,
+        _object: Object<T>,
     ) {
-        permissioned_signer::authorize_unlimited(
-            master,
-            permissioned_signer,
-            TransferPermission { object: object.inner }
-        )
+        abort error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
     }
 
-    /// Grant a transfer permission to the permissioned signer using TransferRef.
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
     public fun grant_permission_with_transfer_ref(
-        permissioned_signer: &signer,
-        ref: &TransferRef,
+        _permissioned_signer: &signer,
+        _ref: &TransferRef,
     ) {
-        permissioned_signer::grant_unlimited_with_permissioned_signer(
-            permissioned_signer,
-            TransferPermission { object: ref.self }
-        )
+        abort error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
     }
 
     #[test_only]
@@ -1191,68 +1176,6 @@ module aptos_framework::object {
 
     #[test_only]
     use aptos_framework::timestamp;
-
-    #[test(creator = @0x123)]
-    fun test_transfer_permission_e2e(
-        creator: &signer,
-    ) {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let (_, hero) = create_hero(creator);
-        let (_, weapon) = create_weapon(creator);
-
-        // Create a permissioned signer
-        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
-        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
-
-        // Grant aaron_permission_signer permission to transfer weapon object
-        grant_permission(creator, &creator_permission_signer, weapon);
-        transfer_to_object(&creator_permission_signer, weapon, hero);
-
-        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
-    }
-
-    #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_transfer_no_permission(
-        creator: &signer,
-    ) {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let (_, hero) = create_hero(creator);
-        let (_, weapon) = create_weapon(creator);
-
-        // Create a permissioned signer
-        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
-        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
-
-        transfer_to_object(&creator_permission_signer, weapon, hero);
-
-        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
-    }
-
-    #[test(creator = @0x123)]
-    fun test_create_and_transfer(
-        creator: &signer,
-    ) {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let (_, hero) = create_hero(creator);
-        let (weapon_ref, weapon) = create_weapon(creator);
-        let t_ref = weapon_ref.generate_transfer_ref();
-
-        // Create a permissioned signer
-        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
-        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
-
-        grant_permission_with_transfer_ref(&creator_permission_signer, &t_ref);
-        transfer_to_object(&creator_permission_signer, weapon, hero);
-
-        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
-    }
 
     #[test_only]
     struct TestOnchainSigner has key {

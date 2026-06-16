@@ -53,7 +53,6 @@ module aptos_framework::vesting {
     use aptos_framework::staking_contract;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
-    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::genesis;
 
@@ -91,7 +90,7 @@ module aptos_framework::vesting {
     const EPERMISSION_DENIED: u64 = 15;
     /// Zero items were provided to a *_many function.
     const EVEC_EMPTY_FOR_MANY_FUNCTION: u64 = 16;
-    /// Current permissioned signer cannot perform vesting operations.
+    /// Deprecated. Vesting permission (permissioned signer) was never enabled.
     const ENO_VESTING_PERMISSION: u64 = 17;
 
     /// Maximum number of shareholders a vesting pool can support.
@@ -331,20 +330,17 @@ module aptos_framework::vesting {
         amount: u64,
     }
 
+    #[deprecated]
     /// Permissions to mutate the vesting config for a given account.
     struct VestPermission has copy, drop, store {}
 
     /// Permissions
-    inline fun check_vest_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, VestPermission {}),
-            error::permission_denied(ENO_VESTING_PERMISSION),
-        );
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer has this permission.
+    inline fun check_vest_permission(_s: &signer) {}
 
-    /// Grant permission to perform vesting operations on behalf of the master signer.
-    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, VestPermission {})
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_VESTING_PERMISSION)
     }
 
     #[view]
