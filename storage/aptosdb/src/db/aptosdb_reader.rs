@@ -557,7 +557,11 @@ impl DbReader for AptosDB {
         use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         gauged_api("get_state_proof_by_version_ext", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
+            if use_hot_state {
+                self.error_if_hot_state_merkle_pruned("Hot state merkle", version)?;
+            } else {
+                self.error_if_state_merkle_pruned("State merkle", version)?;
+            }
 
             self.state_store.get_state_proof_by_version_ext(
                 key_hash,
@@ -589,9 +593,8 @@ impl DbReader for AptosDB {
         root_depth: usize,
     ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
         gauged_api("get_hot_state_value_with_proof_by_version_ext", || {
-            // TODO(HotState): check `hot_state_kv_pruner` / `hot_state_merkle_pruner` instead.
-            self.error_if_state_kv_pruned("HotStateValue", version)?;
-            self.error_if_state_merkle_pruned("State merkle", version)?;
+            self.error_if_hot_state_kv_pruned("HotStateValue", version)?;
+            self.error_if_hot_state_merkle_pruned("Hot state merkle", version)?;
 
             self.state_store
                 .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
