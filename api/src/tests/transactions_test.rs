@@ -2181,7 +2181,7 @@ async fn test_submit_transaction_rejects_invalid_content_type(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .header("content-type", "invalid")
         .method("POST")
         .body("text")
@@ -2208,7 +2208,7 @@ async fn test_submit_transaction_rejects_invalid_json(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .header("content-type", "application/json")
         .method("POST")
         .body("invalid json")
@@ -2252,7 +2252,7 @@ async fn test_create_signing_message_rejects_invalid_content_type(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .header("content-type", "invalid")
         .method("POST")
         .body("text")
@@ -2279,7 +2279,7 @@ async fn test_create_signing_message_rejects_invalid_json(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .header("content-type", "application/json")
         .method("POST")
         .body("invalid json")

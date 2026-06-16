@@ -490,7 +490,7 @@ async fn test_get_account_resources_with_pagination() {
     // be true if for some reason the account used in this test has more than
     // the default max page size for resources (1000 at the time of writing,
     // based on config/src/config/api_config.rs).
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("GET")
         .path(&format!("/v1{}", account_resources(address)));
     let resp = context.reply(req).await;
@@ -505,7 +505,7 @@ async fn test_get_account_resources_with_pagination() {
     // page of results. Assert we can deserialize the string representation
     // of the cursor returned in the header.
     // FIXME: Pagination seems to be off by one (change 4 to 5 below and see what happens).
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("GET")
         .path(&format!("/v1{}?limit=4", account_resources(address)));
     let resp = context.reply(req).await;
@@ -528,11 +528,13 @@ async fn test_get_account_resources_with_pagination() {
     assert_eq!(resources, all_resources[0..4].to_vec());
 
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=5&start={}",
-        account_resources(address),
-        cursor_header
-    ));
+    let req = aptos_api_test_context::request()
+        .method("GET")
+        .path(&format!(
+            "/v1{}?limit=5&start={}",
+            account_resources(address),
+            cursor_header
+        ));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 200);
     let cursor_header = resp
@@ -545,11 +547,13 @@ async fn test_get_account_resources_with_pagination() {
     assert_eq!(resources, all_resources[4..9].to_vec());
 
     // Get the rest of the resources, assert there is no cursor now.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=1000&start={}",
-        account_resources(address),
-        cursor_header
-    ));
+    let req = aptos_api_test_context::request()
+        .method("GET")
+        .path(&format!(
+            "/v1{}?limit=1000&start={}",
+            account_resources(address),
+            cursor_header
+        ));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 200);
     assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
@@ -570,7 +574,7 @@ async fn test_get_account_modules_with_pagination() {
     // be true if for some reason the account used in this test has more than
     // the default max page size for modules (1000 at the time of writing,
     // based on config/src/config/api_config.rs).
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("GET")
         .path(&format!("/v1{}", account_modules(address)));
     let resp = context.reply(req).await;
@@ -584,7 +588,7 @@ async fn test_get_account_modules_with_pagination() {
     // Make a request, assert we get a cursor back in the header for the next
     // page of results. Assert we can deserialize the string representation
     // of the cursor returned in the header.
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("GET")
         .path(&format!("/v1{}?limit=5", account_modules(address)));
     let resp = context.reply(req).await;
@@ -599,11 +603,13 @@ async fn test_get_account_modules_with_pagination() {
     assert_eq!(modules, all_modules[0..5].to_vec());
 
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=5&start={}",
-        account_modules(address),
-        cursor_header
-    ));
+    let req = aptos_api_test_context::request()
+        .method("GET")
+        .path(&format!(
+            "/v1{}?limit=5&start={}",
+            account_modules(address),
+            cursor_header
+        ));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 200);
     let cursor_header = resp
@@ -616,11 +622,13 @@ async fn test_get_account_modules_with_pagination() {
     assert_eq!(modules, all_modules[5..10].to_vec());
 
     // Get the rest of the modules, assert there is no cursor now.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=1000&start={}",
-        account_modules(address),
-        cursor_header
-    ));
+    let req = aptos_api_test_context::request()
+        .method("GET")
+        .path(&format!(
+            "/v1{}?limit=1000&start={}",
+            account_modules(address),
+            cursor_header
+        ));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 200);
     assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
@@ -635,24 +643,26 @@ async fn test_get_account_items_limit_params() {
     let address = "0x1";
 
     // Ensure limit=0 is rejected.
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("GET")
         .path(&format!("/v1{}?limit=0", account_resources(address)));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 400);
 
     // Ensure limit=0 is rejected.
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("GET")
         .path(&format!("/v1{}?limit=0", account_modules(address)));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 400);
 
     // Ensure garbage start param values are rejected.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?start=iwouldnotsurviveavibecheckrightnow",
-        account_modules(address)
-    ));
+    let req = aptos_api_test_context::request()
+        .method("GET")
+        .path(&format!(
+            "/v1{}?start=iwouldnotsurviveavibecheckrightnow",
+            account_modules(address)
+        ));
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 400);
 }

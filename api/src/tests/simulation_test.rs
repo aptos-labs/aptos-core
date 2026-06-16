@@ -70,7 +70,7 @@ async fn simulate_aptos_transfer(
             request["replay_protection_nonce"] = json!(nonce.to_string());
         }
 
-        let req = warp::test::request()
+        let req = aptos_api_test_context::request()
             .method("POST")
             .path("/v1/transactions/simulate")
             .json(&request);
