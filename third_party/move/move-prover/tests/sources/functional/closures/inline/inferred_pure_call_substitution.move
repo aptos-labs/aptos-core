@@ -1,6 +1,4 @@
-// flag: --infer-lambda-specs
-//
-// `--infer-lambda-specs` also enables `SPEC_REWRITE_PURE_FUNS`, so a lambda
+// Spec inference also enables `SPEC_REWRITE_PURE_FUNS`, so a lambda
 // body that calls a pure helper inferences cleanly to
 // `ensures result == y + helper(c, 1)` rather than referencing
 // `result_of<helper>(c, 1)`. The caller's strong post then verifies.

@@ -1,7 +1,8 @@
-// In verify mode, lambdas passed to retained inline-opaque functions may modify
-// captured variables. The lambda lifter converts such captures into `&mut`
-// parameters: `|i| x = x + i` becomes a closure capturing `&mut x` over a lifted
-// function with body `*x = *x + i`. In normal compilation mode this is an error.
+// In verify mode, a lambda passed to a retained inline-opaque function may not
+// modify a captured variable: the lambda lifter rejects it (a captured variable
+// is passed by value, so a modification could not be observed by the caller). In
+// normal compilation the inline function is expanded, so the lambda is never
+// lifted and no error arises.
 module 0x42::retained_mut_capture {
 
     inline fun call_once(f: |u64|) {
@@ -19,22 +20,5 @@ module 0x42::retained_mut_capture {
     }
     spec caller {
         ensures result == 1;
-    }
-
-    struct S has copy, drop {
-        x: u64,
-        y: u64,
-    }
-
-    fun field_caller(): u64 {
-        let s = S { x: 1, y: 7 };
-        call_once(|i| s.x = s.x + i spec {
-            ensures s.x == old(s).x + i;
-            ensures s.y == old(s).y;
-        });
-        s.x + s.y
-    }
-    spec field_caller {
-        ensures result == 9;
     }
 }

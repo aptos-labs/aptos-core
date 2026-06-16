@@ -59,7 +59,7 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
     // Auto-infer specs for lifted lambdas before spec instrumentation reads them
     // (only in standard verify mode; inference mode runs SpecInferenceProcessor at
     // the end of the pipeline and would otherwise double-process).
-    if options.infer_lambda_specs && !options.inference {
+    if !options.no_infer_lambda_specs && !options.inference {
         processors.push(LambdaSpecInferenceProcessor::new());
     }
 

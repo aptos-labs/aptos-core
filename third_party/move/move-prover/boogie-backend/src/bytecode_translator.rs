@@ -1003,21 +1003,7 @@ impl<'env> BoogieTranslator<'env> {
                 .get(&(info.fun.to_qualified_id(), FunctionVariant::Baseline))
                 .map(|insts| !insts.is_empty())
                 .unwrap_or(false);
-            if Self::closure_has_mut_captures(self.env, info) {
-                // Closures capturing mutable references are restricted to appear
-                // directly as arguments of retained inline-opaque calls whose callees
-                // cannot leak function values through their result or a `&mut`
-                // parameter (enforced by the closure checker), and reference captures
-                // lack the `store` ability, so such a closure cannot outlive its call.
-                // Spec instrumentation models the captured locations at that call
-                // site; when a retained body is verified, its symbolic function
-                // parameter is handled by the parameter variant below. This concrete
-                // dispatcher branch is therefore unreachable from verified code.
-                emitln!(
-                    self.writer,
-                    "assume false; // unreachable: closure with `&mut` captures"
-                );
-            } else if fun_env.is_opaque() || !has_inline {
+            if fun_env.is_opaque() || !has_inline {
                 self.emit_opaque_closure_body(
                     info,
                     idx,
@@ -1886,12 +1872,6 @@ impl<'env> BoogieTranslator<'env> {
         kind: BehaviorKind,
     ) {
         let env = self.env;
-        if Self::closure_has_mut_captures(env, info) {
-            // No evaluator axiom: captured mutation post-values have no slot in the
-            // per-type evaluator. Behavioral predicates over such closures are
-            // translated directly at retained inline-opaque call sites.
-            return;
-        }
         let fun_env = env.get_function(info.fun.to_qualified_id());
         let callee_param_tys: Vec<Type> = fun_env
             .get_parameter_types()
@@ -2223,21 +2203,6 @@ impl<'env> BoogieTranslator<'env> {
                 body
             );
         }
-    }
-
-    /// Returns true if the closure captures any mutable reference. Such closures only
-    /// occur in verify mode for lambdas which modify captured variables, and are
-    /// restricted to appear directly as arguments of retained inline-opaque calls.
-    /// Their behavioral predicates are translated directly at those call sites (see
-    /// `SpecTranslator::translate_behavior_predicate`); the per-type evaluator has no
-    /// slots for captured mutation post-values and is not used for them.
-    fn closure_has_mut_captures(env: &GlobalEnv, info: &ClosureInfo) -> bool {
-        let fun_env = env.get_function(info.fun.to_qualified_id());
-        fun_env
-            .get_parameter_types()
-            .iter()
-            .enumerate()
-            .any(|(i, ty)| info.mask.is_captured(i) && ty.is_mutable_reference())
     }
 
     /// Generate per-function behavioral spec functions for closure target functions.
@@ -5970,10 +5935,7 @@ impl FunctionTranslator<'_> {
                         if self.try_reflection_call(writer, env, inst, &callee_env, &dest_str) {
                             // Special case of reflection call, code is generated
                         } else if let Closure(_, _, _, mask) = oper {
-                            // Special case of closure construction. This is a pure datatype
-                            // constructor application, so no implicit returns for `&mut`
-                            // sources are added (captured mutations are stored as values
-                            // inside the closure).
+                            // Special case of closure construction
                             let closure_ctor_name = boogie_closure_pack_name(
                                 env,
                                 &mid.qualified_inst(*fid, inst.clone()),
@@ -5982,7 +5944,7 @@ impl FunctionTranslator<'_> {
                             emitln!(
                                 writer,
                                 "{} := {}({});",
-                                dests.iter().cloned().map(str_local).join(","),
+                                dest_str,
                                 closure_ctor_name,
                                 args_str
                             );

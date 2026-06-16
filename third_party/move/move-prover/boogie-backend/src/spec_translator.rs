@@ -2080,8 +2080,8 @@ impl SpecTranslator<'_> {
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
         let num_params = fun_env.get_parameter_count();
         let num_explicit_results = fun_env.get_return_count();
-        let param_tys = fun_env.get_parameter_types();
-        let num_mut_refs = param_tys
+        let num_mut_refs = fun_env
+            .get_parameter_types()
             .iter()
             .filter(|ty| ty.is_mutable_reference())
             .count();
@@ -2107,27 +2107,9 @@ impl SpecTranslator<'_> {
             },
             // WriteOf(j): take the j-th `&mut` post-state slot. Only needed
             // when the multi Skolem is in play; with `total_outputs == 1`
-            // the scalar Skolem already returns that slot directly. `j` counts
-            // the `&mut` parameters of the closure *type* (i.e. non-captured),
-            // while the Skolem's post-state slots cover ALL `&mut` parameters
-            // in parameter order, including captured mutations; remap.
+            // the scalar Skolem already returns that slot directly.
             BehaviorKind::WriteOf(j) if multi_in_boogie => {
-                let mut non_captured_mut_count = 0;
-                let mut all_mut_count = 0;
-                let mut all_mut_idx = num_mut_refs; // out of range if not found
-                for (i, ty) in param_tys.iter().enumerate() {
-                    if ty.is_mutable_reference() {
-                        if !mask.is_captured(i) {
-                            if non_captured_mut_count == j {
-                                all_mut_idx = all_mut_count;
-                                break;
-                            }
-                            non_captured_mut_count += 1;
-                        }
-                        all_mut_count += 1;
-                    }
-                }
-                Some(ProjKind::Single(num_explicit_results + all_mut_idx))
+                Some(ProjKind::Single(num_explicit_results + j))
             },
             _ => None,
         };
@@ -2182,6 +2164,7 @@ impl SpecTranslator<'_> {
                 .get(&label)
                 .and_then(|e| e.first().map(|(v, _)| v.clone()))
         });
+        let param_tys = fun_env.get_parameter_types();
         let first_non_cap_mut_pos =
             (0..num_params).find(|&i| !mask.is_captured(i) && param_tys[i].is_mutable_reference());
 
@@ -2215,21 +2198,12 @@ impl SpecTranslator<'_> {
         // the per-function Skolem doesn't take them (post-state is in its
         // output tuple instead); skip them here.
         if kind == BehaviorKind::EnsuresOf {
-            // Post-state slots come after `num_explicit_results` result slots, one
-            // per `&mut` parameter in parameter order (captured mutations included,
-            // see `rewrite_behavior_preds_for_captured_muts`). The labeled post
-            // witness belongs to the first *non-captured* `&mut` parameter's slot,
-            // which captured mutation slots may precede.
-            let post_witness_idx = first_non_cap_mut_pos.map(|pos| {
-                num_explicit_results
-                    + param_tys[0..pos]
-                        .iter()
-                        .filter(|ty| ty.is_mutable_reference())
-                        .count()
-            });
             for (j, arg) in pred_args[non_captured_pos..].iter().enumerate() {
                 emit!(self.writer, ", ");
-                if Some(j) == post_witness_idx {
+                // Post-state clones come after `num_explicit_results` result
+                // slots; substitute the first post-state slot with the post
+                // witness if a labeled post range is in scope.
+                if j == num_explicit_results {
                     if let Some(ref var) = post_sub {
                         emit!(self.writer, "{}", var);
                         continue;

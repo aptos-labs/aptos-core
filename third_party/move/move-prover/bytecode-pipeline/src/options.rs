@@ -78,11 +78,11 @@ pub struct ProverOptions {
     /// Whether to run spec inference instead of verification.
     #[arg(skip)]
     pub inference: bool,
-    /// Auto-infer specs for lambda-lifted functions with empty user specs in verify
-    /// mode, so behavioral predicates over such lambdas carry useful information at
-    /// call sites instead of degrading to trivial values.
-    #[arg(long, default_value_t = false)]
-    pub infer_lambda_specs: bool,
+    /// Disable auto-inference of specs for lambda-lifted functions with empty user
+    /// specs in verify mode. Inference is on by default; without it, behavioral
+    /// predicates over such lambdas degrade to trivial values at call sites.
+    #[arg(long)]
+    pub no_infer_lambda_specs: bool,
     /// Do not add `pragma opaque` to inferred specs.
     #[arg(long)]
     pub no_inference_opaque: bool,
@@ -119,7 +119,7 @@ impl Default for ProverOptions {
             for_interpretation: false,
             skip_loop_analysis: false,
             inference: false,
-            infer_lambda_specs: false,
+            no_infer_lambda_specs: false,
             no_inference_opaque: false,
             borrow_natives: vec![],
             verify_exclude: vec![],

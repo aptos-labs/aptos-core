@@ -96,6 +96,7 @@
 use crate::{
     data_invariant_instrumentation::INVARIANT_FAILS_MESSAGE as DATA_INVARIANT_FAILS_MESSAGE,
     global_invariant_instrumentation::GLOBAL_INVARIANT_FAILS_MESSAGE, options::ProverOptions,
+    verification_analysis,
 };
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::CodeOffset;
@@ -657,6 +658,14 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
             return data;
         }
         if !fun_env.module_env.env.is_verify_mode() {
+            return data;
+        }
+        // Only infer for lambdas that are actually verified. The inferred spec is
+        // marked opaque and trusted at call sites through `ensures_of`/`aborts_of`,
+        // so the body must be checked against it; a lambda excluded from
+        // verification (narrow scope, `pragma verify = false`, `--verify-exclude`)
+        // must not contribute a trusted-but-unproven spec.
+        if !verification_analysis::get_info(&FunctionTarget::new(fun_env, &data)).verified {
             return data;
         }
         if !needs_inference(fun_env) {

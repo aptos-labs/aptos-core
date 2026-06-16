@@ -7,7 +7,9 @@
 //! - The closure satisfies the ability requirements of it's inferred type. For the
 //!   definition of closure abilities, see
 //!   [AIP-112](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-112.md).
-//! - The closure does not capture references, as this is currently not allowed.
+//! - The closure does not capture mutable references, and captures immutable
+//!   references only as a direct argument of a retained inline-opaque call in
+//!   verify mode (where the prover models the captured location).
 //! - In a script, the closure cannot have a lambda lifted function.
 //! ```
 
@@ -38,14 +40,14 @@ pub fn check_closures(env: &GlobalEnv) {
         let is_script_module = module_env.is_script_module();
         for fun_env in module_env.get_functions() {
             if let Some(def) = fun_env.get_def() {
-                // In verify mode, closures capturing references are admitted, but only
-                // when constructed directly as arguments of calls to retained
+                // In verify mode, closures capturing immutable references are admitted,
+                // but only when constructed directly as arguments of calls to retained
                 // inline-opaque functions: there, the captured locations are statically
-                // visible to the prover's spec instrumentation, which models their
-                // effects (havoc and `ensures_of` constraints). `ref_capture_allowed`
-                // collects the closure expressions in such positions; it is populated
-                // and consumed in one traversal, since a `Call(MoveFunction, ..)` is
-                // visited before its `Closure` argument in pre-order.
+                // visible to the prover's spec instrumentation, which models them as
+                // read-only snapshots. `ref_capture_allowed` collects the closure
+                // expressions in such positions; it is populated and consumed in one
+                // traversal, since a `Call(MoveFunction, ..)` is visited before its
+                // `Closure` argument in pre-order.
                 if env.is_verify_mode() {
                     check_retained_call_view_conflicts(env, &fun_env, def);
                 }
@@ -130,24 +132,47 @@ pub fn check_closures(env: &GlobalEnv) {
                         };
                         for captured in args {
                             let captured_ty = env.get_node_type(captured.node_id());
-                            if captured_ty.is_reference() && !ref_capture_allowed.contains(id) {
-                                // In verify mode, reference captures are admitted for
-                                // closures passed directly to retained inline-opaque
-                                // functions: the bytecode is never executed but only
-                                // translated for the prover (the VM rejects them in
-                                // regular compilation), and the prover models the
-                                // captured locations at those call sites.
-                                let mut msg = format!(
-                                    "captured value cannot be a reference, but has type `{}`{}",
-                                    captured_ty.display(&fun_env.get_type_display_ctx()),
-                                    wrapper_msg()
-                                );
-                                if env.is_verify_mode() {
-                                    msg += "; in verification, lambdas over references are \
-                                            only supported as direct arguments of calls to \
-                                            inline functions with `pragma opaque`";
+                            if captured_ty.is_reference() {
+                                // In verify mode, an immutable reference capture is
+                                // admitted for a closure passed directly as an argument
+                                // of a retained inline-opaque call: the bytecode is never
+                                // executed but only translated for the prover (the VM
+                                // rejects reference captures), and the prover models the
+                                // captured location at that call site as a read-only
+                                // snapshot. A mutable reference can never be captured:
+                                // since a function type `|T|R` is opaque about whether
+                                // its closure captured a `&mut`, the prover cannot model
+                                // writes through such a capture.
+                                let admitted = ref_capture_allowed.contains(id)
+                                    && !captured_ty.is_mutable_reference();
+                                if !admitted {
+                                    let msg = if ref_capture_allowed.contains(id) {
+                                        // Direct argument of a retained call, so the only
+                                        // problem is the mutability of the reference.
+                                        format!(
+                                            "captured value cannot be a mutable reference, but \
+                                             has type `{}`{}; in verification, lambdas may \
+                                             capture only immutable references",
+                                            captured_ty.display(&fun_env.get_type_display_ctx()),
+                                            wrapper_msg()
+                                        )
+                                    } else {
+                                        let mut msg = format!(
+                                            "captured value cannot be a reference, but has type \
+                                             `{}`{}",
+                                            captured_ty.display(&fun_env.get_type_display_ctx()),
+                                            wrapper_msg()
+                                        );
+                                        if env.is_verify_mode() {
+                                            msg += "; in verification, lambdas may capture only \
+                                                    immutable references, and only as direct \
+                                                    arguments of calls to inline functions with \
+                                                    `pragma opaque`";
+                                        }
+                                        msg
+                                    };
+                                    env.error(&env.get_node_loc(captured.node_id()), &msg)
                                 }
-                                env.error(&env.get_node_loc(captured.node_id()), &msg)
                             }
                             let arg_ty_abilities =
                                 env.type_abilities(&captured_ty, fun_env.get_type_parameters_ref());
@@ -205,12 +230,12 @@ enum RootVar {
 ///   may observe a sibling argument's mutation.
 ///
 /// Views are collected from direct `&`/`&mut` arguments, from the operands of closure
-/// arguments (borrows as produced by lambda lifting for modified captures, captured
-/// values, and the variables used in curried capture expressions), and from
-/// reference-typed locals with a statically visible borrow binding (`let r = &x;`).
-/// Direct non-reference arguments need no tracking (they are evaluated at call entry
-/// under both closure and expansion semantics), and neither do reference-typed
-/// parameters of the enclosing function (they cannot refer to its own locals).
+/// arguments (immutable borrows and captured values, including the variables used in
+/// curried capture expressions), and from reference-typed locals with a statically
+/// visible borrow binding (`let r = &x;`). Direct non-reference arguments need no
+/// tracking (they are evaluated at call entry under both closure and expansion
+/// semantics), and neither do reference-typed parameters of the enclosing function
+/// (they cannot refer to its own locals).
 fn check_retained_call_view_conflicts(env: &GlobalEnv, fun_env: &FunctionEnv, def: &Exp) {
     // Track simple reference bindings `let r = <borrow of root>` in a single
     // program-order pass, so each retained call below is checked against the

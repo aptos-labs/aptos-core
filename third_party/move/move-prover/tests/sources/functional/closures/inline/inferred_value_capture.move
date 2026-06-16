@@ -1,6 +1,4 @@
-// flag: --infer-lambda-specs
-//
-// A lambda without an explicit spec block: `--infer-lambda-specs` synthesizes
+// A lambda without an explicit spec block: spec inference synthesizes
 // `ensures result == y + c; aborts_if y + c > MAX_U64;` from the body, so the
 // behavioral predicate `ensures_of<f>(x, result)` in `apply`'s opaque spec
 // gives the caller enough information to prove `result == x + c`.

@@ -1,5 +1,3 @@
-// flag: --infer-lambda-specs
-//
 // When the lambda body is too complex for the WP analyzer to summarize
 // cleanly, the lambda's spec is left empty (silent skip) and behavioral
 // predicates over it degrade to trivial values. The caller's strong post

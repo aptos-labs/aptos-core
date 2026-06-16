@@ -1,5 +1,3 @@
-// flag: --infer-lambda-specs
-//
 // When the user writes a spec block on the lambda, inference must not append
 // or overwrite. The user's spec is what callers see; the body verifies against
 // it as today.

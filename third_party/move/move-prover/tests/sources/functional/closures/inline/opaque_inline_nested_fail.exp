@@ -1,6 +1,0 @@
-Move prover returns: exiting with bytecode transformation errors
-error: captured mutable reference must be a direct borrow of a local variable
-   ┌─ tests/sources/functional/closures/inline/opaque_inline_nested_fail.move:25:23
-   │
-25 │         call_outer(|| call_once(|i| x = x + i spec { ensures x == old(x) + i; }) // error: captured mutable reference must be a direct borrow
-   │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

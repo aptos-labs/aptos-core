@@ -130,11 +130,11 @@ pub struct ProverOptions {
     #[clap(long)]
     pub error_limit: Option<usize>,
 
-    /// Auto-infer specs for lambda-lifted functions with empty user specs in verify
-    /// mode, so behavioral predicates over such lambdas carry useful information at
-    /// call sites instead of degrading to trivial values.
-    #[clap(long, default_value_t = false)]
-    pub infer_lambda_specs: bool,
+    /// Disable auto-inference of specs for lambda-lifted functions with empty user
+    /// specs in verify mode. Inference is on by default; without it, behavioral
+    /// predicates over such lambdas degrade to trivial values at call sites.
+    #[clap(long)]
+    pub no_infer_lambda_specs: bool,
 
     /// Internal flag: use a temp dir for boogie output so parallel invocations
     /// don't interfere. Set automatically by test harnesses.
@@ -278,7 +278,8 @@ impl ProverOptions {
                 unconditional_abort_as_inconsistency: self.unconditional_abort_as_inconsistency
                     || base_opts.prover.unconditional_abort_as_inconsistency,
                 skip_loop_analysis: self.keep_loops || base_opts.prover.skip_loop_analysis,
-                infer_lambda_specs: self.infer_lambda_specs || base_opts.prover.infer_lambda_specs,
+                no_infer_lambda_specs: self.no_infer_lambda_specs
+                    || base_opts.prover.no_infer_lambda_specs,
                 ..base_opts.prover.clone()
             },
             backend: move_prover_boogie_backend::options::BoogieOptions {

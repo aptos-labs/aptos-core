@@ -1,5 +1,3 @@
-// flag: --infer-lambda-specs
-//
 // The lambda's inferred `aborts_if y + 1 > MAX_U64` propagates through the
 // opaque callee's `aborts_if aborts_of<f>(x);` to constrain the caller's
 // abort condition.

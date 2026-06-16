@@ -211,218 +211,6 @@ impl ClosureFunction {
     }
 }
 
-/// Captured variables which are modified by a lambda and therefore converted into
-/// `&mut` captures (verify mode only).
-#[derive(Default)]
-struct MutCaptures {
-    /// Converted captured locals, by symbol.
-    locals: BTreeSet<Symbol>,
-    /// Converted captured parameters of the enclosing function, by original index.
-    temps: BTreeSet<TempIndex>,
-}
-
-impl MutCaptures {
-    fn is_empty(&self) -> bool {
-        self.locals.is_empty() && self.temps.is_empty()
-    }
-}
-
-/// Rewrites the body of a lifted lambda for captured variables which are modified
-/// and have been converted into `&mut` parameters:
-/// - reads `x` become dereferences `*x`
-/// - assignments `x = e` become mutations `*x = e`
-/// - mutable borrows `&mut x` become the parameter `x` itself
-/// - immutable borrows `&x` become `freeze(x)`
-struct MutCaptureRewriter<'a> {
-    env: &'a GlobalEnv,
-    captures: &'a MutCaptures,
-    /// Local name scopes for shadowing detection.
-    scopes: Vec<BTreeSet<Symbol>>,
-}
-
-impl<'a> MutCaptureRewriter<'a> {
-    fn new(env: &'a GlobalEnv, captures: &'a MutCaptures) -> Self {
-        Self {
-            env,
-            captures,
-            scopes: vec![],
-        }
-    }
-
-    fn is_shadowed(&self, sym: &Symbol) -> bool {
-        self.scopes.iter().any(|scope| scope.contains(sym))
-    }
-
-    /// Returns true if this is an unshadowed reference to a converted variable.
-    fn is_converted_var(&self, exp: &ExpData) -> bool {
-        match exp {
-            ExpData::LocalVar(_, sym) => {
-                self.captures.locals.contains(sym) && !self.is_shadowed(sym)
-            },
-            ExpData::Temporary(_, idx) => self.captures.temps.contains(idx),
-            _ => false,
-        }
-    }
-
-    /// Creates a reference to the `&mut` parameter replacing the converted variable.
-    /// `var_id` is the node of the original variable reference (typed with the value
-    /// type), `ref_id` an optional node to reuse for the reference-typed expression.
-    fn make_param_ref(&self, var_exp: &ExpData, ref_id: Option<NodeId>) -> Exp {
-        let var_id = var_exp.node_id();
-        let id = ref_id.unwrap_or_else(|| {
-            let ty = Type::Reference(
-                ReferenceKind::Mutable,
-                Box::new(self.env.get_node_type(var_id)),
-            );
-            self.env.new_node(self.env.get_node_loc(var_id), ty)
-        });
-        match var_exp {
-            ExpData::LocalVar(_, sym) => ExpData::LocalVar(id, *sym).into_exp(),
-            ExpData::Temporary(_, idx) => ExpData::Temporary(id, *idx).into_exp(),
-            _ => unreachable!("expected variable"),
-        }
-    }
-
-    /// Returns true if the root of a selection chain (field selections, index
-    /// operations) is an unshadowed converted variable.
-    fn chain_root_is_converted(&self, exp: &Exp) -> bool {
-        self.is_converted_var(exp.as_ref().selection_chain_root(false))
-    }
-
-    /// Rewrites a mutation target (the lhs of `Mutate` or the operand of `&mut`)
-    /// whose selection chain is rooted in a converted variable: the variable is
-    /// replaced by the `&mut` parameter itself, so the mutation goes through the
-    /// reference. The default read rewrite (`x` to `*x`) must not be used here,
-    /// since it would mutate a dereferenced copy instead of the captured location.
-    fn rewrite_mutation_target(&mut self, exp: &Exp) -> Exp {
-        if self.is_converted_var(exp.as_ref()) {
-            return self.make_param_ref(exp.as_ref(), None);
-        }
-        match exp.as_ref() {
-            ExpData::Call(id, oper, args)
-                if matches!(
-                    oper,
-                    Operation::Select(..) | Operation::SelectVariants(..) | Operation::Index
-                ) =>
-            {
-                let mut new_args = vec![self.rewrite_mutation_target(&args[0])];
-                for arg in &args[1..] {
-                    new_args.push(self.rewrite_exp(arg.clone()));
-                }
-                ExpData::Call(*id, oper.clone(), new_args).into_exp()
-            },
-            _ => self.rewrite_exp(exp.clone()),
-        }
-    }
-}
-
-impl ExpRewriterFunctions for MutCaptureRewriter<'_> {
-    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        match exp.as_ref() {
-            ExpData::Mutate(id, lhs, rhs) if self.chain_root_is_converted(lhs) => {
-                // E.g. `s.x = e` for converted `s`: mutate through the parameter.
-                let new_lhs = self.rewrite_mutation_target(lhs);
-                let new_rhs = self.rewrite_exp(rhs.clone());
-                ExpData::Mutate(*id, new_lhs, new_rhs).into_exp()
-            },
-            ExpData::Assign(id, pat, rhs) => {
-                if let Pattern::Var(_, sym) = pat {
-                    if self.captures.locals.contains(sym) && !self.is_shadowed(sym) {
-                        // `x = e` becomes `*x = e`
-                        let rhs = self.rewrite_exp(rhs.clone());
-                        let lhs_ty = Type::Reference(
-                            ReferenceKind::Mutable,
-                            Box::new(self.env.get_node_type(pat.node_id())),
-                        );
-                        let lhs_id = self
-                            .env
-                            .new_node(self.env.get_node_loc(pat.node_id()), lhs_ty);
-                        return ExpData::Mutate(
-                            *id,
-                            ExpData::LocalVar(lhs_id, *sym).into_exp(),
-                            rhs,
-                        )
-                        .into_exp();
-                    }
-                } else if pat
-                    .vars()
-                    .iter()
-                    .any(|(_, sym)| self.captures.locals.contains(sym) && !self.is_shadowed(sym))
-                {
-                    self.env.error(
-                        &self.env.get_node_loc(*id),
-                        "modified captured variables are not yet supported in tuple or \
-                         struct assignments inside of a lambda",
-                    );
-                    return exp;
-                }
-                self.rewrite_exp_descent(exp)
-            },
-            ExpData::Call(id, Operation::Borrow(kind), args)
-                if args.len() == 1 && self.is_converted_var(args[0].as_ref()) =>
-            {
-                match kind {
-                    ReferenceKind::Mutable => {
-                        // `&mut x` becomes the parameter `x` itself; the borrow
-                        // node already has the right reference type.
-                        self.make_param_ref(args[0].as_ref(), Some(*id))
-                    },
-                    ReferenceKind::Immutable => {
-                        // `&x` becomes `freeze(x)`; the borrow node already has
-                        // the immutable reference type.
-                        let param_ref = self.make_param_ref(args[0].as_ref(), None);
-                        ExpData::Call(*id, Operation::Freeze(false), vec![param_ref]).into_exp()
-                    },
-                }
-            },
-            ExpData::Call(id, Operation::Borrow(ReferenceKind::Mutable), args)
-                if args.len() == 1 && self.chain_root_is_converted(&args[0]) =>
-            {
-                // E.g. `&mut s.x` for converted `s`: borrow through the parameter.
-                let new_target = self.rewrite_mutation_target(&args[0]);
-                ExpData::Call(*id, Operation::Borrow(ReferenceKind::Mutable), vec![
-                    new_target,
-                ])
-                .into_exp()
-            },
-            _ => self.rewrite_exp_descent(exp),
-        }
-    }
-
-    fn rewrite_enter_scope<'b>(
-        &mut self,
-        _id: NodeId,
-        vars: impl Iterator<Item = &'b (NodeId, Symbol)>,
-    ) {
-        self.scopes
-            .push(vars.map(|(_, sym)| sym).cloned().collect())
-    }
-
-    fn rewrite_exit_scope(&mut self, _id: NodeId) {
-        self.scopes.pop().expect("stack balanced");
-    }
-
-    fn rewrite_local_var(&mut self, node_id: NodeId, sym: Symbol) -> Option<Exp> {
-        if self.captures.locals.contains(&sym) && !self.is_shadowed(&sym) {
-            // Read `x` becomes `*x`.
-            let param_ref = self.make_param_ref(&ExpData::LocalVar(node_id, sym), None);
-            Some(ExpData::Call(node_id, Operation::Deref, vec![param_ref]).into_exp())
-        } else {
-            None
-        }
-    }
-
-    fn rewrite_temporary(&mut self, node_id: NodeId, idx: TempIndex) -> Option<Exp> {
-        if self.captures.temps.contains(&idx) {
-            // Read `x` becomes `*x`.
-            let param_ref = self.make_param_ref(&ExpData::Temporary(node_id, idx), None);
-            Some(ExpData::Call(node_id, Operation::Deref, vec![param_ref]).into_exp())
-        } else {
-            None
-        }
-    }
-}
-
 impl<'a> LambdaLifter<'a> {
     pub fn new(
         options: &'a LambdaLiftingOptions,
@@ -489,22 +277,14 @@ impl<'a> LambdaLifter<'a> {
         }
     }
 
-    /// For the current state, calculate: (params, closure_args, param_index_mapping, mut_captures),
-    /// where
+    /// For the current state, calculate: (params, closure_args, param_index_mapping), where
     /// - `params` = new Parameter for each free var to represent it in the lifted function
     /// - `closure_args` = corresponding expressions to provide as actual arg for each param
     /// - `param_index_mapping` = for each free var which is a Parameter from the enclosing function,
     ///    a mapping from index there to index in the params list
-    /// - `mut_captures` = captured variables which are modified by the lambda and therefore
-    ///    converted into `&mut` captures (verify mode only)
     fn get_params_for_freevars(
         &mut self,
-    ) -> Option<(
-        Vec<Parameter>,
-        Vec<Exp>,
-        BTreeMap<usize, usize>,
-        MutCaptures,
-    )> {
+    ) -> Option<(Vec<Parameter>, Vec<Exp>, BTreeMap<usize, usize>)> {
         let env = self.fun_env.module_env.env;
         let mut closure_args = vec![];
 
@@ -513,23 +293,14 @@ impl<'a> LambdaLifter<'a> {
         // functions (courtesy of #12317)
         let mut param_index_mapping = BTreeMap::new();
         let mut params = vec![];
-        let mut mut_captures = MutCaptures::default();
         let mut saw_error = false;
-
-        // In verify mode, captured variables which are modified by the lambda are
-        // converted into `&mut` captures: the lifted function takes a mutable
-        // reference and the closure captures a borrow of the variable. The body
-        // is rewritten accordingly (see `MutCaptureRewriter`). Outside of verify
-        // mode this is not supported, since the VM does not allow closures to
-        // capture references.
-        let allow_mutating_captures = env.is_verify_mode();
 
         for (used_param_count, (param, var_info)) in self.free_params.iter().enumerate() {
             let name = self.fun_env.get_local_name(*param);
             let var_node_id = var_info.node_id;
             let ty = env.get_node_type(var_node_id);
             let loc = env.get_node_loc(var_node_id);
-            if var_info.modified && !allow_mutating_captures {
+            if var_info.modified {
                 env.error(
                     &loc,
                     &format!(
@@ -539,29 +310,12 @@ impl<'a> LambdaLifter<'a> {
                 );
                 saw_error = true;
             }
-            if var_info.modified && allow_mutating_captures {
-                let ref_ty = Type::Reference(ReferenceKind::Mutable, Box::new(ty.clone()));
-                params.push(Parameter(name, ref_ty.clone(), loc.clone()));
-                let var_id = env.new_node(loc.clone(), ty);
-                if let Some(inst) = env.get_node_instantiation_opt(var_node_id) {
-                    env.set_node_instantiation(var_id, inst);
-                }
-                let borrow_id = env.new_node(loc, ref_ty);
-                closure_args.push(
-                    ExpData::Call(borrow_id, Operation::Borrow(ReferenceKind::Mutable), vec![
-                        ExpData::Temporary(var_id, *param).into_exp(),
-                    ])
-                    .into_exp(),
-                );
-                mut_captures.temps.insert(*param);
-            } else {
-                params.push(Parameter(name, ty.clone(), loc.clone()));
-                let new_id = env.new_node(loc, ty);
-                if let Some(inst) = env.get_node_instantiation_opt(var_node_id) {
-                    env.set_node_instantiation(new_id, inst);
-                }
-                closure_args.push(ExpData::Temporary(new_id, *param).into_exp());
+            params.push(Parameter(name, ty.clone(), loc.clone()));
+            let new_id = env.new_node(loc, ty);
+            if let Some(inst) = env.get_node_instantiation_opt(var_node_id) {
+                env.set_node_instantiation(new_id, inst);
             }
+            closure_args.push(ExpData::Temporary(new_id, *param).into_exp());
             param_index_mapping.insert(*param, used_param_count);
         }
 
@@ -570,7 +324,7 @@ impl<'a> LambdaLifter<'a> {
             let var_info_id = var_info.node_id;
             let ty = env.get_node_type(var_info_id);
             let loc = env.get_node_loc(var_info_id);
-            if var_info.modified && !allow_mutating_captures {
+            if var_info.modified {
                 env.error(
                     &loc,
                     &format!(
@@ -580,47 +334,16 @@ impl<'a> LambdaLifter<'a> {
                 );
                 saw_error = true;
             }
-            if var_info.modified && allow_mutating_captures {
-                if self.fun_env.get_parameters().iter().any(|p| p.0 == *name) {
-                    // Assignments to enclosing function parameters are tracked by
-                    // symbol while reads are tracked as temporaries; converting both
-                    // would create duplicate captures. Not yet supported.
-                    env.error(
-                        &loc,
-                        &format!(
-                            "captured parameter `{}` cannot be modified inside of a lambda",
-                            name.display(env.symbol_pool())
-                        ),
-                    );
-                    saw_error = true;
-                    continue;
-                }
-                let ref_ty = Type::Reference(ReferenceKind::Mutable, Box::new(ty.clone()));
-                params.push(Parameter(*name, ref_ty.clone(), loc.clone()));
-                let var_id = env.new_node(loc.clone(), ty);
-                if let Some(inst) = env.get_node_instantiation_opt(var_info_id) {
-                    env.set_node_instantiation(var_id, inst);
-                }
-                let borrow_id = env.new_node(loc, ref_ty);
-                closure_args.push(
-                    ExpData::Call(borrow_id, Operation::Borrow(ReferenceKind::Mutable), vec![
-                        ExpData::LocalVar(var_id, *name).into_exp(),
-                    ])
-                    .into_exp(),
-                );
-                mut_captures.locals.insert(*name);
-            } else {
-                params.push(Parameter(*name, ty.clone(), loc.clone()));
-                let new_id = env.new_node(loc, ty);
-                if let Some(inst) = env.get_node_instantiation_opt(var_info_id) {
-                    env.set_node_instantiation(new_id, inst);
-                }
-                closure_args.push(ExpData::LocalVar(new_id, *name).into_exp())
+            params.push(Parameter(*name, ty.clone(), loc.clone()));
+            let new_id = env.new_node(loc, ty);
+            if let Some(inst) = env.get_node_instantiation_opt(var_info_id) {
+                env.set_node_instantiation(new_id, inst);
             }
+            closure_args.push(ExpData::LocalVar(new_id, *name).into_exp())
         }
 
         if !saw_error {
-            Some((params, closure_args, param_index_mapping, mut_captures))
+            Some((params, closure_args, param_index_mapping))
         } else {
             None
         }
@@ -746,31 +469,6 @@ impl<'a> LambdaLifter<'a> {
         self.scopes.iter().any(|scope| scope.contains(sym))
     }
 
-    /// Marks the root variable of a mutation target as modified, peeling field
-    /// selections, index operations, and dereferences (e.g. for `s.x = e` or
-    /// `v[i] = e`, the root is `s` resp. `v`). A reference-typed root is not
-    /// marked: there, the mutation goes through the reference and does not
-    /// modify the captured binding itself.
-    fn mark_mutation_root_modified(&mut self, target: &Exp) {
-        let env = self.fun_env.module_env.env;
-        let root = target.as_ref().selection_chain_root(true);
-        match root {
-            ExpData::LocalVar(node_id, name) if !env.get_node_type(*node_id).is_reference() => {
-                self.try_insert_free_local(*name, VarInfo {
-                    node_id: *node_id,
-                    modified: true,
-                });
-            },
-            ExpData::Temporary(node_id, param) if !env.get_node_type(*node_id).is_reference() => {
-                self.free_params.insert(*param, VarInfo {
-                    node_id: *node_id,
-                    modified: true,
-                });
-            },
-            _ => {},
-        }
-    }
-
     /// Insert `sym` as a free local variable, if it is not already in scope.
     fn try_insert_free_local(&mut self, sym: Symbol, var_info: VarInfo) {
         if !self.is_symbol_in_scope(&sym) {
@@ -833,11 +531,6 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
                     }
                 }
             }
-        }
-        // Detect modification of captured variables through mutation targets like
-        // `s.x = e` or `v[i] = e` (`Mutate` has no dedicated rewriter hook).
-        if let ExpData::Mutate(_, lhs, _) = exp.as_ref() {
-            self.mark_mutation_root_modified(lhs);
         }
         // Also if this is a lambda, before descent, clear any usages from siblings in the
         // context, so we get the isolated usage information for the lambda's body.
@@ -904,11 +597,7 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
                         modified: true,
                     });
                 },
-                _ => {
-                    // Mutable borrow through a selection chain, e.g. `&mut s.x`:
-                    // the root variable is modified.
-                    self.mark_mutation_root_modified(&args[0]);
-                },
+                _ => {},
             }
         }
         None
@@ -950,10 +639,7 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
         // param_index_mapping = for each free var which is a Parameter from the enclosing function,
         //      a mapping from index there to index in the params list; other free vars are
         //      substituted automatically by using the same symbol for the param
-        // mut_captures = captured variables converted to `&mut` because the lambda
-        //      modifies them (verify mode only)
-        let (mut params, closure_args, param_index_mapping, mut_captures) =
-            self.get_params_for_freevars()?;
+        let (mut params, closure_args, param_index_mapping) = self.get_params_for_freevars()?;
 
         if closure_args.len() > ClosureMask::MAX_ARGS {
             env.error(
@@ -987,10 +673,8 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
             }
         }
 
-        // Try to rewrite a lambda directly into a curry expression. This is not
-        // possible with converted `&mut` captures, which require a lifted function
-        // with a rewritten body.
-        if bindings.is_empty() && mut_captures.is_empty() {
+        // Try to rewrite a lambda directly into a curry expression
+        if bindings.is_empty() {
             let possible_curry_exp = self.try_to_reduce_lambda_to_curry(id, &lambda_params, body);
             if possible_curry_exp.is_some() {
                 return possible_curry_exp;
@@ -1017,14 +701,6 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
             _ => Type::Error, // type error reported
         };
 
-        // Rewrite accesses to converted `&mut` captures in the body (reads become
-        // dereferences, assignments become mutations, borrows use the parameter).
-        let body = if mut_captures.is_empty() {
-            body.clone()
-        } else {
-            MutCaptureRewriter::new(env, &mut_captures).rewrite_exp(body.clone())
-        };
-
         // Rewrite references to Temporary in the new functions body (#12317)
         let mut replacer = |id: NodeId, target: RewriteTarget| {
             if let RewriteTarget::Temporary(temp) = target {
@@ -1033,30 +709,16 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
             }
             None
         };
-        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body);
+        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
         let fun_id = FunId::new(fun_name);
-        // Spec rewriter needs to map parameters to temporary indices in the spec.
-        // For converted `&mut` captures, the node must get the parameter's reference
-        // type so the spec correctly depends on state (e.g. for `old(..)`).
-        let param_typed_node = |id: NodeId, param: &Parameter| {
-            if env.get_node_type(id) != param.1 {
-                env.new_node(env.get_node_loc(id), param.1.clone())
-            } else {
-                id
-            }
-        };
+        // Spec rewriter needs to map parameters to temporary indices in the spec
         let mut spec_replacer = |id: NodeId, target: RewriteTarget| {
             if let RewriteTarget::Temporary(temp) = target {
                 let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
-                let id = params
-                    .get(new_temp)
-                    .map(|par| param_typed_node(id, par))
-                    .unwrap_or(id);
                 return Some(ExpData::Temporary(id, new_temp).into_exp());
             } else if let RewriteTarget::LocalVar(sym) = target {
                 for (i, par) in params.iter().enumerate() {
                     if sym == par.0 {
-                        let id = param_typed_node(id, par);
                         return Some(ExpData::Temporary(id, i).into_exp());
                     }
                 }

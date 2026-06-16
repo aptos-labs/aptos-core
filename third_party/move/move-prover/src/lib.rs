@@ -47,7 +47,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
     mut experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    if options.inference.inference || options.prover.infer_lambda_specs {
+    if options.inference.inference || !options.prover.no_infer_lambda_specs {
         // Lambda spec inference benefits from pure-spec-fun rewriting too: lambda
         // bodies that call pure user functions then inference cleanly to
         // `result == helper(args)` instead of `result == result_of<helper>(args)`.
