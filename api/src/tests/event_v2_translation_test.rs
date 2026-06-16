@@ -85,7 +85,9 @@ fn rotate_authentication_key_payload(
     use_txn_payload_v2_format,
     use_orderless_transactions,
     case(false, false),
-    case(true, true)
+    // `account::rotate_authentication_key` verifies a sequence-number-based proof and rejects
+    // orderless transactions, so only sequence-number transactions are exercised here.
+    case(true, false)
 )]
 async fn test_event_v2_translation_account_key_rotation_event(
     use_txn_payload_v2_format: bool,

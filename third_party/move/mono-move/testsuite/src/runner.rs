@@ -472,7 +472,8 @@ fn execute_function_v1(
         TransactionIndexKind::BlockExecution {
             transaction_index: TEST_TXN_INDEX,
         },
-        false,
+        false, // is_encrypted_txn
+        false, // is_orderless_txn
     );
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
