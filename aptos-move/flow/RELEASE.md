@@ -1,6 +1,8 @@
 # move-flow Release Guide
 
-This document describes how to release and install move-flow binaries.
+This document describes how to prepare a move-flow source tag in `aptos-core`.
+Published binaries and plugin marketplace updates are owned by
+[`aptos-ai`](https://github.com/aptos-labs/aptos-ai).
 
 ## For Users: Installing move-flow
 
@@ -8,13 +10,12 @@ This document describes how to release and install move-flow binaries.
 
 **Unix/Linux/macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.sh | sh -s -- move-flow
+curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-ai/main/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.ps1 -OutFile install.ps1
-.\install.ps1 -BinaryName move-flow
+irm https://raw.githubusercontent.com/aptos-labs/aptos-ai/main/install.ps1 | iex
 ```
 
 ### Build from source
@@ -27,17 +28,18 @@ cargo install --git https://github.com/aptos-labs/aptos-core --locked aptos-move
 
 **Unix/Linux/macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.sh | sh -s -- move-flow --version 1.0.4
+curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-ai/main/install.sh | sh -s -- --version 1.0.4
 ```
 
 **Windows:**
 ```powershell
-.\install.ps1 -BinaryName move-flow -Version 1.0.4
+irm https://raw.githubusercontent.com/aptos-labs/aptos-ai/main/install.ps1 -OutFile install.ps1
+.\install.ps1 -Version 1.0.4
 ```
 
 ### Manual Installation
 
-1. Go to the [releases page](https://github.com/aptos-labs/aptos-core/releases)
+1. Go to the [`aptos-ai` releases page](https://github.com/aptos-labs/aptos-ai/releases)
 2. Download the appropriate file for your platform:
    - Linux x86_64: `move-flow-v1.0.4-x86_64-unknown-linux-gnu.zip`
    - Linux ARM64: `move-flow-v1.0.4-aarch64-unknown-linux-gnu.zip`
@@ -86,15 +88,14 @@ curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/
    git push
    ```
 
-### Release Process
+### Source Tag Process
 
 1. Go to [Actions → Release move-flow](../../.github/workflows/move-flow-release.yaml)
 2. Click "Run workflow"
 3. Fill in the parameters (the release version is read from
    `aptos-move/flow/Cargo.toml`):
    - **source_git_ref_override**: (optional) specific branch/commit to build from
-   - **release_title**: (optional) custom title, defaults to "move-flow v<version>"
-   - **dry_run**: Uncheck this for a real release, keep checked for testing
+   - **dry_run**: Uncheck this to create the `move-flow-v<version>` source tag
 
 4. Click "Run workflow"
 
@@ -102,7 +103,12 @@ Real releases must be dispatched from the `main` workflow definition. If
 `source_git_ref_override` is set for a real release, the resolved commit must be
 reachable from `main` or an `aptos-release-v*` branch.
 
-### What Gets Created
+After the source tag is created, run the `aptos-ai` move-flow release workflow
+with the matching version. That workflow consumes the `aptos-core` tag, builds
+the binaries, publishes the `aptos-ai` GitHub Release, and opens/updates the
+plugin tree PR in `aptos-ai`.
+
+### What Gets Created Here
 
 For version `1.0.4`, the workflow creates:
 
@@ -111,52 +117,18 @@ For version `1.0.4`, the workflow creates:
 move-flow-v1.0.4
 ```
 
-**Artifacts (5 platforms):**
-```
-move-flow-v1.0.4-x86_64-unknown-linux-gnu.zip
-move-flow-v1.0.4-aarch64-unknown-linux-gnu.zip
-move-flow-v1.0.4-x86_64-apple-darwin.zip
-move-flow-v1.0.4-aarch64-apple-darwin.zip
-move-flow-v1.0.4-x86_64-pc-windows-msvc.zip
-```
-
-**Checksums:**
-```
-move-flow-v1.0.4-x86_64-unknown-linux-gnu.zip.sha256
-move-flow-v1.0.4-aarch64-unknown-linux-gnu.zip.sha256
-move-flow-v1.0.4-x86_64-apple-darwin.zip.sha256
-move-flow-v1.0.4-aarch64-apple-darwin.zip.sha256
-move-flow-v1.0.4-x86_64-pc-windows-msvc.zip.sha256
-SHA256SUMS (combined checksums file)
-```
-
 ### Testing Before Release
 
 Always test with `dry_run: true` first:
 
 1. Set `dry_run: true`
 2. Run the workflow
-3. Check that all builds succeed
-4. Verify artifacts are created (they won't be published)
-5. Verify the Linux artifact generates and uploads the plugin tree
-6. Once confirmed, run again with `dry_run: false`
-
-### Required Secrets
-
-Real releases publish the plugin PR before creating the GitHub release.
-`publish-plugin` pushes to `aptos-labs/aptos-ai` via a GitHub App (scoped to
-`aptos-ai`, `contents` + `pull-requests` write). Add to the `move-flow-release`
-environment:
-
-- `APTOS_AI_PLUGIN_PUBLISHER_APP_ID`
-- `APTOS_AI_PLUGIN_PUBLISHER_APP_KEY` (PEM)
-
-If either secret is absent, the real release fails before creating the GitHub
-release.
+3. Confirm version resolution, source reachability, and tag-collision checks are correct
+4. Once confirmed, run again with `dry_run: false`
 
 ## Build Profile
 
-move-flow uses the `tool` build profile:
+The `aptos-ai` release pipeline builds move-flow with the `cli` profile:
 - Optimized for binary size (`opt-level = "z"`)
 - Link-time optimization enabled
 - Debug symbols stripped
@@ -165,15 +137,14 @@ move-flow uses the `tool` build profile:
 
 ## Troubleshooting
 
-### Release already exists
-Check the [releases page](https://github.com/aptos-labs/aptos-core/releases). If the tag `move-flow-v1.0.4` already exists, you need to either:
+### Tag already exists
+Check the existing `aptos-core` tags. If the tag `move-flow-v1.0.4` already exists, you need to either:
 - Bump the version in `aptos-move/flow/Cargo.toml`
-- Delete the existing release (requires admin permissions)
+- Delete the existing tag (requires admin permissions)
 
-The release workflow's pre-flight job performs an automatic tag-collision
-check before any build runs: if `move-flow-v<version>` already exists
-as a tag or GitHub release, the workflow fails fast with a clear message
-instead of failing later at the publish step.
+The source-tag workflow performs an automatic tag-collision check before
+creating the tag: if `move-flow-v<version>` already exists, the workflow
+fails fast with a clear message instead of creating a duplicate.
 
 ### Binary not found after installation
 Ensure the installation directory is in your PATH:
@@ -191,8 +162,7 @@ Re-download both the archive and checksum file. If the issue persists, report it
 ## Related Documentation
 
 - [Binary Release Workflow](../../scripts/binary_release/README.md)
-- [cargo-binstall Configuration](../../scripts/binary_release/CARGO_BINSTALL.md)
-- [Quick Start Guide](../../scripts/binary_release/QUICKSTART.md)
+- [`aptos-ai` installer documentation](https://github.com/aptos-labs/aptos-ai#readme)
 
 ## Support
 
