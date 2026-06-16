@@ -1499,6 +1499,36 @@ impl StateStore {
         )
     }
 
+    /// Returns the number of hot state items (leaves of the hot state Merkle tree) at `version`.
+    pub fn get_hot_state_item_count(&self, version: Version) -> Result<usize> {
+        self.hot_state_merkle_db.get_leaf_count(version)
+    }
+
+    /// Walks the hot state Merkle tree at `version` from `first_index` and yields up to
+    /// `chunk_size` hot state leaves, each pairing the full key with its [`HotStateValue`] (the
+    /// value or vacancy plus `hot_since_version`). A fast-syncing node uses these to rebuild both
+    /// the hot state KV DB and the hot state Merkle tree; the cold value version is re-stamped to
+    /// the sync version on the receiver, so it is not transmitted here.
+    pub fn get_hot_state_value_chunk_iter(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, HotStateValue)>> + Send + Sync + use<>> {
+        let store = Arc::clone(self);
+        Ok(JellyfishMerkleIterator::new_by_index(
+            Arc::clone(&self.hot_state_merkle_db),
+            version,
+            first_index,
+        )?
+        .map(move |res| {
+            let (key_hash, (key, _leaf_version)) = res?;
+            let value = store.expect_hot_state_value_by_version(key_hash, version)?;
+            Ok((key, value))
+        })
+        .take(chunk_size))
+    }
+
     // state sync doesn't query for the progress, but keeps its record by itself.
     // TODO: change to async comment once it does like https://github.com/aptos-labs/aptos-core/blob/159b00f3d53e4327523052c1b99dd9889bf13b03/storage/backup/backup-cli/src/backup_types/state_snapshot/restore.rs#L147 or overlap at least two chunks.
     pub fn get_snapshot_receiver(
