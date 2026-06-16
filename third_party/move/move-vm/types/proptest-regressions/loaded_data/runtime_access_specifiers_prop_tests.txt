@@ -1,9 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc 909d52933dc057f54814b28bd6ed88504cee077ece2e6d70252adeeab2ba9f58 # shrinks to access = AccessInstance { kind: Reads, resource: StructIdentifier { module: ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000001, name: Identifier("ac") }, name: Identifier("ac") }, instance: [], address: 0000000000000000000000000000000000000000000000000000000000000001 }, s1 = Any, s2 = Any
-cc dba42d5ed4d6a925756fb4ea8f829bed5a209f2be288885b453b352eec92ce5f # shrinks to access = AccessInstance { kind: Reads, resource: StructIdentifier { module: ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000001, name: Identifier("ac") }, name: Identifier("ac") }, instance: [], address: 0000000000000000000000000000000000000000000000000000000000000001 }, s1 = Any, s2 = Any
-cc b95bd44e13064041a78409ce4f11d729f189756de014c143b909e7eec2b8c81f # shrinks to access = AccessInstance { kind: Reads, resource: StructIdentifier { module: ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("ac") }, name: Identifier("ac") }, instance: [], address: 0000000000000000000000000000000000000000000000000000000000000002 }, s1 = Constraint([AccessSpecifierClause { kind: Acquires, resource: Any, address: Literal(0000000000000000000000000000000000000000000000000000000000000001) }], []), s2 = Constraint([AccessSpecifierClause { kind: Acquires, resource: Any, address: Any }], [])

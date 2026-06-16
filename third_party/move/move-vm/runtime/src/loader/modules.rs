@@ -190,7 +190,6 @@ impl Module {
         let mut is_fully_instantiated_signature = vec![];
 
         let mut struct_idxs = vec![];
-        let mut struct_names = vec![];
 
         // validate the correctness of struct handle references.
         for struct_handle in module.struct_handles() {
@@ -200,7 +199,6 @@ impl Module {
             let struct_name =
                 StructIdentifier::new(module_id_pool, module_id, struct_name.to_owned());
             struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
-            struct_names.push(struct_name)
         }
 
         // Build signature table
@@ -261,13 +259,7 @@ impl Module {
 
         for (idx, _) in module.function_defs().iter().enumerate() {
             let findex = FunctionDefinitionIndex(idx as TableIndex);
-            let function = Function::new(
-                natives,
-                findex,
-                &module,
-                signature_table.as_slice(),
-                &struct_names,
-            )?;
+            let function = Function::new(natives, findex, &module, signature_table.as_slice())?;
 
             function_map.insert(function.name.to_owned(), idx);
             function_defs.push(Arc::new(function));

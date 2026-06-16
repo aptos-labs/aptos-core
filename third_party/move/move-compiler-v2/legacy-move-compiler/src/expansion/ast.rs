@@ -234,7 +234,6 @@ pub struct Function {
 #[derive(PartialEq, Clone, Debug)]
 pub struct AccessSpecifier_ {
     pub kind: AccessSpecifierKind,
-    pub negated: bool,
     pub module_address: Option<Address>,
     pub module_name: Option<ModuleName>,
     pub resource_name: Option<Name>,
@@ -244,8 +243,6 @@ pub struct AccessSpecifier_ {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum AccessSpecifierKind {
-    Reads,
-    Writes,
     LegacyAcquires,
 }
 

@@ -849,7 +849,6 @@ pub struct FriendDecl {
 pub struct AccessSpecifier {
     pub loc: Loc,
     pub kind: AccessSpecifierKind,
-    pub negated: bool,
     pub resource: (Loc, ResourceSpecifier),
     pub address: (Loc, AddressSpecifier),
 }
@@ -867,16 +866,7 @@ impl AccessSpecifier {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AccessSpecifierKind {
-    Reads,
-    Writes,
     LegacyAcquires,
-}
-
-impl AccessSpecifierKind {
-    pub fn subsumes(&self, other: &Self) -> bool {
-        use AccessSpecifierKind::*;
-        matches!((self, other), (_, Reads) | (Writes, Writes))
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -4741,8 +4731,6 @@ fn optional_variant_suffix(pool: &SymbolPool, variant: &Option<Symbol>) -> Strin
 impl fmt::Display for AccessSpecifierKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            AccessSpecifierKind::Reads => f.write_str("reads"),
-            AccessSpecifierKind::Writes => f.write_str("writes"),
             AccessSpecifierKind::LegacyAcquires => f.write_str("acquires"),
         }
     }

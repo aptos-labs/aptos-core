@@ -264,7 +264,7 @@ impl Default for VerifierConfig {
             sig_checker_v2_fix_function_signatures: true,
 
             enable_enum_types: true,
-            enable_resource_access_control: true,
+            enable_resource_access_control: false,
             enable_function_values: true,
 
             max_function_return_values: None,
@@ -313,7 +313,7 @@ impl VerifierConfig {
             sig_checker_v2_fix_function_signatures: true,
 
             enable_enum_types: true,
-            enable_resource_access_control: true,
+            enable_resource_access_control: false,
             enable_function_values: true,
 
             max_function_return_values: Some(128),

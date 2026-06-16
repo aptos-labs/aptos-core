@@ -3306,67 +3306,13 @@ fn parse_function_decl(
         sp(name.loc(), Type_::Unit)
     };
 
-    // "pure" | ( ( "!" )? ("acquires" | "reads" | "writes" ) <AccessSpecifierList> )*
+    // ( "acquires" <AccessSpecifierList> )*
     let mut access_specifiers = vec![];
-    let mut pure_loc = None;
-    loop {
-        let negated = if context.tokens.peek() == Tok::Exclaim {
-            context.tokens.advance()?;
-            true
-        } else {
-            false
-        };
-        match context.tokens.peek() {
-            Tok::Acquires => {
-                context.tokens.advance()?;
-                access_specifiers.extend(parse_access_specifier_list(
-                    context,
-                    negated,
-                    &AccessSpecifier_::Acquires,
-                )?)
-            },
-            Tok::Identifier if context.tokens.content() == "reads" => {
-                context.tokens.advance()?;
-                access_specifiers.extend(parse_access_specifier_list(
-                    context,
-                    negated,
-                    &AccessSpecifier_::Reads,
-                )?)
-            },
-            Tok::Identifier if context.tokens.content() == "writes" => {
-                context.tokens.advance()?;
-                access_specifiers.extend(parse_access_specifier_list(
-                    context,
-                    negated,
-                    &AccessSpecifier_::Writes,
-                )?)
-            },
-            Tok::Identifier if context.tokens.content() == "pure" => {
-                pure_loc = Some(current_token_loc(context.tokens));
-                context.tokens.advance()?;
-                if negated {
-                    return Err(Box::new(diag!(
-                        Syntax::InvalidAccessSpecifier,
-                        (pure_loc.unwrap(), "'pure' cannot be negated")
-                    )));
-                }
-            },
-            _ => break,
-        }
+    while let Tok::Acquires = context.tokens.peek() {
+        context.tokens.advance()?;
+        access_specifiers.extend(parse_access_specifier_list(context)?)
     }
-    let access_specifiers = if let Some(loc) = pure_loc {
-        if !access_specifiers.is_empty() {
-            return Err(Box::new(diag!(
-                Syntax::InvalidAccessSpecifier,
-                (
-                    loc,
-                    "'pure' cannot be mixed with 'acquires'/`reads'/'writes'"
-                )
-            )));
-        }
-        // pure is represented by an empty access list
-        Some(vec![])
-    } else if access_specifiers.is_empty() {
+    let access_specifiers = if access_specifiers.is_empty() {
         // no specifiers is represented as None
         None
     } else {
@@ -3427,12 +3373,10 @@ fn parse_parameter(context: &mut Context) -> Result<(Var, Type), Box<Diagnostic>
 //      AccessSpecifierList = <AccessSpecifier> ( "," <AccessSpecifier> )* ","?
 fn parse_access_specifier_list(
     context: &mut Context,
-    negated: bool,
-    ctor: &impl Fn(bool, NameAccessChain, Option<Vec<Type>>, AddressSpecifier) -> AccessSpecifier_,
 ) -> Result<Vec<AccessSpecifier>, Box<Diagnostic>> {
     let mut chain = vec![];
     loop {
-        chain.push(parse_access_specifier(context, negated, ctor)?);
+        chain.push(parse_access_specifier(context)?);
         if context.tokens.peek() == Tok::Comma {
             context.tokens.advance()?;
             // Trailing comma allowed, check FIRST(<AccessSpecifier>)
@@ -3453,11 +3397,7 @@ fn parse_access_specifier_list(
 
 // Parse an access specifier:
 //   AccessSpecifier = <NameAccessChainWithWildcard> <OptionalTypeArgs> <AddressSpecifier>
-fn parse_access_specifier(
-    context: &mut Context,
-    negated: bool,
-    ctor: &impl Fn(bool, NameAccessChain, Option<Vec<Type>>, AddressSpecifier) -> AccessSpecifier_,
-) -> Result<AccessSpecifier, Box<Diagnostic>> {
+fn parse_access_specifier(context: &mut Context) -> Result<AccessSpecifier, Box<Diagnostic>> {
     let start = context.tokens.start_loc();
     let name_chain = parse_name_access_chain(context, true, || "an access specifier")?;
     let type_args = parse_optional_type_args(context)?;
@@ -3467,7 +3407,10 @@ fn parse_access_specifier(
         start,
         address.loc.end() as usize,
     );
-    Ok(sp(loc, (*ctor)(negated, name_chain, type_args, address)))
+    Ok(sp(
+        loc,
+        AccessSpecifier_::Acquires(name_chain, type_args, address),
+    ))
 }
 
 // Parse an address specifier:

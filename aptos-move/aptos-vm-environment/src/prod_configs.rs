@@ -170,8 +170,9 @@ pub fn aptos_prod_verifier_config(
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
-    let enable_resource_access_control =
-        features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
+    // Resource access control was never enabled and has been removed. Access specifiers
+    // are permanently rejected by the verifier.
+    let enable_resource_access_control = false;
     let enable_function_values = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
     // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
 

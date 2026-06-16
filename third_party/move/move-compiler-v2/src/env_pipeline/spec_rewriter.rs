@@ -27,9 +27,8 @@ use itertools::Itertools;
 use log::debug;
 use move_model::{
     ast::{
-        AccessSpecifier, AccessSpecifierKind, ConditionKind, Exp, ExpData, FrameSpec,
-        FunParamAccessOf, GlobalInvariant, MemoryRange, Operation, ResourceSpecifier,
-        SpecBlockTarget, SpecFunDecl, VisitorPosition,
+        ConditionKind, Exp, ExpData, FrameSpec, FunParamAccessOf, GlobalInvariant, MemoryRange,
+        Operation, SpecBlockTarget, SpecFunDecl, VisitorPosition,
     },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
@@ -524,38 +523,6 @@ pub fn compute_direct_old_usage(
         true
     });
     (uses_old, old_memory)
-}
-
-/// Derives used_memory and old_memory from user-declared access specifiers (for spec functions).
-/// All resources in reads + writes go into used_memory.
-/// Resources in writes go into old_memory (writes implies dual-state).
-pub fn derive_memory_from_access_specifiers(
-    env: &GlobalEnv,
-    specifiers: &[AccessSpecifier],
-) -> (
-    BTreeSet<QualifiedInstId<StructId>>,
-    BTreeSet<QualifiedInstId<StructId>>,
-) {
-    let mut used_memory = BTreeSet::new();
-    let mut old_memory = BTreeSet::new();
-    for spec in specifiers {
-        match &spec.resource.1 {
-            ResourceSpecifier::Resource(qid) => {
-                used_memory.insert(qid.clone());
-                if spec.kind == AccessSpecifierKind::Writes {
-                    old_memory.insert(qid.clone());
-                }
-            },
-            _ => {
-                env.error(
-                    &spec.loc,
-                    "access specifiers do not yet support wildcard resource specifiers; \
-                     use concrete resource types",
-                );
-            },
-        }
-    }
-    (used_memory, old_memory)
 }
 
 /// Derive used_memory and old_memory from a `FunParamAccessOf` entry.
