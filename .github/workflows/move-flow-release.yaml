@@ -20,6 +20,13 @@ on:
 permissions:
   contents: read
 
+env:
+  MOVE_FLOW_LINUX_X86_ARTIFACT: binary-builds-x86_64-unknown-linux-gnu
+  MOVE_FLOW_LINUX_ARM_ARTIFACT: binary-builds-aarch64-unknown-linux-gnu
+  MOVE_FLOW_MACOS_X86_ARTIFACT: binary-builds-x86_64-apple-darwin
+  MOVE_FLOW_MACOS_ARM_ARTIFACT: binary-builds-aarch64-apple-darwin
+  MOVE_FLOW_WINDOWS_X86_ARTIFACT: binary-builds-x86_64-pc-windows-msvc
+
 concurrency:
   group: "move-flow-release"
   cancel-in-progress: false
@@ -35,10 +42,18 @@ jobs:
       source_sha: ${{ steps.resolve.outputs.sha }}
       release_version: ${{ steps.version.outputs.version }}
     steps:
+      - name: Real-release workflow ref gate
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Real move-flow releases must be dispatched from refs/heads/main, got $GITHUB_REF."
+            exit 1
+          fi
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_git_ref_override || github.sha }}
-          fetch-depth: 200
+          fetch-depth: 0
           persist-credentials: false
       - name: Resolve source SHA
         id: resolve
@@ -62,14 +77,14 @@ jobs:
           TAG: "move-flow-v${{ steps.version.outputs.version }}"
         run: |
           set -euo pipefail
-          git fetch --no-tags --filter=blob:none --depth=200 origin \
+          git fetch --no-tags --filter=blob:none origin \
             '+refs/heads/main:refs/remotes/origin/main' \
-            '+refs/heads/release-*:refs/remotes/origin/release-*'
+            '+refs/heads/aptos-release-v*:refs/remotes/origin/aptos-release-v*'
           HEAD_SHA="$(git rev-parse HEAD)"
-          REACHED_BY="$(git for-each-ref --format='%(refname:short)' --contains="$HEAD_SHA" \
-            'refs/remotes/origin/main' 'refs/remotes/origin/release-*' | head -n 1)"
+          REACHED_BY="$(git for-each-ref --count=1 --format='%(refname:short)' --contains="$HEAD_SHA" \
+            'refs/remotes/origin/main' 'refs/remotes/origin/aptos-release-v*')"
           if [ -z "$REACHED_BY" ]; then
-            echo "::error::HEAD $HEAD_SHA is not reachable from origin/main or origin/release-*."
+            echo "::error::HEAD $HEAD_SHA is not reachable from origin/main or origin/aptos-release-v*."
             exit 1
           fi
           echo "HEAD reachable from $REACHED_BY."
@@ -79,29 +94,178 @@ jobs:
             exit 1
           fi
 
-  release-move-flow:
-    name: "Release move-flow"
+  build-unix:
+    name: "Build ${{ matrix.label }}"
     needs: preflight
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux x86_64
+            runner: ubuntu-22.04
+            artifact_name: binary-builds-x86_64-unknown-linux-gnu
+          - label: Linux ARM64
+            runner: ubuntu-22.04-arm
+            artifact_name: binary-builds-aarch64-unknown-linux-gnu
+          - label: macOS x86_64
+            runner: macos-15-intel
+            artifact_name: binary-builds-x86_64-apple-darwin
+          - label: macOS ARM64
+            runner: macos-latest
+            artifact_name: binary-builds-aarch64-apple-darwin
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.source_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/cli-rust-setup
+      - name: Build binary
+        run: |
+          scripts/binary_release/build_binary_release.sh \
+            move-flow \
+            aptos-move-flow \
+            tool \
+            "${{ needs.preflight.outputs.release_version }}" \
+            false
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            move-flow-*.zip
+            move-flow-*.zip.sha256
+          if-no-files-found: error
+
+  build-windows-x86:
+    name: "Build Windows x86_64"
+    needs: preflight
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.source_sha }}
+          persist-credentials: false
+      - name: Run cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+      - name: Ensure long paths work
+        run: git config --global core.longpaths true
+        shell: bash
+      - name: Build binary
+        run: |
+          .\scripts\binary_release\build_binary_release.ps1 `
+            -BinaryName "move-flow" `
+            -CrateName "aptos-move-flow" `
+            -BuildProfile "tool" `
+            -Version "${{ needs.preflight.outputs.release_version }}" `
+            -SkipChecks $false
+        shell: powershell
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MOVE_FLOW_WINDOWS_X86_ARTIFACT }}
+          path: |
+            move-flow-*.zip
+            move-flow-*.zip.sha256
+          if-no-files-found: error
+
+  validate-artifacts:
+    name: "Validate release artifacts"
+    needs:
+      - preflight
+      - build-unix
+      - build-windows-x86
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Download prebuilt binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-builds-*
+          merge-multiple: true
+      - name: Validate expected artifacts
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          for target in \
+            x86_64-unknown-linux-gnu \
+            aarch64-unknown-linux-gnu \
+            x86_64-apple-darwin \
+            aarch64-apple-darwin \
+            x86_64-pc-windows-msvc; do
+            test -f "move-flow-v${RELEASE_VERSION}-${target}.zip"
+            test -f "move-flow-v${RELEASE_VERSION}-${target}.zip.sha256"
+          done
+
+  release-binaries:
+    name: "Release binaries"
+    needs:
+      - preflight
+      - validate-artifacts
+      - publish-plugin
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
-      pull-requests: read
-    uses: ./.github/workflows/binary-release.yaml
-    with:
-      binary_name: move-flow
-      crate_name: aptos-move-flow
-      build_profile: tool
-      release_version: ${{ needs.preflight.outputs.release_version }}
-      # Pass the SHA resolved by preflight so every build job in the shared
-      # workflow pins to the same commit, even when the user supplied a branch.
-      source_git_ref_override: ${{ needs.preflight.outputs.source_sha }}
-      release_title: ${{ inputs.release_title || format('move-flow v{0}', needs.preflight.outputs.release_version) }}
-      dry_run: ${{ inputs.dry_run }}
-      internal_call: true
+    steps:
+      - name: Download prebuilt binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-builds-*
+          merge-multiple: true
+      - name: List downloaded artifacts
+        run: ls -lh
+      - name: Create combined SHA256SUMS file
+        run: |
+          set -euo pipefail
+          cat move-flow-*.zip.sha256 > SHA256SUMS
+          echo "Combined checksums:"
+          cat SHA256SUMS
+      - name: Determine release title
+        id: release-info
+        env:
+          RELEASE_TITLE: ${{ inputs.release_title }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$RELEASE_TITLE" ]; then
+            title="$RELEASE_TITLE"
+          else
+            title="move-flow v$RELEASE_VERSION"
+          fi
+          delimiter="release_title_$(uuidgen)"
+          {
+            echo "title<<$delimiter"
+            echo "$title"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+          echo "tag=move-flow-v$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-info.outputs.tag }}
+          TITLE: ${{ steps.release-info.outputs.title }}
+          SOURCE_SHA: ${{ needs.preflight.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "$TITLE" \
+            --notes "Release $TITLE from aptos-core commit $SOURCE_SHA." \
+            move-flow-*.zip \
+            move-flow-*.zip.sha256 \
+            SHA256SUMS
 
   generate-plugin:
     name: "Generate move-flow plugin tree"
-    needs: [preflight, release-move-flow]
-    if: ${{ inputs.dry_run == false }}
+    needs: [preflight, validate-artifacts]
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     permissions:
@@ -109,7 +273,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: binary-builds-x86_64-unknown-linux-gnu
+          name: ${{ env.MOVE_FLOW_LINUX_X86_ARTIFACT }}
           path: released-bin
       - name: Generate plugin tree
         env:
@@ -128,36 +292,34 @@ jobs:
           path: ${{ runner.temp }}/plugin
           include-hidden-files: true
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   publish-plugin:
     name: "Publish move-flow plugin PR to aptos-ai"
-    needs: [preflight, generate-plugin]
+    needs: [preflight, validate-artifacts, generate-plugin]
     if: ${{ inputs.dry_run == false }}
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     environment: move-flow-release
     steps:
       - name: Gate on GitHub App credentials
-        id: gate
         env:
           APP_ID: ${{ secrets.APTOS_AI_PLUGIN_PUBLISHER_APP_ID }}
           APP_KEY: ${{ secrets.APTOS_AI_PLUGIN_PUBLISHER_APP_KEY }}
         run: |
+          set -euo pipefail
           if [ -z "$APP_ID" ] || [ -z "$APP_KEY" ]; then
-            echo "::notice::aptos-ai plugin publisher GitHub App not configured; skipping."
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "::error::aptos-ai plugin publisher GitHub App is not configured."
+            exit 1
           fi
 
-      - if: steps.gate.outputs.ok == 'true'
+      - name: Checkout trusted aptos-core release tooling
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
-      - if: steps.gate.outputs.ok == 'true'
-        name: Generate aptos-ai token
+      - name: Generate aptos-ai token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -166,23 +328,20 @@ jobs:
           owner: aptos-labs
           repositories: aptos-ai
 
-      - if: steps.gate.outputs.ok == 'true'
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           repository: aptos-labs/aptos-ai
           token: ${{ steps.app-token.outputs.token }}
           path: aptos-ai
           ref: main
 
-      - if: steps.gate.outputs.ok == 'true'
-        name: Download plugin tree
+      - name: Download plugin tree
         uses: actions/download-artifact@v4
         with:
           name: move-flow-plugin-tree
           path: plugin-tree
 
-      - if: steps.gate.outputs.ok == 'true'
-        name: Publish plugin PR
+      - name: Publish plugin PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PLUGIN_TREE: ${{ github.workspace }}/plugin-tree

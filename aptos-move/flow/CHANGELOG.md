@@ -16,4 +16,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `x86_64-apple-darwin`, `aarch64-apple-darwin`, and
   `x86_64-pc-windows-msvc`.
 
-
+[Unreleased]: https://github.com/aptos-labs/aptos-core/compare/move-flow-v1.0.4...HEAD
+[1.0.4]: https://github.com/aptos-labs/aptos-core/releases/tag/move-flow-v1.0.4

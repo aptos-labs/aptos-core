@@ -60,8 +60,12 @@ mkdir -p plugins/move-flow
 cp -r "$PLUGIN_SRC/." plugins/move-flow/
 
 BRANCH="move-flow/v${VERSION}"
-# Populate the remote-tracking ref so --force-with-lease has a baseline.
-git fetch origin "$BRANCH" 2>/dev/null || true
+REMOTE_BRANCH="refs/heads/$BRANCH"
+REMOTE_TRACKING_BRANCH="refs/remotes/origin/$BRANCH"
+LEASE="$REMOTE_BRANCH:"
+if git fetch origin "+$REMOTE_BRANCH:$REMOTE_TRACKING_BRANCH" 2>/dev/null; then
+    LEASE="$REMOTE_BRANCH:$(git rev-parse "$REMOTE_TRACKING_BRANCH")"
+fi
 
 # Only an in-repo PR counts as "existing". A fork PR sharing this head branch
 # name (isCrossRepository == true) must not suppress opening the real PR.
@@ -82,7 +86,7 @@ SHA_SHORT="${SHA_SHORT:0:12}"
 git commit -m "Update move-flow plugin to v${VERSION}
 
 Generated from aptos-core commit ${SHA_SHORT}."
-git push -u origin "$BRANCH" --force-with-lease
+git push -u origin "$BRANCH" --force-with-lease="$LEASE"
 
 if [ -z "$EXISTING_PR" ]; then
     gh pr create --repo aptos-labs/aptos-ai \

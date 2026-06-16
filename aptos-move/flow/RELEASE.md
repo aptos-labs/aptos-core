@@ -98,6 +98,10 @@ curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/
 
 4. Click "Run workflow"
 
+Real releases must be dispatched from the `main` workflow definition. If
+`source_git_ref_override` is set for a real release, the resolved commit must be
+reachable from `main` or an `aptos-release-v*` branch.
+
 ### What Gets Created
 
 For version `1.0.4`, the workflow creates:
@@ -134,10 +138,12 @@ Always test with `dry_run: true` first:
 2. Run the workflow
 3. Check that all builds succeed
 4. Verify artifacts are created (they won't be published)
-5. Once confirmed, run again with `dry_run: false`
+5. Verify the Linux artifact generates and uploads the plugin tree
+6. Once confirmed, run again with `dry_run: false`
 
 ### Required Secrets
 
+Real releases publish the plugin PR before creating the GitHub release.
 `publish-plugin` pushes to `aptos-labs/aptos-ai` via a GitHub App (scoped to
 `aptos-ai`, `contents` + `pull-requests` write). Add to the `move-flow-release`
 environment:
@@ -145,7 +151,8 @@ environment:
 - `APTOS_AI_PLUGIN_PUBLISHER_APP_ID`
 - `APTOS_AI_PLUGIN_PUBLISHER_APP_KEY` (PEM)
 
-Absent → the job skips; the release still ships.
+If either secret is absent, the real release fails before creating the GitHub
+release.
 
 ## Build Profile
 
