@@ -157,6 +157,34 @@ fn test_error_if_version_pruned() {
         "AptosDB Other Error: Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
+
+    // Hot state guards consult the hot pruners, independent of the cold ones set above.
+    db.state_store
+        .state_db
+        .state_pruner
+        .hot_state_merkle_pruner
+        .save_min_readable_version(5)
+        .unwrap();
+    db.state_store
+        .state_db
+        .state_pruner
+        .hot_state_kv_pruner
+        .save_min_readable_version(10)
+        .unwrap();
+    assert_eq!(
+        db.error_if_hot_state_merkle_pruned("Hot state", 4)
+            .unwrap_err()
+            .to_string(),
+        "AptosDB Other Error: Version 4 is not epoch ending."
+    );
+    assert!(db.error_if_hot_state_merkle_pruned("Hot state", 5).is_ok());
+    assert_eq!(
+        db.error_if_hot_state_kv_pruned("HotStateValue", 9)
+            .unwrap_err()
+            .to_string(),
+        "AptosDB Other Error: HotStateValue at version 9 is pruned, min available version is 10."
+    );
+    assert!(db.error_if_hot_state_kv_pruned("HotStateValue", 10).is_ok());
 }
 
 #[test]

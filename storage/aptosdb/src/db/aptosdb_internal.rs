@@ -410,6 +410,60 @@ impl AptosDB {
         Ok(())
     }
 
+    pub(super) fn error_if_hot_state_merkle_pruned(
+        &self,
+        data_type: &str,
+        version: Version,
+    ) -> Result<()> {
+        let min_readable_version = self
+            .state_store
+            .state_db
+            .state_pruner
+            .hot_state_merkle_pruner
+            .get_min_readable_version();
+        if version >= min_readable_version {
+            return Ok(());
+        }
+
+        let min_readable_epoch_snapshot_version = self
+            .state_store
+            .state_db
+            .state_pruner
+            .hot_epoch_snapshot_pruner
+            .get_min_readable_version();
+        if version >= min_readable_epoch_snapshot_version {
+            self.ledger_db.metadata_db().ensure_epoch_ending(version)
+        } else {
+            bail!(
+                "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",
+                data_type,
+                version,
+                min_readable_version,
+                min_readable_epoch_snapshot_version,
+            )
+        }
+    }
+
+    pub(super) fn error_if_hot_state_kv_pruned(
+        &self,
+        data_type: &str,
+        version: Version,
+    ) -> Result<()> {
+        let min_readable_version = self
+            .state_store
+            .state_pruner
+            .hot_state_kv_pruner
+            .get_min_readable_version();
+        ensure!(
+            version >= min_readable_version,
+            "{} at version {} is pruned, min available version is {}.",
+            data_type,
+            version,
+            min_readable_version
+        );
+        Ok(())
+    }
+
     pub(super) fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {
         self.ledger_db
             .metadata_db()
