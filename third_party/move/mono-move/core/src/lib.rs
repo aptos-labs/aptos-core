@@ -15,6 +15,7 @@ pub mod root_pool;
 pub mod storage;
 pub mod types;
 pub mod value_layout;
+pub mod vm_error;
 
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, checked_align_up_u32,
@@ -55,5 +56,9 @@ pub use storage::{
 pub use types::{convert_mut_to_immut_ref, strip_ref};
 pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
-    LayoutProvider, ValueLayout, ValueLayoutTable,
+    LayoutProvider, NoLayoutProvider, ValueLayout, ValueLayoutTable, NO_LAYOUT_PROVIDER,
+};
+pub use vm_error::{
+    ArithOp, GlobalStorageOp, LoaderError, LoaderInvariantViolation, LoaderResult, RuntimeError,
+    RuntimeInvariantViolation, RuntimeResult, Signedness, VecOp,
 };

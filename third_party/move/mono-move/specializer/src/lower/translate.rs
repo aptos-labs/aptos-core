@@ -2045,7 +2045,12 @@ impl<'a> LoweringState<'a> {
         }
         heap_ptr_offsets.sort_by_key(|o| o.0);
         heap_ptr_offsets.dedup();
-        Ok(NativeABI::new(args, returns, heap_ptr_offsets)?)
+        Ok(NativeABI::new(
+            args,
+            returns,
+            heap_ptr_offsets,
+            cs.required_descriptors.clone(),
+        )?)
     }
 
     /// Lower one call. Args are written by reverse iteration over the

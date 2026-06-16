@@ -8,21 +8,31 @@
 
 use crate::{
     error::RuntimeError,
-    global_storage::ResourceReadWriteSet,
-    heap::{alloc_vec, is_heap_ptr, Heap, TopFrame},
+    global_storage::{EntryPtr, ResourceReadWriteSet},
+    heap::{
+        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr, Heap,
+        TopFrame,
+    },
     memory::{read_ptr, write_u64},
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
     interner::InternedModuleId,
     native::{
-        NativeABI, NativeContext, NativeContextFamily, NativeExtension, NativeExtensions,
-        NativeFunction, NativeRegistry, RootPool, VMInternalError, VMValue, Vector,
+        Boxed, NativeABI, NativeContext, NativeContextFamily, NativeExtension, NativeExtensions,
+        NativeFunction, NativeRegistry, Opaque, Ref, RootPool, TableHandle, VMInternalError,
+        VMValue, Vector,
     },
+    storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
-    DescriptorProvider, Function, GasMeter, FRAME_METADATA_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorId, DescriptorProvider, Function, GasMeter, LayoutProvider, ResourceProvider,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
 };
-use std::cell::{Cell, RefMut, UnsafeCell};
+use move_core_types::account_address::AccountAddress;
+use std::{
+    cell::{Cell, RefMut, UnsafeCell},
+    ptr::NonNull,
+};
 
 /// Concrete [`NativeContext`] used by the production runtime.
 ///
@@ -50,6 +60,9 @@ pub struct ProductionNativeContext<'a> {
     ty_args: &'a [InternedType],
     /// Descriptor provider, used by any GC the native triggers while allocating.
     desc_provider: &'a dyn DescriptorProvider,
+    /// Value layouts, used by natives that serialize, deserialize, or compare
+    /// values driven by their types.
+    layouts: &'a dyn LayoutProvider,
     /// Start of the native's slot region within the caller's frame. Args are
     /// read and returns written here, within the ABI-verified bounds.
     frame_ptr: *mut u8,
@@ -62,6 +75,8 @@ pub struct ProductionNativeContext<'a> {
     heap: UnsafeCell<&'a mut Heap>,
     /// The transaction's read write set -- provides global storage access.
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
+    /// Resource provider backing global-storage reads on a read-set cache miss.
+    resource_provider: &'a dyn ResourceProvider,
     /// Per-transaction native extensions, shared across native calls. Accessed
     /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
     /// the interior mutability.
@@ -82,6 +97,8 @@ impl<'a> ProductionNativeContext<'a> {
         ty_args: &'a [InternedType],
         gas_meter: &'a mut GasMeter,
         desc_provider: &'a dyn DescriptorProvider,
+        layouts: &'a dyn LayoutProvider,
+        resource_provider: &'a dyn ResourceProvider,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
@@ -90,6 +107,8 @@ impl<'a> ProductionNativeContext<'a> {
             abi,
             ty_args,
             desc_provider,
+            layouts,
+            resource_provider,
             frame_ptr,
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
@@ -108,20 +127,20 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     unsafe fn arg<'a, T: VMValue<'a>>(&'a self, i: usize) -> Result<T, VMInternalError> {
         if self.returns_started.get() {
-            return Err(VMInternalError::InvariantViolation(format!(
+            return Err(VMInternalError::invariant_violation(format!(
                 "arg({}) called after a return value was written",
                 i,
             )));
         }
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
                 self.abi.args().len(),
             ))
         })?;
         if T::FRAME_SLOT_SIZE as u32 != slot.size {
-            return Err(VMInternalError::InvariantViolation(format!(
+            return Err(VMInternalError::invariant_violation(format!(
                 "VMValue size mismatch: ABI says {} bytes for arg {}, T::FRAME_SLOT_SIZE is {}",
                 slot.size,
                 i,
@@ -146,14 +165,14 @@ impl NativeContext for ProductionNativeContext<'_> {
         value: T,
     ) -> Result<(), VMInternalError> {
         let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "return index {} out of bounds (num_returns={})",
                 i,
                 self.abi.returns().len(),
             ))
         })?;
         if T::FRAME_SLOT_SIZE as u32 != slot.size {
-            return Err(VMInternalError::InvariantViolation(format!(
+            return Err(VMInternalError::invariant_violation(format!(
                 "VMValue size mismatch: ABI says {} bytes for return {}, T::FRAME_SLOT_SIZE is {}",
                 slot.size,
                 i,
@@ -167,13 +186,48 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(())
     }
 
+    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> Result<(), VMInternalError> {
+        let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!(
+                "return index {} out of bounds (num_returns={})",
+                i,
+                self.abi.returns().len(),
+            ))
+        })?;
+        if bytes.len() != slot.size as usize {
+            return Err(VMInternalError::invariant_violation(format!(
+                "set_return_raw: return slot {} is {} bytes but got {}",
+                i,
+                slot.size,
+                bytes.len(),
+            )));
+        }
+        // SAFETY: the ABI keeps `[offset, offset + size)` within the frame, and
+        // the length check makes the copy in-bounds. `bytes` is a valid
+        // representation of the slot's type, per this method's contract.
+        //
+        // TODO: `bytes` must NOT alias the return slot it is written to.
+        // This is currently ensured by the `return_started` flag and the absence
+        // of value types that reference the frame.
+        // Re-audit this if new value APIs are added.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                bytes.as_ptr(),
+                self.frame_ptr.add(slot.offset as usize),
+                bytes.len(),
+            );
+        }
+        self.returns_started.set(true);
+        Ok(())
+    }
+
     fn num_ty_args(&self) -> usize {
         self.ty_args.len()
     }
 
     fn ty_arg(&self, i: usize) -> Result<InternedType, VMInternalError> {
         self.ty_args.get(i).copied().ok_or_else(|| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "ty_arg index {} out of bounds (num_ty_args={})",
                 i,
                 self.ty_args.len(),
@@ -183,12 +237,12 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn arg_raw(&self, i: usize) -> Result<Vec<u8>, VMInternalError> {
         if self.returns_started.get() {
-            return Err(VMInternalError::InvariantViolation(format!(
+            return Err(VMInternalError::invariant_violation(format!(
                 "arg_raw({i}) called after a return value was written",
             )));
         }
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
                 self.abi.args().len(),
@@ -204,7 +258,7 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn arg_ptr_offsets(&self, i: usize) -> Result<Vec<u32>, VMInternalError> {
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::InvariantViolation(format!(
+            VMInternalError::invariant_violation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
                 self.abi.args().len(),
@@ -242,7 +296,7 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError> {
         if self.returns_started.get() {
-            return Err(VMInternalError::InvariantViolation(
+            return Err(VMInternalError::invariant_violation(
                 "new_byte_vector called after a return value was written".into(),
             ));
         }
@@ -255,7 +309,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // A heap-aliasing `bytes` would be invalidated by the GC `alloc_vec` may
         // trigger, before the copy below.
         if is_heap_ptr(heap, bytes.as_ptr()) {
-            return Err(VMInternalError::InvariantViolation(
+            return Err(VMInternalError::invariant_violation(
                 "new_byte_vector: bytes must not alias the VM heap".into(),
             ));
         }
@@ -272,19 +326,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             1,
             len,
         )
-        // Allocation failures are resource-limit conditions, not VM bugs.
-        .map_err(|e| match e {
-            RuntimeError::OutOfHeapMemory { requested } => {
-                VMInternalError::OutOfHeapMemory { requested }
-            },
-            RuntimeError::AllocationTooLarge { requested } => {
-                VMInternalError::AllocationTooLarge { requested }
-            },
-            RuntimeError::VecAllocSizeOverflow => VMInternalError::VecAllocSizeOverflow,
-            other => VMInternalError::InvariantViolation(format!(
-                "byte-vector allocation failed: {other}"
-            )),
-        })?;
+        .map_err(VMInternalError::from)?;
         // SAFETY: `ptr` is a fresh vector with room for `len` bytes; no GC runs
         // between here and these writes, so the raw pointer is valid.
         unsafe {
@@ -294,6 +336,206 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    unsafe fn bcs_serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> Result<Vec<u8>, VMInternalError> {
+        // SAFETY: forwarded from this method's contract; serialization performs
+        // no VM-heap allocation, so `base` stays valid throughout.
+        unsafe { crate::value_utils::serialize(self.layouts, base, ty) }.map_err(Into::into)
+    }
+
+    unsafe fn bcs_serialized_size(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> Result<usize, VMInternalError> {
+        // SAFETY: forwarded from this method's contract.
+        unsafe { crate::value_utils::serialized_size(self.layouts, base, ty) }.map_err(Into::into)
+    }
+
+    fn bcs_deserialize_value(
+        &self,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, VMInternalError> {
+        let layout = self.layouts.layout_by_ty(ty).ok_or_else(|| {
+            VMInternalError::invariant_violation("bcs deserialize: no layout for type".into())
+        })?;
+        let mut out = vec![0u8; layout.size as usize];
+        // SAFETY: heap and rws are distinct fields (see the type-level aliasing
+        // rule), so reborrowing both through `&self` at once is sound.
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        // `bytes` is off-heap (the native copied it), so it survives the GC the
+        // retry may run.
+        // SAFETY: `out` is `layout.size` writable bytes.
+        unsafe {
+            deserialize_or_gc(
+                self.layouts,
+                heap,
+                ty,
+                bytes,
+                out.as_mut_ptr(),
+                self.desc_provider,
+                rws,
+                &self.pool,
+                self.extensions,
+                self.frame_ptr,
+                TopFrame::Native(self.abi),
+            )
+        }
+        .map_err(Into::into)
+        .map(|()| out)
+    }
+
+    fn resource_exists(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> Result<bool, VMInternalError> {
+        // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
+        let rws = unsafe { &mut **self.rws.get() };
+        let key = InMemoryStorageKey::resource(address, ty);
+        Ok(rws.exists(self.resource_provider, &key)?)
+    }
+
+    fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> Result<Vec<u8>, VMInternalError> {
+        let slot = self.abi.args().get(i).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!("arg index {i} out of bounds"))
+        })?;
+        // SAFETY: the ABI keeps arg `i` within the frame, holding a value of type
+        // `ty` that stays live for the call.
+        let base = unsafe { self.frame_ptr.add(slot.offset as usize) };
+        unsafe { self.bcs_serialize_value(base, ty) }
+    }
+
+    fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
+        self.abi.required_descriptor(i)
+    }
+
+    fn table_contains(&self, handle: &TableHandle, key: &[u8]) -> Result<bool, VMInternalError> {
+        // SAFETY: `rws` is reborrowed exclusively here.
+        let rws = unsafe { &mut **self.rws.get() };
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        Ok(rws.exists(self.resource_provider, &storage_key)?)
+    }
+
+    fn table_borrow(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        mutable: bool,
+    ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = if mutable {
+            match rws.try_borrow_global_mut(self.resource_provider, &storage_key) {
+                Ok(EntryPtr::Writable(ptr)) => ptr,
+                Ok(EntryPtr::NonWritable(ptr)) => {
+                    // Copy-on-write: an external or stale value must be copied
+                    // into the local heap before it can be mutated.
+                    let heap = unsafe { &mut **self.heap.get() };
+                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
+                    let copied = unsafe {
+                        deep_copy_or_gc(
+                            heap,
+                            self.desc_provider,
+                            rws,
+                            &self.pool,
+                            self.extensions,
+                            self.frame_ptr,
+                            TopFrame::Native(self.abi),
+                            ptr,
+                        )
+                    }
+                    .map_err(VMInternalError::from)?;
+                    rws.commit_borrow_global_mut(&storage_key, copied);
+                    copied
+                },
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            match rws.borrow_global(self.resource_provider, &storage_key) {
+                Ok(ptr) => ptr,
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        };
+        // SAFETY: `ptr` is the live entry value; the reference points at its
+        // start, so the offset is 0. The pool roots it for the rest of the call.
+        let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
+        Ok(Some(Ref::from_handle(handle)))
+    }
+
+    // TODO: See if there's a way to separate out argument-reading from boxing.
+    //       Currently they are both handled here for GC-safety.
+    fn box_arg<'a>(
+        &'a self,
+        value_arg: usize,
+        descriptor: DescriptorId,
+    ) -> Result<Boxed<'a, Opaque>, VMInternalError> {
+        if self.returns_started.get() {
+            return Err(VMInternalError::invariant_violation(format!(
+                "box_arg({value_arg}) called after a return value was written"
+            )));
+        }
+        let slot = self.abi.args().get(value_arg).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!(
+                "box_arg: arg index {value_arg} out of bounds"
+            ))
+        })?;
+        let size = slot.size as usize;
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+
+        // Allocate first, then copy the value out of the frame, so to be
+        // GC-safe.
+        let obj = alloc_or_gc(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            |h| heap_alloc(h, OBJECT_HEADER_SIZE + size, descriptor),
+        )
+        .map_err(VMInternalError::from)?;
+        // SAFETY: the arg slot lies within the frame and `obj` has `size` payload
+        // bytes; no GC runs between the allocation and this copy.
+        unsafe {
+            std::ptr::copy_nonoverlapping(self.frame_ptr.add(slot.offset as usize), obj, size);
+        }
+        // Root the boxed object so it survives later allocations and is
+        // GC-relocated.
+        // SAFETY: `obj` is a freshly allocated, live heap object.
+        Ok(Boxed::from_handle(unsafe { self.pool.root_object(obj) }))
+    }
+
+    fn table_add(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        value: Boxed<'_, Opaque>,
+    ) -> Result<bool, VMInternalError> {
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let obj = NonNull::new(value.ptr()).ok_or_else(|| {
+            VMInternalError::invariant_violation("table_add: null boxed value".into())
+        })?;
+        // SAFETY: `rws` is reborrowed exclusively here.
+        let rws = unsafe { &mut **self.rws.get() };
+        match rws.move_to(self.resource_provider, &storage_key, obj) {
+            Ok(()) => Ok(true),
+            Err(RuntimeError::ResourceAlreadyExists { .. }) => Ok(false),
+            Err(e) => Err(e.into()),
+        }
     }
 
     fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {

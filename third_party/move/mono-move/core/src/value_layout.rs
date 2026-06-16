@@ -451,6 +451,22 @@ pub trait LayoutProvider {
     }
 }
 
+/// A `LayoutProvider` with no layouts; every lookup returns `None`.
+pub struct NoLayoutProvider;
+
+/// Shared `NoLayoutProvider` instance.
+pub static NO_LAYOUT_PROVIDER: NoLayoutProvider = NoLayoutProvider;
+
+impl LayoutProvider for NoLayoutProvider {
+    fn layout(&self, _id: LayoutId) -> Option<&ValueLayout> {
+        None
+    }
+
+    fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
+        None
+    }
+}
+
 // TODO: Test-only, remove when local execution context is refactored and removed.
 pub struct ValueLayoutTable {
     table: Vec<ValueLayout>,

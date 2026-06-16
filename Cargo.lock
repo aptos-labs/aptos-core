@@ -12882,7 +12882,6 @@ dependencies = [
  "move-core-types",
  "shared-dsa",
  "specializer",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -12922,7 +12921,6 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]

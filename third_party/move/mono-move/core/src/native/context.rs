@@ -6,10 +6,11 @@
 use super::{
     extension::NativeExtension,
     result::VMInternalError,
-    value::{VMValue, Vector},
+    value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector},
 };
-use crate::{interner::InternedModuleId, types::InternedType};
+use crate::{interner::InternedModuleId, types::InternedType, DescriptorId};
 use core::cell::RefMut;
+use move_core_types::account_address::AccountAddress;
 
 /// Trait that native functions are written generic over.
 ///
@@ -64,6 +65,15 @@ pub trait NativeContext {
     where
         T: VMValue<'a>;
 
+    /// Writes `bytes` as the in-frame representation of the `i`-th return value.
+    /// `bytes.len()` must equal the slot's size.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be a valid in-frame representation of the slot's Move-level
+    /// type. Any heap pointers it embeds must reference live objects.
+    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> Result<(), VMInternalError>;
+
     /// Number of type arguments.
     fn num_ty_args(&self) -> usize;
 
@@ -86,6 +96,88 @@ pub trait NativeContext {
     /// returns a handle to it. The vector stays live for the rest of the
     /// native call.
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError>;
+
+    /// BCS-serializes the value of type `ty` stored at `base`.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` that stays
+    /// live for the duration of the call.
+    unsafe fn bcs_serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> Result<Vec<u8>, VMInternalError>;
+
+    /// BCS serialized size of the value of type `ty` stored at `base`.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` that stays
+    /// live for the duration of the call.
+    unsafe fn bcs_serialized_size(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> Result<usize, VMInternalError>;
+
+    /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
+    /// representation.
+    ///
+    /// The returned bytes may embed pointers to freshly allocated, unrooted heap
+    /// objects, so they must be written into a frame slot before any further
+    /// heap allocation.
+    fn bcs_deserialize_value(
+        &self,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, VMInternalError>;
+
+    /// Whether a resource of type `ty` exists at `address` in global storage.
+    //
+    // TODO: see if the specializer can lower the caller (object::exists_at) to
+    // the `Exists` micro-op directly, dropping this native path.
+    fn resource_exists(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> Result<bool, VMInternalError>;
+
+    /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
+    fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> Result<Vec<u8>, VMInternalError>;
+
+    /// The `i`-th GC descriptor the native requires.
+    fn required_descriptor(&self, i: usize) -> Option<DescriptorId>;
+
+    /// Boxes the by-value argument `value_arg` into a fresh heap object built
+    /// from `descriptor`, returning an owned handle that stays live for the
+    /// rest of the call.
+    fn box_arg<'a>(
+        &'a self,
+        value_arg: usize,
+        descriptor: DescriptorId,
+    ) -> Result<Boxed<'a, Opaque>, VMInternalError>;
+
+    /// Whether a table entry exists at `(handle, key)`.
+    fn table_contains(&self, handle: &TableHandle, key: &[u8]) -> Result<bool, VMInternalError>;
+
+    /// Borrows the table entry at `(handle, key)`, returning a reference to it.
+    /// Returns `None` if the entry does not exist.
+    fn table_borrow(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        mutable: bool,
+    ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError>;
+
+    /// Adds an already-boxed `value` to the table referenced by `handle` under
+    /// `key`. Returns false if an entry already exists at `key`.
+    fn table_add(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        value: Boxed<'_, Opaque>,
+    ) -> Result<bool, VMInternalError>;
 
     /// Obtains a mutable reference to the extension of type `T`.
     ///

@@ -38,7 +38,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionHandleIndex, VariantFieldHandleIndex},
 };
-use move_core_types::function::ClosureMask;
+use move_core_types::{account_address::AccountAddress, function::ClosureMask, ident_str};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
@@ -91,6 +91,43 @@ pub struct CallSiteInfo {
     pub ty_args: InternedTypeList,
     /// `Some(idx)` when the callee resolves to a registered native.
     pub native_idx: Option<NativeIdx>,
+    /// GC descriptors the native requires (for heap allocation etc.)
+    pub required_descriptors: Vec<DescriptorId>,
+}
+
+/// Types a native needs GC descriptors for.
+///
+/// TODO: Instead of hard-coding them here, figure out a way to allow natives to declare them.
+fn descriptor_types_for_native(
+    interner: &impl Interner,
+    module_id: InternedModuleId,
+    func_name: InternedIdentifier,
+    arg_types: &[InternedType],
+) -> Vec<InternedType> {
+    let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
+    let add_box = interner.identifier_of(ident_str!("add_box"));
+    if module_id == table && func_name == add_box {
+        return arg_types.get(2).copied().into_iter().collect();
+    }
+    Vec::new()
+}
+
+/// Publishes a struct descriptor for the concrete `ty`, recording it in
+/// `descriptors`. A no-op when `ty` is not sized or its pointer offsets can't be
+/// derived (e.g. still generic).
+fn publish_struct_descriptor_for(
+    ctx: &impl SpecializerContext,
+    ty: InternedType,
+    descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
+) -> Result<()> {
+    if let Some((size, _)) = type_size_and_align(ty)
+        && let Ok(ptr_offsets) = type_pointer_offsets(ty)
+    {
+        let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
+        let id = ctx.publish_struct_descriptor(ty, size, &ptr_offsets)?;
+        descriptors.insert(ty, id);
+    }
+    Ok(())
 }
 
 /// Pre-resolved data for one `PackClosure`, consumed in IR order.
@@ -677,6 +714,17 @@ pub fn try_build_context<'a>(
         // against the callee module's `is_native` flag so a registered impl cannot
         // shadow a Move-body function with the same qualified name.
         let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
+        // GC descriptors the native requires for the types it heap-allocates;
+        // the discovery pass published them keyed on the concrete type.
+        let required_descriptors: Vec<DescriptorId> = descriptor_types_for_native(
+            interner,
+            callee_module_id,
+            callee_func_name,
+            view_type_list(param_list),
+        )
+        .iter()
+        .filter_map(|ty| descriptors.vec.get(ty).copied())
+        .collect();
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
@@ -684,6 +732,7 @@ pub fn try_build_context<'a>(
             ret_slots,
             ty_args: call_ty_args,
             native_idx,
+            required_descriptors,
         });
     }
 
@@ -1048,16 +1097,17 @@ fn try_discover_types_for_lowering_in_function_impl(
         // reached via the return/direct-call walks), so their nominals are
         // still discovered. Otherwise, we need to feed `CallClosure` signature
         // types here and recurse into `Type::Function`.
-        let (params, returns) = match instr {
+        let (params, returns, handle_idx) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns))
+                (Some(sig.params), Some(sig.returns), Some(*idx))
             },
             Instr::CallGeneric(_, idx, _) => {
+                let inst = module_ir.module.function_instantiation_at(*idx);
                 let sig = module_ir.module.function_instantiation_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns))
+                (Some(sig.params), Some(sig.returns), Some(inst.handle))
             },
-            _ => (None, None),
+            _ => (None, None, None),
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
@@ -1067,6 +1117,18 @@ fn try_discover_types_for_lowering_in_function_impl(
         if let Some(returns) = returns {
             for &ty in view_type_list(returns) {
                 discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+            }
+        }
+
+        // A native that heap-allocates a type (e.g. `table::add_box`'s `Box<V>`)
+        // requires a struct descriptor for that concrete type, published here so
+        // the build pass can record it in the ABI.
+        if let Some(handle_idx) = handle_idx {
+            let (module_id, func_name) = callee_identity(&module_ir.module, handle_idx);
+            let arg_types = view_type_list(params.expect("call instruction has params"));
+            for value_ty in descriptor_types_for_native(interner, module_id, func_name, arg_types) {
+                let value_ty = ctx.subst_type(value_ty, ty_args)?;
+                publish_struct_descriptor_for(ctx, value_ty, &mut descriptors.vec)?;
             }
         }
 
@@ -1109,13 +1171,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         if let Some(resource_ty) = resource_type_in_instr(instr) {
             discover_type_metadata(ctx, resource_ty, ty_args, visited, descriptors)?;
             let resource_ty = ctx.subst_type(resource_ty, ty_args)?;
-            if let Some((size, _)) = type_size_and_align(resource_ty)
-                && let Ok(ptr_offsets) = type_pointer_offsets(resource_ty)
-            {
-                let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
-                let id = ctx.publish_struct_descriptor(resource_ty, size, &ptr_offsets)?;
-                descriptors.vec.insert(resource_ty, id);
-            }
+            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
         }
 
         // The walks above don't reach a constant's own type. A vector

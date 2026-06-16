@@ -14,7 +14,7 @@ use mono_move_core::{
 /// Exchanges the values behind the two references.
 pub fn native_swap<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let (size, _) = view_type(ctx.ty_arg(0)?).size_and_align().ok_or_else(|| {
-        VMInternalError::InvariantViolation("mem::swap: type argument has no concrete size".into())
+        VMInternalError::invariant_violation("mem::swap: type argument has no concrete size".into())
     })?;
     let size = size as usize;
     // SAFETY: arg 0 / arg 1 are `&mut T`, each holding `size` valid bytes.

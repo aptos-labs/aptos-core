@@ -22,7 +22,6 @@ mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
 move-core-types = { workspace = true }
 rand = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]
 num-bigint = { workspace = true }
