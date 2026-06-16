@@ -817,6 +817,38 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_hot_state_item_count(&self, version: Version) -> Result<usize> {
+        gauged_api("get_hot_state_item_count", || {
+            // TODO(HotState): check `hot_state_merkle_pruner` instead.
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+            // TODO(HotState): read from hot state usage tracking once it exists, as cold's
+            // `get_state_item_count` does, rather than the hot JMT root node's leaf count.
+            self.state_store.get_hot_state_item_count(version)
+        })
+    }
+
+    fn get_hot_state_value_chunk_iter(
+        &self,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, HotStateValue)>> + '_>> {
+        gauged_api("get_hot_state_value_chunk_iter", || {
+            // TODO(HotState): check `hot_state_kv_pruner` / `hot_state_merkle_pruner` instead.
+            self.error_if_state_kv_pruned("HotStateValue", version)?;
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+            let iter = self.state_store.get_hot_state_value_chunk_iter(
+                version,
+                first_index,
+                chunk_size,
+            )?;
+            Ok(Box::new(iter)
+                as Box<
+                    dyn Iterator<Item = Result<(StateKey, HotStateValue)>> + '_,
+                >)
+        })
+    }
+
     fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
         gauged_api("is_state_merkle_pruner_enabled", || {
             Ok(self
