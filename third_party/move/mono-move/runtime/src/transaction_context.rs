@@ -81,6 +81,10 @@ impl ExecutionContext for TransactionContext<'_, '_> {
         &self.extensions
     }
 
+    fn reset_module_read_set(&mut self) {
+        self.read_set = ModuleReadSet::new();
+    }
+
     fn native_call_borrows(
         &mut self,
     ) -> (

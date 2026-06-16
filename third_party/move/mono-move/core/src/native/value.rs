@@ -3,9 +3,10 @@
 
 //! Read / write of native arg and return values through a frame slot.
 
+use super::{context::NativeContext, result::VMInternalError};
 use crate::{
     align::MAX_ALIGN,
-    memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr},
+    memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr, write_u64},
     root_pool::{ObjectHandle, ReferenceHandle, RootPool},
     VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
@@ -232,6 +233,82 @@ impl<'a, V> Ref<'a, Vector<'a, V>> {
     }
 }
 
+impl<'a> Ref<'a, Vector<'a, Opaque>> {
+    /// Moves `length` elements out of `from` (starting at `removal`) and
+    /// inserts them into `self` (the destination) at `insert`, growing `self`
+    /// as needed. When `self` is empty, the fresh allocation borrows its GC
+    /// descriptor from `from`.
+    ///
+    /// Positions are assumed to be in bounds and `length` non-zero; the caller
+    /// is responsible for checking and aborting otherwise.
+    ///
+    /// # Safety
+    ///
+    /// `self` and `from` must reference `vector<T>` values of the same `T`,
+    /// `elem_size` must equal the byte size of `T`, the positions must be in
+    /// range, and `length` must be non-zero.
+    pub unsafe fn move_range<C: NativeContext>(
+        &self,
+        from: &Ref<'a, Vector<'a, Opaque>>,
+        removal: usize,
+        length: usize,
+        insert: usize,
+        elem_size: usize,
+        ctx: &C,
+    ) -> Result<(), VMInternalError> {
+        let to_len = self.borrow().len() as usize;
+
+        // Grow the destination to hold the inserted elements. This is the only
+        // allocation, and the only point at which a GC can run.
+        unsafe { ctx.grow_vector(self, from, elem_size, to_len + length)? };
+
+        // The grow may have relocated either vector, so re-borrow for fresh
+        // pointers. No allocation happens past this point.
+        let to_vec = self.borrow();
+        let from_vec = from.borrow();
+        // SAFETY: used transiently, with no allocation before the writes below.
+        let to_data = unsafe { to_vec.data_ptr() };
+        let from_data = unsafe { from_vec.data_ptr() };
+        let from_len = from_vec.len() as usize;
+
+        // SAFETY: every range lies within the now-sized vectors.
+        unsafe {
+            // Open a gap in `self` at `insert` by shifting its tail right.
+            if to_len > insert {
+                std::ptr::copy(
+                    to_data.add(insert * elem_size),
+                    to_data.add((insert + length) * elem_size),
+                    (to_len - insert) * elem_size,
+                );
+            }
+            // Copy the moved range from `from` into the gap. Move's borrow
+            // rules make `from` and `to` distinct, but we use an overlapping
+            // copy so this stays sound even if speculative execution ever
+            // produces transiently aliasing references.
+            // TODO(security): switch back to `copy_nonoverlapping` once we've
+            // confirmed Block-STM speculation cannot alias the two vectors.
+            std::ptr::copy(
+                from_data.add(removal * elem_size),
+                to_data.add(insert * elem_size),
+                length * elem_size,
+            );
+            // Close the gap left in `from` by shifting its tail left.
+            if from_len > removal + length {
+                std::ptr::copy(
+                    from_data.add((removal + length) * elem_size),
+                    from_data.add(removal * elem_size),
+                    (from_len - removal - length) * elem_size,
+                );
+            }
+
+            // Both objects now hold their adjusted element counts.
+            to_vec.set_len((to_len + length) as u64);
+            from_vec.set_len((from_len - length) as u64);
+        }
+        Ok(())
+    }
+}
+
 impl<'a, T> VMValue<'a> for Ref<'a, T> {
     const FRAME_SLOT_SIZE: usize = 16;
 
@@ -303,6 +380,36 @@ impl<'a, V> Vector<'a, V> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Pointer to element 0 of the data region, or null if the vector is
+    /// empty/unallocated.
+    ///
+    /// # Safety
+    ///
+    /// The pointer is invalidated by any GC; the caller must use it only
+    /// transiently, before any allocation that could trigger collection.
+    #[inline]
+    pub unsafe fn data_ptr(&self) -> *mut u8 {
+        let p = self.ptr();
+        if p.is_null() {
+            std::ptr::null_mut()
+        } else {
+            // SAFETY: a non-null vector object stores its data at `VEC_DATA_OFFSET`.
+            unsafe { p.add(VEC_DATA_OFFSET) }
+        }
+    }
+
+    /// Overwrites the vector's element count.
+    ///
+    /// # Safety
+    ///
+    /// The backing heap object must be non-null and have capacity for `len`
+    /// elements.
+    #[inline]
+    pub unsafe fn set_len(&self, len: u64) {
+        // SAFETY: caller guarantees a non-null object with room for `len` elements.
+        unsafe { write_u64(self.ptr(), VEC_LENGTH_OFFSET, len) };
     }
 
     // TODO: Other vector APIs, added on-demand.

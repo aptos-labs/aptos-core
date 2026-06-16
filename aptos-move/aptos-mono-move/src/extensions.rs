@@ -28,12 +28,16 @@ use aptos_types::{
         StateViewResult, TStateView,
     },
     transaction::{
-        user_transaction_context::{EntryFunctionPayload, UserTransactionContext},
+        user_transaction_context::{
+            EntryFunctionPayload, TransactionIndexKind, UserTransactionContext,
+        },
         AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction,
     },
 };
 use aptos_vm::move_vm_ext::SessionId;
 use bytes::Bytes;
+use mono_move_core::native::NativeExtensions;
+use mono_move_natives::{EventStore, ObjectContextExtension, TransactionContextExtension};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_extensions::NativeContextExtensions;
@@ -90,19 +94,7 @@ pub fn replay_extensions<'a>(
     aux_info: PersistedAuxiliaryInfo,
     entry: &EntryCall,
 ) -> NativeContextExtensions<'a> {
-    let session_id = match signed.replay_protector() {
-        ReplayProtector::SequenceNumber(sequence_number) => SessionId::Txn {
-            sender: entry.sender,
-            sequence_number,
-            script_hash: vec![],
-        },
-        ReplayProtector::Nonce(nonce) => SessionId::OrderlessTxn {
-            sender: entry.sender,
-            nonce,
-            expiration_time: signed.expiration_timestamp_secs(),
-            script_hash: vec![],
-        },
-    };
+    let session_id = session_id(signed, entry);
     let entry_payload = EntryFunctionPayload::new(
         *entry.module.address(),
         entry.module.name().to_string(),
@@ -140,11 +132,13 @@ pub fn make_extensions<'a>(
     let txn_hash = session_id.txn_hash();
     // `SessionId::session_counter`/`into_script_hash` are not public, so derive
     // the same values from the variant we constructed.
-    let (script_hash, session_counter) = match session_id {
-        SessionId::Txn { script_hash, .. } => (script_hash.clone(), 35u8),
-        SessionId::OrderlessTxn { script_hash, .. } => (script_hash.clone(), 40u8),
-        _ => (vec![], 0u8),
+    let script_hash = match session_id {
+        SessionId::Txn { script_hash, .. } | SessionId::OrderlessTxn { script_hash, .. } => {
+            script_hash.clone()
+        },
+        _ => vec![],
     };
+    let session_counter = session_counter(session_id);
 
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new(txn_hash, view));
@@ -163,5 +157,67 @@ pub fn make_extensions<'a>(
     extensions.add(NativeStateStorageContext::new(view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeObjectContext::default());
+    extensions
+}
+
+/// The session id for replaying `entry`, derived from the transaction's replay
+/// protector (sequence number or nonce). Shared by the V1 and V2 extension
+/// builders so both VMs see the same transaction hash.
+fn session_id(signed: &SignedTransaction, entry: &EntryCall) -> SessionId {
+    match signed.replay_protector() {
+        ReplayProtector::SequenceNumber(sequence_number) => SessionId::Txn {
+            sender: entry.sender,
+            sequence_number,
+            script_hash: vec![],
+        },
+        ReplayProtector::Nonce(nonce) => SessionId::OrderlessTxn {
+            sender: entry.sender,
+            nonce,
+            expiration_time: signed.expiration_timestamp_secs(),
+            script_hash: vec![],
+        },
+    }
+}
+
+/// The session counter for a session id, mirroring `SessionId`'s (non-public)
+/// counter assignment: 35 for sequence-number transactions, 40 for orderless.
+fn session_counter(session_id: &SessionId) -> u8 {
+    match session_id {
+        SessionId::Txn { .. } => 35,
+        SessionId::OrderlessTxn { .. } => 40,
+        _ => 0,
+    }
+}
+
+/// Builds MonoMove's native extensions for replaying `entry`, seeded from the
+/// same transaction data as the legacy VM's [`replay_extensions`]: the same
+/// transaction hash and session counter, and the transaction index / reserved
+/// byte from the auxiliary info. `NotAvailable` (no persisted index) seeds a
+/// zero index, matching the absence of a usable monotonic counter.
+pub fn replay_v2_extensions(
+    signed: &SignedTransaction,
+    aux_info: PersistedAuxiliaryInfo,
+    entry: &EntryCall,
+) -> NativeExtensions {
+    let session_id = session_id(signed, entry);
+    let txn_hash = session_id.txn_hash().to_vec();
+    let session_counter = session_counter(&session_id);
+    let (transaction_index, reserved_byte) =
+        match AuxiliaryInfo::new(aux_info, None).transaction_index_kind() {
+            TransactionIndexKind::BlockExecution { transaction_index } => (transaction_index, 0),
+            TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
+                (transaction_index, 1)
+            },
+            TransactionIndexKind::NotAvailable => (0, 0),
+        };
+    let mut extensions = NativeExtensions::new();
+    extensions.add(TransactionContextExtension::new(
+        txn_hash,
+        session_counter,
+        transaction_index,
+        reserved_byte,
+    ));
+    extensions.add(ObjectContextExtension::new());
+    extensions.add(EventStore::new());
     extensions
 }

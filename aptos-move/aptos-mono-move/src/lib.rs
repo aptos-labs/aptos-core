@@ -12,6 +12,7 @@ pub mod args;
 pub mod cache;
 pub mod compare;
 pub mod dump;
+pub mod events;
 pub mod extensions;
 pub mod resolver;
 pub mod txn;

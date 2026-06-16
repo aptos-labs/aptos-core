@@ -26,8 +26,8 @@ use mono_move_core::{
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{
-        is_closed_type, strip_ref, view_type, view_type_list, Alignment, FieldLayout, InternedType,
-        InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
+        is_closed_type, strip_ref, type_to_string, view_type, view_type_list, Alignment,
+        FieldLayout, InternedType, InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
     Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
@@ -102,12 +102,32 @@ fn descriptor_types_for_native(
     interner: &impl Interner,
     module_id: InternedModuleId,
     func_name: InternedIdentifier,
-    arg_types: &[InternedType],
+    callee_ty_args: &[InternedType],
 ) -> Vec<InternedType> {
     let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
-    let add_box = interner.identifier_of(ident_str!("add_box"));
-    if module_id == table && func_name == add_box {
-        return arg_types.get(2).copied().into_iter().collect();
+    let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
+    if module_id == table {
+        // The `*_box` table natives are `<K, V, B>` with `B = Box<V>`, the type
+        // of the value stored in storage. A provider read materializes that
+        // value, so its struct descriptor must be published for every access
+        // that can read it (borrow / contains), not only `add_box`.
+        let is_box_native = [
+            ident_str!("add_box"),
+            ident_str!("borrow_box"),
+            ident_str!("borrow_box_mut"),
+            ident_str!("remove_box"),
+            ident_str!("contains_box"),
+        ]
+        .iter()
+        .any(|name| func_name == interner.identifier_of(name));
+        if is_box_native {
+            return callee_ty_args.get(2).copied().into_iter().collect();
+        }
+    } else if module_id == object && func_name == interner.identifier_of(ident_str!("exists_at")) {
+        // `object::exists_at<T>` reads resource `T` through the provider, which
+        // materializes it just to answer existence, so publish `T`'s layout and
+        // descriptor even though no `borrow_global<T>` instruction names it.
+        return callee_ty_args.first().copied().into_iter().collect();
     }
     Vec::new()
 }
@@ -720,7 +740,7 @@ pub fn try_build_context<'a>(
             interner,
             callee_module_id,
             callee_func_name,
-            view_type_list(param_list),
+            view_type_list(call_ty_args),
         )
         .iter()
         .filter_map(|ty| descriptors.vec.get(ty).copied())
@@ -1108,17 +1128,17 @@ fn try_discover_types_for_lowering_in_function_impl(
         // reached via the return/direct-call walks), so their nominals are
         // still discovered. Otherwise, we need to feed `CallClosure` signature
         // types here and recurse into `Type::Function`.
-        let (params, returns, handle_idx) = match instr {
+        let (params, returns, handle_idx, callee_ty_args) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns), Some(*idx))
+                (Some(sig.params), Some(sig.returns), Some(*idx), EMPTY_TYPE_LIST)
             },
             Instr::CallGeneric(_, idx, _) => {
                 let inst = module_ir.module.function_instantiation_at(*idx);
                 let sig = module_ir.module.function_instantiation_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns), Some(inst.handle))
+                (Some(sig.params), Some(sig.returns), Some(inst.handle), sig.ty_args)
             },
-            _ => (None, None, None),
+            _ => (None, None, None, EMPTY_TYPE_LIST),
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
@@ -1131,13 +1151,20 @@ fn try_discover_types_for_lowering_in_function_impl(
             }
         }
 
-        // A native that heap-allocates a type (e.g. `table::add_box`'s `Box<V>`)
-        // requires a struct descriptor for that concrete type, published here so
-        // the build pass can record it in the ABI.
+        // A native that materializes a typed storage value (e.g. a `table`
+        // `*_box` native's `Box<V>`) requires a struct descriptor for that
+        // concrete type, published here so the build pass can record it in the
+        // ABI and a provider can materialize the value.
         if let Some(handle_idx) = handle_idx {
             let (module_id, func_name) = callee_identity(&module_ir.module, handle_idx);
-            let arg_types = view_type_list(params.expect("call instruction has params"));
-            for value_ty in descriptor_types_for_native(interner, module_id, func_name, arg_types) {
+            for value_ty in
+                descriptor_types_for_native(interner, module_id, func_name, view_type_list(callee_ty_args))
+            {
+                // Publish both the layout and the struct descriptor for the
+                // materialized value type. A provider read needs both, even on a
+                // `contains` access whose return signature never mentions the
+                // value type and so would not reach it through the walks above.
+                discover_type_metadata(ctx, value_ty, ty_args, visited, descriptors)?;
                 let value_ty = ctx.subst_type(value_ty, ty_args)?;
                 publish_struct_descriptor_for(ctx, value_ty, &mut descriptors.vec)?;
             }
@@ -1413,6 +1440,7 @@ fn discover_type_metadata(
             // the generic type would poison its `OnceLock` and break later
             // substitutions over it.
             if !is_closed_type(ty) {
+                eprintln!("DEFER layout: open (generic) type {}", type_to_string(ty));
                 return Ok(None);
             }
             match ctx.get_fields(module_id, name)? {
@@ -1420,6 +1448,10 @@ fn discover_type_metadata(
                     // The context does not have field information for this
                     // nominal (e.g., the module has not been loaded). Treat
                     // like a generic type parameter: defer.
+                    eprintln!(
+                        "DEFER layout: no field info for closed type {}",
+                        type_to_string(ty),
+                    );
                     Ok(None)
                 },
                 Some(FieldTypes::Struct(fields)) => {
@@ -1447,6 +1479,15 @@ fn discover_type_metadata(
                     // nominal type: defer. `None` means a field is not sized.
                     let Some((field_layouts, total, max_align)) = layout_inline_fields(&fields)
                     else {
+                        let bad = fields
+                            .iter()
+                            .position(|f| type_size_and_align(*f).is_none())
+                            .map(|i| type_to_string(fields[i]))
+                            .unwrap_or_default();
+                        eprintln!(
+                            "DEFER layout: closed struct {} has unsized field {bad}",
+                            type_to_string(ty),
+                        );
                         return Ok(None);
                     };
                     // Defer the whole struct if any field's layout is not yet
@@ -1460,6 +1501,15 @@ fn discover_type_metadata(
                         max_align,
                     )?
                     else {
+                        let bad = field_ids
+                            .iter()
+                            .position(Option::is_none)
+                            .map(|i| type_to_string(fields[i]))
+                            .unwrap_or_default();
+                        eprintln!(
+                            "DEFER layout: closed struct {} field {bad} has no published layout",
+                            type_to_string(ty),
+                        );
                         return Ok(None);
                     };
                     // TODO: remove legacy size/layout.

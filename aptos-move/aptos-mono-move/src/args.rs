@@ -111,9 +111,10 @@ impl PrimitiveKind {
 
 /// The `TypeTag` for a value type MonoMove can place by deserialization, or
 /// `None` if the type (or any component) is unsupported. Covers primitives,
-/// `vector<T>` of any supported `T` (including nested vectors), and
-/// `0x1::string::String`. Other structs (e.g. `0x1::option::Option`), function
-/// values, type parameters, and references are unsupported.
+/// `vector<T>` of any supported `T` (including nested vectors),
+/// `0x1::string::String`, `0x1::option::Option<T>` for any supported `T`, and
+/// `0x1::object::Object<T>` (a phantom wrapper over an address). Other structs,
+/// function values, type parameters, and references are unsupported.
 fn value_tag(ty: &Type, structs: &StructNameIndexMap) -> Option<TypeTag> {
     Some(match ty {
         Type::Bool => TypeTag::Bool,
@@ -137,12 +138,88 @@ fn value_tag(ty: &Type, structs: &StructNameIndexMap) -> Option<TypeTag> {
         {
             TypeTag::Struct(Box::new(string_struct_tag()))
         },
+        Type::StructInstantiation { idx, ty_args, .. }
+            if is_well_known(structs, *idx, "option", "Option") =>
+        {
+            // `Option<T>` is an enum with a single type argument `T`. Place it
+            // by deserializing into the heap, recursing on the element type.
+            let [elem] = &ty_args[..] else {
+                return None;
+            };
+            TypeTag::Struct(Box::new(option_struct_tag(value_tag(elem, structs)?)))
+        },
+        Type::StructInstantiation { idx, ty_args, .. }
+            if is_well_known(structs, *idx, "object", "Object") =>
+        {
+            // `Object<T>` is a phantom wrapper over an address (its sole field).
+            // `T` is phantom and never deserialized, but it must match the
+            // instantiation in the code so the resolved type has a published
+            // layout — so it is converted with the general `type_to_tag`.
+            let [phantom] = &ty_args[..] else {
+                return None;
+            };
+            TypeTag::Struct(Box::new(object_struct_tag(type_to_tag(phantom, structs)?)))
+        },
         Type::Struct { .. }
         | Type::StructInstantiation { .. }
         | Type::Reference(_)
         | Type::MutableReference(_)
         | Type::Function { .. }
         | Type::TyParam(_) => return None,
+    })
+}
+
+/// Converts an arbitrary parameter type to its `TypeTag`, resolving struct
+/// names through `structs`. Unlike [`value_tag`], it does not restrict to
+/// MonoMove-placeable value types — it is used for the phantom type arguments
+/// of `Object<T>`, which are only needed to name the nominal, never placed.
+/// Returns `None` for references, function values, and type parameters.
+fn type_to_tag(ty: &Type, structs: &StructNameIndexMap) -> Option<TypeTag> {
+    Some(match ty {
+        Type::Bool => TypeTag::Bool,
+        Type::U8 => TypeTag::U8,
+        Type::U16 => TypeTag::U16,
+        Type::U32 => TypeTag::U32,
+        Type::U64 => TypeTag::U64,
+        Type::U128 => TypeTag::U128,
+        Type::U256 => TypeTag::U256,
+        Type::I8 => TypeTag::I8,
+        Type::I16 => TypeTag::I16,
+        Type::I32 => TypeTag::I32,
+        Type::I64 => TypeTag::I64,
+        Type::I128 => TypeTag::I128,
+        Type::I256 => TypeTag::I256,
+        Type::Address => TypeTag::Address,
+        Type::Signer => TypeTag::Signer,
+        Type::Vector(inner) => TypeTag::Vector(Box::new(type_to_tag(inner, structs)?)),
+        Type::Struct { idx, .. } => TypeTag::Struct(Box::new(struct_tag_of(*idx, vec![], structs)?)),
+        Type::StructInstantiation { idx, ty_args, .. } => {
+            let args = ty_args
+                .iter()
+                .map(|t| type_to_tag(t, structs))
+                .collect::<Option<Vec<_>>>()?;
+            TypeTag::Struct(Box::new(struct_tag_of(*idx, args, structs)?))
+        },
+        Type::Reference(_)
+        | Type::MutableReference(_)
+        | Type::Function { .. }
+        | Type::TyParam(_) => return None,
+    })
+}
+
+/// Builds the `StructTag` for the named struct index with the given type
+/// arguments.
+fn struct_tag_of(
+    idx: StructNameIndex,
+    type_args: Vec<TypeTag>,
+    structs: &StructNameIndexMap,
+) -> Option<StructTag> {
+    let name = structs.idx_to_struct_name(idx).ok()?;
+    Some(StructTag {
+        address: *name.module().address(),
+        module: name.module().name().to_owned(),
+        name: name.name().to_owned(),
+        type_args,
     })
 }
 
@@ -153,6 +230,26 @@ fn string_struct_tag() -> StructTag {
         module: ident_str!("string").to_owned(),
         name: ident_str!("String").to_owned(),
         type_args: vec![],
+    }
+}
+
+/// The struct tag for `0x1::option::Option<elem>`.
+fn option_struct_tag(elem: TypeTag) -> StructTag {
+    StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("option").to_owned(),
+        name: ident_str!("Option").to_owned(),
+        type_args: vec![elem],
+    }
+}
+
+/// The struct tag for `0x1::object::Object<phantom>`.
+fn object_struct_tag(phantom: TypeTag) -> StructTag {
+    StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("object").to_owned(),
+        name: ident_str!("Object").to_owned(),
+        type_args: vec![phantom],
     }
 }
 

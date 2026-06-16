@@ -450,13 +450,13 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::PackClosure(_, _, _, _)
         | Instr::PackClosureGeneric(_, _, _, _)
         | Instr::CallClosure(_, _, _)
-        | Instr::VecPack(_, _, _, _)
+        | Instr::VecPack(_, _, _)
         | Instr::VecLen(_, _, _)
         | Instr::VecImmBorrow(_, _, _, _)
         | Instr::VecMutBorrow(_, _, _, _)
         | Instr::VecPushBack(_, _, _)
         | Instr::VecPopBack(_, _, _)
-        | Instr::VecUnpack(_, _, _, _)
+        | Instr::VecUnpack(_, _, _)
         | Instr::VecSwap(_, _, _, _)
         | Instr::Branch(_)
         | Instr::BrTrue(_, _)
@@ -656,7 +656,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             uses::<USES>(captured, &mut f);
         },
 
-        Instr::VecPack(dst, _, _, elems) => {
+        Instr::VecPack(dst, _, elems) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(elems, &mut f);
         },
@@ -673,7 +673,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*vec_ref, &mut f);
             used::<USES>(*val, &mut f);
         },
-        Instr::VecUnpack(dsts, _, _, src) => {
+        Instr::VecUnpack(dsts, _, src) => {
             defs::<DEFS>(dsts, &mut f);
             used::<USES>(*src, &mut f);
         },
@@ -911,7 +911,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::VecPack(dst, _, _, elems) => {
+        Instr::VecPack(dst, _, elems) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -942,7 +942,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(val, &mut f);
             }
         },
-        Instr::VecUnpack(dsts, _, _, src) => {
+        Instr::VecUnpack(dsts, _, src) => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }

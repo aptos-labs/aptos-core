@@ -13,7 +13,7 @@ use crate::{
         alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr, Heap,
         TopFrame,
     },
-    memory::{read_ptr, write_u64},
+    memory::{read_descriptor, read_obj_size, read_ptr, read_u64, write_ptr, write_u64},
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
@@ -221,6 +221,51 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(())
     }
 
+    unsafe fn set_return_unboxed(
+        &self,
+        i: usize,
+        value: &Boxed<'_, Opaque>,
+    ) -> Result<(), VMInternalError> {
+        let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
+            VMInternalError::invariant_violation(format!(
+                "return index {} out of bounds (num_returns={})",
+                i,
+                self.abi.returns().len(),
+            ))
+        })?;
+        // Copy the inline value (the return slot's size) out of the heap
+        // object's data region. The object was boxed from a value of the return
+        // type, so its data region is at least that wide.
+        // SAFETY: `value.ptr()` is a live object's data pointer with at least
+        // `slot.size` bytes; the ABI keeps the return slot within the frame; no
+        // GC runs before the native returns, so embedded pointers stay valid.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                value.ptr(),
+                self.frame_ptr.add(slot.offset as usize),
+                slot.size as usize,
+            );
+        }
+        self.returns_started.set(true);
+        Ok(())
+    }
+
+    unsafe fn compare_args(
+        &self,
+        i: usize,
+        j: usize,
+        ty: InternedType,
+    ) -> Result<std::cmp::Ordering, VMInternalError> {
+        // SAFETY: args `i` and `j` are references (per this method's contract);
+        // reading them as `Ref<Opaque>` roots them and yields the pointees.
+        let a: Ref<Opaque> = unsafe { self.arg(i)? };
+        let b: Ref<Opaque> = unsafe { self.arg(j)? };
+        // SAFETY: both point to live values of type `ty`; `compare` performs no
+        // heap allocation, so the pointers stay valid throughout the call.
+        unsafe { crate::value_utils::compare(self.layouts, a.ptr(), b.ptr(), ty) }
+            .map_err(Into::into)
+    }
+
     fn num_ty_args(&self) -> usize {
         self.ty_args.len()
     }
@@ -231,6 +276,16 @@ impl NativeContext for ProductionNativeContext<'_> {
                 "ty_arg index {} out of bounds (num_ty_args={})",
                 i,
                 self.ty_args.len(),
+            ))
+        })
+    }
+
+    fn return_ty(&self, i: usize) -> Result<InternedType, VMInternalError> {
+        self.abi.return_ty(i).ok_or_else(|| {
+            VMInternalError::invariant_violation(format!(
+                "return_ty index {} out of bounds (num_returns={})",
+                i,
+                self.abi.returns().len(),
             ))
         })
     }
@@ -417,10 +472,15 @@ impl NativeContext for ProductionNativeContext<'_> {
         self.abi.required_descriptor(i)
     }
 
-    fn table_contains(&self, handle: &TableHandle, key: &[u8]) -> Result<bool, VMInternalError> {
+    fn table_contains(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        value_ty: InternedType,
+    ) -> Result<bool, VMInternalError> {
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         Ok(rws.exists(self.resource_provider, &storage_key)?)
     }
 
@@ -428,9 +488,10 @@ impl NativeContext for ProductionNativeContext<'_> {
         &self,
         handle: &TableHandle,
         key: &[u8],
+        value_ty: InternedType,
         mutable: bool,
     ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
         let ptr = if mutable {
@@ -523,9 +584,10 @@ impl NativeContext for ProductionNativeContext<'_> {
         &self,
         handle: &TableHandle,
         key: &[u8],
+        value_ty: InternedType,
         value: Boxed<'_, Opaque>,
     ) -> Result<bool, VMInternalError> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         let obj = NonNull::new(value.ptr()).ok_or_else(|| {
             VMInternalError::invariant_violation("table_add: null boxed value".into())
         })?;
@@ -538,8 +600,147 @@ impl NativeContext for ProductionNativeContext<'_> {
         }
     }
 
+    fn table_remove(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        value_ty: InternedType,
+    ) -> Result<Option<Boxed<'_, Opaque>>, VMInternalError> {
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = match rws.try_move_from(self.resource_provider, &storage_key) {
+            // Writable: `try_move_from` already marked the entry deleted.
+            Ok(EntryPtr::Writable(ptr)) => ptr,
+            Ok(EntryPtr::NonWritable(ptr)) => {
+                // An external or older-epoch value must be copied into the local
+                // heap before the entry can be marked deleted (mirrors the
+                // `MoveFrom` micro-op).
+                let heap = unsafe { &mut **self.heap.get() };
+                // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
+                let copied = unsafe {
+                    deep_copy_or_gc(
+                        heap,
+                        self.desc_provider,
+                        rws,
+                        &self.pool,
+                        self.extensions,
+                        self.frame_ptr,
+                        TopFrame::Native(self.abi),
+                        ptr,
+                    )
+                }
+                .map_err(VMInternalError::from)?;
+                rws.commit_move_from(&storage_key);
+                copied
+            },
+            Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+        // The moved-out value is handed back to the caller as an owned object.
+        // SAFETY: `ptr` is the live moved-out object; the pool roots it for the
+        // rest of the call.
+        let handle = unsafe { self.pool.root_object(ptr.as_ptr()) };
+        Ok(Some(Boxed::from_handle(handle)))
+    }
+
     fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {
         self.extensions.get_mut::<T>()
+    }
+
+    unsafe fn grow_vector<'a>(
+        &self,
+        target: &Ref<'a, Vector<'a, Opaque>>,
+        donor: &Ref<'a, Vector<'a, Opaque>>,
+        elem_size: usize,
+        required_cap: usize,
+    ) -> Result<(), VMInternalError> {
+        // A zero-sized element type would divide-by-zero in the capacity math
+        // below; the caller is contracted to pass the byte size of a real `T`.
+        debug_assert!(elem_size != 0, "grow_vector: elem_size must be non-zero");
+
+        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
+        // through `&self` at once is sound (see the type-level aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+
+        // The reference handles are rooted, so `target.ptr()` / `donor.ptr()`
+        // stay current across the GC `alloc_vec` may trigger.
+        // SAFETY: `target` references a live `vector<T>`; its slot holds the
+        // current heap pointer (null for an empty vector).
+        let old_ptr = unsafe { read_ptr(target.ptr(), 0usize) };
+
+        if old_ptr.is_null() {
+            // `target` is empty: allocate a fresh vector, copying the GC
+            // descriptor from the (non-empty) donor of the same element type.
+            // SAFETY: `donor` is a non-empty `vector<T>` (caller's contract).
+            let src_ptr = unsafe { read_ptr(donor.ptr(), 0usize) };
+            let descriptor_id = DescriptorId(unsafe { read_descriptor(src_ptr) });
+            let new_ptr = alloc_vec(
+                heap,
+                self.desc_provider,
+                rws,
+                &self.pool,
+                self.extensions,
+                self.frame_ptr,
+                TopFrame::Native(self.abi),
+                descriptor_id,
+                elem_size as u32,
+                (required_cap as u64).max(4),
+            )
+            .map_err(VMInternalError::from)?;
+            // `alloc_vec` zero-inits the length; just publish the new pointer
+            // through the (post-GC) reference.
+            // SAFETY: `target.ptr()` is re-read after the allocation's GC.
+            unsafe { write_ptr(target.ptr(), 0usize, new_ptr) };
+            return Ok(());
+        }
+
+        // `target` is non-empty: grow only if it can't already hold `required_cap`.
+        // SAFETY: `old_ptr` is a live vector object.
+        let old_len = unsafe { read_u64(old_ptr, VEC_LENGTH_OFFSET) };
+        let old_total = unsafe { read_obj_size(old_ptr) } as usize;
+        let old_cap = (old_total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size;
+        if required_cap <= old_cap {
+            return Ok(());
+        }
+
+        let descriptor_id = DescriptorId(unsafe { read_descriptor(old_ptr) });
+        let doubled = if old_cap == 0 { 4 } else { old_cap * 2 };
+        let new_cap = doubled.max(required_cap);
+        let new_ptr = alloc_vec(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            descriptor_id,
+            elem_size as u32,
+            new_cap as u64,
+        )
+        .map_err(VMInternalError::from)?;
+
+        // `alloc_vec` may have run a GC; re-read the old pointer through the
+        // rooted reference, copy the live elements over, then publish the new
+        // pointer through the reference.
+        // SAFETY: `target.ptr()` is re-read after the GC; both objects own at
+        // least `byte_count` data bytes and are distinct allocations.
+        unsafe {
+            let old_ptr = read_ptr(target.ptr(), 0usize);
+            let byte_count = old_len as usize * elem_size;
+            if byte_count > 0 {
+                std::ptr::copy_nonoverlapping(
+                    old_ptr.add(VEC_DATA_OFFSET),
+                    new_ptr.add(VEC_DATA_OFFSET),
+                    byte_count,
+                );
+            }
+            write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len);
+            write_ptr(target.ptr(), 0usize, new_ptr);
+        }
+        Ok(())
     }
 }
 

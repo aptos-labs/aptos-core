@@ -54,6 +54,9 @@ pub enum RuntimeError {
     #[error("VecPopBack on empty vector")]
     PopFromEmptyVector,
 
+    #[error("VecUnpack: expected {expected} elements, vector has {actual}")]
+    VecUnpackLengthMismatch { expected: u64, actual: u64 },
+
     #[error("{op} index out of bounds: idx={idx} len={len}")]
     VectorIndexOutOfBounds { op: VecOp, idx: u64, len: u64 },
 
@@ -124,6 +127,7 @@ impl IntoExecutionError for RuntimeError {
             | NegateMinOverflow { .. }
             | CastOutOfRange { .. }
             | PopFromEmptyVector
+            | VecUnpackLengthMismatch { .. }
             | VectorIndexOutOfBounds { .. }
             | InvalidAbortMessage
             | ResourceDoesNotExist { .. }
@@ -199,6 +203,7 @@ pub enum VecOp {
     LoadElem,
     StoreElem,
     Borrow,
+    Swap,
 }
 
 impl fmt::Display for VecOp {
@@ -207,6 +212,7 @@ impl fmt::Display for VecOp {
             VecOp::LoadElem => write!(f, "VecLoadElem"),
             VecOp::StoreElem => write!(f, "VecStoreElem"),
             VecOp::Borrow => write!(f, "VecBorrow"),
+            VecOp::Swap => write!(f, "VecSwap"),
         }
     }
 }

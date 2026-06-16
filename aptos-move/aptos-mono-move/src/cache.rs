@@ -30,12 +30,14 @@ pub struct FlatState {
     pub resources: HashMap<(AccountAddress, StructTag), Bytes>,
     /// Module bytecode keyed by address and module name (framework + user).
     pub modules: HashMap<(AccountAddress, Identifier), Bytes>,
+    /// Table item bytes keyed by `(table handle address, serialized key)`.
+    pub table_items: HashMap<(AccountAddress, Box<[u8]>), Bytes>,
 }
 
 impl FlatState {
     /// Builds a `FlatState` from a captured state map, unpacking resource
-    /// groups into individual resources. Table-item, raw, and trading-native
-    /// keys are skipped (not compared).
+    /// groups into individual resources. Table items are captured (so V2 can
+    /// read them) but not compared; raw and trading-native keys are skipped.
     pub fn build(state: &BTreeMap<StateKey, StateValue>) -> Result<Self> {
         let mut flat = FlatState::default();
         for (key, value) in state {
@@ -60,9 +62,13 @@ impl FlatState {
                         );
                     },
                 },
-                StateKeyInner::TableItem { .. }
-                | StateKeyInner::Raw(_)
-                | StateKeyInner::TradingNative(_) => {},
+                StateKeyInner::TableItem { handle, key } => {
+                    flat.table_items.insert(
+                        (handle.0, key.clone().into_boxed_slice()),
+                        value.bytes().clone(),
+                    );
+                },
+                StateKeyInner::Raw(_) | StateKeyInner::TradingNative(_) => {},
             }
         }
         Ok(flat)

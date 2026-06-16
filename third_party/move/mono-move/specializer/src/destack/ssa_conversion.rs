@@ -943,7 +943,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let ty = self.interner.vector_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::VecPack(dst, elem_ty, count, elems));
+                    .push(Instr::VecPack(dst, elem_ty, elems));
                 self.push_slot(dst);
             },
             B::VecLen(sig_idx) => {
@@ -998,7 +998,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     dsts.push(self.alloc_vid(elem_ty)?);
                 }
                 self.current_block_instrs
-                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, count, src));
+                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, src));
                 for dst in dsts {
                     self.push_slot(dst);
                 }

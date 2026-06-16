@@ -12,11 +12,14 @@
 use crate::{
     args::ArgLayout,
     cache::FlatState,
+    events::{EventKindCmp, V1Event},
     extensions::{replay_extensions, HarnessView},
     txn::EntryCall,
 };
 use anyhow::{anyhow, Result};
+use aptos_framework_natives::event::NativeEventContext;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_table_natives::NativeTableContext;
 use aptos_types::{
     on_chain_config::{Features, TimedFeaturesBuilder},
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -35,8 +38,9 @@ use move_vm_runtime::{
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
-    AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
-    RuntimeEnvironment, WithRuntimeEnvironment,
+    native_extensions::NativeContextExtensions,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader,
+    LegacyLoaderConfig, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -56,6 +60,11 @@ pub struct V1Outcome {
     pub abort_reason: Option<String>,
     /// Per-resource write ops keyed by publishing address and type.
     pub writes: BTreeMap<(AccountAddress, StructTag), Op<Bytes>>,
+    /// Events emitted, in emission order. Empty on abort.
+    pub events: Vec<V1Event>,
+    /// Per-table-item write ops keyed by `(table handle address, serialized
+    /// key)`. Empty on abort.
+    pub table_writes: BTreeMap<(AccountAddress, Vec<u8>), Op<Bytes>>,
     /// Frame layout for the V2 runner. `Err(reason)` names the first argument
     /// type that is not yet placeable in a MonoMove frame (V1 itself runs
     /// regardless, since the legacy VM deserializes the raw BCS args against the
@@ -178,6 +187,8 @@ pub fn run(
             aborted: true,
             abort_reason: Some(format!("{status:?}")),
             writes: BTreeMap::new(),
+            events: Vec::new(),
+            table_writes: BTreeMap::new(),
             layout,
         });
     }
@@ -192,13 +203,70 @@ pub fn run(
         }
     }
 
+    let events = extract_events(&extensions);
+    let table_writes = extract_table_writes(&mut extensions, &module_storage)?;
+
     Ok(V1Outcome {
         elapsed,
         aborted: false,
         abort_reason: None,
         writes,
+        events,
+        table_writes,
         layout,
     })
+}
+
+/// Reads the legacy VM's table-item writes from its native table context,
+/// keyed by `(table handle address, serialized key)`. Mirrors the resource
+/// `into_effects` path but for tables, which flow through the table extension
+/// rather than the data cache.
+fn extract_table_writes(
+    extensions: &mut NativeContextExtensions,
+    module_storage: &impl AsFunctionValueExtension,
+) -> Result<BTreeMap<(AccountAddress, Vec<u8>), Op<Bytes>>> {
+    let table_ctx = extensions.remove::<NativeTableContext>();
+    let function_value_extension = module_storage.as_function_value_extension();
+    let change_set = table_ctx
+        .into_change_set(&function_value_extension)
+        .map_err(|err| anyhow!("table change set: {err:?}"))?;
+    let mut table_writes = BTreeMap::new();
+    for (handle, change) in change_set.changes {
+        for (key, op) in change.entries {
+            // The entry op carries `(bytes, layout)`; keep only the bytes.
+            let op = match op {
+                Op::New((bytes, _)) => Op::New(bytes),
+                Op::Modify((bytes, _)) => Op::Modify(bytes),
+                Op::Delete => Op::Delete,
+            };
+            table_writes.insert((handle.0, key), op);
+        }
+    }
+    Ok(table_writes)
+}
+
+/// Reads the legacy VM's emitted events from its native event context, in
+/// emission order. A handle event (`ContractEvent::V1`) carries its guid (the
+/// BCS-encoded event key) and sequence number; a module event
+/// (`ContractEvent::V2`) carries neither.
+fn extract_events(extensions: &NativeContextExtensions) -> Vec<V1Event> {
+    let ctx = extensions.get::<NativeEventContext>();
+    ctx.events_iter()
+        .map(|event| {
+            let kind = match event.v1() {
+                Ok(v1) => EventKindCmp::V1 {
+                    guid: bcs::to_bytes(v1.key()).unwrap_or_default(),
+                    sequence_number: v1.sequence_number(),
+                },
+                Err(_) => EventKindCmp::V2,
+            };
+            V1Event {
+                type_tag: event.type_tag().clone(),
+                data: event.event_data().to_vec(),
+                kind,
+            }
+        })
+        .collect()
 }
 
 /// Inserts the flattened resources into `storage` as a `New` change set.

@@ -215,6 +215,13 @@ impl ResourceReadWriteSet {
         Self::default()
     }
 
+    /// Iterates the read-write-set entries. Used by the differential harness to
+    /// enumerate table-item writes (which, unlike resource writes, are not
+    /// driven off another VM's write set).
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&InMemoryStorageKey, &Entry)> {
+        self.entries.iter()
+    }
+
     /// Returns true if the resource exists at the specified key.
     pub(crate) fn exists(
         &mut self,

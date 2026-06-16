@@ -12,17 +12,22 @@
 use crate::{
     args::{ArgKind, ArgLayout},
     cache::FlatState,
+    events::{EventKindCmp, V2Event},
+    extensions::replay_v2_extensions,
     resolver::{resolve_struct_tag, resolve_type_tag},
     txn::EntryCall,
 };
 use anyhow::{anyhow, Result};
+use aptos_types::transaction::{PersistedAuxiliaryInfo, SignedTransaction};
 use mono_move_core::{
-    align_up_u32, native::NativeName, storage::resource_provider::InMemoryStorageKey, GasMeter,
-    Interner,
+    align_up_u32, native::NativeName, storage::resource_provider::InMemoryStorageKey,
+    types::type_to_string, GasMeter, Interner,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_natives::{make_all_production_natives, make_all_test_natives, Dispatch};
+use mono_move_natives::{
+    make_all_production_natives, make_all_test_natives, Dispatch, EventKind, EventStore,
+};
 use mono_move_runtime::{
     ExecutionContext, InterpreterContext, MaterializingResourceProvider, ProductionContextFamily,
     ProductionNativeRegistry, ResourceWrite, RuntimeStatus, TransactionContext,
@@ -48,6 +53,11 @@ pub struct V2Outcome {
     pub abort_reason: Option<String>,
     /// MonoMove's write for each queried key (`None` = untouched / only read).
     pub writes: BTreeMap<(AccountAddress, StructTag), Option<ResourceWrite>>,
+    /// Events emitted, in emission order. Empty on abort.
+    pub events: Vec<V2Event>,
+    /// MonoMove's table-item writes, keyed by `(table handle address,
+    /// serialized key)`. Enumerated from the read-write set. Empty on abort.
+    pub table_writes: BTreeMap<(AccountAddress, Vec<u8>), ResourceWrite>,
 }
 
 /// Builds a module provider from the flattened module bytecode.
@@ -100,13 +110,22 @@ pub fn build_provider<'g, 'ctx>(
             bcs_by_key.insert(InMemoryStorageKey::resource(*addr, ty), bytes.to_vec());
         }
     }
-    MaterializingResourceProvider::new(guard, bcs_by_key)
+    // Table item bytes, keyed type-lessly by `(handle address, key)`; the value
+    // type is supplied by the reader at materialization time.
+    let table_bytes = flat
+        .table_items
+        .iter()
+        .map(|((addr, key), bytes)| ((*addr, key.clone()), bytes.to_vec()))
+        .collect();
+    MaterializingResourceProvider::new(guard, bcs_by_key, table_bytes)
 }
 
 /// Runs `entry` on MonoMove and queries the writes for `query_keys`.
 pub fn run(
     guard: &ExecutionGuard,
     flat: &FlatState,
+    signed: &SignedTransaction,
+    aux_info: PersistedAuxiliaryInfo,
     entry: &EntryCall,
     layout: &ArgLayout,
     query_keys: &[(AccountAddress, StructTag)],
@@ -121,8 +140,8 @@ pub fn run(
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
         &natives,
     );
-    let mut txn_ctx =
-        TransactionContext::new(loader, GasMeter::new(GAS_BUDGET), &provider, &natives);
+    let mut txn_ctx = TransactionContext::new(loader, GasMeter::new(GAS_BUDGET), &provider, &natives)
+        .with_extensions(replay_v2_extensions(signed, aux_info, entry));
 
     // Resolve type arguments and load the function.
     let resolved = entry
@@ -169,6 +188,8 @@ pub fn run(
         Err(err) => (true, Some(err.to_string())),
     };
     let mut writes = BTreeMap::new();
+    let mut events = Vec::new();
+    let mut table_writes = BTreeMap::new();
     if !aborted {
         for (addr, tag) in query_keys {
             let ty = resolve_struct_tag(guard, tag)?;
@@ -178,6 +199,43 @@ pub fn run(
                 .map_err(|err| anyhow!("reading MonoMove write: {err}"))?;
             writes.insert((*addr, tag.clone()), write);
         }
+
+        // Read back the emitted events, serializing each payload (the event
+        // store keeps it in flat form) to BCS for comparison with the legacy VM.
+        let store = interp
+            .extensions()
+            .get_mut::<EventStore>()
+            .map_err(|err| anyhow!("reading MonoMove events: {err}"))?;
+        for entry in store.entries() {
+            // SAFETY: `msg_data` is the flat representation of a value of type
+            // `msg_ty` whose heap pointers reference this run's live heap.
+            let data = unsafe { interp.serialize_value(entry.msg_data.as_ptr(), entry.msg_ty) }
+                .map_err(|err| anyhow!("serializing MonoMove event: {err}"))?;
+            let kind = match &entry.kind {
+                EventKind::V2 => EventKindCmp::V2,
+                EventKind::V1 {
+                    guid,
+                    sequence_number,
+                } => EventKindCmp::V1 {
+                    guid: guid.clone(),
+                    sequence_number: *sequence_number,
+                },
+            };
+            events.push(V2Event {
+                type_str: type_to_string(entry.msg_ty),
+                data,
+                kind,
+            });
+        }
+
+        // Enumerate the table-item writes (driven off the read-write set rather
+        // than V1's keys, since the value type lives in the key).
+        for (handle_addr, key, write) in interp
+            .table_writes()
+            .map_err(|err| anyhow!("reading MonoMove table writes: {err}"))?
+        {
+            table_writes.insert((handle_addr, key.into_vec()), write);
+        }
     }
 
     Ok(V2Outcome {
@@ -185,6 +243,8 @@ pub fn run(
         aborted,
         abort_reason,
         writes,
+        events,
+        table_writes,
     })
 }
 

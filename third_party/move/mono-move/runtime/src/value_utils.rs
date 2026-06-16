@@ -29,10 +29,20 @@ use crate::{
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, ENUM_DATA_OFFSET,
+    types::{
+        InternedType, ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY,
+        SIGNER_TY, U128_TY, U16_TY, U256_TY, U32_TY, U64_TY, U8_TY,
+    },
+    Interner, LayoutId, LayoutKind, LayoutProvider, ValueLayout, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
+    CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
+    ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_UNRESOLVED,
     OBJECT_HEADER_SIZE,
 };
-use move_core_types::int256::{I256, U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    int256::{I256, U256},
+};
 use std::cmp::Ordering;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
@@ -554,11 +564,44 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     dst: *mut u8,
 ) -> AllocationResult<()> {
+    // No interner: deserializing a function value on this path errors. The
+    // callers here (entry-function arguments, constants) never carry one.
+    // SAFETY: caller must enforce the safety precondition.
+    unsafe { deserialize_inner(layouts, None, heap, ty, bytes, dst) }
+}
+
+/// Like [`deserialize`], but with an [`Interner`] so a function value can be
+/// materialized into an unresolved closure. Used by a resource provider reading
+/// stored state, which may contain function values.
+///
+/// # Safety
+///
+/// Same as [`deserialize`].
+pub unsafe fn deserialize_with_interner<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    interner: &dyn Interner,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+) -> AllocationResult<()> {
+    // SAFETY: caller must enforce the safety precondition.
+    unsafe { deserialize_inner(layouts, Some(interner), heap, ty, bytes, dst) }
+}
+
+unsafe fn deserialize_inner<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    interner: Option<&dyn Interner>,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+) -> AllocationResult<()> {
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
 
     let mut cursor = 0usize;
     // SAFETY: caller must enforce the safety precondition.
-    unsafe { deserialize_impl(layouts, heap, layout, bytes, &mut cursor, dst)? };
+    unsafe { deserialize_impl(layouts, interner, heap, layout, bytes, &mut cursor, dst)? };
     if cursor != bytes.len() {
         return Err(RuntimeError::BCSRemainingInput {
             remaining: bytes.len().saturating_sub(cursor),
@@ -573,6 +616,7 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
 /// `dst` must be writable for `layout.size` bytes.
 unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
+    interner: Option<&dyn Interner>,
     heap: &mut Heap,
     layout: &ValueLayout,
     bytes: &[u8],
@@ -612,6 +656,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 unsafe {
                     deserialize_impl(
                         layouts,
+                        interner,
                         heap,
                         field_layout,
                         bytes,
@@ -683,7 +728,9 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                     // element layout, as guaranteed by the precondition of the
                     // function.
                     unsafe {
-                        deserialize_impl(layouts, heap, elem_layout, bytes, cursor, elem_ptr)?
+                        deserialize_impl(
+                            layouts, interner, heap, elem_layout, bytes, cursor, elem_ptr,
+                        )?
                     };
                 }
             }
@@ -719,6 +766,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe {
                 deserialize_impl(
                     layouts,
+                    interner,
                     heap,
                     variant_layout,
                     bytes,
@@ -733,10 +781,155 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             Ok(())
         },
         LayoutKind::Function => {
-            todo!("function values are not yet supported");
+            // A function value deserializes into a closure object. We only
+            // support closures with no captured arguments: we record the
+            // function's symbolic identity as an unresolved closure (resolved
+            // lazily if it is ever called) and leave the captured-data pointer
+            // null.
+            let interner = interner.ok_or_else(|| {
+                unreachable("function value deserialization requires an interner")
+            })?;
+            let func_ref = read_function_value(bytes, cursor, interner)?;
+
+            // SAFETY: the closure object is `OBJECT_HEADER_SIZE + CLOSURE_DATA_SIZE`
+            // bytes with the reserved closure descriptor; `heap_alloc` returns the
+            // data pointer and zero-inits it (so the captured-data pointer starts
+            // null). An OOM propagates as an allocation error.
+            let closure = heap_alloc(
+                heap,
+                OBJECT_HEADER_SIZE + CLOSURE_DATA_SIZE,
+                CLOSURE_DESCRIPTOR_ID,
+            )?;
+            // SAFETY: `closure` is a freshly allocated closure object; the
+            // offsets lie within its `CLOSURE_DATA_SIZE` data region.
+            unsafe {
+                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
+                    FUNC_REF_TAG_UNRESOLVED;
+                write_ptr(
+                    closure,
+                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+                    func_ref.as_raw_ptr() as *const u8,
+                );
+                write_u64(closure, CLOSURE_MASK_OFFSET, 0);
+                write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, std::ptr::null());
+            }
+            // SAFETY: `dst` has space for the 8-byte closure pointer.
+            unsafe { write_ptr(dst, 0usize, closure) };
+            Ok(())
         },
         LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
     }
+}
+
+/// Reads a BCS-encoded function value and returns its symbolic identity interned
+/// as an unresolved closure target. Panics if the closure captures any arguments
+/// (not yet supported).
+///
+/// The wire format is a sequence of `module_id`, `fun_id`, `ty_args`, `mask`,
+/// then one value per captured argument. The sequence carries an (inflated)
+/// length prefix that the producer writes but the consumer ignores in favor of a
+/// fixed field count, so we read and discard it.
+fn read_function_value(
+    bytes: &[u8],
+    cursor: &mut usize,
+    interner: &dyn Interner,
+) -> RuntimeResult<mono_move_core::interner::InternedFunctionRef> {
+    // Sequence length prefix (ignored — see the doc comment).
+    let _seq_len = read_uleb128_len(bytes, cursor)?;
+
+    // `module_id`: address followed by its name.
+    let module_addr = AccountAddress::new(read_array_bytes::<{ AccountAddress::LENGTH }>(
+        bytes, cursor,
+    )?);
+    let module_name = read_identifier(bytes, cursor)?;
+    // `fun_id`.
+    let func_name = read_identifier(bytes, cursor)?;
+    // `ty_args`.
+    let num_ty_args = read_uleb128_len(bytes, cursor)?;
+    let mut ty_args = Vec::with_capacity(num_ty_args as usize);
+    for _ in 0..num_ty_args {
+        ty_args.push(read_type_tag(bytes, cursor, interner)?);
+    }
+    // `mask` (a `u64`); a non-zero mask means captured arguments.
+    let mask = u64::from_le_bytes(
+        read_slice(bytes, cursor, 8)?
+            .try_into()
+            .map_err(|_| unreachable("mask is exactly 8 bytes"))?,
+    );
+    if mask != 0 {
+        todo!("function values with captured arguments are not yet supported");
+    }
+
+    let module_id = interner.module_id_of(&module_addr, ident_str(module_name)?);
+    let func_name = interner.identifier_of(ident_str(func_name)?);
+    let ty_args = interner.type_list_of(&ty_args);
+    Ok(interner.function_ref_of(module_id, func_name, ty_args))
+}
+
+/// Reads a BCS-encoded `TypeTag` and interns it to an [`InternedType`].
+fn read_type_tag(
+    bytes: &[u8],
+    cursor: &mut usize,
+    interner: &dyn Interner,
+) -> RuntimeResult<InternedType> {
+    // Variant indices match `move_core_types::language_storage::TypeTag`.
+    let tag = read_uleb128_len(bytes, cursor)?;
+    Ok(match tag {
+        0 => BOOL_TY,
+        1 => U8_TY,
+        2 => U64_TY,
+        3 => U128_TY,
+        4 => ADDRESS_TY,
+        5 => SIGNER_TY,
+        6 => interner.vector_of(read_type_tag(bytes, cursor, interner)?),
+        7 => {
+            // `Struct`: address, module, name, then type arguments.
+            let addr = AccountAddress::new(read_array_bytes::<{ AccountAddress::LENGTH }>(
+                bytes, cursor,
+            )?);
+            let module = read_identifier(bytes, cursor)?;
+            let name = read_identifier(bytes, cursor)?;
+            let num_args = read_uleb128_len(bytes, cursor)?;
+            let mut args = Vec::with_capacity(num_args as usize);
+            for _ in 0..num_args {
+                args.push(read_type_tag(bytes, cursor, interner)?);
+            }
+            let module_id = interner.module_id_of(&addr, ident_str(module)?);
+            let name = interner.identifier_of(ident_str(name)?);
+            let args = interner.type_list_of(&args);
+            interner.nominal_of(module_id, name, args)
+        },
+        8 => U16_TY,
+        9 => U32_TY,
+        10 => U256_TY,
+        11 => return Err(unreachable("function type tags are not supported").into()),
+        12 => I8_TY,
+        13 => I16_TY,
+        14 => I32_TY,
+        15 => I64_TY,
+        16 => I128_TY,
+        17 => I256_TY,
+        other => return Err(unreachable(&format!("unknown type tag {other}"))),
+    })
+}
+
+/// Reads a BCS-encoded `Identifier` (length-prefixed UTF-8 bytes).
+fn read_identifier<'b>(bytes: &'b [u8], cursor: &mut usize) -> RuntimeResult<&'b str> {
+    let len = read_uleb128_len(bytes, cursor)? as usize;
+    let raw = read_slice(bytes, cursor, len)?;
+    std::str::from_utf8(raw).map_err(|_| unreachable("identifier is not valid UTF-8"))
+}
+
+/// Validates `s` as a Move identifier.
+fn ident_str(s: &str) -> RuntimeResult<&IdentStr> {
+    IdentStr::new(s).map_err(|_| unreachable("invalid Move identifier"))
+}
+
+/// Reads `N` bytes from `bytes` at `cursor` into an array, advancing `cursor`.
+fn read_array_bytes<const N: usize>(bytes: &[u8], cursor: &mut usize) -> RuntimeResult<[u8; N]> {
+    read_slice(bytes, cursor, N)?
+        .try_into()
+        .map_err(|_| unreachable("slice is not exactly N bytes"))
 }
 
 /// Reads `N` bytes from the pointer into an array.
@@ -883,6 +1076,7 @@ mod tests {
         unsafe {
             deserialize_impl(
                 &table,
+                None,
                 &mut heap,
                 &layout,
                 &bytes,
@@ -908,6 +1102,7 @@ mod tests {
         let result = unsafe {
             deserialize_impl(
                 &table,
+                None,
                 &mut heap,
                 layout,
                 &bytes,
@@ -1089,6 +1284,7 @@ mod tests {
             unsafe {
                 deserialize_impl(
                     table,
+                    None,
                     &mut heap,
                     layout,
                     &x_bcs,
@@ -1297,6 +1493,7 @@ mod tests {
             unsafe {
                 deserialize_impl(
                     table,
+                    None,
                     &mut heap,
                     layout,
                     &bytes,

@@ -27,6 +27,13 @@ pub trait ExecutionContext {
     /// The per-transaction native extensions.
     fn extensions(&self) -> &NativeExtensions;
 
+    /// Clears the module read-set so it is repopulated on the next run, without
+    /// evicting any loaded/lowered module code (which lives in the global
+    /// context). Used by the benchmark to measure per-transaction read-set
+    /// population with the code cache kept warm. The default is a no-op for
+    /// contexts that do not track a module read-set.
+    fn reset_module_read_set(&mut self) {}
+
     /// Disjoint borrows all the sub-components needed for a native call.
     /// Needed for avoiding borrow conflicts downstream.
     fn native_call_borrows(

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{DescriptorId, FrameOffset};
+use crate::{types::InternedType, DescriptorId, FrameOffset};
 use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
@@ -23,10 +23,14 @@ pub struct FrameSlot {
 /// Invariants (validated by [`Self::new`]): `args` and `returns` are each
 /// sorted by offset and non-overlapping, and `heap_ptr_offsets` is sorted
 /// ascending.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NativeABI {
     args: Vec<FrameSlot>,
     returns: Vec<FrameSlot>,
+    /// Type of each return value, parallel to `returns`. A native that builds a
+    /// return value whose type is not one of its type arguments (e.g.
+    /// `cmp::compare` returning `Ordering`) reads it from here.
+    return_tys: Vec<InternedType>,
     args_end: u32,
     total_frame_size: u32,
     /// Frame offsets of the pointer slots among the args, sorted ascending. The
@@ -50,6 +54,7 @@ impl NativeABI {
     pub fn new(
         args: Vec<FrameSlot>,
         returns: Vec<FrameSlot>,
+        return_tys: Vec<InternedType>,
         heap_ptr_offsets: Vec<FrameOffset>,
         required_descriptors: Vec<DescriptorId>,
     ) -> Result<Self, NativeABIError> {
@@ -61,6 +66,7 @@ impl NativeABI {
         Ok(Self {
             args,
             returns,
+            return_tys,
             args_end,
             total_frame_size: args_end.max(returns_end),
             heap_ptr_offsets,
@@ -71,6 +77,11 @@ impl NativeABI {
     /// The `i`-th GC descriptor the native requires.
     pub fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
         self.required_descriptors.get(i).copied()
+    }
+
+    /// The type of the `i`-th return value.
+    pub fn return_ty(&self, i: usize) -> Option<InternedType> {
+        self.return_tys.get(i).copied()
     }
 
     pub fn args(&self) -> &[FrameSlot] {

@@ -618,23 +618,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), elem, elem_size);
-                self.check_descriptor_variant(
-                    pc,
-                    "VecPushBack",
-                    descriptor_id,
-                    |inner| match inner {
-                        ObjectDescriptorInner::Vector {
-                            elem_pointer_offsets,
-                            ..
-                        } => !elem_pointer_offsets.is_empty(),
-                        ObjectDescriptorInner::Trivial => true,
-                        ObjectDescriptorInner::Closure
-                        | ObjectDescriptorInner::Struct { .. }
-                        | ObjectDescriptorInner::Enum { .. }
-                        | ObjectDescriptorInner::CapturedData { .. } => false,
-                    },
-                    "a non-empty Vector or Trivial",
-                );
+                self.check_vector_descriptor(pc, "VecPushBack", descriptor_id, elem_size);
             },
 
             MicroOp::VecPopBack {
@@ -670,6 +654,35 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, idx);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), src, elem_size);
+            },
+
+            MicroOp::VecPack(ref op) => {
+                self.check_frame_access_8(pc, op.dst);
+                self.check_nonzero_size(pc, op.elem_size);
+                for &src in &op.srcs {
+                    self.check_frame_access(Some(pc), src, op.elem_size);
+                }
+                self.check_vector_descriptor(pc, "VecPack", op.descriptor_id, op.elem_size);
+            },
+
+            MicroOp::VecUnpack(ref op) => {
+                self.check_frame_access_8(pc, op.src);
+                self.check_nonzero_size(pc, op.elem_size);
+                for &dst in &op.dsts {
+                    self.check_frame_access(Some(pc), dst, op.elem_size);
+                }
+            },
+
+            MicroOp::VecSwap {
+                vec_ref,
+                idx_a,
+                idx_b,
+                elem_size,
+            } => {
+                self.check_frame_access(Some(pc), vec_ref, 16);
+                self.check_frame_access_8(pc, idx_a);
+                self.check_frame_access_8(pc, idx_b);
+                self.check_nonzero_size(pc, elem_size);
             },
 
             // ----- Borrow producing fat pointer (16B dst) -----
@@ -1112,6 +1125,65 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         self.check_frame_access(Some(pc), op.dst, size);
         if let Some(rhs_off) = op.rhs.slot_offset() {
             self.check_frame_access(Some(pc), rhs_off, size);
+        }
+    }
+
+    /// Checks `descriptor_id` for a vector allocation of element stride
+    /// `elem_size`: it must be `Trivial`, or a `Vector` with a non-empty
+    /// pointer-offset list and a matching `elem_size`. The sizes must agree
+    /// because the GC strides the data region by the descriptor's `elem_size`,
+    /// so a mismatch would trace past the allocation.
+    fn check_vector_descriptor(
+        &mut self,
+        pc: usize,
+        op: &str,
+        descriptor_id: DescriptorId,
+        elem_size: u32,
+    ) {
+        match self
+            .provider
+            .descriptor(descriptor_id)
+            .map(|desc| desc.inner())
+        {
+            None => self.err(
+                Some(pc),
+                format!("{}: unknown descriptor_id {}", op, descriptor_id),
+            ),
+            Some(ObjectDescriptorInner::Vector {
+                elem_size: descriptor_elem_size,
+                elem_pointer_offsets,
+            }) => {
+                if elem_pointer_offsets.is_empty() {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "{}: descriptor_id {} is not a non-empty Vector or Trivial",
+                            op, descriptor_id
+                        ),
+                    );
+                } else if *descriptor_elem_size != elem_size {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "{}: elem_size {} does not match Vector descriptor_id {} elem_size {}",
+                            op, elem_size, descriptor_id, descriptor_elem_size
+                        ),
+                    );
+                }
+            },
+            Some(ObjectDescriptorInner::Trivial) => {},
+            Some(
+                ObjectDescriptorInner::Closure
+                | ObjectDescriptorInner::Struct { .. }
+                | ObjectDescriptorInner::Enum { .. }
+                | ObjectDescriptorInner::CapturedData { .. },
+            ) => self.err(
+                Some(pc),
+                format!(
+                    "{}: descriptor_id {} is not a non-empty Vector or Trivial",
+                    op, descriptor_id
+                ),
+            ),
         }
     }
 

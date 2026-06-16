@@ -517,11 +517,11 @@ fn display_instr(
         },
 
         // --- Vector ---
-        Instr::VecPack(d, elem_ty, count, elems) => {
+        Instr::VecPack(d, elem_ty, elems) => {
             write_dst(f, *d)?;
             write!(f, "vec_pack ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}, {}", count, slot_names(elems))
+            write!(f, ", {}, {}", elems.len(), slot_names(elems))
         },
         Instr::VecLen(d, elem_ty, s) => {
             write_dst(f, *d)?;
@@ -553,11 +553,11 @@ fn display_instr(
             display_type(f, *elem_ty)?;
             write!(f, ", {}", slot_name(*s))
         },
-        Instr::VecUnpack(ds, elem_ty, count, s) => {
+        Instr::VecUnpack(ds, elem_ty, s) => {
             write_dsts(f, ds)?;
             write!(f, "vec_unpack ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}, {}", count, slot_name(*s))
+            write!(f, ", {}, {}", ds.len(), slot_name(*s))
         },
         // VecSwap has no destination
         Instr::VecSwap(elem_ty, v, i, j) => {

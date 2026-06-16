@@ -12,19 +12,23 @@
 //! happen outside the loop) and reset in place between samples. V1 loads its
 //! `LoadedFunction` once and clones it per sample; the struct is `Arc`-backed,
 //! so the clone is cheap, and the by-value `execute_loaded_function` API is the
-//! only reason a clone is needed at all (no reload, no re-resolution).
+//! only reason a clone is needed at all (no reload, no re-resolution). V1 also
+//! runs once untimed before sampling, so every module it touches is deserialized
+//! and verified into `module_storage` and the samples measure steady-state
+//! execution rather than one-off loading.
 //!
 //! By default it reads the committed `data/` dir; set `APTOS_MONO_MOVE_DUMP` to
 //! point at a different dump produced by `scripts/download.sh` (the
-//! `<version>_txns` / `<version>_inputs` files). Set `APTOS_MONO_MOVE_LIMIT` to
-//! cap the number of versions benched.
+//! `<version>_txns` / `<version>_inputs` files). Set `APTOS_MONO_MOVE_VERSION`
+//! to a comma-separated list of versions to bench only those; set
+//! `APTOS_MONO_MOVE_LIMIT` to cap the number of versions benched.
 
 use anyhow::{anyhow, Result};
 use aptos_mono_move::{
     args::ArgLayout,
     cache::FlatState,
     dump::Dump,
-    extensions::{replay_extensions, HarnessView},
+    extensions::{replay_extensions, replay_v2_extensions, HarnessView},
     resolver::resolve_type_tag,
     txn, v1, v2,
 };
@@ -52,7 +56,19 @@ fn replay(c: &mut Criterion) {
     let dir = std::env::var("APTOS_MONO_MOVE_DUMP")
         .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/data").to_string());
     let dump = Dump::open(&dir).expect("open dump");
-    let versions = dump.versions().expect("read versions");
+    // `APTOS_MONO_MOVE_VERSION` restricts the run to a comma-separated list of
+    // versions (in the given order); otherwise every version in the dump runs.
+    let versions = match std::env::var("APTOS_MONO_MOVE_VERSION") {
+        Ok(s) if !s.trim().is_empty() => s
+            .split(',')
+            .map(|v| {
+                v.trim()
+                    .parse::<u64>()
+                    .expect("APTOS_MONO_MOVE_VERSION: expected comma-separated u64 versions")
+            })
+            .collect::<Vec<_>>(),
+        _ => dump.versions().expect("read versions"),
+    };
     let limit = std::env::var("APTOS_MONO_MOVE_LIMIT")
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
@@ -128,37 +144,38 @@ fn bench_version(
     // same `replay_extensions` setup as the CLI runner.
     let view = HarnessView::new(raw_state);
 
-    group.bench_function(format!("v1/{version}"), |b| {
-        b.iter(|| {
-            let ts = TraversalStorage::new();
-            let mut tc = TraversalContext::new(&ts);
-            let mut gm = UnmeteredGasMeter;
-            let mut data_cache = TransactionDataCache::empty();
-            let mut extensions = replay_extensions(&view, signed, aux_info, &entry);
-            let _ = MoveVM::execute_loaded_function(
-                loaded.clone(),
-                call_args.clone(),
-                &mut MoveVmDataCacheAdapter::new(&mut data_cache, &storage, &loader),
-                &mut gm,
-                &mut tc,
-                &mut extensions,
-                &loader,
-            );
-        })
-    });
+    let run_v1 = || {
+        let ts = TraversalStorage::new();
+        let mut tc = TraversalContext::new(&ts);
+        let mut gm = UnmeteredGasMeter;
+        let mut data_cache = TransactionDataCache::empty();
+        let mut extensions = replay_extensions(&view, signed, aux_info, &entry);
+        let _ = MoveVM::execute_loaded_function(
+            loaded.clone(),
+            call_args.clone(),
+            &mut MoveVmDataCacheAdapter::new(&mut data_cache, &storage, &loader),
+            &mut gm,
+            &mut tc,
+            &mut extensions,
+            &loader,
+        );
+    };
+    // Warm `module_storage` once before timing: the first execution deserializes
+    // and verifies every module the transaction touches and caches them, so the
+    // timed samples measure steady-state execution rather than one-off module
+    // loading and verification. The throwaway run mutates nothing shared — its
+    // writes land in a per-run data cache, and `storage` is left untouched.
+    run_v1();
+    group.bench_function(format!("v1/{version}"), |b| b.iter(&run_v1));
 
     // ---- MonoMove (V2) ----
+    // Shared, read-only backing state built once: the module provider, native
+    // registry, and the materializing resource provider (whose deserialized
+    // resources are memoized, so they warm up on the first run). The call
+    // target's interned ids are resolved once too.
     let module_provider = v2::build_module_provider(&flat)?;
     let natives = v2::build_natives(guard)?;
     let provider = v2::build_provider(guard, &flat);
-    let loader2 = Loader::new_with_policy(
-        guard,
-        &module_provider,
-        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &natives,
-    );
-    let mut txn_ctx =
-        TransactionContext::new(loader2, GasMeter::new(GAS_BUDGET), &provider, &natives);
 
     let resolved = entry
         .ty_args
@@ -172,6 +189,19 @@ fn bench_version(
     let func = guard
         .intern_identifier(entry.function)
         .into_global_arena_ptr();
+
+    // The loader, transaction context, and interpreter are built once, outside
+    // the timed region: function verification and the VM stack/heap allocation
+    // are one-off costs (the legacy VM caches verified modules and does not
+    // re-allocate per run either), so they should not be charged per sample.
+    let loader = Loader::new_with_policy(
+        guard,
+        &module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
+    );
+    let mut txn_ctx = TransactionContext::new(loader, GasMeter::new(GAS_BUDGET), &provider, &natives)
+        .with_extensions(replay_v2_extensions(signed, aux_info, &entry));
     // SAFETY: the pointer lives in a loaded module's arena, kept alive for the
     // duration of `guard`; mirrors the testsuite engine and the V2 runner.
     let function = unsafe {
@@ -180,14 +210,18 @@ fn bench_version(
             .map_err(|err| anyhow!("v2 load: {err}"))?
             .as_ref_unchecked()
     };
-
-    // Build the interpreter once: verification and stack/heap allocation happen
-    // here, outside the timed region. Each sample resets it in place.
     let mut interp = InterpreterContext::new(&mut txn_ctx, function);
+
+    // Each sample resets only the per-transaction state: the root frame, heap,
+    // and resource read-write set (`reset_root`), and the loader's module
+    // read-set (`reset_module_read_set`), so the read-set is repopulated from
+    // scratch as it would be per transaction. Verification, the stack/heap
+    // allocation, and warm module code / materialized resources are retained.
+    let signers = vec![entry.sender; layout.num_signers];
     group.bench_function(format!("v2/{version}"), |b| {
         b.iter(|| {
+            interp.reset_module_read_set();
             interp.reset_root(function);
-            let signers = vec![entry.sender; layout.num_signers];
             let args_offset = interp.set_root_signers(function, &signers);
             v2::place_args(&mut interp, guard, &entry, &layout, args_offset)
                 .expect("place args");

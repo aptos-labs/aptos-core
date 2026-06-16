@@ -41,6 +41,10 @@ VERSIONS=(
   5664049853  # router::swap_exact_in_router_entry
   5664062408  # pools::batch_update_pool_data
   5664072623  # aptos_account::transfer
+  5781259563
+  5781418865
+  5781418859
+  5781432230
 )
 
 echo "Building aptos-replay-benchmark (release)..."

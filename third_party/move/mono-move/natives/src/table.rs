@@ -9,8 +9,9 @@
 //! the transaction-context extension.
 
 use crate::{polymorphic_natives, transaction_context::TransactionContextExtension, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, Ref, TableHandle, VMInternalError,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Ref, TableHandle, VMInternalError},
+    types::InternedType,
 };
 
 /// Table entry already exists (`error::invalid_argument(100)`).
@@ -38,27 +39,31 @@ pub fn native_new_table_handle<C: NativeContext>(ctx: &C) -> Result<NativeStatus
 /// Shared helper that
 /// - Reads the table handle (arg 0, a `&[mut] Table`)
 /// - Reads the key (arg 1) and serializes it
+/// - Resolves the stored value's type (`B = Box<V>`, the third type argument)
 fn handle_and_key<C: NativeContext>(
     ctx: &C,
-) -> Result<(Ref<'_, TableHandle>, Vec<u8>), VMInternalError> {
+) -> Result<(Ref<'_, TableHandle>, Vec<u8>, InternedType), VMInternalError> {
     // SAFETY: arg 0 is `&[mut] Table<K, V>`, which has the same representation
     // as `&TableHandle` — its single `handle` field.
     let handle: Ref<TableHandle> = unsafe { ctx.arg(0)? };
     let key = ctx.bcs_serialize_arg(1, ctx.ty_arg(0)?)?;
-    Ok((handle, key))
+    // The friend natives are `<K, V, B>` with `B = Box<V>`; the stored value's
+    // type is `B`, the third type argument.
+    let value_ty = ctx.ty_arg(2)?;
+    Ok((handle, key, value_ty))
 }
 
 /// `0x1::table::add_box<K, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>)`
 //
 // TODO: charge gas.
 pub fn native_add_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
-    let (handle, key) = handle_and_key(ctx)?;
+    let (handle, key, value_ty) = handle_and_key(ctx)?;
     let descriptor = ctx.required_descriptor(0).ok_or_else(|| {
         VMInternalError::invariant_violation("add_box: missing value descriptor".into())
     })?;
     // Arg 2 is the `Box<V>` value; box it onto the heap before storing it.
     let value = ctx.box_arg(2, descriptor)?;
-    if ctx.table_add(handle.get(), &key, value)? {
+    if ctx.table_add(handle.get(), &key, value_ty, value)? {
         Ok(NativeStatus::Success)
     } else {
         Ok(NativeStatus::Abort {
@@ -71,8 +76,8 @@ pub fn native_add_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInter
 /// Borrows the entry, writing the reference into return slot 0, or aborts if
 /// the entry is missing.
 fn borrow_box<C: NativeContext>(ctx: &C, mutable: bool) -> Result<NativeStatus, VMInternalError> {
-    let (handle, key) = handle_and_key(ctx)?;
-    match ctx.table_borrow(handle.get(), &key, mutable)? {
+    let (handle, key, value_ty) = handle_and_key(ctx)?;
+    match ctx.table_borrow(handle.get(), &key, value_ty, mutable)? {
         // SAFETY: return 0 is the `&[mut] Box<V>` reference.
         Some(r) => unsafe { ctx.set_return(0, r) }.map(|()| NativeStatus::Success),
         None => Ok(NativeStatus::Abort {
@@ -96,12 +101,31 @@ pub fn native_borrow_box_mut<C: NativeContext>(ctx: &C) -> Result<NativeStatus, 
     borrow_box(ctx, true)
 }
 
+/// `0x1::table::remove_box<K, V, B>(table: &mut Table<K, V>, key: K): Box<V>`
+///
+/// Removes the entry at `key`, returning the moved-out `Box<V>` value, or aborts
+/// if no entry exists.
+//
+// TODO: charge gas.
+pub fn native_remove_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+    let (handle, key, value_ty) = handle_and_key(ctx)?;
+    match ctx.table_remove(handle.get(), &key, value_ty)? {
+        // SAFETY: return 0 is the moved-out `Box<V>` value; unboxing copies the
+        // inline value out of the (now-removed) heap object.
+        Some(value) => unsafe { ctx.set_return_unboxed(0, &value) }.map(|()| NativeStatus::Success),
+        None => Ok(NativeStatus::Abort {
+            code: NOT_FOUND,
+            message: None,
+        }),
+    }
+}
+
 /// `0x1::table::contains_box<K, V, B>(table: &Table<K, V>, key: K): bool`
 //
 // TODO: charge gas.
 pub fn native_contains_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
-    let (handle, key) = handle_and_key(ctx)?;
-    let exists = ctx.table_contains(handle.get(), &key)?;
+    let (handle, key, value_ty) = handle_and_key(ctx)?;
+    let exists = ctx.table_contains(handle.get(), &key, value_ty)?;
     // SAFETY: return 0 is `bool`.
     unsafe { ctx.set_return(0, exists)? };
     Ok(NativeStatus::Success)
@@ -114,6 +138,7 @@ pub fn make_all_table_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
         ("0x1::table::add_box", native_add_box),
         ("0x1::table::borrow_box", native_borrow_box),
         ("0x1::table::borrow_box_mut", native_borrow_box_mut),
+        ("0x1::table::remove_box", native_remove_box),
         ("0x1::table::contains_box", native_contains_box),
     ]
 }

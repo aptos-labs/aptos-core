@@ -37,16 +37,16 @@ use mono_move_core::{
         VMInternalError,
     },
     next_captured_value_offset,
-    storage::resource_provider::InMemoryStorageKey,
+    storage::resource_provider::{InMemoryStorageKey, StorageRead},
     types::{view_type_list, InternedType, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -62,8 +62,11 @@ use std::ptr::{null, NonNull};
 /// differential comparison against another VM's write set.
 #[derive(Debug)]
 pub enum ResourceWrite {
-    /// Resource was created or modified; holds the BCS bytes of the new value.
-    Value(Vec<u8>),
+    /// Resource newly published this run (it did not exist beforehand); holds
+    /// the BCS bytes of the value.
+    Created(Vec<u8>),
+    /// Existing resource overwritten; holds the BCS bytes of the new value.
+    Modified(Vec<u8>),
     /// Resource was moved out of global storage.
     Deleted,
 }
@@ -252,6 +255,14 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.root_pool = RootPool::new();
     }
 
+    /// Clears the loader's module read-set so the next run repopulates it from
+    /// scratch, without re-verifying or re-allocating and without evicting
+    /// warm module code. Used by the benchmark to measure per-transaction
+    /// read-set population with everything else kept warm.
+    pub fn reset_module_read_set(&mut self) {
+        self.exec_ctx.reset_module_read_set();
+    }
+
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result(&self) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
@@ -370,10 +381,11 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     }
 
     /// Returns the write this run made to the resource at `key`, or `None` if
-    /// the resource was only read (or never touched). `Value` carries the BCS
-    /// bytes of the resulting value; `Deleted` means it was moved out. Intended
-    /// for the differential harness, which drives comparison off another VM's
-    /// write set. Table-item keys are never compared and return `None`.
+    /// the resource was only read (or never touched). `Created`/`Modified` carry
+    /// the BCS bytes of the resulting value (distinguished by whether it existed
+    /// beforehand); `Deleted` means it was moved out. Intended for the
+    /// differential harness, which drives comparison off another VM's write set.
+    /// Table-item keys are never compared and return `None`.
     pub fn resource_write(&self, key: &InMemoryStorageKey) -> RuntimeResult<Option<ResourceWrite>> {
         let Some(entry) = self.read_write_set.get(key) else {
             return Ok(None);
@@ -390,9 +402,71 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
                 // value of type `ty` in this run's heap, and `exec_ctx`
                 // provides its layout.
                 let bytes = unsafe { value_utils::serialize(&*self.exec_ctx, ptr.as_ptr(), ty)? };
-                Ok(Some(ResourceWrite::Value(bytes)))
+                // The pre-run read tells creation (absent before) from
+                // modification (present before).
+                Ok(Some(match entry.read {
+                    StorageRead::DoesNotExist => ResourceWrite::Created(bytes),
+                    StorageRead::ExternalHeap { .. } => ResourceWrite::Modified(bytes),
+                }))
             },
         }
+    }
+
+    /// Returns every table-item write this run made, keyed by `(table handle
+    /// address, serialized key)`. Unlike resources, table-item writes are not
+    /// looked up by key (the harness has no way to enumerate the keys a
+    /// transaction touches otherwise), so this enumerates the read-write set.
+    /// `Created`/`Modified` carry the BCS bytes of the stored value (`Box<V>`),
+    /// distinguished by whether it existed beforehand; `Deleted` means the entry
+    /// was removed.
+    pub fn table_writes(
+        &self,
+    ) -> RuntimeResult<Vec<(AccountAddress, Box<[u8]>, ResourceWrite)>> {
+        let mut writes = Vec::new();
+        for (key, entry) in self.read_write_set.entries() {
+            let InMemoryStorageKey::TableItem {
+                handle,
+                key: table_key,
+                value_ty,
+            } = key
+            else {
+                continue;
+            };
+            let write = match entry.write {
+                StorageWrite::NotModified => continue,
+                StorageWrite::Deleted { .. } => ResourceWrite::Deleted,
+                StorageWrite::LocalHeap { ptr, .. } => {
+                    // SAFETY: a `LocalHeap` write points at a live `Box<V>` value
+                    // of type `value_ty`; `exec_ctx` provides its layout.
+                    let bytes =
+                        unsafe { value_utils::serialize(&*self.exec_ctx, ptr.as_ptr(), *value_ty)? };
+                    match entry.read {
+                        StorageRead::DoesNotExist => ResourceWrite::Created(bytes),
+                        StorageRead::ExternalHeap { .. } => ResourceWrite::Modified(bytes),
+                    }
+                },
+            };
+            writes.push((handle.address(), table_key.clone(), write));
+        }
+        Ok(writes)
+    }
+
+    /// Serializes the value of type `ty` stored at `base` to BCS, using this
+    /// run's layout provider and heap. Used by the differential harness to read
+    /// back emitted event payloads, which the event store keeps in flat form.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` whose heap
+    /// pointers (if any) reference live objects in this run's heap.
+    pub unsafe fn serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> RuntimeResult<Vec<u8>> {
+        // SAFETY: forwarded from this method's contract; `exec_ctx` supplies the
+        // layout, and serialization performs no VM-heap allocation.
+        unsafe { value_utils::serialize(&*self.exec_ctx, base, ty) }
     }
 
     /// Deserialize a BCS-encoded entry-function argument of the given type into
@@ -1537,6 +1611,46 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     );
                 },
 
+                MicroOp::VecPack(ref op) => {
+                    self.exec_vec_pack(fp, op)?;
+                },
+
+                MicroOp::VecUnpack(ref op) => {
+                    self.exec_vec_unpack(fp, op)?;
+                },
+
+                MicroOp::VecSwap {
+                    vec_ref,
+                    idx_a,
+                    idx_b,
+                    elem_size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                    let idx_a = read_u64(fp, idx_a);
+                    let idx_b = read_u64(fp, idx_b);
+                    let len = read_vec_len(vec_ptr);
+                    // Indices are checked before the equal-indices no-op.
+                    for idx in [idx_a, idx_b] {
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::Swap,
+                                idx,
+                                len,
+                            });
+                        }
+                    }
+                    // Equal pointers are UB for `swap_nonoverlapping`; distinct
+                    // in-bounds indices guarantee disjoint element ranges.
+                    if idx_a != idx_b {
+                        std::ptr::swap_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
+                            vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                    }
+                },
+
                 // ----- Reference (fat pointer) instructions -----
                 MicroOp::VecBorrow {
                     dst,
@@ -2003,6 +2117,69 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
             )
         }
+    }
+
+    /// Allocates the vector at exact capacity in a single allocation, writes
+    /// the length, copies each source element from the frame, and writes the
+    /// heap pointer to `op.dst`. Any GC runs inside the allocation, before the
+    /// fp-relative element reads, so those reads see post-GC pointers.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+        let count = op.srcs.len() as u64;
+        // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
+        // payload byte is overwritten below before the op returns and no GC can
+        // intervene afterwards. A fully-initialized-payload alloc variant would
+        // avoid the dead memset. Padding needs to be carefully considered for
+        // the optimization.
+        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        unsafe {
+            write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
+            for (elem_idx, src) in op.srcs.iter().enumerate() {
+                // Non-overlapping: the source is a frame slot, the destination
+                // is in the freshly-allocated heap vector — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    fp.add((*src).into()),
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size) as *mut u8,
+                    op.elem_size as usize,
+                );
+            }
+            write_ptr(fp, op.dst, vec_ptr);
+        }
+        Ok(())
+    }
+
+    /// Checks that the vector's length equals `op.dsts.len()` — erroring on a
+    /// mismatch; then copies each element into its destination slot. A null
+    /// `src` is the empty vector: it unpacks cleanly when `dsts` is empty and
+    /// fails the length check otherwise.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.src` and each `op.dsts` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_unpack(&mut self, fp: *mut u8, op: &VecUnpackOp) -> RuntimeResult<()> {
+        unsafe {
+            let vec_ptr = read_ptr(fp, op.src);
+            let expected = op.dsts.len() as u64;
+            let actual = read_vec_len(vec_ptr);
+            if actual != expected {
+                return Err(RuntimeError::VecUnpackLengthMismatch { expected, actual });
+            }
+            for (elem_idx, dst) in op.dsts.iter().enumerate() {
+                // Non-overlapping: the source is a heap vector element, the
+                // destination is a frame slot — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size),
+                    fp.add((*dst).into()),
+                    op.elem_size as usize,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Deep-copy the value tree rooted at the specified source into the

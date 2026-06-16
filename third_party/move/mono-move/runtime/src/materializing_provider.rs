@@ -21,9 +21,11 @@ use mono_move_core::{
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
+    types::type_to_string,
     LayoutProvider, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
+use move_core_types::account_address::AccountAddress;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
 
 /// A read-only resource provider that materializes BCS-encoded values into a
@@ -35,6 +37,11 @@ pub struct MaterializingResourceProvider<'g, 'ctx> {
     guard: &'g ExecutionGuard<'ctx>,
     /// Pre-interned resource keys to their raw BCS bytes.
     bcs_by_key: HashMap<InMemoryStorageKey, Vec<u8>>,
+    /// Table item bytes keyed by `(table handle address, serialized key)`. Kept
+    /// separate from `bcs_by_key` because a table item's storage key carries a
+    /// value type that is unknown when the cache is built; the type is supplied
+    /// by the reader (it lives in the `TableItem` key) and used to materialize.
+    table_bytes: HashMap<(AccountAddress, Box<[u8]>), Vec<u8>>,
     /// Provider-owned heap holding materialized values. Never GC'd.
     heap: RefCell<Heap>,
     /// Memoizes materialized reads so a key always maps to the same pointer.
@@ -51,15 +58,22 @@ impl<'g, 'ctx> MaterializingResourceProvider<'g, 'ctx> {
     pub fn new(
         guard: &'g ExecutionGuard<'ctx>,
         bcs_by_key: HashMap<InMemoryStorageKey, Vec<u8>>,
+        table_bytes: HashMap<(AccountAddress, Box<[u8]>), Vec<u8>>,
     ) -> Self {
-        let total_bytes: usize = bcs_by_key.values().map(|b| b.len()).sum();
+        let total_bytes: usize = bcs_by_key
+            .values()
+            .chain(table_bytes.values())
+            .map(|b| b.len())
+            .sum();
+        let entries = bcs_by_key.len() + table_bytes.len();
         let heap_size = total_bytes
             .saturating_mul(16)
-            .saturating_add(bcs_by_key.len().saturating_mul(4096))
+            .saturating_add(entries.saturating_mul(4096))
             .max(1 << 20);
         Self {
             guard,
             bcs_by_key,
+            table_bytes,
             heap: RefCell::new(Heap::new(heap_size)),
             materialized: RefCell::new(HashMap::new()),
         }
@@ -69,27 +83,43 @@ impl<'g, 'ctx> MaterializingResourceProvider<'g, 'ctx> {
     /// pointer to it. Returns [`StorageRead::DoesNotExist`] when the key is
     /// absent (or is a table item, which this provider does not serve).
     fn materialize(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
-        let Some(bytes) = self.bcs_by_key.get(key) else {
-            return Ok(StorageRead::DoesNotExist);
-        };
-        let ty = match key {
-            InMemoryStorageKey::Resource { ty, .. } => *ty,
-            InMemoryStorageKey::TableItem { .. } => return Ok(StorageRead::DoesNotExist),
+        // A resource is keyed (and looked up) by its full type-bearing key; a
+        // table item's bytes are stored type-less by `(handle, key)`, and its
+        // value type travels in the storage key.
+        let (bytes, ty) = match key {
+            InMemoryStorageKey::Resource { ty, .. } => {
+                let Some(bytes) = self.bcs_by_key.get(key) else {
+                    return Ok(StorageRead::DoesNotExist);
+                };
+                (bytes.as_slice(), *ty)
+            },
+            InMemoryStorageKey::TableItem {
+                handle,
+                key,
+                value_ty,
+            } => {
+                let Some(bytes) = self.table_bytes.get(&(handle.address(), key.clone())) else {
+                    return Ok(StorageRead::DoesNotExist);
+                };
+                (bytes.as_slice(), *value_ty)
+            },
         };
 
         let size = self
             .guard
             .layout_by_ty(ty)
             .ok_or_else(|| {
-                ResourceProviderError::InvariantViolation(
-                    "no layout published for resource type".to_string(),
-                )
+                ResourceProviderError::InvariantViolation(format!(
+                    "no layout published for type {}",
+                    type_to_string(ty),
+                ))
             })?
             .size;
         let desc_id = self.guard.struct_descriptor_for(ty).ok_or_else(|| {
-            ResourceProviderError::InvariantViolation(
-                "no struct descriptor published for resource type".to_string(),
-            )
+            ResourceProviderError::InvariantViolation(format!(
+                "no struct descriptor published for type {}",
+                type_to_string(ty),
+            ))
         })?;
 
         let total = OBJECT_HEADER_SIZE + size as usize;
@@ -101,9 +131,10 @@ impl<'g, 'ctx> MaterializingResourceProvider<'g, 'ctx> {
         // payload is `size` bytes; `guard` supplies the layout for `ty`. The
         // provider heap never GCs, so `obj` stays valid for the whole run.
         unsafe {
-            value_utils::deserialize(self.guard, &mut heap, ty, bytes, obj).map_err(|e| {
-                ResourceProviderError::InvariantViolation(format!("deserialize resource: {e:?}"))
-            })?;
+            value_utils::deserialize_with_interner(self.guard, self.guard, &mut heap, ty, bytes, obj)
+                .map_err(|e| {
+                    ResourceProviderError::InvariantViolation(format!("deserialize resource: {e:?}"))
+                })?;
         }
         // SAFETY: `heap_alloc` never returns a null object pointer.
         let ptr = unsafe { NonNull::new_unchecked(obj) };
