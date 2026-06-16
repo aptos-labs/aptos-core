@@ -1,4 +1,3 @@
-// flag: --aptos
 // flag: --no-inference-opaque
 module 0x42::vault {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore};

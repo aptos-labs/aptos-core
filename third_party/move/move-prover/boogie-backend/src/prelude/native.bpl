@@ -388,6 +388,7 @@ axiom (
 {%- set Type = impl.struct_name -%}
 {%- set Self = "Table int (" ~ V ~ ")" -%}
 {%- set S = "'" ~ instance.0.suffix ~ "_" ~ instance.1.suffix ~ "'" -%}
+{%- set SK = "'" ~ instance.0.suffix ~ "'" -%}
 {%- set SV = "'" ~ instance.1.suffix ~ "'" -%}
 {%- set ENC = "$EncodeKey'" ~ instance.0.suffix ~ "'" -%}
 
@@ -562,6 +563,101 @@ procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}
 }
 {%- endif %}
 
+{%- if impl.fun_to_vec_pair != "" %}
+// Decompose the map into two vectors with parallel positions. Order is unspecified
+// because the underlying SMT-array model has no notion of insertion order.
+procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: {{Self}}) returns (ks: Vec ({{K}}), vs: Vec ({{V}})) {
+    assume LenVec(ks) == LenTable(t);
+    assume LenVec(vs) == LenTable(t);
+    assume (forall i: int :: 0 <= i && i < LenVec(ks) ==>
+        ContainsTable(t, {{ENC}}(ReadVec(ks, i))));
+    assume (forall k: {{K}} :: ContainsTable(t, {{ENC}}(k)) ==> $ContainsVec{{SK}}(ks, k));
+    assume (forall i: int :: 0 <= i && i < LenVec(ks) ==>
+        GetTable(t, {{ENC}}(ReadVec(ks, i))) == ReadVec(vs, i));
+}
+{%- endif %}
+
+{%- if impl.fun_keys != "" %}
+// Project all keys of the map into a vector. Order is unspecified. Keys are distinct
+// (forced by `LenVec == LenTable` + every position is a Table key).
+procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: {{Self}}) returns (ks: Vec ({{K}})) {
+    assume LenVec(ks) == LenTable(t);
+    assume (forall i: int :: 0 <= i && i < LenVec(ks) ==>
+        ContainsTable(t, {{ENC}}(ReadVec(ks, i))));
+    assume (forall k: {{K}} :: ContainsTable(t, {{ENC}}(k)) ==> $ContainsVec{{SK}}(ks, k));
+}
+{%- endif %}
+
+{%- if impl.fun_values != "" %}
+// Project all values of the map into a vector. Order is unspecified, but multiplicity
+// is preserved: if two distinct keys map to the same value, that value appears twice
+// in the result. The local `ks` is a havoc'd witness, constrained to be a permutation
+// of the table's keys, and used positionally to pin each `vs` slot to a distinct key's
+// value. Callers never see `ks`, so they cannot reason about which permutation; but
+// its existence forces `vs` to be the multiset of values of the map's entries.
+procedure {:inline 2} {{impl.fun_values}}{{S}}(t: {{Self}}) returns (vs: Vec ({{V}})) {
+    var ks: Vec ({{K}});
+    assume LenVec(ks) == LenTable(t);
+    assume LenVec(vs) == LenTable(t);
+    assume (forall i: int :: 0 <= i && i < LenVec(ks) ==>
+        ContainsTable(t, {{ENC}}(ReadVec(ks, i))));
+    assume (forall k: {{K}} :: ContainsTable(t, {{ENC}}(k)) ==> $ContainsVec{{SK}}(ks, k));
+    assume (forall i: int :: 0 <= i && i < LenVec(ks) ==>
+        GetTable(t, {{ENC}}(ReadVec(ks, i))) == ReadVec(vs, i));
+}
+{%- endif %}
+
+{%- if impl.fun_new_from != "" %}
+// True iff `keys` contains two distinct positions with equal encoded keys.
+function {:inline} {{impl.fun_new_from}}_HasDup{{S}}(keys: Vec ({{K}})): bool {
+    (exists i: int, j: int ::
+        0 <= i && i < LenVec(keys) && 0 <= j && j < LenVec(keys) && i != j &&
+        {{ENC}}(ReadVec(keys, i)) == {{ENC}}(ReadVec(keys, j)))
+}
+// Build a Table from two parallel vectors. Aborts when lengths differ or the keys
+// contain a duplicate.
+procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys: Vec ({{K}}), values: Vec ({{V}})) returns (t: {{Self}}) {
+    // The length-mismatch branch originates in `vector::zip` and aborts with
+    // `EVECTORS_LENGTH_MISMATCH = 0x20002` (std::error category OUT_OF_RANGE = 2,
+    // reason 2). The duplicate-key branch originates in the inner `add` and aborts
+    // with the map's own `EKEY_ALREADY_EXISTS` (std::error category INVALID_ARGUMENT,
+    // here approximated as EALREADY_EXISTS in the prover-internal `$StdError` scheme
+    // matching how the existing `add_no_override` intrinsic encodes it).
+    if (LenVec(keys) != LenVec(values)) {
+        call $Abort($StdError(2/*OUT_OF_RANGE*/, 2/*EVECTORS_LENGTH_MISMATCH*/));
+    } else if ({{impl.fun_new_from}}_HasDup{{S}}(keys)) {
+        call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 100/*EALREADY_EXISTS*/));
+    } else {
+        assume LenTable(t) == LenVec(keys);
+        assume (forall k: {{K}} :: ContainsTable(t, {{ENC}}(k)) <==> $ContainsVec{{SK}}(keys, k));
+        assume (forall i: int :: 0 <= i && i < LenVec(keys) ==>
+            GetTable(t, {{ENC}}(ReadVec(keys, i))) == ReadVec(values, i));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_upsert_kv != "" and not instance.0.is_bv and not instance.1.is_bv %}
+// Like upsert, but additionally returns the displaced key as Option<K>. Under the
+// $EncodeKey-as-injection model the stored key is $IsEqual to the input key, so we
+// return the input key.
+procedure {:inline 2} {{impl.fun_upsert_kv}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}})
+returns (prev_k: $1_option_Option{{SK}}, prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};
+    enc_k := {{ENC}}(k);
+    t := $Dereference(m);
+    if (ContainsTable(t, enc_k)) {
+        prev_k := $1_option_Option{{SK}}_Some(k);
+        prev_v := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
+        m' := $UpdateMutation(m, UpdateTable(t, enc_k, v));
+    } else {
+        prev_k := $1_option_Option{{SK}}_None();
+        prev_v := $1_option_Option{{SV}}_None();
+        m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+    }
+}
+{%- endif %}
+
 {%- if impl.fun_spec_len != "" %}
 function {:inline} {{impl.fun_spec_len}}{{S}}(t: ({{Self}})): int {
     LenTable(t)
@@ -629,6 +725,15 @@ function {:inline} {{impl.fun_spec_aborts_del}}{{S}}(t: {{Self}}, k: {{K}}): boo
 {%- if impl.fun_spec_aborts_borrow != "" %}
 function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): bool {
     !ContainsTable(t, {{ENC}}(k))
+}
+{%- endif %}
+
+{%- if impl.fun_spec_aborts_new_from != "" %}
+function {:inline} {{impl.fun_spec_aborts_new_from}}{{S}}(keys: Vec ({{K}}), values: Vec ({{V}})): bool {
+    LenVec(keys) != LenVec(values) ||
+    (exists i: int, j: int ::
+        0 <= i && i < LenVec(keys) && 0 <= j && j < LenVec(keys) && i != j &&
+        {{ENC}}(ReadVec(keys, i)) == {{ENC}}(ReadVec(keys, j)))
 }
 {%- endif %}
 

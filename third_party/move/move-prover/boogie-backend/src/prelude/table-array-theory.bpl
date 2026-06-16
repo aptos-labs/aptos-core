@@ -57,6 +57,10 @@ function {:inline} RemoveTable<K,V>(t: Table K V, k: K): Table K V {
 axiom {:ctor "Table"} (forall<K,V> t: Table K V :: {LenTable(t)}
     (exists k: K :: {ContainsTable(t, k)} ContainsTable(t, k)) ==> LenTable(t) >= 1
 );
-// TODO: we might want to encoder a stronger property that the length of table
-// must be more than N given a set of N items. Currently we don't see a need here
-// and the above axiom seems to be sufficient.
+// Converse: a non-empty table contains at least one key. Required by templates
+// that build a key witness vector of length `LenTable(t)`; without it, havoc'd
+// states with `LenTable(t) >= 1` and no keys admit no witness.
+axiom {:ctor "Table"} (forall<K,V> t: Table K V :: {LenTable(t)}
+    LenTable(t) >= 1 ==> (exists k: K :: {ContainsTable(t, k)} ContainsTable(t, k))
+);
+// TODO: pin exact cardinality (LenTable(t) >= N given N distinct present keys).

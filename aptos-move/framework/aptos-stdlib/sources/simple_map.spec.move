@@ -5,7 +5,12 @@ spec aptos_std::simple_map {
 
     spec SimpleMap {
         pragma intrinsic = map,
-            map_new = create,
+            map_new = new,
+            map_new_from = new_from,
+            map_to_vec_pair = to_vec_pair,
+            map_keys = keys,
+            map_values = values,
+            map_upsert_kv = upsert,
             map_len = length,
             map_destroy_empty = destroy_empty,
             map_has_key = contains_key,
@@ -22,14 +27,11 @@ spec aptos_std::simple_map {
             map_spec_aborts_destroy_empty = spec_aborts_destroy_empty,
             map_spec_aborts_add = spec_aborts_add,
             map_spec_aborts_del = spec_aborts_del,
-            map_spec_aborts_borrow = spec_aborts_borrow;
+            map_spec_aborts_borrow = spec_aborts_borrow,
+            map_spec_aborts_new_from = spec_aborts_new_from;
     }
 
     spec length {
-        pragma intrinsic;
-    }
-
-    spec create {
         pragma intrinsic;
     }
 
@@ -53,10 +55,6 @@ spec aptos_std::simple_map {
         pragma intrinsic;
     }
 
-    spec add_all {
-        pragma intrinsic;
-    }
-
     spec remove {
         pragma intrinsic;
     }
@@ -66,61 +64,27 @@ spec aptos_std::simple_map {
     }
 
     spec keys {
-        pragma verify=false;
+        pragma intrinsic;
     }
 
     spec values {
-        pragma verify=false;
+        pragma intrinsic;
     }
 
-    spec new<Key: store, Value: store>(): SimpleMap<Key, Value> {
+    spec new {
         pragma intrinsic;
-        pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] spec_len(result) == 0;
-        ensures [abstract] forall k: Key: !spec_contains_key(result, k);
     }
 
-    spec new_from<Key: store, Value: store>(
-    keys: vector<Key>,
-    values: vector<Value>,
-    ): SimpleMap<Key, Value> {
+    spec new_from {
         pragma intrinsic;
-        pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] spec_len(result) == len(keys);
-        ensures [abstract] forall k: Key: spec_contains_key(result, k) <==> vector::spec_contains(keys, k);
-        ensures [abstract] forall i in 0..len(keys):
-            spec_get(result, keys.borrow(i)) == values.borrow(i);
     }
 
-    spec to_vec_pair<Key: store, Value: store>(self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
+    spec to_vec_pair {
         pragma intrinsic;
-        pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract]
-            forall k: Key: vector::spec_contains(result_1, k) <==>
-                spec_contains_key(self, k);
-        ensures [abstract] forall i in 0..len(result_1):
-            spec_get(self, result_1.borrow(i)) == result_2.borrow(i);
     }
 
-    spec upsert<Key: store, Value: store>(
-        self: &mut SimpleMap<Key, Value>,
-        key: Key,
-        value: Value
-        ): (std::option::Option<Key>, std::option::Option<Value>) {
+    spec upsert {
         pragma intrinsic;
-        pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result_1);
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result_2);
-        ensures [abstract] spec_contains_key(self, key);
-        ensures [abstract] spec_get(self, key) == value;
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_1)) && (option::spec_borrow(result_1) == key));
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_2)) && (option::spec_borrow(result_2) == spec_get(old(
-            self
-        ), key)));
     }
 
     // Specification functions for tables
@@ -136,4 +100,5 @@ spec aptos_std::simple_map {
     spec native fun spec_aborts_add<K, V>(m: SimpleMap<K, V>, k: K, v: V): bool;
     spec native fun spec_aborts_del<K, V>(m: SimpleMap<K, V>, k: K): bool;
     spec native fun spec_aborts_borrow<K, V>(m: SimpleMap<K, V>, k: K): bool;
+    spec native fun spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool;
 }

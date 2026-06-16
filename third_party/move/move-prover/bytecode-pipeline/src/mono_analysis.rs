@@ -7,15 +7,20 @@
 //! computes the distinct type instantiations in the model for structs and inlined functions.
 
 use itertools::Itertools;
-use move_core_types::{ability::AbilitySet, function::ClosureMask};
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+};
 use move_model::{
     ast,
-    ast::{Condition, ConditionKind, ExpData},
+    ast::{Address, Condition, ConditionKind, ExpData},
     model::{
         FieldEnv, FunId, GlobalEnv, ModuleId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
         SpecVarId, StructEnv, StructId,
     },
-    pragmas::INTRINSIC_TYPE_MAP,
+    pragmas::{
+        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_TO_VEC_PAIR,
+        INTRINSIC_FUN_MAP_UPSERT_KV, INTRINSIC_FUN_MAP_VALUES, INTRINSIC_TYPE_MAP,
+    },
     symbol::Symbol,
     ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
@@ -228,6 +233,10 @@ impl MonoAnalysisProcessor {
         }
         // Analyze functions
         analyzer.analyze_funs();
+        // Some intrinsic role bodies use types (e.g. `Option<K>`/`Option<V>` for the upsert
+        // roles) that no Move source code mentions directly. Register them so that mono
+        // generates the corresponding Boogie declarations the prelude templates depend on.
+        analyzer.register_intrinsic_associated_types();
         let Analyzer {
             mut info,
             done_types,
@@ -250,7 +259,96 @@ struct Analyzer<'a> {
     inst_opt: Option<Vec<Type>>,
 }
 
+/// Locate the `0x1::option::Option` struct. Returns `None` when the module is not in the
+/// model — in which case any upsert intrinsic would have been rejected during compilation,
+/// so there is nothing more to register. The lookup is pinned to address `0x1` because the
+/// backend hard-codes `$1_option_*` Boogie symbols; a same-named user module at a different
+/// address must not be picked up.
+fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
+    let option_module_sym = env.symbol_pool().make("option");
+    let option_struct_sym = env.symbol_pool().make("Option");
+    let std_addr = Address::Numerical(AccountAddress::ONE);
+    for module in env.get_modules() {
+        let name = module.get_name();
+        if name.addr() == &std_addr && name.name() == option_module_sym {
+            if let Some(sid) = module.find_struct(option_struct_sym).map(|s| s.get_id()) {
+                return Some(module.get_id().qualified(sid));
+            }
+        }
+    }
+    None
+}
+
 impl Analyzer<'_> {
+    /// Register type instantiations that intrinsic role bodies depend on but no Move source
+    /// references directly:
+    ///
+    /// 1. `Option<K>` / `Option<V>` for roles whose Boogie body constructs Option results
+    ///    (currently `map_upsert_kv` returning `(Option<K>, Option<V>)`).
+    /// 2. `Vec<K>` / `Vec<V>` for roles whose Boogie body references the type-aware
+    ///    `$ContainsVec'<X>'` helper (`map_keys`, `map_values`, `map_to_vec_pair`,
+    ///    `map_new_from`).
+    ///
+    /// Both concrete and type-parameter args are registered, so callers parameterized
+    /// over the map's K/V also get matching companion-type declarations.
+    fn register_intrinsic_associated_types(&mut self) {
+        let option_qid = find_option_struct(self.env);
+        let intrinsics = self.env.get_intrinsics();
+
+        // Roles whose Boogie body constructs an `Option<K>` value.
+        let option_k_roles = [INTRINSIC_FUN_MAP_UPSERT_KV];
+        // Roles whose Boogie body constructs an `Option<V>` value.
+        let option_v_roles = [INTRINSIC_FUN_MAP_UPSERT_KV];
+        // Roles whose Boogie body references the type-aware `$ContainsVec'<K>'` (a
+        // per-vec-instance helper that uses `$IsEqual` instead of raw `==`). For each
+        // such role we must register `Vec<K>` so the backend emits `$ContainsVec'<K>'`.
+        let vec_k_roles = [
+            INTRINSIC_FUN_MAP_TO_VEC_PAIR,
+            INTRINSIC_FUN_MAP_KEYS,
+            INTRINSIC_FUN_MAP_VALUES,
+            INTRINSIC_FUN_MAP_NEW_FROM,
+        ];
+
+        // Collect first to avoid borrow conflicts with self.add_type below.
+        let mut option_to_register: Vec<Type> = vec![];
+        for (struct_qid, ty_args) in self.info.table_inst.iter() {
+            let Some(decl) = intrinsics.get_decl_for_struct(struct_qid) else {
+                continue;
+            };
+            let needs_option_k = option_k_roles
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            let needs_option_v = option_v_roles
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            let needs_vec_k = vec_k_roles
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            if !needs_option_k && !needs_option_v && !needs_vec_k {
+                continue;
+            }
+            for (k, v) in ty_args.iter() {
+                if needs_option_k {
+                    option_to_register.push(k.clone());
+                }
+                if needs_option_v {
+                    option_to_register.push(v.clone());
+                }
+                if needs_vec_k {
+                    // Register Vec<K> / Vec<V> so the prelude emits the per-type
+                    // `$ContainsVec'<X>'` helper our templates use.
+                    self.info.vec_inst.insert(k.clone());
+                    self.info.vec_inst.insert(v.clone());
+                }
+            }
+        }
+        if let Some(option_qid) = option_qid {
+            for ty in option_to_register {
+                self.add_type(&Type::Struct(option_qid.module_id, option_qid.id, vec![ty]));
+            }
+        }
+    }
+
     fn analyze_funs(&mut self) {
         // Analyze top-level, verified functions. Any functions they call will be queued
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.

@@ -12,11 +12,12 @@ spec aptos_std::smart_table {
             map_borrow_mut = borrow_mut,
             map_borrow_mut_with_default = borrow_mut_with_default,
             map_borrow_with_default = borrow_with_default,
+            map_keys = keys,
             map_spec_get = spec_get,
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
-        map_spec_has_key = spec_contains;
+            map_spec_has_key = spec_contains;
     }
 
     spec new_with_config<K: copy + drop + store, V: store>(num_initial_buckets: u64, split_load_threshold: u8, target_bucket_size: u64): SmartTable<K, V> {
@@ -51,8 +52,8 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec keys<K: store + copy + drop, V: store + copy>(self: &SmartTable<K, V>): vector<K> {
-        pragma verify = false;
+    spec keys {
+        pragma intrinsic;
     }
 
     spec keys_paginated<K: store + copy + drop, V: store + copy>(
@@ -65,10 +66,6 @@ spec aptos_std::smart_table {
         Option<u64>,
         Option<u64>,
     ) {
-        pragma verify = false;
-    }
-
-    spec add_all<K, V>(self: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
         pragma verify = false;
     }
 
