@@ -434,6 +434,35 @@ impl StateDb {
                 })
             })
     }
+
+    /// Reads the persisted hot-state KV entry for `state_key` (hashing to `key_hash`) at
+    /// `version` and assembles the corresponding [`StateSlot`], carrying the key, value (or
+    /// vacancy), `hot_since_version`, and (for occupied entries) `value_version`.
+    ///
+    /// Errors if no live entry exists — callers walk the hot state Merkle tree first, so a
+    /// matching KV entry must exist at `version` by invariant.
+    fn expect_hot_state_slot_by_version(
+        &self,
+        state_key: StateKey,
+        key_hash: HashValue,
+        version: Version,
+    ) -> Result<StateSlot> {
+        let (hot_since_version, entry) = self
+            .hot_state_kv_db
+            .get_hot_state_entry_by_version(key_hash, version)?
+            .and_then(|(hot_since_version, entry_opt)| {
+                entry_opt.map(|entry| (hot_since_version, entry))
+            })
+            .ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "Hot state entry is missing for key hash {key_hash} by version {version}"
+                ))
+            })?;
+        Ok(StateSlot::new(
+            state_key,
+            entry.into_slot_kind(hot_since_version),
+        ))
+    }
 }
 
 impl StateStore {
@@ -1497,6 +1526,34 @@ impl StateStore {
             first_index,
             state_key_values,
         )
+    }
+
+    /// Returns the number of hot state items (leaves of the hot state Merkle tree) at `version`.
+    pub fn get_hot_state_item_count(&self, version: Version) -> Result<usize> {
+        self.hot_state_merkle_db.get_leaf_count(version)
+    }
+
+    /// Walks the hot state Merkle tree at `version` from `first_index` and yields up to
+    /// `chunk_size` hot state leaves, each as a [`StateSlot`] carrying the full key, value (or
+    /// vacancy), `hot_since_version`, and (for occupied entries) `value_version`. A fast-syncing
+    /// node uses these to rebuild both the hot state KV DB and the hot state Merkle tree.
+    pub fn get_hot_state_value_chunk_iter(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<StateSlot>> + Send + Sync + use<>> {
+        let store = Arc::clone(self);
+        Ok(JellyfishMerkleIterator::new_by_index(
+            Arc::clone(&self.hot_state_merkle_db),
+            version,
+            first_index,
+        )?
+        .map(move |res| {
+            let (key_hash, (key, _leaf_version)) = res?;
+            store.expect_hot_state_slot_by_version(key, key_hash, version)
+        })
+        .take(chunk_size))
     }
 
     // state sync doesn't query for the progress, but keeps its record by itself.

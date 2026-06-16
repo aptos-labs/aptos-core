@@ -19,6 +19,7 @@ use aptos_types::{
     state_store::{
         hot_state::HotStateValue,
         state_key::StateKey,
+        state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -455,6 +456,22 @@ pub trait DbReader: Send + Sync {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> Result<StateValueChunkWithProof>;
+
+        /// Returns the total number of hot state items (leaves of the hot state Merkle tree) at
+        /// the given version.
+        fn get_hot_state_item_count(&self, version: Version) -> Result<usize>;
+
+        /// Returns an iterator over hot state leaves, walking the hot state Merkle tree at
+        /// `version` from `first_index` for up to `chunk_size` leaves. Each [`StateSlot`] carries
+        /// the full key, value (or vacancy), `hot_since_version`, and (for occupied entries)
+        /// `value_version` — everything needed to rebuild the hot state KV DB and Merkle tree on a
+        /// fast-syncing node.
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<StateSlot>> + '_>>;
 
         /// Returns if the state store pruner is enabled.
         fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;

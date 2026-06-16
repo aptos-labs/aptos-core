@@ -589,22 +589,9 @@ impl StateKvDb {
             }
 
             // This is the most recent entry for this key_hash at the snapshot version.
-            if let Some(kind) = match entry_opt {
-                None => None, // Evicted — not hot.
-                Some(HotStateEntry::Occupied {
-                    value,
-                    value_version,
-                }) => Some(StateSlotKind::HotOccupied {
-                    value_version,
-                    value,
-                    hot_since_version,
-                    lru_info: LRUEntry::uninitialized(),
-                }),
-                Some(HotStateEntry::Vacant) => Some(StateSlotKind::HotVacant {
-                    hot_since_version,
-                    lru_info: LRUEntry::uninitialized(),
-                }),
-            } {
+            // `None` means evicted — not hot, so skip it.
+            if let Some(entry) = entry_opt {
+                let kind = entry.into_slot_kind(hot_since_version);
                 entries.push((key_hash, hot_since_version, kind));
             }
 
@@ -663,6 +650,28 @@ impl StateKvDb {
         };
         loaded.validate_lru_chain();
         loaded
+    }
+}
+
+impl HotStateEntry {
+    /// Builds the in-memory [`StateSlotKind`] for a persisted hot entry that became hot at
+    /// `hot_since_version`, with uninitialized LRU pointers (the caller wires up the chain).
+    pub(crate) fn into_slot_kind(self, hot_since_version: Version) -> StateSlotKind {
+        match self {
+            HotStateEntry::Occupied {
+                value,
+                value_version,
+            } => StateSlotKind::HotOccupied {
+                value_version,
+                value,
+                hot_since_version,
+                lru_info: LRUEntry::uninitialized(),
+            },
+            HotStateEntry::Vacant => StateSlotKind::HotVacant {
+                hot_since_version,
+                lru_info: LRUEntry::uninitialized(),
+            },
+        }
     }
 }
 
