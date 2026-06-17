@@ -2064,6 +2064,8 @@ dependencies = [
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "attestation-doc-validation",
+ "aws-nitro-enclaves-cose",
+ "aws-nitro-enclaves-nsm-api",
  "bcs 0.1.4",
  "better_any",
  "blake2-rfc",
@@ -2071,6 +2073,7 @@ dependencies = [
  "byteorder",
  "claims",
  "curve25519-dalek-ng",
+ "ecdsa",
  "either",
  "flate2",
  "hex",
@@ -2083,6 +2086,8 @@ dependencies = [
  "move-vm-types",
  "num-traits",
  "once_cell",
+ "p256",
+ "p384",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "ripemd",
@@ -2095,6 +2100,8 @@ dependencies = [
  "smallvec",
  "tiny-keccak",
  "triomphe",
+ "webpki",
+ "x509-parser",
 ]
 
 [[package]]
@@ -5755,7 +5762,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
- "synstructure",
+ "synstructure 0.12.6",
 ]
 
 [[package]]
@@ -6090,7 +6097,7 @@ dependencies = [
  "serde_bytes",
  "serde_cbor",
  "serde_with 2.3.3",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
  "time",
  "wasm-bindgen",
@@ -14782,7 +14789,7 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "primeorder",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -19025,6 +19032,18 @@ dependencies = [
 
 [[package]]
 name = "synstructure"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "unicode-xid",
+]
+
+[[package]]
+name = "synstructure"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
@@ -21533,7 +21552,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.87",
- "synstructure",
+ "synstructure 0.13.2",
 ]
 
 [[package]]
@@ -21612,7 +21631,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.87",
- "synstructure",
+ "synstructure 0.13.2",
 ]
 
 [[package]]

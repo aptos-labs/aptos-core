@@ -6,8 +6,8 @@
 pub mod account;
 
 pub mod account_abstraction;
-pub mod aws_nitro_utils;
 pub mod aggregator_natives;
+pub mod aws_nitro_utils;
 pub mod code;
 pub mod consensus_config;
 pub mod create_signer;

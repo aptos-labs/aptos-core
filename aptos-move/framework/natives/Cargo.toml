@@ -33,6 +33,8 @@ aptos-native-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
 attestation-doc-validation = "0.10"
+aws-nitro-enclaves-cose = { version = "0.5.2", default-features = false }
+aws-nitro-enclaves-nsm-api = { version = "0.4", default-features = false }
 ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
@@ -45,6 +47,7 @@ blake2-rfc = { workspace = true }
 bulletproofs = { workspace = true }
 byteorder = { workspace = true }
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
+ecdsa = "0.16"
 either = { workspace = true }
 flate2 = { workspace = true }
 hex = { workspace = true }
@@ -57,6 +60,8 @@ move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
+p256 = "0.13"
+p384 = "0.13"
 rand = { workspace = true }
 rand_core = { workspace = true }
 ripemd = { workspace = true }
@@ -69,6 +74,8 @@ siphasher = { workspace = true }
 smallvec = { workspace = true }
 tiny-keccak = { workspace = true }
 triomphe = { workspace = true }
+webpki = "0.22.4"
+x509-parser = "0.14"
 
 [dev-dependencies]
 claims = { workspace = true }
