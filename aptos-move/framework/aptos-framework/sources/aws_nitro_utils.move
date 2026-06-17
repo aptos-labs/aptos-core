@@ -136,7 +136,7 @@ module aptos_framework::aws_nitro_utils {
     ): Option<AttestationDoc>;
 
     /// Initializes the chain-managed Nitro root certificate store.
-    public fun initialize(aptos_framework: &signer, root_certs: vector<vector<u8>>) {
+    public entry fun initialize(aptos_framework: &signer, root_certs: vector<vector<u8>>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<TrustedRoots>(@aptos_framework),
@@ -158,7 +158,7 @@ module aptos_framework::aws_nitro_utils {
     }
 
     /// Replaces the chain-managed Nitro root certificate set.
-    public fun set_trusted_roots(aptos_framework: &signer, root_certs: vector<vector<u8>>) {
+    public entry fun set_trusted_roots(aptos_framework: &signer, root_certs: vector<vector<u8>>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert_trusted_roots_initialized();
 
@@ -167,7 +167,7 @@ module aptos_framework::aws_nitro_utils {
     }
 
     /// Adds one DER-encoded Nitro root certificate to the chain-managed set.
-    public fun add_trusted_root(aptos_framework: &signer, root_cert: vector<u8>) {
+    public entry fun add_trusted_root(aptos_framework: &signer, root_cert: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert_trusted_roots_initialized();
 
@@ -180,7 +180,7 @@ module aptos_framework::aws_nitro_utils {
     }
 
     /// Removes one DER-encoded Nitro root certificate from the chain-managed set.
-    public fun remove_trusted_root(aptos_framework: &signer, root_cert: &vector<u8>) {
+    public entry fun remove_trusted_root(aptos_framework: &signer, root_cert: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert_trusted_roots_initialized();
 
@@ -188,7 +188,7 @@ module aptos_framework::aws_nitro_utils {
         let len = root_certs.length();
         let i = 0;
         while (i < len) {
-            if (root_certs.borrow(i) == root_cert) {
+            if (root_certs.borrow(i) == &root_cert) {
                 root_certs.remove(i);
                 return
             };
@@ -579,7 +579,7 @@ module aptos_framework::aws_nitro_utils {
         assert!(trusted_root_count() == 2, 5);
         assert!(contains_trusted_root(&b"root-b"), 6);
 
-        remove_trusted_root(aptos_framework, &b"root-a");
+        remove_trusted_root(aptos_framework, b"root-a");
         assert!(trusted_roots() == vector[b"root-b"], 7);
 
         set_trusted_roots(aptos_framework, vector[b"root-c"]);
