@@ -75,4 +75,4 @@ fun entry() {
     12: Return
 }
 
-fun identity(): skipped (not all types are concrete)
+fun identity(): skipped (generic function not instantiated)

@@ -54,7 +54,7 @@ fun identity(r0, r1): _0 {
 === micro-ops ===
 // module 0x1::test
 
-fun caller(): skipped (not all types are concrete)
+fun caller(): skipped (generic function not instantiated)
 
 fun entry() {
   frame_data_size: 8
@@ -67,4 +67,4 @@ fun entry() {
     4: Return
 }
 
-fun identity(): skipped (not all types are concrete)
+fun identity(): skipped (generic function not instantiated)
