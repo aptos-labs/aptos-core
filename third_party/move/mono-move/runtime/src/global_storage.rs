@@ -215,6 +215,13 @@ impl ResourceReadWriteSet {
         Self::default()
     }
 
+    /// Iterates the read-write-set entries. Used by the differential harness to
+    /// enumerate table-item writes (which, unlike resource writes, are not
+    /// driven off another VM's write set).
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&InMemoryStorageKey, &Entry)> {
+        self.entries.iter()
+    }
+
     /// Returns true if the resource exists at the specified key.
     pub(crate) fn exists(
         &mut self,
@@ -372,6 +379,13 @@ impl ResourceReadWriteSet {
     /// Returns the number of entries in the journal (undo log).
     pub fn journal_len(&self) -> usize {
         self.journal.len()
+    }
+
+    /// Returns the entry recorded for `key`, if this run has touched it (read,
+    /// written, or both). Used to read back the final write of a resource for
+    /// differential comparison against another VM.
+    pub(crate) fn get(&self, key: &InMemoryStorageKey) -> Option<&Entry> {
+        self.entries.get(key)
     }
 
     /// Save the current state and advance the epoch. A subsequent roll back

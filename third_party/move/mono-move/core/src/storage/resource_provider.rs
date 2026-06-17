@@ -3,7 +3,7 @@
 
 //! Resource storage access for the runtime.
 
-use crate::{types::InternedType, ExecutionErrorKind, IntoExecutionError};
+use crate::{native::TableHandle, types::InternedType, ExecutionErrorKind, IntoExecutionError};
 use move_core_types::account_address::AccountAddress;
 use std::ptr::NonNull;
 use thiserror::Error;
@@ -43,9 +43,13 @@ pub enum InMemoryStorageKey {
     /// A table item, identified by its table handle and the serialized bytes of
     /// its key.
     TableItem {
-        handle: AccountAddress,
+        handle: TableHandle,
         // TODO(perf): consider interning these keys later.
         key: Box<[u8]>,
+        /// The stored value's type (`Box<V>` for a `Table<K, V>`). Carried so a
+        /// provider can materialize the item; for a fixed `(handle, key)` it is
+        /// always the same, so it does not affect key identity in practice.
+        value_ty: InternedType,
     },
 }
 
@@ -55,9 +59,14 @@ impl InMemoryStorageKey {
         InMemoryStorageKey::Resource { address, ty }
     }
 
-    /// Builds a table item key from its handle and the serialized key bytes.
-    pub fn table_item(handle: AccountAddress, key: Box<[u8]>) -> Self {
-        InMemoryStorageKey::TableItem { handle, key }
+    /// Builds a table item key from its handle, the serialized key bytes, and
+    /// the stored value's type.
+    pub fn table_item(handle: TableHandle, key: Box<[u8]>, value_ty: InternedType) -> Self {
+        InMemoryStorageKey::TableItem {
+            handle,
+            key,
+            value_ty,
+        }
     }
 
     /// Returns the address a key is anchored at: the publishing address for a
@@ -65,7 +74,7 @@ impl InMemoryStorageKey {
     pub fn address(&self) -> AccountAddress {
         match self {
             InMemoryStorageKey::Resource { address, .. } => *address,
-            InMemoryStorageKey::TableItem { handle, .. } => *handle,
+            InMemoryStorageKey::TableItem { handle, .. } => handle.address(),
         }
     }
 }

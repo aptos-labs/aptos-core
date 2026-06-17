@@ -25,13 +25,24 @@
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
     heap::{heap_alloc, AllocationResult, Heap},
-    memory::{read_ptr, read_vec_len, write_ptr, write_u64},
+    memory::{read_enum_tag, read_ptr, read_vec_len, write_enum_tag, write_ptr, write_u64},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
+    types::{
+        InternedType, ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY,
+        SIGNER_TY, U128_TY, U16_TY, U256_TY, U32_TY, U64_TY, U8_TY,
+    },
+    Interner, LayoutId, LayoutKind, LayoutProvider, ValueLayout, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
+    CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
+    ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_UNRESOLVED,
+    OBJECT_HEADER_SIZE,
 };
-use move_core_types::int256::{I256, U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    int256::{I256, U256},
+};
 use std::cmp::Ordering;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
@@ -173,8 +184,24 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(())
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums and function values is not yet supported");
+        LayoutKind::ClosedEnum { variants, .. } => {
+            // SAFETY: an enum value holds a non-null heap pointer and data
+            // follows the offset.
+            let obj_ptr = unsafe { read_ptr(base, 0usize) };
+            let tag = unsafe { read_enum_tag(obj_ptr) };
+            let variant_id = variants
+                .get(tag as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag, variants.len()))?;
+            write_uleb128_len(out, tag);
+
+            let variant_layout = layouts.layout(*variant_id).ok_or_else(layout_not_found)?;
+            // SAFETY: the variant body lives at the specified offset within
+            // the object.
+            unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
+            Ok(())
+        },
+        LayoutKind::Function => {
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("References cannot be serialized")),
     }
@@ -298,15 +325,33 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(true)
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            // TODO(enums): implement enum equality. Resolve the open enum's
-            // variants lazily (read the u64 tag at `ENUM_TAG_OFFSET` from each
-            // operand's heap object; if the tags differ return `false`, else
-            // recurse over the active variant's field layouts). `gc_layout`
-            // now lets functions that compare enums lower, so until this lands
-            // enum `==` (and equality of any value containing an enum) panics
-            // here. Same for function values.
-            todo!("enums or function values are not yet supported");
+        LayoutKind::ClosedEnum { variants, .. } => {
+            // SAFETY: well-typed enum values hold non-null heap pointers and
+            // every enum object stores its data following the offset.
+            let obj_a = unsafe { read_ptr(a, 0usize) };
+            let obj_b = unsafe { read_ptr(b, 0usize) };
+            let tag_a = unsafe { read_enum_tag(obj_a) };
+            let tag_b = unsafe { read_enum_tag(obj_b) };
+
+            if tag_a != tag_b {
+                return Ok(false);
+            }
+            let variant_id = *variants
+                .get(tag_a as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
+
+            // SAFETY: both variant bodies live at the specified offset.
+            unsafe {
+                equals_impl(
+                    layouts,
+                    obj_a.add(ENUM_DATA_OFFSET),
+                    obj_b.add(ENUM_DATA_OFFSET),
+                    variant_id,
+                )
+            }
+        },
+        LayoutKind::Function => {
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Equality runs on pointee types only")),
     }
@@ -460,8 +505,34 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(len_a.cmp(&len_b))
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums and function values are not yet supported");
+        LayoutKind::ClosedEnum { variants, .. } => {
+            // SAFETY: well-typed enum values hold non-null heap pointers and
+            // every enum object stores its tag followed by data payload.
+            let obj_a = unsafe { read_ptr(a, 0usize) };
+            let obj_b = unsafe { read_ptr(b, 0usize) };
+            let tag_a = unsafe { read_enum_tag(obj_a) };
+            let tag_b = unsafe { read_enum_tag(obj_b) };
+
+            let ord = tag_a.cmp(&tag_b);
+            if ord.is_ne() {
+                return Ok(ord);
+            }
+            let variant_id = *variants
+                .get(tag_a as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
+
+            // SAFETY: both variant bodies live at the specified offset.
+            unsafe {
+                compare_impl(
+                    layouts,
+                    obj_a.add(ENUM_DATA_OFFSET),
+                    obj_b.add(ENUM_DATA_OFFSET),
+                    variant_id,
+                )
+            }
+        },
+        LayoutKind::Function => {
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Comparison runs on pointee types only")),
     }
@@ -493,11 +564,44 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     dst: *mut u8,
 ) -> AllocationResult<()> {
+    // No interner: deserializing a function value on this path errors. The
+    // callers here (entry-function arguments, constants) never carry one.
+    // SAFETY: caller must enforce the safety precondition.
+    unsafe { deserialize_inner(layouts, None, heap, ty, bytes, dst) }
+}
+
+/// Like [`deserialize`], but with an [`Interner`] so a function value can be
+/// materialized into an unresolved closure. Used by a resource provider reading
+/// stored state, which may contain function values.
+///
+/// # Safety
+///
+/// Same as [`deserialize`].
+pub unsafe fn deserialize_with_interner<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    interner: &dyn Interner,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+) -> AllocationResult<()> {
+    // SAFETY: caller must enforce the safety precondition.
+    unsafe { deserialize_inner(layouts, Some(interner), heap, ty, bytes, dst) }
+}
+
+unsafe fn deserialize_inner<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    interner: Option<&dyn Interner>,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+) -> AllocationResult<()> {
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
 
     let mut cursor = 0usize;
     // SAFETY: caller must enforce the safety precondition.
-    unsafe { deserialize_impl(layouts, heap, layout, bytes, &mut cursor, dst)? };
+    unsafe { deserialize_impl(layouts, interner, heap, layout, bytes, &mut cursor, dst)? };
     if cursor != bytes.len() {
         return Err(RuntimeError::BCSRemainingInput {
             remaining: bytes.len().saturating_sub(cursor),
@@ -512,6 +616,7 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
 /// `dst` must be writable for `layout.size` bytes.
 unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
+    interner: Option<&dyn Interner>,
     heap: &mut Heap,
     layout: &ValueLayout,
     bytes: &[u8],
@@ -551,6 +656,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 unsafe {
                     deserialize_impl(
                         layouts,
+                        interner,
                         heap,
                         field_layout,
                         bytes,
@@ -622,7 +728,9 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                     // element layout, as guaranteed by the precondition of the
                     // function.
                     unsafe {
-                        deserialize_impl(layouts, heap, elem_layout, bytes, cursor, elem_ptr)?
+                        deserialize_impl(
+                            layouts, interner, heap, elem_layout, bytes, cursor, elem_ptr,
+                        )?
                     };
                 }
             }
@@ -632,11 +740,196 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { write_ptr(dst, 0usize, vec_ptr) };
             Ok(())
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums and function values are not yet supported");
+        LayoutKind::ClosedEnum {
+            descriptor_id,
+            variants,
+            max_variant_size,
+        } => {
+            // BCS encodes the variant index as a ULEB128 before the fields.
+            let tag = read_uleb128_len(bytes, cursor)?;
+            if tag >= variants.len() as u64 {
+                return Err(RuntimeError::EnumVariantMismatch { tag }.into());
+            }
+
+            let variant_layout = layouts
+                .layout(variants[tag as usize])
+                .ok_or_else(layout_not_found)?;
+
+            let total_size = OBJECT_HEADER_SIZE + *max_variant_size as usize;
+            let obj_ptr = heap_alloc(heap, total_size, *descriptor_id)?;
+
+            // SAFETY: the allocation has enough size to write the tag.
+            unsafe { write_enum_tag(obj_ptr, tag) };
+
+            // SAFETY: variant body live at the specified offset. The maximum
+            // size was allocated so there is enough space to deserialize into.
+            unsafe {
+                deserialize_impl(
+                    layouts,
+                    interner,
+                    heap,
+                    variant_layout,
+                    bytes,
+                    cursor,
+                    obj_ptr.add(ENUM_DATA_OFFSET),
+                )?
+            };
+
+            // SAFETY: `dst` has space to write the 8-byte enum pointer as
+            // guaranteed by the caller.
+            unsafe { write_ptr(dst, 0usize, obj_ptr) };
+            Ok(())
+        },
+        LayoutKind::Function => {
+            // A function value deserializes into a closure object. We only
+            // support closures with no captured arguments: we record the
+            // function's symbolic identity as an unresolved closure (resolved
+            // lazily if it is ever called) and leave the captured-data pointer
+            // null.
+            let interner = interner.ok_or_else(|| {
+                unreachable("function value deserialization requires an interner")
+            })?;
+            let func_ref = read_function_value(bytes, cursor, interner)?;
+
+            // SAFETY: the closure object is `OBJECT_HEADER_SIZE + CLOSURE_DATA_SIZE`
+            // bytes with the reserved closure descriptor; `heap_alloc` returns the
+            // data pointer and zero-inits it (so the captured-data pointer starts
+            // null). An OOM propagates as an allocation error.
+            let closure = heap_alloc(
+                heap,
+                OBJECT_HEADER_SIZE + CLOSURE_DATA_SIZE,
+                CLOSURE_DESCRIPTOR_ID,
+            )?;
+            // SAFETY: `closure` is a freshly allocated closure object; the
+            // offsets lie within its `CLOSURE_DATA_SIZE` data region.
+            unsafe {
+                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
+                    FUNC_REF_TAG_UNRESOLVED;
+                write_ptr(
+                    closure,
+                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+                    func_ref.as_raw_ptr() as *const u8,
+                );
+                write_u64(closure, CLOSURE_MASK_OFFSET, 0);
+                write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, std::ptr::null());
+            }
+            // SAFETY: `dst` has space for the 8-byte closure pointer.
+            unsafe { write_ptr(dst, 0usize, closure) };
+            Ok(())
         },
         LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
     }
+}
+
+/// Reads a BCS-encoded function value and returns its symbolic identity interned
+/// as an unresolved closure target. Panics if the closure captures any arguments
+/// (not yet supported).
+///
+/// The wire format is a sequence of `module_id`, `fun_id`, `ty_args`, `mask`,
+/// then one value per captured argument. The sequence carries an (inflated)
+/// length prefix that the producer writes but the consumer ignores in favor of a
+/// fixed field count, so we read and discard it.
+fn read_function_value(
+    bytes: &[u8],
+    cursor: &mut usize,
+    interner: &dyn Interner,
+) -> RuntimeResult<mono_move_core::interner::InternedFunctionRef> {
+    // Sequence length prefix (ignored — see the doc comment).
+    let _seq_len = read_uleb128_len(bytes, cursor)?;
+
+    // `module_id`: address followed by its name.
+    let module_addr = AccountAddress::new(read_array_bytes::<{ AccountAddress::LENGTH }>(
+        bytes, cursor,
+    )?);
+    let module_name = read_identifier(bytes, cursor)?;
+    // `fun_id`.
+    let func_name = read_identifier(bytes, cursor)?;
+    // `ty_args`.
+    let num_ty_args = read_uleb128_len(bytes, cursor)?;
+    let mut ty_args = Vec::with_capacity(num_ty_args as usize);
+    for _ in 0..num_ty_args {
+        ty_args.push(read_type_tag(bytes, cursor, interner)?);
+    }
+    // `mask` (a `u64`); a non-zero mask means captured arguments.
+    let mask = u64::from_le_bytes(
+        read_slice(bytes, cursor, 8)?
+            .try_into()
+            .map_err(|_| unreachable("mask is exactly 8 bytes"))?,
+    );
+    if mask != 0 {
+        todo!("function values with captured arguments are not yet supported");
+    }
+
+    let module_id = interner.module_id_of(&module_addr, ident_str(module_name)?);
+    let func_name = interner.identifier_of(ident_str(func_name)?);
+    let ty_args = interner.type_list_of(&ty_args);
+    Ok(interner.function_ref_of(module_id, func_name, ty_args))
+}
+
+/// Reads a BCS-encoded `TypeTag` and interns it to an [`InternedType`].
+fn read_type_tag(
+    bytes: &[u8],
+    cursor: &mut usize,
+    interner: &dyn Interner,
+) -> RuntimeResult<InternedType> {
+    // Variant indices match `move_core_types::language_storage::TypeTag`.
+    let tag = read_uleb128_len(bytes, cursor)?;
+    Ok(match tag {
+        0 => BOOL_TY,
+        1 => U8_TY,
+        2 => U64_TY,
+        3 => U128_TY,
+        4 => ADDRESS_TY,
+        5 => SIGNER_TY,
+        6 => interner.vector_of(read_type_tag(bytes, cursor, interner)?),
+        7 => {
+            // `Struct`: address, module, name, then type arguments.
+            let addr = AccountAddress::new(read_array_bytes::<{ AccountAddress::LENGTH }>(
+                bytes, cursor,
+            )?);
+            let module = read_identifier(bytes, cursor)?;
+            let name = read_identifier(bytes, cursor)?;
+            let num_args = read_uleb128_len(bytes, cursor)?;
+            let mut args = Vec::with_capacity(num_args as usize);
+            for _ in 0..num_args {
+                args.push(read_type_tag(bytes, cursor, interner)?);
+            }
+            let module_id = interner.module_id_of(&addr, ident_str(module)?);
+            let name = interner.identifier_of(ident_str(name)?);
+            let args = interner.type_list_of(&args);
+            interner.nominal_of(module_id, name, args)
+        },
+        8 => U16_TY,
+        9 => U32_TY,
+        10 => U256_TY,
+        11 => return Err(unreachable("function type tags are not supported").into()),
+        12 => I8_TY,
+        13 => I16_TY,
+        14 => I32_TY,
+        15 => I64_TY,
+        16 => I128_TY,
+        17 => I256_TY,
+        other => return Err(unreachable(&format!("unknown type tag {other}"))),
+    })
+}
+
+/// Reads a BCS-encoded `Identifier` (length-prefixed UTF-8 bytes).
+fn read_identifier<'b>(bytes: &'b [u8], cursor: &mut usize) -> RuntimeResult<&'b str> {
+    let len = read_uleb128_len(bytes, cursor)? as usize;
+    let raw = read_slice(bytes, cursor, len)?;
+    std::str::from_utf8(raw).map_err(|_| unreachable("identifier is not valid UTF-8"))
+}
+
+/// Validates `s` as a Move identifier.
+fn ident_str(s: &str) -> RuntimeResult<&IdentStr> {
+    IdentStr::new(s).map_err(|_| unreachable("invalid Move identifier"))
+}
+
+/// Reads `N` bytes from `bytes` at `cursor` into an array, advancing `cursor`.
+fn read_array_bytes<const N: usize>(bytes: &[u8], cursor: &mut usize) -> RuntimeResult<[u8; N]> {
+    read_slice(bytes, cursor, N)?
+        .try_into()
+        .map_err(|_| unreachable("slice is not exactly N bytes"))
 }
 
 /// Reads `N` bytes from the pointer into an array.
@@ -740,11 +1033,23 @@ fn unreachable(message: &str) -> RuntimeError {
     RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(message.to_string()))
 }
 
+/// Invariant violation when an in-memory enum tag does not name a variant. A
+/// well-formed enum's tag is always in range, so this signals heap corruption,
+/// not bad input (a bad BCS variant index is rejected as a user error during
+/// deserialization).
+fn enum_tag_out_of_range(tag: u64, variant_count: usize) -> RuntimeError {
+    RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
+        tag,
+        variant_count,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::heap::AllocationError;
     use mono_move_core::{
+        align_up_u32,
         types::U64_TY,
         value_layout::{U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
@@ -771,6 +1076,7 @@ mod tests {
         unsafe {
             deserialize_impl(
                 &table,
+                None,
                 &mut heap,
                 &layout,
                 &bytes,
@@ -796,6 +1102,7 @@ mod tests {
         let result = unsafe {
             deserialize_impl(
                 &table,
+                None,
                 &mut heap,
                 layout,
                 &bytes,
@@ -977,6 +1284,7 @@ mod tests {
             unsafe {
                 deserialize_impl(
                     table,
+                    None,
                     &mut heap,
                     layout,
                     &x_bcs,
@@ -1185,6 +1493,7 @@ mod tests {
             unsafe {
                 deserialize_impl(
                     table,
+                    None,
                     &mut heap,
                     layout,
                     &bytes,
@@ -1336,6 +1645,114 @@ mod tests {
             },
         ];
         unsafe { check_roundtrip(&table, id, 16, &values) };
+    }
+
+    /// Builds and pushes a closed-enum layout into `table`: one struct layout
+    /// per variant (via [`build_struct_layout`]), then the enum layout itself.
+    /// Each variant is `(in_memory_size, fields)`, with `fields` as
+    /// `(data_region_relative_offset, layout_id)` pairs. The heap payload size
+    /// is the 8-byte tag plus the widest variant region, rounded up to 8.
+    fn build_closed_enum_layout(
+        table: &mut ValueLayoutTable,
+        variants: Vec<(u32, Vec<(u32, LayoutId)>)>,
+    ) -> LayoutId {
+        let mut variant_ids = Vec::with_capacity(variants.len());
+        let mut max_data = 0u32;
+        for (size, fields) in variants {
+            max_data = max_data.max(size);
+            let layout = build_struct_layout(table, size, fields);
+            variant_ids.push(table.push(U64_TY, layout));
+        }
+        let max_variant_size = align_up_u32(8 + max_data, 8);
+        let layout = ValueLayout::closed_enum(
+            DescriptorId(3),
+            variant_ids.into_boxed_slice(),
+            max_variant_size,
+        );
+        table.push(U64_TY, layout)
+    }
+
+    #[test]
+    fn test_enum_unit_and_tuple_variants() {
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        enum E {
+            A,
+            B(u64),
+            C(u8, u64),
+        }
+
+        let mut table = ValueLayoutTable::new();
+        let eid = build_closed_enum_layout(&mut table, vec![
+            (0, vec![]),
+            (8, vec![(0, U64_LAYOUT_ID)]),
+            (16, vec![(0, U8_LAYOUT_ID), (8, U64_LAYOUT_ID)]),
+        ]);
+        let values = [
+            E::A,
+            E::B(0),
+            E::B(7),
+            E::C(1, 2),
+            E::C(1, 3),
+            E::C(2, 0),
+            E::A,
+        ];
+        unsafe { check_roundtrip(&table, eid, 8, &values) };
+    }
+
+    #[test]
+    fn test_enum_with_vector_variant() {
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        enum E {
+            Empty,
+            Items(Vec<u64>),
+        }
+
+        let mut table = ValueLayoutTable::new();
+        let vec_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
+        let eid = build_closed_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, vec_id)])]);
+        let values = [
+            E::Empty,
+            E::Items(vec![]),
+            E::Items(vec![1]),
+            E::Items(vec![1, 2]),
+            E::Items(vec![2]),
+            E::Items(vec![1]),
+        ];
+        unsafe { check_roundtrip(&table, eid, 8, &values) };
+    }
+
+    #[test]
+    fn test_enum_as_struct_field() {
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        enum Inner {
+            X,
+            Y(u64),
+        }
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        struct Outer {
+            id: u64,
+            e: Inner,
+        }
+
+        let mut table = ValueLayoutTable::new();
+        let inner_eid =
+            build_closed_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, U64_LAYOUT_ID)])]);
+        let outer = build_struct_layout(&table, 16, vec![(0, U64_LAYOUT_ID), (8, inner_eid)]);
+        let oid = table.push(U64_TY, outer);
+        let values = [
+            Outer { id: 1, e: Inner::X },
+            Outer {
+                id: 1,
+                e: Inner::Y(0),
+            },
+            Outer {
+                id: 1,
+                e: Inner::Y(5),
+            },
+            Outer { id: 2, e: Inner::X },
+            Outer { id: 1, e: Inner::X },
+        ];
+        unsafe { check_roundtrip(&table, oid, 16, &values) };
     }
 }
 

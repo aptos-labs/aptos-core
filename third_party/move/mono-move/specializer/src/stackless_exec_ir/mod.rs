@@ -15,9 +15,8 @@ use mono_move_core::{
     IntTy, PreparedModule,
 };
 use move_binary_format::file_format::{
-    ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
-    FunctionInstantiationIndex, IdentifierIndex, VariantFieldHandleIndex,
-    VariantFieldInstantiationIndex,
+    ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
+    IdentifierIndex, VariantFieldHandleIndex,
 };
 use move_core_types::{
     function::ClosureMask,
@@ -149,8 +148,11 @@ const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
 /// A stackless IR instruction with explicit named-slot operands.
 ///
-/// TODO: convert variants to struct-style (named fields) so call sites read
-/// `Instr::Pack { dst, ty, args }` rather than positional tuples.
+/// TODO:
+/// (1) convert variants to struct-style (named fields) so call sites read
+/// `Instr::Move { dst, src }` rather than positional tuples.
+/// (2) add description for each instruction variant.
+/// (3) change uses of raw integers into newtypes/type-aliases.
 #[derive(Clone)]
 pub enum Instr {
     // --- Loads ---
@@ -184,80 +186,67 @@ pub enum Instr {
     /// `dst = op(lhs_slot, immediate)` — binary op with immediate right operand
     BinaryOpImm(Slot, BinaryOp, Slot, ImmValue),
 
-    // --- Struct (second field is the interned struct `Type`; generic
-    // variants additionally carry an interned type-argument list) ---
+    // --- Struct (second field is the interned struct `Type`) ---
     //
-    // Contract: for the non-generic `Pack` / `Unpack`, the carried
-    // `InternedType` MUST be a fully-substituted concrete `Type::Nominal`
-    // — no `Type::TypeParam` in any constituent, and its `NominalLayout`
-    // must be populated.
-    //
-    // TODO: depending on how we pre-intern types, we may be able to unify
-    // some of instructions here.
+    // Contract: the carried `InternedType` is the instantiated nominal, with
+    // the instantiation's type arguments already applied. Inside a generic
+    // function it may still contain the enclosing function's `TypeParam`s.
     Pack(Slot, InternedType, Vec<Slot>),
-    PackGeneric(Slot, InternedType, Vec<Slot>),
     Unpack(Vec<Slot>, InternedType, Slot),
-    UnpackGeneric(Vec<Slot>, InternedType, Slot),
 
-    // --- Variant (enum type + variant ordinal) ---
+    // --- Variant (enum type + variant ordinal; same type contract as
+    // `Pack`/`Unpack`) ---
     PackVariant(Slot, InternedType, u16, Vec<Slot>),
-    PackVariantGeneric(Slot, InternedType, u16, Vec<Slot>),
     UnpackVariant(Vec<Slot>, InternedType, u16, Slot),
-    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, Slot),
     TestVariant(Slot, InternedType, u16, Slot),
-    TestVariantGeneric(Slot, InternedType, u16, Slot),
 
     // --- References ---
+    //
+    // Field ops carry `(instantiated owner type, non-generic field handle)`:
+    // the handle gives the field position; the owner type has the same contract
+    // as `Pack`/`Unpack`.
     ImmBorrowLoc(Slot, Slot),
     MutBorrowLoc(Slot, Slot),
-    ImmBorrowField(Slot, FieldHandleIndex, Slot),
-    MutBorrowField(Slot, FieldHandleIndex, Slot),
-    ImmBorrowFieldGeneric(Slot, FieldInstantiationIndex, Slot),
-    MutBorrowFieldGeneric(Slot, FieldInstantiationIndex, Slot),
-    ImmBorrowVariantField(Slot, VariantFieldHandleIndex, Slot),
-    MutBorrowVariantField(Slot, VariantFieldHandleIndex, Slot),
-    ImmBorrowVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
-    MutBorrowVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
+    ImmBorrowField(Slot, InternedType, FieldHandleIndex, Slot),
+    MutBorrowField(Slot, InternedType, FieldHandleIndex, Slot),
+    ImmBorrowVariantField(Slot, InternedType, VariantFieldHandleIndex, Slot),
+    MutBorrowVariantField(Slot, InternedType, VariantFieldHandleIndex, Slot),
     ReadRef(Slot, Slot),
     /// `*dst_ref = src_val`
     WriteRef(Slot, Slot),
 
     // --- Fused field access (borrow+read/write combined) ---
     /// `dst = src_ref.field` (imm_borrow_field + read_ref)
-    ReadField(Slot, FieldHandleIndex, Slot),
-    ReadFieldGeneric(Slot, FieldInstantiationIndex, Slot),
+    ReadField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `dst_ref.field = val` (mut_borrow_field + write_ref)
-    WriteField(FieldHandleIndex, Slot, Slot),
-    WriteFieldGeneric(FieldInstantiationIndex, Slot, Slot),
-    ReadVariantField(Slot, VariantFieldHandleIndex, Slot),
-    ReadVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
-    WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
-    WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
+    WriteField(InternedType, FieldHandleIndex, Slot, Slot),
+    ReadVariantField(Slot, InternedType, VariantFieldHandleIndex, Slot),
+    WriteVariantField(InternedType, VariantFieldHandleIndex, Slot, Slot),
 
     // --- Fused inline-struct field access (borrow_loc + field op combined) ---
     /// `dst = &local.field` (imm_borrow_loc + imm_borrow_field on an inline struct local)
-    ImmBorrowLocField(Slot, FieldHandleIndex, Slot),
+    ImmBorrowLocField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `dst = &mut local.field`
-    MutBorrowLocField(Slot, FieldHandleIndex, Slot),
+    MutBorrowLocField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `dst = local.field` (imm_borrow_loc + read_field on an inline struct local)
-    ReadLocalField(Slot, FieldHandleIndex, Slot),
+    ReadLocalField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `local.field = src` (mut_borrow_loc + write_field on an inline struct local)
-    WriteLocalField(FieldHandleIndex, Slot, Slot),
+    WriteLocalField(InternedType, FieldHandleIndex, Slot, Slot),
 
     // --- Globals (struct type is the interned `Type` for the named
-    // resource; generic variants carry the instantiated nominal) ---
+    // resource; same type contract as `Pack`/`Unpack`) ---
     Exists(Slot, InternedType, Slot),
-    ExistsGeneric(Slot, InternedType, Slot),
     MoveFrom(Slot, InternedType, Slot),
-    MoveFromGeneric(Slot, InternedType, Slot),
     /// `(struct_ty, signer, val)`
     MoveTo(InternedType, Slot, Slot),
-    MoveToGeneric(InternedType, Slot, Slot),
     ImmBorrowGlobal(Slot, InternedType, Slot),
-    ImmBorrowGlobalGeneric(Slot, InternedType, Slot),
     MutBorrowGlobal(Slot, InternedType, Slot),
-    MutBorrowGlobalGeneric(Slot, InternedType, Slot),
 
+    // TODO: the generic/non-generic call-like pairs (`Call`/`CallGeneric` and
+    // `PackClosure`/`PackClosureGeneric`) could each collapse to one variant
+    // carrying `(inner FunctionHandleIndex, target ty_args)` — EMPTY for the
+    // non-generic form — mirroring how the field-op twins carry their owner
+    // type. Collapse both pairs together so the rule stays uniform.
     // --- Calls ---
     Call(Vec<Slot>, FunctionHandleIndex, Vec<Slot>),
     CallGeneric(Vec<Slot>, FunctionInstantiationIndex, Vec<Slot>),
@@ -271,13 +260,13 @@ pub enum Instr {
     CallClosure(Vec<Slot>, InternedTypeList, Vec<Slot>),
 
     // --- Vector (second field is the vector's element type) ---
-    VecPack(Slot, InternedType, u16, Vec<Slot>),
+    VecPack(Slot, InternedType, Vec<Slot>),
     VecLen(Slot, InternedType, Slot),
     VecImmBorrow(Slot, InternedType, Slot, Slot),
     VecMutBorrow(Slot, InternedType, Slot, Slot),
     VecPushBack(InternedType, Slot, Slot),
     VecPopBack(Slot, InternedType, Slot),
-    VecUnpack(Vec<Slot>, InternedType, u16, Slot),
+    VecUnpack(Vec<Slot>, InternedType, Slot),
     VecSwap(InternedType, Slot, Slot, Slot),
 
     // --- Control flow ---
@@ -323,49 +312,31 @@ impl Instr {
             Instr::BinaryOp(..) => "BinaryOp",
             Instr::BinaryOpImm(..) => "BinaryOpImm",
             Instr::Pack(..) => "Pack",
-            Instr::PackGeneric(..) => "PackGeneric",
             Instr::Unpack(..) => "Unpack",
-            Instr::UnpackGeneric(..) => "UnpackGeneric",
             Instr::PackVariant(..) => "PackVariant",
-            Instr::PackVariantGeneric(..) => "PackVariantGeneric",
             Instr::UnpackVariant(..) => "UnpackVariant",
-            Instr::UnpackVariantGeneric(..) => "UnpackVariantGeneric",
             Instr::TestVariant(..) => "TestVariant",
-            Instr::TestVariantGeneric(..) => "TestVariantGeneric",
             Instr::ImmBorrowLoc(..) => "ImmBorrowLoc",
             Instr::MutBorrowLoc(..) => "MutBorrowLoc",
             Instr::ImmBorrowField(..) => "ImmBorrowField",
             Instr::MutBorrowField(..) => "MutBorrowField",
-            Instr::ImmBorrowFieldGeneric(..) => "ImmBorrowFieldGeneric",
-            Instr::MutBorrowFieldGeneric(..) => "MutBorrowFieldGeneric",
             Instr::ImmBorrowVariantField(..) => "ImmBorrowVariantField",
             Instr::MutBorrowVariantField(..) => "MutBorrowVariantField",
-            Instr::ImmBorrowVariantFieldGeneric(..) => "ImmBorrowVariantFieldGeneric",
-            Instr::MutBorrowVariantFieldGeneric(..) => "MutBorrowVariantFieldGeneric",
             Instr::ReadRef(..) => "ReadRef",
             Instr::WriteRef(..) => "WriteRef",
             Instr::ReadField(..) => "ReadField",
-            Instr::ReadFieldGeneric(..) => "ReadFieldGeneric",
             Instr::WriteField(..) => "WriteField",
-            Instr::WriteFieldGeneric(..) => "WriteFieldGeneric",
             Instr::ReadVariantField(..) => "ReadVariantField",
-            Instr::ReadVariantFieldGeneric(..) => "ReadVariantFieldGeneric",
             Instr::WriteVariantField(..) => "WriteVariantField",
-            Instr::WriteVariantFieldGeneric(..) => "WriteVariantFieldGeneric",
             Instr::ImmBorrowLocField(..) => "ImmBorrowLocField",
             Instr::MutBorrowLocField(..) => "MutBorrowLocField",
             Instr::ReadLocalField(..) => "ReadLocalField",
             Instr::WriteLocalField(..) => "WriteLocalField",
             Instr::Exists(..) => "Exists",
-            Instr::ExistsGeneric(..) => "ExistsGeneric",
             Instr::MoveFrom(..) => "MoveFrom",
-            Instr::MoveFromGeneric(..) => "MoveFromGeneric",
             Instr::MoveTo(..) => "MoveTo",
-            Instr::MoveToGeneric(..) => "MoveToGeneric",
             Instr::ImmBorrowGlobal(..) => "ImmBorrowGlobal",
-            Instr::ImmBorrowGlobalGeneric(..) => "ImmBorrowGlobalGeneric",
             Instr::MutBorrowGlobal(..) => "MutBorrowGlobal",
-            Instr::MutBorrowGlobalGeneric(..) => "MutBorrowGlobalGeneric",
             Instr::Call(..) => "Call",
             Instr::CallGeneric(..) => "CallGeneric",
             Instr::PackClosure(..) => "PackClosure",

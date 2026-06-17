@@ -15,7 +15,7 @@ use crate::{
         translate::{lower_function, LoweredFunction},
     },
     stackless_exec_ir::{
-        instr_utils::{nominal_type_in_instr, resource_type_in_instr, NominalKind},
+        instr_utils::{field_layout_nominal_in_instr, resource_type_in_instr, NominalKind},
         FunctionIR, Instr, ModuleIR,
     },
 };
@@ -26,8 +26,8 @@ use mono_move_core::{
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{
-        strip_ref, view_type, view_type_list, Alignment, FieldLayout, InternedType,
-        InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
+        is_closed_type, strip_ref, type_to_string, view_type, view_type_list, Alignment,
+        FieldLayout, InternedType, InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
     Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
@@ -38,7 +38,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionHandleIndex, VariantFieldHandleIndex},
 };
-use move_core_types::function::ClosureMask;
+use move_core_types::{account_address::AccountAddress, function::ClosureMask, ident_str};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
@@ -91,6 +91,63 @@ pub struct CallSiteInfo {
     pub ty_args: InternedTypeList,
     /// `Some(idx)` when the callee resolves to a registered native.
     pub native_idx: Option<NativeIdx>,
+    /// GC descriptors the native requires (for heap allocation etc.)
+    pub required_descriptors: Vec<DescriptorId>,
+}
+
+/// Types a native needs GC descriptors for.
+///
+/// TODO: Instead of hard-coding them here, figure out a way to allow natives to declare them.
+fn descriptor_types_for_native(
+    interner: &impl Interner,
+    module_id: InternedModuleId,
+    func_name: InternedIdentifier,
+    callee_ty_args: &[InternedType],
+) -> Vec<InternedType> {
+    let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
+    let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
+    if module_id == table {
+        // The `*_box` table natives are `<K, V, B>` with `B = Box<V>`, the type
+        // of the value stored in storage. A provider read materializes that
+        // value, so its struct descriptor must be published for every access
+        // that can read it (borrow / contains), not only `add_box`.
+        let is_box_native = [
+            ident_str!("add_box"),
+            ident_str!("borrow_box"),
+            ident_str!("borrow_box_mut"),
+            ident_str!("remove_box"),
+            ident_str!("contains_box"),
+        ]
+        .iter()
+        .any(|name| func_name == interner.identifier_of(name));
+        if is_box_native {
+            return callee_ty_args.get(2).copied().into_iter().collect();
+        }
+    } else if module_id == object && func_name == interner.identifier_of(ident_str!("exists_at")) {
+        // `object::exists_at<T>` reads resource `T` through the provider, which
+        // materializes it just to answer existence, so publish `T`'s layout and
+        // descriptor even though no `borrow_global<T>` instruction names it.
+        return callee_ty_args.first().copied().into_iter().collect();
+    }
+    Vec::new()
+}
+
+/// Publishes a struct descriptor for the concrete `ty`, recording it in
+/// `descriptors`. A no-op when `ty` is not sized or its pointer offsets can't be
+/// derived (e.g. still generic).
+fn publish_struct_descriptor_for(
+    ctx: &impl SpecializerContext,
+    ty: InternedType,
+    descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
+) -> Result<()> {
+    if let Some((size, _)) = type_size_and_align(ty)
+        && let Ok(ptr_offsets) = type_pointer_offsets(ty)
+    {
+        let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
+        let id = ctx.publish_struct_descriptor(ty, size, &ptr_offsets)?;
+        descriptors.insert(ty, id);
+    }
+    Ok(())
 }
 
 /// Pre-resolved data for one `PackClosure`, consumed in IR order.
@@ -159,18 +216,19 @@ pub(crate) struct VariantFieldAccess {
     pub uniform_offset: Option<u32>,
 }
 
-/// Resolve a `VariantFieldHandleIndex` against the owning enum's derived layout.
-/// Move groups variants in a handle by field index, not byte layout, so a shared
+/// Resolve a `VariantFieldHandleIndex` against the owning enum's derived
+/// layout. `enum_ty` is the instantiated owner carried by the instruction. Move
+/// groups variants in a handle by field index, not byte layout, so a shared
 /// field can sit at different byte offsets across the handle's variants; the
 /// access selects the offset by the runtime tag (and aborts for variants that
 /// lack the field).
 pub(crate) fn resolve_variant_field_access(
     module: &PreparedModule,
     enum_layouts: &UnorderedMap<InternedType, EnumLayout>,
+    enum_ty: InternedType,
     vfh: VariantFieldHandleIndex,
 ) -> Result<VariantFieldAccess> {
     let handle = module.variant_field_handle_at(vfh);
-    let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
     let field_pos = handle.field as usize;
     let layout = enum_layouts
         .get(&enum_ty)
@@ -229,6 +287,13 @@ pub struct LoweringContext<'a> {
     /// Module the function lives in; gives lowering access to the
     /// constant pool and other module-level metadata.
     pub module: &'a PreparedModule,
+    /// Type arguments the function is lowered at (empty when non-generic).
+    pub ty_args: InternedTypeList,
+    /// Home-slot types with `ty_args` substituted, indexed by Home slot id.
+    /// The single source of slot types for lowering.
+    pub home_types: InternedTypeList,
+    /// Interner used to substitute `ty_args` into instruction-embedded types.
+    pub interner: &'a dyn Interner,
     pub home_slots: Vec<SizedSlot>,
     /// End offset of the home-slot region; feeds `callee_base`.
     pub frame_data_size: u32,
@@ -364,11 +429,26 @@ pub fn try_build_context<'a>(
     module_ir: &'a ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
-    interner: &impl Interner,
+    interner: &'a impl Interner,
     descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
 ) -> Result<BuildContextOutcome<'a>> {
-    // 1. Compute home slot layout with natural alignment padding.
+    // 1. Reject `ty_args` whose length doesn't match the declared type
+    // parameter count.
+    // TODO: this should not be reachable from valid execution, but the current
+    // snapshot printing can reach it for publish-time views.
+    let declared_ty_params = module_ir
+        .module
+        .function_handle_at(func_ir.handle_idx)
+        .type_parameters
+        .len();
+    if view_type_list(ty_args).len() != declared_ty_params {
+        return Ok(BuildContextOutcome::Skipped(
+            "generic function not instantiated",
+        ));
+    }
+
+    // 2. Compute home slot layout with natural alignment padding.
     //
     // Slots are laid out linearly in declaration order, padding each to
     // its alignment. This can leave gaps between a small slot followed
@@ -405,7 +485,7 @@ pub fn try_build_context<'a>(
         FRAME_ALIGN,
     );
 
-    // 2. Build `return_slots` from this function's own signature.
+    // 3. Build `return_slots` from this function's own signature.
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     let own_ret_list =
         interner.type_list_of(module_ir.module.interned_types_at(own_handle.return_));
@@ -437,7 +517,7 @@ pub fn try_build_context<'a>(
         frame_data_size = ret_end;
     }
 
-    // 3. Reserve a scratch slot at the tail of the home region for
+    // 4. Reserve a scratch slot at the tail of the home region for
     //    `Ret` cycle-breaking — `return_slots` overlap home, so swaps
     //    like `(b, a)` form copy cycles that `emit_parallel_copy`
     //    routes through this slot. Sized to the widest return slot
@@ -462,7 +542,7 @@ pub fn try_build_context<'a>(
         )
     });
 
-    // 4. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
+    // 5. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
     //    lowering, when the body uses either. It holds the intermediate heap
     //    pointer between the alloc/move and the box/unbox copy. Must not be
     //    GC-tracked.
@@ -471,16 +551,17 @@ pub fn try_build_context<'a>(
         .any(|instr| matches!(instr, Instr::MoveTo(..) | Instr::MoveFrom(..)));
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
-    // 5. Single IR pass over the function's enum ops: (1) verify each one's enum
+    // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
     //    layout was derivable during discovery, and (2) detect which scratch
     //    slots the lowering needs.
     let mut needs_variant_field_scratch = false;
     let mut needs_enum_ptr_scratch = false;
     for instr in func_ir.instrs() {
-        let Some((enum_ty, NominalKind::Enum)) = nominal_type_in_instr(&module_ir.module, instr)
-        else {
+        let Some((enum_ty, NominalKind::Enum)) = field_layout_nominal_in_instr(instr) else {
             continue;
         };
+        // Discovery keys `enum_layouts` by the substituted type.
+        let enum_ty = interner.subst_type(enum_ty, ty_args)?;
         if !descriptors.enum_layouts.contains_key(&enum_ty) {
             // Skip the whole function when any enum op references an enum whose
             // layout was not derivable.
@@ -511,7 +592,7 @@ pub fn try_build_context<'a>(
 
     // TODO: we need to revisit the complexity and performance of this function
     // after support for generic monomorphization is in place.
-    // 6. Lay out every callee-frame region in a single IR-order pass: regular
+    // 7. Lay out every callee-frame region in a single IR-order pass: regular
     //    calls (`Call`/`CallGeneric`) and closures (`PackClosure`/`CallClosure`)
     //    are disjoint instruction kinds writing disjoint outputs, so one walk
     //    serves both.
@@ -579,6 +660,46 @@ pub fn try_build_context<'a>(
                 });
                 continue;
             },
+            Instr::PackClosureGeneric(_, fii, _, _) => {
+                let inst = module_ir.module.function_instantiation_at(*fii);
+                let sig = module_ir.module.function_instantiation_signature_at(*fii);
+                // The closure target's type arguments at this instantiation:
+                // its instantiation type arguments with this function's
+                // `ty_args` substituted in.
+                let closure_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
+                let (callee_module_id, callee_func_name) =
+                    callee_identity(&module_ir.module, inst.handle);
+                // TODO: support native closure targets (see `PackClosure`).
+                if natives
+                    .resolve(callee_module_id, callee_func_name, closure_ty_args)
+                    .is_some()
+                {
+                    return Ok(BuildContextOutcome::Skipped(
+                        "native closure target not yet lowered",
+                    ));
+                }
+                let func_ref =
+                    interner.function_ref_of(callee_module_id, callee_func_name, closure_ty_args);
+                let layout = descriptors.closure_captured[closure_pack_idx];
+                closure_pack_idx += 1;
+                let (captured_data_descriptor_id, values_size) = match layout {
+                    CapturedDataLayout::NonCapturing => (None, 0),
+                    CapturedDataLayout::Capturing(info) => {
+                        (Some(info.descriptor_id), info.values_size)
+                    },
+                    CapturedDataLayout::NotDerivable => {
+                        return Ok(BuildContextOutcome::Skipped(
+                            "captured-data layout not derivable",
+                        ));
+                    },
+                };
+                closure_pack_sites.push(ClosurePackInfo {
+                    func_ref,
+                    captured_data_descriptor_id,
+                    values_size,
+                });
+                continue;
+            },
             Instr::CallClosure(_, sig_types, _) => {
                 let first = view_type_list(*sig_types)
                     .first()
@@ -613,6 +734,17 @@ pub fn try_build_context<'a>(
         // against the callee module's `is_native` flag so a registered impl cannot
         // shadow a Move-body function with the same qualified name.
         let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
+        // GC descriptors the native requires for the types it heap-allocates;
+        // the discovery pass published them keyed on the concrete type.
+        let required_descriptors: Vec<DescriptorId> = descriptor_types_for_native(
+            interner,
+            callee_module_id,
+            callee_func_name,
+            view_type_list(call_ty_args),
+        )
+        .iter()
+        .filter_map(|ty| descriptors.vec.get(ty).copied())
+        .collect();
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
@@ -620,6 +752,7 @@ pub fn try_build_context<'a>(
             ret_slots,
             ty_args: call_ty_args,
             native_idx,
+            required_descriptors,
         });
     }
 
@@ -633,6 +766,9 @@ pub fn try_build_context<'a>(
 
     Ok(BuildContextOutcome::Built(LoweringContext {
         module: &module_ir.module,
+        ty_args,
+        home_types: home_list,
+        interner,
         home_slots,
         frame_data_size,
         call_sites,
@@ -786,6 +922,17 @@ pub trait SpecializerContext {
     /// Publishes `layout` for `ty` and returns its assigned id. Idempotent.
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId;
 
+    /// Publishes the variant-body layouts of `enum_ty` (one per variant, in tag
+    /// order), returning their ids. Idempotent on `enum_ty`: re-publishing the
+    /// same enum reuses the cached ids rather than appending a fresh set.
+    /// Variant bodies have no Move type of their own, so they are keyed by the
+    /// owning enum.
+    fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]>;
+
     /// Publishes a struct descriptor for `struct_ty` (with payload size `size`
     /// and intra-struct heap-pointer offsets `ptr_offsets`), returning the
     /// assigned [`DescriptorId`]. Used for resources spilled to the heap by
@@ -882,12 +1029,9 @@ pub fn try_lower_function(
         // Leaf function: no callee slots needed beyond metadata.
         .unwrap_or(param_and_local_sizes_sum + FRAME_METADATA_SIZE);
 
-    // Derive `frame_layout` and `zero_frame` from home-slot types.
-    // Substitute `ty_args` so generic instantiations see concrete
+    // Derive `frame_layout` and `zero_frame` from the substituted home-slot
     // types — `gc_layout` rejects raw `TypeParam`s.
-    let home_list = interner.type_list_of(&func_ir.home_slot_types);
-    let home_list = interner.subst_type_list(home_list, ty_args)?;
-    let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
+    let derived = derive_frame_layout(&ctx, func_ir, view_type_list(ctx.home_types))?;
 
     Ok(LoweringOutcome::Built(Function {
         name,
@@ -978,21 +1122,23 @@ fn try_discover_types_for_lowering_in_function_impl(
     for instr in func_ir.instrs() {
         // Calls: walk param + return signature lists.
         //
-        // TODO: `CallClosure` signatures are not walked, and
-        // `discover_type_metadata` treats `Type::Function` as terminal, so a
-        // type reached only through a closure signature's args/results misses
-        // its descriptor and skips lowering. Recurse into `Type::Function` and
-        // feed closure-call signatures here.
-        let (params, returns) = match instr {
+        // TODO: closure-call signatures are not walked, and
+        // `discover_type_metadata` stops at `Type::Function`. Verify that:
+        // closure args/results are always materialized in home-slot temps (or
+        // reached via the return/direct-call walks), so their nominals are
+        // still discovered. Otherwise, we need to feed `CallClosure` signature
+        // types here and recurse into `Type::Function`.
+        let (params, returns, handle_idx, callee_ty_args) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns))
+                (Some(sig.params), Some(sig.returns), Some(*idx), EMPTY_TYPE_LIST)
             },
             Instr::CallGeneric(_, idx, _) => {
+                let inst = module_ir.module.function_instantiation_at(*idx);
                 let sig = module_ir.module.function_instantiation_signature_at(*idx);
-                (Some(sig.params), Some(sig.returns))
+                (Some(sig.params), Some(sig.returns), Some(inst.handle), sig.ty_args)
             },
-            _ => (None, None),
+            _ => (None, None, None, EMPTY_TYPE_LIST),
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
@@ -1005,9 +1151,28 @@ fn try_discover_types_for_lowering_in_function_impl(
             }
         }
 
-        // Catch nominal types an instruction references directly but
-        // that aren't reached by the home/call walks above.
-        if let Some((ty, _kind)) = nominal_type_in_instr(&module_ir.module, instr) {
+        // A native that materializes a typed storage value (e.g. a `table`
+        // `*_box` native's `Box<V>`) requires a struct descriptor for that
+        // concrete type, published here so the build pass can record it in the
+        // ABI and a provider can materialize the value.
+        if let Some(handle_idx) = handle_idx {
+            let (module_id, func_name) = callee_identity(&module_ir.module, handle_idx);
+            for value_ty in
+                descriptor_types_for_native(interner, module_id, func_name, view_type_list(callee_ty_args))
+            {
+                // Publish both the layout and the struct descriptor for the
+                // materialized value type. A provider read needs both, even on a
+                // `contains` access whose return signature never mentions the
+                // value type and so would not reach it through the walks above.
+                discover_type_metadata(ctx, value_ty, ty_args, visited, descriptors)?;
+                let value_ty = ctx.subst_type(value_ty, ty_args)?;
+                publish_struct_descriptor_for(ctx, value_ty, &mut descriptors.vec)?;
+            }
+        }
+
+        // Catch the field-layout nominal an instruction references directly
+        // that isn't reached by the home/call walks above.
+        if let Some((ty, _kind)) = field_layout_nominal_in_instr(instr) {
             discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
         }
 
@@ -1019,24 +1184,32 @@ fn try_discover_types_for_lowering_in_function_impl(
             descriptors.closure_captured.push(layout);
         }
 
+        // `PackClosureGeneric`: same as above, with the callee's type arguments
+        // composed from the instantiation signature and the enclosing
+        // function's `ty_args`.
+        if let Instr::PackClosureGeneric(_, fii, mask, _) = instr {
+            let inst = module_ir.module.function_instantiation_at(*fii);
+            let sig = module_ir.module.function_instantiation_signature_at(*fii);
+            let closure_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
+            let layout = discover_captured_data_descriptor(
+                ctx,
+                interner,
+                module_ir,
+                inst.handle,
+                *mask,
+                closure_ty_args,
+            )?;
+            descriptors.closure_captured.push(layout);
+        }
+
         // Resources accessed by global-storage ops are laid out as heap
         // objects, so `move_to` can spill the inline value. Discover the
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
-        //
-        // TODO: a still-generic resource (in the module-level walk) is skipped
-        // here, mirroring vector descriptors. Handle it once generic
-        // global-storage ops are lowered.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
             discover_type_metadata(ctx, resource_ty, ty_args, visited, descriptors)?;
             let resource_ty = ctx.subst_type(resource_ty, ty_args)?;
-            if let Some((size, _)) = type_size_and_align(resource_ty)
-                && let Ok(ptr_offsets) = type_pointer_offsets(resource_ty)
-            {
-                let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
-                let id = ctx.publish_struct_descriptor(resource_ty, size, &ptr_offsets)?;
-                descriptors.vec.insert(resource_ty, id);
-            }
+            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
         }
 
         // The walks above don't reach a constant's own type. A vector
@@ -1114,6 +1287,63 @@ fn layout_inline_fields(
     }
     let total = checked_align_up_u32(offset, max_align)?;
     Some((fields, total, max_align))
+}
+
+/// Builds the [`ValueLayout`] for an inline aggregate — a struct, or one enum
+/// variant body — from its field layouts and the published layout id of each
+/// field. `total`/`align` are the aggregate's in-memory size and alignment.
+///
+/// Returns `Ok(None)` when any field's layout is not yet published (the
+/// aggregate is deferred, mirroring a deferred struct). Errors only on an
+/// internal inconsistency (a published id that does not resolve to a layout).
+fn try_build_inline_value_layout(
+    ctx: &impl SpecializerContext,
+    field_layouts: &[VariantFieldLayout],
+    field_ids: &[Option<LayoutId>],
+    total: u32,
+    align: u32,
+) -> Result<Option<ValueLayout>> {
+    let mut layout_fields = Vec::with_capacity(field_layouts.len());
+    let mut fixed_bcs_total: u64 = 0;
+    let mut data_dependent = false;
+    for (field, &fid) in field_layouts.iter().zip(field_ids) {
+        // A field can be sized yet still lack a published layout (e.g. a
+        // `vector<T>` whose element layout is deferred). Defer the aggregate.
+        let Some(id) = fid else {
+            return Ok(None);
+        };
+        let Some(child) = ctx.layout(id) else {
+            bail!("published layout id does not resolve to a layout");
+        };
+        layout_fields.push(FieldValueLayout {
+            offset: field.offset,
+            id,
+        });
+        match child.fixed_bcs_size {
+            Some(bcs_sz) => fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64),
+            None => data_dependent = true,
+        }
+    }
+
+    let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
+        None
+    } else {
+        Some(fixed_bcs_total as u32)
+    };
+    // No pointers and no padding exactly when the packed BCS size equals the
+    // in-memory size: a pointer field makes the BCS size data-dependent
+    // (`None`), and alignment padding makes it strictly smaller than `total`.
+    let mut flags = LayoutFlags::empty();
+    if fixed_bcs_size == Some(total) {
+        flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
+    }
+    Ok(Some(ValueLayout::struct_layout(
+        total,
+        align,
+        fixed_bcs_size,
+        flags,
+        layout_fields.into_boxed_slice(),
+    )))
 }
 
 /// Recursive post-order DFS that visits every nominal reachable from the given
@@ -1205,11 +1435,23 @@ fn discover_type_metadata(
             ty_args: nominal_ty_args,
             ..
         } => {
+            // An open nominal (free type parameters) has no publishable
+            // layout. Defer before publishing anything: setting a layout on
+            // the generic type would poison its `OnceLock` and break later
+            // substitutions over it.
+            if !is_closed_type(ty) {
+                eprintln!("DEFER layout: open (generic) type {}", type_to_string(ty));
+                return Ok(None);
+            }
             match ctx.get_fields(module_id, name)? {
                 None => {
                     // The context does not have field information for this
                     // nominal (e.g., the module has not been loaded). Treat
                     // like a generic type parameter: defer.
+                    eprintln!(
+                        "DEFER layout: no field info for closed type {}",
+                        type_to_string(ty),
+                    );
                     Ok(None)
                 },
                 Some(FieldTypes::Struct(fields)) => {
@@ -1237,60 +1479,45 @@ fn discover_type_metadata(
                     // nominal type: defer. `None` means a field is not sized.
                     let Some((field_layouts, total, max_align)) = layout_inline_fields(&fields)
                     else {
+                        let bad = fields
+                            .iter()
+                            .position(|f| type_size_and_align(*f).is_none())
+                            .map(|i| type_to_string(fields[i]))
+                            .unwrap_or_default();
+                        eprintln!(
+                            "DEFER layout: closed struct {} has unsized field {bad}",
+                            type_to_string(ty),
+                        );
+                        return Ok(None);
+                    };
+                    // Defer the whole struct if any field's layout is not yet
+                    // published (e.g. a `vector<T>` whose element layout is
+                    // deferred), before recording any nominal layout.
+                    let Some(value_layout) = try_build_inline_value_layout(
+                        &*ctx,
+                        &field_layouts,
+                        &field_ids,
+                        total,
+                        max_align,
+                    )?
+                    else {
+                        let bad = field_ids
+                            .iter()
+                            .position(Option::is_none)
+                            .map(|i| type_to_string(fields[i]))
+                            .unwrap_or_default();
+                        eprintln!(
+                            "DEFER layout: closed struct {} field {bad} has no published layout",
+                            type_to_string(ty),
+                        );
                         return Ok(None);
                     };
                     // TODO: remove legacy size/layout.
-                    let mut nominal_fields = Vec::with_capacity(fields.len());
-                    let mut layout_fields = Vec::with_capacity(fields.len());
-                    let mut fixed_bcs_total: u64 = 0;
-                    let mut data_dependent = false;
-
-                    for (field, &fid) in field_layouts.iter().zip(&field_ids) {
-                        // A field can be sized yet still lack a published layout:
-                        // `vector<T>` always reports an 8-byte pointer, but its
-                        // layout is deferred until the element layout and vector
-                        // descriptor exist. Defer the nominal too, rather than
-                        // treating this as an invariant violation.
-                        let Some(id) = fid else {
-                            return Ok(None);
-                        };
-                        let Some(child) = ctx.layout(id) else {
-                            bail!("published layout id does not resolve to a layout");
-                        };
-                        nominal_fields.push(FieldLayout::new(field.offset, field.ty));
-                        layout_fields.push(FieldValueLayout {
-                            offset: field.offset,
-                            id,
-                        });
-                        match child.fixed_bcs_size {
-                            Some(bcs_sz) => {
-                                fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64)
-                            },
-                            None => data_dependent = true,
-                        }
-                    }
+                    let nominal_fields = field_layouts
+                        .iter()
+                        .map(|field| FieldLayout::new(field.offset, field.ty))
+                        .collect::<Vec<_>>();
                     ctx.set_nominal_layout(ty, total, max_align, Some(&nominal_fields))?;
-
-                    let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
-                        None
-                    } else {
-                        Some(fixed_bcs_total as u32)
-                    };
-                    // The struct has no pointers and no padding exactly when
-                    // its packed BCS size equals its in-memory size: a pointer
-                    // field makes the BCS size data-dependent (`None`), and any
-                    // alignment padding makes it strictly smaller than `total`.
-                    let mut flags = LayoutFlags::empty();
-                    if fixed_bcs_size == Some(total) {
-                        flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
-                    }
-                    let value_layout = ValueLayout::struct_layout(
-                        total,
-                        max_align,
-                        fixed_bcs_size,
-                        flags,
-                        layout_fields.into_boxed_slice(),
-                    );
                     Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },
                 Some(FieldTypes::Enum(variants)) => {
@@ -1306,32 +1533,43 @@ fn discover_type_metadata(
                     let mut variant_layouts: Vec<Vec<VariantFieldLayout>> =
                         Vec::with_capacity(variants.len());
                     let mut variant_ptr_offsets: Vec<Vec<u32>> = Vec::with_capacity(variants.len());
+                    // One struct layout per variant body, for the closed-enum
+                    // value layout. Collected (not yet published) while every
+                    // variant's fields have a published layout; abandoned on the
+                    // first miss. Published as one keyed set after the loop.
+                    let mut variant_value_layouts: Vec<ValueLayout> =
+                        Vec::with_capacity(variants.len());
                     let mut max_data_size = 0u32;
                     let mut all_sized = true;
+                    let mut all_value_layouts = true;
 
                     'variants: for variant_fields in &variants {
                         // Substitute each field type by the enum's own type
                         // args (mirrors the Struct arm), then recurse so nested
-                        // vec/struct/enum descriptors get published.
+                        // vec/struct/enum descriptors and layouts get published,
+                        // capturing each field's layout id.
                         let fields = variant_fields
                             .iter()
                             .map(|field_ty| ctx.subst_type(*field_ty, *nominal_ty_args))
                             .collect::<Result<Vec<_>>>()?;
+                        let mut field_ids = Vec::with_capacity(fields.len());
                         for &field_ty in &fields {
-                            discover_type_metadata(
+                            field_ids.push(discover_type_metadata(
                                 ctx,
                                 field_ty,
                                 EMPTY_TYPE_LIST,
                                 visited,
                                 descriptors,
-                            )?;
+                            )?);
                         }
 
                         // Per-variant layout: offsets are data-region-relative
                         // (0-based after the tag).
-                        let Some((variant_layout, variant_size, _)) = layout_inline_fields(&fields)
+                        let Some((variant_layout, variant_size, variant_align)) =
+                            layout_inline_fields(&fields)
                         else {
                             all_sized = false;
+                            all_value_layouts = false;
                             break 'variants;
                         };
                         // GC pointer offsets: each field's inner pointer offsets
@@ -1340,8 +1578,26 @@ fn discover_type_metadata(
                             variant_layout.iter().map(|field| (field.offset, field.ty)),
                         ) else {
                             all_sized = false;
+                            all_value_layouts = false;
                             break 'variants;
                         };
+
+                        // Build + publish this variant's value layout (a struct
+                        // over its fields). Once any variant defers, stop — the
+                        // enum cannot be closed.
+                        if all_value_layouts {
+                            match try_build_inline_value_layout(
+                                &*ctx,
+                                &variant_layout,
+                                &field_ids,
+                                variant_size,
+                                variant_align,
+                            )? {
+                                Some(layout) => variant_value_layouts.push(layout),
+                                None => all_value_layouts = false,
+                            }
+                        }
+
                         max_data_size = max_data_size.max(variant_size);
                         variant_layouts.push(variant_layout);
                         variant_ptr_offsets.push(ptr_offsets);
@@ -1363,14 +1619,28 @@ fn discover_type_metadata(
                             descriptor_id,
                             variants: variant_layouts,
                         });
+
+                        // Publish the closed-enum value layout when every variant
+                        // body resolved. `size` is the heap payload (tag + widest
+                        // variant region, 8-aligned) the allocator needs. The
+                        // variant bodies are published as one set keyed by the
+                        // enum type (idempotent), so re-discovering the enum
+                        // reuses them rather than orphaning a fresh set.
+                        if all_value_layouts {
+                            debug_assert_eq!(variant_value_layouts.len(), variants.len());
+                            let variant_ids =
+                                ctx.publish_variant_layouts(ty, variant_value_layouts);
+                            let value_layout =
+                                ValueLayout::closed_enum(descriptor_id, variant_ids, size);
+                            return Ok(Some(ctx.publish_layout(ty, value_layout)));
+                        }
                     }
 
-                    // TODO: consider reconciling `EnumLayout`, `ValueLayout::open_enum`, and the enum descriptor.
-                    // The enum's `ValueLayout` is the open-enum shape regardless
-                    // of whether the variant field layout was derivable; the
-                    // value-traversal walk resolves variants lazily.
-                    let value_layout = ValueLayout::open_enum(ty, *nominal_ty_args);
-                    Ok(Some(ctx.publish_layout(ty, value_layout)))
+                    // The enum's variant bodies are not all resolvable yet, so
+                    // defer its value layout (mirrors a deferred struct). Only
+                    // reachable in the partial-load module pre-pass, never in
+                    // per-function lowering.
+                    Ok(None)
                 },
             }
         },

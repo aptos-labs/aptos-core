@@ -81,17 +81,25 @@ impl ExecutionContext for TransactionContext<'_, '_> {
         &self.extensions
     }
 
+    fn reset_module_read_set(&mut self) {
+        self.read_set = ModuleReadSet::new();
+    }
+
     fn native_call_borrows(
         &mut self,
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
+        &dyn LayoutProvider,
+        &dyn ResourceProvider,
         &mut GasMeter,
         &NativeExtensions,
     ) {
         (
             self.natives,
             self.loader.guard(),
+            self.loader.guard(),
+            self.resource_provider,
             &mut self.gas_meter,
             &self.extensions,
         )

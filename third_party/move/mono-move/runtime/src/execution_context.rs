@@ -10,7 +10,8 @@ use mono_move_core::{
     native::{NativeExtensions, NativeRegistry},
     storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
-    ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, NO_DESCRIPTOR_PROVIDER,
+    ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, LayoutProvider,
+    NO_DESCRIPTOR_PROVIDER, NO_LAYOUT_PROVIDER,
 };
 use mono_move_loader::LoaderResult;
 
@@ -26,6 +27,13 @@ pub trait ExecutionContext {
     /// The per-transaction native extensions.
     fn extensions(&self) -> &NativeExtensions;
 
+    /// Clears the module read-set so it is repopulated on the next run, without
+    /// evicting any loaded/lowered module code (which lives in the global
+    /// context). Used by the benchmark to measure per-transaction read-set
+    /// population with the code cache kept warm. The default is a no-op for
+    /// contexts that do not track a module read-set.
+    fn reset_module_read_set(&mut self) {}
+
     /// Disjoint borrows all the sub-components needed for a native call.
     /// Needed for avoiding borrow conflicts downstream.
     fn native_call_borrows(
@@ -33,6 +41,8 @@ pub trait ExecutionContext {
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
+        &dyn LayoutProvider,
+        &dyn ResourceProvider,
         &mut GasMeter,
         &NativeExtensions,
     );
@@ -137,12 +147,16 @@ impl ExecutionContext for LocalExecutionContext<'_> {
     ) -> (
         &ProductionNativeRegistry,
         &dyn DescriptorProvider,
+        &dyn LayoutProvider,
+        &dyn ResourceProvider,
         &mut GasMeter,
         &NativeExtensions,
     ) {
         (
             &self.natives,
             &NO_DESCRIPTOR_PROVIDER,
+            &NO_LAYOUT_PROVIDER,
+            self.resource_provider,
             &mut self.gas_meter,
             &self.extensions,
         )

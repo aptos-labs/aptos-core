@@ -9,10 +9,11 @@ use crate::{
         ArithOp, RuntimeError, RuntimeInvariantViolation, RuntimeResult, RuntimeStatus, Signedness,
         VecOp,
     },
-    global_storage::{EntryPtr, ResourceReadWriteSet},
+    global_storage::{EntryPtr, ResourceReadWriteSet, StorageWrite},
     heap::{
+        deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        AllocationError, Heap,
+        AllocationError, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
@@ -31,25 +32,44 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
+    native::{
+        NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool,
+        VMInternalError,
+    },
     next_captured_value_offset,
-    storage::resource_provider::InMemoryStorageKey,
-    types::{view_type_list, InternedTypeList},
+    storage::resource_provider::{InMemoryStorageKey, StorageRead},
+    types::{view_type_list, InternedType, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
-use move_core_types::int256::{I256, U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
+
+/// A resource write produced by an interpreter run, in a form ready for
+/// differential comparison against another VM's write set.
+#[derive(Debug)]
+pub enum ResourceWrite {
+    /// Resource newly published this run (it did not exist beforehand); holds
+    /// the BCS bytes of the value.
+    Created(Vec<u8>),
+    /// Existing resource overwritten; holds the BCS bytes of the new value.
+    Modified(Vec<u8>),
+    /// Resource was moved out of global storage.
+    Deleted,
+}
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
@@ -76,6 +96,10 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + Lay
     /// checkpoint stack.
     pub(crate) read_write_set: ResourceReadWriteSet,
     rng: StdRng,
+    /// Signer values for the root entry function. The leading `&signer`
+    /// parameters reference these. Kept here so the references stay valid for
+    /// the whole run; GC leaves them alone because they are not heap pointers.
+    signers: Vec<AccountAddress>,
 }
 
 impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'a, T> {
@@ -116,6 +140,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
+            signers: Vec::new(),
         }
     }
 
@@ -147,7 +172,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.exec_ctx
             .extensions()
             .checkpoint()
-            .map_err(RuntimeError::VMInternal)
+            .map_err(VMInternalError::into_runtime_error)
     }
 
     /// Rolls back the `n` most recent checkpoints across the read-write set and
@@ -161,7 +186,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.exec_ctx
             .extensions()
             .rollback(n)
-            .map_err(RuntimeError::VMInternal)
+            .map_err(VMInternalError::into_runtime_error)
     }
 
     /// TODO: move to execution context
@@ -213,6 +238,31 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
     }
 
+    /// Resets the interpreter to re-run `entry` from a clean state, reusing the
+    /// already-allocated stack/heap and the already-verified function (no
+    /// re-verification). Discards the previous run's heap allocations,
+    /// global-storage read-write set, and auxiliary GC roots, and resets the call
+    /// stack to the root frame. Place arguments with [`Self::set_root_arg`] /
+    /// [`Self::deserialize_arg`], then call [`Self::run`].
+    ///
+    /// This is the cheap path for re-running over warm loader/provider caches
+    /// (e.g. benchmark samples). The gas meter is not reset, so use a budget
+    /// large enough for the intended number of runs.
+    pub fn reset_root(&mut self, entry: &Function) {
+        self.invoke(entry);
+        self.heap.reset();
+        self.read_write_set = ResourceReadWriteSet::new();
+        self.root_pool = RootPool::new();
+    }
+
+    /// Clears the loader's module read-set so the next run repopulates it from
+    /// scratch, without re-verifying or re-allocating and without evicting
+    /// warm module code. Used by the benchmark to measure per-transaction
+    /// read-set population with everything else kept warm.
+    pub fn reset_module_read_set(&mut self) {
+        self.exec_ctx.reset_module_read_set();
+    }
+
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result(&self) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
@@ -261,6 +311,50 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
     }
 
+    /// Stores `signers` and writes a reference into each leading signer
+    /// parameter slot of `function`'s root frame, then returns the byte offset
+    /// at which the first non-signer argument begins (the end of the signer
+    /// parameter region). Call this before placing the remaining arguments with
+    /// [`Self::set_root_arg`] / [`Self::deserialize_arg`].
+    ///
+    /// A `&signer` parameter is a 16-byte reference, so its slot gets a fat
+    /// pointer into the stored signer value; a by-value `signer` parameter (32
+    /// bytes) gets the address copied inline. The signer values live in
+    /// `self.signers` for the duration of the run, and the references point into
+    /// that storage — GC ignores them because they are not heap pointers
+    /// (`relocate` skips non-heap pointers).
+    pub fn set_root_signers(&mut self, function: &Function, signers: &[AccountAddress]) -> u32 {
+        // Width of a reference (fat pointer); a `&signer` slot has this size.
+        const REFERENCE_SIZE: u32 = 16;
+
+        self.signers = signers.to_vec();
+        let base = self.stack.as_ptr();
+        for (i, slot) in function
+            .param_slots
+            .iter()
+            .take(self.signers.len())
+            .enumerate()
+        {
+            let dst = FRAME_METADATA_SIZE + usize::from(slot.offset);
+            // SAFETY: `self.signers[i]` is a live 32-byte address; `slot`
+            // addresses a leading signer parameter slot in the root frame,
+            // sized either 16 (a `&signer` reference) or 32 (a by-value signer).
+            unsafe {
+                let signer_ptr = self.signers.as_ptr().add(i) as *const u8;
+                if slot.size == REFERENCE_SIZE {
+                    write_fat_ptr(base, dst, signer_ptr, 0);
+                } else {
+                    std::ptr::copy_nonoverlapping(signer_ptr, base.add(dst), 32);
+                }
+            }
+        }
+        function
+            .param_slots
+            .get(self.signers.len())
+            .map(|slot| slot.offset.0)
+            .unwrap_or(function.param_region_size as u32)
+    }
+
     /// Read a raw heap pointer from the root frame at the given byte offset.
     pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
         unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
@@ -284,6 +378,117 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             }
         }
         Ok(ptr as u64)
+    }
+
+    /// Returns the write this run made to the resource at `key`, or `None` if
+    /// the resource was only read (or never touched). `Created`/`Modified` carry
+    /// the BCS bytes of the resulting value (distinguished by whether it existed
+    /// beforehand); `Deleted` means it was moved out. Intended for the
+    /// differential harness, which drives comparison off another VM's write set.
+    /// Table-item keys are never compared and return `None`.
+    pub fn resource_write(&self, key: &InMemoryStorageKey) -> RuntimeResult<Option<ResourceWrite>> {
+        let Some(entry) = self.read_write_set.get(key) else {
+            return Ok(None);
+        };
+        match entry.write {
+            StorageWrite::NotModified => Ok(None),
+            StorageWrite::Deleted { .. } => Ok(Some(ResourceWrite::Deleted)),
+            StorageWrite::LocalHeap { ptr, .. } => {
+                let ty = match key {
+                    InMemoryStorageKey::Resource { ty, .. } => *ty,
+                    InMemoryStorageKey::TableItem { .. } => return Ok(None),
+                };
+                // SAFETY: a `LocalHeap` write points at the start of a live
+                // value of type `ty` in this run's heap, and `exec_ctx`
+                // provides its layout.
+                let bytes = unsafe { value_utils::serialize(&*self.exec_ctx, ptr.as_ptr(), ty)? };
+                // The pre-run read tells creation (absent before) from
+                // modification (present before).
+                Ok(Some(match entry.read {
+                    StorageRead::DoesNotExist => ResourceWrite::Created(bytes),
+                    StorageRead::ExternalHeap { .. } => ResourceWrite::Modified(bytes),
+                }))
+            },
+        }
+    }
+
+    /// Returns every table-item write this run made, keyed by `(table handle
+    /// address, serialized key)`. Unlike resources, table-item writes are not
+    /// looked up by key (the harness has no way to enumerate the keys a
+    /// transaction touches otherwise), so this enumerates the read-write set.
+    /// `Created`/`Modified` carry the BCS bytes of the stored value (`Box<V>`),
+    /// distinguished by whether it existed beforehand; `Deleted` means the entry
+    /// was removed.
+    pub fn table_writes(
+        &self,
+    ) -> RuntimeResult<Vec<(AccountAddress, Box<[u8]>, ResourceWrite)>> {
+        let mut writes = Vec::new();
+        for (key, entry) in self.read_write_set.entries() {
+            let InMemoryStorageKey::TableItem {
+                handle,
+                key: table_key,
+                value_ty,
+            } = key
+            else {
+                continue;
+            };
+            let write = match entry.write {
+                StorageWrite::NotModified => continue,
+                StorageWrite::Deleted { .. } => ResourceWrite::Deleted,
+                StorageWrite::LocalHeap { ptr, .. } => {
+                    // SAFETY: a `LocalHeap` write points at a live `Box<V>` value
+                    // of type `value_ty`; `exec_ctx` provides its layout.
+                    let bytes =
+                        unsafe { value_utils::serialize(&*self.exec_ctx, ptr.as_ptr(), *value_ty)? };
+                    match entry.read {
+                        StorageRead::DoesNotExist => ResourceWrite::Created(bytes),
+                        StorageRead::ExternalHeap { .. } => ResourceWrite::Modified(bytes),
+                    }
+                },
+            };
+            writes.push((handle.address(), table_key.clone(), write));
+        }
+        Ok(writes)
+    }
+
+    /// Serializes the value of type `ty` stored at `base` to BCS, using this
+    /// run's layout provider and heap. Used by the differential harness to read
+    /// back emitted event payloads, which the event store keeps in flat form.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` whose heap
+    /// pointers (if any) reference live objects in this run's heap.
+    pub unsafe fn serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> RuntimeResult<Vec<u8>> {
+        // SAFETY: forwarded from this method's contract; `exec_ctx` supplies the
+        // layout, and serialization performs no VM-heap allocation.
+        unsafe { value_utils::serialize(&*self.exec_ctx, base, ty) }
+    }
+
+    /// Deserialize a BCS-encoded entry-function argument of the given type into
+    /// the root frame at `offset`, allocating any heap sub-objects. Used to
+    /// place non-primitive (vector/struct) arguments that do not fit a raw
+    /// frame slot; primitive args go through [`Self::set_root_arg`].
+    pub fn deserialize_arg(
+        &mut self,
+        offset: u32,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> RuntimeResult<()> {
+        // SAFETY: `offset` addresses a writable root-frame slot sized for `ty`,
+        // and `exec_ctx` provides the layout. Mirrors `exec_store_imm_vec`.
+        unsafe {
+            let dst = self
+                .stack
+                .as_ptr()
+                .add(FRAME_METADATA_SIZE + offset as usize);
+            value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
+                .map_err(AllocationError::into_runtime_error)
+        }
     }
 }
 
@@ -1406,6 +1611,46 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     );
                 },
 
+                MicroOp::VecPack(ref op) => {
+                    self.exec_vec_pack(fp, op)?;
+                },
+
+                MicroOp::VecUnpack(ref op) => {
+                    self.exec_vec_unpack(fp, op)?;
+                },
+
+                MicroOp::VecSwap {
+                    vec_ref,
+                    idx_a,
+                    idx_b,
+                    elem_size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                    let idx_a = read_u64(fp, idx_a);
+                    let idx_b = read_u64(fp, idx_b);
+                    let len = read_vec_len(vec_ptr);
+                    // Indices are checked before the equal-indices no-op.
+                    for idx in [idx_a, idx_b] {
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::Swap,
+                                idx,
+                                len,
+                            });
+                        }
+                    }
+                    // Equal pointers are UB for `swap_nonoverlapping`; distinct
+                    // in-bounds indices guarantee disjoint element ranges.
+                    if idx_a != idx_b {
+                        std::ptr::swap_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
+                            vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                    }
+                },
+
                 // ----- Reference (fat pointer) instructions -----
                 MicroOp::VecBorrow {
                     dst,
@@ -1849,26 +2094,92 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
+        // TODO: add an ld_const test that fills the heap so the first
+        // deserialize fails and the GC-then-retry path inside `deserialize_or_gc`
+        // runs. Needs a `ForceGC` native to drive it deterministically in the
+        // differential suite.
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
-            if let Err(err) =
-                value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
-            {
-                match err {
-                    AllocationError::RuntimeError(err) => return Err(err),
-                    AllocationError::OutOfHeapMemory { .. } => {
-                        // TODO: add an ld_const test that fills the heap so
-                        // the first deserialize fails and this GC-then-retry
-                        // path runs. Needs a `ForceGC` native to drive it
-                        // deterministically in the differential suite.
-                        gc_collect!(self)?;
-                        value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
-                            .map_err(AllocationError::into_runtime_error)?;
-                    },
-                }
-            }
-            Ok(())
+            deserialize_or_gc(
+                self.exec_ctx,
+                &mut self.heap,
+                ty,
+                bytes,
+                dst,
+                self.exec_ctx,
+                &mut self.read_write_set,
+                &self.root_pool,
+                self.exec_ctx.extensions(),
+                self.frame_ptr,
+                crate::heap::TopFrame::Function {
+                    func: self.current_func,
+                    pc: self.pc,
+                },
+            )
         }
+    }
+
+    /// Allocates the vector at exact capacity in a single allocation, writes
+    /// the length, copies each source element from the frame, and writes the
+    /// heap pointer to `op.dst`. Any GC runs inside the allocation, before the
+    /// fp-relative element reads, so those reads see post-GC pointers.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+        let count = op.srcs.len() as u64;
+        // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
+        // payload byte is overwritten below before the op returns and no GC can
+        // intervene afterwards. A fully-initialized-payload alloc variant would
+        // avoid the dead memset. Padding needs to be carefully considered for
+        // the optimization.
+        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        unsafe {
+            write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
+            for (elem_idx, src) in op.srcs.iter().enumerate() {
+                // Non-overlapping: the source is a frame slot, the destination
+                // is in the freshly-allocated heap vector — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    fp.add((*src).into()),
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size) as *mut u8,
+                    op.elem_size as usize,
+                );
+            }
+            write_ptr(fp, op.dst, vec_ptr);
+        }
+        Ok(())
+    }
+
+    /// Checks that the vector's length equals `op.dsts.len()` — erroring on a
+    /// mismatch; then copies each element into its destination slot. A null
+    /// `src` is the empty vector: it unpacks cleanly when `dsts` is empty and
+    /// fails the length check otherwise.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.src` and each `op.dsts` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_unpack(&mut self, fp: *mut u8, op: &VecUnpackOp) -> RuntimeResult<()> {
+        unsafe {
+            let vec_ptr = read_ptr(fp, op.src);
+            let expected = op.dsts.len() as u64;
+            let actual = read_vec_len(vec_ptr);
+            if actual != expected {
+                return Err(RuntimeError::VecUnpackLengthMismatch { expected, actual });
+            }
+            for (elem_idx, dst) in op.dsts.iter().enumerate() {
+                // Non-overlapping: the source is a heap vector element, the
+                // destination is a frame slot — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size),
+                    fp.add((*dst).into()),
+                    op.elem_size as usize,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Deep-copy the value tree rooted at the specified source into the
@@ -1881,27 +2192,20 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// at `src - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
         // SAFETY: by this function's contract `root` points to a live object.
-        let root_guard = unsafe { self.root_pool.root_object(root.as_ptr()) };
-        // SAFETY: `root_guard.ptr()` is the rooted (possibly relocated) pointer
-        // to that live object, so it is non-null.
-        match unsafe {
-            self.heap
-                .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(root_guard.ptr()))
-        } {
-            Ok(ptr) => Ok(ptr),
-            Err(AllocationError::RuntimeError(err)) => Err(err),
-            Err(AllocationError::OutOfHeapMemory { .. }) => {
-                gc_collect!(self)?;
-                // Re-read the root pointer from the handle, as its address may
-                // have been changed by the GC.
-                // SAFETY: the handle keeps the root live across GC; the relocated
-                // pointer still points to the same live object, so it is non-null.
-                unsafe {
-                    self.heap
-                        .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(root_guard.ptr()))
-                        .map_err(AllocationError::into_runtime_error)
-                }
-            },
+        unsafe {
+            deep_copy_or_gc(
+                &mut self.heap,
+                self.exec_ctx,
+                &mut self.read_write_set,
+                &self.root_pool,
+                self.exec_ctx.extensions(),
+                self.frame_ptr,
+                TopFrame::Function {
+                    func: self.current_func,
+                    pc: self.pc,
+                },
+                root,
+            )
         }
     }
 
@@ -2456,7 +2760,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = self.frame_ptr;
         self.frame_ptr = new_fp;
         let result = {
-            let (registry, provider, gas_meter, extensions) = self.exec_ctx.native_call_borrows();
+            let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
+                self.exec_ctx.native_call_borrows();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
                     idx: native_idx.0,
@@ -2475,6 +2780,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 view_type_list(ty_args),
                 gas_meter,
                 provider,
+                layouts,
+                resource_provider,
                 &mut self.heap,
                 &mut self.read_write_set,
                 extensions,
@@ -2489,7 +2796,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 Ok(StepResult::Continue)
             },
             Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
-            Err(e) => Err(RuntimeError::VMInternal(e)),
+            Err(e) => Err(e.into_runtime_error()),
         }
     }
 

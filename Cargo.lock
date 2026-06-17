@@ -3159,6 +3159,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-mono-move"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework-natives",
+ "aptos-gas-schedule",
+ "aptos-table-natives",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4",
+ "bytes",
+ "clap 4.5.60",
+ "criterion",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-natives",
+ "mono-move-runtime",
+ "mono-move-testsuite",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+]
+
+[[package]]
 name = "aptos-move-cli"
 version = "1.0.0"
 dependencies = [
@@ -12855,7 +12882,6 @@ dependencies = [
  "move-core-types",
  "shared-dsa",
  "specializer",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -12887,6 +12913,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "mono-move-alloc",
  "mono-move-core",
+ "mono-move-global-context",
  "mono-move-loader",
  "move-core-types",
  "num-bigint 0.3.3",
@@ -12894,7 +12921,6 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]

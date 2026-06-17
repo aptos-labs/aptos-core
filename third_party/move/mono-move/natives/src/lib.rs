@@ -14,26 +14,40 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 mod address_derivation;
 pub mod aggregator_v2;
+pub mod bcs;
+pub mod cmp;
 pub mod event;
+pub mod from_bytes;
 pub mod function_info;
+pub mod hash;
 pub mod mem;
 pub mod object;
 pub mod signer;
 pub mod state_storage;
+pub mod string;
+pub mod table;
 pub mod test_natives;
 pub mod transaction_context;
 pub mod type_info;
+pub mod vector;
 
 pub use aggregator_v2::make_all_aggregator_v2_natives;
+pub use bcs::make_all_bcs_natives;
+pub use cmp::make_all_cmp_natives;
 pub use event::{make_all_event_natives, EventEntry, EventKind, EventStore};
+pub use from_bytes::make_all_from_bytes_natives;
 pub use function_info::make_all_function_info_natives;
+pub use hash::make_all_hash_natives;
 pub use mem::make_all_mem_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
 pub use signer::make_all_signer_natives;
 pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBoundary};
+pub use string::make_all_string_natives;
+pub use table::make_all_table_natives;
 pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
 pub use transaction_context::{make_all_transaction_context_natives, TransactionContextExtension};
 pub use type_info::make_all_type_info_natives;
+pub use vector::make_all_vector_natives;
 
 /// How a native is dispatched against a call's type arguments. A native that
 /// works for any instantiation registers as [`Dispatch::Polymorphic`]; a native
@@ -72,6 +86,13 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_object_natives::<F>());
     natives.extend(make_all_state_storage_natives::<F>());
     natives.extend(make_all_event_natives::<F>());
+    natives.extend(make_all_string_natives::<F>());
+    natives.extend(make_all_bcs_natives::<F>());
+    natives.extend(make_all_from_bytes_natives::<F>());
+    natives.extend(make_all_table_natives::<F>());
+    natives.extend(make_all_cmp_natives::<F>());
+    natives.extend(make_all_vector_natives::<F>());
+    natives.extend(make_all_hash_natives::<F>());
     natives
 }
 

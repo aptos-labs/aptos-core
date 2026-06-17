@@ -27,7 +27,7 @@ use crate::{
     stackless_exec_ir::{Instr, Slot},
 };
 use anyhow::{bail, Result};
-use mono_move_core::types::{strip_ref, InternedType};
+use mono_move_core::types::InternedType;
 use move_binary_format::file_format::FieldHandleIndex;
 
 // --- Loads ---
@@ -44,7 +44,7 @@ fn move_bytes(num_bytes: u32) -> u64 {
 const OP: u64 = 5;
 
 // --- Structs / variants ---
-/// Generic pack/unpack and variant pack/unpack.
+/// Variant pack/unpack.
 const PACK_UNPACK: u64 = 8;
 const TEST_VARIANT: u64 = 4;
 
@@ -53,7 +53,7 @@ const BORROW: u64 = 2;
 fn read_write_ref(num_bytes: u32) -> u64 {
     2 + 3 * num_bytes as u64
 }
-/// A field read whose size isn't known here (generic and variant forms).
+/// A field read whose size isn't known here (variant forms).
 const FIELD_READ: u64 = 5;
 
 // --- Globals ---
@@ -91,6 +91,11 @@ pub(crate) trait CostContext {
 
     /// Byte size of field `fh` of struct type `struct_ty`.
     fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<u32>;
+
+    /// Substitutes the instantiation's type arguments into an
+    /// instruction-embedded type.
+    /// TODO: reconsider whether this is the right abstraction.
+    fn concrete_ty(&self, ty: InternedType) -> Result<InternedType>;
 }
 
 /// Total move cost over a list of source slots.
@@ -129,61 +134,45 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         Instr::UnaryOp(..) | Instr::BinaryOp(..) | Instr::BinaryOpImm(..) => OP,
 
         // --- Structs ---
-        Instr::Pack(_, struct_ty, _) | Instr::Unpack(_, struct_ty, _) => {
-            move_bytes(concrete_type_size(*struct_ty, "struct type")?)
-        },
-        Instr::PackGeneric(..) | Instr::UnpackGeneric(..) => PACK_UNPACK,
+        Instr::Pack(_, struct_ty, _) | Instr::Unpack(_, struct_ty, _) => move_bytes(
+            concrete_type_size(cx.concrete_ty(*struct_ty)?, "struct type")?,
+        ),
 
         // --- Enums ---
-        Instr::PackVariant(..)
-        | Instr::PackVariantGeneric(..)
-        | Instr::UnpackVariant(..)
-        | Instr::UnpackVariantGeneric(..) => PACK_UNPACK,
-        Instr::TestVariant(..) | Instr::TestVariantGeneric(..) => TEST_VARIANT,
+        Instr::PackVariant(..) | Instr::UnpackVariant(..) => PACK_UNPACK,
+        Instr::TestVariant(..) => TEST_VARIANT,
 
         // --- References ---
         Instr::ImmBorrowLoc(..)
         | Instr::MutBorrowLoc(..)
         | Instr::ImmBorrowField(..)
         | Instr::MutBorrowField(..)
-        | Instr::ImmBorrowFieldGeneric(..)
-        | Instr::MutBorrowFieldGeneric(..)
         | Instr::ImmBorrowVariantField(..)
-        | Instr::MutBorrowVariantField(..)
-        | Instr::ImmBorrowVariantFieldGeneric(..)
-        | Instr::MutBorrowVariantFieldGeneric(..) => BORROW,
+        | Instr::MutBorrowVariantField(..) => BORROW,
         Instr::ReadRef(_, ref_src) => read_write_ref(ref_pointee_size(cx.slot_ty(*ref_src)?)?),
         Instr::WriteRef(ref_dst, _) => read_write_ref(ref_pointee_size(cx.slot_ty(*ref_dst)?)?),
 
         // --- Fused field access (borrow + read/write) ---
-        Instr::ReadField(_, fh, src) => {
-            read_write_ref(cx.field_size(strip_ref(cx.slot_ty(*src)?)?, *fh)?)
+        Instr::ReadField(_, owner, fh, _) => {
+            read_write_ref(cx.field_size(cx.concrete_ty(*owner)?, *fh)?)
         },
-        Instr::ReadFieldGeneric(..) => FIELD_READ,
-        Instr::WriteField(_, _, val) | Instr::WriteFieldGeneric(_, _, val) => {
-            read_write_ref(cx.slot_size(*val)?)
-        },
-        Instr::ReadVariantField(..) | Instr::ReadVariantFieldGeneric(..) => FIELD_READ,
-        Instr::WriteVariantField(_, _, val) | Instr::WriteVariantFieldGeneric(_, _, val) => {
-            read_write_ref(cx.slot_size(*val)?)
-        },
+        Instr::WriteField(_, _, _, val) => read_write_ref(cx.slot_size(*val)?),
+        Instr::ReadVariantField(..) => FIELD_READ,
+        Instr::WriteVariantField(_, _, _, val) => read_write_ref(cx.slot_size(*val)?),
 
         // --- Fused inline-struct field access ---
         Instr::ImmBorrowLocField(..) | Instr::MutBorrowLocField(..) => BORROW,
-        Instr::ReadLocalField(_, fh, local) => move_bytes(cx.field_size(cx.slot_ty(*local)?, *fh)?),
-        Instr::WriteLocalField(_, _, val) => move_bytes(cx.slot_size(*val)?),
+        Instr::ReadLocalField(_, owner, fh, _) => {
+            move_bytes(cx.field_size(cx.concrete_ty(*owner)?, *fh)?)
+        },
+        Instr::WriteLocalField(_, _, _, val) => move_bytes(cx.slot_size(*val)?),
 
         // --- Globals ---
         Instr::Exists(..)
-        | Instr::ExistsGeneric(..)
         | Instr::MoveFrom(..)
-        | Instr::MoveFromGeneric(..)
         | Instr::MoveTo(..)
-        | Instr::MoveToGeneric(..)
         | Instr::ImmBorrowGlobal(..)
-        | Instr::ImmBorrowGlobalGeneric(..)
-        | Instr::MutBorrowGlobal(..)
-        | Instr::MutBorrowGlobalGeneric(..) => GLOBAL,
+        | Instr::MutBorrowGlobal(..) => GLOBAL,
 
         // --- Calls ---
         Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) => {
@@ -197,14 +186,20 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         Instr::CallClosure(rets, _, args) => call_cost(cx, args, rets)?,
 
         // --- Vector ---
-        Instr::VecPack(_, _, _, elems) => VEC_NEW + sum_move(cx, elems)?,
+        Instr::VecPack(_, _, elems) => VEC_NEW + sum_move(cx, elems)?,
         Instr::VecLen(..) => VEC_LEN,
         Instr::VecImmBorrow(..) | Instr::VecMutBorrow(..) => VEC_BORROW,
-        Instr::VecPushBack(elem_ty, _, _) | Instr::VecPopBack(_, elem_ty, _) => {
-            vec_elem(concrete_type_size(*elem_ty, "vector elem type")?)
+        Instr::VecPushBack(elem_ty, _, _) | Instr::VecPopBack(_, elem_ty, _) => vec_elem(
+            concrete_type_size(cx.concrete_ty(*elem_ty)?, "vector elem type")?,
+        ),
+        Instr::VecUnpack(dsts, elem_ty, _) => {
+            VEC_NEW
+                + dsts.len() as u64
+                    * move_bytes(concrete_type_size(cx.concrete_ty(*elem_ty)?, "vector elem type")?)
         },
-        Instr::VecUnpack(..) => VEC_NEW,
-        Instr::VecSwap(..) => VEC_BORROW,
+        Instr::VecSwap(elem_ty, _, _, _) => {
+            2 * vec_elem(concrete_type_size(cx.concrete_ty(*elem_ty)?, "vector elem type")?)
+        },
 
         // --- Control flow ---
         Instr::Branch(..) => JUMP,

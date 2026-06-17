@@ -3,9 +3,10 @@
 
 //! Read / write of native arg and return values through a frame slot.
 
+use super::{context::NativeContext, result::VMInternalError};
 use crate::{
     align::MAX_ALIGN,
-    memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr},
+    memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr, write_u64},
     root_pool::{ObjectHandle, ReferenceHandle, RootPool},
     VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
@@ -134,6 +135,44 @@ impl<'a> VMValue<'a> for AccountAddress {
     }
 }
 
+/// A table's storage handle.
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct TableHandle(AccountAddress);
+
+impl TableHandle {
+    pub fn new(address: AccountAddress) -> Self {
+        Self(address)
+    }
+
+    /// The handle's address.
+    pub fn address(&self) -> AccountAddress {
+        self.0
+    }
+}
+
+/// A `TableHandle` has the same representation as the `address` it wraps.
+impl<'a> VMValue<'a> for TableHandle {
+    const FRAME_SLOT_SIZE: usize = <AccountAddress as VMValue<'a>>::FRAME_SLOT_SIZE;
+
+    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+        Self(unsafe { AccountAddress::read_from_frame(pool, frame_ptr, offset) })
+    }
+
+    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+        unsafe { self.0.write_to_frame(frame_ptr, offset) }
+    }
+}
+
+impl Ref<'_, TableHandle> {
+    /// Borrows the referenced table handle.
+    pub fn get(&self) -> &TableHandle {
+        // SAFETY: `TableHandle` is `repr(transparent)` over the address bytes the
+        // reference points at, so the referent reinterprets as `&TableHandle`.
+        unsafe { &*(self.ptr() as *const TableHandle) }
+    }
+}
+
 /// Marker for a type that is not statically known.
 ///
 /// This can be used to build composite types in generic native functions — e.g. the
@@ -152,7 +191,15 @@ pub struct Ref<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> Ref<'_, T> {
+impl<'a, T> Ref<'a, T> {
+    /// Wraps a rooted reference handle.
+    pub fn from_handle(handle: ReferenceHandle<'a>) -> Self {
+        Self {
+            handle,
+            _marker: PhantomData,
+        }
+    }
+
     /// Raw pointer to the referenced value.
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
@@ -183,6 +230,82 @@ impl<'a, V> Ref<'a, Vector<'a, V>> {
         //
         // SAFETY: `vec_ptr` is the heap object pointer held by a valid `vector<V>`.
         Vector::from_handle(unsafe { self.handle.pool().root_object(vec_ptr) })
+    }
+}
+
+impl<'a> Ref<'a, Vector<'a, Opaque>> {
+    /// Moves `length` elements out of `from` (starting at `removal`) and
+    /// inserts them into `self` (the destination) at `insert`, growing `self`
+    /// as needed. When `self` is empty, the fresh allocation borrows its GC
+    /// descriptor from `from`.
+    ///
+    /// Positions are assumed to be in bounds and `length` non-zero; the caller
+    /// is responsible for checking and aborting otherwise.
+    ///
+    /// # Safety
+    ///
+    /// `self` and `from` must reference `vector<T>` values of the same `T`,
+    /// `elem_size` must equal the byte size of `T`, the positions must be in
+    /// range, and `length` must be non-zero.
+    pub unsafe fn move_range<C: NativeContext>(
+        &self,
+        from: &Ref<'a, Vector<'a, Opaque>>,
+        removal: usize,
+        length: usize,
+        insert: usize,
+        elem_size: usize,
+        ctx: &C,
+    ) -> Result<(), VMInternalError> {
+        let to_len = self.borrow().len() as usize;
+
+        // Grow the destination to hold the inserted elements. This is the only
+        // allocation, and the only point at which a GC can run.
+        unsafe { ctx.grow_vector(self, from, elem_size, to_len + length)? };
+
+        // The grow may have relocated either vector, so re-borrow for fresh
+        // pointers. No allocation happens past this point.
+        let to_vec = self.borrow();
+        let from_vec = from.borrow();
+        // SAFETY: used transiently, with no allocation before the writes below.
+        let to_data = unsafe { to_vec.data_ptr() };
+        let from_data = unsafe { from_vec.data_ptr() };
+        let from_len = from_vec.len() as usize;
+
+        // SAFETY: every range lies within the now-sized vectors.
+        unsafe {
+            // Open a gap in `self` at `insert` by shifting its tail right.
+            if to_len > insert {
+                std::ptr::copy(
+                    to_data.add(insert * elem_size),
+                    to_data.add((insert + length) * elem_size),
+                    (to_len - insert) * elem_size,
+                );
+            }
+            // Copy the moved range from `from` into the gap. Move's borrow
+            // rules make `from` and `to` distinct, but we use an overlapping
+            // copy so this stays sound even if speculative execution ever
+            // produces transiently aliasing references.
+            // TODO(security): switch back to `copy_nonoverlapping` once we've
+            // confirmed Block-STM speculation cannot alias the two vectors.
+            std::ptr::copy(
+                from_data.add(removal * elem_size),
+                to_data.add(insert * elem_size),
+                length * elem_size,
+            );
+            // Close the gap left in `from` by shifting its tail left.
+            if from_len > removal + length {
+                std::ptr::copy(
+                    from_data.add((removal + length) * elem_size),
+                    from_data.add(removal * elem_size),
+                    (from_len - removal - length) * elem_size,
+                );
+            }
+
+            // Both objects now hold their adjusted element counts.
+            to_vec.set_len((to_len + length) as u64);
+            from_vec.set_len((from_len - length) as u64);
+        }
+        Ok(())
     }
 }
 
@@ -259,6 +382,36 @@ impl<'a, V> Vector<'a, V> {
         self.len() == 0
     }
 
+    /// Pointer to element 0 of the data region, or null if the vector is
+    /// empty/unallocated.
+    ///
+    /// # Safety
+    ///
+    /// The pointer is invalidated by any GC; the caller must use it only
+    /// transiently, before any allocation that could trigger collection.
+    #[inline]
+    pub unsafe fn data_ptr(&self) -> *mut u8 {
+        let p = self.ptr();
+        if p.is_null() {
+            std::ptr::null_mut()
+        } else {
+            // SAFETY: a non-null vector object stores its data at `VEC_DATA_OFFSET`.
+            unsafe { p.add(VEC_DATA_OFFSET) }
+        }
+    }
+
+    /// Overwrites the vector's element count.
+    ///
+    /// # Safety
+    ///
+    /// The backing heap object must be non-null and have capacity for `len`
+    /// elements.
+    #[inline]
+    pub unsafe fn set_len(&self, len: u64) {
+        // SAFETY: caller guarantees a non-null object with room for `len` elements.
+        unsafe { write_u64(self.ptr(), VEC_LENGTH_OFFSET, len) };
+    }
+
     // TODO: Other vector APIs, added on-demand.
 }
 
@@ -299,6 +452,35 @@ impl<'a, V> VMValue<'a> for Vector<'a, V> {
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         // Write the vector's current heap pointer into the destination slot.
         unsafe { write_ptr(frame_ptr, offset, self.ptr()) };
+    }
+}
+
+/// An owned, freshly heap-allocated Move value.
+///
+/// Unlike a `Ref`, it owns its heap object rather than borrowing one.
+/// Valid throughout the native call and GC-safe.
+#[must_use = "a boxed value should be consumed"]
+pub struct Boxed<'a, T> {
+    handle: ObjectHandle<'a>,
+    _marker: PhantomData<T>,
+}
+
+impl<'a, T> Boxed<'a, T> {
+    /// Wraps a rooted heap object. VM-internal (the context impl boxes a value
+    /// this way).
+    pub fn from_handle(handle: ObjectHandle<'a>) -> Self {
+        Self {
+            handle,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Current heap pointer of the boxed object.
+    ///
+    /// Stale if GC runs -- only for transient use.
+    #[inline]
+    pub fn ptr(&self) -> *mut u8 {
+        self.handle.ptr()
     }
 }
 
