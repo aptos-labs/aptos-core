@@ -13,37 +13,26 @@ The stackless execution IR is then lowered into monomorphic micro-ops, when all 
 
 ## Test Infrastructure
 
-The specializer pipeline is exercised by the **snapshot tests** in the `mono-move-testsuite` crate (`mono-move/testsuite/tests/snapshot.rs`).
+The specializer pipeline is exercised by the **differential tests** in the `mono-move-testsuite` crate (`mono-move/testsuite/tests/differential.rs`).
 
 ### Framework
 
-Tests use `datatest-stable` (a data-driven test harness) with `harness = false` in the testsuite crate's `Cargo.toml`. The entry point is `mono-move/testsuite/tests/snapshot.rs`.
+Tests use `datatest-stable` (a data-driven harness, `harness = false` in the testsuite crate's `Cargo.toml`) over the cases under `mono-move/testsuite/tests/test_cases/differential/`. Inputs are `.move` (compiled with `move-compiler-v2`) or `.masm` (assembled with `move-asm`), selected by extension.
 
-## Test Runners
+### Directives
 
-Two runners are registered, one per input format:
+Each input drives the pipeline with `// RUN:` lines:
 
-- **`masm_runner`** — Takes `.masm` files (Move assembly), assembles them via `move-asm`, then runs `destack` and per-function micro-op lowering.
-- **`move_runner`** — Takes `.move` files, compiles them with `move-compiler-v2`, then runs `destack` and micro-op lowering. Move test output additionally includes the disassembled masm for reference.
-
-## Test Cases
-
-Located under `mono-move/testsuite/tests/test_cases/snapshot/`:
-
-- `masm/` — Hand-written Move assembly inputs (`.masm` files).
-- `move/` — Move source inputs (`.move` files).
+- `// RUN: publish [--print(<sections>)]` — destack plus per-function micro-op lowering. `--print` renders specializer golden output into the `.exp`; sections are any of `bytecode`, `stackless`, `micro-ops`. A function that cannot be lowered at publish time renders `skipped (<reason>)`.
+- `// RUN: execute <addr>::<mod>::<fn> --args ...` paired with `// CHECK:` / `// CHECK-SUBSTR:` — runs the function on both the legacy MoveVM (v1) and mono-move (v2) and checks they agree (and match the expected output).
 
 ## Baseline (Golden) Files
 
-Each input file has an expected-output baseline:
-
-- `<name>.exp` — Expected output from the pipeline.
-
-Baselines are verified (or auto-updated). To update baselines after intentional output changes, set `UPBL=1` (update baseline env var) and re-run the tests. The updates should be explainable for the given change.
+Each input with a `--print` section has a `<name>.exp` baseline. Baselines are verified, or refreshed with `UPBL=1`; updates should be explainable for the change.
 
 ## Running Tests
 
 ```bash
-cargo test -p mono-move-testsuite --test snapshot          # verify against baselines
-UPBL=1 cargo test -p mono-move-testsuite --test snapshot   # update baselines
+cargo test -p mono-move-testsuite --test differential          # verify against baselines
+UPBL=1 cargo test -p mono-move-testsuite --test differential   # update baselines
 ```
