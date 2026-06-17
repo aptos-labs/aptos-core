@@ -39,7 +39,9 @@ fi
 # (so the released binary never runs alongside the aptos-ai token) and passes
 # it via PLUGIN_TREE. Locally we build and run from source.
 if [ -n "${PLUGIN_TREE:-}" ]; then
-    PLUGIN_SRC="$PLUGIN_TREE"
+    # Resolve to an absolute path so the later cp still works after cd.
+    PLUGIN_SRC="$(cd "$PLUGIN_TREE" 2>/dev/null && pwd)" \
+        || { echo "ERROR: PLUGIN_TREE path '$PLUGIN_TREE' does not exist" >&2; exit 1; }
 else
     command -v cargo >/dev/null 2>&1 \
         || { echo "ERROR: cargo not on PATH (needed to build from source; set PLUGIN_TREE to skip)" >&2; exit 1; }
