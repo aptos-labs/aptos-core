@@ -30,7 +30,7 @@ module aptos_framework::jwks {
 
     /// We limit the size of a `PatchedJWKs` resource installed by a dapp owner for federated keyless accounts.
     /// Note: If too large, validators waste work reading it for invalid TXN signatures.
-    const MAX_FEDERATED_JWKS_SIZE_BYTES: u64 = 2 * 1024; // 2 KiB
+    const MAX_FEDERATED_JWKS_SIZE_BYTES: u64 = 4 * 1024; // 4 KiB
 
     const EUNEXPECTED_EPOCH: u64 = 1;
     const EUNEXPECTED_VERSION: u64 = 2;
