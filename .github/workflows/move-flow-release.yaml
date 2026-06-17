@@ -61,15 +61,12 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --filter=blob:none origin \
-            '+refs/heads/main:refs/remotes/origin/main' \
-            '+refs/heads/aptos-release-v*:refs/remotes/origin/aptos-release-v*'
-          REACHED_BY="$(git for-each-ref --count=1 --format='%(refname:short)' --contains="$SOURCE_SHA" \
-            'refs/remotes/origin/main' 'refs/remotes/origin/aptos-release-v*')"
-          if [ -z "$REACHED_BY" ]; then
-            echo "::error::$SOURCE_SHA is not reachable from origin/main or origin/aptos-release-v*."
+            '+refs/heads/main:refs/remotes/origin/main'
+          if ! git merge-base --is-ancestor "$SOURCE_SHA" refs/remotes/origin/main; then
+            echo "::error::$SOURCE_SHA is not reachable from origin/main."
             exit 1
           fi
-          echo "Source SHA reachable from $REACHED_BY."
+          echo "Source SHA reachable from origin/main."
           if gh api "repos/${{ github.repository }}/git/ref/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::Tag '$TAG' already exists. Bump the version or delete the existing tag."
             exit 1

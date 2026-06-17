@@ -101,7 +101,7 @@ irm https://raw.githubusercontent.com/aptos-labs/aptos-ai/main/install.ps1 -OutF
 
 Real releases must be dispatched from the `main` workflow definition. If
 `source_git_ref_override` is set for a real release, the resolved commit must be
-reachable from `main` or an `aptos-release-v*` branch.
+reachable from `main`.
 
 After the source tag is created, run the `aptos-ai` move-flow release workflow
 with the matching version. That workflow consumes the `aptos-core` tag, builds
