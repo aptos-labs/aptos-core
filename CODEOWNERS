@@ -12,7 +12,7 @@
 /aptos-move/aptos-vm/ @wrwg @zekun000 @vgao1996 @georgemitenkov
 /aptos-move/aptos-vm/src/keyless_validation.rs @alinush
 /aptos-move/aptos-vm-profiling/ @vgao1996
-/aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
+/aptos-move/aptos-vm-types/ @georgemitenkov @vgao1996
 /aptos-move/framework/ @aptos-labs/move
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
 /aptos-move/framework/aptos-framework/sources/jwks.move @zjma
@@ -25,7 +25,7 @@
 /aptos-move/framework/table-natives/ @aptos-labs/move
 /aptos-move/framework/src/natives/ @aptos-labs/move
 /aptos-move/framework/src/natives/cryptography/ @aptos-labs/move @alinush @zjma 
-/aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl @georgemitenkov
+/aptos-move/block-executor/ @zekun000 @sasha8 @danielxiangzl @georgemitenkov
 /aptos-move/sharded_block-executor/ @sitalkedia
 /aptos-move/mvhashmap/ @runtian-zhou @sasha8 @danielxiangzl
 
