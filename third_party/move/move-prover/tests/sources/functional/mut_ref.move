@@ -1,3 +1,4 @@
+// separate_baseline: path
 module 0x1::TestMutRef {
     use std::vector;
 

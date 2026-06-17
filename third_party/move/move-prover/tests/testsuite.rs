@@ -11,7 +11,10 @@ use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
 use move_model::metadata::LanguageVersion;
 use move_prover::{cli::Options, run_move_prover_v2};
-use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
+use move_prover_test_utils::{
+    baseline_test::{verify_baseline, verify_or_update_baseline},
+    extract_test_directives,
+};
 use once_cell::sync::OnceCell;
 use std::{
     collections::BTreeMap,
@@ -66,7 +69,8 @@ fn get_features() -> &'static [Feature] {
     static TESTED_FEATURES: OnceCell<Vec<Feature>> = OnceCell::new();
     TESTED_FEATURES.get_or_init(|| {
         vec![
-            // Tests the default configuration with the v2 compiler chain
+            // Tests the default configuration (path-free prophecy reference model) with
+            // the v2 compiler chain.
             Feature {
                 name: "default",
                 flags: &[],
@@ -86,6 +90,24 @@ fn get_features() -> &'static [Feature] {
                 only_if_requested: true, // Only run if requested
                 separate_baseline: false,
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
+                enabling_condition: |group, _| group == "unit",
+            },
+            // Cross-checks the legacy WriteBack (static) reference model against the
+            // default path-free prophecy model. Every unit test also runs under
+            // `--path-refs` and, by default, must produce the SAME `.exp` as the default
+            // (separate_baseline: false) — that shared baseline is the proof the two
+            // models agree. A test whose static output legitimately differs escapes the
+            // sharing with `// separate_baseline: path` (producing `foo.path_exp`); a test
+            // the default (prophecy) model cannot verify is excluded from the default with
+            // `// exclude_for: default`. Runs in CI.
+            Feature {
+                name: "path",
+                flags: &["--path-refs"],
+                inclusion_mode: InclusionMode::Implicit,
+                enable_in_ci: true,
+                only_if_requested: false,
+                separate_baseline: false, // shares foo.exp with `default`
+                runner: |p| test_runner_for_feature(p, get_feature_by_name("path")),
                 enabling_condition: |group, _| group == "unit",
             },
         ]
@@ -115,7 +137,8 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
 
     let temp_dir = TempDir::new()?;
     std::fs::create_dir_all(temp_dir.path())?;
-    let (mut args, baseline_path) = get_flags_and_baseline(temp_dir.path(), path, feature)?;
+    let (mut args, baseline_path, owns_baseline) =
+        get_flags_and_baseline(temp_dir.path(), path, feature)?;
 
     args.insert(0, "mvp_test".to_owned());
     args.push("--verbose=warn".to_owned());
@@ -162,7 +185,11 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
     if baseline_valid {
         diags += &String::from_utf8_lossy(&error_writer.into_inner());
         if let Some(ref path) = baseline_path {
-            verify_or_update_baseline(path.as_path(), &diags)?
+            if owns_baseline {
+                verify_or_update_baseline(path.as_path(), &diags)?
+            } else {
+                verify_baseline(path.as_path(), &diags)?
+            }
         } else if !diags.is_empty() {
             return Err(anyhow!(
                 "Unexpected prover output (expected none): {}",
@@ -179,7 +206,7 @@ fn get_flags_and_baseline(
     temp_dir: &Path,
     path: &Path,
     feature: &Feature,
-) -> anyhow::Result<(Vec<String>, Option<PathBuf>)> {
+) -> anyhow::Result<(Vec<String>, Option<PathBuf>, bool)> {
     // Determine the way how to configure tests based on directory of the path.
     let path_str = path.to_string_lossy();
 
@@ -191,13 +218,20 @@ fn get_flags_and_baseline(
         "--dependency=../extensions/move-table-extension/sources",
     ];
 
-    let (base_flags, baseline_path) =
+    let (base_flags, baseline_path, owns_baseline) =
         if path_str.contains("diem-framework/") || path_str.contains("move-stdlib/") {
-            (dep_flags, None)
+            (dep_flags, None, true)
         } else {
             let feature_name = feature.name.to_string();
             let separate_baseline = feature.separate_baseline
                 || extract_test_directives(path, "// separate_baseline: ")?.contains(&feature_name);
+            // A shared baseline is owned by the `default` feature; other features
+            // only verify against it, also under baseline updating, so divergence
+            // fails their trial instead of being masked by the last writer. If a
+            // test excludes `default`, the running feature owns the baseline.
+            let default_excluded =
+                extract_test_directives(path, "// exclude_for: ")?.contains(&"default".to_string());
+            let owns_baseline = separate_baseline || feature.name == "default" || default_excluded;
             (
                 dep_flags,
                 Some(path.with_extension(
@@ -207,6 +241,7 @@ fn get_flags_and_baseline(
                         EXP_EXT.to_string()
                     },
                 )),
+                owns_baseline,
             )
         };
     let mut flags = base_flags.iter().map(|s| (*s).to_string()).collect_vec();
@@ -233,7 +268,7 @@ fn get_flags_and_baseline(
     let base_name = format!("{}.bpl", path.file_stem().unwrap().to_str().unwrap());
     let output = temp_dir.join(base_name).to_str().unwrap().to_string();
     flags.push(format!("--output={}", output));
-    Ok((flags, baseline_path))
+    Ok((flags, baseline_path, owns_baseline))
 }
 
 /// Collects the enabled tests.

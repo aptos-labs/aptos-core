@@ -1,0 +1,40 @@
+Move prover returns: exiting with verification errors
+error: global memory invariant does not hold
+   ┌─ tests/sources/functional/update_inv_cond_borrow.move:11:9
+   │
+11 │ ╭         invariant update forall a: address where old(exists<T>(a)):
+12 │ │             global<T>(a).v >= old(global<T>(a).v);
+   │ ╰──────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/update_inv_cond_borrow.move:29: clear_one_of
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/update_inv_cond_borrow.move:30: clear_one_of
+   =     at tests/sources/functional/update_inv_cond_borrow.move:29: clear_one_of
+   =     at tests/sources/functional/update_inv_cond_borrow.move:30: clear_one_of
+   =         r = <redacted>
+   =     at tests/sources/functional/update_inv_cond_borrow.move:31: clear_one_of
+   =         r = <redacted>
+   =     at tests/sources/functional/update_inv_cond_borrow.move:11
+
+error: global memory invariant does not hold
+   ┌─ tests/sources/functional/update_inv_cond_borrow.move:11:9
+   │
+11 │ ╭         invariant update forall a: address where old(exists<T>(a)):
+12 │ │             global<T>(a).v >= old(global<T>(a).v);
+   │ ╰──────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/update_inv_cond_borrow.move:29: clear_one_of
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/update_inv_cond_borrow.move:30: clear_one_of
+   =     at tests/sources/functional/update_inv_cond_borrow.move:11
+   =     at tests/sources/functional/update_inv_cond_borrow.move:30: clear_one_of
+   =         r = <redacted>
+   =     at tests/sources/functional/update_inv_cond_borrow.move:31: clear_one_of
+   =         r = <redacted>
+   =     at tests/sources/functional/update_inv_cond_borrow.move:11
+   =     at tests/sources/functional/update_inv_cond_borrow.move:31: clear_one_of
+   =     at tests/sources/functional/update_inv_cond_borrow.move:11

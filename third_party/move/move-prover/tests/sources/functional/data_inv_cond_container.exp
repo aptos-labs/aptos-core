@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: data invariant on `data_inv_cond_container::R1` cannot be checked here: the struct is mutated through a conditional borrow of a global resource, which the prophecy reference model does not yet support. Use `--path-refs` or restructure the borrow
+   ┌─ tests/sources/functional/data_inv_cond_container.move:23:9
+   │
+23 │         r.x = 0; // error: rejected — invariant above the borrow fork
+   │         ^^^^^^^
+
+error: data invariant on `data_inv_cond_container::R2` cannot be checked here: the struct is mutated through a conditional borrow of a global resource, which the prophecy reference model does not yet support. Use `--path-refs` or restructure the borrow
+   ┌─ tests/sources/functional/data_inv_cond_container.move:23:9
+   │
+23 │         r.x = 0; // error: rejected — invariant above the borrow fork
+   │         ^^^^^^^

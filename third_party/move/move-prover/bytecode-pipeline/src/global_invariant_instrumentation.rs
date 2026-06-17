@@ -11,11 +11,11 @@ use crate::{
 };
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::Exp,
+    ast::{Exp, TempIndex},
     exp_generator::ExpGenerator,
     model::{FunctionEnv, GlobalId, Loc},
     spec_translator::{SpecTranslator, TranslatedSpec},
-    ty::Type,
+    ty::{Type, BOOL_TYPE},
 };
 use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
@@ -23,7 +23,7 @@ use move_stackless_bytecode::{
     function_target_pipeline::{
         FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
     },
-    stackless_bytecode::{Bytecode, Operation, PropKind},
+    stackless_bytecode::{BorrowNode, Bytecode, Constant, Operation, PropKind},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -173,9 +173,18 @@ impl<'env> Instrumenter<'env> {
         let xlated_entrypoint = self.translate_invariants(&pack.entrypoint_assumptions);
         let xlated_exitpoint = self.translate_invariants(&pack.exitpoint_assertions);
 
+        let prophecy_refs = !ProverOptions::get(self.builder.global_env()).path_refs;
         let mut xlated_inlined = BTreeMap::new();
         let mut xlated_for_opaque_begin = BTreeMap::new();
         let mut xlated_for_opaque_end = BTreeMap::new();
+        // Pre-state snapshots relocated from a state-transition instruction to the
+        // `BorrowGlobal` site(s) of the reference it commits: borrow offset -> the
+        // transition offsets whose snapshots are taken there. Multi-valued on both
+        // sides — one borrow may serve several transitions (the reference dies on
+        // several paths) and one transition may relocate to several borrow sites
+        // (the reference is borrowed on several paths or in a loop).
+        let mut relocated_saves_at: BTreeMap<CodeOffset, Vec<CodeOffset>> = BTreeMap::new();
+        let mut relocated_from: BTreeSet<CodeOffset> = BTreeSet::new();
         for (&code_offset, related_invs) in &pack.per_bytecode_assertions {
             let xlated = self.translate_invariants(related_invs);
             xlated_inlined.insert(code_offset, xlated);
@@ -197,6 +206,57 @@ impl<'env> Instrumenter<'env> {
                     }
                 }
             }
+
+            // Under the prophecy model a global resource is mutated eagerly at its
+            // `BorrowGlobal`, while the state transition is marked later — at
+            // `ProphecyCommitGlobal` for ordinary borrows, at `WriteBack(GlobalRoot)`
+            // for ghost updates. A snapshot left at the transition would observe the
+            // installed prophecy, so it is relocated to every `BorrowGlobal` defining
+            // the committed reference (a looped site re-snapshots, keeping `old` at
+            // the reaching borrow).
+            let committed_ref = match old_code.get(code_offset as usize).unwrap() {
+                Bytecode::Call(_, _, Operation::ProphecyCommitGlobal(_), srcs, _) => {
+                    srcs.first().copied()
+                },
+                Bytecode::Call(
+                    _,
+                    _,
+                    Operation::WriteBack(BorrowNode::GlobalRoot(_), _),
+                    srcs,
+                    _,
+                ) if prophecy_refs => srcs.first().copied(),
+                _ => None,
+            };
+            if let Some(child) = committed_ref {
+                let xlated = xlated_inlined.get(&code_offset).unwrap();
+                if !xlated.saved_memory.is_empty() || !xlated.saved_spec_vars.is_empty() {
+                    let mut found = false;
+                    for (needle, bc) in old_code.iter().enumerate() {
+                        if let Bytecode::Call(_, dests, Operation::BorrowGlobal(..), _, _) = bc {
+                            if dests.first() == Some(&child) {
+                                relocated_saves_at
+                                    .entry(needle as CodeOffset)
+                                    .or_default()
+                                    .push(code_offset);
+                                found = true;
+                            }
+                        }
+                    }
+                    if found {
+                        relocated_from.insert(code_offset);
+                    }
+                }
+            }
+        }
+        // A relocated transition's snapshots run only on paths through its borrow
+        // site(s), but its assertion sits at a death point other paths may reach
+        // (e.g. a reference borrowed from either of two resources, dying at the
+        // merge). Guard it with a flag set exactly at those sites: elsewhere the
+        // assertion is vacuous, and the transition that did occur is asserted by its
+        // own marker.
+        let mut transition_flags: BTreeMap<CodeOffset, TempIndex> = BTreeMap::new();
+        for &transition in &relocated_from {
+            transition_flags.insert(transition, self.builder.new_temp(BOOL_TYPE.clone()));
         }
 
         // Step 1: emit entrypoint assumptions
@@ -205,6 +265,13 @@ impl<'env> Instrumenter<'env> {
         // Step 2: emit entrypoint snapshots. This can happen if this function defers invariant
         // checking to the return point and one of the suspended invariant is an update invariant.
         self.emit_state_saves_for_update_invs(&xlated_exitpoint);
+
+        // Initialize the relocated-transition flags: not taken until a borrow site runs.
+        for flag in transition_flags.values() {
+            let flag = *flag;
+            self.builder
+                .emit_with(|id| Bytecode::Load(id, flag, Constant::Bool(false)));
+        }
 
         // Step 3: go over the bytecode and instrument assertions.
         //         For update invariants, instrument state snapshots before the bytecode.
@@ -218,10 +285,22 @@ impl<'env> Instrumenter<'env> {
             {
                 self.emit_state_saves_for_update_invs(xlated);
             }
+            if let Some(transitions) = relocated_saves_at.get(&code_offset) {
+                for transition in transitions {
+                    self.emit_state_saves_for_update_invs(xlated_inlined.get(transition).unwrap());
+                    let flag = transition_flags[transition];
+                    self.builder
+                        .emit_with(|id| Bytecode::Load(id, flag, Constant::Bool(true)));
+                }
+            }
 
             if let Some(xlated) = xlated_inlined.get(&code_offset) {
-                // skip pre-instrumentation for OpaqueCallEnd, already got them on OpaqueCallBegin
-                if !xlated_for_opaque_end.contains_key(&code_offset) {
+                // skip pre-instrumentation when the snapshots were already emitted
+                // elsewhere: at the OpaqueCallBegin for an OpaqueCallEnd, or at the
+                // BorrowGlobal site(s) for a prophecy state transition
+                if !xlated_for_opaque_end.contains_key(&code_offset)
+                    && !relocated_from.contains(&code_offset)
+                {
                     self.emit_state_saves_for_update_invs(xlated);
                 }
             }
@@ -236,7 +315,14 @@ impl<'env> Instrumenter<'env> {
 
             // post-instrumentation for assertions
             if let Some(xlated) = xlated_inlined.get(&code_offset) {
-                self.assert_or_assume_translated_invariants(xlated, PropKind::Assert);
+                match transition_flags.get(&code_offset) {
+                    Some(flag) => {
+                        self.assert_translated_invariants_guarded_by(xlated, *flag);
+                    },
+                    None => {
+                        self.assert_or_assume_translated_invariants(xlated, PropKind::Assert);
+                    },
+                }
             }
         }
 
@@ -275,6 +361,22 @@ impl<'env> Instrumenter<'env> {
     ) {
         for (loc, _, cond) in &xlated.invariants {
             self.emit_invariant(loc.clone(), cond.clone(), prop_kind);
+        }
+    }
+
+    /// Assert the invariants of a relocated state transition, guarded by its
+    /// path flag: vacuous on paths that never executed the transition's borrow
+    /// (whose own transition is asserted by its own marker).
+    fn assert_translated_invariants_guarded_by(
+        &mut self,
+        xlated: &TranslatedSpec,
+        flag: TempIndex,
+    ) {
+        for (loc, _, cond) in &xlated.invariants {
+            let guarded = self
+                .builder
+                .mk_implies(self.builder.mk_temporary(flag), cond.clone());
+            self.emit_invariant(loc.clone(), guarded, PropKind::Assert);
         }
     }
 

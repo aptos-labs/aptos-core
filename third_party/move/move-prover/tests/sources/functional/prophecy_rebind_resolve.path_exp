@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/prophecy_rebind_resolve.move:26:13
+   │
+26 │             assert s.a == s.b; // error: intended failure guards against vacuity
+   │             ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:18: rebind_local
+   =         s = <redacted>
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:19: rebind_local
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:20: rebind_local
+   =         r = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:21: rebind_local
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:22: rebind_local
+   =         r = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:24: rebind_local
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:25: rebind_local
+   =     at tests/sources/functional/prophecy_rebind_resolve.move:26: rebind_local

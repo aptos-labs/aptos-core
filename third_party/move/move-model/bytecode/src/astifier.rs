@@ -1214,6 +1214,13 @@ impl Generator {
             | OpaqueCallEnd(_, _, _)
             | IsParent(_, _)
             | WriteBack(_, _)
+            | ProphecyBorrow(_, _)
+            | ProphecyCommitGlobal(_)
+            | ProphecyRepin(_)
+            | ProphecySyncCurrent(_, _)
+            | ProphecySyncFinal(_, _)
+            | Resolve
+            | ResolveReturn
             | UnpackRef
             | PackRef
             | UnpackRefDeep

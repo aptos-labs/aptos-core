@@ -20,4 +20,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at tests/sources/functional/modifies_fun_call.move:7: mutate
    =         d = <redacted>
    =     at tests/sources/functional/modifies_fun_call.move:8: mutate
+   =         d = <redacted>
+   =     at tests/sources/functional/modifies_fun_call.move:8: mutate
    =         ABORTED

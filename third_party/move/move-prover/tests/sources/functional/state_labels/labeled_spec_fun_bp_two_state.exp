@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:58:9
+   │
+58 │         ensures S1.. |~ incremented(addr); // error: two increments from S1 to exit
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:44: three_increments
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:45: three_increments
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:46: three_increments
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:47: three_increments
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:48: three_increments
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:57: three_increments (spec)
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_two_state.move:58: three_increments (spec)

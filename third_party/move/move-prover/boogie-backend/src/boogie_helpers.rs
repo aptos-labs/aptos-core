@@ -30,7 +30,10 @@ use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecod
 use num::BigUint;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::BTreeSet;
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+};
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const MAX_TUPLE_SIZE: usize = 8;
@@ -1444,11 +1447,28 @@ pub fn boogie_behavioral_fun_result_name(
     format!("$bp_ensures_of_result{}'{}'", plural, fun_name)
 }
 
+/// Memoization of `compute_evaluator_memory_union`, keyed by the Boogie-rendered
+/// function type name (the same key the union is computed under). Mono info is
+/// immutable once the backend runs, so entries never invalidate.
+#[derive(Default)]
+struct EvaluatorMemoryUnionCache(
+    RefCell<
+        BTreeMap<
+            String,
+            (
+                BTreeSet<QualifiedInstId<StructId>>,
+                BTreeSet<QualifiedInstId<StructId>>,
+            ),
+        >,
+    >,
+);
+
 /// Compute the union of (used_memory, old_memory) for all closure/param/field
 /// variants matching the given function type in MonoInfo.
 /// This is used by the Boogie code generator for emitting memory arguments in
 /// behavioral predicate evaluators and by the label analysis for discovering
-/// which (label, memory) pairs need Boogie variable declarations.
+/// which (label, memory) pairs need Boogie variable declarations. Called per
+/// behavioral-predicate occurrence, so results are cached per function type.
 pub fn compute_evaluator_memory_union(
     env: &GlobalEnv,
     fun_type: &Type,
@@ -1458,8 +1478,14 @@ pub fn compute_evaluator_memory_union(
 ) {
     use move_prover_bytecode_pipeline::mono_analysis;
 
-    let mono_info = mono_analysis::get_info(env);
     let boogie_name = boogie_type(env, fun_type, false);
+    if let Some(cache) = env.get_extension::<EvaluatorMemoryUnionCache>() {
+        if let Some(hit) = cache.0.borrow().get(&boogie_name) {
+            return hit.clone();
+        }
+    }
+
+    let mono_info = mono_analysis::get_info(env);
 
     let mut union_used_memory = BTreeSet::new();
     let mut union_old_memory = BTreeSet::new();
@@ -1526,5 +1552,14 @@ pub fn compute_evaluator_memory_union(
         }
     }
 
+    if env.get_extension::<EvaluatorMemoryUnionCache>().is_none() {
+        env.set_extension(EvaluatorMemoryUnionCache::default());
+    }
+    if let Some(cache) = env.get_extension::<EvaluatorMemoryUnionCache>() {
+        cache.0.borrow_mut().insert(
+            boogie_name,
+            (union_used_memory.clone(), union_old_memory.clone()),
+        );
+    }
     (union_used_memory, union_old_memory)
 }

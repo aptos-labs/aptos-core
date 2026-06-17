@@ -1532,6 +1532,12 @@ impl ExpData {
     }
 
     /// Returns the used memory of this expression.
+    ///
+    /// `Operation::Behavior` is intentionally not descended into: a behavioral
+    /// predicate's memory is folded into the enclosing spec function's or
+    /// function spec's memory by the spec rewriter's combined fixpoint (see
+    /// `spec_rewriter::compute_transitive_spec_memory`), and some consumers
+    /// (e.g. data invariant checking) rely on it being excluded here.
     pub fn used_memory(
         &self,
         env: &GlobalEnv,
@@ -1565,6 +1571,9 @@ impl ExpData {
     }
 
     /// Returns the directly used memory of this expression, without label.
+    ///
+    /// `Operation::Behavior` is intentionally not descended into; see
+    /// `used_memory` above.
     pub fn directly_used_memory(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<StructId>> {
         let mut result = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
