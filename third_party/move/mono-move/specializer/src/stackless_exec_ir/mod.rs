@@ -271,13 +271,13 @@ pub enum Instr {
     CallClosure(Vec<Slot>, InternedTypeList, Vec<Slot>),
 
     // --- Vector (second field is the vector's element type) ---
-    VecPack(Slot, InternedType, u16, Vec<Slot>),
+    VecPack(Slot, InternedType, Vec<Slot>),
     VecLen(Slot, InternedType, Slot),
     VecImmBorrow(Slot, InternedType, Slot, Slot),
     VecMutBorrow(Slot, InternedType, Slot, Slot),
     VecPushBack(InternedType, Slot, Slot),
     VecPopBack(Slot, InternedType, Slot),
-    VecUnpack(Vec<Slot>, InternedType, u16, Slot),
+    VecUnpack(Vec<Slot>, InternedType, Slot),
     VecSwap(InternedType, Slot, Slot, Slot),
 
     // --- Control flow ---

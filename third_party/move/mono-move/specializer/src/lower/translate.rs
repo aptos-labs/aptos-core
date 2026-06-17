@@ -23,10 +23,10 @@ use anyhow::{anyhow, bail, Context, Result};
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp,
-    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp,
-    JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, ValueCmpOp,
-    ValueRefCmpOp, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, DescriptorId, FrameLayoutInfo, FrameOffset,
+    IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp,
+    JumpValueCmpOp, JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand,
+    SizedSlot, ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, VariantFieldHandleIndex,
@@ -399,6 +399,18 @@ impl<'a> LoweringState<'a> {
             })?;
         }
         Ok(())
+    }
+
+    /// `DescriptorId` published for `vec_ty`, with the shared diagnostic of
+    /// the allocating vector ops. `op_name` prefixes the error message.
+    fn vector_descriptor_id(&self, op_name: &str, vec_ty: InternedType) -> Result<DescriptorId> {
+        self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
+            anyhow!(
+                "{}: no descriptor published for this vector type \
+                 (its element type may be generic or have unresolved layout)",
+                op_name
+            )
+        })
     }
 
     /// Interned-type corresponding to `slot`.
@@ -1317,24 +1329,61 @@ impl<'a> LoweringState<'a> {
                     elem_size,
                 })?;
             },
-            Instr::VecPack(dst, _elem_ty, _count, elems) => {
-                if !elems.is_empty() {
-                    bail!("VecPack with elements not yet lowered");
+            Instr::VecPack(dst, elem_ty, elems) => {
+                let dst_typed = self.def_typed_slot(*dst)?;
+                // Empty literal keeps the fast path: null pointer is the empty
+                // vector — no allocation, no descriptor needed.
+                if elems.is_empty() {
+                    self.emit(MicroOp::VecNew {
+                        dst: dst_typed.slot.offset,
+                    })?;
+                } else {
+                    let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                    let descriptor_id = self.vector_descriptor_id("VecPack", dst_typed.ty)?;
+                    let srcs = elems
+                        .iter()
+                        .map(|elem| Ok(self.slot(*elem)?.offset))
+                        .collect::<Result<Vec<_>>>()?;
+                    self.emit(MicroOp::VecPack(Box::new(VecPackOp {
+                        dst: dst_typed.slot.offset,
+                        descriptor_id,
+                        elem_size,
+                        srcs,
+                    })))?;
                 }
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::VecNew {
-                    dst: dst_info.offset,
+            },
+            Instr::VecUnpack(dsts, elem_ty, src) => {
+                // TODO: the Move compiler only emits `VecUnpack` with count 0,
+                // but handwritten bytecode may use it with any count. If we
+                // restrict to count 0, we can apply simplifications.
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let src_info = self.slot(*src)?;
+                let dst_offsets = dsts
+                    .iter()
+                    .map(|dst| Ok(self.def_slot(*dst)?.offset))
+                    .collect::<Result<Vec<_>>>()?;
+                self.emit(MicroOp::VecUnpack(Box::new(VecUnpackOp {
+                    src: src_info.offset,
+                    elem_size,
+                    dsts: dst_offsets,
+                })))?;
+            },
+            Instr::VecSwap(elem_ty, vec_ref, idx_a, idx_b) => {
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let idx_a_info = self.slot(*idx_a)?;
+                let idx_b_info = self.slot(*idx_b)?;
+                self.emit(MicroOp::VecSwap {
+                    vec_ref: vec_ref_info.offset,
+                    idx_a: idx_a_info.offset,
+                    idx_b: idx_b_info.offset,
+                    elem_size,
                 })?;
             },
             Instr::VecPushBack(elem_ty, vec_ref, val) => {
                 let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
-                let descriptor_id = self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "VecPushBack: no descriptor published for this vector type \
-                         (its element type may be generic or have unresolved layout)"
-                    )
-                })?;
+                let descriptor_id = self.vector_descriptor_id("VecPushBack", vec_ty)?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let val_info = self.slot(*val)?;
                 self.emit(MicroOp::VecPushBack {

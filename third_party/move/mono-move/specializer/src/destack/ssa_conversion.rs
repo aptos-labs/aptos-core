@@ -908,13 +908,14 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 
             // --- Vector ops ---
             B::VecPack(sig_idx, count) => {
+                // The bytecode verifier bounds the count to u16::MAX, so this cast is lossless.
                 let count = *count as u16;
                 let elems = self.pop_n_reverse(count as usize)?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
                 let ty = self.interner.vector_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::VecPack(dst, elem_ty, count, elems));
+                    .push(Instr::VecPack(dst, elem_ty, elems));
                 self.push_slot(dst);
             },
             B::VecLen(sig_idx) => {
@@ -961,6 +962,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 self.push_slot(dst);
             },
             B::VecUnpack(sig_idx, count) => {
+                // The bytecode verifier bounds the count to u16::MAX, so this cast is lossless.
                 let count = *count as u16;
                 let src = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
@@ -969,7 +971,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     dsts.push(self.alloc_vid(elem_ty)?);
                 }
                 self.current_block_instrs
-                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, count, src));
+                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, src));
                 for dst in dsts {
                     self.push_slot(dst);
                 }
