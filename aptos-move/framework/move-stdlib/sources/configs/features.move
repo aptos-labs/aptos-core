@@ -889,6 +889,51 @@ module std::features {
     /// Lifetime: permanent
     const TRANSACTION_INFO_V1: u64 = 117;
 
+    /// Umbrella auth flag for the native-trading subsystem; the per-store
+    /// flags below gate the actual writes. Both must be on to write.
+    const TRADING_NATIVE: u64 = 118;
+
+    public fun get_trading_native_feature(): u64 {
+        TRADING_NATIVE
+    }
+
+    public fun is_trading_native_enabled(): bool {
+        is_enabled(TRADING_NATIVE)
+    }
+
+    /// Gates native-position writes.
+    const NATIVE_POSITION: u64 = 119;
+
+    public fun get_native_position_feature(): u64 {
+        NATIVE_POSITION
+    }
+
+    public fun is_native_position_enabled(): bool {
+        is_enabled(NATIVE_POSITION)
+    }
+
+    /// Gates native-orderbook writes.
+    const NATIVE_ORDERBOOK: u64 = 120;
+
+    public fun get_native_orderbook_feature(): u64 {
+        NATIVE_ORDERBOOK
+    }
+
+    public fun is_native_orderbook_enabled(): bool {
+        is_enabled(NATIVE_ORDERBOOK)
+    }
+
+    /// Gates native-collateral writes.
+    const NATIVE_COLLATERAL: u64 = 121;
+
+    public fun get_native_collateral_feature(): u64 {
+        NATIVE_COLLATERAL
+    }
+
+    public fun is_native_collateral_enabled(): bool {
+        is_enabled(NATIVE_COLLATERAL)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -1,0 +1,8 @@
+Move prover returns: exiting with compilation errors
+error: local `c` is mutated through one argument of this call and referenced or captured through another
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_value_capture_conflict.move:24:9
+   │
+24 │         run(|y| y + c, &mut c, 0)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda

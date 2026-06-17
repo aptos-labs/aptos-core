@@ -168,6 +168,10 @@ pub enum FeatureFlag {
     AllowFriendEntryVisibilityDowngrade,
     HotnessInEpilogue,
     TransactionInfoV1,
+    TradingNative,
+    NativePosition,
+    NativeOrderbook,
+    NativeCollateral,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -439,6 +443,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::HotnessInEpilogue => AptosFeatureFlag::HOTNESS_IN_EPILOGUE,
             FeatureFlag::TransactionInfoV1 => AptosFeatureFlag::TRANSACTION_INFO_V1,
+            FeatureFlag::TradingNative => AptosFeatureFlag::TRADING_NATIVE,
+            FeatureFlag::NativePosition => AptosFeatureFlag::NATIVE_POSITION,
+            FeatureFlag::NativeOrderbook => AptosFeatureFlag::NATIVE_ORDERBOOK,
+            FeatureFlag::NativeCollateral => AptosFeatureFlag::NATIVE_COLLATERAL,
         }
     }
 }
@@ -637,6 +645,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::HOTNESS_IN_EPILOGUE => FeatureFlag::HotnessInEpilogue,
             AptosFeatureFlag::TRANSACTION_INFO_V1 => FeatureFlag::TransactionInfoV1,
+            AptosFeatureFlag::TRADING_NATIVE => FeatureFlag::TradingNative,
+            AptosFeatureFlag::NATIVE_POSITION => FeatureFlag::NativePosition,
+            AptosFeatureFlag::NATIVE_ORDERBOOK => FeatureFlag::NativeOrderbook,
+            AptosFeatureFlag::NATIVE_COLLATERAL => FeatureFlag::NativeCollateral,
         }
     }
 }

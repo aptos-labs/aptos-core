@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: captured value cannot be a reference, but has type `&u64`; in verification, lambdas may capture only immutable references, and only as direct arguments of calls to inline functions with `pragma opaque`
+   ┌─ tests/sources/functional/closures/inline/ref_capture_restriction.move:16:32
+   │
+16 │         regular_apply(|y| y + *r, x) // error: captured value cannot be a reference
+   │                                ^
+
+error: captured value cannot be a reference, but has type `&u64`; in verification, lambdas may capture only immutable references, and only as direct arguments of calls to inline functions with `pragma opaque`
+   ┌─ tests/sources/functional/closures/inline/ref_capture_restriction.move:26:37
+   │
+26 │         let _w = Wrap { f: |y| y + *r }; // error: captured value cannot be a reference
+   │                                     ^
