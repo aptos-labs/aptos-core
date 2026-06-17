@@ -4,7 +4,7 @@
 use crate::{
     requests::{
         DataRequest::{
-            GetEpochEndingLedgerInfos, GetNewTransactionDataWithProof,
+            GetEpochEndingLedgerInfos, GetHotStateValuesWithProof, GetNewTransactionDataWithProof,
             GetNewTransactionOutputsWithProof, GetNewTransactionsOrOutputsWithProof,
             GetNewTransactionsWithProof, GetNumberOfStatesAtVersion, GetServerProtocolVersion,
             GetStateValuesWithProof, GetStorageServerSummary, GetTransactionDataWithProof,
@@ -26,7 +26,7 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{
         TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, Version,
@@ -148,6 +148,7 @@ pub enum DataResponse {
     NumberOfStatesAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
     StateValueChunkWithProof(StateValueChunkWithProof),
+    HotStateValueChunkWithProof(HotStateValueChunkWithProof),
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
@@ -193,6 +194,9 @@ impl DataResponse {
             Self::NumberOfStatesAtVersion(_) => Self::get_number_of_states_at_version_label(),
             Self::ServerProtocolVersion(_) => Self::get_server_protocol_version_label(),
             Self::StateValueChunkWithProof(_) => Self::get_state_value_chunk_with_proof_label(),
+            Self::HotStateValueChunkWithProof(_) => {
+                Self::get_hot_state_value_chunk_with_proof_label()
+            },
             Self::StorageServerSummary(_) => Self::get_storage_server_summary_label(),
             Self::TransactionOutputsWithProof(_) => {
                 Self::get_transaction_outputs_with_proof_label()
@@ -257,6 +261,11 @@ impl DataResponse {
     /// Returns a label for the state value chunk with proof response
     pub fn get_state_value_chunk_with_proof_label() -> &'static str {
         "state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the hot state value chunk with proof response
+    pub fn get_hot_state_value_chunk_with_proof_label() -> &'static str {
+        "hot_state_value_chunk_with_proof"
     }
 
     /// Returns a label for the storage server summary response
@@ -332,6 +341,21 @@ impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
             DataResponse::StateValueChunkWithProof(inner) => Ok(inner),
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected state_value_chunk_with_proof, found {}",
+                data_response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for HotStateValueChunkWithProof {
+    type Error = crate::responses::Error;
+
+    fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::HotStateValueChunkWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
+                "expected hot_state_value_chunk_with_proof, found {}",
                 data_response.get_label()
             ))),
         }
@@ -725,20 +749,12 @@ impl DataSummary {
                 .map(|range| range.contains(*version))
                 .unwrap_or(false),
             GetStateValuesWithProof(request) => {
-                let proof_version = request.version;
-
-                let can_serve_states = self
-                    .states
-                    .map(|range| range.contains(request.version))
-                    .unwrap_or(false);
-
-                let can_create_proof = self
-                    .synced_ledger_info
-                    .as_ref()
-                    .map(|li| li.ledger_info().version() >= proof_version)
-                    .unwrap_or(false);
-
-                can_serve_states && can_create_proof
+                self.can_service_state_values_with_proof(request.version)
+            },
+            GetHotStateValuesWithProof(request) => {
+                // Hot state snapshots are persisted at the same checkpoints as cold state, so the
+                // same `states` range and proof version govern serviceability.
+                self.can_service_state_values_with_proof(request.version)
             },
             GetTransactionOutputsWithProof(request) => self
                 .can_service_transaction_outputs_with_proof(
@@ -813,6 +829,15 @@ impl DataSummary {
             .as_ref()
             .map(|li| li.ledger_info().version() >= proof_version)
             .unwrap_or(false)
+    }
+
+    /// Returns true iff the peer can serve the state values at `version` and prove them
+    fn can_service_state_values_with_proof(&self, version: u64) -> bool {
+        let can_serve_states = self
+            .states
+            .map(|range| range.contains(version))
+            .unwrap_or(false);
+        can_serve_states && self.can_create_proof(version)
     }
 
     /// Returns true iff the peer can service the transaction outputs in the given range
