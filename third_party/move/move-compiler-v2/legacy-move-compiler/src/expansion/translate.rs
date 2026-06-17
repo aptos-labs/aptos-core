@@ -1399,9 +1399,12 @@ fn invalid_variant_access(context: &mut Context, loc: Loc) {
 
 fn access_specifier(context: &mut Context, specifier: P::AccessSpecifier) -> E::AccessSpecifier {
     let (kind, chain, type_args, address) = match specifier.value {
-        AccessSpecifier_::Acquires(chain, type_args, address) => {
-            (AccessSpecifierKind::LegacyAcquires, chain, type_args, address)
-        },
+        AccessSpecifier_::Acquires(chain, type_args, address) => (
+            AccessSpecifierKind::LegacyAcquires,
+            chain,
+            type_args,
+            address,
+        ),
     };
     let (module_address, module_name, resource_name) =
         access_specifier_name_access_chain(context, chain);

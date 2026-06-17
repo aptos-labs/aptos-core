@@ -13,7 +13,6 @@ module aptos_framework::code {
     use std::string;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
-    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::object_code_deployment;
 
@@ -108,22 +107,19 @@ module aptos_framework::code {
     /// `code_object` does not exist.
     const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 0xA;
 
-    /// Current permissioned signer cannot publish codes.
+    /// Deprecated. Code publishing permission (permissioned signer) was never enabled.
     const ENO_CODE_PERMISSION: u64 = 0xB;
 
+    #[deprecated]
     struct CodePublishingPermission has copy, drop, store {}
 
     /// Permissions
-    public(friend) fun check_code_publishing_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, CodePublishingPermission {}),
-            error::permission_denied(ENO_CODE_PERMISSION),
-        );
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer can publish code.
+    public(friend) fun check_code_publishing_permission(_s: &signer) {}
 
-    /// Grant permission to publish code on behalf of the master signer.
-    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, CodePublishingPermission {})
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_CODE_PERMISSION)
     }
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This

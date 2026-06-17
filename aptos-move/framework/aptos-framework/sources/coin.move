@@ -11,7 +11,6 @@ module aptos_framework::coin {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
-    use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
 
     use aptos_framework::fungible_asset::{
@@ -692,18 +691,8 @@ module aptos_framework::coin {
         };
     }
 
-    inline fun assert_signer_has_permission<CoinType>(account: &signer) {
-        if (permissioned_signer::is_permissioned_signer(account)) {
-            fungible_asset::withdraw_permission_check_by_address(
-                account,
-                primary_fungible_store::primary_store_address(
-                    signer::address_of(account),
-                    ensure_paired_metadata<CoinType>()
-                ),
-                0
-            );
-        }
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer has permission.
+    inline fun assert_signer_has_permission<CoinType>(_account: &signer) {}
 
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
     public entry fun migrate_to_fungible_store<CoinType>(
@@ -898,15 +887,7 @@ module aptos_framework::coin {
     public fun deposit_with_signer<CoinType>(
         account: &signer, coin: Coin<CoinType>
     ) acquires CoinConversionMap, CoinInfo {
-        let metadata = ensure_paired_metadata<CoinType>();
         let account_address = signer::address_of(account);
-        fungible_asset::refill_permission(
-            account,
-            coin.value,
-            primary_fungible_store::primary_store_address_inlined(
-                account_address, metadata
-            )
-        );
         deposit(account_address, coin);
     }
 
@@ -994,7 +975,7 @@ module aptos_framework::coin {
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         initialize_internal(
             account,
             name,
@@ -1012,7 +993,7 @@ module aptos_framework::coin {
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         system_addresses::assert_aptos_framework(account);
         initialize_internal(
             account,
@@ -1031,7 +1012,7 @@ module aptos_framework::coin {
         decimals: u8,
         monitor_supply: bool,
         parallelizable: bool
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
 
@@ -1103,7 +1084,7 @@ module aptos_framework::coin {
         mint_internal<CoinType>(amount)
     }
 
-    public fun register<CoinType>(account: &signer) acquires CoinInfo, CoinConversionMap {
+    public fun register<CoinType>(account: &signer) {
         let account_addr = signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
         // Short-circuit and do nothing if account is already registered for CoinType.
@@ -1961,256 +1942,4 @@ module aptos_framework::coin {
     /// The flag the existence of which indicates the primary fungible store is created by the migration from CoinStore.
     struct MigrationFlag has key {}
 
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50024, location = aptos_framework::fungible_asset)]
-    fun test_withdraw_with_permissioned_signer_no_migration(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) = initialize_fake_money(account, 1, true);
-        create_coin_conversion_map(account);
-
-        let coin = mint<FakeMoney>(100, &mint_cap);
-        deposit(account_addr, coin);
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-
-        // Withdraw from permissioned signer with no migration rules set
-        //
-        // Aborted with error.
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 10);
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-
-        burn(coin_2, &burn_cap);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50024, location = aptos_framework::fungible_asset)]
-    fun test_withdraw_with_permissioned_signer(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) = initialize_fake_money(account, 1, true);
-        create_coin_conversion_map(account);
-
-        let coin = mint<FakeMoney>(100, &mint_cap);
-        deposit(account_addr, coin);
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-
-        // Withdraw from permissioned signer with no migration rules set
-        //
-        // Aborted with error.
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 10);
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-
-        burn(coin_2, &burn_cap);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50024, location = aptos_framework::fungible_asset)]
-    fun test_withdraw_with_permissioned_signer_no_capacity(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) =
-            initialize_and_register_fake_money(account, 1, true);
-        ensure_paired_metadata<FakeMoney>();
-
-        let coin = mint<FakeMoney>(100, &mint_cap);
-        deposit(account_addr, coin);
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-
-        // Withdraw from permissioned signer with no permissions granted.
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 10);
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-
-        burn(coin_2, &burn_cap);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
-
-    #[test(account = @aptos_framework)]
-    fun test_e2e_withdraw_with_permissioned_signer_and_migration(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, CoinStore, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) =
-            initialize_and_register_fake_money(account, 1, true);
-        let metadata = ensure_paired_metadata<FakeMoney>();
-
-        let coin = mint<FakeMoney>(100, &mint_cap);
-        deposit(account_addr, coin);
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 10
-        );
-
-        // Withdraw from permissioned signer with proper permissions.
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 10);
-        burn(coin_2, &burn_cap);
-
-        // Withdraw with some funds from CoinStore and some from PFS.
-        primary_fungible_store::deposit(
-            account_addr,
-            coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap))
-        );
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 100
-        );
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 100);
-        burn(coin_2, &burn_cap);
-
-        // Withdraw funds from PFS only.
-        assert!(coin_balance<FakeMoney>(account_addr) == 0, 1);
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 10
-        );
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 10);
-        burn(coin_2, &burn_cap);
-
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50024, location = aptos_framework::fungible_asset)]
-    fun test_e2e_withdraw_with_permissioned_signer_no_permission_1(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) =
-            initialize_and_register_fake_money(account, 1, true);
-        let metadata = ensure_paired_metadata<FakeMoney>();
-
-        let coin = mint<FakeMoney>(100, &mint_cap);
-        deposit(account_addr, coin);
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 10
-        );
-
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 20);
-        burn(coin_2, &burn_cap);
-
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50024, location = aptos_framework::fungible_asset)]
-    fun test_e2e_withdraw_with_permissioned_signer_no_permission_2(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) =
-            initialize_and_register_fake_money(account, 1, true);
-        let metadata = ensure_paired_metadata<FakeMoney>();
-
-        let coin = mint<FakeMoney>(100, &mint_cap);
-        deposit(account_addr, coin);
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 10
-        );
-
-        // Withdraw from permissioned signer with proper permissions.
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 10);
-        burn(coin_2, &burn_cap);
-
-        // Withdraw with some funds from CoinStore and some from PFS.
-        primary_fungible_store::deposit(
-            account_addr,
-            coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap))
-        );
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 90
-        );
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 100);
-        burn(coin_2, &burn_cap);
-
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50024, location = aptos_framework::fungible_asset)]
-    fun test_e2e_withdraw_with_permissioned_signer_no_permission_3(
-        account: &signer
-    ) acquires CoinConversionMap, CoinInfo, PairedCoinType {
-        account::create_account_for_test(signer::address_of(account));
-        let account_addr = signer::address_of(account);
-        let (burn_cap, freeze_cap, mint_cap) =
-            initialize_and_register_fake_money(account, 1, true);
-        let metadata = ensure_paired_metadata<FakeMoney>();
-
-        let permissioned_handle =
-            permissioned_signer::create_permissioned_handle(account);
-        let permissioned_signer =
-            permissioned_signer::signer_from_permissioned_handle(&permissioned_handle);
-
-        // Withdraw with some funds from PFS only.
-        primary_fungible_store::deposit(
-            account_addr,
-            coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap))
-        );
-        primary_fungible_store::grant_permission(
-            account, &permissioned_signer, metadata, 90
-        );
-        let coin_2 = withdraw<FakeMoney>(&permissioned_signer, 100);
-        burn(coin_2, &burn_cap);
-
-        permissioned_signer::destroy_permissioned_handle(permissioned_handle);
-        move_to(
-            account,
-            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
-        );
-    }
 }

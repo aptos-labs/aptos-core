@@ -10,7 +10,6 @@ module aptos_framework::account {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
-    use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
@@ -221,7 +220,7 @@ module aptos_framework::account {
     const ENEW_AUTH_KEY_ALREADY_MAPPED: u64 = 21;
     /// The current authentication key and the new authentication key are the same
     const ENEW_AUTH_KEY_SAME_AS_CURRENT: u64 = 22;
-    /// Current permissioned signer cannot perform the privilaged operations.
+    /// Deprecated. Account permission (permissioned signer) was never enabled.
     const ENO_ACCOUNT_PERMISSION: u64 = 23;
     /// Specified scheme is not recognized. Should be ED25519_SCHEME(0), MULTI_ED25519_SCHEME(1), SINGLE_KEY_SCHEME(2), or MULTI_KEY_SCHEME(3).
     const EUNRECOGNIZED_SCHEME: u64 = 24;
@@ -247,6 +246,7 @@ module aptos_framework::account {
     /// Create signer for testing, independently of an Aptos-style `Account`.
     public fun create_signer_for_test(addr: address): signer { create_signer(addr) }
 
+    #[deprecated]
     enum AccountPermission has copy, drop, store {
         /// Permission to rotate a key.
         KeyRotation,
@@ -255,33 +255,20 @@ module aptos_framework::account {
     }
 
     /// Permissions
-    ///
-    inline fun check_rotation_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, AccountPermission::KeyRotation {}),
-            error::permission_denied(ENO_ACCOUNT_PERMISSION),
-        );
+    /// Deprecated. Permissioned signers were never enabled, so every signer has this permission.
+    inline fun check_rotation_permission(_s: &signer) {}
+
+    /// Deprecated. Permissioned signers were never enabled, so every signer has this permission.
+    inline fun check_offering_permission(_s: &signer) {}
+
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_key_rotation_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_ACCOUNT_PERMISSION)
     }
 
-    inline fun check_offering_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, AccountPermission::Offering {}),
-            error::permission_denied(ENO_ACCOUNT_PERMISSION),
-        );
-    }
-
-    /// Grant permission to perform key rotations on behalf of the master signer.
-    ///
-    /// This is **extremely dangerous** and should be granted only when it's absolutely needed.
-    public fun grant_key_rotation_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, AccountPermission::KeyRotation {})
-    }
-
-    /// Grant permission to use offered address's signer on behalf of the master signer.
-    ///
-    /// This is **extremely dangerous** and should be granted only when it's absolutely needed.
-    public fun grant_key_offering_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, AccountPermission::Offering {})
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
+    public fun grant_key_offering_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::permission_denied(ENO_ACCOUNT_PERMISSION)
     }
 
     /// Only called during genesis to initialize system resources for this module.
@@ -1605,123 +1592,6 @@ module aptos_framework::account {
 
         let signer = create_authorized_signer(&bob, alice_addr);
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
-    }
-
-    #[test(bob = @0x345)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_permission(bob: signer) acquires Account {
-        let (alice_sk, alice_pk) = ed25519::generate_keys();
-        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
-        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
-        let alice_addr = signer::address_of(&alice);
-
-        let bob_addr = signer::address_of(&bob);
-        create_account(bob_addr);
-
-        let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: Account[alice_addr].sequence_number,
-            source_address: alice_addr,
-            recipient_address: bob_addr,
-        };
-
-        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
-
-        let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
-        let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
-
-        grant_key_offering_permission(&alice, &alice_permission_signer);
-
-        offer_signer_capability(
-            &alice_permission_signer,
-            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
-            0,
-            alice_pk_bytes,
-            bob_addr
-        );
-
-        assert!(Account[alice_addr].signer_capability_offer.for.contains(&bob_addr), 0);
-
-        let signer = create_authorized_signer(&bob, alice_addr);
-        assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
-
-        permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
-    }
-
-    #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 0x50017, location = Self)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_no_permission(bob: signer) acquires Account {
-        let (alice_sk, alice_pk) = ed25519::generate_keys();
-        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
-        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
-        let alice_addr = signer::address_of(&alice);
-
-        let bob_addr = signer::address_of(&bob);
-        create_account(bob_addr);
-
-        let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: Account[alice_addr].sequence_number,
-            source_address: alice_addr,
-            recipient_address: bob_addr,
-        };
-
-        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
-
-        let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
-        let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
-
-        offer_signer_capability(
-            &alice_permission_signer,
-            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
-            0,
-            alice_pk_bytes,
-            bob_addr
-        );
-
-        assert!(Account[alice_addr].signer_capability_offer.for.contains(&bob_addr), 0);
-
-        let signer = create_authorized_signer(&bob, alice_addr);
-        assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
-
-        permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
-    }
-
-    #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 0x50017, location = Self)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_wrong_permission(bob: signer) acquires Account {
-        let (alice_sk, alice_pk) = ed25519::generate_keys();
-        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
-        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
-        let alice_addr = signer::address_of(&alice);
-
-        let bob_addr = signer::address_of(&bob);
-        create_account(bob_addr);
-
-        let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: Account[alice_addr].sequence_number,
-            source_address: alice_addr,
-            recipient_address: bob_addr,
-        };
-
-        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
-
-        let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
-        let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
-
-        grant_key_rotation_permission(&alice, &alice_permission_signer);
-
-        offer_signer_capability(
-            &alice_permission_signer,
-            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
-            0,
-            alice_pk_bytes,
-            bob_addr
-        );
-
-        assert!(Account[alice_addr].signer_capability_offer.for.contains(&bob_addr), 0);
-
-        let signer = create_authorized_signer(&bob, alice_addr);
-        assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
-
-        permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
     }
 
     #[test(bob = @0x345)]

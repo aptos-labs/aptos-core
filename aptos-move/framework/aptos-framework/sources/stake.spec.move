@@ -636,10 +636,8 @@ spec aptos_framework::stake {
     }
 
     spec schema AbortsIfSignerPermissionStake {
-        use aptos_framework::permissioned_signer;
+        // Deprecated: permissioned signers were never enabled, so there is no permission to check.
         s: signer;
-        let perm = StakeManagementPermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec schema UpdateStakePoolAbortsIf {

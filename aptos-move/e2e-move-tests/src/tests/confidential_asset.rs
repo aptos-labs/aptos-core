@@ -312,12 +312,10 @@ fn create_confidential_transfer_payload(
 }
 
 /// Serialize an address as a Move signer value for use with exec_function_bypass_visibility.
-/// The signer BCS layout is an enum: variant 0 = single address.
+/// A signer is a bare address.
 #[cfg(feature = "move-harness-with-test-only")]
 fn serialize_signer(address: AccountAddress) -> Vec<u8> {
-    let mut bytes = vec![0u8]; // enum variant index 0
-    bytes.extend_from_slice(&bcs::to_bytes(&address).unwrap());
-    bytes
+    bcs::to_bytes(&address).unwrap()
 }
 
 /// Set the auditor for a given asset type. Requires calling from the framework address.

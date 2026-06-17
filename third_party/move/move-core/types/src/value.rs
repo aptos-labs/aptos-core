@@ -68,19 +68,6 @@ pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], a
     Ok(&VARIANT_NAME_PLACEHOLDERS[..len])
 }
 
-/// enum signer {
-///     Master { account: address },
-///     Permissioned { account: address, permissions_address: address },
-/// }
-/// enum variant tag for a master signer.
-pub const MASTER_SIGNER_VARIANT: u16 = 0;
-/// enum variant tag for a permissioned signer.
-pub const PERMISSIONED_SIGNER_VARIANT: u16 = 1;
-/// field offset of a master account address in a enum encoded signer.
-pub const MASTER_ADDRESS_FIELD_OFFSET: usize = 1;
-/// field offset of a permission storage address in a enum encoded permission signer.
-pub const PERMISSION_ADDRESS_FIELD_OFFSET: usize = 2;
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
@@ -115,8 +102,7 @@ pub enum MoveValue {
     Address(AccountAddress),
     Vector(Vec<MoveValue>),
     Struct(MoveStruct),
-    // TODO: Signer is only used to construct arguments easily.
-    //       Refactor the code to reflect the new permissioned signer schema.
+    // A signer carries only an account address; its runtime representation is a bare address.
     Signer(AccountAddress),
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
@@ -810,13 +796,6 @@ impl MoveStructLayout {
             },
         }
     }
-
-    pub fn signer_serialization_layout() -> Self {
-        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address], vec![
-            MoveTypeLayout::Address,
-            MoveTypeLayout::Address,
-        ]])
-    }
 }
 
 impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
@@ -1064,15 +1043,9 @@ impl serde::Serialize for MoveValue {
             MoveValue::I128(i) => serializer.serialize_i128(*i),
             MoveValue::I256(i) => i.serialize(serializer),
             MoveValue::Address(a) => a.serialize(serializer),
-            MoveValue::Signer(a) => {
-                // Runtime representation of signer looks following:
-                // enum signer {
-                //     Master { account: address },
-                //     Permissioned { account: address, permissions_address: address },
-                // }
-                MoveStruct::new_variant(MASTER_SIGNER_VARIANT, vec![MoveValue::Address(*a)])
-                    .serialize(serializer)
-            },
+            // A signer serializes identically to its address. The runtime representation of a
+            // signer is a bare address.
+            MoveValue::Signer(a) => a.serialize(serializer),
             MoveValue::Vector(v) => {
                 let mut t = serializer.serialize_seq(Some(v.len()))?;
                 for val in v {

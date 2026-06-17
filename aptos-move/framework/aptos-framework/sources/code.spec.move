@@ -73,10 +73,8 @@ spec aptos_framework::code {
     }
 
     spec schema AbortsIfPermissionedSigner {
-        use aptos_framework::permissioned_signer;
+        // Deprecated: permissioned signers were never enabled, so there is no permission to check.
         s: signer;
-        let perm = CodePublishingPermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata) {

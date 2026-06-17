@@ -16,7 +16,7 @@ use move_core_types::{
     function::ClosureMask,
     int256,
     language_storage::{TypeTag, OPTION_NONE_TAG},
-    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_runtime::native_functions::NativeFunction;
@@ -308,27 +308,20 @@ fn native_format_impl(
             write!(out, "@{}", str).unwrap();
         },
         MoveTypeLayout::Signer => {
-            let fix_enabled = context
-                .context
-                .get_feature_flags()
-                .is_enabled(FeatureFlag::SIGNER_NATIVE_FORMAT_FIX);
-            let addr = if fix_enabled {
-                val.value_as::<Struct>()?
-                    .unpack()?
-                    // The second field of a signer is always the master address regardless of which variants.
-                    .nth(MASTER_ADDRESS_FIELD_OFFSET)
-                    .ok_or_else(|| SafeNativeError::abort(EINVALID_FORMAT))?
-                    .value_as::<AccountAddress>()?
-            } else {
-                val.value_as::<AccountAddress>()?
-            };
-
+            // A signer is a bare address.
+            let addr = val.value_as::<AccountAddress>()?;
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
                 addr.to_hex_literal()
             };
-            if fix_enabled {
+            // The SIGNER_NATIVE_FORMAT_FIX feature controls whether the formatted output prefixes
+            // the address with `@`.
+            if context
+                .context
+                .get_feature_flags()
+                .is_enabled(FeatureFlag::SIGNER_NATIVE_FORMAT_FIX)
+            {
                 write!(out, "signer(@{})", str).unwrap();
             } else {
                 write!(out, "signer({})", str).unwrap();

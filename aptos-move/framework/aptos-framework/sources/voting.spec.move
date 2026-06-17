@@ -44,10 +44,8 @@ spec aptos_framework::voting {
     }
 
     spec schema AbortsIfPermissionedSigner {
-        use aptos_framework::permissioned_signer;
+        // Deprecated: permissioned signers were never enabled, so there is no permission to check.
         s: signer;
-        let perm = VotePermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec register<ProposalType: store>(account: &signer) {

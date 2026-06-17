@@ -1,5 +1,4 @@
 spec aptos_framework::dispatchable_fungible_asset {
-    use aptos_framework::permissioned_signer;
     spec module {
         pragma verify = false;
     }
@@ -21,7 +20,6 @@ spec aptos_framework::dispatchable_fungible_asset {
     }
 
     spec withdraw {
-        modifies global<permissioned_signer::PermissionStorage>(permissioned_signer::spec_permission_address(owner));
         modifies global<fungible_asset::FungibleStore>(object::object_address(store));
         modifies global<fungible_asset::ConcurrentFungibleBalance>(object::object_address(store));
     }

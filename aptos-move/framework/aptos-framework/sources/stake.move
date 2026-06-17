@@ -37,7 +37,6 @@ module aptos_framework::stake {
     use aptos_framework::staking_config::{Self, StakingConfig, StakingRewardsConfig};
     use aptos_framework::chain_status;
     use aptos_framework::create_signer;
-    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -241,6 +240,7 @@ module aptos_framework::stake {
         pool_address: address
     }
 
+    #[deprecated]
     struct StakeManagementPermission has copy, drop, store {}
 
     #[event]
@@ -392,20 +392,14 @@ module aptos_framework::stake {
     }
 
     /// Permissions
-    inline fun check_stake_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, StakeManagementPermission {}),
-            error::permission_denied(ENO_STAKE_PERMISSION)
-        );
-    }
+    /// Deprecated. Permissioned signers were never enabled, so every signer has stake permission.
+    inline fun check_stake_permission(_s: &signer) {}
 
-    /// Grant permission to mutate staking on behalf of the master signer.
+    /// Deprecated. The permissioned signer feature was never enabled and has been removed. Aborts.
     public fun grant_permission(
-        master: &signer, permissioned_signer: &signer
+        _master: &signer, _permissioned_signer: &signer
     ) {
-        permissioned_signer::authorize_unlimited(
-            master, permissioned_signer, StakeManagementPermission {}
-        )
+        abort error::permission_denied(ENO_STAKE_PERMISSION)
     }
 
     #[view]

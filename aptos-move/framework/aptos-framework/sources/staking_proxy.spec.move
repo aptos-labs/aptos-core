@@ -45,10 +45,8 @@ spec aptos_framework::staking_proxy {
     }
 
     spec grant_permission {
-        pragma aborts_if_is_partial;
-        aborts_if !permissioned_signer::spec_is_permissioned_signer(permissioned_signer);
-        aborts_if permissioned_signer::spec_is_permissioned_signer(master);
-        aborts_if signer::address_of(master) != signer::address_of(permissioned_signer);
+        // Deprecated: the function aborts unconditionally.
+        aborts_if true;
     }
 
     /// Aborts if conditions of SetStakePoolOperator are not met
@@ -209,9 +207,7 @@ spec aptos_framework::staking_proxy {
     }
 
     spec schema AbortsIfSignerPermissionStakeProxy {
-        use aptos_framework::permissioned_signer;
+        // Deprecated: permissioned signers were never enabled, so there is no permission to check.
         s: signer;
-        let perm = StakeProxyPermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 }
