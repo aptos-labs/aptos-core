@@ -12862,9 +12862,14 @@ dependencies = [
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "blake2-rfc",
  "mono-move-core",
  "move-core-types",
+ "ripemd",
+ "sha2 0.9.9",
  "sha3 0.9.1",
+ "siphasher 0.3.11",
+ "tiny-keccak",
 ]
 
 [[package]]
