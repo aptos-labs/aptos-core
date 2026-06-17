@@ -100,6 +100,16 @@ fn test_common(pkg: &str) {
     run_tests_for_pkg(pkg, named_address);
 }
 
+fn test_common_with_stack(pkg: &'static str, stack_size: usize) {
+    let handle = std::thread::Builder::new()
+        .stack_size(stack_size)
+        .spawn(move || test_common(pkg))
+        .unwrap();
+    if let Err(err) = handle.join() {
+        std::panic::resume_unwind(err);
+    }
+}
+
 fn test_resource_account_common(pkg: &str) {
     let named_address = BTreeMap::from([(
         String::from(pkg),
@@ -323,5 +333,7 @@ fn test_package_manager() {
 
 #[test]
 fn test_poker() {
-    test_common("poker");
+    // Poker pulls in Nitro attestation utilities; compiling that dependency graph can exceed
+    // the default Rust test-thread stack.
+    test_common_with_stack("poker", 64 * 1024 * 1024);
 }

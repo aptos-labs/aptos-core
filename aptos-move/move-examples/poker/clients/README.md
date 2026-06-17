@@ -15,18 +15,23 @@ Set env or edit:
 - `NODE_URL` – Aptos node URL (e.g. https://fullnode.devnet.aptoslabs.com).
 - `TABLE_PRIVATE_KEY` – Hex private key for the table account (TEE).
 - `PLAYER_PRIVATE_KEY` – Hex private key for the player (player-client).
+- `ATTESTATION_DOC_PATH` – Optional path to a raw Nitro attestation document for table registration.
 
 Deploy the poker module and set `POKER_MODULE_ADDRESS` (e.g. the address where `poker` is published).
 
 ## Table client (TEE)
 
-For **production**, run this binary inside an AWS Nitro Enclave and obtain a real attestation document (e.g. from the NSM) before calling `register_table`.
+For **production**, run this binary inside an AWS Nitro Enclave and obtain a real attestation document (e.g. from the NSM) before calling `register_table`. The chain-managed Nitro root store must already be initialized, and the NSM request must set `user_data` to:
 
-For **dev/test**, the script uses a placeholder attestation; on-chain `register_table` will abort unless the chain accepts it (e.g. testnet with a modified or mock native). Use `register_table_for_test` only in Move unit tests, not from a client.
+```text
+b"APTOS_POKER_TABLE_V1" || bcs(table_address)
+```
+
+For **dev/test**, omit `ATTESTATION_DOC_PATH` to use a placeholder attestation; on-chain `register_table` will abort unless verification is bypassed in a local test-only package. Use `register_table_for_test` only in Move unit tests, not from a client.
 
 1. Create and fund the table account (faucet or transfer).
 2. Run the table client; it will:
-   - Register the table (with attestation doc; in dev you may need to publish a module that skips verification for testing).
+   - Register the table with an attestation doc bound to the table address.
    - Enter a loop: wait for at least 2 players, run a trivial “hand” (e.g. no-op or fixed winner), call `settle_hand` and `settle_leaving_players`.
 
 ```bash

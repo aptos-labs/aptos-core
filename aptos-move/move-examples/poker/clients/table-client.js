@@ -5,16 +5,18 @@
  * 2. Loop: wait for min players, run hand, submit settle_hand and settle_leaving_players.
  *
  * Usage:
- *   TABLE_PRIVATE_KEY=0x... POKER_MODULE_ADDRESS=0x... NODE_URL=https://... node table-client.js
+ *   TABLE_PRIVATE_KEY=0x... POKER_MODULE_ADDRESS=0x... ATTESTATION_DOC_PATH=/path/doc.bin node table-client.js
  *
  * For dev: POKER_MODULE_ADDRESS is the address where the poker module is deployed (e.g. table account).
  */
 
+const fs = require("fs");
 const { Aptos, AptosConfig } = require("@aptos-labs/ts-sdk");
 
 const NODE_URL = process.env.NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const TABLE_PRIVATE_KEY = process.env.TABLE_PRIVATE_KEY;
 const POKER_MODULE_ADDRESS = process.env.POKER_MODULE_ADDRESS;
+const ATTESTATION_DOC_PATH = process.env.ATTESTATION_DOC_PATH;
 
 if (!TABLE_PRIVATE_KEY || !POKER_MODULE_ADDRESS) {
   console.error("Set TABLE_PRIVATE_KEY and POKER_MODULE_ADDRESS");
@@ -34,9 +36,12 @@ async function main() {
     process.exit(1);
   }
 
-  // In production: get attestation bytes from Nitro Enclave NSM (GetAttestationDocument).
-  // Here we use a placeholder; on-chain register_table will fail unless verification is bypassed (test only).
-  const attestationDoc = new Uint8Array(0);
+  // In production, generate this inside the enclave with NSM GetAttestationDocument.
+  // The document's user_data must be b"APTOS_POKER_TABLE_V1" || bcs(table_address).
+  const attestationDoc = ATTESTATION_DOC_PATH ? fs.readFileSync(ATTESTATION_DOC_PATH) : new Uint8Array(0);
+  if (!ATTESTATION_DOC_PATH) {
+    console.warn("ATTESTATION_DOC_PATH not set; register_table is expected to fail outside test-only flows.");
+  }
 
   const { Account, Ed25519PrivateKey } = require("@aptos-labs/ts-sdk");
   const key = Ed25519PrivateKey.fromString(TABLE_PRIVATE_KEY.replace(/^0x/, ""));

@@ -97,6 +97,25 @@ module aptos_framework::aws_nitro_utils {
         verify_and_parse_attestation_from_store(attestation_doc, timestamp::now_seconds())
     }
 
+    /// Verifies an AWS Nitro Enclave attestation document and checks that its
+    /// `user_data` field equals `expected_user_data`.
+    ///
+    /// This is a small dapp-facing helper for policies that only need to bind
+    /// the attested enclave to an application-specific request or account.
+    public fun verify_attestation_user_data(
+        attestation_doc: vector<u8>,
+        expected_user_data: &vector<u8>,
+    ): bool {
+        if (!is_initialized()) {
+            return false
+        };
+        verify_attestation_user_data_from_store(
+            attestation_doc,
+            timestamp::now_seconds(),
+            expected_user_data,
+        )
+    }
+
     /// Verifies an AWS Nitro Enclave attestation document against caller-provided
     /// DER-encoded root certificates.
     ///
@@ -223,6 +242,46 @@ module aptos_framework::aws_nitro_utils {
             TrustedRoots[@aptos_framework].root_certs,
             unix_time_secs,
         )
+    }
+
+    /// Verifies an attestation using the chain-managed Nitro root certificates
+    /// and checks that its `user_data` field equals `expected_user_data`.
+    public fun verify_attestation_user_data_from_store(
+        attestation_doc: vector<u8>,
+        unix_time_secs: u64,
+        expected_user_data: &vector<u8>,
+    ): bool {
+        if (!is_initialized()) {
+            return false
+        };
+        verify_attestation_user_data_with_roots(
+            attestation_doc,
+            TrustedRoots[@aptos_framework].root_certs,
+            unix_time_secs,
+            expected_user_data,
+        )
+    }
+
+    /// Verifies an attestation against caller-provided DER-encoded root
+    /// certificates and checks that its `user_data` field equals
+    /// `expected_user_data`.
+    public fun verify_attestation_user_data_with_roots(
+        attestation_doc: vector<u8>,
+        trusted_root_certs: vector<vector<u8>>,
+        unix_time_secs: u64,
+        expected_user_data: &vector<u8>,
+    ): bool {
+        let doc_opt = verify_and_parse_attestation_with_roots(
+            attestation_doc,
+            trusted_root_certs,
+            unix_time_secs,
+        );
+        if (doc_opt.is_none()) {
+            return false
+        };
+
+        let doc = doc_opt.extract();
+        user_data_equals(&doc, expected_user_data)
     }
 
     /// Convenience verifier for key-release policies that bind a Nitro attestation
@@ -449,6 +508,19 @@ module aptos_framework::aws_nitro_utils {
                 &b"public-key",
             ),
             3,
+        );
+        assert!(
+            !verify_attestation_user_data(vector::empty<u8>(), &b"user-data"),
+            4,
+        );
+        assert!(
+            !verify_attestation_user_data_with_roots(
+                vector::empty<u8>(),
+                vector[b"fake-root"],
+                0,
+                &b"user-data",
+            ),
+            5,
         );
     }
 

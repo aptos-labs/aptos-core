@@ -6,15 +6,18 @@
 // - Players enter with APT locked as chips, request leave after current hand, get 95% back (5% fee to server).
 
 module poker::poker {
+    use std::bcs;
     use std::error;
     use std::signer;
     use std::vector;
 
-    use aptos_framework::aws_nitro_utils;
-    use aptos_framework::coin::{Self, Coin};
     use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::aws_nitro_utils;
+    use aptos_framework::coin;
+    use aptos_framework::coin::Coin;
     use aptos_framework::event;
-    use aptos_std::table::{Self, Table};
+    use aptos_std::table;
+    use aptos_std::table::Table;
 
     // Minimum players to run a hand.
     const MIN_PLAYERS: u64 = 2;
@@ -32,6 +35,8 @@ module poker::poker {
     const EINVALID_SETTLE_SUM: u64 = 8;
     const EZERO_AMOUNT: u64 = 9;
     const EMIN_PLAYERS: u64 = 10;
+
+    const TABLE_ATTESTATION_DOMAIN: vector<u8> = b"APTOS_POKER_TABLE_V1";
 
     #[event]
     struct TableRegistered has drop, store {
@@ -74,10 +79,21 @@ module poker::poker {
         min_players: u64,
     }
 
-    /// Register a new table. Only succeeds if attestation is valid (TEE).
+    /// Register a new table. Only succeeds if Nitro attestation is valid and bound to this table.
     public entry fun register_table(table: &signer, attestation_doc: vector<u8>) {
-        assert!(aws_nitro_utils::verify_attestation(attestation_doc), error::invalid_argument(EINVALID_ATTESTATION));
+        let table_addr = signer::address_of(table);
+        let expected_user_data = table_attestation_user_data(table_addr);
+        assert!(
+            aws_nitro_utils::verify_attestation_user_data(attestation_doc, &expected_user_data),
+            error::invalid_argument(EINVALID_ATTESTATION),
+        );
         register_table_internal(table);
+    }
+
+    fun table_attestation_user_data(table_addr: address): vector<u8> {
+        let user_data = TABLE_ATTESTATION_DOMAIN;
+        user_data.append(bcs::to_bytes(&table_addr));
+        user_data
     }
 
     fun register_table_internal(table: &signer) {
@@ -95,7 +111,7 @@ module poker::poker {
     }
 
     /// Player locks APT as chips and joins the table. They play from the next hand.
-    public entry fun enter_table(table_addr: address, player: &signer, amount: u64) acquires TableInfo {
+    public entry fun enter_table(player: &signer, table_addr: address, amount: u64) acquires TableInfo {
         assert!(amount > 0, error::invalid_argument(EZERO_AMOUNT));
         assert!(exists<TableInfo>(table_addr), error::not_found(ETABLE_NOT_FOUND));
         let player_addr = signer::address_of(player);
@@ -109,7 +125,7 @@ module poker::poker {
     }
 
     /// Request to leave after the current hand finishes.
-    public entry fun request_leave(table_addr: address, player: &signer) acquires TableInfo {
+    public entry fun request_leave(player: &signer, table_addr: address) acquires TableInfo {
         let player_addr = signer::address_of(player);
         assert!(exists<TableInfo>(table_addr), error::not_found(ETABLE_NOT_FOUND));
         let table = borrow_global_mut<TableInfo>(table_addr);
@@ -134,8 +150,8 @@ module poker::poker {
         assert!(vector::length(&add_to) == vector::length(&add_amounts), error::invalid_argument(EINVALID_SETTLE_SUM));
 
         let table_info = borrow_global_mut<TableInfo>(table_addr);
-        let mut total_deduct = 0u64;
-        let mut total_add = 0u64;
+        let total_deduct = 0u64;
+        let total_add = 0u64;
         let len_d = vector::length(&deduct_from);
         let len_a = vector::length(&add_to);
         let i = 0u64;
@@ -230,8 +246,6 @@ module poker::poker {
     #[test_only]
     use aptos_framework::aptos_coin;
     #[test_only]
-    use aptos_framework::coin::BurnCapability;
-    #[test_only]
     use aptos_framework::timestamp;
 
     #[test_only]
@@ -273,19 +287,19 @@ module poker::poker {
         assert!(table_exists(table_addr), 0);
         assert!(min_players(table_addr) == MIN_PLAYERS, 1);
 
-        enter_table(table_addr, alice, 100);
-        enter_table(table_addr, bob, 200);
+        enter_table(alice, table_addr, 100);
+        enter_table(bob, table_addr, 200);
         assert!(player_balance(table_addr, alice_addr) == 100, 2);
         assert!(player_balance(table_addr, bob_addr) == 200, 3);
 
-        request_leave(table_addr, alice);
+        request_leave(alice, table_addr);
         assert!(player_pending_leave(table_addr, alice_addr), 4);
 
         settle_leaving_players(table, table_addr, vector[alice_addr]);
         assert!(player_balance(table_addr, alice_addr) == 0, 5);
         assert!(player_balance(table_addr, bob_addr) == 200, 6);
 
-        request_leave(table_addr, bob);
+        request_leave(bob, table_addr);
         settle_leaving_players(table, table_addr, vector[bob_addr]);
         assert!(player_balance(table_addr, bob_addr) == 0, 7);
 
