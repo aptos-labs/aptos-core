@@ -130,6 +130,8 @@ use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     graph::{DomRelation, Graph},
+    livevar_analysis::LiveVarAnalysisProcessor,
+    reaching_def_analysis::ReachingDefProcessor,
     stackless_bytecode::{
         AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, Label, Operation, PropKind,
     },
@@ -685,8 +687,23 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
         if !needs_inference(fun_env) {
             return data;
         }
+        // The WP analyzer reads Move-level semantics where a `&mut`-to-`&mut`
+        // assignment is a pure alias. Under the prophecy model the pipeline retains
+        // such copies (they are stateful reborrows there), so the analyzer would see
+        // a write through a copy as unrelated to the parameter. Infer from an
+        // alias-normalized clone (copy propagation + assignment elimination); the
+        // inferred spec is expressed over parameters, and the clone is discarded.
+        let normalized = {
+            let reach_def = ReachingDefProcessor::new();
+            let live_vars = LiveVarAnalysisProcessor::new_no_annotate();
+            let d = reach_def.process(_targets, fun_env, data.clone(), _scc_opt);
+            live_vars.process(_targets, fun_env, d, _scc_opt)
+        };
         let _ = run_spec_inference_on_data(
-            fun_env, &data, /*annotate=*/ false, /*silent=*/ true,
+            fun_env,
+            &normalized,
+            /*annotate=*/ false,
+            /*silent=*/ true,
         );
         data
     }
@@ -3392,6 +3409,13 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
 
                     // WP[...](Q) = Q  (verification IL; no effect on inference)
                     Operation::IsParent(_, _)
+                    | Operation::ProphecyBorrow(_, _)
+                    | Operation::ProphecyCommitGlobal(_)
+                    | Operation::ProphecyRepin(_)
+                    | Operation::ProphecySyncCurrent(_, _)
+                    | Operation::ProphecySyncFinal(_, _)
+                    | Operation::Resolve
+                    | Operation::ResolveReturn
                     | Operation::UnpackRef
                     | Operation::PackRef
                     | Operation::UnpackRefDeep

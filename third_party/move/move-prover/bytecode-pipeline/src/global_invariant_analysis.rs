@@ -313,6 +313,18 @@ impl PerFunctionRelevance {
                     WriteBack(GlobalRoot(mem), _) => {
                         (BTreeSet::new(), std::iter::once(mem.clone()).collect())
                     },
+                    ProphecyCommitGlobal(mem) => {
+                        // Under the prophecy model the resource is written eagerly at the
+                        // borrow, and this commit marker is where the global-state
+                        // transition is asserted rather than at a write-back.
+                        (BTreeSet::new(), std::iter::once(mem.clone()).collect())
+                    },
+                    ProphecyRepin(..) => {
+                        // Restores the borrow's eager update after an intervening call;
+                        // not a state transition — the invariant stays deferred to the
+                        // commit marker.
+                        continue;
+                    },
 
                     Exists(mid, sid, inst) | GetGlobal(mid, sid, inst) => {
                         let mem = mid.qualified_inst(*sid, inst.to_owned());

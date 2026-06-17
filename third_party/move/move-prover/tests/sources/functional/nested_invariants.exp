@@ -15,6 +15,7 @@ error: data invariant does not hold
    =     at tests/sources/functional/nested_invariants.move:65: mutate_inner_data_invariant_invalid
    =         r = <redacted>
    =     at tests/sources/functional/nested_invariants.move:66: mutate_inner_data_invariant_invalid
+   =         r = <redacted>
    =     at tests/sources/functional/nested_invariants.move:29
    =     at tests/sources/functional/nested_invariants.move:32
    =     at tests/sources/functional/nested_invariants.move:16
@@ -44,6 +45,7 @@ error: data invariant does not hold
    =     at tests/sources/functional/nested_invariants.move:59: mutate_outer_data_invariant_invalid
    =         r = <redacted>
    =     at tests/sources/functional/nested_invariants.move:60: mutate_outer_data_invariant_invalid
+   =         r = <redacted>
    =     at tests/sources/functional/nested_invariants.move:29
    =     at tests/sources/functional/nested_invariants.move:32
 

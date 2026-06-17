@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/data_inv_zero_result.move:17:9
+   │
+17 │         invariant forall S in *, s: signer: S |~ !aborts_of<f>(s);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/data_inv_zero_result.move:49: make_bad
+   =         owner = <redacted>
+   =     at tests/sources/functional/closures/data_inv_zero_result.move:50: make_bad
+   =     at tests/sources/functional/closures/data_inv_zero_result.move:17

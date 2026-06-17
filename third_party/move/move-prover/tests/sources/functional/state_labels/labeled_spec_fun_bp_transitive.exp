@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:43:9
+   │
+43 │ ╭         ensures forall S in *:
+44 │ │             (S |~ (exists<Counter>(a) && Counter[a].value < 1000))
+45 │ │                 ==> (S |~ under_cap(a)); // error: says nothing about the cap
+   │ ╰────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:30: touch
+   =         a = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:31: touch
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:10: bump
+   =         a = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:11: bump
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:12: bump
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:10: bump
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:13: bump
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:38: touch (spec)
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_transitive.move:43: touch (spec)

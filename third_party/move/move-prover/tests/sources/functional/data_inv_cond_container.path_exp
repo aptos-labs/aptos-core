@@ -1,0 +1,34 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/data_inv_cond_container.move:13:9
+   │
+13 │         invariant i.x > 0;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/data_inv_cond_container.move:21: violates
+   =         a = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:22: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:23: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:23: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:13
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/data_inv_cond_container.move:18:9
+   │
+18 │         invariant i.x > 0;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/data_inv_cond_container.move:21: violates
+   =         a = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:22: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:23: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:23: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_container.move:18

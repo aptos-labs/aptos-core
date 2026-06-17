@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/unlabeled_spec_fun_with_bp.move:62:9
+   │
+62 │         ensures incremented(a); // error: two increments do not satisfy a single increment's ensures
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/unlabeled_spec_fun_with_bp.move:56: do_inc_twice
+   =         a = <redacted>
+   =     at tests/sources/functional/state_labels/unlabeled_spec_fun_with_bp.move:57: do_inc_twice
+   =     at tests/sources/functional/state_labels/unlabeled_spec_fun_with_bp.move:58: do_inc_twice
+   =     at tests/sources/functional/state_labels/unlabeled_spec_fun_with_bp.move:62: do_inc_twice (spec)

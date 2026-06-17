@@ -289,13 +289,24 @@ procedure {:inline 1} $1_vector_borrow_mut{{S}}(m: $Mutation (Vec ({{T}})), inde
 returns (dst: $Mutation ({{T}}), m': $Mutation (Vec ({{T}})))
 {
     var v: Vec ({{T}});
+{%- if not options.path_refs %}
+    var f: {{T}};
+{%- endif %}
     v := $Dereference(m);
     if (!InRangeVec(v, index)) {
         call $ExecFailureAbort();
         return;
     }
+{%- if not options.path_refs %}
+    // Eager index borrow: the element ref gets a fresh prophecy `f`; the parent's
+    // element `index` is set to `f` so resolving the element flows back to the parent.
+    havoc f;
+    dst := $Mutation(ReadVec(v, index), f);
+    m' := $UpdateMutation(m, UpdateVec(v, index, f));
+{%- else %}
     dst := $Mutation(m->l, ExtendVec(m->p, index), ReadVec(v, index));
     m' := m;
+{%- endif %}
 }
 
 function {:inline} $1_vector_$borrow_mut{{S}}(v: Vec ({{T}}), i: int): {{T}} {
@@ -1095,14 +1106,26 @@ procedure {:inline 2} {{impl.fun_borrow}}{{S}}(t: {{Self}}, k: {{K}}) returns (v
 procedure {:inline 2} {{impl.fun_borrow_mut}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
 returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};{{GBD}}
+    var t: {{Self}};
+{%- if not options.path_refs %}
+    var f: {{V}};
+{%- endif %}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (!ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
+{%- if not options.path_refs %}
+        // Eager index borrow (prophecy): the element ref gets a fresh prophecy `f`; the
+        // parent's slot `enc_k` is set to `f` so resolving the element flows back to the
+        // parent (mirrors the vector `borrow_mut`).
+        havoc f;
+        dst := $Mutation(GetTable(t{{U}}, enc_k), f);
+        m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, f){{SW2}});
+{%- else %}
         dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t{{U}}, enc_k));
         m' := m;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -1113,15 +1136,30 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
     var t: {{Self}};{{GBD}}
     var t': {{Self}};
+{%- if not options.path_refs %}
+    var f: {{V}};
+{%- endif %}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (!ContainsTable(t{{U}}, enc_k)) {
+{%- if not options.path_refs %}
+        havoc f;
+        dst := $Mutation(default, f);
+        {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, f){{W2}});
+{%- else %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, default){{W2}});
         t' := $Dereference(m');
         dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t'{{U}}, enc_k));
+{%- endif %}
     } else {
+{%- if not options.path_refs %}
+        havoc f;
+        dst := $Mutation(GetTable(t{{U}}, enc_k), f);
+        m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, f){{SW2}});
+{%- else %}
         dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t{{U}}, enc_k));
         m' := m;
+{%- endif %}
     }
 }
 {%- endif %}

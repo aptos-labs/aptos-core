@@ -52,7 +52,7 @@ use move_model::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
-    well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
+    well_known::{RECEIVER_PARAM_NAME, TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
@@ -142,6 +142,12 @@ enum BpAxiomCtx<'a> {
         /// Instantiation of the struct declaring the invariant being lifted;
         /// the invariant body's type parameters are the struct's.
         struct_inst: &'a [Type],
+        /// The struct field whose data invariant is being lifted over this
+        /// fun-param witness family; the matching target for the invariant's
+        /// behavioral-predicate occurrences (the lifted conditions are always
+        /// the source struct's invariants).
+        src_struct_id: &'a QualifiedInstId<StructId>,
+        src_field_sym: Symbol,
     },
 }
 
@@ -186,6 +192,46 @@ impl BpAxiomCtx<'_> {
                     boogie_behavioral_spec_fun_name(env, fun, *param_sym, kind, &[])
                 }
             },
+        }
+    }
+
+    /// The struct field whose data invariant is being lifted.
+    fn source_field(&self) -> (&QualifiedInstId<StructId>, Symbol) {
+        match self {
+            BpAxiomCtx::StructField {
+                struct_id,
+                field_sym,
+            } => (struct_id, *field_sym),
+            BpAxiomCtx::FunParam {
+                src_struct_id,
+                src_field_sym,
+                ..
+            } => (src_struct_id, *src_field_sym),
+        }
+    }
+
+    /// Whether `exp` — the function expression (`args[0]`) of a behavioral
+    /// predicate call in a struct data invariant — refers exactly to the field
+    /// whose invariant is being lifted: a `Select` of that field, applied to no
+    /// receiver (the bare-field-name convention, see
+    /// `data_invariant_instrumentation.rs`) or to the `self` receiver. Rewriting
+    /// any other occurrence to this ctx's witness functions would fabricate an
+    /// unchecked assumption, so the caller bails on a mismatch.
+    fn matches_fun_ref(&self, env: &GlobalEnv, exp: &Exp) -> bool {
+        let (struct_id, field_sym) = self.source_field();
+        match exp.as_ref() {
+            ExpData::Call(_, AstOperation::Select(mid, sid, fid), sel_args) => {
+                mid.qualified(*sid) == struct_id.to_qualified_id()
+                    && fid.symbol() == field_sym
+                    && match sel_args.as_slice() {
+                        [] => true,
+                        [recv] => matches!(recv.as_ref(), ExpData::LocalVar(_, s)
+                            if env.symbol_pool().string(*s).as_str()
+                                == RECEIVER_PARAM_NAME),
+                        _ => false,
+                    }
+            },
+            _ => false,
         }
     }
 }
@@ -1522,6 +1568,19 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Report that a `&mut` result derived through a function value
+    /// (`BorrowEdge::Invoke`) is not supported under the prophecy reference model,
+    /// and havoc the result so translation can continue to further errors.
+    fn emit_unsupported_invoke_mut_ref(&self, result_local: &str) {
+        self.env.error(
+            &self.env.internal_loc(),
+            "the default prophecy reference model does not yet support \
+             mutable references derived through function values; pass \
+             --path-refs to use the legacy write-back model",
+        );
+        emitln!(self.writer, "havoc {};", result_local);
+    }
+
     /// Emit behavioral predicate call body: aborts_of check, memory havoc with frame
     /// conditions, result_of assignment, and ensures_of assumption. Used by both opaque
     /// closure variants and function parameter variants in the `$apply` procedure.
@@ -1687,20 +1746,30 @@ impl<'env> BoogieTranslator<'env> {
         let result_bp_args = post_mem_args.iter().chain(data_args.iter()).join(", ");
 
         // Assign results using result_of function (now using post-state args)
+        let path_refs = ProverOptions::get(env).path_refs;
         if !result_locals.is_empty() {
             if result_locals.len() == 1 {
                 let result_local = &result_locals[0];
                 if explicit_result_count == 1 {
                     if explicit_results[0].is_mutable_reference() {
                         let base_param = first_mut_ref_param.unwrap_or(0);
-                        emitln!(
-                            self.writer,
-                            "{} := $ChildMutation(p{}, -1, {}({}));",
-                            result_local,
-                            base_param,
-                            result_fun_name,
-                            result_bp_args
-                        );
+                        if !path_refs {
+                            // A &mut derived through a function value (BorrowEdge::Invoke)
+                            // is not yet modeled under the prophecy reference model: the
+                            // static model havocs the lender at the Invoke write-back, but
+                            // the path-free model cannot identify the lender to havoc at
+                            // resolve. Refuse to verify rather than emit an unsound result.
+                            self.emit_unsupported_invoke_mut_ref(result_local);
+                        } else {
+                            emitln!(
+                                self.writer,
+                                "{} := $ChildMutation(p{}, -1, {}({}));",
+                                result_local,
+                                base_param,
+                                result_fun_name,
+                                result_bp_args
+                            );
+                        }
                     } else {
                         emitln!(
                             self.writer,
@@ -1728,15 +1797,20 @@ impl<'env> BoogieTranslator<'env> {
                     if i < explicit_result_count {
                         if explicit_results[i].is_mutable_reference() {
                             let base_param = first_mut_ref_param.unwrap_or(0);
-                            emitln!(
-                                self.writer,
-                                "{} := $ChildMutation(p{}, -1, {}({})->${});",
-                                result_local,
-                                base_param,
-                                multi_result_fun_name,
-                                result_bp_args,
-                                i
-                            );
+                            if !path_refs {
+                                // See the single-result case above: unsupported.
+                                self.emit_unsupported_invoke_mut_ref(result_local);
+                            } else {
+                                emitln!(
+                                    self.writer,
+                                    "{} := $ChildMutation(p{}, -1, {}({})->${});",
+                                    result_local,
+                                    base_param,
+                                    multi_result_fun_name,
+                                    result_bp_args,
+                                    i
+                                );
+                            }
                         } else {
                             emitln!(
                                 self.writer,
@@ -3661,63 +3735,6 @@ impl<'env> BoogieTranslator<'env> {
                     all_result_type_refs[0],
                     &precond,
                 );
-                // Emit data invariant axioms for all behavioral predicate kinds.
-                // The extractor builds a multi-pattern trigger from the
-                // invariant's own BP-call occurrences, so no single trigger
-                // application is passed in.
-                {
-                    let data_param_decls: Vec<String> = params
-                        .iter()
-                        .enumerate()
-                        .map(|(i, ty)| {
-                            format!(
-                                "arg{}: {}",
-                                i,
-                                boogie_type(self.env, ty.skip_reference(), false)
-                            )
-                        })
-                        .collect();
-                    let sf_ctx = BpAxiomCtx::StructField {
-                        struct_id: &info.struct_id,
-                        field_sym: info.field_sym,
-                    };
-                    let fp_mem_args = BpMemArgs::empty();
-                    for kind in [
-                        BehaviorKind::EnsuresOf,
-                        BehaviorKind::ResultOf,
-                        BehaviorKind::AbortsOf,
-                        BehaviorKind::RequiresOf,
-                    ] {
-                        self.emit_data_invariant_axiom_for_behavior(
-                            info,
-                            kind,
-                            &input_param_decls,
-                            &sf_ctx,
-                            &sf_mem_args,
-                            &params,
-                            &precond,
-                        );
-                        // Also emit for function parameter variants (the
-                        // evaluator dispatch branches on discriminator tag, so
-                        // both variants must be constrained).
-                        for fp_info in fun_param_infos {
-                            let fp_ctx = BpAxiomCtx::FunParam {
-                                fun: &fp_info.fun,
-                                param_sym: fp_info.param_sym,
-                                struct_inst: &info.struct_id.inst,
-                            };
-                            self.emit_data_invariant_axiom_for_behavior(
-                                info,
-                                kind,
-                                &data_param_decls,
-                                &fp_ctx,
-                                &fp_mem_args,
-                                &params,
-                                &precond,
-                            );
-                        }
-                    }
-                }
                 let body = format!("{}({}) == result0", result_fun_name, input_args_str);
                 emitln!(
                     self.writer,
@@ -3774,6 +3791,73 @@ impl<'env> BoogieTranslator<'env> {
                     ensures_fun_name,
                     full_param_decls.join(", ")
                 );
+            }
+            // Emit data invariant axioms for the behavioral predicate kinds.
+            // The extractor builds a multi-pattern trigger from the invariant's
+            // own BP-call occurrences, so no single trigger application is
+            // passed in. `AbortsOf`/`RequiresOf` never reference the result
+            // witness, so they are lifted for every output arity; the
+            // `EnsuresOf`/`ResultOf` lifting substitutes the single-result
+            // witness function and is only available for one output.
+            {
+                let data_param_decls: Vec<String> = params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ty)| {
+                        format!(
+                            "arg{}: {}",
+                            i,
+                            boogie_type(self.env, ty.skip_reference(), false)
+                        )
+                    })
+                    .collect();
+                let sf_ctx = BpAxiomCtx::StructField {
+                    struct_id: &info.struct_id,
+                    field_sym: info.field_sym,
+                };
+                let fp_mem_args = BpMemArgs::empty();
+                for kind in [
+                    BehaviorKind::EnsuresOf,
+                    BehaviorKind::ResultOf,
+                    BehaviorKind::AbortsOf,
+                    BehaviorKind::RequiresOf,
+                ] {
+                    if matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+                        && all_result_types.len() != 1
+                    {
+                        continue;
+                    }
+                    self.emit_data_invariant_axiom_for_behavior(
+                        info,
+                        kind,
+                        &input_param_decls,
+                        &sf_ctx,
+                        &sf_mem_args,
+                        &params,
+                        &precond,
+                    );
+                    // Also emit for function parameter variants (the
+                    // evaluator dispatch branches on discriminator tag, so
+                    // both variants must be constrained).
+                    for fp_info in fun_param_infos {
+                        let fp_ctx = BpAxiomCtx::FunParam {
+                            fun: &fp_info.fun,
+                            param_sym: fp_info.param_sym,
+                            struct_inst: &info.struct_id.inst,
+                            src_struct_id: &info.struct_id,
+                            src_field_sym: info.field_sym,
+                        };
+                        self.emit_data_invariant_axiom_for_behavior(
+                            info,
+                            kind,
+                            &data_param_decls,
+                            &fp_ctx,
+                            &fp_mem_args,
+                            &params,
+                            &precond,
+                        );
+                    }
+                }
             }
         }
     }
@@ -3927,15 +4011,18 @@ impl<'env> BoogieTranslator<'env> {
                 Value::Address(a) => Some(format!("{:?}", a)),
                 _ => None,
             },
-            ExpData::Call(_, oper, args) => self
-                .translate_invariant_call_to_boogie(oper, args, var_map, ctx, mem_args, result_sub),
+            ExpData::Call(id, oper, args) => self.translate_invariant_call_to_boogie(
+                *id, oper, args, var_map, ctx, mem_args, result_sub,
+            ),
             _ => None,
         }
     }
 
     /// Translate a Call expression in a data invariant body to Boogie.
+    #[allow(clippy::too_many_arguments)]
     fn translate_invariant_call_to_boogie(
         &self,
+        node_id: NodeId,
         oper: &AstOperation,
         args: &[Exp],
         var_map: &BTreeMap<Symbol, String>,
@@ -3945,6 +4032,15 @@ impl<'env> BoogieTranslator<'env> {
     ) -> Option<String> {
         match oper {
             AstOperation::Behavior(kind, _) => {
+                // Soundness: only occurrences targeting the lifted field may be
+                // rewritten to this ctx's witness functions — an occurrence naming
+                // a different function value (e.g. a cross-field invariant) would
+                // otherwise become an assumption that is never checked. Bailing
+                // skips the axiom; the pack-time assert still enforces the
+                // original invariant.
+                if !ctx.matches_fun_ref(self.env, &args[0]) {
+                    return None;
+                }
                 // Resolve the Boogie function name for this specific BP kind:
                 // a body may mix kinds (e.g. `!aborts_of<f>(..) ==> result_of<f>(..) <= y`)
                 // and each call must map to its own kind-specific function (bool
@@ -3981,6 +4077,33 @@ impl<'env> BoogieTranslator<'env> {
                 let field_env = struct_env.get_field(*fid);
                 let field_name = boogie_field_sel(&field_env);
                 Some(format!("{}->{}", arg, field_name))
+            },
+            AstOperation::SpecFunction(mid, fid, fun_range) => {
+                // Only pure spec functions can appear in a lifted axiom body: the
+                // axiom quantifies the BP witness memories universally, and a
+                // memory-reading spec function would have to be evaluated at those
+                // quantified states, which the lifted encoding does not thread
+                // through its arguments.
+                let module_env = self.env.get_module(*mid);
+                let decl = module_env.get_spec_fun(*fid);
+                if !decl.used_memory.is_empty()
+                    || !decl.old_memory.is_empty()
+                    || !fun_range.is_default()
+                {
+                    return None;
+                }
+                let inst = self.env.get_node_instantiation(node_id);
+                if inst.iter().any(|t| t.is_open()) {
+                    return None;
+                }
+                let fun_name = boogie_spec_fun_name(&module_env, *fid, &inst, false);
+                let mut translated_args = Vec::with_capacity(args.len());
+                for a in args {
+                    translated_args.push(self.translate_invariant_body_to_boogie(
+                        a, var_map, ctx, mem_args, result_sub,
+                    )?);
+                }
+                Some(format!("{}({})", fun_name, translated_args.join(", ")))
             },
             AstOperation::Ge => {
                 self.translate_binop(">=", args, var_map, ctx, mem_args, result_sub)
@@ -4065,7 +4188,10 @@ impl<'env> BoogieTranslator<'env> {
         // an unresolvable suffix fails loudly at Boogie type check); keep raw
         // `==` otherwise so the emitted axioms for non-ghost code are
         // unchanged.
-        if ty.is_open() || type_has_ghost_transitively(self.env, &ty) {
+        if ty.is_open()
+            || type_has_ghost_transitively(self.env, &ty)
+            || !has_native_equality(self.env, self.options, &ty)
+        {
             let suffix = boogie_type_suffix(self.env, &ty, false);
             let call = format!("$IsEqual'{}'({}, {})", suffix, a, b);
             Some(if negated { format!("!{}", call) } else { call })
@@ -4093,6 +4219,50 @@ impl<'env> BoogieTranslator<'env> {
         let b =
             self.translate_invariant_body_to_boogie(&args[1], var_map, ctx, mem_args, result_sub)?;
         Some(format!("({} {} {})", a, op, b))
+    }
+
+    /// Helper: translate an equality in a data invariant body. Types with native
+    /// Boogie equality use `==`/`!=`; all others must go through
+    /// `$IsEqual'<suffix>'`, whose definition normalizes representation-dependent
+    /// values (e.g. vectors).
+    fn translate_equality(
+        &self,
+        eq: bool,
+        args: &[Exp],
+        var_map: &BTreeMap<Symbol, String>,
+        ctx: &BpAxiomCtx,
+        mem_args: &BpMemArgs,
+        result_sub: Option<&BTreeMap<Symbol, String>>,
+    ) -> Option<String> {
+        if args.len() != 2 {
+            return None;
+        }
+        let ty = self.env.get_node_type(args[0].node_id());
+        let ty = ty.skip_reference();
+        if ty.is_open() {
+            return None;
+        }
+        if has_native_equality(self.env, self.options, ty) {
+            self.translate_binop(
+                if eq { "==" } else { "!=" },
+                args,
+                var_map,
+                ctx,
+                mem_args,
+                result_sub,
+            )
+        } else {
+            let a = self
+                .translate_invariant_body_to_boogie(&args[0], var_map, ctx, mem_args, result_sub)?;
+            let b = self
+                .translate_invariant_body_to_boogie(&args[1], var_map, ctx, mem_args, result_sub)?;
+            Some(format!(
+                "{}({}, {})",
+                boogie_equality_for_type(self.env, eq, ty, false),
+                a,
+                b
+            ))
+        }
     }
 }
 
@@ -4209,6 +4379,14 @@ impl BoogieTranslator<'_> {
             if let ExpData::Call(_, AstOperation::Behavior(BehaviorKind::EnsuresOf, _), bp_args) =
                 c.as_ref()
             {
+                // Only absorb occurrences targeting the lifted field: a foreign
+                // `ensures_of` must stay in the residual, where its translation
+                // bails on the field mismatch and kills the axiom (absorbing it
+                // would bind its result vars to this ctx's result function).
+                if !ctx.matches_fun_ref(env, &bp_args[0]) {
+                    residual.push(c.clone());
+                    continue;
+                }
                 if bp_args.len() < num_inputs + 1 {
                     return None;
                 }
@@ -5854,9 +6032,12 @@ impl FunctionTranslator<'_> {
         // follows:
         // - for mutual references, by their exclusive access in Move.
         // - for immutable references because we have eliminated them
+        // The prophecy model carries no location, and reference parameters are
+        // independent prophecy pairs, so no disjointness assumption is needed.
+        let prophecy_refs = !ProverOptions::get(fun_target.global_env()).path_refs;
         for i in 0..fun_target.get_parameter_count() {
             let ty = fun_target.get_local_type(i);
-            if ty.is_reference() {
+            if ty.is_reference() && !prophecy_refs {
                 emitln!(writer, "assume $t{}->l == $Param({});", i, i);
             }
         }
@@ -5891,6 +6072,7 @@ impl FunctionTranslator<'_> {
         let options = self.parent.options;
         let fun_target = self.fun_target;
         let env = fun_target.global_env();
+        let prophecy_refs = !ProverOptions::get(env).path_refs;
 
         // Set location of this code in the CodeWriter.
         let attr_id = bytecode.get_attr_id();
@@ -6026,18 +6208,91 @@ impl FunctionTranslator<'_> {
                 then_target.as_usize(),
                 else_target.as_usize(),
             ),
-            Assign(_, dest, src, _) => {
-                emitln!(writer, "{} := {};", str_local(*dest), str_local(*src));
+            Assign(id, dest, src, _) => {
+                // Under the prophecy model a `&mut`-to-`&mut` assignment is a
+                // reborrow: fresh prophecy for the destination, source relinked to it
+                // — a verbatim copy would share one prophecy between two independently
+                // resolved handles (vacuity). Exception: an assignment marked as a
+                // *rename* (a final reborrow, see `normalize_exits`) hands the
+                // source's whole binding to the destination, so the verbatim copy is
+                // exactly right there. The scratch prophecy temp is shared across
+                // assign sites of one source; `fresh_prophecy` havocs it before
+                // each use.
+                let is_mut_ref_assign = prophecy_refs
+                    && self.get_local_type(*dest).is_mutable_reference()
+                    && self.get_local_type(*src).is_mutable_reference()
+                    && !fun_target.data.prophecy_rename_assigns.contains(id);
+                if is_mut_ref_assign {
+                    let f = self.fresh_prophecy(*src);
+                    emitln!(
+                        writer,
+                        "{} := $Mutation($Dereference({}), {});",
+                        str_local(*dest),
+                        str_local(*src),
+                        f
+                    );
+                    emitln!(
+                        writer,
+                        "{} := $UpdateMutation({}, {});",
+                        str_local(*src),
+                        str_local(*src),
+                        f
+                    );
+                } else {
+                    emitln!(writer, "{} := {};", str_local(*dest), str_local(*src));
+                }
             },
             Ret(_, rets) => {
+                // A returned `&mut` parameter is handed back twice — as the result
+                // and as its own out-value — sharing one prophecy; resolving both at
+                // the caller would pin it to two values (and, for a conditional
+                // return, equate lenders of distinct parameters). Re-borrow it here:
+                // fresh prophecy for the result, out-value relinked to it —
+                // path-correct, since this `Ret` knows which parameter its branch
+                // returns. A non-parameter return already minted its own prophecy.
+                let param_count = fun_target.get_parameter_count();
+                let mut fresh_for: BTreeMap<TempIndex, String> = BTreeMap::new();
+                let mut type_idx: BTreeMap<String, usize> = BTreeMap::new();
                 for (i, r) in rets.iter().enumerate() {
-                    emitln!(writer, "$ret{} := {};", i, str_local(*r));
+                    if prophecy_refs
+                        && *r < param_count
+                        && self.get_local_type(*r).is_mutable_reference()
+                    {
+                        let suffix = boogie_type_suffix(
+                            env,
+                            self.get_local_type(*r).skip_reference(),
+                            false,
+                        );
+                        let idx = type_idx.entry(suffix).or_insert(0);
+                        let f = self.fresh_prophecy_idx(*r, *idx);
+                        *idx = usize::saturating_add(*idx, 1);
+                        emitln!(
+                            writer,
+                            "$ret{} := $Mutation($Dereference({}), {});",
+                            i,
+                            str_local(*r),
+                            f
+                        );
+                        fresh_for.insert(*r, f);
+                    } else {
+                        emitln!(writer, "$ret{} := {};", i, str_local(*r));
+                    }
                 }
                 // Also assign input to output $mut parameters
                 let mut ret_idx = rets.len();
-                for i in 0..fun_target.get_parameter_count() {
+                for i in 0..param_count {
                     if self.get_local_type(i).is_mutable_reference() {
-                        emitln!(writer, "$ret{} := {};", ret_idx, str_local(i));
+                        if let Some(f) = fresh_for.get(&i) {
+                            emitln!(
+                                writer,
+                                "$ret{} := $UpdateMutation({}, {});",
+                                ret_idx,
+                                str_local(i),
+                                f
+                            );
+                        } else {
+                            emitln!(writer, "$ret{} := {};", ret_idx, str_local(i));
+                        }
                         ret_idx = usize::saturating_add(ret_idx, 1);
                     }
                 }
@@ -6105,8 +6360,100 @@ impl FunctionTranslator<'_> {
                     OpaqueCallBegin(..) | OpaqueCallEnd(..) => {
                         // These are just markers.  There is no generated code.
                     },
-                    WriteBack(node, edge) => {
-                        self.translate_write_back(node, edge, srcs[0]);
+                    WriteBack(node, edge) => match node {
+                        BorrowNode::GlobalRoot(memory) if prophecy_refs => {
+                            // Ghost/global write-back under prophecy: the path-free mutation
+                            // carries no location, so the resource address is threaded as the
+                            // second source (see spec_instrumentation `emit_updates`). Update
+                            // the resource memory directly, avoiding `$GlobalLocationAddress`
+                            // (undefined under prophecy).
+                            let memory = &memory.to_owned().instantiate(self.type_inst);
+                            let memory_name = boogie_resource_memory_name(env, memory, &None);
+                            emitln!(
+                                writer,
+                                "{} := $ResourceUpdate({}, $t{}, $Dereference($t{}));",
+                                memory_name,
+                                memory_name,
+                                srcs[1],
+                                srcs[0]
+                            );
+                        },
+                        _ => self.translate_write_back(node, edge, srcs[0]),
+                    },
+                    ProphecyCommitGlobal(..) => {
+                        // Global-state transition marker for a resolved global borrow: no
+                        // code is generated (the resource was eagerly updated at the
+                        // borrow). Its sole purpose is to mark the transition for the
+                        // global invariant analysis, asserted after the prophecy is
+                        // resolved.
+                    },
+                    ProphecyRepin(mem) => {
+                        // Call re-pin (see prophecy_instrumentation `call_repins`):
+                        // restore the eager global update after an intervening call may
+                        // have havoced the resource memory — re-install the reference's
+                        // prophecy, `mem := $ResourceUpdate(mem, addr, ref->f)`. srcs =
+                        // [ref, addr].
+                        let mem = mem.to_owned().instantiate(self.type_inst);
+                        let memory_name = boogie_resource_memory_name(env, &mem, &None);
+                        emitln!(
+                            writer,
+                            "{} := $ResourceUpdate({}, {}, {}->f);",
+                            memory_name,
+                            memory_name,
+                            str_local(srcs[1]),
+                            str_local(srcs[0])
+                        );
+                    },
+                    ProphecyBorrow(node, edge) => {
+                        // Eager lender update: install the child's prophecy (its final
+                        // value `r->f`) into the lender at borrow creation. This is the
+                        // prophecy counterpart of WriteBack, emitted at creation rather
+                        // than at end of scope, and reads `r->f` rather than `r->v`.
+                        // Global roots take no creation-time update here — theirs is
+                        // emitted inline at `BorrowGlobal` — so they never appear.
+                        let value = format!("{}->f", str_local(srcs[0]));
+                        self.emit_prophecy_lender_update(node, edge, &value, None);
+                    },
+                    ProphecySyncCurrent(node, edge) => {
+                        // Observation sync: conditionally install the borrowing
+                        // reference's current value into the lender, so the following
+                        // observation sees the borrow's current state. srcs =
+                        // [child, flag(, saved address)].
+                        let value = format!("$Dereference({})", str_local(srcs[0]));
+                        self.emit_prophecy_lender_update(
+                            node,
+                            edge,
+                            &value,
+                            Some((str_local(srcs[1]), srcs.get(2).map(|a| str_local(*a)))),
+                        );
+                    },
+                    ProphecySyncFinal(node, edge) => {
+                        // Restore the eager state (the child's final value) after the
+                        // observation. Same operands as `ProphecySyncCurrent`.
+                        let value = format!("{}->f", str_local(srcs[0]));
+                        self.emit_prophecy_lender_update(
+                            node,
+                            edge,
+                            &value,
+                            Some((str_local(srcs[1]), srcs.get(2).map(|a| str_local(*a)))),
+                        );
+                    },
+                    Resolve => {
+                        // Fulfill the prophecy: the value the borrow leaves behind is its
+                        // final value. Combined with the eager lender update at creation,
+                        // this flows the mutation back to the lender with no path.
+                        let r = str_local(srcs[0]);
+                        emitln!(writer, "assume {}->v == {}->f;", r, r);
+                    },
+                    ResolveReturn => {
+                        // A returned &mut is derived from a parameter, not committed: leave
+                        // its prophecy free in the inlined (Baseline) body for the caller to
+                        // resolve. Only standalone verification (no caller) finalizes it, so
+                        // postconditions over `result` hold.
+                        if !baseline_flag {
+                            let r = str_local(srcs[0]);
+                            emitln!(writer, "assume {}->v == {}->f;", r, r);
+                        }
                     },
                     IsParent(node, edge) => {
                         if let BorrowNode::Reference(parent) = node {
@@ -6155,13 +6502,27 @@ impl FunctionTranslator<'_> {
                     BorrowLoc => {
                         let src = srcs[0];
                         let dest = dests[0];
-                        emitln!(
-                            writer,
-                            "{} := $Mutation($Local({}), EmptyVec(), {});",
-                            str_local(dest),
-                            src,
-                            str_local(src)
-                        );
+                        if prophecy_refs {
+                            // Path-free: the child holds the borrowed value and a fresh
+                            // prophecy as its final value. The eager lender update is
+                            // emitted by the following ProphecyBorrow instruction.
+                            let f = self.fresh_prophecy(dest);
+                            emitln!(
+                                writer,
+                                "{} := $Mutation({}, {});",
+                                str_local(dest),
+                                str_local(src),
+                                f
+                            );
+                        } else {
+                            emitln!(
+                                writer,
+                                "{} := $Mutation($Local({}), EmptyVec(), {});",
+                                str_local(dest),
+                                src,
+                                str_local(src)
+                            );
+                        }
                     },
                     ReadRef => {
                         let src = srcs[0];
@@ -6526,15 +6887,30 @@ impl FunctionTranslator<'_> {
                         self.check_intrinsic_select(attr_id, &struct_env);
                         let field_env = &struct_env.get_field_by_offset(*field_offset);
                         let field_sel = boogie_field_sel(field_env);
-                        emitln!(
-                            writer,
-                            "{} := $ChildMutation({}, {}, $Dereference({})->{});",
-                            dest_str,
-                            src_str,
-                            field_offset,
-                            src_str,
-                            field_sel,
-                        );
+                        if prophecy_refs {
+                            // Path-free: child holds the current field value and a fresh
+                            // prophecy. The eager parent update is emitted by the
+                            // following ProphecyBorrow instruction.
+                            let f = self.fresh_prophecy(dests[0]);
+                            emitln!(
+                                writer,
+                                "{} := $Mutation($Dereference({})->{}, {});",
+                                dest_str,
+                                src_str,
+                                field_sel,
+                                f
+                            );
+                        } else {
+                            emitln!(
+                                writer,
+                                "{} := $ChildMutation({}, {}, $Dereference({})->{});",
+                                dest_str,
+                                src_str,
+                                field_offset,
+                                src_str,
+                                field_sel,
+                            );
+                        }
                     },
                     BorrowVariantField(mid, sid, variants, inst, field_offset) => {
                         let inst = &self.inst_slice(inst);
@@ -6543,6 +6919,14 @@ impl FunctionTranslator<'_> {
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         self.check_intrinsic_select(attr_id, &struct_env);
+                        // Path-free prophecy: the child holds the current field value and a
+                        // fresh prophecy; the eager parent update is the following
+                        // ProphecyBorrow (mirrors `BorrowField`).
+                        let proph = if prophecy_refs {
+                            Some(self.fresh_prophecy(dests[0]))
+                        } else {
+                            None
+                        };
                         let mut else_symbol = "";
                         // Need to go through all variants to find the correct field
                         for variant in variants {
@@ -6555,15 +6939,26 @@ impl FunctionTranslator<'_> {
                             );
                             let field_sel = boogie_field_sel(&field_env);
                             emitln!(writer, "{} is {}) {{", deref_src_str, struct_variant_name);
-                            emitln!(
-                                writer,
-                                "{} := $ChildMutation({}, {}, {}->{});",
-                                dest_str,
-                                src_str,
-                                field_offset,
-                                deref_src_str,
-                                field_sel,
-                            );
+                            if let Some(f) = &proph {
+                                emitln!(
+                                    writer,
+                                    "{} := $Mutation({}->{}, {});",
+                                    dest_str,
+                                    deref_src_str,
+                                    field_sel,
+                                    f
+                                );
+                            } else {
+                                emitln!(
+                                    writer,
+                                    "{} := $ChildMutation({}, {}, {}->{});",
+                                    dest_str,
+                                    src_str,
+                                    field_offset,
+                                    deref_src_str,
+                                    field_sel,
+                                );
+                            }
                             emitln!(writer, "}");
                             if else_symbol.is_empty() {
                                 else_symbol = " else ";
@@ -6645,16 +7040,44 @@ impl FunctionTranslator<'_> {
                         emitln!(writer, "if (!$ResourceExists({}, {})) {{", memory, addr_str);
                         writer.with_indent(|| emitln!(writer, "call $ExecFailureAbort();"));
                         emitln!(writer, "} else {");
-                        writer.with_indent(|| {
-                            emitln!(
-                                writer,
-                                "{} := $Mutation($Global({}), EmptyVec(), $ResourceValue({}, {}));",
-                                dest_str,
-                                addr_str,
-                                memory,
-                                addr_str
-                            );
-                        });
+                        if prophecy_refs {
+                            // Path-free: the reference holds the current resource value
+                            // and a fresh prophecy, and the resource is eagerly set to
+                            // that prophecy. The global invariant is asserted later, at
+                            // the resolve marker (ProphecyCommitGlobal), once the
+                            // prophecy is fulfilled. The address is read here, where it is
+                            // live, rather than at resolution.
+                            writer.with_indent(|| {
+                                let f = self.fresh_prophecy(dests[0]);
+                                emitln!(
+                                    writer,
+                                    "{} := $Mutation($ResourceValue({}, {}), {});",
+                                    dest_str,
+                                    memory,
+                                    addr_str,
+                                    f
+                                );
+                                emitln!(
+                                    writer,
+                                    "{} := $ResourceUpdate({}, {}, {});",
+                                    memory,
+                                    memory,
+                                    addr_str,
+                                    f
+                                );
+                            });
+                        } else {
+                            writer.with_indent(|| {
+                                emitln!(
+                                    writer,
+                                    "{} := $Mutation($Global({}), EmptyVec(), $ResourceValue({}, {}));",
+                                    dest_str,
+                                    addr_str,
+                                    memory,
+                                    addr_str
+                                );
+                            });
+                        }
                         emitln!(writer, "}");
                     },
                     GetGlobal(mid, sid, inst) => {
@@ -7269,7 +7692,11 @@ impl FunctionTranslator<'_> {
                         make_bitwise(bv_oper_str, op1, op2, dest);
                     },
                     Uninit => {
-                        emitln!(writer, "assume $t{}->l == $Uninitialized();", srcs[0]);
+                        if !prophecy_refs {
+                            // The prophecy datatype carries no location, so there is
+                            // nothing to mark uninitialized; the value stays havoced.
+                            emitln!(writer, "assume $t{}->l == $Uninitialized();", srcs[0]);
+                        }
                     },
                     Drop | Release => {},
                     TraceLocal(idx) => {
@@ -7442,6 +7869,161 @@ impl FunctionTranslator<'_> {
         }
 
         false
+    }
+
+    /// Emit a havoc of a scratch temp typed as the referent of the reference `ref_temp`,
+    /// and return its Boogie name. Used as a fresh prophecy (final value) for the
+    /// path-free prophecy reference model. The corresponding scratch temp is reserved in
+    /// `compute_needed_temps`.
+    fn fresh_prophecy(&self, ref_temp: TempIndex) -> String {
+        self.fresh_prophecy_idx(ref_temp, 0)
+    }
+
+    /// Mint a fresh prophecy value (a havoced scratch temp of `ref_temp`'s referent type) for
+    /// the given temp pool index. Index 0 is used by single-borrow sites; the `Ret` re-borrow
+    /// uses successive indices when one return statement re-borrows several same-typed
+    /// references.
+    fn fresh_prophecy_idx(&self, ref_temp: TempIndex, idx: usize) -> String {
+        let env = self.fun_target.global_env();
+        let writer = self.parent.writer;
+        let global_state = env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let baseline_flag = self.fun_target.data.variant == FunctionVariant::Baseline;
+        let mid = self.fun_target.func_env.module_env.get_id();
+        let fid = self.fun_target.func_env.get_id();
+        let num_oper = global_state
+            .get_temp_index_oper(mid, fid, ref_temp, baseline_flag)
+            .unwrap();
+        let bv_flag = self.bv_flag(num_oper);
+        let ty = self.get_local_type(ref_temp);
+        let temp_str = boogie_temp(env, ty.skip_reference(), idx, bv_flag);
+        emitln!(writer, "havoc {};", temp_str);
+        temp_str
+    }
+
+    /// Emit a prophecy lender update: install `value` into the lender identified
+    /// by `(node, edge)`. Unguarded, this is the creation-time eager update
+    /// (`ProphecyBorrow`); with `guard = Some((flag, addr))` the assignment is
+    /// conditional on the path flag — the form used by observation syncs — and a
+    /// `GlobalRoot` lender updates the resource at the saved borrow address.
+    fn emit_prophecy_lender_update(
+        &self,
+        node: &BorrowNode,
+        edge: &BorrowEdge,
+        value: &str,
+        guard: Option<(String, Option<String>)>,
+    ) {
+        let writer = self.parent.writer;
+        let env = self.parent.env;
+        let str_local = |idx: usize| format!("$t{}", idx);
+        let (lhs, updated) = match (node, edge) {
+            (BorrowNode::LocalRoot(x), BorrowEdge::Direct) => (str_local(*x), value.to_string()),
+            (BorrowNode::Reference(s), BorrowEdge::Direct) => {
+                let s = str_local(*s);
+                let updated = format!("$UpdateMutation({}, {})", s, value);
+                (s, updated)
+            },
+            (BorrowNode::Reference(s), BorrowEdge::Field(mem, variant, offset)) => {
+                let mem = mem.to_owned().instantiate(self.type_inst);
+                let struct_env = env.get_struct_qid(mem.to_qualified_id());
+                let update_fun = if let Some(variants) = variant {
+                    // Enum variant field: use the variant-specific update function
+                    // (mirrors the static write-back). The borrow only succeeded in
+                    // this variant, so the update is applied in it.
+                    let field_env =
+                        struct_env.get_field_by_offset_optional_variant(Some(variants[0]), *offset);
+                    let global_state = &self
+                        .parent
+                        .env
+                        .get_extension::<GlobalNumberOperationState>()
+                        .expect("global number operation state");
+                    let type_name = boogie_type_for_struct_field(
+                        global_state,
+                        &field_env,
+                        self.parent.env,
+                        &field_env.get_type(),
+                    );
+                    boogie_variant_field_update(&field_env, type_name, &mem.inst)
+                } else {
+                    let field_env = struct_env.get_field_by_offset_optional_variant(None, *offset);
+                    boogie_field_update(&field_env, &mem.inst)
+                };
+                let s = str_local(*s);
+                let updated = format!(
+                    "$UpdateMutation({}, {}($Dereference({}), {}))",
+                    s, update_fun, s, value
+                );
+                (s, updated)
+            },
+            (BorrowNode::Reference(s), BorrowEdge::Index(kind)) => {
+                // Element borrow through a native `borrow_mut` (vector/table): update
+                // the container at the selector saved at the borrow site. Sync sites
+                // are only created for the vector/table kinds (`compute_sync_sites`).
+                let (_, sel) = guard
+                    .as_ref()
+                    .expect("index lender update requires a guarded sync");
+                let sel = sel
+                    .as_ref()
+                    .expect("index lender update requires the saved selector");
+                let (update_fun, sel_expr) = match kind {
+                    IndexEdgeKind::Vector => ("UpdateVec", sel.to_string()),
+                    IndexEdgeKind::Table => {
+                        // Table slots are keyed by the encoded key, mirroring the
+                        // native template (`table_module` in native.bpl).
+                        let table_ty = self
+                            .get_local_type(*s)
+                            .skip_reference()
+                            .instantiate(self.type_inst);
+                        let Type::Struct(_, _, targs) = &table_ty else {
+                            unreachable!("table lender must have a struct type")
+                        };
+                        let suffix = boogie_type_suffix(env, &targs[0], false);
+                        ("UpdateTable", format!("$EncodeKey'{}'({})", suffix, sel))
+                    },
+                    IndexEdgeKind::Custom(..) => {
+                        unreachable!("no sync sites are created for custom borrow natives")
+                    },
+                };
+                let s = str_local(*s);
+                let updated = format!(
+                    "$UpdateMutation({}, {}($Dereference({}), {}, {}))",
+                    s, update_fun, s, sel_expr, value
+                );
+                (s, updated)
+            },
+            (BorrowNode::GlobalRoot(mem), BorrowEdge::Direct) => {
+                let (_, addr) = guard
+                    .as_ref()
+                    .expect("global lender update requires a guarded sync");
+                let addr = addr
+                    .as_ref()
+                    .expect("global lender update requires the saved borrow address");
+                let mem = mem.to_owned().instantiate(self.type_inst);
+                let memory_name = boogie_resource_memory_name(env, &mem, &None);
+                let updated = format!("$ResourceUpdate({}, {}, {})", memory_name, addr, value);
+                (memory_name, updated)
+            },
+            _ => unreachable!(
+                "unsupported prophecy lender update: {:?} / {:?}",
+                node, edge
+            ),
+        };
+        match guard {
+            Some((flag, _)) => {
+                emitln!(
+                    writer,
+                    "{} := (if {} then {} else {});",
+                    lhs,
+                    flag,
+                    updated,
+                    lhs
+                );
+            },
+            None => {
+                emitln!(writer, "{} := {};", lhs, updated);
+            },
+        }
     }
 
     fn translate_write_back(&self, dest: &BorrowNode, edge: &BorrowEdge, src: TempIndex) {
@@ -7996,6 +8578,7 @@ impl FunctionTranslator<'_> {
             .expect("global number operation state");
         let mid = fun_target.func_env.module_env.get_id();
         let fid = fun_target.func_env.get_id();
+        let prophecy_refs = !ProverOptions::get(env).path_refs;
 
         for bc in &fun_target.data.code {
             match bc {
@@ -8062,6 +8645,18 @@ impl FunctionTranslator<'_> {
                             need(&ty, false, *cnt);
                         }
                     },
+                    BorrowLoc | BorrowField(..) | BorrowVariantField(..) | BorrowGlobal(..)
+                        if prophecy_refs =>
+                    {
+                        // Reserve a scratch temp for the fresh prophecy minted at the
+                        // creation of this borrow (see fresh_prophecy).
+                        let ty = &self.get_local_type(dests[0]);
+                        let num_oper = &global_state
+                            .get_temp_index_oper(mid, fid, dests[0], baseline_flag)
+                            .unwrap();
+                        let bv_flag = self.bv_flag(num_oper, ty);
+                        need(ty, bv_flag, 1)
+                    },
                     _ => {},
                 },
                 Prop(_, PropKind::Modifies, exp) => {
@@ -8070,6 +8665,49 @@ impl FunctionTranslator<'_> {
                         bv_flag_for_type(env, &global_state.get_node_num_oper(exp.node_id()), &ty);
                     need(&BOOL_TYPE, false, 1);
                     need(&ty, bv_flag, 1)
+                },
+                Ret(_, rets) if prophecy_refs => {
+                    // Reserve scratch temps for the fresh prophecies minted when re-borrowing
+                    // returned `&mut` parameters (see the `Ret` translation). Count per type
+                    // suffix so a return of several same-typed references gets distinct temps.
+                    let mut per_suffix: BTreeMap<String, usize> = BTreeMap::new();
+                    for &r in rets {
+                        if r < fun_target.get_parameter_count()
+                            && self.get_local_type(r).is_mutable_reference()
+                        {
+                            let ty = self.get_local_type(r);
+                            let suffix = boogie_type_suffix(env, ty.skip_reference(), false);
+                            *per_suffix.entry(suffix).or_insert(0) += 1;
+                        }
+                    }
+                    for &r in rets {
+                        if r < fun_target.get_parameter_count()
+                            && self.get_local_type(r).is_mutable_reference()
+                        {
+                            let ty = &self.get_local_type(r);
+                            let num_oper = &global_state
+                                .get_temp_index_oper(mid, fid, r, baseline_flag)
+                                .unwrap();
+                            let bv_flag = self.bv_flag(num_oper);
+                            let suffix = boogie_type_suffix(env, ty.skip_reference(), false);
+                            need(ty, bv_flag, per_suffix[&suffix]);
+                        }
+                    }
+                },
+                Assign(_, dest, src, _)
+                    if prophecy_refs
+                        && self.get_local_type(*dest).is_mutable_reference()
+                        && self.get_local_type(*src).is_mutable_reference() =>
+                {
+                    // Reserve a scratch temp for the fresh prophecy minted when a
+                    // `&mut`-to-`&mut` assignment re-borrows its source (see the `Assign`
+                    // translation).
+                    let ty = &self.get_local_type(*src);
+                    let num_oper = &global_state
+                        .get_temp_index_oper(mid, fid, *src, baseline_flag)
+                        .unwrap();
+                    let bv_flag = self.bv_flag(num_oper);
+                    need(ty, bv_flag, 1);
                 },
                 _ => {},
             }

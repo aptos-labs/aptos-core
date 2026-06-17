@@ -1215,6 +1215,13 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::Stop
             | Operation::IsParent(_, _)
             | Operation::WriteBack(_, _)
+            | Operation::ProphecyBorrow(_, _)
+            | Operation::ProphecyCommitGlobal(_)
+            | Operation::ProphecyRepin(_)
+            | Operation::ProphecySyncCurrent(_, _)
+            | Operation::ProphecySyncFinal(_, _)
+            | Operation::Resolve
+            | Operation::ResolveReturn
             | Operation::UnpackRef
             | Operation::PackRef
             | Operation::UnpackRefDeep

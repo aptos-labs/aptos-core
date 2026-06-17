@@ -6,7 +6,7 @@
 use crate::{memory_instrumentation::Instrumenter, options::ProverOptions};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{self, QuantKind},
+    ast::{self, QuantKind, TempIndex},
     exp_generator::ExpGenerator,
     model::FunctionEnv,
     ty::{PrimitiveType, Type},
@@ -16,7 +16,9 @@ use move_stackless_bytecode::{
     function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{Bytecode, HavocKind, Label, Operation, PropKind},
+    stackless_bytecode::{
+        AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label, Operation, PropKind,
+    },
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -68,6 +70,64 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
 }
 
 impl LoopAnalysisProcessor {
+    /// Collect the prophecy observation syncs for a loop's invariant group: the
+    /// union over the invariants' attributes of the entries recorded by
+    /// `prophecy_instrumentation`, deduplicated by site (consecutive invariants
+    /// record identical lists). Empty under `--path-refs`.
+    fn prophecy_syncs_for_invariants(
+        builder: &FunctionDataBuilder,
+        invariants: &BTreeMap<CodeOffset, (AttrId, ast::Exp)>,
+    ) -> Vec<(
+        BorrowNode,
+        BorrowEdge,
+        TempIndex,
+        TempIndex,
+        Option<TempIndex>,
+    )> {
+        let mut seen = BTreeSet::new();
+        let mut result = vec![];
+        for (attr_id, _) in invariants.values() {
+            if let Some(entries) = builder.data.loop_invariant_prophecy_syncs.get(attr_id) {
+                for entry in entries {
+                    // The path flag identifies the borrow site.
+                    if seen.insert(entry.3) {
+                        result.push(entry.clone());
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Emit the prophecy observation syncs (`current == true`) or restores
+    /// (`current == false`) bracketing a loop-invariant group, so the invariants
+    /// observe the current value of every borrowed lender instead of the eagerly
+    /// installed prophecy (see `prophecy_instrumentation`).
+    fn emit_prophecy_syncs(
+        builder: &mut FunctionDataBuilder,
+        syncs: &[(
+            BorrowNode,
+            BorrowEdge,
+            TempIndex,
+            TempIndex,
+            Option<TempIndex>,
+        )],
+        current: bool,
+    ) {
+        for (node, edge, child, flag, addr) in syncs {
+            let op = if current {
+                Operation::ProphecySyncCurrent(node.clone(), edge.clone())
+            } else {
+                Operation::ProphecySyncFinal(node.clone(), edge.clone())
+            };
+            let mut srcs = vec![*child, *flag];
+            if let Some(addr) = addr {
+                srcs.push(*addr);
+            }
+            builder.emit_with(|id| Bytecode::Call(id, vec![], op, srcs, None));
+        }
+    }
+
     /// Perform a loop transformation that eliminate back-edges in a loop and flatten the function
     /// CFG into a directed acyclic graph (DAG).
     ///
@@ -105,7 +165,12 @@ impl LoopAnalysisProcessor {
                     builder.emit(bytecode);
                     builder.set_loc_from_attr(attr_id);
                     if let Some(loop_info) = loop_annotation.fat_loops.get(&label) {
+                        let prophecy_syncs = Self::prophecy_syncs_for_invariants(
+                            &builder,
+                            &loop_info.spec_info().invariants,
+                        );
                         // assert loop invariants -> this is the base case
+                        Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, true);
                         for (i, (attr_id, exp)) in
                             loop_info.spec_info().invariants.values().enumerate()
                         {
@@ -131,6 +196,7 @@ impl LoopAnalysisProcessor {
                                 Bytecode::Prop(attr_id, PropKind::Assert, exp.clone())
                             });
                         }
+                        Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, false);
 
                         // havoc all loop targets
                         for idx in &loop_info.spec_info().val_targets {
@@ -290,9 +356,11 @@ impl LoopAnalysisProcessor {
                         builder.emit_with(|attr_id| Bytecode::Prop(attr_id, PropKind::Assume, exp));
 
                         // re-assume loop invariants
+                        Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, true);
                         for (attr_id, exp) in loop_info.spec_info().invariants.values() {
                             builder.emit(Bytecode::Prop(*attr_id, PropKind::Assume, exp.clone()));
                         }
+                        Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, false);
                     }
                 },
                 Bytecode::Prop(_, PropKind::Assert, _)
@@ -328,6 +396,9 @@ impl LoopAnalysisProcessor {
             builder.clear_next_debug_comment();
 
             // add instrumentations to assert loop invariants -> this is the induction case
+            let prophecy_syncs =
+                Self::prophecy_syncs_for_invariants(&builder, &loop_info.spec_info().invariants);
+            Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, true);
             for (i, (attr_id, exp)) in loop_info.spec_info().invariants.values().enumerate() {
                 // insert write-back actions before the first assertion
                 if i == 0 {
@@ -349,6 +420,7 @@ impl LoopAnalysisProcessor {
                 );
                 builder.emit_with(|attr_id| Bytecode::Prop(attr_id, PropKind::Assert, exp.clone()));
             }
+            Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, false);
 
             // stop the checking in proving mode (branch back to loop header for interpretation mode)
             builder.emit_with(|attr_id| {

@@ -251,6 +251,15 @@ pub fn add_prelude(
     options: &BoogieOptions,
     writer: &CodeWriter,
 ) -> anyhow::Result<()> {
+    // The prelude templates branch on the reference model (`options.path_refs`),
+    // which is a prover-level choice. Derive it from `ProverOptions` here, at the
+    // single point the templates consume it, so no embedder has to keep the
+    // `BoogieOptions` mirror in sync (a stale mirror would silently compile the
+    // prelude for the wrong model).
+    let mut patched_options = options.clone();
+    patched_options.path_refs =
+        move_prover_bytecode_pipeline::options::ProverOptions::get(env).path_refs;
+    let options = &patched_options;
     emit!(writer, "\n// ** Expanded prelude\n\n");
     let templ = |name: &'static str, cont: &[u8]| (name, String::from_utf8_lossy(cont).to_string());
 

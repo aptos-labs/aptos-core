@@ -1,0 +1,44 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/prophecy_observe_sync.move:27:13
+   │
+27 │             assert x == 100; // error: intended failure guards against vacuity
+   │             ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/prophecy_observe_sync.move:16: observe_between_writes
+   =         s = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:17: observe_between_writes
+   =         c = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:18: observe_between_writes
+   =         c = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:20: observe_between_writes
+   =     at tests/sources/functional/prophecy_observe_sync.move:21: observe_between_writes
+   =     at tests/sources/functional/prophecy_observe_sync.move:23: observe_between_writes
+   =         c = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:24: observe_between_writes
+   =         x = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:26: observe_between_writes
+   =     at tests/sources/functional/prophecy_observe_sync.move:27: observe_between_writes
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/prophecy_observe_sync.move:51:13
+   │
+51 │             assert x == 5; // error: intended failure guards against vacuity
+   │             ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/prophecy_observe_sync.move:34: observe_after_join
+   =         c = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:35: observe_after_join
+   =         x = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:37: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:38: observe_after_join
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:39: observe_after_join
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:44: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:45: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:46: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:48: observe_after_join
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/prophecy_observe_sync.move:50: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:51: observe_after_join

@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:28:9
+   │
+28 │ ╭         ensures forall S in *:
+29 │ │             (S |~ exists<Box<u64>>(a)) ==> (S |~ can_put(a, false)); // error: wrong instantiation
+   │ ╰────────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:18: test
+   =         a = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:19: test
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:7: put
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:8: put
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:7: put
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:20: test
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:7: put
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:8: put
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:7: put
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:24: test (spec)
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:26: test (spec)
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_bp_generic.move:28: test (spec)

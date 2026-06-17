@@ -75,6 +75,10 @@ pub struct SpecTranslator<'env> {
     fresh_var_count: RefCell<usize>,
     /// Whether we are inside `old()` within a spec fun body that uses old.
     in_old_context: RefCell<bool>,
+    /// Whether we are translating the body of a spec function. In this context
+    /// memory is referenced through the enclosing Boogie function's parameters
+    /// (`old_X`/`X`) instead of global variables or `old(...)`.
+    in_spec_fun_body: bool,
     /// The set of old-context memory for the spec fun currently being translated (if any).
     fun_old_memory: Option<BTreeSet<QualifiedInstId<StructId>>>,
     /// The set of &mut parameter names for the spec fun being translated.
@@ -177,6 +181,7 @@ impl<'env> SpecTranslator<'env> {
             type_inst: vec![],
             fresh_var_count: Default::default(),
             in_old_context: RefCell::new(false),
+            in_spec_fun_body: false,
             fun_old_memory: None,
             fun_mut_params: BTreeSet::new(),
             lifted_choice_infos: Default::default(),
@@ -882,8 +887,9 @@ impl SpecTranslator<'_> {
                 }
                 emit!(self.writer, " :: ");
             }
+            let mut trans = self.clone();
+            trans.in_spec_fun_body = true;
             if fun.uses_old {
-                let mut trans = self.clone();
                 trans.fun_old_memory = Some(old_memory);
                 trans.fun_mut_params = fun
                     .params
@@ -891,10 +897,8 @@ impl SpecTranslator<'_> {
                     .filter(|Parameter(_, ty, _)| ty.is_mutable_reference())
                     .map(|Parameter(name, _, _)| *name)
                     .collect();
-                trans.translate_exp(body);
-            } else {
-                self.translate_exp(body);
             }
+            trans.translate_exp(body);
             if !intermediate_labels.is_empty() {
                 emit!(self.writer, ")");
             }
@@ -1005,9 +1009,10 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, " :: ");
             }
 
+            let mut trans = self.clone();
+            trans.in_spec_fun_body = true;
             if fun.uses_old {
                 // Set up old-aware context for body translation
-                let mut trans = self.clone();
                 trans.fun_old_memory = Some(old_memory);
                 trans.fun_mut_params = fun
                     .params
@@ -1015,10 +1020,8 @@ impl SpecTranslator<'_> {
                     .filter(|Parameter(_, ty, _)| ty.is_mutable_reference())
                     .map(|Parameter(name, _, _)| *name)
                     .collect();
-                trans.translate_exp(body);
-            } else {
-                self.translate_exp(body);
             }
+            trans.translate_exp(body);
 
             // Close existential
             if !intermediate_labels.is_empty() {
@@ -2253,37 +2256,20 @@ impl SpecTranslator<'_> {
         // Emit memory args following the same dual-state pattern as build_memory_params.
         // Use resolve_memory_name to resolve labels through the label chain — when a
         // resource type was not modified at a label, its memory resolves to the predecessor.
-        let uses_old = !union_old_memory.is_empty();
-        let current = match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf
-            | BehaviorKind::ResultOf
-            | BehaviorKind::UnchangedOf
-            | BehaviorKind::FoldsOf
-            | BehaviorKind::WriteOf(_) => post,
-        };
         let mut first = true;
-        for memory in &union_used_memory {
-            if uses_old && union_old_memory.contains(memory) {
-                // Check that the pre-state memory reference will be declared.
-                if !self.check_name_declared(node_id, kind, *pre, memory) {
-                    return !first;
-                }
+        for (memory, labels) in
+            evaluator_memory_slot_labels(kind, pre, post, &union_used_memory, &union_old_memory)
+        {
+            // Check that the pre-state memory reference of a slot pair will be declared.
+            if labels.len() == 2 && !self.check_name_declared(node_id, kind, *pre, memory) {
+                return !first;
+            }
+            for label in labels {
                 if !first {
                     emit!(self.writer, ", ");
                 }
                 first = false;
-                let pre_name = self.resolve_memory_name(memory, *pre);
-                emit!(self.writer, &pre_name);
-                emit!(self.writer, ", ");
-                let current_name = self.resolve_memory_name(memory, *current);
-                emit!(self.writer, &current_name);
-            } else {
-                if !first {
-                    emit!(self.writer, ", ");
-                }
-                first = false;
-                let mem_name = self.resolve_memory_name(memory, *current);
+                let mem_name = self.resolve_memory_name(memory, label);
                 emit!(self.writer, &mem_name);
             }
         }
@@ -2503,15 +2489,29 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, ", ");
                 }
                 first = false;
-                // When pre is None (no explicit label) and we're in a procedure context
-                // (not a spec function body), use old() to reference entry state;
-                // without old(), the unlabeled memory name is the exit state in ensures.
+                // When pre is None (no explicit label): in a procedure context, use
+                // old() to reference the entry state (without old(), the unlabeled
+                // memory name is the exit state in ensures). In a spec function body,
+                // reference the enclosing function's parameters: the pre-state
+                // parameter `old_X` for two-state kinds (it exists since the
+                // predicate target's old memory is folded into the enclosing
+                // function's `old_memory`), and the current-state parameter for
+                // one-state kinds, which evaluate all slots at a single state.
                 // When pre is Some, resolve through label chain for non-modified types.
-                let pre_name = if pre.is_none() && self.fun_old_memory.is_none() {
-                    format!(
-                        "old({})",
-                        boogie_resource_memory_name(self.env, memory, &pre)
-                    )
+                let pre_name = if pre.is_none() {
+                    if !self.in_spec_fun_body {
+                        format!(
+                            "old({})",
+                            boogie_resource_memory_name(self.env, memory, &pre)
+                        )
+                    } else if kind.is_two_state() {
+                        format!(
+                            "old_{}",
+                            boogie_resource_memory_name(self.env, memory, &None)
+                        )
+                    } else {
+                        boogie_resource_memory_name(self.env, memory, &None)
+                    }
                 } else {
                     self.resolve_memory_name(memory, pre)
                 };
@@ -2543,8 +2543,8 @@ impl SpecTranslator<'_> {
         pre: Option<MemoryLabel>,
         memory: &QualifiedInstId<StructId>,
     ) -> bool {
-        if self.fun_old_memory.is_some() {
-            return true; // spec function body — pre maps to old_ param
+        if self.in_spec_fun_body {
+            return true; // spec function body — pre maps to a function parameter
         }
         let declared = self.declared_mem_names.borrow();
         if declared.is_empty() {
@@ -3241,6 +3241,23 @@ impl SpecTranslator<'_> {
             .error(loc, "type values not supported by this backend");
     }
 
+    /// Collects behavioral-predicate applications (`ensures_of`/`aborts_of`/`result_of`/…)
+    /// in a quantifier body, returned as `&Exp` so they can be re-emitted as trigger
+    /// patterns. Deliberately recurses through `Call` nodes only — which covers
+    /// data-invariant bodies (`Not`/`Implies`/`And`/comparisons wrapping the predicate) —
+    /// and not under nested binders, whose predicates would yield triggers with
+    /// unbound variables.
+    fn collect_behavior_exps<'e>(exp: &'e Exp, out: &mut Vec<&'e Exp>) {
+        if let ExpData::Call(_, op, args) = exp.as_ref() {
+            if matches!(op, Operation::Behavior(..)) {
+                out.push(exp);
+            }
+            for arg in args {
+                Self::collect_behavior_exps(arg, out);
+            }
+        }
+    }
+
     /// Collect (label, memory_type) pairs from an expression for labels that need
     /// existential quantification in Boogie function bodies.
     pub fn collect_intermediate_labels_from_exp(
@@ -3284,33 +3301,69 @@ impl SpecTranslator<'_> {
                             }
                         }
                     },
-                    Operation::Behavior(_, range) if !range.is_default() => {
-                        // Resolve the closure (first arg) to get the function's memory usage.
-                        if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
-                            args.first().map(|a| a.as_ref())
-                        {
-                            let inst = env.get_node_instantiation(*closure_id);
-                            let inst = Type::instantiate_slice(&inst, type_inst);
-                            let fun_env = env.get_function(mid.qualified(*fid));
-                            for mem in fun_env.get_spec_used_memory() {
-                                let mem = mem.clone().instantiate(&inst);
-                                for label in range.labels() {
-                                    result.insert((label, mem.clone()));
-                                }
-                            }
-                            for mem in fun_env.get_spec_old_memory() {
-                                let mem = mem.clone().instantiate(&inst);
-                                for label in range.labels() {
-                                    result.insert((label, mem.clone()));
-                                }
-                            }
-                        }
+                    Operation::Behavior(kind, range) if !range.is_default() => {
+                        // Bind exactly the (label, memory) pairs the predicate's rendered
+                        // argument slots will carry. A binder without a matching rendered
+                        // slot would be unused and invalidate the quantifier's trigger; a
+                        // rendered slot without a binder would pin the predicate to the
+                        // ambient state, so the `forall S` universal could not be
+                        // instantiated once the heap moves.
+                        result.extend(self.behavior_slot_label_pairs(*kind, range, args));
                     },
                     _ => {},
                 }
             }
             true
         });
+        result
+    }
+
+    /// The (label, memory) pairs a behavioral predicate application's rendered
+    /// memory slots carry, following the same dispatch as its emission: a closure
+    /// literal renders the target function's own spec memory
+    /// (`emit_fun_spec_memory_args`), everything else the evaluator's type union
+    /// (`emit_evaluator_memory_args`). Both sides use the shared slot-label rule.
+    fn behavior_slot_label_pairs(
+        &self,
+        kind: BehaviorKind,
+        range: &MemoryRange,
+        args: &[Exp],
+    ) -> BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> {
+        let env = self.env;
+        let mut result = BTreeSet::new();
+        let Some(fun_arg) = args.first() else {
+            return result;
+        };
+        let (used_memory, old_memory) =
+            if let ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _) = fun_arg.as_ref()
+            {
+                let inst = env.get_node_instantiation(*closure_id);
+                let inst = Type::instantiate_slice(&inst, &self.type_inst);
+                let fun_env = env.get_function(mid.qualified(*fid));
+                let used: BTreeSet<_> = fun_env
+                    .get_spec_used_memory()
+                    .iter()
+                    .map(|m| m.clone().instantiate(&inst))
+                    .collect();
+                let old: BTreeSet<_> = fun_env
+                    .get_spec_old_memory()
+                    .iter()
+                    .map(|m| m.clone().instantiate(&inst))
+                    .collect();
+                (used, old)
+            } else {
+                let fun_type = env
+                    .get_node_type(fun_arg.node_id())
+                    .instantiate(&self.type_inst);
+                compute_evaluator_memory_union(env, &fun_type)
+            };
+        for (memory, labels) in
+            evaluator_memory_slot_labels(kind, &range.pre, &range.post, &used_memory, &old_memory)
+        {
+            for label in labels.into_iter().flatten() {
+                result.insert((label, memory.clone()));
+            }
+        }
         result
     }
 
@@ -3903,6 +3956,83 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, "}");
             }
         } else {
+            // Implicit trigger for a StateDomain quantifier: a state-quantified
+            // behavioral predicate is only usable when *assumed* if its universal
+            // carries a trigger, and Boogie infers none for the `$Memory`-typed
+            // binders. Emit the body's behavioral-predicate applications as a single
+            // multi-pattern trigger — together they mention every bound memory and
+            // value variable, so the quantifier instantiates at a matching predicate
+            // term (an abort check or invariant assertion at a call/resolve site).
+            let has_state_domain = ranges.iter().any(|(_, range)| {
+                matches!(
+                    self.get_node_type(range.node_id()).skip_reference(),
+                    Type::StateDomain
+                )
+            });
+            if has_state_domain {
+                let mut behavior_exps: Vec<&Exp> = vec![];
+                Self::collect_behavior_exps(body, &mut behavior_exps);
+                // A trigger is only admissible if its patterns jointly mention every
+                // bound variable. Check structurally before emitting: every bound
+                // value variable must occur free in some collected predicate, every
+                // memory binder of a state variable must be carried by some
+                // predicate's rendered slots, and no state variable may bind `&mut`
+                // value-state witnesses (whose mention cannot be established here).
+                // When the check fails, no trigger is emitted — never an invalid one.
+                let trigger_ok = !behavior_exps.is_empty() && {
+                    let mentioned_vars: BTreeSet<Symbol> =
+                        behavior_exps.iter().flat_map(|be| be.free_vars()).collect();
+                    let slot_pairs: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
+                        behavior_exps
+                            .iter()
+                            .filter_map(|be| {
+                                if let ExpData::Call(_, Operation::Behavior(kind, range), args) =
+                                    be.as_ref()
+                                {
+                                    Some(self.behavior_slot_label_pairs(*kind, range, args))
+                                } else {
+                                    None
+                                }
+                            })
+                            .flatten()
+                            .collect();
+                    ranges.iter().all(|(pat, range)| {
+                        let (_, var_name) = self.require_range_var(pat);
+                        match self.get_node_type(range.node_id()).skip_reference() {
+                            Type::StateDomain => {
+                                state_domain_labels
+                                    .get(&var_name)
+                                    .map(|affected| {
+                                        affected.iter().all(|pair| slot_pairs.contains(pair))
+                                    })
+                                    .unwrap_or(true)
+                                    && self
+                                        .find_value_state_for_label(&scan_targets, var_name)
+                                        .is_none()
+                            },
+                            _ => mentioned_vars.contains(&var_name),
+                        }
+                    })
+                };
+                if trigger_ok {
+                    emit!(self.writer, "{");
+                    let mut comma = "";
+                    for be in &behavior_exps {
+                        emit!(self.writer, "{}", comma);
+                        self.with_range_selector_assignments(
+                            ranges,
+                            &range_tmps,
+                            &quant_vars,
+                            &resource_vars,
+                            || {
+                                self.translate_exp(be);
+                            },
+                        );
+                        comma = ",";
+                    }
+                    emit!(self.writer, "}");
+                }
+            }
             // Implicit triggers from ResourceDomain range.
             for (pat, range) in ranges {
                 let (_, var_name) = self.require_range_var(pat);
@@ -4755,4 +4885,35 @@ impl SpecTranslator<'_> {
             },
         }
     }
+}
+
+/// The slot-label rule shared by evaluator-argument emission
+/// (`emit_evaluator_memory_args`) and state-quantifier binder collection
+/// (`collect_intermediate_labels_from_exp`): for each memory in the evaluator's
+/// union footprint, the ordered labels its argument slots carry for the given
+/// predicate kind. When any memory has declared write access, each such memory
+/// contributes an `(old, current)` slot pair; every other memory a single
+/// `current` slot. One-state kinds evaluate `current` at the pre-state. Keeping
+/// emission and binder collection on this one rule guarantees a quantified state
+/// label is bound exactly when some rendered slot carries it.
+fn evaluator_memory_slot_labels<'a>(
+    kind: BehaviorKind,
+    pre: &Option<MemoryLabel>,
+    post: &Option<MemoryLabel>,
+    used_memory: &'a BTreeSet<QualifiedInstId<StructId>>,
+    old_memory: &BTreeSet<QualifiedInstId<StructId>>,
+) -> Vec<(&'a QualifiedInstId<StructId>, Vec<Option<MemoryLabel>>)> {
+    let uses_old = !old_memory.is_empty();
+    let current = if kind.is_two_state() { post } else { pre };
+    used_memory
+        .iter()
+        .map(|memory| {
+            let labels = if uses_old && old_memory.contains(memory) {
+                vec![*pre, *current]
+            } else {
+                vec![*current]
+            };
+            (memory, labels)
+        })
+        .collect()
 }

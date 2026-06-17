@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot observe a location while it is mutably borrowed through a function call (prophecy reference model): the borrow's structure is not statically known here. Assert over the returned reference instead, or use `--path-refs`
+   ┌─ tests/sources/functional/prophecy_observe_call_ref.move:19:13
+   │
+19 │             assert s.a == 5; // error: cannot observe under a call-derived borrow
+   │             ^^^^^^^^^^^^^^^^
