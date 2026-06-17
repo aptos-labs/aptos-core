@@ -2,14 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    proof::SparseMerkleRangeProof,
     state_store::{
+        state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_value::StateValue,
     },
     transaction::Version,
 };
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher},
+    hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -80,6 +82,33 @@ impl HotStateValue {
             } => Self::new(None, *hot_since_version),
             _ => panic!("Must be hot slot"),
         }
+    }
+}
+
+/// A single chunk of the hot state at a specific version, with a range proof against the hot state
+/// Merkle root. Mirrors [`StateValueChunkWithProof`], but each entry carries the full
+/// [`HotStateValue`] (value-or-vacancy plus `hot_since_version`) — what a fast-syncing node hashes
+/// into the hot state Merkle tree and writes to the hot state KV DB.
+///
+/// [`StateValueChunkWithProof`]: crate::state_store::state_value::StateValueChunkWithProof
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct HotStateValueChunkWithProof {
+    pub first_index: u64,     // The first hot state index in chunk
+    pub last_index: u64,      // The last hot state index in chunk
+    pub first_key: HashValue, // The first hot state key hash in chunk
+    pub last_key: HashValue,  // The last hot state key hash in chunk
+    pub raw_values: Vec<(StateKey, HotStateValue)>, // The state key and its hot state value.
+    pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the hot state tree
+    pub root_hash: HashValue, // The root hash of the hot state Merkle tree for this chunk
+}
+
+impl HotStateValueChunkWithProof {
+    /// Returns true iff this is the last chunk (i.e. no more hot state values follow it).
+    pub fn is_last_chunk(&self) -> bool {
+        let right_siblings = self.proof.right_siblings();
+        right_siblings
+            .iter()
+            .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
     }
 }
 
