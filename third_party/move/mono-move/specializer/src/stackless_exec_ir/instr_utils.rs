@@ -226,17 +226,24 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
     }
 }
 
-/// Concrete nominal (struct or enum) type whose layout `instr`'s
-/// lowering needs, if any.
+/// Whether a nominal type is a struct or an enum.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NominalKind {
+    Struct,
+    Enum,
+}
+
+/// Concrete nominal (struct or enum) type whose layout `instr`'s lowering
+/// needs, with its kind; `None` when `instr` references no nominal type.
 /// TODO: complete the function over all instructions.
 pub(crate) fn nominal_type_in_instr(
     module: &PreparedModule,
     instr: &Instr,
-) -> Option<InternedType> {
+) -> Option<(InternedType, NominalKind)> {
     use move_binary_format::access::ModuleAccess;
     match instr {
         // Carry the concrete struct type directly.
-        Instr::Pack(_, ty, _) | Instr::Unpack(_, ty, _) => Some(*ty),
+        Instr::Pack(_, ty, _) | Instr::Unpack(_, ty, _) => Some((*ty, NominalKind::Struct)),
 
         // Carry a field handle resolving to the owning concrete struct.
         Instr::ImmBorrowField(_, fh, _)
@@ -248,31 +255,45 @@ pub(crate) fn nominal_type_in_instr(
         | Instr::ReadLocalField(_, fh, _)
         | Instr::WriteLocalField(fh, _, _) => {
             let owner = module.field_handle_at(*fh).owner;
-            Some(module.interned_nominal_def_type_at(owner))
+            Some((
+                module.interned_nominal_def_type_at(owner),
+                NominalKind::Struct,
+            ))
         },
 
-        // Generic struct/field, variant (enum), global-resource, vector,
-        // and closure ops also carry types, but their lowering isn't
-        // supported yet — none reference a concrete inline struct here.
+        // Non-generic variant ops carry the concrete enum type directly.
+        Instr::PackVariant(_, ty, _, _)
+        | Instr::UnpackVariant(_, ty, _, _)
+        | Instr::TestVariant(_, ty, _, _) => Some((*ty, NominalKind::Enum)),
+
+        // Non-generic variant-field ops resolve the owning concrete enum
+        // via the variant-field handle's struct index.
+        Instr::ImmBorrowVariantField(_, vfh, _)
+        | Instr::MutBorrowVariantField(_, vfh, _)
+        | Instr::ReadVariantField(_, vfh, _)
+        | Instr::WriteVariantField(vfh, _, _) => {
+            let struct_index = module.variant_field_handle_at(*vfh).struct_index;
+            Some((
+                module.interned_nominal_def_type_at(struct_index),
+                NominalKind::Enum,
+            ))
+        },
+
+        // Generic struct/field, generic variant (enum), global-resource,
+        // vector, and closure ops also carry types, but their lowering
+        // isn't supported yet — none reference a concrete inline struct here.
         Instr::PackGeneric(..)
         | Instr::UnpackGeneric(..)
-        | Instr::PackVariant(..)
         | Instr::PackVariantGeneric(..)
-        | Instr::UnpackVariant(..)
         | Instr::UnpackVariantGeneric(..)
-        | Instr::TestVariant(..)
         | Instr::TestVariantGeneric(..)
         | Instr::ImmBorrowFieldGeneric(..)
         | Instr::MutBorrowFieldGeneric(..)
-        | Instr::ImmBorrowVariantField(..)
-        | Instr::MutBorrowVariantField(..)
         | Instr::ImmBorrowVariantFieldGeneric(..)
         | Instr::MutBorrowVariantFieldGeneric(..)
         | Instr::ReadFieldGeneric(..)
         | Instr::WriteFieldGeneric(..)
-        | Instr::ReadVariantField(..)
         | Instr::ReadVariantFieldGeneric(..)
-        | Instr::WriteVariantField(..)
         | Instr::WriteVariantFieldGeneric(..)
         | Instr::Exists(..)
         | Instr::ExistsGeneric(..)
@@ -509,13 +530,13 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::PackClosure(_, _, _, _)
         | Instr::PackClosureGeneric(_, _, _, _)
         | Instr::CallClosure(_, _, _)
-        | Instr::VecPack(_, _, _, _)
+        | Instr::VecPack(_, _, _)
         | Instr::VecLen(_, _, _)
         | Instr::VecImmBorrow(_, _, _, _)
         | Instr::VecMutBorrow(_, _, _, _)
         | Instr::VecPushBack(_, _, _)
         | Instr::VecPopBack(_, _, _)
-        | Instr::VecUnpack(_, _, _, _)
+        | Instr::VecUnpack(_, _, _)
         | Instr::VecSwap(_, _, _, _)
         | Instr::Branch(_)
         | Instr::BrTrue(_, _)
@@ -758,7 +779,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             uses::<USES>(captured, &mut f);
         },
 
-        Instr::VecPack(dst, _, _, elems) => {
+        Instr::VecPack(dst, _, elems) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(elems, &mut f);
         },
@@ -775,7 +796,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*vec_ref, &mut f);
             used::<USES>(*val, &mut f);
         },
-        Instr::VecUnpack(dsts, _, _, src) => {
+        Instr::VecUnpack(dsts, _, src) => {
             defs::<DEFS>(dsts, &mut f);
             used::<USES>(*src, &mut f);
         },
@@ -1086,7 +1107,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::VecPack(dst, _, _, elems) => {
+        Instr::VecPack(dst, _, elems) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -1117,7 +1138,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(val, &mut f);
             }
         },
-        Instr::VecUnpack(dsts, _, _, src) => {
+        Instr::VecUnpack(dsts, _, src) => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }

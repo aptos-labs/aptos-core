@@ -7,11 +7,13 @@
 \usepackage{esz}
 \usepackage{mathpartir}
 \usepackage{graphicx}
+\usepackage{tikz}
 \usepackage{xspace}
 \usepackage{xurl}
 \usepackage{caption}
 \usepackage{bbding}
 \usepackage{tabularx}
+\usepackage{booktabs}
 \usepackage{enumitem}
 \usepackage{cite}
 % titlesec clashes with llncs's \subparagraph definition (it cannot
@@ -26,6 +28,9 @@
 \let\subparagraph\titlesec@oldsubparagraph
 \makeatother
 \usepackage{hyperref}
+% Character protrusion + font expansion; reclaims vertical space and
+% improves justification with no visible quality loss. Load after fonts.
+\usepackage{microtype}
 % IEEEtran.cls sets \citepunct to "], [", which produces "[A], [B]" for
 % \cite{A,B}. Override to a plain ", " so consecutive cites share one bracket.
 \renewcommand{\citepunct}{, }
@@ -33,19 +38,35 @@
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 \def\UrlFont{\rmfamily}
 
-% Tighten section/subsection vertical spacing for two-column layout.
-\titlespacing*{\section}{0pt}{1.2ex plus 0.2ex minus 0.2ex}{0.6ex plus 0.1ex}
-\titlespacing*{\subsection}{0pt}{0.8ex plus 0.1ex minus 0.1ex}{0.4ex plus 0.1ex}
+% Tighten section/subsection/paragraph vertical spacing.
+\titlespacing*{\section}{0pt}{0.9ex plus 0.15ex minus 0.15ex}{0.45ex plus 0.1ex}
+\titlespacing*{\subsection}{0pt}{0.6ex plus 0.1ex minus 0.1ex}{0.3ex plus 0.1ex}
+\titlespacing*{\subsubsection}{0pt}{0.5ex plus 0.1ex minus 0.1ex}{0.3ex plus 0.1ex}
+% \paragraph is a run-in heading; the third arg is the horizontal gap to the text.
+\titlespacing*{\paragraph}{0pt}{0.6ex plus 0.1ex minus 0.1ex}{0.6em}
+
+% Tighten the vertical space around floats and between a float and its
+% caption to reclaim page space (defaults are ~20pt / ~10pt).
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\captionsetup{skip=4pt}
+
+% Tighten display-math vertical skips to reclaim space.
+\setlength{\abovedisplayskip}{4pt plus 1pt minus 1pt}
+\setlength{\belowdisplayskip}{4pt plus 1pt minus 1pt}
+\setlength{\abovedisplayshortskip}{2pt plus 1pt}
+\setlength{\belowdisplayshortskip}{2pt plus 1pt}
 
 % Labeled-paragraph list: bold inline label, lightly indented.
 % Use as \begin{Description} \item[Label.] body \item[...] ... \end{Description}.
 \newlist{Description}{description}{1}
-\setlist[Description]{leftmargin=1em, labelindent=1em, style=unboxed, font=\bfseries, itemsep=0.5ex, topsep=0.5ex}
+\setlist[Description]{leftmargin=1em, labelindent=1em, style=unboxed, font=\bfseries, itemsep=0.25ex, topsep=0.25ex, parsep=0pt}
 
 % Bulleted list with an em-dash marker flush against the left text margin.
 % Use as \begin{Itemize} \item ... \item ... \end{Itemize}.
 \newlist{Itemize}{itemize}{1}
-\setlist[Itemize]{label=--, leftmargin=1em, labelindent=0pt, labelsep=0.5em, itemsep=0.5ex, topsep=0.5ex}
+\setlist[Itemize]{label=--, leftmargin=1em, labelindent=0pt, labelsep=0.5em, itemsep=0.25ex, topsep=0.25ex, parsep=0pt}
 
 \newcommand{\TODO}[2]{%
     \noindent\textcolor{gray}{%
@@ -60,9 +81,11 @@
 % Toggle for camera-ready: change \commentstrue below to \commentsfalse and
 % every \tengzhang{...} / \wolfgang{...} / ... expands to nothing.
 \newif\ifcomments
-\commentstrue
+\commentsfalse
 \newcommand{\authorcomment}[2]{\ifcomments\textcolor{#1}{\textsf{\small[\textbf{#2}]}}\fi}
 \newcommand{\tengzhang}[1]{\authorcomment{blue}{teng: #1}}
+\newcommand{\vineeth}[1]{\authorcomment{red}{vineeth: #1}}
+\newcommand{\george}[1]{\authorcomment{green}{george: #1}}
 
 %\setlength{\belowcaptionskip}{-1ex}
 %\setlength{\textfloatsep}{0.2ex}
@@ -205,6 +228,8 @@
     keywordstyle=\color{black}, % don't bold keywords which is the default
     commentstyle=\color{gray}\normalfont\itshape,
     escapechar=@, % use to embed LaTeX into code
+    aboveskip=0.4\baselineskip, % tighten space around display listings
+    belowskip=0.4\baselineskip,
     breaklines=true,
     % \sat is set in \scriptstyle and followed by tight kerning, so its
     % right side-bearing is small; tail the replacement with \, so the
@@ -319,7 +344,7 @@
     \lstset{
         language=Move,
         style=MoveStyle,
-        basicstyle=\relsize{-1}\ttfamily,
+        basicstyle=\relsize{-2}\ttfamily,
         keywordstyle=\color{blue},
         xleftmargin=2em,
     }
@@ -331,7 +356,7 @@
     \lstset{
         language=Move,
         style=MoveStyle,
-        basicstyle=\relsize{-1}\ttfamily,
+        basicstyle=\relsize{-2}\ttfamily,
         keywordstyle=\color{blue},
         xleftmargin=2em,
     %numbers=left,
@@ -346,7 +371,7 @@
     \lstset{
         language=Move,
         style=MoveStyle,
-        basicstyle=\relsize{-1}\ttfamily,
+        basicstyle=\relsize{-2}\ttfamily,
         keywordstyle=\color{blue},
         xleftmargin=2em,
         numbers=left,
@@ -391,7 +416,7 @@
 % escapechar (@), e.g. @\textgreater @.
 \lstnewenvironment{claude}{
     \lstset{
-        basicstyle=\relsize{-1}\ttfamily,
+        basicstyle=\relsize{-2}\ttfamily,
         breaklines=true,
         breakautoindent=true,
         breakatwhitespace=true,

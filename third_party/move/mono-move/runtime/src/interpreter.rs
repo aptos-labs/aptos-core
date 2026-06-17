@@ -16,9 +16,10 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_account_address, read_bool, read_descriptor, read_fat_ptr, read_obj_size, read_ptr,
-        read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr, write_bool, write_fat_ptr,
-        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
+        read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
+        read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
+        write_bool, write_enum_tag, write_fat_ptr, write_ptr, write_u32, write_u64, write_u8,
+        MemoryRegion,
     },
     native_context::ProductionNativeContext,
     types::{
@@ -30,18 +31,18 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, RootPool},
+    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type_list, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -1286,6 +1287,9 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::Move { dst, src, size } => {
+                    // TODO: consider adding a provably non-overlapping variant of this op.
+                    // Overlap-safe `copy`: `dst` and `src` may partially overlap.
+                    // E.g. the return-value shuffle may move results in the same home region.
                     std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
                 },
 
@@ -1400,6 +1404,46 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         vec_elem_ptr(vec_ptr, idx, elem_size) as *mut u8,
                         elem_size as usize,
                     );
+                },
+
+                MicroOp::VecPack(ref op) => {
+                    self.exec_vec_pack(fp, op)?;
+                },
+
+                MicroOp::VecUnpack(ref op) => {
+                    self.exec_vec_unpack(fp, op)?;
+                },
+
+                MicroOp::VecSwap {
+                    vec_ref,
+                    idx_a,
+                    idx_b,
+                    elem_size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                    let idx_a = read_u64(fp, idx_a);
+                    let idx_b = read_u64(fp, idx_b);
+                    let len = read_vec_len(vec_ptr);
+                    // Indices are checked before the equal-indices no-op.
+                    for idx in [idx_a, idx_b] {
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::Swap,
+                                idx,
+                                len,
+                            });
+                        }
+                    }
+                    // Equal pointers are UB for `swap_nonoverlapping`; distinct
+                    // in-bounds indices guarantee disjoint element ranges.
+                    if idx_a != idx_b {
+                        std::ptr::swap_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
+                            vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                    }
                 },
 
                 // ----- Reference (fat pointer) instructions -----
@@ -1681,6 +1725,150 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let right = read_bool(fp, rhs);
                     write_bool(fp, dst, left || right)
                 },
+                MicroOp::EnumTestTag {
+                    dst,
+                    enum_ref,
+                    variant,
+                } => {
+                    // Deref the enum fat pointer to the heap object, then read the tag.
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    let tag = read_enum_tag(obj_ptr);
+                    write_bool(fp, dst, tag == variant);
+                },
+
+                MicroOp::EnumBorrowVariantField {
+                    dst,
+                    enum_ref,
+                    ref offsets,
+                } => {
+                    // Deref the enum fat pointer to the heap object, read the
+                    // tag, then borrow the field at that variant's offset.
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    let tag = read_enum_tag(obj_ptr);
+                    let Some(variant_offset) = offsets.get(tag as usize) else {
+                        // A tag past the variant table is heap corruption (a
+                        // well-formed enum's tag is always in range), not a
+                        // user-level mismatch. Surface it as an invariant
+                        // violation.
+                        invariant_violation!(EnumTagOutOfRange {
+                            tag,
+                            variant_count: offsets.len(),
+                        });
+                    };
+                    match variant_offset {
+                        Some(offset) => write_fat_ptr(fp, dst, obj_ptr, *offset as u64),
+                        // Tag in range but this variant does not declare the
+                        // field (move semantics for this is a runtime error).
+                        None => return Err(RuntimeError::EnumVariantMismatch { tag }),
+                    }
+                },
+
+                MicroOp::EnumCheckVariant { enum_ptr, variant } => {
+                    // `enum_ptr` is the heap-pointer value; runtime error if
+                    // its tag is not the expected variant.
+                    let obj_ptr = read_ptr(fp, enum_ptr);
+                    let tag = read_enum_tag(obj_ptr);
+                    if tag != variant {
+                        return Err(RuntimeError::EnumVariantMismatch { tag });
+                    }
+                },
+
+                MicroOp::EnumNew {
+                    dst,
+                    descriptor_id,
+                    variant,
+                } => {
+                    let obj_ptr = alloc_obj!(self, fp, descriptor_id)?;
+                    // No safe point between the allocation and these
+                    // non-allocating writes: stamp the tag through the fresh
+                    // pointer, then publish it to `dst`.
+                    write_enum_tag(obj_ptr, variant);
+                    write_ptr(fp, dst, obj_ptr);
+                },
+
+                MicroOp::EnumReadVariantField {
+                    dst,
+                    enum_ref,
+                    offset,
+                    size,
+                } => {
+                    // Double deref of the enum fat pointer to the heap object,
+                    // then copy the field bytes directly — no intermediate
+                    // scratch reference. The offset is a static uniform offset
+                    // (no tag dispatch).
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    // Non-overlapping: `dst` is a stack-region slot, the field
+                    // is heap-object bytes.
+                    std::ptr::copy_nonoverlapping(
+                        obj_ptr.add(offset as usize),
+                        fp.add(dst.into()),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::EnumWriteVariantField {
+                    enum_ref,
+                    offset,
+                    src,
+                    size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    // Non-overlapping: `src` is a stack-region slot, the field
+                    // is heap-object bytes.
+                    std::ptr::copy_nonoverlapping(
+                        fp.add(src.into()),
+                        obj_ptr.add(offset as usize),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {
+                    // Pre-condition: each `base + off` holds a heap pointer
+                    // byte-copied from another value, so the pointee is still
+                    // shared with that value. Replace each non-null pointer
+                    // with a pointer to a fresh deep copy, making the value at
+                    // `base` independent (Move value semantics). Null (e.g. an
+                    // empty vector) stays null.
+                    //
+                    // TODO(gas): the IR-level cost of the materializing
+                    // instruction charges only the shallow byte move, not this
+                    // heap-graph copy. Change charging to reflect at least the
+                    // amount of work done.
+                    //
+                    // TODO(perf): the materializing op currently emits a byte
+                    // move into `base` followed by this in-place fixup that
+                    // re-reads from `base`. A fused `src -> dst` deep copy
+                    // would drop the separate move and the re-read. It would
+                    // need deep-copying variants of `ReadRef`, `Read*Field`,
+                    // etc.
+                    if let &[off] = offsets.as_ref() {
+                        // Fast path for copying whole-enum / whole-vector /
+                        // aggregate with one heap backed field: a single owned
+                        // pointer at one offset. Uses single-root `deep_copy`,
+                        // avoiding the batch's per-op `Vec`s.
+                        if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
+                            let new = self.deep_copy(src)?;
+                            write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                        }
+                    } else {
+                        let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
+                        let mut sources: Vec<NonNull<u8>> = Vec::with_capacity(offsets.len());
+                        for &off in offsets.iter() {
+                            if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
+                                live_offsets.push(off);
+                                sources.push(src);
+                            }
+                        }
+                        let copies = self.deep_copy_batch(&sources)?;
+                        for (off, new) in live_offsets.iter().zip(copies) {
+                            write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                        }
+                    }
+                },
             }
         }
 
@@ -1723,6 +1911,69 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         }
     }
 
+    /// Allocates the vector at exact capacity in a single allocation, writes
+    /// the length, copies each source element from the frame, and writes the
+    /// heap pointer to `op.dst`. Any GC runs inside the allocation, before the
+    /// fp-relative element reads, so those reads see post-GC pointers.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+        let count = op.srcs.len() as u64;
+        // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
+        // payload byte is overwritten below before the op returns and no GC can
+        // intervene afterwards. A fully-initialized-payload alloc variant would
+        // avoid the dead memset. Padding needs to be carefully considered for
+        // the optimization.
+        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        unsafe {
+            write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
+            for (elem_idx, src) in op.srcs.iter().enumerate() {
+                // Non-overlapping: the source is a frame slot, the destination
+                // is in the freshly-allocated heap vector — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    fp.add((*src).into()),
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size) as *mut u8,
+                    op.elem_size as usize,
+                );
+            }
+            write_ptr(fp, op.dst, vec_ptr);
+        }
+        Ok(())
+    }
+
+    /// Checks that the vector's length equals `op.dsts.len()` — erroring on a
+    /// mismatch; then copies each element into its destination slot. A null
+    /// `src` is the empty vector: it unpacks cleanly when `dsts` is empty and
+    /// fails the length check otherwise.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.src` and each `op.dsts` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_unpack(&mut self, fp: *mut u8, op: &VecUnpackOp) -> RuntimeResult<()> {
+        unsafe {
+            let vec_ptr = read_ptr(fp, op.src);
+            let expected = op.dsts.len() as u64;
+            let actual = read_vec_len(vec_ptr);
+            if actual != expected {
+                return Err(RuntimeError::VecUnpackLengthMismatch { expected, actual });
+            }
+            for (elem_idx, dst) in op.dsts.iter().enumerate() {
+                // Non-overlapping: the source is a heap vector element, the
+                // destination is a frame slot — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size),
+                    fp.add((*dst).into()),
+                    op.elem_size as usize,
+                );
+            }
+        }
+        Ok(())
+    }
+
     /// Deep-copy the value tree rooted at the specified source into the
     /// local heap. Returns the data-region pointer of the freshly-allocated
     /// root copy.
@@ -1755,6 +2006,68 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 }
             },
         }
+    }
+
+    /// Deep-copy each of `sources` into the local heap, returning the new root
+    /// pointers in the same order.
+    ///
+    /// All sources are rooted for the whole batch, so a GC triggered partway
+    /// through preserves and relocates the not-yet-copied ones. Because
+    /// `try_deep_copy` never GCs mid-copy, a *successful* pass builds every
+    /// result without an intervening GC, so the already-built results need no
+    /// root of their own — only the sources are rooted. Mirrors
+    /// [`Self::deep_copy`]'s single GC-then-retry-once policy, batched over all
+    /// sources.
+    ///
+    /// # Safety
+    ///
+    /// Every `source` must point to the data region of a live object whose
+    /// header is at `source - OBJECT_HEADER_SIZE`.
+    unsafe fn deep_copy_batch(
+        &mut self,
+        sources: &[NonNull<u8>],
+    ) -> RuntimeResult<Vec<NonNull<u8>>> {
+        // SAFETY: each source is a live object (caller contract); the handle
+        // keeps it live and relocated across any GC during the batch.
+        let guards: Vec<ObjectHandle> = sources
+            .iter()
+            .map(|&src| unsafe { self.root_pool.root_object(src.as_ptr()) })
+            .collect();
+        // First attempt. On out-of-memory, the partial copies are unrooted
+        // garbage; drop them, GC (which relocates the rooted sources), and
+        // retry the whole batch once.
+        let mut out = Vec::with_capacity(guards.len());
+        let mut needs_gc = false;
+        for guard in &guards {
+            // SAFETY: each root holds a live object; GC keeps `guard.ptr()`
+            // valid and relocated.
+            match unsafe {
+                self.heap
+                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+            } {
+                Ok(ptr) => out.push(ptr),
+                Err(AllocationError::RuntimeError(err)) => return Err(err),
+                Err(AllocationError::OutOfHeapMemory { .. }) => {
+                    needs_gc = true;
+                    break;
+                },
+            }
+        }
+        if !needs_gc {
+            return Ok(out);
+        }
+        gc_collect!(self)?;
+        out.clear();
+        for guard in &guards {
+            // SAFETY: as above, after relocation.
+            let ptr = unsafe {
+                self.heap
+                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+            }
+            .map_err(AllocationError::into_runtime_error)?;
+            out.push(ptr);
+        }
+        Ok(out)
     }
 
     /// Implementation of `MicroOp::PackClosure`.

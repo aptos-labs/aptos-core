@@ -9,6 +9,13 @@
 //! Descriptors themselves are not re-verified here; their soundness is
 //! enforced by [`mono_move_core::ObjectDescriptor`]'s constructors at
 //! publish time.
+//!
+//! TODO:
+//! 1. Call this something other than verifier (well-formedness checker) to
+//!    avoid ambiguity with bytecode verifier.
+//! 2. Replace various hard-coded constants with named constants.
+//! 3. Precisely list out what is checked and what is out of scope.
+//! 4. For instructions with more than 1 destination, they must be disjoint.
 
 use mono_move_core::{
     captured_values_size,
@@ -548,6 +555,60 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, src);
             },
 
+            MicroOp::EnumTestTag { dst, enum_ref, .. } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_frame_access_1(pc, dst);
+            },
+
+            MicroOp::EnumBorrowVariantField { dst, enum_ref, .. } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+
+            MicroOp::EnumCheckVariant { enum_ptr, .. } => {
+                self.check_frame_access_8(pc, enum_ptr);
+            },
+
+            MicroOp::EnumNew {
+                dst,
+                descriptor_id,
+                variant,
+            } => {
+                self.check_frame_access_8(pc, dst);
+                self.check_enum_new(pc, descriptor_id, variant);
+            },
+
+            MicroOp::EnumReadVariantField {
+                dst,
+                enum_ref,
+                offset,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), dst, size);
+            },
+
+            MicroOp::EnumWriteVariantField {
+                enum_ref,
+                offset,
+                src,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), src, size);
+            },
+
+            // Each owned heap pointer at `base + off` is an 8-byte frame slot.
+            MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {
+                for &off in offsets.iter() {
+                    self.check_frame_access(Some(pc), FrameOffset(base.0.saturating_add(off)), 8);
+                }
+            },
+
             // ----- Vec push/pop: vec_ref (16B fat pointer) + variable-width slot -----
             MicroOp::VecPushBack {
                 vec_ref,
@@ -558,23 +619,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), elem, elem_size);
-                self.check_descriptor_variant(
-                    pc,
-                    "VecPushBack",
-                    descriptor_id,
-                    |inner| match inner {
-                        ObjectDescriptorInner::Vector {
-                            elem_pointer_offsets,
-                            ..
-                        } => !elem_pointer_offsets.is_empty(),
-                        ObjectDescriptorInner::Trivial => true,
-                        ObjectDescriptorInner::Closure
-                        | ObjectDescriptorInner::Struct { .. }
-                        | ObjectDescriptorInner::Enum { .. }
-                        | ObjectDescriptorInner::CapturedData { .. } => false,
-                    },
-                    "a non-empty Vector or Trivial",
-                );
+                self.check_vector_descriptor(pc, "VecPushBack", descriptor_id, elem_size);
             },
 
             MicroOp::VecPopBack {
@@ -610,6 +655,35 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, idx);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), src, elem_size);
+            },
+
+            MicroOp::VecPack(ref op) => {
+                self.check_frame_access_8(pc, op.dst);
+                self.check_nonzero_size(pc, op.elem_size);
+                for &src in &op.srcs {
+                    self.check_frame_access(Some(pc), src, op.elem_size);
+                }
+                self.check_vector_descriptor(pc, "VecPack", op.descriptor_id, op.elem_size);
+            },
+
+            MicroOp::VecUnpack(ref op) => {
+                self.check_frame_access_8(pc, op.src);
+                self.check_nonzero_size(pc, op.elem_size);
+                for &dst in &op.dsts {
+                    self.check_frame_access(Some(pc), dst, op.elem_size);
+                }
+            },
+
+            MicroOp::VecSwap {
+                vec_ref,
+                idx_a,
+                idx_b,
+                elem_size,
+            } => {
+                self.check_frame_access(Some(pc), vec_ref, 16);
+                self.check_frame_access_8(pc, idx_a);
+                self.check_frame_access_8(pc, idx_b);
+                self.check_nonzero_size(pc, elem_size);
             },
 
             // ----- Borrow producing fat pointer (16B dst) -----
@@ -1055,6 +1129,65 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 
+    /// Checks `descriptor_id` for a vector allocation of element stride
+    /// `elem_size`: it must be `Trivial`, or a `Vector` with a non-empty
+    /// pointer-offset list and a matching `elem_size`. The sizes must agree
+    /// because the GC strides the data region by the descriptor's `elem_size`,
+    /// so a mismatch would trace past the allocation.
+    fn check_vector_descriptor(
+        &mut self,
+        pc: usize,
+        op: &str,
+        descriptor_id: DescriptorId,
+        elem_size: u32,
+    ) {
+        match self
+            .provider
+            .descriptor(descriptor_id)
+            .map(|desc| desc.inner())
+        {
+            None => self.err(
+                Some(pc),
+                format!("{}: unknown descriptor_id {}", op, descriptor_id),
+            ),
+            Some(ObjectDescriptorInner::Vector {
+                elem_size: descriptor_elem_size,
+                elem_pointer_offsets,
+            }) => {
+                if elem_pointer_offsets.is_empty() {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "{}: descriptor_id {} is not a non-empty Vector or Trivial",
+                            op, descriptor_id
+                        ),
+                    );
+                } else if *descriptor_elem_size != elem_size {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "{}: elem_size {} does not match Vector descriptor_id {} elem_size {}",
+                            op, elem_size, descriptor_id, descriptor_elem_size
+                        ),
+                    );
+                }
+            },
+            Some(ObjectDescriptorInner::Trivial) => {},
+            Some(
+                ObjectDescriptorInner::Closure
+                | ObjectDescriptorInner::Struct { .. }
+                | ObjectDescriptorInner::Enum { .. }
+                | ObjectDescriptorInner::CapturedData { .. },
+            ) => self.err(
+                Some(pc),
+                format!(
+                    "{}: descriptor_id {} is not a non-empty Vector or Trivial",
+                    op, descriptor_id
+                ),
+            ),
+        }
+    }
+
     /// Check that `descriptor_id` resolves and its variant satisfies `pred`.
     /// `op` names the calling micro-op and `expected` names the expected
     /// variant, both for the error message.
@@ -1079,6 +1212,38 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 ),
             ),
             Some(_) => {},
+        }
+    }
+
+    /// `EnumNew` allocates an enum object and stamps `tag` into it. The
+    /// descriptor must be an `Enum`, and `tag` must name one of its variants
+    fn check_enum_new(&mut self, pc: usize, descriptor_id: DescriptorId, tag: u64) {
+        match self.provider.descriptor(descriptor_id) {
+            None => self.err(
+                Some(pc),
+                format!("EnumNew: unknown descriptor_id {}", descriptor_id),
+            ),
+            Some(desc) => match desc.inner() {
+                ObjectDescriptorInner::Enum {
+                    variant_pointer_offsets,
+                    ..
+                } => {
+                    let variant_count = variant_pointer_offsets.len();
+                    if tag as usize >= variant_count {
+                        self.err(
+                            Some(pc),
+                            format!(
+                                "EnumNew: tag {} out of range (descriptor {} has {} variants)",
+                                tag, descriptor_id, variant_count
+                            ),
+                        );
+                    }
+                },
+                _ => self.err(
+                    Some(pc),
+                    format!("EnumNew: descriptor_id {} is not an Enum", descriptor_id),
+                ),
+            },
         }
     }
 

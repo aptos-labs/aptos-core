@@ -11,8 +11,12 @@
 //! and the numbers are placeholders.
 //!
 //! A cost may also have a runtime-dependent component, knowable only during
-//! execution (e.g. the IO of a global-storage operation). Only the fixed and
-//! size-dependent parts are computed here; the runtime charges the rest.
+//! execution (e.g. the IO of a global-storage operation, or the size of the
+//! deep-copies). Only the fixed and size-dependent parts are computed here; the
+//! runtime charges the rest.
+//!
+//! TODO(gas): the deep-copy component of heap-backed copies/reads is uncharged
+//! — these arms charge only the shallow byte move.
 //!
 //! TODO: split cost computation from resolution. Emit size-dependent costs as
 //! formulas (e.g. `a + b * size(T)`) and resolve them later, rather than
@@ -193,14 +197,19 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         Instr::CallClosure(rets, _, args) => call_cost(cx, args, rets)?,
 
         // --- Vector ---
-        Instr::VecPack(_, _, _, elems) => VEC_NEW + sum_move(cx, elems)?,
+        Instr::VecPack(_, _, elems) => VEC_NEW + sum_move(cx, elems)?,
         Instr::VecLen(..) => VEC_LEN,
         Instr::VecImmBorrow(..) | Instr::VecMutBorrow(..) => VEC_BORROW,
         Instr::VecPushBack(elem_ty, _, _) | Instr::VecPopBack(_, elem_ty, _) => {
             vec_elem(concrete_type_size(*elem_ty, "vector elem type")?)
         },
-        Instr::VecUnpack(..) => VEC_NEW,
-        Instr::VecSwap(..) => VEC_BORROW,
+        Instr::VecUnpack(dsts, elem_ty, _) => {
+            VEC_NEW
+                + dsts.len() as u64 * move_bytes(concrete_type_size(*elem_ty, "vector elem type")?)
+        },
+        Instr::VecSwap(elem_ty, _, _, _) => {
+            2 * vec_elem(concrete_type_size(*elem_ty, "vector elem type")?)
+        },
 
         // --- Control flow ---
         Instr::Branch(..) => JUMP,

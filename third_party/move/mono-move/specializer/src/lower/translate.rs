@@ -4,8 +4,12 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use super::{
-    context::{concrete_type_size, CallSiteInfo, LoweringContext, TypedSlot},
+    context::{
+        concrete_type_size, resolve_variant_field_access, CallSiteInfo, LoweringContext, TypedSlot,
+        VariantFieldAccess,
+    },
     gc_layout::type_pointer_offsets,
+    lower_utils::ranges_overlap,
     parallel_copy,
 };
 use crate::{
@@ -19,12 +23,14 @@ use anyhow::{anyhow, bail, Context, Result};
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{strip_ref, view_type, InternedType, Type},
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp,
-    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp,
-    JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, ValueCmpOp,
-    ValueRefCmpOp, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, DescriptorId, FrameLayoutInfo, FrameOffset,
+    IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp,
+    JumpValueCmpOp, JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand,
+    SizedSlot, ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
 };
-use move_binary_format::file_format::{ConstantPoolIndex, FieldHandleIndex};
+use move_binary_format::file_format::{
+    ConstantPoolIndex, FieldHandleIndex, VariantFieldHandleIndex,
+};
 
 /// Validates that a primitive constant's BCS bytes are exactly `N` wide and
 /// returns them as a fixed array. Fixed-width integers and `address` encode
@@ -51,6 +57,10 @@ pub(super) struct LoweredFunction {
     /// Each entry's `code_offset` indexes directly into `code`.
     pub safe_points: Vec<SafePointEntry>,
 }
+
+/// TODO: move this constant into a shared location and reuse elsewhere.
+/// Byte width of an enum value in a frame slot: an 8-byte heap pointer.
+const ENUM_PTR_SIZE: u32 = 8;
 
 /// Lower a slot-allocated function to its micro-op form.
 pub(super) fn lower_function(
@@ -211,6 +221,33 @@ impl<'a> LoweringState<'a> {
         Ok((field.offset, size))
     }
 
+    /// Resolve a `VariantFieldHandleIndex` against the owning enum's derived
+    /// layout into a [`VariantFieldAccess`].
+    fn resolve_variant_field(&self, vfh: VariantFieldHandleIndex) -> Result<VariantFieldAccess> {
+        resolve_variant_field_access(self.ctx.module, &self.ctx.enum_layouts, vfh)
+    }
+
+    /// Emit the borrow of a variant field's reference into `dst_ref`. Uses the
+    /// static `enum_borrow` when the offset is variant-independent, else the
+    /// tag-dispatched `EnumBorrowVariantField` (which also aborts when the
+    /// runtime variant does not declare the field).
+    fn emit_variant_field_borrow(
+        &mut self,
+        access: &VariantFieldAccess,
+        enum_ref: FrameOffset,
+        dst_ref: FrameOffset,
+    ) -> Result<()> {
+        match access.uniform_offset {
+            Some(offset) => self.emit(MicroOp::enum_borrow(enum_ref, offset, dst_ref))?,
+            None => self.emit(MicroOp::enum_borrow_variant_field(
+                enum_ref,
+                &access.offsets,
+                dst_ref,
+            ))?,
+        }
+        Ok(())
+    }
+
     fn xfer_binding(&self, j: u16) -> Result<TypedSlot> {
         self.xfer_bindings[j as usize]
             .with_context(|| format!("Xfer({}) read without a prior def in this block", j))
@@ -224,18 +261,25 @@ impl<'a> LoweringState<'a> {
         })
     }
 
-    /// Returns layout info for a destination slot. For
-    /// `Slot::Xfer(j)`, stages a pending binding from `Xfer(j)` to
-    /// the typed slot at arg position `j` of the upcoming call.
-    /// Errors for `Slot::Vid`.
+    /// Returns sized layout info for a destination slot.
     fn def_slot(&mut self, slot: Slot) -> Result<SizedSlot> {
+        Ok(self.def_typed_slot(slot)?.slot)
+    }
+
+    /// Resolves a destination slot to its sized layout and value type. For
+    /// `Slot::Xfer(j)`, stages a pending binding to arg position `j` of the
+    /// upcoming call. Errors for `Slot::Vid`.
+    fn def_typed_slot(&mut self, slot: Slot) -> Result<TypedSlot> {
         Ok(match slot {
-            Slot::Home(i) => self.ctx.home_slots[i as usize],
+            Slot::Home(i) => TypedSlot {
+                slot: self.ctx.home_slots[i as usize],
+                ty: self.home_slot_types[i as usize],
+            },
             Slot::Xfer(j) => {
                 let call_site = &self.ctx.call_sites[self.call_site_cursor];
                 let typed_slot = call_site.arg_slots[j as usize];
                 self.pending_def_binds.push((j, typed_slot));
-                typed_slot.slot
+                typed_slot
             },
             Slot::Vid(i) => bail!("Vid({}) in post-allocation IR", i),
         })
@@ -357,6 +401,18 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
+    /// `DescriptorId` published for `vec_ty`, with the shared diagnostic of
+    /// the allocating vector ops. `op_name` prefixes the error message.
+    fn vector_descriptor_id(&self, op_name: &str, vec_ty: InternedType) -> Result<DescriptorId> {
+        self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
+            anyhow!(
+                "{}: no descriptor published for this vector type \
+                 (its element type may be generic or have unresolved layout)",
+                op_name
+            )
+        })
+    }
+
     /// Interned-type corresponding to `slot`.
     fn slot_interned_type(&self, slot: Slot) -> Result<InternedType> {
         Ok(match slot {
@@ -370,6 +426,31 @@ impl<'a> LoweringState<'a> {
     /// when an interned pointer is needed instead.
     fn slot_type(&self, slot: Slot) -> Result<&'static Type> {
         Ok(view_type(self.slot_interned_type(slot)?))
+    }
+
+    /// After an op materializes an owned value into a slot (`Copy`, `ReadRef`,
+    /// `Read*Field`), append a `DeepCopyHeapPtrs` when the value is heap-backed so the
+    /// byte copy does not alias the source's heap object (Move value semantics).
+    /// `dst_ty` is the materialized value's type (from [`Self::def_typed_slot`]),
+    /// `dst_off` its frame offset. A reference is shallow-copied (a copy of a
+    /// reference is another reference); a value with no owned heap pointers
+    /// (scalar, inline-scalar struct) needs nothing, keeping those hot paths a
+    /// bare byte copy.
+    fn maybe_deep_copy(&mut self, dst_ty: InternedType, dst_off: FrameOffset) -> Result<()> {
+        if matches!(
+            view_type(dst_ty),
+            Type::ImmutRef { .. } | Type::MutRef { .. }
+        ) {
+            return Ok(());
+        }
+        let offsets = type_pointer_offsets(dst_ty)?;
+        if !offsets.is_empty() {
+            self.emit(MicroOp::deep_copy_heap_ptrs(
+                dst_off,
+                offsets.into_boxed_slice(),
+            ))?;
+        }
+        Ok(())
     }
 
     /// Emit an `IntCast` to `to` from `src` into `dst`. The source type comes
@@ -628,10 +709,19 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Copy/Move ---
-            Instr::Copy(dst, src) | Instr::Move(dst, src) => {
+            // `Move` transfers ownership: a byte copy is the whole operation.
+            Instr::Move(dst, src) => {
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit_single_move(dst_info.offset, src_info)?;
+            },
+            // `Copy` must produce an independent value: byte copy, then deep-copy
+            // any owned heap pointers so a heap-backed value does not alias.
+            Instr::Copy(dst, src) => {
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_typed_slot(*dst)?;
+                self.emit_single_move(dst_info.slot.offset, src_info)?;
+                self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
 
             // --- Binary ops ---
@@ -982,12 +1072,13 @@ impl<'a> LoweringState<'a> {
                 // type-faithful path; `dst_info.size` would be cheaper.
                 let size = self.ref_pointee_size(*ref_src)?;
                 let ref_info = self.slot(*ref_src)?;
-                let dst_info = self.def_slot(*dst)?;
+                let dst_info = self.def_typed_slot(*dst)?;
                 self.emit(MicroOp::ReadRef {
-                    dst: dst_info.offset,
+                    dst: dst_info.slot.offset,
                     ref_ptr: ref_info.offset,
                     size,
                 })?;
+                self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
             Instr::WriteRef(ref_dst, src) => {
                 // TODO: `size` could equivalently come from `src_info.size`
@@ -1238,24 +1329,61 @@ impl<'a> LoweringState<'a> {
                     elem_size,
                 })?;
             },
-            Instr::VecPack(dst, _elem_ty, _count, elems) => {
-                if !elems.is_empty() {
-                    bail!("VecPack with elements not yet lowered");
+            Instr::VecPack(dst, elem_ty, elems) => {
+                let dst_typed = self.def_typed_slot(*dst)?;
+                // Empty literal keeps the fast path: null pointer is the empty
+                // vector — no allocation, no descriptor needed.
+                if elems.is_empty() {
+                    self.emit(MicroOp::VecNew {
+                        dst: dst_typed.slot.offset,
+                    })?;
+                } else {
+                    let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                    let descriptor_id = self.vector_descriptor_id("VecPack", dst_typed.ty)?;
+                    let srcs = elems
+                        .iter()
+                        .map(|elem| Ok(self.slot(*elem)?.offset))
+                        .collect::<Result<Vec<_>>>()?;
+                    self.emit(MicroOp::VecPack(Box::new(VecPackOp {
+                        dst: dst_typed.slot.offset,
+                        descriptor_id,
+                        elem_size,
+                        srcs,
+                    })))?;
                 }
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::VecNew {
-                    dst: dst_info.offset,
+            },
+            Instr::VecUnpack(dsts, elem_ty, src) => {
+                // TODO: the Move compiler only emits `VecUnpack` with count 0,
+                // but handwritten bytecode may use it with any count. If we
+                // restrict to count 0, we can apply simplifications.
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let src_info = self.slot(*src)?;
+                let dst_offsets = dsts
+                    .iter()
+                    .map(|dst| Ok(self.def_slot(*dst)?.offset))
+                    .collect::<Result<Vec<_>>>()?;
+                self.emit(MicroOp::VecUnpack(Box::new(VecUnpackOp {
+                    src: src_info.offset,
+                    elem_size,
+                    dsts: dst_offsets,
+                })))?;
+            },
+            Instr::VecSwap(elem_ty, vec_ref, idx_a, idx_b) => {
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let idx_a_info = self.slot(*idx_a)?;
+                let idx_b_info = self.slot(*idx_b)?;
+                self.emit(MicroOp::VecSwap {
+                    vec_ref: vec_ref_info.offset,
+                    idx_a: idx_a_info.offset,
+                    idx_b: idx_b_info.offset,
+                    elem_size,
                 })?;
             },
             Instr::VecPushBack(elem_ty, vec_ref, val) => {
                 let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
-                let descriptor_id = self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "VecPushBack: no descriptor published for this vector type \
-                         (its element type may be generic or have unresolved layout)"
-                    )
-                })?;
+                let descriptor_id = self.vector_descriptor_id("VecPushBack", vec_ty)?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let val_info = self.slot(*val)?;
                 self.emit(MicroOp::VecPushBack {
@@ -1285,13 +1413,14 @@ impl<'a> LoweringState<'a> {
                 let struct_ty = self.slot_interned_type(*local)?;
                 let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
                 let local_info = self.slot(*local)?;
-                let dst_info = self.def_slot(*dst)?;
+                let dst_info = self.def_typed_slot(*dst)?;
                 let src = SizedSlot {
                     offset: FrameOffset(local_info.offset.0 + field_offset),
                     size: field_size,
                     align: local_info.align,
                 };
-                self.emit_single_move(dst_info.offset, src)?;
+                self.emit_single_move(dst_info.slot.offset, src)?;
+                self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
             Instr::WriteLocalField(fh, local, val) => {
                 let struct_ty = self.slot_interned_type(*local)?;
@@ -1327,13 +1456,14 @@ impl<'a> LoweringState<'a> {
                 let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
                 let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
                 let src_info = self.slot(*src)?;
-                let dst_info = self.def_slot(*dst)?;
+                let dst_info = self.def_typed_slot(*dst)?;
                 self.emit(MicroOp::ReadRefOffset {
-                    dst: dst_info.offset,
+                    dst: dst_info.slot.offset,
                     ref_ptr: src_info.offset,
                     offset: field_offset,
                     size: field_size,
                 })?;
+                self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
             Instr::WriteField(fh, dst_ref, val) => {
                 let struct_ty = strip_ref(self.slot_interned_type(*dst_ref)?)?;
@@ -1601,6 +1731,249 @@ impl<'a> LoweringState<'a> {
                     ty: *ty,
                     src: box_ptr,
                 })?;
+            },
+
+            // --- Enum variant ops (non-generic) ---
+            //
+            // Enums are heap objects: `[tag(8)] [variant data]`. Pack
+            // allocates, writes the tag, then stores each field; Unpack
+            // asserts the runtime tag, then reads each field by value; the
+            // others read/write/borrow through the heap pointer. Field offsets
+            // come from the derived `EnumLayout`; the `enum_*` helpers add
+            // `ENUM_DATA_OFFSET`.
+            Instr::PackVariant(dst, enum_ty, variant_ord, args) => {
+                let ctx = self.ctx;
+                let layout = ctx
+                    .enum_layout(*enum_ty)
+                    .ok_or_else(|| anyhow::anyhow!("PackVariant: no derived layout for enum"))?;
+                let variant_fields =
+                    layout.variants.get(*variant_ord as usize).ok_or_else(|| {
+                        anyhow::anyhow!("PackVariant: variant ordinal {} out of range", variant_ord)
+                    })?;
+                if variant_fields.len() != args.len() {
+                    bail!(
+                        "PackVariant: arg count {} does not match variant field count {}",
+                        args.len(),
+                        variant_fields.len()
+                    );
+                }
+                let descriptor_id = layout.descriptor_id;
+                // GC-safe ordering: `def_slot` only stages the dst's Xfer bind,
+                // so the dst is not a safe-point root at the allocating
+                // `EnumNew`; the live field args are. `EnumNew` fuses the
+                // allocation and the tag store.
+                let dst_off = self.def_slot(*dst)?.offset;
+                // Resolve the field arg slots up front so we can detect aliasing
+                // before emitting.
+                let arg_slots = self.slots_to_sized_slots(args)?;
+                // `EnumNew` writes the heap pointer to its target slot BEFORE the
+                // field stores read the args. The slot allocator may thread the
+                // enum dst and a field arg through one Xfer position (its
+                // read-before-write contract assumes an instruction reads all
+                // sources before writing dst), so if `dst`'s pointer slot aliases
+                // any arg slot, writing the pointer to `dst` would clobber that
+                // arg before its store reads it. In that case stage the pointer in
+                // the reserved scratch and publish it to `dst` only after the last
+                // store; otherwise write straight to `dst`.
+                let aliases_arg =
+                    variant_fields
+                        .iter()
+                        .zip(arg_slots.iter())
+                        .any(|(field, arg)| {
+                            ranges_overlap(dst_off.0, ENUM_PTR_SIZE, arg.offset.0, field.size)
+                        });
+                let pack_ptr = if aliases_arg {
+                    self.ctx.enum_ptr_scratch.ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "PackVariant: dst aliases an arg but no enum-pointer scratch"
+                        )
+                    })?
+                } else {
+                    dst_off
+                };
+                self.emit(MicroOp::enum_new(pack_ptr, descriptor_id, *variant_ord))?;
+                // `enum_store` is non-allocating: no safe point between `EnumNew`
+                // and the final store, so the scratch pointer never spans a GC.
+                for (field, arg) in variant_fields.iter().zip(arg_slots.iter()) {
+                    let size = field.size;
+                    let store = if size == 8 {
+                        MicroOp::enum_store8(pack_ptr, field.offset, arg.offset)
+                    } else {
+                        MicroOp::enum_store(pack_ptr, field.offset, arg.offset, size)
+                    };
+                    self.emit(store)?;
+                }
+                if aliases_arg {
+                    self.emit(MicroOp::Move8 {
+                        dst: dst_off,
+                        src: pack_ptr,
+                    })?;
+                }
+            },
+            Instr::UnpackVariant(dsts, enum_ty, variant_ord, src) => {
+                let ctx = self.ctx;
+                let layout = ctx
+                    .enum_layout(*enum_ty)
+                    .ok_or_else(|| anyhow::anyhow!("UnpackVariant: no derived layout for enum"))?;
+                let variant_fields =
+                    layout.variants.get(*variant_ord as usize).ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "UnpackVariant: variant ordinal {} out of range",
+                            variant_ord
+                        )
+                    })?;
+                if variant_fields.len() != dsts.len() {
+                    bail!(
+                        "UnpackVariant: dst count {} does not match variant field count {}",
+                        dsts.len(),
+                        variant_fields.len()
+                    );
+                }
+                let src_off = self.slot(*src)?.offset;
+                // Resolve all dst slots up front (mirrors struct `Unpack`) so we
+                // can detect aliasing before emitting any load.
+                let mut dst_offs = Vec::with_capacity(dsts.len());
+                for dst in dsts.iter() {
+                    dst_offs.push(self.def_slot(*dst)?.offset);
+                }
+                // Each field load rereads the enum pointer from its source slot.
+                // The slot allocator may thread the consumed enum and a field
+                // output through one Xfer position (its read-before-write contract
+                // assumes sources are read before dsts are written), so if a dst
+                // slot aliases `src`, the load that writes that dst corrupts the
+                // pointer and the next load dereferences garbage (memory-unsafe).
+                // In that case copy the pointer into the reserved scratch and load
+                // every field from there; otherwise read straight from `src`.
+                let aliases_dst =
+                    variant_fields
+                        .iter()
+                        .zip(dst_offs.iter())
+                        .any(|(field, dst_off)| {
+                            ranges_overlap(src_off.0, ENUM_PTR_SIZE, dst_off.0, field.size)
+                        });
+                let load_ptr = if aliases_dst {
+                    let scratch = self.ctx.enum_ptr_scratch.ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "UnpackVariant: dst aliases src but no enum-pointer scratch"
+                        )
+                    })?;
+                    self.emit(MicroOp::Move8 {
+                        dst: scratch,
+                        src: src_off,
+                    })?;
+                    scratch
+                } else {
+                    src_off
+                };
+                // Assert the runtime tag matches before reading fields by
+                // value. Reachable from a refutable `let E::V { .. } = e` or
+                // hand-crafted bytecode; without it, mono-move would read
+                // another variant's bytes (potential type confusion).
+                //
+                // TODO(perf): elide this check when the variant is statically
+                // known. The dominant case is a `match` arm, where a preceding
+                // `TestVariant(&L, V)` + `BrTrue` already proved the tag. A
+                // sound elision is a conservative forward dataflow in the
+                // destack phase tracking "local L is known variant V": seed {L:
+                // V} on the taken edge of `TestVariant(ref, V)` + `BrTrue`
+                // where `ref` borrows L (via `ImmBorrowLoc` provenance); kill
+                // on any reassignment of L; intersect at CFG joins; then drop
+                // this check when `src` is a direct Move/Copy of a local known
+                // to be V. Default to emitting the check, so an imprecise
+                // analysis can only keep a redundant check, never drop a needed
+                // one. The fact must key on the shared local (TestVariant takes
+                // a `&enum`, UnpackVariant the value); there is no
+                // `VariantSwitch` in this IR to shortcut through.
+                self.emit(MicroOp::enum_check_variant(load_ptr, *variant_ord as u64))?;
+                for (field, &dst_off) in variant_fields.iter().zip(dst_offs.iter()) {
+                    let size = field.size;
+                    let load = if size == 8 {
+                        MicroOp::enum_load8(load_ptr, field.offset, dst_off)
+                    } else {
+                        MicroOp::enum_load(load_ptr, field.offset, dst_off, size)
+                    };
+                    self.emit(load)?;
+                }
+            },
+            Instr::TestVariant(dst, _enum_ty, variant_ord, src) => {
+                // `src` is an enum reference.
+                let enum_ref = self.slot(*src)?.offset;
+                let dst_off = self.def_slot(*dst)?.offset;
+                self.emit(MicroOp::enum_test_tag(
+                    enum_ref,
+                    *variant_ord as u64,
+                    dst_off,
+                ))?;
+            },
+            // By-reference field read/write: `src`/`dst_ref` is an enum fat
+            // pointer. The uniform-offset fast path fuses the heap deref and
+            // the value copy into one `Enum{Read,Write}VariantField` (no
+            // scratch reference). The divergent-offset path resolves the offset
+            // by tag: `emit_variant_field_borrow` materializes a field
+            // reference in the scratch slot, then `ReadRef`/`WriteRef` accesses
+            // it. Every op here is non-allocating, so the scratch reference
+            // never spans a safe point.
+            Instr::ReadVariantField(dst, vfh, src) => {
+                let access = self.resolve_variant_field(*vfh)?;
+                let src_off = self.slot(*src)?.offset;
+                let dst_typed = self.def_typed_slot(*dst)?;
+                let dst_off = dst_typed.slot.offset;
+                match access.uniform_offset {
+                    Some(offset) => self.emit(MicroOp::enum_read_variant_field(
+                        src_off,
+                        offset,
+                        dst_off,
+                        access.field_size,
+                    ))?,
+                    None => {
+                        let scratch = self.ctx.variant_field_scratch.ok_or_else(|| {
+                            anyhow::anyhow!("ReadVariantField: no scratch slot reserved")
+                        })?;
+                        self.emit_variant_field_borrow(&access, src_off, scratch)?;
+                        self.emit(MicroOp::ReadRef {
+                            dst: dst_off,
+                            ref_ptr: scratch,
+                            size: access.field_size,
+                        })?;
+                    },
+                }
+                // A by-value variant-field read materializes the field; if it is
+                // itself heap-backed, make it independent.
+                self.maybe_deep_copy(dst_typed.ty, dst_off)?;
+            },
+            Instr::WriteVariantField(vfh, dst_ref, val) => {
+                let access = self.resolve_variant_field(*vfh)?;
+                let ref_off = self.slot(*dst_ref)?.offset;
+                let val_off = self.slot(*val)?.offset;
+                match access.uniform_offset {
+                    Some(offset) => self.emit(MicroOp::enum_write_variant_field(
+                        ref_off,
+                        offset,
+                        val_off,
+                        access.field_size,
+                    ))?,
+                    None => {
+                        let scratch = self.ctx.variant_field_scratch.ok_or_else(|| {
+                            anyhow::anyhow!("WriteVariantField: no scratch slot reserved")
+                        })?;
+                        self.emit_variant_field_borrow(&access, ref_off, scratch)?;
+                        self.emit(MicroOp::WriteRef {
+                            ref_ptr: scratch,
+                            src: val_off,
+                            size: access.field_size,
+                        })?;
+                    },
+                }
+            },
+            // Borrowing a variant field directly produces a field reference
+            // into `dst`; the borrow derefs the enum and offsets into the heap
+            // object (statically or by runtime tag).
+            Instr::ImmBorrowVariantField(dst, vfh, src)
+            | Instr::MutBorrowVariantField(dst, vfh, src) => {
+                let access = self.resolve_variant_field(*vfh)?;
+                let src_off = self.slot(*src)?.offset;
+                let dst_off = self.def_slot(*dst)?.offset;
+                self.emit_variant_field_borrow(&access, src_off, dst_off)?;
             },
 
             // --- Generic and variant field forms: not yet lowered ---
