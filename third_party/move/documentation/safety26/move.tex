@@ -11,13 +11,14 @@ Substitution is carried through transitively: accesses to type-indexed global st
 \paragraph{Abilities.}
 Each type carries a subset of the four abilities: |copy|, |drop|, |store|, and |key|.
 Types without |drop| or |copy| are linear: every value of such a type must be moved, globally stored, or explicitly destructured.
+|key| indicates a type which can be stored as a global resource, and |store| a type which can be transitively included in resources.
 
 \paragraph{Algebraic data types.}
 Structs are nominal product types; enums are nominal sums whose variants carry payloads.
 Pattern matching may bind references directly into a variant's fields.
 
 \paragraph{Modular encapsulation.}
-Privileged operations (construction, destruction, and field access) on a private type are confined to its defining module, so module-external code can manipulate values only through module provided functions.
+Privileged operations (construction, destruction, and field access) on a private type are confined to its defining module, so module-external code can manipulate values only through module-provided functions.
 
 \paragraph{References.}
 Immutable (|&T|) and mutable (|&mut T|) references obey a static aliasing discipline comparable to Rust's~\cite{rust,rustbelt}: two live mutable references cannot point to overlapping memory, and references cannot outlive the values they borrow.

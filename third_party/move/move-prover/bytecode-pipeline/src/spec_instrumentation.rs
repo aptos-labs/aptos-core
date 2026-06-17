@@ -2187,6 +2187,12 @@ impl<'a> Instrumenter<'a> {
 /// instrumentation: emitting it only when the enclosing spec already has an
 /// assertion of that predicate ensures `spec.saved_memory` was populated
 /// with the right label for the callee's used memory.
+/// Returns the first pre-state label under which the enclosing spec references the
+/// given callee through behavioral predicates.
+/// TODO(#20069): with references anchored at different labels, sequential calls to
+/// the same callee have different entry snapshots, but the aggregated call-site
+/// assumes all bind to this single label; selecting the label per call site needs
+/// a correlation between calls and the abstract state labels they define.
 fn find_behavior_pre_label_for_callee(
     spec: &TranslatedSpec,
     mid: ModuleId,
