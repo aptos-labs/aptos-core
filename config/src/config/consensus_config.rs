@@ -107,6 +107,15 @@ pub struct ConsensusConfig {
     /// Path to the digest key blob file (BCS-serialized DigestKey).
     /// Required for validators on non-test chains. For test chains, falls back to TEST_DIGEST_KEY.
     pub digest_key_blob_path: Option<PathBuf>,
+    /// Streaming DigestKey store: rounds pinned in memory at startup. Never evicted, so epoch
+    /// wrap to round 0 stays instant.
+    pub digest_key_pinned_prefix_rounds: usize,
+    /// Streaming DigestKey store: rounds kept resident behind `cursor` past the pinned prefix.
+    pub digest_key_sliding_lookback_rounds: usize,
+    /// Streaming DigestKey store: rounds prefetched ahead of `cursor` past the pinned prefix.
+    pub digest_key_sliding_lookahead_rounds: usize,
+    /// Streaming DigestKey store: number of rounds the loader reads per syscall.
+    pub digest_key_read_batch_rounds: usize,
     /// Path to the public parameters blob file (BCS-serialized PublicParameters).
     /// Required for validators on non-test chains. For test chains, falls back to TEST_PUBLIC_PARAMETERS.
     pub public_parameters_blob_path: Option<PathBuf>,
@@ -408,6 +417,10 @@ impl Default for ConsensusConfig {
             },
             secret_share_request_delay_ms: 300,
             digest_key_blob_path: None,
+            digest_key_pinned_prefix_rounds: 10_000,
+            digest_key_sliding_lookback_rounds: 100,
+            digest_key_sliding_lookahead_rounds: 100,
+            digest_key_read_batch_rounds: 64,
             public_parameters_blob_path: None,
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,

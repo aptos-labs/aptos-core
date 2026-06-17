@@ -16,7 +16,11 @@ use crate::{
 use anyhow::Result;
 use aptos_batch_encryption::{
     group::{Fr, G2Affine, Pairing},
-    shared::{digest::DigestKey, digest_key_file, encryption_key::EncryptionKey},
+    shared::{
+        digest::{DigestKey, DigestKeyHeader, DigestKeyView, RoundData},
+        digest_key_store::{DigestKeyStore, DigestKeyStoreConfig},
+        encryption_key::EncryptionKey,
+    },
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
@@ -187,47 +191,101 @@ pub fn initialize_public_parameters(chain_id: ChainId) -> PublicParametersSource
 /// Path to the BCS-serialized DigestKey blob file.
 static DIGEST_KEY_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-/// Deferred DigestKey source — no expensive work at init time.
-#[derive(Debug)]
-enum DigestKeyOverride {
-    /// Resolve to TEST_DIGEST_KEY on first access (deferred).
+/// Streaming-store config. Set before `initialize_digest_key` if non-default values are needed.
+static DIGEST_KEY_STORE_CONFIG: OnceLock<DigestKeyStoreConfig> = OnceLock::new();
+
+/// Backing storage for the production `DigestKey`.
+///
+/// Either a streaming, bounded-residency `DigestKeyStore` (production, file-backed) or an
+/// in-memory `DigestKey` (test chains and explicit-set tests). Both implement `DigestKeyView`,
+/// so consumers see one uniform surface.
+pub enum DigestKeyHandle {
+    Store(Arc<DigestKeyStore>),
+    InMemory(Arc<DigestKey>),
+}
+
+impl DigestKeyHandle {
+    pub fn header(&self) -> &DigestKeyHeader {
+        match self {
+            DigestKeyHandle::Store(s) => DigestKeyView::header(s.as_ref()),
+            DigestKeyHandle::InMemory(k) => DigestKeyView::header(k.as_ref()),
+        }
+    }
+
+    pub fn round(&self, r: usize) -> Arc<RoundData> {
+        match self {
+            DigestKeyHandle::Store(s) => DigestKeyView::round(s.as_ref(), r),
+            DigestKeyHandle::InMemory(k) => DigestKeyView::round(k.as_ref(), r),
+        }
+    }
+
+    pub fn tau_g2(&self) -> G2Affine {
+        self.header().tau_g2
+    }
+
+    pub fn num_rounds(&self) -> usize {
+        self.header().num_rounds
+    }
+}
+
+impl DigestKeyView for DigestKeyHandle {
+    fn header(&self) -> &DigestKeyHeader {
+        DigestKeyHandle::header(self)
+    }
+
+    fn round(&self, r: usize) -> Arc<RoundData> {
+        DigestKeyHandle::round(self, r)
+    }
+}
+
+/// Deferred resolution of which backing source to use. Set by `initialize_digest_key`.
+enum DigestKeyResolution {
+    /// File-backed; lazy `DigestKeyStore::open` on first access.
+    FromFile {
+        path: PathBuf,
+        cfg: DigestKeyStoreConfig,
+    },
+    /// Test-chain validator fallback — `TEST_DIGEST_KEY` evaluated on first access.
     TestFallback,
-    /// An explicit Arc (e.g. set directly in tests).
+    /// Explicit `set_digest_key` from tests.
     Explicit(Arc<DigestKey>),
 }
 
-/// Deferred DigestKey override (for test chains).
-static DIGEST_KEY_OVERRIDE: OnceLock<DigestKeyOverride> = OnceLock::new();
+static DIGEST_KEY_RESOLUTION: OnceLock<DigestKeyResolution> = OnceLock::new();
 
-/// Production DigestKey: checks override first, then reads from file path.
-/// Returns `None` if neither was configured or if reading/deserializing fails.
-/// TEST_DIGEST_KEY is only evaluated here (on first access), not at boot.
-pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
-    match DIGEST_KEY_OVERRIDE.get() {
-        Some(DigestKeyOverride::TestFallback) => {
-            return Some(Arc::clone(&TEST_DIGEST_KEY));
+/// Production `DigestKey` handle. Lazily resolves on first access, opening the streaming store
+/// or installing the in-memory test key as needed.
+pub static DIGEST_KEY: Lazy<Option<Arc<DigestKeyHandle>>> = Lazy::new(|| {
+    let resolution = DIGEST_KEY_RESOLUTION.get()?;
+    match resolution {
+        DigestKeyResolution::TestFallback => Some(Arc::new(DigestKeyHandle::InMemory(Arc::clone(
+            &TEST_DIGEST_KEY,
+        )))),
+        DigestKeyResolution::Explicit(key) => {
+            Some(Arc::new(DigestKeyHandle::InMemory(Arc::clone(key))))
         },
-        Some(DigestKeyOverride::Explicit(key)) => {
-            return Some(Arc::clone(key));
+        DigestKeyResolution::FromFile { path, cfg } => {
+            let start = Instant::now();
+            match DigestKeyStore::open(path, cfg.clone()) {
+                Ok(store) => {
+                    tracing::info!(
+                        "[DigestKey] streaming store opened for {} in {:?}",
+                        path.display(),
+                        start.elapsed(),
+                    );
+                    Some(Arc::new(DigestKeyHandle::Store(store)))
+                },
+                Err(e) => {
+                    tracing::error!(
+                        "[DigestKey] failed to open streaming store for {}: {}",
+                        path.display(),
+                        e
+                    );
+                    None
+                },
+            }
         },
-        None => {},
     }
-    let path = DIGEST_KEY_PATH.get()?;
-    let start = Instant::now();
-    let key: DigestKey = match digest_key_file::read_digest_key(path) {
-        Ok(k) => k,
-        Err(e) => {
-            tracing::error!("[DigestKey] failed to read file: {}", e);
-            return None;
-        },
-    };
-    let elapsed = start.elapsed();
-    tracing::info!(
-        "[DigestKey] loaded from {} in {:?}",
-        path.display(),
-        elapsed,
-    );
-    Some(Arc::new(key))
 });
 
 /// Store the path to the DigestKey blob file. No I/O is performed.
@@ -237,10 +295,40 @@ pub fn set_digest_key_path(path: PathBuf) {
         .expect("DigestKey path already set");
 }
 
-/// Directly set the DigestKey.
+/// Override the default streaming-store tuning. Must be called before `initialize_digest_key`.
+pub fn set_digest_key_store_config(cfg: DigestKeyStoreConfig) {
+    DIGEST_KEY_STORE_CONFIG
+        .set(cfg)
+        .expect("DigestKeyStore config already set");
+}
+
+/// Mirror of [`DigestKeyStoreConfig`] suitable for `aptos-node` to pass in without a direct
+/// dependency on `aptos-batch-encryption`. The fields match `DigestKeyStoreConfig`.
+#[derive(Clone, Debug)]
+pub struct DigestKeyStoreConfigOverride {
+    pub pinned_prefix_rounds: usize,
+    pub sliding_lookback_rounds: usize,
+    pub sliding_lookahead_rounds: usize,
+    pub read_batch_rounds: usize,
+}
+
+impl From<DigestKeyStoreConfigOverride> for DigestKeyStoreConfig {
+    fn from(o: DigestKeyStoreConfigOverride) -> Self {
+        DigestKeyStoreConfig {
+            pinned_prefix_rounds: o.pinned_prefix_rounds,
+            sliding_lookback_rounds: o.sliding_lookback_rounds,
+            sliding_lookahead_rounds: o.sliding_lookahead_rounds,
+            read_batch_rounds: o.read_batch_rounds,
+        }
+    }
+}
+
+/// Directly set an in-memory DigestKey. Used by tests that need a specific test setup
+/// without going through the file path.
 pub fn set_digest_key(key: Arc<DigestKey>) {
-    DIGEST_KEY_OVERRIDE
-        .set(DigestKeyOverride::Explicit(key))
+    DIGEST_KEY_RESOLUTION
+        .set(DigestKeyResolution::Explicit(key))
+        .map_err(|_| ())
         .expect("DigestKey already set");
 }
 
@@ -262,14 +350,21 @@ pub enum DigestKeySource {
 pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKeySource {
     if let Some(path) = DIGEST_KEY_PATH.get() {
         match std::fs::metadata(path) {
-            Ok(meta) => DigestKeySource::WillLoadFromFile {
-                path: path.clone(),
-                file_size: meta.len(),
+            Ok(meta) => {
+                let cfg = DIGEST_KEY_STORE_CONFIG.get().cloned().unwrap_or_default();
+                let _ = DIGEST_KEY_RESOLUTION.set(DigestKeyResolution::FromFile {
+                    path: path.clone(),
+                    cfg,
+                });
+                DigestKeySource::WillLoadFromFile {
+                    path: path.clone(),
+                    file_size: meta.len(),
+                }
             },
             Err(_) => DigestKeySource::NotAvailable,
         }
     } else if chain_id == ChainId::test() && is_validator {
-        let _ = DIGEST_KEY_OVERRIDE.set(DigestKeyOverride::TestFallback);
+        let _ = DIGEST_KEY_RESOLUTION.set(DigestKeyResolution::TestFallback);
         DigestKeySource::TestKeyFallback
     } else {
         DigestKeySource::NotAvailable

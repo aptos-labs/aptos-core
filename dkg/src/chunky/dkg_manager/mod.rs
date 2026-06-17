@@ -575,7 +575,7 @@ impl ChunkyDKGManager {
             let digest_key = DIGEST_KEY
                 .as_ref()
                 .ok_or_else(|| anyhow!("DigestKey not available; cannot derive encryption key"))?;
-            let key = agg_subtrx_for_blocking.derive_encryption_key_bytes(digest_key.tau_g2)?;
+            let key = agg_subtrx_for_blocking.derive_encryption_key_bytes(digest_key.tau_g2())?;
             let bytes = bcs::to_bytes(agg_subtrx_for_blocking.as_ref())
                 .map_err(|e| anyhow!("transcript serialization error: {e}"))?;
             counters::CHUNKY_DKG_OBJECT_SIZE_BYTES

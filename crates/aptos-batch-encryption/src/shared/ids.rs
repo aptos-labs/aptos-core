@@ -140,15 +140,17 @@ impl IdSet<ComputedCoeffs> {
 
     pub fn compute_all_eval_proofs_with_setup(
         &self,
-        setup: &crate::shared::digest::DigestKey,
+        setup: &dyn crate::shared::digest::DigestKeyView,
         round: usize,
     ) -> HashMap<Id, G1Affine> {
+        let round_data = setup.round(round);
         let pfs: Vec<G1Affine> = setup
-            .fk_domain
-            .eval_proofs_at_x_coords_naive_multi_point_eval(
+            .header()
+            .fk_params
+            .eval_proofs_at_x_coords_naive_multi_point_eval_with(
                 &self.poly_coeffs(),
                 &self.poly_roots,
-                round,
+                &round_data.prepared_toeplitz_input,
             )
             .iter()
             .map(|g| G1Affine::from(*g))
@@ -164,12 +166,18 @@ impl IdSet<ComputedCoeffs> {
 
     pub fn compute_all_eval_proofs_with_setup_vzgg_multi_point_eval(
         &self,
-        setup: &crate::shared::digest::DigestKey,
+        setup: &dyn crate::shared::digest::DigestKeyView,
         round: usize,
     ) -> HashMap<Id, G1Affine> {
+        let round_data = setup.round(round);
         let pfs: Vec<G1Affine> = setup
-            .fk_domain
-            .eval_proofs_at_x_coords(&self.poly_coeffs(), &self.poly_roots, round)
+            .header()
+            .fk_params
+            .eval_proofs_at_x_coords_with(
+                &self.poly_coeffs(),
+                &self.poly_roots,
+                &round_data.prepared_toeplitz_input,
+            )
             .iter()
             .map(|g| G1Affine::from(*g))
             .collect();
@@ -184,16 +192,18 @@ impl IdSet<ComputedCoeffs> {
 
     pub fn compute_eval_proofs_with_setup(
         &self,
-        setup: &crate::shared::digest::DigestKey,
+        setup: &dyn crate::shared::digest::DigestKeyView,
         ids: &[Id],
         round: usize,
     ) -> HashMap<Id, G1Affine> {
+        let round_data = setup.round(round);
         let pfs: Vec<G1Affine> = setup
-            .fk_domain
-            .eval_proofs_at_x_coords_naive_multi_point_eval(
+            .header()
+            .fk_params
+            .eval_proofs_at_x_coords_naive_multi_point_eval_with(
                 &self.poly_coeffs(),
                 &ids.iter().map(|id| id.x()).collect::<Vec<Fr>>(),
-                round,
+                &round_data.prepared_toeplitz_input,
             )
             .iter()
             .map(|g| G1Affine::from(*g))
@@ -209,7 +219,7 @@ impl IdSet<ComputedCoeffs> {
 
     pub fn compute_eval_proof_with_setup(
         &self,
-        setup: &crate::shared::digest::DigestKey,
+        setup: &dyn crate::shared::digest::DigestKeyView,
         id: Id,
         round: usize,
     ) -> G1Affine {
@@ -218,7 +228,8 @@ impl IdSet<ComputedCoeffs> {
         let mut q_coeffs = quotient(&self.poly_coeffs.mult_tree, index_of_id).coeffs;
         q_coeffs.push(Fr::zero());
 
-        G1Projective::msm(&setup.tau_powers_g1[round], &q_coeffs)
+        let round_data = setup.round(round);
+        G1Projective::msm(&round_data.tau_powers_g1, &q_coeffs)
             .unwrap()
             .into()
     }

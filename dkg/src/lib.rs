@@ -25,8 +25,8 @@ use aptos_types::{
     chain_id::ChainId,
     dkg::chunky_dkg::{
         initialize_digest_key, initialize_public_parameters, set_digest_key_path,
-        set_public_parameters_path, DigestKeySource, PublicParametersSource, DIGEST_KEY,
-        PUBLIC_PARAMETERS,
+        set_digest_key_store_config, set_public_parameters_path, DigestKeySource,
+        DigestKeyStoreConfigOverride, PublicParametersSource, DIGEST_KEY, PUBLIC_PARAMETERS,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -77,11 +77,13 @@ pub fn start_dkg_runtime(
 /// Spawns a background thread to eagerly load the key from file and record load duration.
 pub fn initialize_digest_key_with_counters(
     blob_path: Option<&PathBuf>,
+    store_config: DigestKeyStoreConfigOverride,
     chain_id: ChainId,
     is_validator: bool,
 ) {
     if let Some(path) = blob_path {
         set_digest_key_path(path.clone());
+        set_digest_key_store_config(store_config.into());
     }
     let source = initialize_digest_key(chain_id, is_validator);
     match source {

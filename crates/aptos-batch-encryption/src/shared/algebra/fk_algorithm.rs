@@ -273,6 +273,131 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
     }
 }
 
+/// The round-independent parameters of the FK algorithm: the Toeplitz domain and the FFT evaluation
+/// domain. Splitting these out of [`FKDomain`] lets callers run the algorithm against a single
+/// round's prepared input without materializing the full `Vec<PreparedInput>` from the trusted
+/// setup file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FKDomainParams<F: FftField> {
+    pub toeplitz_domain: ToeplitzDomain<F>,
+    pub fft_domain: Radix2EvaluationDomain<F>,
+}
+
+impl<F: FftField> FKDomainParams<F> {
+    pub fn new(max_poly_degree: usize, eval_domain_size: usize) -> Option<Self> {
+        Some(Self {
+            toeplitz_domain: ToeplitzDomain::new(max_poly_degree)?,
+            fft_domain: Radix2EvaluationDomain::new(eval_domain_size)?,
+        })
+    }
+
+    pub fn toeplitz_for_poly(&self, f: &[F]) -> Vec<F> {
+        let toeplitz: Vec<F> = Vec::from(&f[1..])
+            .into_iter()
+            .chain(vec![F::zero(); f.len() - 2])
+            .collect();
+
+        debug_assert_eq!(toeplitz.len(), self.toeplitz_domain.dimension() * 2 - 1);
+
+        toeplitz
+    }
+}
+
+impl<F: FftField> FKDomainParams<F> {
+    /// Prepare a per-round Toeplitz input from the round's `tau_powers`. Mirrors the per-round
+    /// step in `FKDomain::new`, exposed so we can build prepared inputs incrementally as rounds
+    /// stream off disk.
+    pub fn prepare_round_input<T>(&self, tau_powers_for_round: &[T]) -> PreparedInput<F, T>
+    where
+        T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize,
+    {
+        let mut tau_powers_reversed: Vec<T> = tau_powers_for_round.to_vec();
+        tau_powers_reversed.reverse();
+        self.toeplitz_domain
+            .prepare_input(&tau_powers_reversed[1..])
+    }
+
+    fn compute_h_term_commitments_with<T>(
+        &self,
+        f: &[F],
+        prepared_toeplitz_input: &PreparedInput<F, T>,
+    ) -> Vec<T>
+    where
+        T: DomainCoeff<F>
+            + Mul<F, Output = T>
+            + VariableBaseMSM<ScalarField = F>
+            + CanonicalSerialize
+            + CanonicalDeserialize,
+    {
+        let mut f = Vec::from(f);
+        f.extend(std::iter::repeat_n(
+            F::zero(),
+            self.toeplitz_domain.dimension() + 1 - f.len(),
+        ));
+        debug_assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
+
+        self.toeplitz_domain
+            .eval_prepared(&self.toeplitz_for_poly(&f), prepared_toeplitz_input)
+    }
+
+    pub fn eval_proofs_at_roots_of_unity_with<T>(
+        &self,
+        f: &[F],
+        prepared_toeplitz_input: &PreparedInput<F, T>,
+    ) -> Vec<T>
+    where
+        T: DomainCoeff<F>
+            + Mul<F, Output = T>
+            + VariableBaseMSM<ScalarField = F>
+            + CanonicalSerialize
+            + CanonicalDeserialize,
+    {
+        let h_term_commitments = self.compute_h_term_commitments_with(f, prepared_toeplitz_input);
+        self.fft_domain.fft(&h_term_commitments)
+    }
+
+    pub fn eval_proofs_at_x_coords_with<T>(
+        &self,
+        f: &[F],
+        x_coords: &[F],
+        prepared_toeplitz_input: &PreparedInput<F, T>,
+    ) -> Vec<T>
+    where
+        T: DomainCoeff<F>
+            + Mul<F, Output = T>
+            + VariableBaseMSM<ScalarField = F>
+            + CanonicalSerialize
+            + CanonicalDeserialize,
+    {
+        let h_term_commitments = self.compute_h_term_commitments_with(f, prepared_toeplitz_input);
+        multi_point_eval(&h_term_commitments, x_coords)
+    }
+
+    pub fn eval_proofs_at_x_coords_naive_multi_point_eval_with<T>(
+        &self,
+        f: &[F],
+        x_coords: &[F],
+        prepared_toeplitz_input: &PreparedInput<F, T>,
+    ) -> Vec<T>
+    where
+        T: DomainCoeff<F>
+            + Mul<F, Output = T>
+            + VariableBaseMSM<ScalarField = F>
+            + CanonicalSerialize
+            + CanonicalDeserialize,
+    {
+        let h_term_commitments = self.compute_h_term_commitments_with(f, prepared_toeplitz_input);
+
+        multi_point_eval_naive(
+            &h_term_commitments
+                .into_iter()
+                .map(T::MulBase::from)
+                .collect::<Vec<T::MulBase>>(),
+            x_coords,
+        )
+    }
+}
+
 /// Encapsulates the [`ToeplitzDomain`] and a FFT evaluation domain required for running the FK
 /// algorithm.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -280,6 +405,17 @@ pub struct FKDomain<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + Canoni
     pub toeplitz_domain: ToeplitzDomain<F>,
     pub fft_domain: Radix2EvaluationDomain<F>,
     pub prepared_toeplitz_inputs: Vec<PreparedInput<F, T>>,
+}
+
+impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> FKDomain<F, T> {
+    /// Borrow the round-independent params for callers that want to drive the FK algorithm against
+    /// a single round's prepared input.
+    pub fn params(&self) -> FKDomainParams<F> {
+        FKDomainParams {
+            toeplitz_domain: self.toeplitz_domain.clone(),
+            fft_domain: self.fft_domain,
+        }
+    }
 }
 
 impl<

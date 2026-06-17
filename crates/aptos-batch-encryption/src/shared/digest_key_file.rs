@@ -4,8 +4,8 @@
 use crate::{
     group::{Fr, G1Affine, G1Projective, G2Affine},
     shared::{
-        algebra::fk_algorithm::{FKDomain, PreparedInput, ToeplitzDomain},
-        digest::DigestKey,
+        algebra::fk_algorithm::{FKDomainParams, PreparedInput, ToeplitzDomain},
+        digest::{DigestKey, DigestKeyHeader, RoundData},
     },
 };
 use anyhow::{bail, Result};
@@ -18,8 +18,9 @@ use ark_serialize::{
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
-    io::{Read, Seek, Write},
+    io::{Cursor, Read, Seek, Write},
     path::Path,
+    sync::Arc,
 };
 
 // Structs
@@ -89,21 +90,25 @@ impl From<(Vec<G1Affine>, PreparedInput<Fr, G1Projective>)> for Round {
 
 impl From<DigestKey> for (HeaderV1, Vec<Round>) {
     fn from(value: DigestKey) -> Self {
-        (
-            HeaderV1 {
-                batch_size: value.max_batch_size(),
-                num_rounds: value.tau_powers_g1.len(),
-                tau_g2: value.tau_g2,
-                toeplitz_domain: value.fk_domain.toeplitz_domain,
-                fft_domain: value.fk_domain.fft_domain,
-            },
-            value
-                .tau_powers_g1
-                .into_iter()
-                .zip(value.fk_domain.prepared_toeplitz_inputs)
-                .map(Round::from)
-                .collect(),
-        )
+        let header_v1 = HeaderV1 {
+            batch_size: value.header.batch_size,
+            num_rounds: value.header.num_rounds,
+            tau_g2: value.header.tau_g2,
+            toeplitz_domain: value.header.fk_params.toeplitz_domain.clone(),
+            fft_domain: value.header.fk_params.fft_domain,
+        };
+        let rounds: Vec<Round> = value
+            .rounds
+            .into_iter()
+            .map(|round_arc| {
+                let round = Arc::try_unwrap(round_arc).unwrap_or_else(|arc| (*arc).clone());
+                Round {
+                    tau_powers_g1: round.tau_powers_g1,
+                    prepared_toeplitz_input: round.prepared_toeplitz_input,
+                }
+            })
+            .collect();
+        (header_v1, rounds)
     }
 }
 
@@ -152,24 +157,29 @@ pub fn write_round(file: &File, round: &Round, header: &HeaderV1) -> Result<()> 
 impl From<(HeaderV1, Vec<Round>)> for DigestKey {
     // Assumes correct shape
     fn from(value: (HeaderV1, Vec<Round>)) -> Self {
-        let (tau_powers_g1, prepared_toeplitz_inputs): (
-            Vec<Vec<G1Affine>>,
-            Vec<PreparedInput<Fr, G1Projective>>,
-        ) = value
-            .1
+        let (header_v1, file_rounds) = value;
+        let rounds: Vec<Arc<RoundData>> = file_rounds
             .into_iter()
-            .map(|round| (round.tau_powers_g1, round.prepared_toeplitz_input))
+            .map(|round| {
+                Arc::new(RoundData {
+                    tau_powers_g1: round.tau_powers_g1,
+                    prepared_toeplitz_input: round.prepared_toeplitz_input,
+                })
+            })
             .collect();
-
-        Self {
-            tau_g2: value.0.tau_g2,
-            tau_powers_g1,
-            fk_domain: FKDomain {
-                toeplitz_domain: value.0.toeplitz_domain,
-                fft_domain: value.0.fft_domain,
-                prepared_toeplitz_inputs,
+        // `num_rounds` reflects the rounds actually carried by this `DigestKey`, which may be
+        // a subrange of the file (see `read_digest_key_range`). HeaderV1.num_rounds is the
+        // on-disk count.
+        let header = Arc::new(DigestKeyHeader {
+            tau_g2: header_v1.tau_g2,
+            batch_size: header_v1.batch_size,
+            num_rounds: rounds.len(),
+            fk_params: FKDomainParams {
+                toeplitz_domain: header_v1.toeplitz_domain,
+                fft_domain: header_v1.fft_domain,
             },
-        }
+        });
+        DigestKey::from_parts(header, rounds)
     }
 }
 
@@ -272,6 +282,36 @@ pub fn read_round(file: &File, header: &HeaderV1) -> Result<Round> {
     })
 }
 
+/// Decode a single round from an in-memory byte slice of length `header.round_size_bytes()`.
+///
+/// Pure CPU work. The streaming `DigestKeyStore` uses this to amortize I/O: read a batch of N
+/// round-sized chunks in one `read_exact`, then decode each chunk with this function.
+pub fn decode_round_from_slice(buf: &[u8], header: &HeaderV1) -> Result<Round> {
+    if buf.len() != header.round_size_bytes() {
+        bail!(
+            "decode_round_from_slice: buffer size {} does not match round size {}",
+            buf.len(),
+            header.round_size_bytes()
+        );
+    }
+    let mut cursor = Cursor::new(buf);
+
+    let mut tau_powers_g1: Vec<G1Affine> = (0..header.num_powers_per_round())
+        .map(|_| G1Affine::deserialize_with_mode(&mut cursor, Compress::No, Validate::No))
+        .collect::<std::result::Result<Vec<G1Affine>, SerializationError>>()?;
+    tau_powers_g1.shrink_to_fit();
+
+    let mut prepared_input_y: Vec<G1Projective> = (0..header.prepared_input_size())
+        .map(|_| G1Projective::deserialize_with_mode(&mut cursor, Compress::No, Validate::No))
+        .collect::<std::result::Result<Vec<G1Projective>, SerializationError>>()?;
+    prepared_input_y.shrink_to_fit();
+
+    Ok(Round {
+        tau_powers_g1,
+        prepared_toeplitz_input: PreparedInput::new(prepared_input_y),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::shared::{digest::DigestKey, digest_key_file::*};
@@ -339,10 +379,10 @@ mod tests {
 
         let dk_from_file = read_digest_key_range(file.path(), 2, 3).unwrap();
 
-        dk.tau_powers_g1.remove(0);
-        dk.tau_powers_g1.remove(0);
-        dk.fk_domain.prepared_toeplitz_inputs.remove(0);
-        dk.fk_domain.prepared_toeplitz_inputs.remove(0);
+        dk.rounds.remove(0);
+        dk.rounds.remove(0);
+        let header = std::sync::Arc::make_mut(&mut dk.header);
+        header.num_rounds = 3;
 
         assert_eq!(dk, dk_from_file);
     }

@@ -753,6 +753,12 @@ pub fn setup_environment_and_start_node(
     // Initialize the DigestKey and PublicParameters for chunky DKG
     aptos_dkg_runtime::initialize_digest_key_with_counters(
         node_config.consensus.digest_key_blob_path.as_ref(),
+        aptos_types::dkg::chunky_dkg::DigestKeyStoreConfigOverride {
+            pinned_prefix_rounds: node_config.consensus.digest_key_pinned_prefix_rounds,
+            sliding_lookback_rounds: node_config.consensus.digest_key_sliding_lookback_rounds,
+            sliding_lookahead_rounds: node_config.consensus.digest_key_sliding_lookahead_rounds,
+            read_batch_rounds: node_config.consensus.digest_key_read_batch_rounds,
+        },
         chain_id,
         node_config.base.role.is_validator(),
     );
