@@ -16,6 +16,7 @@ use aptos_storage_service_types::{
 use aptos_types::{
     proof::definition::SparseMerkleRangeProof,
     state_store::{
+        hot_state::HotStateValueChunkWithProof,
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -89,6 +90,57 @@ async fn test_get_states_with_proof() {
                 DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
             );
         }
+    }
+}
+
+#[tokio::test]
+async fn test_get_hot_states_with_proof() {
+    // Test small and large chunk requests (hot state only uses size and time-aware chunking)
+    let max_state_chunk_size = StorageServiceConfig::default().max_state_chunk_size;
+    for chunk_size in [1, 100, max_state_chunk_size] {
+        // Create test data
+        let version = 101;
+        let start_index = 100;
+        let end_index = start_index + chunk_size - 1;
+        let hot_state_value_chunk_with_proof = HotStateValueChunkWithProof {
+            first_index: start_index,
+            last_index: end_index,
+            first_key: HashValue::random(),
+            last_key: HashValue::random(),
+            raw_values: vec![],
+            proof: SparseMerkleRangeProof::new(vec![]),
+            root_hash: HashValue::random(),
+        };
+
+        // Create the mock db reader
+        let mut db_reader = mock::create_mock_db_reader();
+        expect_get_hot_state_values_with_proof(
+            &mut db_reader,
+            version,
+            start_index,
+            chunk_size,
+            hot_state_value_chunk_with_proof.clone(),
+        );
+
+        // Create the storage client and server
+        let storage_config = utils::create_storage_config(false, true);
+        let (mut mock_client, mut service, _, _, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        utils::update_storage_server_summary(&mut service, version, 10);
+        tokio::spawn(service.start());
+
+        // Process a request to fetch a hot states chunk with a proof
+        let response =
+            get_hot_state_values_with_proof(&mut mock_client, version, start_index, end_index)
+                .await
+                .unwrap();
+
+        // Verify the response is correct
+        assert_matches!(response, StorageServiceResponse::RawResponse(_));
+        assert_eq!(
+            response.get_data_response().unwrap(),
+            DataResponse::HotStateValueChunkWithProof(hot_state_value_chunk_with_proof)
+        );
     }
 }
 
@@ -307,6 +359,60 @@ async fn get_state_values_with_proof(
         end_index,
     });
     utils::send_storage_request(mock_client, use_compression, data_request).await
+}
+
+/// Sets an expectation on the given mock db for a call to fetch hot state values with proof. Hot
+/// state is only served via the size and time-aware chunking path (iterator + proof).
+fn expect_get_hot_state_values_with_proof(
+    mock_db: &mut MockDatabaseReader,
+    version: u64,
+    start_index: u64,
+    chunk_size: u64,
+    mut hot_state_value_chunk_with_proof: HotStateValueChunkWithProof,
+) {
+    // Expect a call to get a hot state value iterator
+    let mut expectation_sequence = Sequence::new();
+    let state_value_iterator = hot_state_value_chunk_with_proof
+        .clone()
+        .raw_values
+        .into_iter()
+        .map(Ok);
+    mock_db
+        .expect_get_hot_state_value_chunk_iter()
+        .times(1)
+        .with(
+            eq(version),
+            eq(start_index as usize),
+            eq(chunk_size as usize),
+        )
+        .returning(move |_, _, _| Ok(Box::new(state_value_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get the hot state value chunk proof
+    mock_db
+        .expect_get_hot_state_value_chunk_proof()
+        .times(1)
+        .with(eq(version), eq(start_index as usize), always())
+        .return_once(move |_, _, given_state_values| {
+            hot_state_value_chunk_with_proof.raw_values = given_state_values;
+            Ok(hot_state_value_chunk_with_proof)
+        })
+        .in_sequence(&mut expectation_sequence);
+}
+
+/// Sends a hot state values with proof request and processes the response
+async fn get_hot_state_values_with_proof(
+    mock_client: &mut MockClient,
+    version: u64,
+    start_index: u64,
+    end_index: u64,
+) -> Result<StorageServiceResponse, StorageServiceError> {
+    let data_request = DataRequest::GetHotStateValuesWithProof(StateValuesWithProofRequest {
+        version,
+        start_index,
+        end_index,
+    });
+    utils::send_storage_request(mock_client, false, data_request).await
 }
 
 /// A helper method to request a states with proof chunk using the
