@@ -98,6 +98,10 @@ pub struct ProverOptions {
     /// instead of creating Identical temps.
     #[arg(long, default_value_t = false)]
     pub inline_spec_lets: bool,
+    /// Use the prophecy-based (RustHorn/Creusot) reference model instead of the
+    /// WriteBack-based static model. Path-free; gated in the prelude and pipeline.
+    #[arg(long, default_value_t = false)]
+    pub prophecy_refs: bool,
 }
 
 // add custom struct for mutation options
@@ -124,6 +128,7 @@ impl Default for ProverOptions {
             borrow_natives: vec![],
             verify_exclude: vec![],
             inline_spec_lets: false,
+            prophecy_refs: false,
         }
     }
 }

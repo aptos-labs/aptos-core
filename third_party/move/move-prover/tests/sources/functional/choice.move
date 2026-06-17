@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 // separate_baseline: cvc5
 // TODO(cvc5): this test requires a separate baseline because cvc5 produces false positives for some of choices
 // separate_baseline: simplify

@@ -1,0 +1,40 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:31:9
+   │
+31 │ ╭         ensures exists S in *:
+32 │ │             (S |~ requires_of<checked_inc>(c)) &&
+33 │ │             (S |~ !aborts_of<checked_inc>(c));
+   │ ╰──────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:25: inc_twice_with_bp
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:30: inc_twice_with_bp (spec)
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:25: inc_twice_with_bp
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:19: checked_inc (spec)
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:26: inc_twice_with_bp
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:19: checked_inc (spec)
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:13: checked_inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:14: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:15: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:16: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:13: checked_inc
+   =         result = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:17: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:19: checked_inc (spec)
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:27: inc_twice_with_bp
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:19: checked_inc (spec)
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:13: checked_inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:14: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:15: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:16: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:13: checked_inc
+   =         result = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:17: checked_inc
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:25: inc_twice_with_bp
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:31: inc_twice_with_bp (spec)

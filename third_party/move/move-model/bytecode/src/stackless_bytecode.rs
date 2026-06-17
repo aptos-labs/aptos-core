@@ -294,6 +294,17 @@ pub enum Operation {
     UnpackRefDeep,
     PackRefDeep,
 
+    // Prophecy memory model (alternative to WriteBack/IsParent; emitted only
+    // under the prophecy_refs flag). ProphecyBorrow marks a borrow creation,
+    // carrying the lender node and edge; Resolve marks a dying reference whose
+    // prophecy is fulfilled (assume current == final). ResolveReturn marks a
+    // returned reference: it is derived from a parameter and resolved only when
+    // verifying its function standalone (no caller); in the inlined body it is
+    // left free for the caller to resolve.
+    ProphecyBorrow(BorrowNode, BorrowEdge),
+    Resolve,
+    ResolveReturn,
+
     // Get shortcut
     GetField(ModuleId, StructId, Vec<Type>, usize),
     GetVariantField(ModuleId, StructId, Vec<Symbol>, Vec<Type>, usize),
@@ -355,6 +366,9 @@ impl Operation {
             Operation::PackRef => false,
             Operation::UnpackRefDeep => false,
             Operation::PackRefDeep => false,
+            Operation::ProphecyBorrow(..) => false,
+            Operation::Resolve => false,
+            Operation::ResolveReturn => false,
             Operation::CastU8 => true,
             Operation::CastU16 => true,
             Operation::CastU32 => true,
@@ -791,6 +805,13 @@ impl Bytecode {
                 map(true, f, srcs),
                 map_abort(f, aa),
             ),
+            Call(attr, _, ProphecyBorrow(node, edge), srcs, aa) => Call(
+                attr,
+                vec![],
+                ProphecyBorrow(map_node(f, node), edge),
+                map(true, f, srcs),
+                map_abort(f, aa),
+            ),
             Call(attr, dests, IsParent(node, edge), srcs, aa) => Call(
                 attr,
                 map(false, f, dests),
@@ -895,6 +916,9 @@ impl Bytecode {
                     WriteBack(node, edge) => {
                         WriteBack(node.instantiate(params), edge.instantiate(params))
                     },
+                    ProphecyBorrow(node, edge) => {
+                        ProphecyBorrow(node.instantiate(params), edge.instantiate(params))
+                    },
                     // others
                     _ => op.clone(),
                 };
@@ -965,6 +989,14 @@ impl Bytecode {
             },
             Call(_, _, Operation::WriteBack(Reference(dest), ..), _, aa) => {
                 // write-back to a reference only distorts the value, but not the pointer itself
+                (add_abort(vec![], aa), vec![(*dest, false)])
+            },
+            Call(_, _, Operation::ProphecyBorrow(LocalRoot(dest), ..), _, aa) => {
+                // eager prophecy update of a local lender distorts its value
+                (add_abort(vec![*dest], aa), vec![])
+            },
+            Call(_, _, Operation::ProphecyBorrow(Reference(dest), ..), _, aa) => {
+                // eager prophecy update of a reference lender distorts the value, not the pointer
                 (add_abort(vec![], aa), vec![(*dest, false)])
             },
             Call(_, _, Operation::WriteRef, srcs, aa) => {
@@ -1421,6 +1453,14 @@ impl fmt::Display for OperationDisplay<'_> {
                 node.display(self.func_target),
                 edge.display(self.func_target.global_env())
             )?,
+            ProphecyBorrow(node, edge) => write!(
+                f,
+                "prophecy_borrow[{}{}]",
+                node.display(self.func_target),
+                edge.display(self.func_target.global_env())
+            )?,
+            Resolve => write!(f, "resolve")?,
+            ResolveReturn => write!(f, "resolve_return")?,
 
             Havoc(kind) => {
                 write!(f, "havoc[{}]", match kind {

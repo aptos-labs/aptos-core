@@ -310,7 +310,10 @@ impl PerFunctionRelevance {
                         let mem = mid.qualified_inst(*sid, inst.to_owned());
                         (BTreeSet::new(), std::iter::once(mem).collect())
                     },
-                    WriteBack(GlobalRoot(mem), _) => {
+                    WriteBack(GlobalRoot(mem), _) | ProphecyBorrow(GlobalRoot(mem), _) => {
+                        // Under the prophecy model the resource is written eagerly at the
+                        // borrow (ProphecyBorrow), so the global invariant is asserted
+                        // there rather than at a write-back.
                         (BTreeSet::new(), std::iter::once(mem.clone()).collect())
                     },
 

@@ -1192,7 +1192,10 @@ impl<'a> Instrumenter<'a> {
                     None,
                 )
             });
-            // write_back[GhostMem](mem_ref)
+            // write_back[GhostMem](mem_ref, addr_temp). The address is passed as a second
+            // source so the prophecy model (whose path-free `$Mutation` carries no location)
+            // can update the resource memory without `$GlobalLocationAddress`; the static
+            // model ignores it.
             self.builder.emit_with(|id| {
                 Bytecode::Call(
                     id,
@@ -1201,7 +1204,7 @@ impl<'a> Instrumenter<'a> {
                         BorrowNode::GlobalRoot(ghost_mem.clone()),
                         BorrowEdge::Direct,
                     ),
-                    vec![mem_ref],
+                    vec![mem_ref, addr_temp],
                     None,
                 )
             });

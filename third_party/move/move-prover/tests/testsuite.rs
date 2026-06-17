@@ -88,6 +88,23 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
             },
+            // Tests with the path-free prophecy reference model. Every unit test runs
+            // under `--prophecy-refs` as well and, by default, must produce the SAME
+            // `.exp` as without the flag (separate_baseline: false) — that shared
+            // baseline is the proof the two models agree. A test whose prophecy output
+            // legitimately differs escapes the sharing with `// separate_baseline:
+            // prophecy` (producing `foo.prophecy_exp`), or is excluded entirely with
+            // `// exclude_for: prophecy`. Runs in CI.
+            Feature {
+                name: "prophecy",
+                flags: &["--prophecy-refs"],
+                inclusion_mode: InclusionMode::Implicit,
+                enable_in_ci: true,
+                only_if_requested: false,
+                separate_baseline: false, // shares foo.exp with `default`
+                runner: |p| test_runner_for_feature(p, get_feature_by_name("prophecy")),
+                enabling_condition: |group, _| group == "unit",
+            },
         ]
     })
 }

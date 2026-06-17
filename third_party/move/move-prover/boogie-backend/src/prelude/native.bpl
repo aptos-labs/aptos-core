@@ -287,13 +287,24 @@ procedure {:inline 1} $1_vector_borrow_mut{{S}}(m: $Mutation (Vec ({{T}})), inde
 returns (dst: $Mutation ({{T}}), m': $Mutation (Vec ({{T}})))
 {
     var v: Vec ({{T}});
+{%- if options.prophecy_refs %}
+    var f: {{T}};
+{%- endif %}
     v := $Dereference(m);
     if (!InRangeVec(v, index)) {
         call $ExecFailureAbort();
         return;
     }
+{%- if options.prophecy_refs %}
+    // Eager index borrow: the element ref gets a fresh prophecy `f`; the parent's
+    // element `index` is set to `f` so resolving the element flows back to the parent.
+    havoc f;
+    dst := $Mutation(ReadVec(v, index), f);
+    m' := $UpdateMutation(m, UpdateVec(v, index, f));
+{%- else %}
     dst := $Mutation(m->l, ExtendVec(m->p, index), ReadVec(v, index));
     m' := m;
+{%- endif %}
 }
 
 function {:inline} $1_vector_$borrow_mut{{S}}(v: Vec ({{T}}), i: int): {{T}} {
@@ -520,13 +531,25 @@ procedure {:inline 2} {{impl.fun_borrow_mut}}{{S}}(m: $Mutation ({{Self}}), k: {
 returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
     var t: {{Self}};
+{%- if options.prophecy_refs %}
+    var f: {{V}};
+{%- endif %}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (!ContainsTable(t, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
+{%- if options.prophecy_refs %}
+        // Eager index borrow (prophecy): the element ref gets a fresh prophecy `f`; the
+        // parent's slot `enc_k` is set to `f` so resolving the element flows back to the
+        // parent (mirrors the vector `borrow_mut`).
+        havoc f;
+        dst := $Mutation(GetTable(t, enc_k), f);
+        m' := $UpdateMutation(m, UpdateTable(t, enc_k, f));
+{%- else %}
         dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
         m' := m;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -537,15 +560,30 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
     var t: {{Self}};
     var t': {{Self}};
+{%- if options.prophecy_refs %}
+    var f: {{V}};
+{%- endif %}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (!ContainsTable(t, enc_k)) {
         m' := $UpdateMutation(m, AddTable(t, enc_k, default));
         t' := $Dereference(m');
+{%- if options.prophecy_refs %}
+        havoc f;
+        dst := $Mutation(GetTable(t', enc_k), f);
+        m' := $UpdateMutation(m', UpdateTable(t', enc_k, f));
+{%- else %}
         dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t', enc_k));
+{%- endif %}
     } else {
+{%- if options.prophecy_refs %}
+        havoc f;
+        dst := $Mutation(GetTable(t, enc_k), f);
+        m' := $UpdateMutation(m, UpdateTable(t, enc_k, f));
+{%- else %}
         dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
         m' := m;
+{%- endif %}
     }
 }
 {%- endif %}

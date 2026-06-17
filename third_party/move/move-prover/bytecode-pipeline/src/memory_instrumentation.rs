@@ -201,7 +201,7 @@ impl<'a> Instrumenter<'a> {
         Self::is_pack_ref_ty_(ty, self.builder.global_env())
     }
 
-    fn is_pack_ref_ty_(ty: &Type, env: &GlobalEnv) -> bool {
+    pub(crate) fn is_pack_ref_ty_(ty: &Type, env: &GlobalEnv) -> bool {
         use Type::*;
         match ty.skip_reference() {
             Struct(mid, sid, inst) => {

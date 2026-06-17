@@ -1,26 +1,26 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-   ┌─ tests/sources/functional/closures/closure_refs.move:56:9
+   ┌─ tests/sources/functional/closures/closure_refs.move:60:9
    │
-56 │         ensures result == 33; // expected to fail
+60 │         ensures result == 33; // expected to fail
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/closures/closure_refs.move:47: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:51: update_a
    =         s = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:48: update_a
-   =     at tests/sources/functional/closures/closure_refs.move:42: update_indirect
+   =     at tests/sources/functional/closures/closure_refs.move:52: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:46: update_indirect
    =         s = <redacted>
    =         borrow = <redacted>
    =         new_value = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:43: update_indirect
-   =     at tests/sources/functional/closures/closure_refs.move:34: borrow_a
+   =     at tests/sources/functional/closures/closure_refs.move:47: update_indirect
+   =     at tests/sources/functional/closures/closure_refs.move:38: borrow_a
    =         s = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:35: borrow_a
+   =     at tests/sources/functional/closures/closure_refs.move:39: borrow_a
    =         result = <redacted>
    =         s = <redacted>
    =         <redacted> = <redacted>
    =         s = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:49: update_a
-   =     at tests/sources/functional/closures/closure_refs.move:46: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:53: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:50: update_a
    =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:56: update_a (spec)
+   =     at tests/sources/functional/closures/closure_refs.move:60: update_a (spec)

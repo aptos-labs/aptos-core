@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 // This file consists of a series of test cases which are client functions
 // using the standard vector module.
 module 0x42::TestStrongEdges {

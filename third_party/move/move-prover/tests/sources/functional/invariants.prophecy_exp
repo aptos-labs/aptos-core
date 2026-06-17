@@ -1,0 +1,72 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/invariants.move:16:9
+   │
+16 │         invariant greater_one(self.x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/invariants.move:43: invalid_R_pack
+   =     at tests/sources/functional/invariants.move:16
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/invariants.move:16:9
+   │
+16 │         invariant greater_one(self.x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/invariants.move:114: lifetime_invalid_R
+   =     at tests/sources/functional/invariants.move:16
+   =     at tests/sources/functional/invariants.move:114: lifetime_invalid_R
+   =         r = <redacted>
+   =     at tests/sources/functional/invariants.move:115: lifetime_invalid_R
+   =     at tests/sources/functional/invariants.move:116: lifetime_invalid_R
+   =     at tests/sources/functional/invariants.move:117: lifetime_invalid_R
+   =         x_ref = <redacted>
+   =     at tests/sources/functional/invariants.move:16
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/invariants.move:151:9
+    │
+151 │         invariant y > 1;
+    │         ^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/invariants.move:154: lifetime_invalid_S_branching
+    =         cond = <redacted>
+    =     at tests/sources/functional/invariants.move:155: lifetime_invalid_S_branching
+    =     at tests/sources/functional/invariants.move:144
+    =     at tests/sources/functional/invariants.move:155: lifetime_invalid_S_branching
+    =         a = <redacted>
+    =     at tests/sources/functional/invariants.move:156: lifetime_invalid_S_branching
+    =     at tests/sources/functional/invariants.move:151
+    =     at tests/sources/functional/invariants.move:156: lifetime_invalid_S_branching
+    =         b = <redacted>
+    =     at tests/sources/functional/invariants.move:157: lifetime_invalid_S_branching
+    =         a_ref = <redacted>
+    =     at tests/sources/functional/invariants.move:158: lifetime_invalid_S_branching
+    =         b_ref = <redacted>
+    =     at tests/sources/functional/invariants.move:159: lifetime_invalid_S_branching
+    =     at tests/sources/functional/invariants.move:144
+    =     at tests/sources/functional/invariants.move:159: lifetime_invalid_S_branching
+    =         x_ref = <redacted>
+    =     at tests/sources/functional/invariants.move:161: lifetime_invalid_S_branching
+    =     at tests/sources/functional/invariants.move:164: lifetime_invalid_S_branching
+    =     at tests/sources/functional/invariants.move:144
+    =     at tests/sources/functional/invariants.move:151
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/invariants.move:175:9
+    │
+175 │         invariant self.self > 10;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/invariants.move:179: pack_struct_self
+    =     at tests/sources/functional/invariants.move:175
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/invariants.move:187:9
+    │
+187 │         invariant self.x > 10;
+    │         ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/invariants.move:191: pack_struct_RR
+    =     at tests/sources/functional/invariants.move:187

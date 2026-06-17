@@ -257,6 +257,9 @@ impl Options {
                 .push("Extensions=0x1".to_string());
         }
         self.backend.num_instances = std::cmp::max(self.backend.num_instances, 1);
+        // Mirror the prophecy switch into the backend so the Tera prelude (whose
+        // context carries `BoogieOptions`, not `ProverOptions`) can gate on it.
+        self.backend.prophecy_refs = self.prover.prophecy_refs;
         self.backend.derive_options();
 
         if self.print_config {

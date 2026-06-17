@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/public_struct_cross_module_inv.move:13:9
+   │
+13 │         invariant self.x > 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/public_struct_cross_module_inv.move:32: violate
+   =         s = <redacted>
+   =     at tests/sources/functional/public_struct_cross_module_inv.move:33: violate
+   =     at tests/sources/functional/public_struct_cross_module_inv.move:32: violate
+   =         s = <redacted>
+   =     at tests/sources/functional/public_struct_cross_module_inv.move:13: pack$S

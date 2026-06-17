@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 module 0x42::TestReferences {
 
     use std::vector;
