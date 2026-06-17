@@ -37,12 +37,12 @@ use mono_move_core::{
     types::{view_type_list, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -1406,6 +1406,46 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     );
                 },
 
+                MicroOp::VecPack(ref op) => {
+                    self.exec_vec_pack(fp, op)?;
+                },
+
+                MicroOp::VecUnpack(ref op) => {
+                    self.exec_vec_unpack(fp, op)?;
+                },
+
+                MicroOp::VecSwap {
+                    vec_ref,
+                    idx_a,
+                    idx_b,
+                    elem_size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                    let idx_a = read_u64(fp, idx_a);
+                    let idx_b = read_u64(fp, idx_b);
+                    let len = read_vec_len(vec_ptr);
+                    // Indices are checked before the equal-indices no-op.
+                    for idx in [idx_a, idx_b] {
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::Swap,
+                                idx,
+                                len,
+                            });
+                        }
+                    }
+                    // Equal pointers are UB for `swap_nonoverlapping`; distinct
+                    // in-bounds indices guarantee disjoint element ranges.
+                    if idx_a != idx_b {
+                        std::ptr::swap_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
+                            vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                    }
+                },
+
                 // ----- Reference (fat pointer) instructions -----
                 MicroOp::VecBorrow {
                     dst,
@@ -1869,6 +1909,69 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             }
             Ok(())
         }
+    }
+
+    /// Allocates the vector at exact capacity in a single allocation, writes
+    /// the length, copies each source element from the frame, and writes the
+    /// heap pointer to `op.dst`. Any GC runs inside the allocation, before the
+    /// fp-relative element reads, so those reads see post-GC pointers.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+        let count = op.srcs.len() as u64;
+        // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
+        // payload byte is overwritten below before the op returns and no GC can
+        // intervene afterwards. A fully-initialized-payload alloc variant would
+        // avoid the dead memset. Padding needs to be carefully considered for
+        // the optimization.
+        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        unsafe {
+            write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
+            for (elem_idx, src) in op.srcs.iter().enumerate() {
+                // Non-overlapping: the source is a frame slot, the destination
+                // is in the freshly-allocated heap vector — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    fp.add((*src).into()),
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size) as *mut u8,
+                    op.elem_size as usize,
+                );
+            }
+            write_ptr(fp, op.dst, vec_ptr);
+        }
+        Ok(())
+    }
+
+    /// Checks that the vector's length equals `op.dsts.len()` — erroring on a
+    /// mismatch; then copies each element into its destination slot. A null
+    /// `src` is the empty vector: it unpacks cleanly when `dsts` is empty and
+    /// fails the length check otherwise.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.src` and each `op.dsts` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_unpack(&mut self, fp: *mut u8, op: &VecUnpackOp) -> RuntimeResult<()> {
+        unsafe {
+            let vec_ptr = read_ptr(fp, op.src);
+            let expected = op.dsts.len() as u64;
+            let actual = read_vec_len(vec_ptr);
+            if actual != expected {
+                return Err(RuntimeError::VecUnpackLengthMismatch { expected, actual });
+            }
+            for (elem_idx, dst) in op.dsts.iter().enumerate() {
+                // Non-overlapping: the source is a heap vector element, the
+                // destination is a frame slot — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size),
+                    fp.add((*dst).into()),
+                    op.elem_size as usize,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Deep-copy the value tree rooted at the specified source into the
