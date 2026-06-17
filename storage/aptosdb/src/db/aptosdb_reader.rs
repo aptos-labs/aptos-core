@@ -863,6 +863,12 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_hot_state_snapshot_min_servable_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_hot_state_snapshot_min_servable_version", || {
+            self.state_store.hot_state_min_servable_version()
+        })
+    }
+
     fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
         gauged_api("is_state_merkle_pruner_enabled", || {
             Ok(self

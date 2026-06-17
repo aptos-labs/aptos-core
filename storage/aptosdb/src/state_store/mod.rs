@@ -1507,6 +1507,19 @@ impl StateStore {
         self.hot_state_merkle_db.get_leaf_count(version)
     }
 
+    /// Returns the lowest servable version for hot state value chunks (the earliest
+    /// persisted hot state Merkle snapshot), or `None` if this node does not serve
+    /// hot state. Hot state does not start from version 0.
+    pub fn hot_state_min_servable_version(&self) -> Result<Option<Version>> {
+        if self.hot_state_config.delete_on_restart {
+            return Ok(None);
+        }
+
+        self.state_db
+            .hot_state_merkle_db
+            .get_earliest_state_snapshot_version()
+    }
+
     /// Walks the hot state Merkle tree at `version` from `first_index` and yields up to
     /// `chunk_size` hot state leaves, each pairing the full key with its [`HotStateValue`] (the
     /// value or vacancy plus `hot_since_version`).

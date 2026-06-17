@@ -294,6 +294,9 @@ fn create_db_reader_with_expectations(
         .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
     db_reader
+        .expect_get_hot_state_snapshot_min_servable_version()
+        .returning(move || Ok(Some(lowest_version)));
+    db_reader
 }
 
 /// Sends a storage summary request and processes the response
@@ -338,6 +341,7 @@ fn verify_server_summary_response(
                 )
                 .unwrap(),
             ),
+            hot_states: Some(CompleteDataRange::new(lowest_version, highest_version).unwrap()),
         },
     };
 

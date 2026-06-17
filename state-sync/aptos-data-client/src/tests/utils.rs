@@ -152,6 +152,7 @@ pub fn create_storage_summary_with_timestamp(
             transactions: Some(CompleteDataRange::new(0, version).unwrap()),
             transaction_outputs: Some(CompleteDataRange::new(0, version).unwrap()),
             states: None,
+            hot_states: None,
         },
     }
 }

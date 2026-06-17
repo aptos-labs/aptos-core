@@ -499,6 +499,41 @@ fn test_data_summary_service_state_chunk_request() {
 }
 
 #[test]
+fn test_data_summary_service_hot_state_chunk_request() {
+    // Hot state is advertised via its own `hot_states` range, distinct from cold state.
+    let data_client_config = AptosDataClientConfig::default();
+    let data_summary = DataSummary {
+        synced_ledger_info: Some(create_ledger_info_at_version(250)),
+        hot_states: Some(create_data_range(100, 300)),
+        ..Default::default()
+    };
+
+    for compression in [true, false] {
+        // Valid request versions (within the hot state range and at or below the synced version)
+        for version in [100, 200, 250] {
+            verify_serviceability(
+                &data_client_config,
+                &data_summary,
+                None,
+                create_hot_state_values_request_at_version(version, compression),
+                true,
+            );
+        }
+
+        // Invalid request versions (outside the hot state range or beyond the synced version)
+        for version in [50, 99, 251, 300] {
+            verify_serviceability(
+                &data_client_config,
+                &data_summary,
+                None,
+                create_hot_state_values_request_at_version(version, compression),
+                false,
+            );
+        }
+    }
+}
+
+#[test]
 fn test_protocol_metadata_service() {
     // Create the protocol metadata
     let metadata = ProtocolMetadata {
@@ -877,6 +912,19 @@ fn create_state_values_request_at_version(
     use_compression: bool,
 ) -> StorageServiceRequest {
     create_state_values_request(version, 0, 1000, use_compression)
+}
+
+/// Creates a request for hot state values at a given version
+fn create_hot_state_values_request_at_version(
+    version: Version,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request = DataRequest::GetHotStateValuesWithProof(StateValuesWithProofRequest {
+        version,
+        start_index: 0,
+        end_index: 1000,
+    });
+    StorageServiceRequest::new(data_request, use_compression)
 }
 
 /// Generates a random u64

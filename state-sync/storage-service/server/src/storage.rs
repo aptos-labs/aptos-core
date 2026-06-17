@@ -21,6 +21,7 @@ use aptos_types::{
         AccumulatorRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -113,6 +114,17 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         start_index: u64,
         end_index: u64,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error>;
+
+    /// Returns a chunk holding a list of hot state values starting at the
+    /// specified `start_index` and ending at `end_index` (inclusive). In
+    /// some cases, less hot state values may be returned (e.g., due to network
+    /// or chunk limits).
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> aptos_storage_service_types::Result<HotStateValueChunkWithProof, Error>;
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
@@ -173,6 +185,24 @@ impl StorageReader {
 
         // No pruning has occurred. Return the transactions range.
         Ok(*transactions_range)
+    }
+
+    /// Returns the hot state range held in the database, or `None` if the node
+    /// does not serve hot state.
+    fn fetch_hot_state_values_range(
+        &self,
+        latest_version: Version,
+    ) -> aptos_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
+        let Some(min_version) = self.storage.get_hot_state_snapshot_min_servable_version()? else {
+            return Ok(None);
+        };
+        if min_version > latest_version {
+            return Ok(None);
+        }
+
+        let hot_state_range = CompleteDataRange::new(min_version, latest_version)
+            .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+        Ok(Some(hot_state_range))
     }
 
     /// Returns the transaction range held in the database (lowest to highest).
@@ -1030,6 +1060,87 @@ impl StorageReader {
             version, start_index, end_index
         )))
     }
+
+    /// Returns a hot state value chunk with proof response (bound by the max response size in
+    /// bytes). Hot state only supports size and time-aware chunking; there is no count-based
+    /// (legacy) fallback.
+    fn get_hot_state_value_chunk_with_proof_by_size(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        max_response_size: u64,
+    ) -> Result<HotStateValueChunkWithProof, Error> {
+        // Calculate the number of hot state values to fetch
+        let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
+        let max_num_state_values = self.config.max_state_chunk_size;
+        let num_state_values_to_fetch = min(expected_num_state_values, max_num_state_values);
+
+        // Get the hot state value chunk iterator
+        let mut state_value_iterator = self.storage.get_hot_state_value_chunk_iter(
+            version,
+            start_index as usize,
+            num_state_values_to_fetch as usize,
+        )?;
+
+        // Initialize the fetched hot state values
+        let mut state_values = vec![];
+
+        // Create a response progress tracker
+        let mut response_progress_tracker = ResponseDataProgressTracker::new(
+            num_state_values_to_fetch,
+            max_response_size,
+            self.config.max_storage_read_wait_time_ms,
+            self.time_service.clone(),
+        );
+
+        // Fetch as many hot state values as possible
+        while !response_progress_tracker.is_response_complete() {
+            match state_value_iterator.next() {
+                Some(Ok(state_value)) => {
+                    // Calculate the number of serialized bytes for the hot state value
+                    let num_serialized_bytes = get_num_serialized_bytes(&state_value)
+                        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+
+                    // Add the hot state value to the list
+                    if response_progress_tracker
+                        .data_items_fits_in_response(true, num_serialized_bytes)
+                    {
+                        state_values.push(state_value);
+                        response_progress_tracker.add_data_item(num_serialized_bytes);
+                    } else {
+                        break; // Cannot add any more data items
+                    }
+                },
+                Some(Err(error)) => {
+                    return Err(Error::StorageErrorEncountered(error.to_string()));
+                },
+                None => {
+                    // Log a warning that the iterator did not contain all the expected data
+                    warn!(
+                        "The hot state value iterator is missing data! Version: {:?}, \
+                        start index: {:?}, end index: {:?}, num state values to fetch: {:?}",
+                        version, start_index, end_index, num_state_values_to_fetch
+                    );
+                    break;
+                },
+            }
+        }
+
+        // Create the hot state value chunk with proof
+        let hot_state_value_chunk_with_proof = self.storage.get_hot_state_value_chunk_proof(
+            version,
+            start_index as usize,
+            state_values,
+        )?;
+
+        // Update the data truncation metrics
+        response_progress_tracker.update_data_truncation_metrics(
+            DataResponse::get_hot_state_value_chunk_with_proof_label(),
+        );
+
+        Ok(hot_state_value_chunk_with_proof)
+    }
 }
 
 impl StorageReaderInterface for StorageReader {
@@ -1060,6 +1171,9 @@ impl StorageReaderInterface for StorageReader {
         // Fetch the state values range
         let states = self.fetch_state_values_range(latest_version, &transactions)?;
 
+        // Fetch the hot state values range
+        let hot_states = self.fetch_hot_state_values_range(latest_version)?;
+
         // Return the relevant data summary
         let data_summary = DataSummary {
             synced_ledger_info: Some(latest_ledger_info_with_sigs),
@@ -1067,6 +1181,7 @@ impl StorageReaderInterface for StorageReader {
             transactions,
             transaction_outputs,
             states,
+            hot_states,
         };
 
         Ok(data_summary)
@@ -1213,6 +1328,20 @@ impl StorageReaderInterface for StorageReader {
             self.config.enable_size_and_time_aware_chunking,
         )
     }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> aptos_storage_service_types::Result<HotStateValueChunkWithProof, Error> {
+        self.get_hot_state_value_chunk_with_proof_by_size(
+            version,
+            start_index,
+            end_index,
+            self.config.max_network_chunk_bytes,
+        )
+    }
 }
 
 // A simple macro that wraps each storage read call with a timer
@@ -1257,6 +1386,8 @@ impl DbReader for TimedStorageReader {
         fn is_state_merkle_pruner_enabled(&self) -> StorageResult<bool>;
 
         fn get_epoch_snapshot_prune_window(&self) -> StorageResult<usize>;
+
+        fn get_hot_state_snapshot_min_servable_version(&self) -> StorageResult<Option<Version>>;
 
         fn get_first_txn_version(&self) -> StorageResult<Option<Version>>;
 
@@ -1344,6 +1475,20 @@ impl DbReader for TimedStorageReader {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> StorageResult<StateValueChunkWithProof>;
+
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(StateKey, HotStateValue)>> + '_>>;
+
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> StorageResult<HotStateValueChunkWithProof>;
 
         fn get_persisted_auxiliary_info_iterator(
             &self,

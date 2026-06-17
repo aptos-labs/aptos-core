@@ -1153,6 +1153,7 @@ pub fn update_storage_server_summary(
     // Set the transaction and state ranges
     let data_range = CompleteDataRange::new(0, highest_synced_version).unwrap();
     data_summary.states = Some(data_range);
+    data_summary.hot_states = Some(data_range);
     data_summary.transactions = Some(data_range);
     data_summary.transaction_outputs = Some(data_range);
 
