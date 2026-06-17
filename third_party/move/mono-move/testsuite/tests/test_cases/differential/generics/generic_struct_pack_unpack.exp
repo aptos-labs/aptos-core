@@ -1,0 +1,310 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x42::generic_struct_pack_unpack
+struct Box<T0> has drop
+  value: T0
+
+struct Pair<T0, T1> has drop
+  first: T0
+  second: T1
+
+// Function definition at index 0
+fun box_address(l0: address): u64
+    copy_loc l0
+    pack Box<address>
+    unpack Box<address>
+    move_loc l0
+    eq
+    // @5
+    br_false l0
+    ld_u64 1
+    ret
+l0: ld_u64 0
+    ret
+
+// Function definition at index 1
+fun box_nested(l0: u64): u64
+    move_loc l0
+    pack Box<u64>
+    pack Box<Box<u64>>
+    unpack Box<Box<u64>>
+    unpack Box<u64>
+    // @5
+    ret
+
+// Function definition at index 2
+fun box_u128(l0: u128): u128
+    move_loc l0
+    pack Box<u128>
+    unpack Box<u128>
+    ret
+
+// Function definition at index 3
+fun box_u64(l0: u64): u64
+    move_loc l0
+    pack Box<u64>
+    unpack Box<u64>
+    ret
+
+// Function definition at index 4
+fun box_u8(l0: u8): u8
+    move_loc l0
+    pack Box<u8>
+    unpack Box<u8>
+    ret
+
+// Function definition at index 5
+fun pair_swapped(l0: u8, l1: u64): u64
+    local l2: Pair<u64, u8>
+    local l3: u8
+    local l4: u64
+    copy_loc l0
+    copy_loc l1
+    pack Pair<u8, u64>
+    move_loc l1
+    move_loc l0
+    // @5
+    pack Pair<u64, u8>
+    st_loc l2
+    unpack Pair<u8, u64>
+    st_loc l1
+    move_loc l2
+    // @10
+    unpack Pair<u64, u8>
+    st_loc l3
+    st_loc l4
+    cast_u64
+    move_loc l1
+    // @15
+    add
+    move_loc l4
+    add
+    move_loc l3
+    cast_u64
+    // @20
+    add
+    ret
+
+// Function definition at index 6
+fun pair_wide(l0: u64, l1: u64): u64
+    move_loc l0
+    cast_u128
+    move_loc l1
+    pack Pair<u128, u64>
+    unpack Pair<u128, u64>
+    // @5
+    st_loc l0
+    cast_u64
+    move_loc l0
+    add
+    ret
+
+=== stackless ===
+// module 0x42::generic_struct_pack_unpack
+
+fun box_address(r0): u64 {
+  slots: params(1), locals(0), temps(3)
+    r0: address
+    r1: 0x42::generic_struct_pack_unpack::Box<address>
+    r2: address
+    r3: u64
+  code:
+  L2:
+    0: r1 := pack 0x42::generic_struct_pack_unpack::Box<address>, [r0]
+    1: [r2] := unpack 0x42::generic_struct_pack_unpack::Box<address>, r1
+    2: br_neq L0, r2, r0
+  L1:
+    3: r3 := ld_u64 1
+    4: ret [r3]
+  L0:
+    5: r3 := ld_u64 0
+    6: ret [r3]
+}
+
+fun box_nested(r0): u64 {
+  slots: params(1), locals(0), temps(3)
+    r0: u64
+    r1: 0x42::generic_struct_pack_unpack::Box<u64>
+    r2: 0x42::generic_struct_pack_unpack::Box<0x42::generic_struct_pack_unpack::Box<u64>>
+    r3: u64
+  code:
+  L0:
+    0: r1 := pack 0x42::generic_struct_pack_unpack::Box<u64>, [r0]
+    1: r2 := pack 0x42::generic_struct_pack_unpack::Box<0x42::generic_struct_pack_unpack::Box<u64>>, [r1]
+    2: [r1] := unpack 0x42::generic_struct_pack_unpack::Box<0x42::generic_struct_pack_unpack::Box<u64>>, r2
+    3: [r3] := unpack 0x42::generic_struct_pack_unpack::Box<u64>, r1
+    4: ret [r3]
+}
+
+fun box_u128(r0): u128 {
+  slots: params(1), locals(0), temps(2)
+    r0: u128
+    r1: 0x42::generic_struct_pack_unpack::Box<u128>
+    r2: u128
+  code:
+  L0:
+    0: r1 := pack 0x42::generic_struct_pack_unpack::Box<u128>, [r0]
+    1: [r2] := unpack 0x42::generic_struct_pack_unpack::Box<u128>, r1
+    2: ret [r2]
+}
+
+fun box_u64(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: u64
+    r1: 0x42::generic_struct_pack_unpack::Box<u64>
+    r2: u64
+  code:
+  L0:
+    0: r1 := pack 0x42::generic_struct_pack_unpack::Box<u64>, [r0]
+    1: [r2] := unpack 0x42::generic_struct_pack_unpack::Box<u64>, r1
+    2: ret [r2]
+}
+
+fun box_u8(r0): u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: u8
+    r1: 0x42::generic_struct_pack_unpack::Box<u8>
+    r2: u8
+  code:
+  L0:
+    0: r1 := pack 0x42::generic_struct_pack_unpack::Box<u8>, [r0]
+    1: [r2] := unpack 0x42::generic_struct_pack_unpack::Box<u8>, r1
+    2: ret [r2]
+}
+
+fun pair_swapped(r0, r1): u64 {
+  slots: params(2), locals(3), temps(4)
+    r0: u8
+    r1: u64
+    r2: 0x42::generic_struct_pack_unpack::Pair<u64, u8>
+    r3: u8
+    r4: u64
+    r5: 0x42::generic_struct_pack_unpack::Pair<u8, u64>
+    r6: u8
+    r7: u64
+    r8: u64
+  code:
+  L0:
+    0: r5 := pack 0x42::generic_struct_pack_unpack::Pair<u8, u64>, [r0, r1]
+    1: r2 := pack 0x42::generic_struct_pack_unpack::Pair<u64, u8>, [r1, r0]
+    2: [r6, r1] := unpack 0x42::generic_struct_pack_unpack::Pair<u8, u64>, r5
+    3: [r4, r3] := unpack 0x42::generic_struct_pack_unpack::Pair<u64, u8>, r2
+    4: r7 := cast_u64 r6
+    5: r7 := add r7, r1
+    6: r7 := add r7, r4
+    7: r8 := cast_u64 r3
+    8: r8 := add r7, r8
+    9: ret [r8]
+}
+
+fun pair_wide(r0, r1): u64 {
+  slots: params(2), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u128
+    r3: 0x42::generic_struct_pack_unpack::Pair<u128, u64>
+    r4: u64
+  code:
+  L0:
+    0: r2 := cast_u128 r0
+    1: r3 := pack 0x42::generic_struct_pack_unpack::Pair<u128, u64>, [r2, r1]
+    2: [r2, r0] := unpack 0x42::generic_struct_pack_unpack::Pair<u128, u64>, r3
+    3: r4 := cast_u64 r2
+    4: r4 := add r4, r0
+    5: ret [r4]
+}
+=== micro-ops ===
+// module 0x42::generic_struct_pack_unpack
+
+fun box_address() {
+  frame_data_size: 104
+  entry_gas: 199
+  code:
+    0: Move(32) [32] <- [0]
+    1: Move(32) [64] <- [32]
+    2: JumpIntCmp @6 [64] != u256 [0] gas_taken=56 gas_fallthrough=56
+    3: StoreImm8 [96] <- #1
+    4: Move8 [0] <- [96]
+    5: Return
+    6: StoreImm8 [96] <- #0
+    7: Move8 [0] <- [96]
+    8: Return
+}
+
+fun box_nested() {
+  frame_data_size: 32
+  entry_gas: 158
+  code:
+    0: Move8 [8] <- [0]
+    1: Move8 [16] <- [8]
+    2: Move8 [8] <- [16]
+    3: Move8 [24] <- [8]
+    4: Move8 [0] <- [24]
+    5: Return
+}
+
+fun box_u128() {
+  frame_data_size: 48
+  entry_gas: 202
+  code:
+    0: Move(16) [16] <- [0]
+    1: Move(16) [32] <- [16]
+    2: Move(16) [0] <- [32]
+    3: Return
+}
+
+fun box_u64() {
+  frame_data_size: 24
+  entry_gas: 106
+  code:
+    0: Move8 [8] <- [0]
+    1: Move8 [16] <- [8]
+    2: Move8 [0] <- [16]
+    3: Return
+}
+
+fun box_u8() {
+  frame_data_size: 8
+  entry_gas: 22
+  code:
+    0: Move(1) [1] <- [0]
+    1: Move(1) [2] <- [1]
+    2: Move(1) [0] <- [2]
+    3: Return
+}
+
+fun pair_swapped() {
+  frame_data_size: 88
+  entry_gas: 279
+  code:
+    0: Move8 [56] <- [8]
+    1: Move(1) [48] <- [0]
+    2: Move(1) [24] <- [0]
+    3: Move8 [16] <- [8]
+    4: Move8 [8] <- [56]
+    5: Move(1) [64] <- [48]
+    6: Move(1) [32] <- [24]
+    7: Move8 [40] <- [16]
+    8: IntCast.u8->u64 [72] <- [64]
+    9: AddU64 [72] <- [72] + [8]
+    10: AddU64 [72] <- [72] + [40]
+    11: IntCast.u8->u64 [80] <- [32]
+    12: AddU64 [80] <- [72] + [80]
+    13: Move8 [0] <- [80]
+    14: Return
+}
+
+fun pair_wide() {
+  frame_data_size: 64
+  entry_gas: 217
+  code:
+    0: IntCast.u64->u128 [16] <- [0]
+    1: Move8 [48] <- [8]
+    2: Move(16) [32] <- [16]
+    3: Move8 [0] <- [48]
+    4: Move(16) [16] <- [32]
+    5: IntCast.u128->u64 [56] <- [16]
+    6: AddU64 [56] <- [56] + [0]
+    7: Move8 [0] <- [56]
+    8: Return
+}

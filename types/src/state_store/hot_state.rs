@@ -154,6 +154,36 @@ impl CryptoHash for HotStateValueRef<'_> {
     }
 }
 
+/// A single chunk of the hot state at a specific version, with a range proof against the hot state
+/// Merkle root.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct HotStateValueChunkWithProof {
+    /// The first hot state index in chunk
+    pub first_index: u64,
+    /// The last hot state index in chunk
+    pub last_index: u64,
+    /// The first hot state key hash in chunk
+    pub first_key: HashValue,
+    /// The last hot state key hash in chunk
+    pub last_key: HashValue,
+    /// The state key and its hot state value.
+    pub raw_values: Vec<(StateKey, HotStateValue)>,
+    /// The proof to ensure the chunk is in the hot state tree
+    pub proof: SparseMerkleRangeProof,
+    /// The root hash of the hot state Merkle tree for this chunk
+    pub root_hash: HashValue,
+}
+
+impl HotStateValueChunkWithProof {
+    /// Returns true iff this is the last chunk (i.e. no more hot state values follow it).
+    pub fn is_last_chunk(&self) -> bool {
+        self.proof
+            .right_siblings()
+            .iter()
+            .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
