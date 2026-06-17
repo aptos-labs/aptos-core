@@ -221,6 +221,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // lock a second time to publish the result. Splitting the read and
         // the install keeps the lock window short for the common hit case
         // and avoids holding it across lowering work.
+        //
+        // TODO(perf): the cache key distinguishes instantiations that
+        // differ only in phantom type arguments even though their lowered
+        // code is identical. A per-callee mask of the type parameters that
+        // actually affect lowering would let the key ignore the rest;
+        // same-package callers could also stop forwarding unused ty_args,
+        // but upgradable code can't (the caller can't tell which params the
+        // callee currently needs).
         if let Some((function, function_ms)) =
             module.get_instantiated_function_ptr(func_name, ty_args)
         {
@@ -257,6 +265,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 });
             },
         };
+        // TODO(gas): the lowering work needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,

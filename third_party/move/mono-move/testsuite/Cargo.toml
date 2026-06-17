@@ -52,10 +52,6 @@ walkdir = { workspace = true }
 name = "differential"
 harness = false
 
-[[test]]
-name = "snapshot"
-harness = false
-
 [[bench]]
 name = "fib"
 harness = false

@@ -15,7 +15,7 @@ use crate::{
         translate::{lower_function, LoweredFunction},
     },
     stackless_exec_ir::{
-        instr_utils::{nominal_type_in_instr, resource_type_in_instr, NominalKind},
+        instr_utils::{field_layout_nominal_in_instr, resource_type_in_instr, NominalKind},
         FunctionIR, Instr, ModuleIR,
     },
 };
@@ -26,7 +26,7 @@ use mono_move_core::{
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{
-        strip_ref, view_type, view_type_list, Alignment, FieldLayout, InternedType,
+        is_closed_type, strip_ref, view_type, view_type_list, Alignment, FieldLayout, InternedType,
         InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
@@ -159,18 +159,19 @@ pub(crate) struct VariantFieldAccess {
     pub uniform_offset: Option<u32>,
 }
 
-/// Resolve a `VariantFieldHandleIndex` against the owning enum's derived layout.
-/// Move groups variants in a handle by field index, not byte layout, so a shared
+/// Resolve a `VariantFieldHandleIndex` against the owning enum's derived
+/// layout. `enum_ty` is the instantiated owner carried by the instruction. Move
+/// groups variants in a handle by field index, not byte layout, so a shared
 /// field can sit at different byte offsets across the handle's variants; the
 /// access selects the offset by the runtime tag (and aborts for variants that
 /// lack the field).
 pub(crate) fn resolve_variant_field_access(
     module: &PreparedModule,
     enum_layouts: &UnorderedMap<InternedType, EnumLayout>,
+    enum_ty: InternedType,
     vfh: VariantFieldHandleIndex,
 ) -> Result<VariantFieldAccess> {
     let handle = module.variant_field_handle_at(vfh);
-    let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
     let field_pos = handle.field as usize;
     let layout = enum_layouts
         .get(&enum_ty)
@@ -229,6 +230,13 @@ pub struct LoweringContext<'a> {
     /// Module the function lives in; gives lowering access to the
     /// constant pool and other module-level metadata.
     pub module: &'a PreparedModule,
+    /// Type arguments the function is lowered at (empty when non-generic).
+    pub ty_args: InternedTypeList,
+    /// Home-slot types with `ty_args` substituted, indexed by Home slot id.
+    /// The single source of slot types for lowering.
+    pub home_types: InternedTypeList,
+    /// Interner used to substitute `ty_args` into instruction-embedded types.
+    pub interner: &'a dyn Interner,
     pub home_slots: Vec<SizedSlot>,
     /// End offset of the home-slot region; feeds `callee_base`.
     pub frame_data_size: u32,
@@ -364,11 +372,26 @@ pub fn try_build_context<'a>(
     module_ir: &'a ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
-    interner: &impl Interner,
+    interner: &'a impl Interner,
     descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
 ) -> Result<BuildContextOutcome<'a>> {
-    // 1. Compute home slot layout with natural alignment padding.
+    // 1. Reject `ty_args` whose length doesn't match the declared type
+    // parameter count.
+    // TODO: this should not be reachable from valid execution, but the current
+    // snapshot printing can reach it for publish-time views.
+    let declared_ty_params = module_ir
+        .module
+        .function_handle_at(func_ir.handle_idx)
+        .type_parameters
+        .len();
+    if view_type_list(ty_args).len() != declared_ty_params {
+        return Ok(BuildContextOutcome::Skipped(
+            "generic function not instantiated",
+        ));
+    }
+
+    // 2. Compute home slot layout with natural alignment padding.
     //
     // Slots are laid out linearly in declaration order, padding each to
     // its alignment. This can leave gaps between a small slot followed
@@ -405,7 +428,7 @@ pub fn try_build_context<'a>(
         FRAME_ALIGN,
     );
 
-    // 2. Build `return_slots` from this function's own signature.
+    // 3. Build `return_slots` from this function's own signature.
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     let own_ret_list =
         interner.type_list_of(module_ir.module.interned_types_at(own_handle.return_));
@@ -437,7 +460,7 @@ pub fn try_build_context<'a>(
         frame_data_size = ret_end;
     }
 
-    // 3. Reserve a scratch slot at the tail of the home region for
+    // 4. Reserve a scratch slot at the tail of the home region for
     //    `Ret` cycle-breaking — `return_slots` overlap home, so swaps
     //    like `(b, a)` form copy cycles that `emit_parallel_copy`
     //    routes through this slot. Sized to the widest return slot
@@ -462,7 +485,7 @@ pub fn try_build_context<'a>(
         )
     });
 
-    // 4. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
+    // 5. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
     //    lowering, when the body uses either. It holds the intermediate heap
     //    pointer between the alloc/move and the box/unbox copy. Must not be
     //    GC-tracked.
@@ -471,16 +494,17 @@ pub fn try_build_context<'a>(
         .any(|instr| matches!(instr, Instr::MoveTo(..) | Instr::MoveFrom(..)));
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
-    // 5. Single IR pass over the function's enum ops: (1) verify each one's enum
+    // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
     //    layout was derivable during discovery, and (2) detect which scratch
     //    slots the lowering needs.
     let mut needs_variant_field_scratch = false;
     let mut needs_enum_ptr_scratch = false;
     for instr in func_ir.instrs() {
-        let Some((enum_ty, NominalKind::Enum)) = nominal_type_in_instr(&module_ir.module, instr)
-        else {
+        let Some((enum_ty, NominalKind::Enum)) = field_layout_nominal_in_instr(instr) else {
             continue;
         };
+        // Discovery keys `enum_layouts` by the substituted type.
+        let enum_ty = interner.subst_type(enum_ty, ty_args)?;
         if !descriptors.enum_layouts.contains_key(&enum_ty) {
             // Skip the whole function when any enum op references an enum whose
             // layout was not derivable.
@@ -511,7 +535,7 @@ pub fn try_build_context<'a>(
 
     // TODO: we need to revisit the complexity and performance of this function
     // after support for generic monomorphization is in place.
-    // 6. Lay out every callee-frame region in a single IR-order pass: regular
+    // 7. Lay out every callee-frame region in a single IR-order pass: regular
     //    calls (`Call`/`CallGeneric`) and closures (`PackClosure`/`CallClosure`)
     //    are disjoint instruction kinds writing disjoint outputs, so one walk
     //    serves both.
@@ -559,6 +583,46 @@ pub fn try_build_context<'a>(
                 let func_ref =
                     interner.function_ref_of(callee_module_id, callee_func_name, EMPTY_TYPE_LIST);
                 // Captured-data layout resolved positionally.
+                let layout = descriptors.closure_captured[closure_pack_idx];
+                closure_pack_idx += 1;
+                let (captured_data_descriptor_id, values_size) = match layout {
+                    CapturedDataLayout::NonCapturing => (None, 0),
+                    CapturedDataLayout::Capturing(info) => {
+                        (Some(info.descriptor_id), info.values_size)
+                    },
+                    CapturedDataLayout::NotDerivable => {
+                        return Ok(BuildContextOutcome::Skipped(
+                            "captured-data layout not derivable",
+                        ));
+                    },
+                };
+                closure_pack_sites.push(ClosurePackInfo {
+                    func_ref,
+                    captured_data_descriptor_id,
+                    values_size,
+                });
+                continue;
+            },
+            Instr::PackClosureGeneric(_, fii, _, _) => {
+                let inst = module_ir.module.function_instantiation_at(*fii);
+                let sig = module_ir.module.function_instantiation_signature_at(*fii);
+                // The closure target's type arguments at this instantiation:
+                // its instantiation type arguments with this function's
+                // `ty_args` substituted in.
+                let closure_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
+                let (callee_module_id, callee_func_name) =
+                    callee_identity(&module_ir.module, inst.handle);
+                // TODO: support native closure targets (see `PackClosure`).
+                if natives
+                    .resolve(callee_module_id, callee_func_name, closure_ty_args)
+                    .is_some()
+                {
+                    return Ok(BuildContextOutcome::Skipped(
+                        "native closure target not yet lowered",
+                    ));
+                }
+                let func_ref =
+                    interner.function_ref_of(callee_module_id, callee_func_name, closure_ty_args);
                 let layout = descriptors.closure_captured[closure_pack_idx];
                 closure_pack_idx += 1;
                 let (captured_data_descriptor_id, values_size) = match layout {
@@ -633,6 +697,9 @@ pub fn try_build_context<'a>(
 
     Ok(BuildContextOutcome::Built(LoweringContext {
         module: &module_ir.module,
+        ty_args,
+        home_types: home_list,
+        interner,
         home_slots,
         frame_data_size,
         call_sites,
@@ -882,12 +949,9 @@ pub fn try_lower_function(
         // Leaf function: no callee slots needed beyond metadata.
         .unwrap_or(param_and_local_sizes_sum + FRAME_METADATA_SIZE);
 
-    // Derive `frame_layout` and `zero_frame` from home-slot types.
-    // Substitute `ty_args` so generic instantiations see concrete
+    // Derive `frame_layout` and `zero_frame` from the substituted home-slot
     // types — `gc_layout` rejects raw `TypeParam`s.
-    let home_list = interner.type_list_of(&func_ir.home_slot_types);
-    let home_list = interner.subst_type_list(home_list, ty_args)?;
-    let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
+    let derived = derive_frame_layout(&ctx, func_ir, view_type_list(ctx.home_types))?;
 
     Ok(LoweringOutcome::Built(Function {
         name,
@@ -978,11 +1042,12 @@ fn try_discover_types_for_lowering_in_function_impl(
     for instr in func_ir.instrs() {
         // Calls: walk param + return signature lists.
         //
-        // TODO: `CallClosure` signatures are not walked, and
-        // `discover_type_metadata` treats `Type::Function` as terminal, so a
-        // type reached only through a closure signature's args/results misses
-        // its descriptor and skips lowering. Recurse into `Type::Function` and
-        // feed closure-call signatures here.
+        // TODO: closure-call signatures are not walked, and
+        // `discover_type_metadata` stops at `Type::Function`. Verify that:
+        // closure args/results are always materialized in home-slot temps (or
+        // reached via the return/direct-call walks), so their nominals are
+        // still discovered. Otherwise, we need to feed `CallClosure` signature
+        // types here and recurse into `Type::Function`.
         let (params, returns) = match instr {
             Instr::Call(_, idx, _) => {
                 let sig = module_ir.module.function_signature_at(*idx);
@@ -1005,9 +1070,9 @@ fn try_discover_types_for_lowering_in_function_impl(
             }
         }
 
-        // Catch nominal types an instruction references directly but
-        // that aren't reached by the home/call walks above.
-        if let Some((ty, _kind)) = nominal_type_in_instr(&module_ir.module, instr) {
+        // Catch the field-layout nominal an instruction references directly
+        // that isn't reached by the home/call walks above.
+        if let Some((ty, _kind)) = field_layout_nominal_in_instr(instr) {
             discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
         }
 
@@ -1019,14 +1084,28 @@ fn try_discover_types_for_lowering_in_function_impl(
             descriptors.closure_captured.push(layout);
         }
 
+        // `PackClosureGeneric`: same as above, with the callee's type arguments
+        // composed from the instantiation signature and the enclosing
+        // function's `ty_args`.
+        if let Instr::PackClosureGeneric(_, fii, mask, _) = instr {
+            let inst = module_ir.module.function_instantiation_at(*fii);
+            let sig = module_ir.module.function_instantiation_signature_at(*fii);
+            let closure_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
+            let layout = discover_captured_data_descriptor(
+                ctx,
+                interner,
+                module_ir,
+                inst.handle,
+                *mask,
+                closure_ty_args,
+            )?;
+            descriptors.closure_captured.push(layout);
+        }
+
         // Resources accessed by global-storage ops are laid out as heap
         // objects, so `move_to` can spill the inline value. Discover the
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
-        //
-        // TODO: a still-generic resource (in the module-level walk) is skipped
-        // here, mirroring vector descriptors. Handle it once generic
-        // global-storage ops are lowered.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
             discover_type_metadata(ctx, resource_ty, ty_args, visited, descriptors)?;
             let resource_ty = ctx.subst_type(resource_ty, ty_args)?;
@@ -1205,6 +1284,13 @@ fn discover_type_metadata(
             ty_args: nominal_ty_args,
             ..
         } => {
+            // An open nominal (free type parameters) has no publishable
+            // layout. Defer before publishing anything: setting a layout on
+            // the generic type would poison its `OnceLock` and break later
+            // substitutions over it.
+            if !is_closed_type(ty) {
+                return Ok(None);
+            }
             match ctx.get_fields(module_id, name)? {
                 None => {
                     // The context does not have field information for this

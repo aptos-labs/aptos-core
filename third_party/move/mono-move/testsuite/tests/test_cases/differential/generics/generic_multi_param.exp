@@ -48,4 +48,4 @@ fun entry() {
     4: Return
 }
 
-fun pick_first(): skipped (not all types are concrete)
+fun pick_first(): skipped (generic function not instantiated)
