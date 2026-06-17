@@ -40,6 +40,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -389,6 +390,20 @@ mock! {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> aptos_storage_interface::Result<StateValueChunkWithProof>;
+
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, HotStateValue)>>>>;
+
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> aptos_storage_interface::Result<HotStateValueChunkWithProof>;
     }
 }
 
