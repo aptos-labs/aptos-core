@@ -21,23 +21,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare-source-tag:
-    name: "Prepare source tag"
+  validate:
+    name: "Validate source tag"
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      source_sha: ${{ steps.resolve.outputs.sha }}
     steps:
-      - name: Real-release workflow ref gate
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "::error::Real move-flow releases must be dispatched from refs/heads/main, got $GITHUB_REF."
-            exit 1
-          fi
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_git_ref_override || github.sha }}
@@ -59,7 +54,7 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Preparing move-flow source tag v$VERSION."
-      - name: Real-release gates
+      - name: Release gates
         env:
           TAG: "move-flow-v${{ steps.version.outputs.version }}"
           SOURCE_SHA: ${{ steps.resolve.outputs.sha }}
@@ -79,11 +74,29 @@ jobs:
             echo "::error::Tag '$TAG' already exists. Bump the version or delete the existing tag."
             exit 1
           fi
+
+  create-tag:
+    name: "Create source tag"
+    needs: validate
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Real-release workflow ref gate
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Real move-flow releases must be dispatched from refs/heads/main, got $GITHUB_REF."
+            exit 1
+          fi
       - name: Create source tag
-        if: ${{ inputs.dry_run == false }}
         env:
-          TAG: "move-flow-v${{ steps.version.outputs.version }}"
-          SOURCE_SHA: ${{ steps.resolve.outputs.sha }}
+          TAG: "move-flow-v${{ needs.validate.outputs.version }}"
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
         run: |
           set -euo pipefail
           gh api --method POST "repos/${{ github.repository }}/git/refs" \
