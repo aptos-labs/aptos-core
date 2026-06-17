@@ -19,6 +19,8 @@ Set env or edit:
 
 Deploy the poker module and set `POKER_MODULE_ADDRESS` (e.g. the address where `poker` is published).
 
+For a localnet plus AWS Nitro smoke run, use `NODE_URL=http://127.0.0.1:8080/v1` and follow [`../LOCAL_AWS_E2E.md`](../LOCAL_AWS_E2E.md).
+
 ## Table client (TEE)
 
 For **production**, run this binary inside an AWS Nitro Enclave and obtain a real attestation document (e.g. from the NSM) before calling `register_table`. The chain-managed Nitro root store must already be initialized, and the NSM request must set `user_data` to:
@@ -27,7 +29,7 @@ For **production**, run this binary inside an AWS Nitro Enclave and obtain a rea
 b"APTOS_POKER_TABLE_V1" || bcs(table_address)
 ```
 
-For **dev/test**, omit `ATTESTATION_DOC_PATH` to use a placeholder attestation; on-chain `register_table` will abort unless verification is bypassed in a local test-only package. Use `register_table_for_test` only in Move unit tests, not from a client.
+For **dev/test**, on-chain `register_table` still requires a valid Nitro attestation unless verification is bypassed in a Move unit test. Use `register_table_for_test` only in Move unit tests, not from a client.
 
 1. Create and fund the table account (faucet or transfer).
 2. Run the table client; it will:

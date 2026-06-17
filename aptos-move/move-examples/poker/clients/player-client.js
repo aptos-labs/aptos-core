@@ -30,15 +30,19 @@ const aptos = new Aptos(config);
 
 const moduleAddr = POKER_MODULE_ADDRESS || tableAddr;
 const MODULE_NAME = "poker";
-const POKER_MODULE = `${moduleAddr}::${MODULE_NAME}::poker`;
+const POKER_MODULE = `${moduleAddr}::${MODULE_NAME}`;
+
+function accountFromHexPrivateKey(privateKey) {
+  const key = new Ed25519PrivateKey(privateKey.replace(/^0x/, ""));
+  return Account.fromPrivateKey({ privateKey: key });
+}
 
 async function getPlayerAddress() {
   if (!PLAYER_PRIVATE_KEY) {
     console.error("Set PLAYER_PRIVATE_KEY");
     process.exit(1);
   }
-  const key = Ed25519PrivateKey.fromString(PLAYER_PRIVATE_KEY.replace(/^0x/, ""));
-  const account = Account.fromPrivateKey({ privateKey: key });
+  const account = accountFromHexPrivateKey(PLAYER_PRIVATE_KEY);
   return { account, address: account.accountAddress.toStringLong() };
 }
 

@@ -52,7 +52,7 @@ The table client is intended to run inside an **AWS Nitro Enclave**:
      `settle_leaving_players(table, table_addr, leaving_players)`.  
    - Repeat; if not enough players, wait and retry.
 
-See `clients/` for a minimal table client (dev: placeholder attestation) and player client.
+See `clients/` for a minimal table client and player client. For the localnet plus AWS Nitro smoke path that was run end to end, see [`LOCAL_AWS_E2E.md`](LOCAL_AWS_E2E.md).
 
 ## Player client
 

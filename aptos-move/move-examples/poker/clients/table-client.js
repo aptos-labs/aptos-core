@@ -11,7 +11,7 @@
  */
 
 const fs = require("fs");
-const { Aptos, AptosConfig } = require("@aptos-labs/ts-sdk");
+const { Aptos, AptosConfig, Account, Ed25519PrivateKey } = require("@aptos-labs/ts-sdk");
 
 const NODE_URL = process.env.NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const TABLE_PRIVATE_KEY = process.env.TABLE_PRIVATE_KEY;
@@ -27,15 +27,14 @@ const config = new AptosConfig({ fullnode: NODE_URL });
 const aptos = new Aptos(config);
 
 const MODULE_NAME = "poker";
-const POKER_MODULE = `${POKER_MODULE_ADDRESS}::${MODULE_NAME}::poker`;
+const POKER_MODULE = `${POKER_MODULE_ADDRESS}::${MODULE_NAME}`;
+
+function accountFromHexPrivateKey(privateKey) {
+  const key = new Ed25519PrivateKey(privateKey.replace(/^0x/, ""));
+  return Account.fromPrivateKey({ privateKey: key });
+}
 
 async function main() {
-  const accountInfo = await aptos.getAccountInfo({ accountAddress: POKER_MODULE_ADDRESS }).catch(() => null);
-  if (!accountInfo) {
-    console.error("Table account not found. Create and fund it first.");
-    process.exit(1);
-  }
-
   // In production, generate this inside the enclave with NSM GetAttestationDocument.
   // The document's user_data must be b"APTOS_POKER_TABLE_V1" || bcs(table_address).
   const attestationDoc = ATTESTATION_DOC_PATH ? fs.readFileSync(ATTESTATION_DOC_PATH) : new Uint8Array(0);
@@ -43,9 +42,7 @@ async function main() {
     console.warn("ATTESTATION_DOC_PATH not set; register_table is expected to fail outside test-only flows.");
   }
 
-  const { Account, Ed25519PrivateKey } = require("@aptos-labs/ts-sdk");
-  const key = Ed25519PrivateKey.fromString(TABLE_PRIVATE_KEY.replace(/^0x/, ""));
-  const tableAccount = Account.fromPrivateKey({ privateKey: key });
+  const tableAccount = accountFromHexPrivateKey(TABLE_PRIVATE_KEY);
 
   console.log("Registering table (attestation required in prod)...");
   const payload = {

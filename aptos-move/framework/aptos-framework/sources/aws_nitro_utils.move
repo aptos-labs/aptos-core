@@ -3,11 +3,14 @@
 
 /// Utilities for verifying AWS Nitro Enclave attestation documents.
 module aptos_framework::aws_nitro_utils {
+    use aptos_framework::aptos_governance;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use std::error;
     use std::option;
     use std::option::Option;
+
+    #[test_only]
     use std::vector;
 
     /// One Platform Configuration Register (PCR) entry from the attestation document.
@@ -145,6 +148,15 @@ module aptos_framework::aws_nitro_utils {
         move_to(aptos_framework, TrustedRoots { root_certs });
     }
 
+    /// Initializes the Nitro root certificate store from the core resources account.
+    /// This is intended for localnet/testnet flows where core resources can mint APT and
+    /// has governance signer capabilities.
+    public entry fun initialize_testnet_only(core_resources: &signer, root_certs: vector<vector<u8>>) {
+        let aptos_framework = aptos_governance::get_signer_testnet_only(core_resources, @aptos_framework);
+        initialize(&aptos_framework, root_certs);
+    }
+
+    #[view]
     /// Returns true iff the chain-managed Nitro root certificate store exists.
     public fun is_initialized(): bool {
         exists<TrustedRoots>(@aptos_framework)
@@ -166,6 +178,13 @@ module aptos_framework::aws_nitro_utils {
         trusted_roots.root_certs = root_certs;
     }
 
+    /// Replaces the Nitro root certificate set from the core resources account.
+    /// Intended for localnet/testnet root rotation drills.
+    public entry fun set_trusted_roots_testnet_only(core_resources: &signer, root_certs: vector<vector<u8>>) {
+        let aptos_framework = aptos_governance::get_signer_testnet_only(core_resources, @aptos_framework);
+        set_trusted_roots(&aptos_framework, root_certs);
+    }
+
     /// Adds one DER-encoded Nitro root certificate to the chain-managed set.
     public entry fun add_trusted_root(aptos_framework: &signer, root_cert: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -177,6 +196,13 @@ module aptos_framework::aws_nitro_utils {
             error::already_exists(ETRUSTED_ROOT_ALREADY_EXISTS),
         );
         trusted_roots.root_certs.push_back(root_cert);
+    }
+
+    /// Adds one Nitro root certificate from the core resources account.
+    /// Intended for localnet/testnet root rotation drills.
+    public entry fun add_trusted_root_testnet_only(core_resources: &signer, root_cert: vector<u8>) {
+        let aptos_framework = aptos_governance::get_signer_testnet_only(core_resources, @aptos_framework);
+        add_trusted_root(&aptos_framework, root_cert);
     }
 
     /// Removes one DER-encoded Nitro root certificate from the chain-managed set.
@@ -197,12 +223,21 @@ module aptos_framework::aws_nitro_utils {
         abort error::not_found(ETRUSTED_ROOT_NOT_FOUND)
     }
 
+    /// Removes one Nitro root certificate from the core resources account.
+    /// Intended for localnet/testnet root rotation drills.
+    public entry fun remove_trusted_root_testnet_only(core_resources: &signer, root_cert: vector<u8>) {
+        let aptos_framework = aptos_governance::get_signer_testnet_only(core_resources, @aptos_framework);
+        remove_trusted_root(&aptos_framework, root_cert);
+    }
+
+    #[view]
     /// Returns a copy of the chain-managed DER-encoded Nitro root certificates.
     public fun trusted_roots(): vector<vector<u8>> {
         assert_trusted_roots_initialized();
         TrustedRoots[@aptos_framework].root_certs
     }
 
+    #[view]
     /// Returns the number of chain-managed Nitro root certificates.
     public fun trusted_root_count(): u64 {
         assert_trusted_roots_initialized();

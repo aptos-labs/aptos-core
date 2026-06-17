@@ -8,6 +8,6 @@
     "player": "node player-client.js"
   },
   "dependencies": {
-    "@aptos-labs/ts-sdk": "^1.0.0"
+    "@aptos-labs/ts-sdk": "1.33.1"
   }
 }
