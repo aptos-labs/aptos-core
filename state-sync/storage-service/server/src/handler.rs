@@ -409,6 +409,9 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetStateValuesWithProof(request) => {
                 self.get_state_value_chunk_with_proof(request)
             },
+            DataRequest::GetHotStateValuesWithProof(request) => {
+                self.get_hot_state_value_chunk_with_proof(request)
+            },
             DataRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             },
@@ -473,6 +476,21 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         Ok(DataResponse::StateValueChunkWithProof(
             state_value_chunk_with_proof,
+        ))
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        request: &StateValuesWithProofRequest,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let hot_state_value_chunk_with_proof = self.storage.get_hot_state_value_chunk_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+        )?;
+
+        Ok(DataResponse::HotStateValueChunkWithProof(
+            hot_state_value_chunk_with_proof,
         ))
     }
 
