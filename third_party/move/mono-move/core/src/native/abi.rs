@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::FrameOffset;
+use crate::{DescriptorId, FrameOffset};
 use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
@@ -32,6 +32,8 @@ pub struct NativeABI {
     /// Frame offsets of the pointer slots among the args, sorted ascending. The
     /// GC scans these when a native is the top frame.
     heap_ptr_offsets: Vec<FrameOffset>,
+    /// GC descriptors required by the native, in the order it expects.
+    required_descriptors: Vec<DescriptorId>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -49,6 +51,7 @@ impl NativeABI {
         args: Vec<FrameSlot>,
         returns: Vec<FrameSlot>,
         heap_ptr_offsets: Vec<FrameOffset>,
+        required_descriptors: Vec<DescriptorId>,
     ) -> Result<Self, NativeABIError> {
         check_well_formed(&args, "arg")?;
         check_well_formed(&returns, "return")?;
@@ -61,7 +64,13 @@ impl NativeABI {
             args_end,
             total_frame_size: args_end.max(returns_end),
             heap_ptr_offsets,
+            required_descriptors,
         })
+    }
+
+    /// The `i`-th GC descriptor the native requires.
+    pub fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
+        self.required_descriptors.get(i).copied()
     }
 
     pub fn args(&self) -> &[FrameSlot] {

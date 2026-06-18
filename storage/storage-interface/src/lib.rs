@@ -17,7 +17,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        hot_state::HotStateValue,
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -455,6 +455,30 @@ pub trait DbReader: Send + Sync {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> Result<StateValueChunkWithProof>;
+
+        /// Returns the total number of hot state items (leaves of the hot state Merkle tree) at
+        /// the given version.
+        fn get_hot_state_item_count(&self, version: Version) -> Result<usize>;
+
+        /// Returns an iterator over hot state leaves, walking the hot state Merkle tree at
+        /// `version` from `first_index` for up to `chunk_size` leaves. Each item pairs the full
+        /// state key with its `HotStateValue` (the value or vacancy plus `hot_since_version`) —
+        /// what a fast-syncing node needs to rebuild the hot state KV DB and Merkle tree.
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, HotStateValue)>> + '_>>;
+
+        /// Assembles a hot state value chunk with a range proof against the hot state Merkle root
+        /// at `version`.
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> Result<HotStateValueChunkWithProof>;
 
         /// Returns if the state store pruner is enabled.
         fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;

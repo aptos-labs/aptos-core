@@ -1,20 +1,19 @@
 // Differential test for `mem::swap`.
 
 // RUN: publish
-module 0x1::mem {
-    public native fun swap<T>(left: &mut T, right: &mut T);
-}
 module 0x1::main {
+    use std::mem;
+
     struct Pair has drop { a: u64, b: u64 }
 
     // Swap, then combine both values so the result reflects the swap.
     public fun swap_u64(a: u64, b: u64): u64 {
-        0x1::mem::swap(&mut a, &mut b);
+        mem::swap(&mut a, &mut b);
         a * 1000000 + b
     }
 
     public fun swap_address(a: address, b: address): address {
-        0x1::mem::swap(&mut a, &mut b);
+        mem::swap(&mut a, &mut b);
         a
     }
 
@@ -22,14 +21,14 @@ module 0x1::main {
     public fun swap_struct(): u64 {
         let x = Pair { a: 1, b: 2 };
         let y = Pair { a: 3, b: 4 };
-        0x1::mem::swap(&mut x, &mut y);
+        mem::swap(&mut x, &mut y);
         x.a * 1000 + x.b * 100 + y.a * 10 + y.b
     }
 
     // Swap two fields of the same struct via field references.
     public fun swap_fields(): u64 {
         let p = Pair { a: 5, b: 8 };
-        0x1::mem::swap(&mut p.a, &mut p.b);
+        mem::swap(&mut p.a, &mut p.b);
         p.a * 1000 + p.b
     }
 
@@ -37,7 +36,7 @@ module 0x1::main {
     public fun swap_vector(): vector<u8> {
         let x = b"ab";
         let y = b"cd";
-        0x1::mem::swap(&mut x, &mut y);
+        mem::swap(&mut x, &mut y);
         x
     }
 }

@@ -1,47 +1,101 @@
-# This defines a workflow to build and release move-flow.
-# In order to trigger it go to the Actions Tab of the Repo, click "Release move-flow" and then "Run Workflow".
-
 name: "Release move-flow"
 
 on:
   workflow_dispatch:
     inputs:
-      release_version:
-        type: string
-        required: true
-        description: "The release version. E.g. '0.1.0':"
       source_git_ref_override:
         type: string
         required: false
-        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch name (e.g. devnet) or tag to build the binaries from. Defaults to the workflow Git REV:"
-      release_title:
-        type: string
-        required: false
-        description: "Optional custom release title. Defaults to 'move-flow v<version>':"
+        description: "Override source ref (SHA / branch / tag):"
       dry_run:
         type: boolean
         required: false
         default: true
-        description: "Dry run - If checked, the release will not be created"
-      skip_checks:
-        type: boolean
-        required: false
-        default: false
-        description: "Skip checks - If checked, the release will skip version checks"
+        description: "Dry run"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "move-flow-release"
+  cancel-in-progress: false
 
 jobs:
-  release-move-flow:
-    name: "Release move-flow"
+  validate:
+    name: "Validate source tag"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      source_sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - name: Resolve source SHA
+        id: resolve
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Resolve release version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION="$(awk -F'"' '/^\[/{s=$0} s=="[package]" && /^version *=/ {print $2; exit}' \
+            aptos-move/flow/Cargo.toml)"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::aptos-move-flow version '$VERSION' must be MAJOR.MINOR.PATCH."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Preparing move-flow source tag v$VERSION."
+      - name: Release gates
+        env:
+          TAG: "move-flow-v${{ steps.version.outputs.version }}"
+          SOURCE_SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --filter=blob:none origin \
+            '+refs/heads/main:refs/remotes/origin/main'
+          if ! git merge-base --is-ancestor "$SOURCE_SHA" refs/remotes/origin/main; then
+            echo "::error::$SOURCE_SHA is not reachable from origin/main."
+            exit 1
+          fi
+          echo "Source SHA reachable from origin/main."
+          if gh api "repos/${{ github.repository }}/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag '$TAG' already exists. Bump the version or delete the existing tag."
+            exit 1
+          fi
+
+  create-tag:
+    name: "Create source tag"
+    needs: validate
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
     permissions:
       contents: write
-      pull-requests: read
-    uses: ./.github/workflows/binary-release.yaml
-    with:
-      binary_name: move-flow
-      crate_name: aptos-move-flow
-      build_profile: tool
-      release_version: ${{ inputs.release_version }}
-      source_git_ref_override: ${{ inputs.source_git_ref_override }}
-      release_title: ${{ inputs.release_title || format('move-flow v{0}', inputs.release_version) }}
-      dry_run: ${{ inputs.dry_run }}
-      skip_checks: ${{ inputs.skip_checks }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Real-release workflow ref gate
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Real move-flow releases must be dispatched from refs/heads/main, got $GITHUB_REF."
+            exit 1
+          fi
+      - name: Create source tag
+        env:
+          TAG: "move-flow-v${{ needs.validate.outputs.version }}"
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/$TAG" \
+            -f sha="$SOURCE_SHA"

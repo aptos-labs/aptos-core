@@ -44,4 +44,4 @@ fun call_identity_u64() {
     3: Return
 }
 
-fun identity(): skipped (not all types are concrete)
+fun identity(): skipped (generic function not instantiated)

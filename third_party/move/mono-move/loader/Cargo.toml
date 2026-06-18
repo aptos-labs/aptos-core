@@ -18,7 +18,6 @@ mono-move-global-context = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
 specializer = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]
 mono-move-testsuite = { workspace = true }

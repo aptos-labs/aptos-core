@@ -22,11 +22,11 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
-    types::{strip_ref, view_type, InternedType, Type},
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp,
-    IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp,
-    JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, ValueCmpOp,
-    ValueRefCmpOp, FRAME_METADATA_SIZE,
+    types::{is_closed_type, strip_ref, view_type, view_type_list, InternedType, Type},
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, DescriptorId, FrameLayoutInfo, FrameOffset,
+    IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp,
+    JumpValueCmpOp, JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand,
+    SizedSlot, ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, VariantFieldHandleIndex,
@@ -153,8 +153,8 @@ struct LoweringState<'a> {
     /// Monotonic cursor into `ctx.closure_call_sites`; advances once per
     /// lowered `Instr::CallClosure`.
     closure_call_cursor: usize,
-    /// Types of the function IR's home (frame-resident) slots, indexed
-    /// by Home slot id.
+    /// Types of the function IR's home (frame-resident) slots with the
+    /// instantiation's type arguments substituted, indexed by Home slot id.
     home_slot_types: &'a [InternedType],
     /// `Some(TypedSlot)` while `Slot::Xfer(j)` holds a fully-written
     /// live value visible to the GC; `None` otherwise. Length
@@ -181,6 +181,10 @@ impl gas::CostContext for LoweringState<'_> {
     fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<u32> {
         Ok(self.resolve_field(struct_ty, fh)?.1)
     }
+
+    fn concrete_ty(&self, ty: InternedType) -> Result<InternedType> {
+        LoweringState::concrete_ty(self, ty)
+    }
 }
 
 impl<'a> LoweringState<'a> {
@@ -195,11 +199,22 @@ impl<'a> LoweringState<'a> {
             call_site_cursor: 0,
             closure_pack_cursor: 0,
             closure_call_cursor: 0,
-            home_slot_types: &func_ir.home_slot_types,
+            home_slot_types: view_type_list(ctx.home_types),
             xfer_bindings: vec![None; num_xfer_positions],
             pending_def_binds: Vec::new(),
             pending_safe_points: Vec::new(),
         }
+    }
+
+    /// Substitutes the instantiation's type arguments into `ty`, producing a
+    /// closed type; identity when `ty_args` is empty.
+    fn concrete_ty(&self, ty: InternedType) -> Result<InternedType> {
+        let ty = self.ctx.interner.subst_type(ty, self.ctx.ty_args)?;
+        debug_assert!(
+            is_closed_type(ty),
+            "instruction-embedded type still open after substitution"
+        );
+        Ok(ty)
     }
 
     /// Resolve a `FieldHandleIndex` against the struct type `struct_ty`
@@ -221,10 +236,14 @@ impl<'a> LoweringState<'a> {
         Ok((field.offset, size))
     }
 
-    /// Resolve a `VariantFieldHandleIndex` against the owning enum's derived
+    /// Resolve a `VariantFieldHandleIndex` against `enum_ty`'s derived
     /// layout into a [`VariantFieldAccess`].
-    fn resolve_variant_field(&self, vfh: VariantFieldHandleIndex) -> Result<VariantFieldAccess> {
-        resolve_variant_field_access(self.ctx.module, &self.ctx.enum_layouts, vfh)
+    fn resolve_variant_field(
+        &self,
+        enum_ty: InternedType,
+        vfh: VariantFieldHandleIndex,
+    ) -> Result<VariantFieldAccess> {
+        resolve_variant_field_access(self.ctx.module, &self.ctx.enum_layouts, enum_ty, vfh)
     }
 
     /// Emit the borrow of a variant field's reference into `dst_ref`. Uses the
@@ -399,6 +418,18 @@ impl<'a> LoweringState<'a> {
             })?;
         }
         Ok(())
+    }
+
+    /// `DescriptorId` published for `vec_ty`, with the shared diagnostic of
+    /// the allocating vector ops. `op_name` prefixes the error message.
+    fn vector_descriptor_id(&self, op_name: &str, vec_ty: InternedType) -> Result<DescriptorId> {
+        self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
+            anyhow!(
+                "{}: no descriptor published for this vector type \
+                 (its element type may be generic or have unresolved layout)",
+                op_name
+            )
+        })
     }
 
     /// Interned-type corresponding to `slot`.
@@ -1005,43 +1036,58 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Unary ops ---
-            Instr::UnaryOp(dst, op, src) if op.cast_target_ty().is_some() => {
-                let to = op
-                    .cast_target_ty()
-                    .expect("guard above ensures this is a cast");
-                self.lower_cast(*dst, *src, to)?;
-            },
-            Instr::UnaryOp(dst, UnaryOp::Negate, src) => {
-                let src_ty = self.slot_type(*src)?;
-                let signed_ty = IntTy::from_type(src_ty)
-                    .filter(|t| t.is_signed())
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("UnaryOp::Negate requires a signed integer type")
+            Instr::UnaryOp(dst, op, src) => match op {
+                UnaryOp::CastU8
+                | UnaryOp::CastU16
+                | UnaryOp::CastU32
+                | UnaryOp::CastU64
+                | UnaryOp::CastU128
+                | UnaryOp::CastU256
+                | UnaryOp::CastI8
+                | UnaryOp::CastI16
+                | UnaryOp::CastI32
+                | UnaryOp::CastI64
+                | UnaryOp::CastI128
+                | UnaryOp::CastI256 => {
+                    // TODO: collapse UnaryOp::Cast* into UnaryOp::Cast(IntTy)
+                    // instead of matching twice here.
+                    let to = op
+                        .cast_target_ty()
+                        .expect("every cast op has a cast target type");
+                    self.lower_cast(*dst, *src, to)?;
+                },
+                UnaryOp::Negate => {
+                    let src_ty = self.slot_type(*src)?;
+                    let signed_ty = IntTy::from_type(src_ty)
+                        .filter(|t| t.is_signed())
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("UnaryOp::Negate requires a signed integer type")
+                        })?;
+                    let src_info = self.slot(*src)?;
+                    let dst_info = self.def_slot(*dst)?;
+                    self.emit(MicroOp::IntNegate(IntNegateOp {
+                        ty: signed_ty,
+                        dst: dst_info.offset,
+                        src: src_info.offset,
+                    }))?;
+                },
+                UnaryOp::FreezeRef => {
+                    // Runtime no-op: &mut T and &T share the same 16-byte
+                    // fat-pointer representation. Propagate the slot value.
+                    // TODO: fold this away at the stackless exec IR level so
+                    // lowering emits nothing at all.
+                    let src_info = self.slot(*src)?;
+                    let dst_info = self.def_slot(*dst)?;
+                    self.emit_single_move(dst_info.offset, src_info)?;
+                },
+                UnaryOp::Not => {
+                    let src_info = self.slot(*src)?;
+                    let dst_info = self.def_slot(*dst)?;
+                    self.emit(MicroOp::BoolNot {
+                        dst: dst_info.offset,
+                        src: src_info.offset,
                     })?;
-                let src_info = self.slot(*src)?;
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::IntNegate(IntNegateOp {
-                    ty: signed_ty,
-                    dst: dst_info.offset,
-                    src: src_info.offset,
-                }))?;
-            },
-            Instr::UnaryOp(dst, UnaryOp::FreezeRef, src) => {
-                // Runtime no-op: &mut T and &T share the same 16-byte
-                // fat-pointer representation. Propagate the slot value.
-                // TODO: fold this away at the stackless exec IR level so
-                // lowering emits nothing at all.
-                let src_info = self.slot(*src)?;
-                let dst_info = self.def_slot(*dst)?;
-                self.emit_single_move(dst_info.offset, src_info)?;
-            },
-            Instr::UnaryOp(dst, UnaryOp::Not, src) => {
-                let src_info = self.slot(*src)?;
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::BoolNot {
-                    dst: dst_info.offset,
-                    src: src_info.offset,
-                })?;
+                },
             },
 
             // --- References ---
@@ -1295,7 +1341,8 @@ impl<'a> LoweringState<'a> {
             },
             Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx)
             | Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx) => {
-                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let elem_size =
+                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let idx_info = self.slot(*idx)?;
                 let dst_info = self.def_slot(*dst)?;
@@ -1308,7 +1355,8 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             Instr::VecPopBack(dst, elem_ty, vec_ref) => {
-                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let elem_size =
+                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::VecPopBack {
@@ -1317,24 +1365,65 @@ impl<'a> LoweringState<'a> {
                     elem_size,
                 })?;
             },
-            Instr::VecPack(dst, _elem_ty, _count, elems) => {
-                if !elems.is_empty() {
-                    bail!("VecPack with elements not yet lowered");
+            Instr::VecPack(dst, elem_ty, elems) => {
+                let dst_typed = self.def_typed_slot(*dst)?;
+                // Empty literal keeps the fast path: null pointer is the empty
+                // vector — no allocation, no descriptor needed.
+                if elems.is_empty() {
+                    self.emit(MicroOp::VecNew {
+                        dst: dst_typed.slot.offset,
+                    })?;
+                } else {
+                    let elem_size =
+                        concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                    let descriptor_id = self.vector_descriptor_id("VecPack", dst_typed.ty)?;
+                    let srcs = elems
+                        .iter()
+                        .map(|elem| Ok(self.slot(*elem)?.offset))
+                        .collect::<Result<Vec<_>>>()?;
+                    self.emit(MicroOp::VecPack(Box::new(VecPackOp {
+                        dst: dst_typed.slot.offset,
+                        descriptor_id,
+                        elem_size,
+                        srcs,
+                    })))?;
                 }
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::VecNew {
-                    dst: dst_info.offset,
+            },
+            Instr::VecUnpack(dsts, elem_ty, src) => {
+                // TODO: the Move compiler only emits `VecUnpack` with count 0,
+                // but handwritten bytecode may use it with any count. If we
+                // restrict to count 0, we can apply simplifications.
+                let elem_size =
+                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let src_info = self.slot(*src)?;
+                let dst_offsets = dsts
+                    .iter()
+                    .map(|dst| Ok(self.def_slot(*dst)?.offset))
+                    .collect::<Result<Vec<_>>>()?;
+                self.emit(MicroOp::VecUnpack(Box::new(VecUnpackOp {
+                    src: src_info.offset,
+                    elem_size,
+                    dsts: dst_offsets,
+                })))?;
+            },
+            Instr::VecSwap(elem_ty, vec_ref, idx_a, idx_b) => {
+                let elem_size =
+                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let idx_a_info = self.slot(*idx_a)?;
+                let idx_b_info = self.slot(*idx_b)?;
+                self.emit(MicroOp::VecSwap {
+                    vec_ref: vec_ref_info.offset,
+                    idx_a: idx_a_info.offset,
+                    idx_b: idx_b_info.offset,
+                    elem_size,
                 })?;
             },
             Instr::VecPushBack(elem_ty, vec_ref, val) => {
-                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let elem_size =
+                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
-                let descriptor_id = self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "VecPushBack: no descriptor published for this vector type \
-                         (its element type may be generic or have unresolved layout)"
-                    )
-                })?;
+                let descriptor_id = self.vector_descriptor_id("VecPushBack", vec_ty)?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let val_info = self.slot(*val)?;
                 self.emit(MicroOp::VecPushBack {
@@ -1350,9 +1439,9 @@ impl<'a> LoweringState<'a> {
             // The struct lives in a frame slot at compile-time-known offset;
             // the field's absolute frame offset is therefore also compile-time.
             // No fat pointer is materialized.
-            Instr::ImmBorrowLocField(dst, fh, local) | Instr::MutBorrowLocField(dst, fh, local) => {
-                let struct_ty = self.slot_interned_type(*local)?;
-                let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
+            Instr::ImmBorrowLocField(dst, owner, fh, local)
+            | Instr::MutBorrowLocField(dst, owner, fh, local) => {
+                let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
                 let local_info = self.slot(*local)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::SlotBorrow {
@@ -1360,9 +1449,9 @@ impl<'a> LoweringState<'a> {
                     local: FrameOffset(local_info.offset.0 + field_offset),
                 })?;
             },
-            Instr::ReadLocalField(dst, fh, local) => {
-                let struct_ty = self.slot_interned_type(*local)?;
-                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+            Instr::ReadLocalField(dst, owner, fh, local) => {
+                let (field_offset, field_size) =
+                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
                 let local_info = self.slot(*local)?;
                 let dst_info = self.def_typed_slot(*dst)?;
                 let src = SizedSlot {
@@ -1373,9 +1462,9 @@ impl<'a> LoweringState<'a> {
                 self.emit_single_move(dst_info.slot.offset, src)?;
                 self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
-            Instr::WriteLocalField(fh, local, val) => {
-                let struct_ty = self.slot_interned_type(*local)?;
-                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+            Instr::WriteLocalField(owner, fh, local, val) => {
+                let (field_offset, field_size) =
+                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
                 let local_info = self.slot(*local)?;
                 let val_info = self.slot(*val)?;
                 let src = SizedSlot {
@@ -1392,9 +1481,9 @@ impl<'a> LoweringState<'a> {
             // pointer in `src` (or `dst_ref`). Use the offset-bearing ref
             // micro-ops to fold the field offset into the address compute in a
             // single dispatch.
-            Instr::ImmBorrowField(dst, fh, src) | Instr::MutBorrowField(dst, fh, src) => {
-                let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
-                let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
+            Instr::ImmBorrowField(dst, owner, fh, src)
+            | Instr::MutBorrowField(dst, owner, fh, src) => {
+                let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::DeriveRefOffsetImm {
@@ -1403,9 +1492,9 @@ impl<'a> LoweringState<'a> {
                     offset: field_offset,
                 })?;
             },
-            Instr::ReadField(dst, fh, src) => {
-                let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
-                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+            Instr::ReadField(dst, owner, fh, src) => {
+                let (field_offset, field_size) =
+                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_typed_slot(*dst)?;
                 self.emit(MicroOp::ReadRefOffset {
@@ -1416,9 +1505,9 @@ impl<'a> LoweringState<'a> {
                 })?;
                 self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
-            Instr::WriteField(fh, dst_ref, val) => {
-                let struct_ty = strip_ref(self.slot_interned_type(*dst_ref)?)?;
-                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+            Instr::WriteField(owner, fh, dst_ref, val) => {
+                let (field_offset, field_size) =
+                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
                 let ref_info = self.slot(*dst_ref)?;
                 let val_info = self.slot(*val)?;
                 self.emit(MicroOp::WriteRefOffset {
@@ -1437,8 +1526,10 @@ impl<'a> LoweringState<'a> {
             // copy cycle (which neither order resolves) needs a swap-style
             // bytecode op which does not currently exist.
             Instr::Pack(dst, struct_ty, args) => {
-                // `struct_ty` must be a concrete nominal with a populated layout.
-                let layout = view_type(*struct_ty)
+                // After substitution, `struct_ty` must be a concrete nominal
+                // with a populated layout.
+                let struct_ty = self.concrete_ty(*struct_ty)?;
+                let layout = view_type(struct_ty)
                     .layout()
                     .ok_or_else(|| anyhow::anyhow!("Pack: struct_ty has no populated layout"))?;
                 let fields = layout.field_layouts().ok_or_else(|| {
@@ -1497,7 +1588,8 @@ impl<'a> LoweringState<'a> {
             },
             Instr::Unpack(dsts, struct_ty, src) => {
                 // See the `Instr::Pack` arm above for the `struct_ty` contract.
-                let layout = view_type(*struct_ty)
+                let struct_ty = self.concrete_ty(*struct_ty)?;
+                let layout = view_type(struct_ty)
                     .layout()
                     .ok_or_else(|| anyhow::anyhow!("Unpack: struct_ty has no populated layout"))?;
                 let fields = layout.field_layouts().ok_or_else(|| {
@@ -1553,8 +1645,10 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Closures ---
-            Instr::PackClosure(dst, _fhi, mask, captured) => {
-                // Target identity + captured-data descriptor were resolved in
+            Instr::PackClosure(dst, _, mask, captured)
+            | Instr::PackClosureGeneric(dst, _, mask, captured) => {
+                // Target identity (with composed type arguments for the
+                // generic form) + captured-data descriptor were resolved in
                 // `try_build_context`; read them positionally.
                 let info = &self.ctx.closure_pack_sites[self.closure_pack_cursor];
                 self.closure_pack_cursor += 1;
@@ -1571,7 +1665,6 @@ impl<'a> LoweringState<'a> {
                     captured: captured_slots,
                 })))?;
             },
-            Instr::PackClosureGeneric(..) => bail!("generic closures not yet lowered"),
             Instr::CallClosure(rets, _sig_types, all_args) => {
                 let ret_slots = &self.ctx.closure_call_sites[self.closure_call_cursor];
                 self.closure_call_cursor += 1;
@@ -1591,30 +1684,33 @@ impl<'a> LoweringState<'a> {
 
             // --- Global storage ---
             Instr::Exists(dst, ty, addr) => {
+                let concrete_ty = self.concrete_ty(*ty)?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::Exists {
                     addr: addr_info.offset,
-                    ty: *ty,
+                    ty: concrete_ty,
                     dst: dst_info.offset,
                 })?;
             },
             Instr::ImmBorrowGlobal(dst, ty, addr) => {
+                let concrete_ty = self.concrete_ty(*ty)?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::BorrowGlobal {
                     dst: dst_info.offset,
                     addr: addr_info.offset,
-                    ty: *ty,
+                    ty: concrete_ty,
                 })?;
             },
             Instr::MutBorrowGlobal(dst, ty, addr) => {
+                let concrete_ty = self.concrete_ty(*ty)?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::BorrowGlobalMut {
                     dst: dst_info.offset,
                     addr: addr_info.offset,
-                    ty: *ty,
+                    ty: concrete_ty,
                 })?;
             },
             Instr::MoveFrom(dst, ty, addr) => {
@@ -1622,6 +1718,7 @@ impl<'a> LoweringState<'a> {
                 // `box_ptr`, then unbox its inline value into `dst`. `MoveFrom`
                 // may GC (deep-copy) before it writes `box_ptr`; the unbox copy
                 // that follows does not allocate.
+                let concrete_ty = self.concrete_ty(*ty)?;
                 let box_ptr = self
                     .ctx
                     .resource_box_slot
@@ -1631,11 +1728,11 @@ impl<'a> LoweringState<'a> {
                 self.emit(MicroOp::MoveFrom {
                     dst: box_ptr,
                     addr: addr_info.offset,
-                    ty: *ty,
+                    ty: concrete_ty,
                 })?;
                 debug_assert_eq!(
                     dst_info.size,
-                    concrete_type_size(*ty, "move_from resource")?,
+                    concrete_type_size(concrete_ty, "move_from resource")?,
                     "move_from: dst slot width must equal the resource's heap-object payload size",
                 );
                 self.emit_heap_move_from(dst_info.offset, box_ptr, dst_info.size)?;
@@ -1655,7 +1752,8 @@ impl<'a> LoweringState<'a> {
                 // the relocated child pointer, not a stale one. This relies on
                 // `frame_layout` being a whole-function root set; it would break
                 // if safe points became per-PC / liveness-based.
-                let descriptor_id = self.ctx.descriptor_id(*ty).ok_or_else(|| {
+                let concrete_ty = self.concrete_ty(*ty)?;
+                let descriptor_id = self.ctx.descriptor_id(concrete_ty).ok_or_else(|| {
                     anyhow::anyhow!(
                         "MoveTo: no descriptor published for the resource type \
                          (its layout may be unresolved)"
@@ -1673,13 +1771,13 @@ impl<'a> LoweringState<'a> {
                 })?;
                 debug_assert_eq!(
                     val_info.size,
-                    concrete_type_size(*ty, "move_to resource")?,
+                    concrete_type_size(concrete_ty, "move_to resource")?,
                     "move_to: val slot width must equal the descriptor payload size HeapNew allocated",
                 );
                 self.emit_heap_move_to(box_ptr, val_info.offset, val_info.size)?;
                 self.emit(MicroOp::MoveTo {
                     signer_ref: signer_info.offset,
-                    ty: *ty,
+                    ty: concrete_ty,
                     src: box_ptr,
                 })?;
             },
@@ -1693,9 +1791,10 @@ impl<'a> LoweringState<'a> {
             // come from the derived `EnumLayout`; the `enum_*` helpers add
             // `ENUM_DATA_OFFSET`.
             Instr::PackVariant(dst, enum_ty, variant_ord, args) => {
+                let enum_ty = self.concrete_ty(*enum_ty)?;
                 let ctx = self.ctx;
                 let layout = ctx
-                    .enum_layout(*enum_ty)
+                    .enum_layout(enum_ty)
                     .ok_or_else(|| anyhow::anyhow!("PackVariant: no derived layout for enum"))?;
                 let variant_fields =
                     layout.variants.get(*variant_ord as usize).ok_or_else(|| {
@@ -1762,9 +1861,10 @@ impl<'a> LoweringState<'a> {
                 }
             },
             Instr::UnpackVariant(dsts, enum_ty, variant_ord, src) => {
+                let enum_ty = self.concrete_ty(*enum_ty)?;
                 let ctx = self.ctx;
                 let layout = ctx
-                    .enum_layout(*enum_ty)
+                    .enum_layout(enum_ty)
                     .ok_or_else(|| anyhow::anyhow!("UnpackVariant: no derived layout for enum"))?;
                 let variant_fields =
                     layout.variants.get(*variant_ord as usize).ok_or_else(|| {
@@ -1864,8 +1964,8 @@ impl<'a> LoweringState<'a> {
             // reference in the scratch slot, then `ReadRef`/`WriteRef` accesses
             // it. Every op here is non-allocating, so the scratch reference
             // never spans a safe point.
-            Instr::ReadVariantField(dst, vfh, src) => {
-                let access = self.resolve_variant_field(*vfh)?;
+            Instr::ReadVariantField(dst, enum_ty, vfh, src) => {
+                let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
                 let src_off = self.slot(*src)?.offset;
                 let dst_typed = self.def_typed_slot(*dst)?;
                 let dst_off = dst_typed.slot.offset;
@@ -1892,8 +1992,8 @@ impl<'a> LoweringState<'a> {
                 // itself heap-backed, make it independent.
                 self.maybe_deep_copy(dst_typed.ty, dst_off)?;
             },
-            Instr::WriteVariantField(vfh, dst_ref, val) => {
-                let access = self.resolve_variant_field(*vfh)?;
+            Instr::WriteVariantField(enum_ty, vfh, dst_ref, val) => {
+                let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
                 let ref_off = self.slot(*dst_ref)?.offset;
                 let val_off = self.slot(*val)?.offset;
                 match access.uniform_offset {
@@ -1919,35 +2019,15 @@ impl<'a> LoweringState<'a> {
             // Borrowing a variant field directly produces a field reference
             // into `dst`; the borrow derefs the enum and offsets into the heap
             // object (statically or by runtime tag).
-            Instr::ImmBorrowVariantField(dst, vfh, src)
-            | Instr::MutBorrowVariantField(dst, vfh, src) => {
-                let access = self.resolve_variant_field(*vfh)?;
+            Instr::ImmBorrowVariantField(dst, enum_ty, vfh, src)
+            | Instr::MutBorrowVariantField(dst, enum_ty, vfh, src) => {
+                let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
                 let src_off = self.slot(*src)?.offset;
                 let dst_off = self.def_slot(*dst)?.offset;
                 self.emit_variant_field_borrow(&access, src_off, dst_off)?;
             },
 
-            // --- Generic and variant field forms: not yet lowered ---
-            Instr::ImmBorrowFieldGeneric(..)
-            | Instr::MutBorrowFieldGeneric(..)
-            | Instr::ReadFieldGeneric(..)
-            | Instr::WriteFieldGeneric(..) => {
-                bail!("generic field instruction not yet lowered")
-            },
-
-            // Generic global-storage ops carry a still-generic resource type
-            // that the lowering state can't substitute yet.
-            Instr::ExistsGeneric(..)
-            | Instr::MoveFromGeneric(..)
-            | Instr::MoveToGeneric(..)
-            | Instr::ImmBorrowGlobalGeneric(..)
-            | Instr::MutBorrowGlobalGeneric(..) => {
-                bail!("generic global-storage instruction not yet lowered")
-            },
-
             Instr::ForceGC => self.emit(MicroOp::ForceGC)?,
-
-            _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }
 
         Ok(())
@@ -2013,7 +2093,12 @@ impl<'a> LoweringState<'a> {
         }
         heap_ptr_offsets.sort_by_key(|o| o.0);
         heap_ptr_offsets.dedup();
-        Ok(NativeABI::new(args, returns, heap_ptr_offsets)?)
+        Ok(NativeABI::new(
+            args,
+            returns,
+            heap_ptr_offsets,
+            cs.required_descriptors.clone(),
+        )?)
     }
 
     /// Lower one call. Args are written by reverse iteration over the

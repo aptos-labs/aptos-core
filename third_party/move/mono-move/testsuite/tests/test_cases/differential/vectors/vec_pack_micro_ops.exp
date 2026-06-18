@@ -1,0 +1,109 @@
+=== micro-ops ===
+// module 0x66::vec_pack_micro_ops
+
+fun consume_empty() {
+  frame_data_size: 16
+  entry_gas: 74
+  code:
+    0: VecNew [8]
+    1: VecUnpack [] <- [8] (size=8)
+    2: Return
+}
+
+fun literal_args() {
+  frame_data_size: 16
+  entry_gas: 193
+  code:
+    0: VecPack [40] <- [[0]] (size=1, desc=0)
+    1: VecPack [48] <- [[8], [8]] (size=8, desc=0)
+    2: CallIndirect 0x66::vec_pack_micro_ops::take_two
+    3: Move8 [0] <- [40]
+    4: Return
+  safe_point_layouts:
+    0: []
+    1: [40]
+}
+
+fun pack_nested() {
+  frame_data_size: 96
+  entry_gas: 148
+  code:
+    0: VecPack [16] <- [[0], [0]] (size=1, desc=0)
+    1: VecPack [24] <- [[1]] (size=1, desc=0)
+    2: VecPack [8] <- [[16], [24]] (size=8, desc=2)
+    3: SlotBorrow [32] <- &[8]
+    4: StoreImm8 [48] <- #0
+    5: VecBorrow [56] <- &[32][[48]] (elem_size=8)
+    6: StoreImm8 [48] <- #1
+    7: VecBorrow [72] <- &[56][[48]] (elem_size=1)
+    8: ReadRef [88] <- *[72] (size=1)
+    9: SlotBorrow [32] <- &[8]
+    10: StoreImm8 [48] <- #1
+    11: VecBorrow [56] <- &[32][[48]] (elem_size=8)
+    12: StoreImm8 [48] <- #0
+    13: VecBorrow [72] <- &[56][[48]] (elem_size=1)
+    14: ReadRef [89] <- *[72] (size=1)
+    15: IntAdd [89] <- [88] + u8 [89]
+    16: Move(1) [0] <- [89]
+    17: Return
+  safe_point_layouts:
+    0: []
+    1: []
+    2: []
+}
+
+fun pack_u64() {
+  frame_data_size: 72
+  entry_gas: 175
+  code:
+    0: VecPack [24] <- [[0], [8], [16]] (size=8, desc=0)
+    1: SlotBorrow [32] <- &[24]
+    2: StoreImm8 [48] <- #1
+    3: VecBorrow [56] <- &[32][[48]] (elem_size=8)
+    4: ReadRef [48] <- *[56] (size=8)
+    5: Move8 [0] <- [48]
+    6: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun swap_pair() {
+  frame_data_size: 88
+  entry_gas: 211
+  code:
+    0: VecPack [16] <- [[0], [8]] (size=8, desc=0)
+    1: SlotBorrow [24] <- &[16]
+    2: StoreImm8 [40] <- #0
+    3: StoreImm8 [48] <- #1
+    4: VecSwap [24][[40]] <-> [24][[48]] (size=8)
+    5: SlotBorrow [56] <- &[16]
+    6: StoreImm8 [48] <- #0
+    7: VecBorrow [72] <- &[56][[48]] (elem_size=8)
+    8: ReadRef [48] <- *[72] (size=8)
+    9: Move8 [0] <- [48]
+    10: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun take_two() {
+  frame_data_size: 64
+  entry_gas: 72
+  code:
+    0: SlotBorrow [16] <- &[0]
+    1: VecLen [32] <- vec_len([16])
+    2: MulU64Imm [32] <- [32] * #10
+    3: SlotBorrow [40] <- &[8]
+    4: VecLen [56] <- vec_len([40])
+    5: AddU64 [56] <- [32] + [56]
+    6: Move8 [0] <- [56]
+    7: Return
+}
+=== frame-layout ===
+// module 0x66::vec_pack_micro_ops
+fun consume_empty: heap_ptr_offsets=[8] zero_frame=true
+fun literal_args: heap_ptr_offsets=[] zero_frame=false
+fun pack_nested: heap_ptr_offsets=[8, 16, 24, 32, 56, 72] zero_frame=true
+fun pack_u64: heap_ptr_offsets=[24, 32, 56] zero_frame=true
+fun swap_pair: heap_ptr_offsets=[16, 24, 56, 72] zero_frame=true
+fun take_two: heap_ptr_offsets=[0, 8, 16, 40] zero_frame=true

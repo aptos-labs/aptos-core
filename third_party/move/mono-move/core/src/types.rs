@@ -158,7 +158,7 @@ pub fn view_name(ptr: InternedIdentifier) -> &'static str {
 /// Converts `&mut T` to `&T` by interning the immutable counterpart. Errors
 /// if `mut_ref` is not a [`Type::MutRef`].
 ///
-/// Reads through `view_type` and therefore inherits its safety contract.
+/// Inherits safety contract of [`view_type`].
 pub fn convert_mut_to_immut_ref(
     interner: &impl Interner,
     mut_ref: InternedType,
@@ -172,12 +172,46 @@ pub fn convert_mut_to_immut_ref(
 /// Strips the reference from `&T` or `&mut T`, returning `T`. Errors if
 /// `ref_ty` is not a reference type.
 ///
-/// Reads through `view_type` and therefore inherits its safety contract.
+/// Inherits safety contract of [`view_type`].
 pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
     let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
         anyhow::bail!("strip_ref: expected reference type");
     };
     Ok(*inner)
+}
+
+/// Whether `ty` contains no [`Type::TypeParam`] node.
+///
+/// Inherits safety contract of [`view_type`].
+/// TODO: convert to non-recursive.
+pub fn is_closed_type(ty: InternedType) -> bool {
+    match view_type(ty) {
+        Type::TypeParam { .. } => false,
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer => true,
+        Type::Vector { elem } => is_closed_type(*elem),
+        Type::ImmutRef { inner } | Type::MutRef { inner } => is_closed_type(*inner),
+        Type::Nominal { ty_args, .. } => {
+            view_type_list(*ty_args).iter().copied().all(is_closed_type)
+        },
+        Type::Function { args, results, .. } => {
+            view_type_list(*args).iter().copied().all(is_closed_type)
+                && view_type_list(*results).iter().copied().all(is_closed_type)
+        },
+    }
 }
 
 /// Layout for struct fields:

@@ -272,6 +272,31 @@ pub struct CallClosureOp {
     pub provided_args: Vec<SizedSlot>,
 }
 
+/// Operand data for [`MicroOp::VecPack`].
+#[derive(Clone, Debug)]
+pub struct VecPackOp {
+    /// Frame slot that receives the vector's heap pointer.
+    pub dst: FrameOffset,
+    /// GC trace descriptor for the allocated vector object.
+    pub descriptor_id: DescriptorId,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// Element sources (in the current frame), in element order.
+    pub srcs: Vec<FrameOffset>,
+}
+
+/// Operand data for [`MicroOp::VecUnpack`].
+#[derive(Clone, Debug)]
+pub struct VecUnpackOp {
+    /// Frame slot holding the vector's heap pointer (by value, not a
+    /// reference).
+    pub src: FrameOffset,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// Element destinations (in the current frame), in element order.
+    pub dsts: Vec<FrameOffset>,
+}
+
 #[derive(Clone)]
 pub enum MicroOp {
     //======================================================================
@@ -759,7 +784,6 @@ pub enum MicroOp {
     // `elem_size` is baked into each instruction (statically known).
     //
     // May want:
-    // - VecSwap (native in Move's vector module),
     // - VecMoveRange (bulk move between vectors) — tricky: this is
     //   really a memcpy between two heap-allocated regions, but we
     //   currently have no vector-to-vector addressing mode,
@@ -820,6 +844,32 @@ pub enum MicroOp {
         vec_ref: FrameOffset,
         idx: FrameOffset,
         src: FrameOffset,
+        elem_size: u32,
+    },
+
+    /// Create a vector of exactly [`VecPackOp::srcs`]`.len()` elements: one
+    /// allocation at exact capacity (this part MAY TRIGGER GC), then one
+    /// element copy per source slot, then the heap pointer is written to
+    /// [`VecPackOp::dst`].
+    ///
+    /// Use `VecNew` fast path instead (null pointer, no allocation), when
+    /// [`VecPackOp::srcs`] are empty.
+    VecPack(Box<VecPackOp>),
+
+    /// Destructure a vector into [`VecUnpackOp::dsts`]`.len()` element slots.
+    /// [`VecUnpackOp::src`] holds the vector's heap pointer by value. Errors
+    /// unless the vector's length equals [`VecUnpackOp::dsts`]`.len()` exactly
+    /// (in either direction); a null pointer is the empty vector, so unpack
+    /// with zero [`VecUnpackOp::dsts`] succeeds on it.
+    VecUnpack(Box<VecUnpackOp>),
+
+    /// Swap vector[idx_a] and vector[idx_b]. `vec_ref` is a 16-byte fat pointer
+    /// whose target holds the vector's heap pointer; `idx_a`/`idx_b` are u64
+    /// slots. Errors if either index is out of bounds. Equal indices are valid.
+    VecSwap {
+        vec_ref: FrameOffset,
+        idx_a: FrameOffset,
+        idx_b: FrameOffset,
         elem_size: u32,
     },
 
@@ -1218,6 +1268,17 @@ pub enum MicroOp {
         base: FrameOffset,
         offsets: Box<[u32]>,
     },
+}
+
+/// Write a comma-separated list of frame offsets as `[o0], [o1], ...`.
+fn write_offset_list(f: &mut fmt::Formatter<'_>, offsets: &[FrameOffset]) -> fmt::Result {
+    for (pos, offset) in offsets.iter().enumerate() {
+        if pos > 0 {
+            write!(f, ", ")?;
+        }
+        write!(f, "[{}]", offset.0)?;
+    }
+    Ok(())
 }
 
 // TODO: make gas costs optional in this output. Most tests don't care about
@@ -1619,6 +1680,28 @@ impl fmt::Display for MicroOp {
                     f,
                     "VecStoreElem [{}][[{}]] <- [{}] (size={})",
                     vec_ref.0, idx.0, src.0, elem_size
+                )
+            },
+            MicroOp::VecPack(op) => {
+                write!(f, "VecPack [{}] <- [", op.dst.0)?;
+                write_offset_list(f, &op.srcs)?;
+                write!(f, "] (size={}, desc={})", op.elem_size, op.descriptor_id)
+            },
+            MicroOp::VecUnpack(op) => {
+                write!(f, "VecUnpack [")?;
+                write_offset_list(f, &op.dsts)?;
+                write!(f, "] <- [{}] (size={})", op.src.0, op.elem_size)
+            },
+            MicroOp::VecSwap {
+                vec_ref,
+                idx_a,
+                idx_b,
+                elem_size,
+            } => {
+                write!(
+                    f,
+                    "VecSwap [{}][[{}]] <-> [{}][[{}]] (size={})",
+                    vec_ref.0, idx_a.0, vec_ref.0, idx_b.0, elem_size
                 )
             },
             MicroOp::StoreImmVec { dst, idx } => {
@@ -2085,6 +2168,7 @@ impl MicroOp {
             MicroOp::HeapNew { .. }
             | MicroOp::EnumNew { .. }
             | MicroOp::VecPushBack { .. }
+            | MicroOp::VecPack(_)
             | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
@@ -2144,6 +2228,8 @@ impl MicroOp {
             | MicroOp::VecPopBack { .. }
             | MicroOp::VecLoadElem { .. }
             | MicroOp::VecStoreElem { .. }
+            | MicroOp::VecUnpack(_)
+            | MicroOp::VecSwap { .. }
             | MicroOp::SlotBorrow { .. }
             | MicroOp::VecBorrow { .. }
             | MicroOp::HeapBorrow { .. }

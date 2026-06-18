@@ -74,8 +74,8 @@ fun entry() {
     3: Return
 }
 
-fun innermost(): skipped (not all types are concrete)
+fun innermost(): skipped (generic function not instantiated)
 
-fun middle(): skipped (not all types are concrete)
+fun middle(): skipped (generic function not instantiated)
 
-fun outer(): skipped (not all types are concrete)
+fun outer(): skipped (generic function not instantiated)

@@ -3,7 +3,7 @@
 
 //! Resource storage access for the runtime.
 
-use crate::{types::InternedType, ExecutionErrorKind, IntoExecutionError};
+use crate::{native::TableHandle, types::InternedType, ExecutionErrorKind, IntoExecutionError};
 use move_core_types::account_address::AccountAddress;
 use std::ptr::NonNull;
 use thiserror::Error;
@@ -43,7 +43,7 @@ pub enum InMemoryStorageKey {
     /// A table item, identified by its table handle and the serialized bytes of
     /// its key.
     TableItem {
-        handle: AccountAddress,
+        handle: TableHandle,
         // TODO(perf): consider interning these keys later.
         key: Box<[u8]>,
     },
@@ -56,7 +56,7 @@ impl InMemoryStorageKey {
     }
 
     /// Builds a table item key from its handle and the serialized key bytes.
-    pub fn table_item(handle: AccountAddress, key: Box<[u8]>) -> Self {
+    pub fn table_item(handle: TableHandle, key: Box<[u8]>) -> Self {
         InMemoryStorageKey::TableItem { handle, key }
     }
 
@@ -65,7 +65,7 @@ impl InMemoryStorageKey {
     pub fn address(&self) -> AccountAddress {
         match self {
             InMemoryStorageKey::Resource { address, .. } => *address,
-            InMemoryStorageKey::TableItem { handle, .. } => *handle,
+            InMemoryStorageKey::TableItem { handle, .. } => handle.address(),
         }
     }
 }

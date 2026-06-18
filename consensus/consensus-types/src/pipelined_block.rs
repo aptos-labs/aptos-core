@@ -20,7 +20,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    decryption::BlockTxnDecryptionKey,
+    decryption::{BlockTxnDecryptionKey, DecryptionPayload},
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
     secret_sharing::{SecretShare, SecretSharedKey},
@@ -71,36 +71,43 @@ pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type MaterializeResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
 
+/// Per-block output of the decrypt phase that downstream phases (and the
+/// child block's decrypt phase) consume. The variant selects which
+/// `BlockMetadataExt` the block emits, so it must be identical across all
+/// validators.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DecryptionOutcome {
+    /// Decryption disabled for this epoch. Emits `BlockMetadataExt::V1`.
+    Disabled,
+    /// Decryption enabled, but the on-chain `PerBlockDecryptionKeyV2` resource
+    /// doesn't exist yet (chain predates the dense-round framework upgrade).
+    /// Behaves exactly like older binaries: the digest is keyed by the
+    /// consensus round and the block emits `BlockMetadataExt::V2`.
+    Legacy(Option<BlockTxnDecryptionKey>),
+    /// Dense-round tracking is active. Emits `BlockMetadataExt::V3`.
+    RoundTracked {
+        /// The decryption round the next key-producing block will consume:
+        /// the parent's value, bumped by one iff this block produced a key.
+        next_decryption_round: u64,
+        /// `Some` iff this block produced a key; carries the round this
+        /// block consumed (= the pre-bump counter).
+        payload: Option<DecryptionPayload>,
+    },
+}
+
 #[derive(Clone, Debug)]
 pub struct DecryptionResult {
     pub decrypted_txns: Vec<SignedTransaction>,
     pub regular_txns: Vec<SignedTransaction>,
     pub max_txns_from_block_to_execute: Option<u64>,
     pub block_gas_limit: Option<u64>,
-    pub decryption_key: Option<Option<BlockTxnDecryptionKey>>,
-}
-
-impl DecryptionResult {
-    pub fn passthrough(
-        regular_txns: Vec<SignedTransaction>,
-        max_txns_from_block_to_execute: Option<u64>,
-        block_gas_limit: Option<u64>,
-        decryption_key: Option<Option<BlockTxnDecryptionKey>>,
-    ) -> Self {
-        Self {
-            decrypted_txns: Vec::new(),
-            regular_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            decryption_key,
-        }
-    }
+    pub outcome: DecryptionOutcome,
 }
 
 pub type PrepareResult = (
     Arc<Vec<SignatureVerifiedTransaction>>,
     Option<u64>,
-    Option<Option<BlockTxnDecryptionKey>>,
+    DecryptionOutcome,
 );
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped

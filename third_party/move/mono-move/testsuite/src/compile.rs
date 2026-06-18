@@ -50,8 +50,8 @@ pub const TEST_UTILS_PATH: &str = concat!(
 pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
     run_compiler(Options {
         sources: vec![path.to_string_lossy().into_owned()],
-        dependencies: move_stdlib::move_stdlib_files(),
-        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        dependencies: aptos_move_stdlib::move_stdlib_files(),
+        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
@@ -62,8 +62,8 @@ pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
 /// test's storage.
 pub fn compile_move_stdlib() -> Result<Vec<CompiledModule>> {
     run_compiler(Options {
-        sources: move_stdlib::move_stdlib_files(),
-        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        sources: aptos_move_stdlib::move_stdlib_files(),
+        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
@@ -105,12 +105,12 @@ pub fn compile_move_source(source: &str) -> Result<Vec<CompiledModule>> {
         .and_then(|mut f| f.write_all(source.as_bytes()))
         .context("failed to write temp source file")?;
 
-    let mut dependencies = move_stdlib::move_stdlib_files();
+    let mut dependencies = aptos_move_stdlib::move_stdlib_files();
     dependencies.push(TEST_UTILS_PATH.to_string());
     run_compiler(Options {
         sources: vec![path.to_string_lossy().into_owned()],
         dependencies,
-        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()

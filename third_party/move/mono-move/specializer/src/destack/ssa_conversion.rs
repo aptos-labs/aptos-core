@@ -18,9 +18,10 @@ use mono_move_core::{
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Bytecode, CodeOffset, FieldInstantiationIndex, StructDefInstantiationIndex,
-        StructDefinitionIndex, StructFieldInformation, StructVariantInstantiationIndex,
-        VariantFieldInstantiationIndex, VariantIndex,
+        Bytecode, CodeOffset, FieldHandleIndex, FieldInstantiationIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
+        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        VariantIndex,
     },
 };
 use shared_dsa::{Entry, UnorderedMap};
@@ -206,30 +207,50 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         Ok((ty, handle.variant, ty_args))
     }
 
-    fn field_inst_type(
+    /// Given a generic field instantiation, returns:
+    /// 1. Inner (non-generic) field handle,
+    /// 2. Instantiated owner type,
+    /// 3. Instantiated field type.
+    fn field_inst_parts(
         &self,
         module: &PreparedModule,
         idx: FieldInstantiationIndex,
-    ) -> Result<InternedType> {
+    ) -> Result<(FieldHandleIndex, InternedType, InternedType)> {
         let inst = &module.field_instantiations[idx.0 as usize];
-        let base = module.interned_field_type_at(inst.handle);
         let ty_args = self
             .interner
             .type_list_of(module.interned_types_at(inst.type_parameters));
-        self.interner.subst_type(base, ty_args)
+        let owner_idx = module.field_handle_at(inst.handle).owner;
+        let owner = self
+            .interner
+            .subst_type(module.interned_nominal_def_type_at(owner_idx), ty_args)?;
+        let field_ty = self
+            .interner
+            .subst_type(module.interned_field_type_at(inst.handle), ty_args)?;
+        Ok((inst.handle, owner, field_ty))
     }
 
-    fn variant_field_inst_type(
+    /// Given a generic variant-field instantiation, returns:
+    /// 1. Inner (non-generic) variant-field handle,
+    /// 2. Instantiated owner type,
+    /// 3. Instantiated field type.
+    fn variant_field_inst_parts(
         &self,
         module: &PreparedModule,
         idx: VariantFieldInstantiationIndex,
-    ) -> Result<InternedType> {
+    ) -> Result<(VariantFieldHandleIndex, InternedType, InternedType)> {
         let inst = &module.variant_field_instantiations[idx.0 as usize];
-        let base = module.interned_variant_field_type_at(inst.handle);
         let ty_args = self
             .interner
             .type_list_of(module.interned_types_at(inst.type_parameters));
-        self.interner.subst_type(base, ty_args)
+        let owner_idx = module.variant_field_handle_at(inst.handle).struct_index;
+        let owner = self
+            .interner
+            .subst_type(module.interned_nominal_def_type_at(owner_idx), ty_args)?;
+        let field_ty = self
+            .interner
+            .subst_type(module.interned_variant_field_type_at(inst.handle), ty_args)?;
+        Ok((inst.handle, owner, field_ty))
     }
 
     // --------------------------------------------------------------------------------------------
@@ -462,7 +483,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let result_ty = self.struct_inst_ty(module, *idx)?;
                 let dst = self.alloc_vid(result_ty)?;
                 self.current_block_instrs
-                    .push(Instr::PackGeneric(dst, result_ty, fields));
+                    .push(Instr::Pack(dst, result_ty, fields));
                 self.push_slot(dst);
             },
             B::Unpack(idx) => {
@@ -497,7 +518,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     dsts.push(self.alloc_vid(fty)?);
                 }
                 self.current_block_instrs
-                    .push(Instr::UnpackGeneric(dsts.clone(), inst_ty, src));
+                    .push(Instr::Unpack(dsts.clone(), inst_ty, src));
                 for dst in dsts {
                     self.push_slot(dst);
                 }
@@ -523,7 +544,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let fields = self.pop_n_reverse(n)?;
                 let (inst_ty, variant_ord, _) = self.variant_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(inst_ty)?;
-                self.current_block_instrs.push(Instr::PackVariantGeneric(
+                self.current_block_instrs.push(Instr::PackVariant(
                     dst,
                     inst_ty,
                     variant_ord,
@@ -567,7 +588,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     let fty = self.interner.subst_type(fty, ty_args)?;
                     dsts.push(self.alloc_vid(fty)?);
                 }
-                self.current_block_instrs.push(Instr::UnpackVariantGeneric(
+                self.current_block_instrs.push(Instr::UnpackVariant(
                     dsts.clone(),
                     inst_ty,
                     variant_ord,
@@ -592,7 +613,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let (inst_ty, variant, _) = self.variant_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(ty::BOOL_TY)?;
                 self.current_block_instrs
-                    .push(Instr::TestVariantGeneric(dst, inst_ty, variant, src));
+                    .push(Instr::TestVariant(dst, inst_ty, variant, src));
                 self.push_slot(dst);
             },
 
@@ -617,74 +638,82 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::ImmBorrowField(idx) => {
                 let src = self.pop_slot()?;
+                let owner_idx = module.field_handle_at(*idx).owner;
+                let owner = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_field_type_at(*idx);
                 let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowField(dst, *idx, src));
+                    .push(Instr::ImmBorrowField(dst, owner, *idx, src));
                 self.push_slot(dst);
             },
             B::MutBorrowField(idx) => {
                 let src = self.pop_slot()?;
+                let owner_idx = module.field_handle_at(*idx).owner;
+                let owner = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_field_type_at(*idx);
                 let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowField(dst, *idx, src));
+                    .push(Instr::MutBorrowField(dst, owner, *idx, src));
                 self.push_slot(dst);
             },
             B::ImmBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.field_inst_type(module, *idx)?;
+                let (handle, owner, fty) = self.field_inst_parts(module, *idx)?;
                 let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowFieldGeneric(dst, *idx, src));
+                    .push(Instr::ImmBorrowField(dst, owner, handle, src));
                 self.push_slot(dst);
             },
             B::MutBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.field_inst_type(module, *idx)?;
+                let (handle, owner, fty) = self.field_inst_parts(module, *idx)?;
                 let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowFieldGeneric(dst, *idx, src));
+                    .push(Instr::MutBorrowField(dst, owner, handle, src));
                 self.push_slot(dst);
             },
             B::ImmBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
+                let owner_idx = module.variant_field_handle_at(*idx).struct_index;
+                let owner = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_variant_field_type_at(*idx);
                 let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowVariantField(dst, *idx, src));
+                    .push(Instr::ImmBorrowVariantField(dst, owner, *idx, src));
                 self.push_slot(dst);
             },
             B::MutBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
+                let owner_idx = module.variant_field_handle_at(*idx).struct_index;
+                let owner = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_variant_field_type_at(*idx);
                 let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowVariantField(dst, *idx, src));
+                    .push(Instr::MutBorrowVariantField(dst, owner, *idx, src));
                 self.push_slot(dst);
             },
             B::ImmBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.variant_field_inst_type(module, *idx)?;
+                let (handle, owner, fty) = self.variant_field_inst_parts(module, *idx)?;
                 let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowVariantFieldGeneric(dst, *idx, src));
+                    .push(Instr::ImmBorrowVariantField(dst, owner, handle, src));
                 self.push_slot(dst);
             },
             B::MutBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.variant_field_inst_type(module, *idx)?;
+                let (handle, owner, fty) = self.variant_field_inst_parts(module, *idx)?;
                 let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowVariantFieldGeneric(dst, *idx, src));
+                    .push(Instr::MutBorrowVariantField(dst, owner, handle, src));
                 self.push_slot(dst);
             },
             B::ReadRef => {
@@ -716,7 +745,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let inst_ty = self.struct_inst_ty(module, *idx)?;
                 let dst = self.alloc_vid(ty::BOOL_TY)?;
                 self.current_block_instrs
-                    .push(Instr::ExistsGeneric(dst, inst_ty, addr));
+                    .push(Instr::Exists(dst, inst_ty, addr));
                 self.push_slot(dst);
             },
             B::MoveFrom(idx) => {
@@ -732,7 +761,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let ty = self.struct_inst_ty(module, *idx)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MoveFromGeneric(dst, ty, addr));
+                    .push(Instr::MoveFrom(dst, ty, addr));
                 self.push_slot(dst);
             },
             B::MoveTo(idx) => {
@@ -747,7 +776,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let signer = self.pop_slot()?;
                 let inst_ty = self.struct_inst_ty(module, *idx)?;
                 self.current_block_instrs
-                    .push(Instr::MoveToGeneric(inst_ty, signer, val));
+                    .push(Instr::MoveTo(inst_ty, signer, val));
             },
             B::ImmBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
@@ -764,7 +793,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let ty = self.interner.immut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowGlobalGeneric(dst, inner, addr));
+                    .push(Instr::ImmBorrowGlobal(dst, inner, addr));
                 self.push_slot(dst);
             },
             B::MutBorrowGlobal(idx) => {
@@ -782,7 +811,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let ty = self.interner.mut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowGlobalGeneric(dst, inner, addr));
+                    .push(Instr::MutBorrowGlobal(dst, inner, addr));
                 self.push_slot(dst);
             },
 
@@ -908,13 +937,14 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 
             // --- Vector ops ---
             B::VecPack(sig_idx, count) => {
+                // The bytecode verifier bounds the count to u16::MAX, so this cast is lossless.
                 let count = *count as u16;
                 let elems = self.pop_n_reverse(count as usize)?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
                 let ty = self.interner.vector_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::VecPack(dst, elem_ty, count, elems));
+                    .push(Instr::VecPack(dst, elem_ty, elems));
                 self.push_slot(dst);
             },
             B::VecLen(sig_idx) => {
@@ -961,6 +991,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 self.push_slot(dst);
             },
             B::VecUnpack(sig_idx, count) => {
+                // The bytecode verifier bounds the count to u16::MAX, so this cast is lossless.
                 let count = *count as u16;
                 let src = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
@@ -969,7 +1000,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     dsts.push(self.alloc_vid(elem_ty)?);
                 }
                 self.current_block_instrs
-                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, count, src));
+                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, src));
                 for dst in dsts {
                     self.push_slot(dst);
                 }
