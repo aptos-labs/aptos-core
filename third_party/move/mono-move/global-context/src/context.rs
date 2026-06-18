@@ -230,7 +230,7 @@ struct Layouts {
     /// Type to layout ID mapping. Types are concrete.
     by_ty: DashMap<InternedType, LayoutId, ahash::RandomState>,
     /// Enum type to the layout IDs of its per-variant bodies. Variant bodies
-    /// have no Move type of their own, so they are keyed in this map.
+    /// may not have a Move type of their own, so they are keyed in this map.
     enum_variants_by_type: DashMap<InternedType, Box<[LayoutId]>, ahash::RandomState>,
     /// All existing layouts in ID order. `boxcar::Vec` is an append-only
     /// concurrent vector: entries are pushed through a shared `&` reference and

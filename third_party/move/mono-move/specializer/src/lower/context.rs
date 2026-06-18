@@ -1427,8 +1427,8 @@ fn discover_type_metadata(
                     let mut variant_layouts: Vec<Vec<VariantFieldLayout>> =
                         Vec::with_capacity(variants.len());
                     let mut variant_ptr_offsets: Vec<Vec<u32>> = Vec::with_capacity(variants.len());
-                    // One struct layout per variant body, for the closed-enum
-                    // value layout. Collected (not yet published) while every
+                    // One struct layout per variant body, for the enum value
+                    // layout. Collected (not yet published) while every
                     // variant's fields have a published layout; abandoned on the
                     // first miss. Published as one keyed set after the loop.
                     let mut variant_value_layouts: Vec<ValueLayout> =
@@ -1478,7 +1478,7 @@ fn discover_type_metadata(
 
                         // Build + publish this variant's value layout (a struct
                         // over its fields). Once any variant defers, stop — the
-                        // enum cannot be closed.
+                        // enum value layout cannot be built.
                         if all_value_layouts {
                             match try_build_inline_value_layout(
                                 &*ctx,
@@ -1514,7 +1514,7 @@ fn discover_type_metadata(
                             variants: variant_layouts,
                         });
 
-                        // Publish the closed-enum value layout when every variant
+                        // Publish the enum value layout when every variant
                         // body resolved. `size` is the heap payload (tag + widest
                         // variant region, 8-aligned) the allocator needs. The
                         // variant bodies are published as one set keyed by the
@@ -1525,7 +1525,7 @@ fn discover_type_metadata(
                             let variant_ids =
                                 ctx.publish_variant_layouts(ty, variant_value_layouts);
                             let value_layout =
-                                ValueLayout::closed_enum(descriptor_id, variant_ids, size);
+                                ValueLayout::frozen_enum(descriptor_id, variant_ids, size);
                             return Ok(Some(ctx.publish_layout(ty, value_layout)));
                         }
                     }

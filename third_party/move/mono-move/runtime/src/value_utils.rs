@@ -174,7 +174,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(())
         },
-        LayoutKind::ClosedEnum { variants, .. } => {
+        LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: an enum value holds a non-null heap pointer and data
             // follows the offset.
             let obj_ptr = unsafe { read_ptr(base, 0usize) };
@@ -315,7 +315,7 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(true)
         },
-        LayoutKind::ClosedEnum { variants, .. } => {
+        LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: well-typed enum values hold non-null heap pointers and
             // every enum object stores its data following the offset.
             let obj_a = unsafe { read_ptr(a, 0usize) };
@@ -323,12 +323,18 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             let tag_a = unsafe { read_enum_tag(obj_a) };
             let tag_b = unsafe { read_enum_tag(obj_b) };
 
-            if tag_a != tag_b {
-                return Ok(false);
-            }
+            // Validate both tags before the equality check. An out-of-range tag
+            // is heap corruption and must fail closed even when the tags differ.
             let variant_id = *variants
                 .get(tag_a as usize)
                 .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
+            if tag_b as usize >= variants.len() {
+                return Err(enum_tag_out_of_range(tag_b, variants.len()));
+            }
+
+            if tag_a != tag_b {
+                return Ok(false);
+            }
 
             // SAFETY: both variant bodies live at the specified offset.
             unsafe {
@@ -356,6 +362,8 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
 ///    lexicographically over their bytes.
 /// 3. Vectors compare lexicographically (over smaller prefix)
 /// 4. Structs compare field-by-field.
+/// 5. Enums compare by variant tag first, then field-by-field over the
+///    matching variant's body.
 ///
 /// # Safety
 ///
@@ -495,7 +503,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(len_a.cmp(&len_b))
         },
-        LayoutKind::ClosedEnum { variants, .. } => {
+        LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: well-typed enum values hold non-null heap pointers and
             // every enum object stores its tag followed by data payload.
             let obj_a = unsafe { read_ptr(a, 0usize) };
@@ -503,13 +511,19 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             let tag_a = unsafe { read_enum_tag(obj_a) };
             let tag_b = unsafe { read_enum_tag(obj_b) };
 
+            // Validate both tags before ordering them. An out-of-range tag is
+            // heap corruption and must fail closed even when the tags differ.
+            let variant_id = *variants
+                .get(tag_a as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
+            if tag_b as usize >= variants.len() {
+                return Err(enum_tag_out_of_range(tag_b, variants.len()));
+            }
+
             let ord = tag_a.cmp(&tag_b);
             if ord.is_ne() {
                 return Ok(ord);
             }
-            let variant_id = *variants
-                .get(tag_a as usize)
-                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
 
             // SAFETY: both variant bodies live at the specified offset.
             unsafe {
@@ -693,28 +707,28 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { write_ptr(dst, 0usize, vec_ptr) };
             Ok(())
         },
-        LayoutKind::ClosedEnum {
+        LayoutKind::FrozenEnum {
             descriptor_id,
             variants,
-            max_variant_size,
+            max_size_across_variants,
         } => {
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(RuntimeError::EnumVariantMismatch { tag }.into());
+                return Err(enum_tag_out_of_range(tag, variants.len()).into());
             }
 
             let variant_layout = layouts
                 .layout(variants[tag as usize])
                 .ok_or_else(layout_not_found)?;
 
-            let total_size = OBJECT_HEADER_SIZE + *max_variant_size as usize;
+            let total_size = OBJECT_HEADER_SIZE + *max_size_across_variants as usize;
             let obj_ptr = heap_alloc(heap, total_size, *descriptor_id)?;
 
             // SAFETY: the allocation has enough size to write the tag.
             unsafe { write_enum_tag(obj_ptr, tag) };
 
-            // SAFETY: variant body live at the specified offset. The maximum
+            // SAFETY: variant body lives at the specified offset. The maximum
             // size was allocated so there is enough space to deserialize into.
             unsafe {
                 deserialize_impl(
@@ -840,10 +854,10 @@ fn unreachable(message: &str) -> RuntimeError {
     RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(message.to_string()))
 }
 
-/// Invariant violation when an in-memory enum tag does not name a variant. A
-/// well-formed enum's tag is always in range, so this signals heap corruption,
-/// not bad input (a bad BCS variant index is rejected as a user error during
-/// deserialization).
+/// Invariant violation when an enum tag does not name a variant, whether read
+/// from an in-memory value or decoded from BCS. A well-formed enum's tag is
+/// always in range, so an out-of-range tag signals corruption, not a legitimate
+/// runtime condition.
 fn enum_tag_out_of_range(tag: u64, variant_count: usize) -> RuntimeError {
     RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
         tag,
@@ -1450,12 +1464,12 @@ mod tests {
         unsafe { check_roundtrip(&table, id, 16, &values) };
     }
 
-    /// Builds and pushes a closed-enum layout into `table`: one struct layout
-    /// per variant (via [`build_struct_layout`]), then the enum layout itself.
+    /// Builds and pushes an enum layout into `table`: one struct layout per
+    /// variant (via [`build_struct_layout`]), then the enum layout itself.
     /// Each variant is `(in_memory_size, fields)`, with `fields` as
     /// `(data_region_relative_offset, layout_id)` pairs. The heap payload size
     /// is the 8-byte tag plus the widest variant region, rounded up to 8.
-    fn build_closed_enum_layout(
+    fn build_enum_layout(
         table: &mut ValueLayoutTable,
         variants: Vec<(u32, Vec<(u32, LayoutId)>)>,
     ) -> LayoutId {
@@ -1466,11 +1480,11 @@ mod tests {
             let layout = build_struct_layout(table, size, fields);
             variant_ids.push(table.push(U64_TY, layout));
         }
-        let max_variant_size = align_up_u32(8 + max_data, 8);
-        let layout = ValueLayout::closed_enum(
+        let max_size_across_variants = align_up_u32(8 + max_data, 8);
+        let layout = ValueLayout::frozen_enum(
             DescriptorId(3),
             variant_ids.into_boxed_slice(),
-            max_variant_size,
+            max_size_across_variants,
         );
         table.push(U64_TY, layout)
     }
@@ -1485,7 +1499,7 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let eid = build_closed_enum_layout(&mut table, vec![
+        let eid = build_enum_layout(&mut table, vec![
             (0, vec![]),
             (8, vec![(0, U64_LAYOUT_ID)]),
             (16, vec![(0, U8_LAYOUT_ID), (8, U64_LAYOUT_ID)]),
@@ -1512,7 +1526,7 @@ mod tests {
 
         let mut table = ValueLayoutTable::new();
         let vec_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
-        let eid = build_closed_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, vec_id)])]);
+        let eid = build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, vec_id)])]);
         let values = [
             E::Empty,
             E::Items(vec![]),
@@ -1539,7 +1553,7 @@ mod tests {
 
         let mut table = ValueLayoutTable::new();
         let inner_eid =
-            build_closed_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, U64_LAYOUT_ID)])]);
+            build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, U64_LAYOUT_ID)])]);
         let outer = build_struct_layout(&table, 16, vec![(0, U64_LAYOUT_ID), (8, inner_eid)]);
         let oid = table.push(U64_TY, outer);
         let values = [

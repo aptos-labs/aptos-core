@@ -103,14 +103,20 @@ pub enum LayoutKind {
         elem_id: LayoutId,
         descriptor_id: DescriptorId,
     },
-    /// A closed (non-upgradable) enum: an 8-byte heap-pointer slot pointing at
-    /// an enum object. Every variant's body is a published (pseudo) struct
-    /// layout.
-    ClosedEnum {
+    /// An enum whose variant layouts are fixed: an 8-byte heap-pointer slot
+    /// pointing at an enum object. Each variant body has its own published
+    /// layout, which may itself contain enums, vectors, or structs.
+    ///
+    /// TODO: today only frozen (non-upgradable) enums get this layout. Use it
+    /// for all enums once the upgrade story is finalized.
+    FrozenEnum {
         descriptor_id: DescriptorId,
-        /// One struct layout per variant, indexed by variant tag.
+        /// One layout per variant body, indexed by variant tag.
         variants: Box<[LayoutId]>,
-        max_variant_size: u32,
+        /// Size of the enum object's data region: the 8-byte tag plus the
+        /// widest variant body, rounded up to 8-byte alignment. Sized to the
+        /// largest variant so any variant fits.
+        max_size_across_variants: u32,
     },
     /// A reference (16-byte fat pointer). All references share this layout.
     Ref,
@@ -295,21 +301,21 @@ impl ValueLayout {
         }
     }
 
-    /// Layout for a closed enum.
-    pub fn closed_enum(
+    /// Layout for a frozen enum.
+    pub fn frozen_enum(
         descriptor_id: DescriptorId,
         variants: Box<[LayoutId]>,
-        max_variant_size: u32,
+        max_size_across_variants: u32,
     ) -> ValueLayout {
         Self {
             size: 8,
             align: MAX_ALIGN as u32,
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
-            kind: LayoutKind::ClosedEnum {
+            kind: LayoutKind::FrozenEnum {
                 descriptor_id,
                 variants,
-                max_variant_size,
+                max_size_across_variants,
             },
         }
     }
