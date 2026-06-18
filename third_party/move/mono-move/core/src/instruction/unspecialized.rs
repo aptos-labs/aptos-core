@@ -13,7 +13,7 @@
 //! the operand type at runtime.
 
 use super::{CodeOffset, FrameOffset};
-use crate::types::{InternedType, Type};
+use crate::types::{self, InternedType, Type};
 use move_core_types::int256::{I256, U256};
 use std::fmt;
 
@@ -80,6 +80,25 @@ impl IntTy {
             Type::I256 => IntTy::I256,
             _ => return None,
         })
+    }
+
+    /// The interned [`Type`] for this integer type.
+    /// This is the inverse of [`from_type`](Self::from_type).
+    pub const fn interned_ty(self) -> InternedType {
+        match self {
+            IntTy::U8 => types::U8_TY,
+            IntTy::U16 => types::U16_TY,
+            IntTy::U32 => types::U32_TY,
+            IntTy::U64 => types::U64_TY,
+            IntTy::U128 => types::U128_TY,
+            IntTy::U256 => types::U256_TY,
+            IntTy::I8 => types::I8_TY,
+            IntTy::I16 => types::I16_TY,
+            IntTy::I32 => types::I32_TY,
+            IntTy::I64 => types::I64_TY,
+            IntTy::I128 => types::I128_TY,
+            IntTy::I256 => types::I256_TY,
+        }
     }
 }
 
@@ -476,6 +495,29 @@ mod tests {
             CmpKind::Neq,
         ] {
             assert_eq!(kind.negate().negate(), kind);
+        }
+    }
+
+    #[test]
+    fn interned_ty_then_from_type_is_identity() {
+        for ty in [
+            IntTy::U8,
+            IntTy::U16,
+            IntTy::U32,
+            IntTy::U64,
+            IntTy::U128,
+            IntTy::U256,
+            IntTy::I8,
+            IntTy::I16,
+            IntTy::I32,
+            IntTy::I64,
+            IntTy::I128,
+            IntTy::I256,
+        ] {
+            assert_eq!(
+                IntTy::from_type(types::view_type(ty.interned_ty())),
+                Some(ty)
+            );
         }
     }
 }

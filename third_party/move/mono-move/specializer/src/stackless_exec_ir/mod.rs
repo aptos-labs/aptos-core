@@ -66,43 +66,11 @@ pub struct Label(pub u16);
 /// Unary operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
-    CastU8,
-    CastU16,
-    CastU32,
-    CastU64,
-    CastU128,
-    CastU256,
-    CastI8,
-    CastI16,
-    CastI32,
-    CastI64,
-    CastI128,
-    CastI256,
+    /// Cast the operand to the given integer type, aborting if it doesn't fit.
+    Cast(IntTy),
     Not,
     Negate,
     FreezeRef,
-}
-
-impl UnaryOp {
-    /// Returns the target [`IntTy`] if the operation is a cast operation,
-    /// otherwise `None`.
-    pub fn cast_target_ty(self) -> Option<IntTy> {
-        Some(match self {
-            UnaryOp::CastU8 => IntTy::U8,
-            UnaryOp::CastU16 => IntTy::U16,
-            UnaryOp::CastU32 => IntTy::U32,
-            UnaryOp::CastU64 => IntTy::U64,
-            UnaryOp::CastU128 => IntTy::U128,
-            UnaryOp::CastU256 => IntTy::U256,
-            UnaryOp::CastI8 => IntTy::I8,
-            UnaryOp::CastI16 => IntTy::I16,
-            UnaryOp::CastI32 => IntTy::I32,
-            UnaryOp::CastI64 => IntTy::I64,
-            UnaryOp::CastI128 => IntTy::I128,
-            UnaryOp::CastI256 => IntTy::I256,
-            UnaryOp::Not | UnaryOp::Negate | UnaryOp::FreezeRef => return None,
-        })
-    }
 }
 
 /// Binary operations.

@@ -1037,25 +1037,7 @@ impl<'a> LoweringState<'a> {
 
             // --- Unary ops ---
             Instr::UnaryOp(dst, op, src) => match op {
-                UnaryOp::CastU8
-                | UnaryOp::CastU16
-                | UnaryOp::CastU32
-                | UnaryOp::CastU64
-                | UnaryOp::CastU128
-                | UnaryOp::CastU256
-                | UnaryOp::CastI8
-                | UnaryOp::CastI16
-                | UnaryOp::CastI32
-                | UnaryOp::CastI64
-                | UnaryOp::CastI128
-                | UnaryOp::CastI256 => {
-                    // TODO: collapse UnaryOp::Cast* into UnaryOp::Cast(IntTy)
-                    // instead of matching twice here.
-                    let to = op
-                        .cast_target_ty()
-                        .expect("every cast op has a cast target type");
-                    self.lower_cast(*dst, *src, to)?;
-                },
+                UnaryOp::Cast(to) => self.lower_cast(*dst, *src, *to)?,
                 UnaryOp::Negate => {
                     let src_ty = self.slot_type(*src)?;
                     let signed_ty = IntTy::from_type(src_ty)
