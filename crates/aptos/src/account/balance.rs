@@ -19,6 +19,15 @@ use serde::Serialize;
 ///
 /// TODO: Fungible assets
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Show the APT balance of the current profile's account
+  $ aptos account balance
+
+  # Show the APT balance of a specific account
+  $ aptos account balance --account 0xc0ffee
+
+  # Show the balance of a specific coin or fungible asset
+  $ aptos account balance --account 0xc0ffee --coin-type 0x1::aptos_coin::AptosCoin")]
 pub struct Balance {
     /// Address of the account you want to list resources/modules/balance for
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
