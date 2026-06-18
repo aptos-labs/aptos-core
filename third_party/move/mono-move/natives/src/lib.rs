@@ -14,8 +14,10 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 mod address_derivation;
 pub mod aggregator_v2;
+pub mod aptos_hash;
 pub mod event;
 pub mod function_info;
+pub mod hash;
 pub mod mem;
 pub mod object;
 pub mod signer;
@@ -25,8 +27,10 @@ pub mod transaction_context;
 pub mod type_info;
 
 pub use aggregator_v2::make_all_aggregator_v2_natives;
+pub use aptos_hash::make_all_aptos_hash_natives;
 pub use event::{make_all_event_natives, EventEntry, EventKind, EventStore};
 pub use function_info::make_all_function_info_natives;
+pub use hash::make_all_hash_natives;
 pub use mem::make_all_mem_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
 pub use signer::make_all_signer_natives;
@@ -72,6 +76,8 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_object_natives::<F>());
     natives.extend(make_all_state_storage_natives::<F>());
     natives.extend(make_all_event_natives::<F>());
+    natives.extend(make_all_hash_natives::<F>());
+    natives.extend(make_all_aptos_hash_natives::<F>());
     natives
 }
 
