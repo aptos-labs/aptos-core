@@ -26,7 +26,7 @@ fun call_bool(): bool {
   code:
   L0:
     0: x0 := ld_true
-    1: [x0] := call identity, [x0]
+    1: [x0] := call identity<bool>, [x0]
     2: ret [x0]
 }
 
@@ -35,7 +35,7 @@ fun call_u64(): u64 {
   code:
   L0:
     0: x0 := ld_u64 7
-    1: [x0] := call identity, [x0]
+    1: [x0] := call identity<u64>, [x0]
     2: ret [x0]
 }
 

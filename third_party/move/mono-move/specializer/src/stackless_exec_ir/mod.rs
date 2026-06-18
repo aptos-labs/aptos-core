@@ -15,8 +15,8 @@ use mono_move_core::{
     IntTy, PreparedModule,
 };
 use move_binary_format::file_format::{
-    ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
-    IdentifierIndex, VariantFieldHandleIndex,
+    ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, IdentifierIndex,
+    VariantFieldHandleIndex,
 };
 use move_core_types::{
     function::ClosureMask,
@@ -210,18 +210,23 @@ pub enum Instr {
     ImmBorrowGlobal(Slot, InternedType, Slot),
     MutBorrowGlobal(Slot, InternedType, Slot),
 
-    // TODO: the generic/non-generic call-like pairs (`Call`/`CallGeneric` and
-    // `PackClosure`/`PackClosureGeneric`) could each collapse to one variant
-    // carrying `(inner FunctionHandleIndex, target ty_args)` — EMPTY for the
-    // non-generic form — mirroring how the field-op twins carry their owner
-    // type. Collapse both pairs together so the rule stays uniform.
     // --- Calls ---
-    Call(Vec<Slot>, FunctionHandleIndex, Vec<Slot>),
-    CallGeneric(Vec<Slot>, FunctionInstantiationIndex, Vec<Slot>),
+    //
+    // Carries `(inner FunctionHandleIndex, target ty_args)`: the handle gives the
+    // callee identity; `ty_args` is the instantiation's type arguments, and is
+    // `EMPTY_TYPE_LIST` for a non-generic call. Same type contract as
+    // `Pack`/`Unpack` — inside a generic function the args may still contain the
+    // enclosing function's `TypeParam`s.
+    Call(Vec<Slot>, FunctionHandleIndex, InternedTypeList, Vec<Slot>),
 
-    // --- Closures ---
-    PackClosure(Slot, FunctionHandleIndex, ClosureMask, Vec<Slot>),
-    PackClosureGeneric(Slot, FunctionInstantiationIndex, ClosureMask, Vec<Slot>),
+    // --- Closures (same `(inner handle, target ty_args)` contract as `Call`) ---
+    PackClosure(
+        Slot,
+        FunctionHandleIndex,
+        InternedTypeList,
+        ClosureMask,
+        Vec<Slot>,
+    ),
     /// `CallClosure(rets, signature_types, args)` — `signature_types` is the
     /// interned list of types from the closure's signature (arg types followed
     /// by result types, matching the source `SignatureIndex`).
@@ -306,9 +311,7 @@ impl Instr {
             Instr::ImmBorrowGlobal(..) => "ImmBorrowGlobal",
             Instr::MutBorrowGlobal(..) => "MutBorrowGlobal",
             Instr::Call(..) => "Call",
-            Instr::CallGeneric(..) => "CallGeneric",
             Instr::PackClosure(..) => "PackClosure",
-            Instr::PackClosureGeneric(..) => "PackClosureGeneric",
             Instr::CallClosure(..) => "CallClosure",
             Instr::VecPack(..) => "VecPack",
             Instr::VecLen(..) => "VecLen",
