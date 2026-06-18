@@ -32,7 +32,7 @@ fun entry(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call outer, [r0]
+    0: [x0] := call outer<u64>, [r0]
     1: ret [x0]
 }
 
@@ -49,7 +49,7 @@ fun middle(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call innermost, [r0]
+    0: [x0] := call innermost<_0>, [r0]
     1: ret [x0]
 }
 
@@ -58,7 +58,7 @@ fun outer(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call middle, [r0]
+    0: [x0] := call middle<_0>, [r0]
     1: ret [x0]
 }
 === micro-ops ===

@@ -18,10 +18,10 @@ use mono_move_core::{
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Bytecode, CodeOffset, FieldHandleIndex, FieldInstantiationIndex,
-        StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
-        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
-        VariantIndex,
+        Bytecode, CodeOffset, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
+        FunctionInstantiationIndex, StructDefInstantiationIndex, StructDefinitionIndex,
+        StructFieldInformation, StructVariantInstantiationIndex, VariantFieldHandleIndex,
+        VariantFieldInstantiationIndex, VariantIndex,
     },
 };
 use shared_dsa::{Entry, UnorderedMap};
@@ -251,6 +251,20 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             .interner
             .subst_type(module.interned_variant_field_type_at(inst.handle), ty_args)?;
         Ok((inst.handle, owner, field_ty))
+    }
+
+    /// Given a generic function instantiation, returns its inner (non-generic)
+    /// function handle and interned type arguments.
+    fn fun_inst_parts(
+        &self,
+        module: &PreparedModule,
+        idx: FunctionInstantiationIndex,
+    ) -> (FunctionHandleIndex, InternedTypeList) {
+        let inst = module.function_instantiation_at(idx);
+        let ty_args = self
+            .interner
+            .type_list_of(module.interned_types_at(inst.type_parameters));
+        (inst.handle, ty_args)
     }
 
     // --------------------------------------------------------------------------------------------
@@ -826,18 +840,19 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 for &rty in ret_types {
                     rets.push(self.alloc_vid(rty)?);
                 }
-                self.current_block_instrs
-                    .push(Instr::Call(rets.clone(), *idx, args));
+                self.current_block_instrs.push(Instr::Call(
+                    rets.clone(),
+                    *idx,
+                    ty::EMPTY_TYPE_LIST,
+                    args,
+                ));
                 for r in rets {
                     self.push_slot(r);
                 }
             },
             B::CallGeneric(idx) => {
-                let inst = module.function_instantiation_at(*idx);
-                let handle = module.function_handle_at(inst.handle);
-                let ty_args = self
-                    .interner
-                    .type_list_of(module.interned_types_at(inst.type_parameters));
+                let (handle_idx, ty_args) = self.fun_inst_parts(module, *idx);
+                let handle = module.function_handle_at(handle_idx);
                 let params = module.interned_types_at(handle.parameters);
                 let ret_types = module.interned_types_at(handle.return_);
                 let num_args = params.len();
@@ -847,8 +862,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     let rty = self.interner.subst_type(rty, ty_args)?;
                     rets.push(self.alloc_vid(rty)?);
                 }
-                self.current_block_instrs
-                    .push(Instr::CallGeneric(rets.clone(), *idx, args));
+                self.current_block_instrs.push(Instr::Call(
+                    rets.clone(),
+                    handle_idx,
+                    ty_args,
+                    args,
+                ));
                 for r in rets {
                     self.push_slot(r);
                 }
@@ -871,18 +890,20 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
                 let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::PackClosure(dst, *fhi, *mask, captured));
+                self.current_block_instrs.push(Instr::PackClosure(
+                    dst,
+                    *fhi,
+                    ty::EMPTY_TYPE_LIST,
+                    *mask,
+                    captured,
+                ));
                 self.push_slot(dst);
             },
             B::PackClosureGeneric(fii, mask) => {
                 let captured_count = mask.captured_count() as usize;
                 let captured = self.pop_n_reverse(captured_count)?;
-                let inst = &module.function_instantiations[fii.0 as usize];
-                let handle = module.function_handle_at(inst.handle);
-                let ty_args = self
-                    .interner
-                    .type_list_of(module.interned_types_at(inst.type_parameters));
+                let (handle_idx, ty_args) = self.fun_inst_parts(module, *fii);
+                let handle = module.function_handle_at(handle_idx);
                 let params = self
                     .interner
                     .type_list_of(module.interned_types_at(handle.parameters));
@@ -898,8 +919,9 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
                 let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::PackClosureGeneric(dst, *fii, *mask, captured));
+                self.current_block_instrs.push(Instr::PackClosure(
+                    dst, handle_idx, ty_args, *mask, captured,
+                ));
                 self.push_slot(dst);
             },
             B::CallClosure(sig_idx) => {
