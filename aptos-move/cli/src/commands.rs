@@ -820,6 +820,12 @@ pub struct IncludedArtifactsArgs {
 
 /// Publishes the modules in a Move package to the Aptos blockchain
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Publish the package in the current directory using the default profile
+  $ aptos move publish --named-addresses alice=0xc0ffee
+
+  # Publish non-interactively without confirmation prompts (for scripts/agents)
+  $ aptos move publish --named-addresses alice=0xc0ffee --assume-yes")]
 pub struct PublishPackage {
     #[clap(flatten)]
     pub override_size_check_option: OverrideSizeCheckOption,
