@@ -31,6 +31,18 @@ cargo build -p aptos-node --bin aptos-node
 cargo build -p aptos-faucet-service --bin aptos-faucet-service
 ```
 
+## Gas Notes
+
+The `--max-gas` values below are transaction gas-unit caps, not the gas fee. They are deliberately conservative for localnet repeatability. In the run used to validate this guide, actual `gas_used` was much lower:
+
+```text
+initialize_testnet_only: 6580
+publish poker: 40285
+settle_leaving_players: 131
+```
+
+The paid fee is `gas_used * gas_unit_price`; on this localnet run the CLI used `gas_unit_price = 100` octas.
+
 ## 1. Start Localnet
 
 From the repo root:
