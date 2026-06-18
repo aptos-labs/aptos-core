@@ -102,6 +102,18 @@ impl_vm_value_for_integer!(i128);
 impl_vm_value_for_integer!(U256);
 impl_vm_value_for_integer!(I256);
 
+/// The empty payload of a fieldless enum variant: zero-width, reads and writes
+/// nothing.
+impl<'a> VMValue<'a> for () {
+    const FRAME_SLOT_SIZE: usize = 0;
+
+    #[inline]
+    unsafe fn read_from_frame(_pool: &'a RootPool, _frame_ptr: *const u8, _offset: usize) -> Self {}
+
+    #[inline]
+    unsafe fn write_to_frame(self, _frame_ptr: *mut u8, _offset: usize) {}
+}
+
 impl<'a> VMValue<'a> for bool {
     const FRAME_SLOT_SIZE: usize = 1;
 
@@ -134,6 +146,44 @@ impl<'a> VMValue<'a> for AccountAddress {
     }
 }
 
+/// A table's storage handle.
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct TableHandle(AccountAddress);
+
+impl TableHandle {
+    pub fn new(address: AccountAddress) -> Self {
+        Self(address)
+    }
+
+    /// The handle's address.
+    pub fn address(&self) -> AccountAddress {
+        self.0
+    }
+}
+
+/// A `TableHandle` has the same representation as the `address` it wraps.
+impl<'a> VMValue<'a> for TableHandle {
+    const FRAME_SLOT_SIZE: usize = <AccountAddress as VMValue<'a>>::FRAME_SLOT_SIZE;
+
+    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+        Self(unsafe { AccountAddress::read_from_frame(pool, frame_ptr, offset) })
+    }
+
+    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+        unsafe { self.0.write_to_frame(frame_ptr, offset) }
+    }
+}
+
+impl Ref<'_, TableHandle> {
+    /// Borrows the referenced table handle.
+    pub fn get(&self) -> &TableHandle {
+        // SAFETY: `TableHandle` is `repr(transparent)` over the address bytes the
+        // reference points at, so the referent reinterprets as `&TableHandle`.
+        unsafe { &*(self.ptr() as *const TableHandle) }
+    }
+}
+
 /// Marker for a type that is not statically known.
 ///
 /// This can be used to build composite types in generic native functions — e.g. the
@@ -152,7 +202,15 @@ pub struct Ref<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> Ref<'_, T> {
+impl<'a, T> Ref<'a, T> {
+    /// Wraps a rooted reference handle.
+    pub fn from_handle(handle: ReferenceHandle<'a>) -> Self {
+        Self {
+            handle,
+            _marker: PhantomData,
+        }
+    }
+
     /// Raw pointer to the referenced value.
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
@@ -298,6 +356,54 @@ impl<'a, V> VMValue<'a> for Vector<'a, V> {
     #[inline]
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         // Write the vector's current heap pointer into the destination slot.
+        unsafe { write_ptr(frame_ptr, offset, self.ptr()) };
+    }
+}
+
+/// An owned, freshly heap-allocated Move value.
+///
+/// Unlike a `Ref`, it owns its heap object rather than borrowing one.
+/// Valid throughout the native call and GC-safe.
+#[must_use = "a boxed value should be consumed"]
+pub struct Boxed<'a, T> {
+    handle: ObjectHandle<'a>,
+    _marker: PhantomData<T>,
+}
+
+impl<'a, T> Boxed<'a, T> {
+    /// Wraps a rooted heap object. VM-internal (the context impl boxes a value
+    /// this way).
+    pub fn from_handle(handle: ObjectHandle<'a>) -> Self {
+        Self {
+            handle,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Current heap pointer of the boxed object.
+    ///
+    /// Stale if GC runs -- only for transient use.
+    #[inline]
+    pub fn ptr(&self) -> *mut u8 {
+        self.handle.ptr()
+    }
+}
+
+/// A boxed value's in-frame representation is the 8-byte pointer to its object,
+/// letting a native return one with `set_return`.
+impl<'a, T> VMValue<'a> for Boxed<'a, T> {
+    const FRAME_SLOT_SIZE: usize = 8;
+
+    #[inline]
+    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+        // SAFETY: the slot holds the object's 8-byte heap pointer.
+        let ptr = unsafe { read_ptr(frame_ptr, offset) };
+        // SAFETY: `ptr` is the object's heap pointer.
+        Boxed::from_handle(unsafe { pool.root_object(ptr) })
+    }
+
+    #[inline]
+    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         unsafe { write_ptr(frame_ptr, offset, self.ptr()) };
     }
 }

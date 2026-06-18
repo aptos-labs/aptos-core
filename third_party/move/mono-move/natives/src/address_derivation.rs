@@ -7,6 +7,7 @@
 // TODO: unify with aptos-core's `AuthenticationKey` so we don't end up having two
 // duplicate implementation of the same scheme and derivation algorithm.
 
+use mono_move_core::native::TableHandle;
 use move_core_types::account_address::AccountAddress;
 use sha3::{Digest, Sha3_256};
 
@@ -40,6 +41,15 @@ pub(crate) fn object_address_from_object(
     let mut preimage = source.to_vec();
     preimage.extend_from_slice(derive_from.as_ref());
     address_from_preimage(preimage, DERIVE_OBJECT_FROM_OBJECT_SCHEME)
+}
+
+/// Table handle: `sha3_256(txn_hash || table_count_be_u32)`. Unlike the AUID and
+/// object derivations, no scheme byte is appended.
+pub(crate) fn table_handle(txn_hash: &[u8], table_count: u32) -> TableHandle {
+    let mut hasher = Sha3_256::new();
+    hasher.update(txn_hash);
+    hasher.update(table_count.to_be_bytes());
+    TableHandle::new(AccountAddress::new(hasher.finalize().into()))
 }
 
 #[cfg(test)]

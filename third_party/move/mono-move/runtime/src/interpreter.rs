@@ -11,8 +11,9 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
+        deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        AllocationError, Heap,
+        AllocationError, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
@@ -31,7 +32,10 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
+    native::{
+        NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool,
+        VMInternalError,
+    },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type_list, InternedTypeList},
@@ -147,7 +151,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.exec_ctx
             .extensions()
             .checkpoint()
-            .map_err(RuntimeError::VMInternal)
+            .map_err(VMInternalError::into_runtime_error)
     }
 
     /// Rolls back the `n` most recent checkpoints across the read-write set and
@@ -161,7 +165,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.exec_ctx
             .extensions()
             .rollback(n)
-            .map_err(RuntimeError::VMInternal)
+            .map_err(VMInternalError::into_runtime_error)
     }
 
     /// TODO: move to execution context
@@ -1889,25 +1893,28 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
+        // TODO: add an ld_const test that fills the heap so the first
+        // deserialize fails and the GC-then-retry path inside `deserialize_or_gc`
+        // runs. Needs a `ForceGC` native to drive it deterministically in the
+        // differential suite.
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
-            if let Err(err) =
-                value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
-            {
-                match err {
-                    AllocationError::RuntimeError(err) => return Err(err),
-                    AllocationError::OutOfHeapMemory { .. } => {
-                        // TODO: add an ld_const test that fills the heap so
-                        // the first deserialize fails and this GC-then-retry
-                        // path runs. Needs a `ForceGC` native to drive it
-                        // deterministically in the differential suite.
-                        gc_collect!(self)?;
-                        value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
-                            .map_err(AllocationError::into_runtime_error)?;
-                    },
-                }
-            }
-            Ok(())
+            deserialize_or_gc(
+                self.exec_ctx,
+                &mut self.heap,
+                ty,
+                bytes,
+                dst,
+                self.exec_ctx,
+                &mut self.read_write_set,
+                &self.root_pool,
+                self.exec_ctx.extensions(),
+                self.frame_ptr,
+                crate::heap::TopFrame::Function {
+                    func: self.current_func,
+                    pc: self.pc,
+                },
+            )
         }
     }
 
@@ -1984,27 +1991,20 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// at `src - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
         // SAFETY: by this function's contract `root` points to a live object.
-        let root_guard = unsafe { self.root_pool.root_object(root.as_ptr()) };
-        // SAFETY: `root_guard.ptr()` is the rooted (possibly relocated) pointer
-        // to that live object, so it is non-null.
-        match unsafe {
-            self.heap
-                .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(root_guard.ptr()))
-        } {
-            Ok(ptr) => Ok(ptr),
-            Err(AllocationError::RuntimeError(err)) => Err(err),
-            Err(AllocationError::OutOfHeapMemory { .. }) => {
-                gc_collect!(self)?;
-                // Re-read the root pointer from the handle, as its address may
-                // have been changed by the GC.
-                // SAFETY: the handle keeps the root live across GC; the relocated
-                // pointer still points to the same live object, so it is non-null.
-                unsafe {
-                    self.heap
-                        .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(root_guard.ptr()))
-                        .map_err(AllocationError::into_runtime_error)
-                }
-            },
+        unsafe {
+            deep_copy_or_gc(
+                &mut self.heap,
+                self.exec_ctx,
+                &mut self.read_write_set,
+                &self.root_pool,
+                self.exec_ctx.extensions(),
+                self.frame_ptr,
+                TopFrame::Function {
+                    func: self.current_func,
+                    pc: self.pc,
+                },
+                root,
+            )
         }
     }
 
@@ -2559,7 +2559,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = self.frame_ptr;
         self.frame_ptr = new_fp;
         let result = {
-            let (registry, provider, gas_meter, extensions) = self.exec_ctx.native_call_borrows();
+            let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
+                self.exec_ctx.native_call_borrows();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
                     idx: native_idx.0,
@@ -2578,6 +2579,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 view_type_list(ty_args),
                 gas_meter,
                 provider,
+                layouts,
+                resource_provider,
                 &mut self.heap,
                 &mut self.read_write_set,
                 extensions,
@@ -2592,7 +2595,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 Ok(StepResult::Continue)
             },
             Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
-            Err(e) => Err(RuntimeError::VMInternal(e)),
+            Err(e) => Err(e.into_runtime_error()),
         }
     }
 
