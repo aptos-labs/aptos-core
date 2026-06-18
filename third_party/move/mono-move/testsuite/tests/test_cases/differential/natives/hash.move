@@ -1,9 +1,11 @@
 // Differential test for the `std::hash` natives (sha2_256, sha3_256).
 //
-// `std::hash` is part of the Move stdlib, which is pre-published into both VMs,
-// so it can be called directly. Inputs are built as byte-string literals since
-// the test harness only passes integer/bool/address arguments. Expected values
-// are the standard NIST test vectors; `// CHECK` asserts both VMs agree.
+// `std::hash` is in the Move stdlib, pre-published into both VMs, so it is
+// called directly. Inputs are byte-string literals.
+//
+// TODO: extend the test harness to pass richer argument types (beyond
+// integer/bool/address) and to support public structs and enums, so these
+// natives can be exercised with non-literal inputs.
 
 // RUN: publish
 module 0x1::main {

@@ -16,9 +16,9 @@ use sha3::Sha3_256;
 pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
-    // SAFETY: the bytes are consumed before any allocation, so GC cannot
-    // relocate them while the slice is held.
     let digest = {
+        // SAFETY: the bytes are consumed before any allocation, so GC cannot
+        // relocate them while the slice is held.
         let bytes = unsafe { data.as_bytes() };
         Sha256::digest(bytes).to_vec()
     };
@@ -34,9 +34,9 @@ pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 pub fn native_sha3_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
-    // SAFETY: the bytes are consumed before any allocation, so GC cannot
-    // relocate them while the slice is held.
     let digest = {
+        // SAFETY: the bytes are consumed before any allocation, so GC cannot
+        // relocate them while the slice is held.
         let bytes = unsafe { data.as_bytes() };
         Sha3_256::digest(bytes).to_vec()
     };
