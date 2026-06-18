@@ -62,16 +62,6 @@ pub(crate) fn framework_upgrade() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] =
                 FrameworkUpgrade::EPOCH_DURATION_SECS.into();
         }))
-        // Genesis enables chunky DKG (decryption) by default. This test upgrades
-        // only half the validators to the new binary, which would emit
-        // BlockMetadataExt::V3 while the still-old half emits V2 — divergent
-        // metadata that stalls consensus. Force chunky DKG off on every node via
-        // the local seqnum override (local > on-chain genesis seqnum of 0), so
-        // the chain stays on V1/V2 across the mixed-binary upgrade window. The
-        // V2->V3 switch is exercised separately once all binaries are upgraded.
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.chunky_dkg_override_seq_num = 1;
-        }))
         .with_emit_job(mixed_compatible_emit_job())
 }
 
