@@ -104,6 +104,9 @@ impl Tool {
 ///
 /// This is useful for debugging as well as determining what versions are compatible with the CLI
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Print build information (e.g. CLI version) as JSON
+  $ aptos info")]
 pub struct InfoTool {}
 
 #[async_trait]
