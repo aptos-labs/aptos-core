@@ -409,19 +409,16 @@ impl InitTool {
             eprintln!("Using command line argument for rest URL {}", rest_url);
             Some(rest_url.to_string())
         } else if is_non_interactive() {
-            // Keep an existing endpoint if present, otherwise fail fast: a custom
-            // network has no default REST URL to fall back on.
-            if let Some(current) = profile_config.rest_url.as_deref() {
-                eprintln!("No rest url given, keeping the existing url...");
-                Some(current.to_string())
-            } else {
-                return Err(CliError::CommandArgumentError(
-                    "`--network custom` requires a REST endpoint, but none was provided and \
-                     prompting is not available in a non-interactive session. Pass `--rest-url \
-                     <url>`."
-                        .to_string(),
-                ));
-            }
+            // Fail fast rather than silently reusing the profile's previously stored
+            // endpoint. In a non-interactive session the target chain must come from
+            // caller-supplied input, not hidden on-disk state, so a stale config
+            // cannot redirect initialization/lookup/funding at a different network.
+            return Err(CliError::CommandArgumentError(
+                "`--network custom` requires a REST endpoint in a non-interactive session. \
+                 Pass `--rest-url <url>` (it is not inferred from any previously stored \
+                 profile value)."
+                    .to_string(),
+            ));
         } else {
             let current = profile_config.rest_url.as_deref();
             eprintln!(
@@ -456,16 +453,13 @@ impl InitTool {
             eprintln!("Using command line argument for faucet URL {}", faucet_url);
             Some(faucet_url.to_string())
         } else if is_non_interactive() {
-            // No faucet is a valid configuration, so default to keeping an existing
-            // value if present, otherwise skipping the faucet. Pass `--faucet-url
-            // <url>` (or `--skip-faucet`) to be explicit.
-            if let Some(current) = profile_config.faucet_url.as_deref() {
-                eprintln!("No faucet url given, keeping the existing url...");
-                Some(current.to_string())
-            } else {
-                eprintln!("No faucet url given, skipping faucet...");
-                None
-            }
+            // Do not reuse a previously stored faucet from on-disk state, which could
+            // point follow-on funding at a stale faucet. Skip the faucet unless one is
+            // explicitly provided via `--faucet-url`.
+            eprintln!(
+                "No faucet url given; skipping faucet (pass `--faucet-url <url>` to set one)..."
+            );
+            None
         } else {
             let current = profile_config.faucet_url.as_deref();
             eprintln!(
