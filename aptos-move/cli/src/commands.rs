@@ -531,6 +531,12 @@ pub struct CompileScriptOutput {
 /// This will run Move unit tests against a package with debug mode
 /// turned on.  Note, that move code warnings currently block tests from running.
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Run all unit tests in the current package
+  $ aptos move test
+
+  # Run only tests whose name matches a filter
+  $ aptos move test --filter transfer")]
 pub struct TestPackage {
     /// A filter string to determine which unit tests to run
     #[clap(long, short)]
