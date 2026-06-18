@@ -23,7 +23,7 @@ use crate::{
         TransactionOutput,
     },
     txn_commit_hook::TransactionCommitHook,
-    txn_last_input_output::TxnLastInputOutput,
+    txn_last_input_output::{HotStateReadWriteSet, TxnLastInputOutput},
     txn_provider::TxnProvider,
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
@@ -92,8 +92,58 @@ where
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+    hot_state_post_commit_accumulator:
+        &'a ExplicitSyncWrapper<HotStatePostCommitAccumulator<T>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
+}
+
+struct HotStatePostCommitAccumulator<T: BlockExecutableTransaction> {
+    next_txn_idx: TxnIndex,
+    ready: Vec<Option<HotStateReadWriteSet<T>>>,
+}
+
+impl<T: BlockExecutableTransaction> HotStatePostCommitAccumulator<T> {
+    fn new(num_txns: usize) -> Self {
+        Self {
+            next_txn_idx: 0,
+            ready: std::iter::repeat_with(|| None).take(num_txns).collect(),
+        }
+    }
+
+    fn record(
+        &mut self,
+        txn_idx: TxnIndex,
+        hot_state_rw: HotStateReadWriteSet<T>,
+    ) -> Result<(), PanicError> {
+        let slot = self.ready.get_mut(txn_idx as usize).ok_or_else(|| {
+            code_invariant_error(format!(
+                "Hot-state read/write set recorded for out-of-range txn {}",
+                txn_idx
+            ))
+        })?;
+
+        if slot.replace(hot_state_rw).is_some() {
+            return Err(code_invariant_error(format!(
+                "Hot-state read/write set recorded twice for txn {}",
+                txn_idx
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn drain_ready(&mut self, block_limit_processor: &mut BlockGasLimitProcessor<T>) {
+        while let Some(slot) = self.ready.get_mut(self.next_txn_idx as usize) {
+            let Some(hot_state_rw) = slot.take() else {
+                break;
+            };
+
+            block_limit_processor
+                .accumulate_hot_state_rw(hot_state_rw.writes.iter(), hot_state_rw.reads.iter());
+            self.next_txn_idx += 1;
+        }
+    }
 }
 
 /// BlockSTM worker pool.
@@ -1274,7 +1324,7 @@ where
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        let trace = last_input_output.record_materialized_txn_output(
+        let (trace, hot_state_rw) = last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
             materialized_resource_write_set
@@ -1325,6 +1375,30 @@ where
             }
         }
 
+        if let Some(hot_state_rw) = hot_state_rw {
+            if !shared_sync_params
+                .maybe_block_epilogue_txn_idx
+                .dereference()
+                .is_some_and(|epilogue_txn_idx| epilogue_txn_idx == txn_idx)
+            {
+                Self::record_materialized_hot_state_rw(txn_idx, hot_state_rw, shared_sync_params)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn record_materialized_hot_state_rw(
+        txn_idx: TxnIndex,
+        hot_state_rw: HotStateReadWriteSet<T>,
+        shared_sync_params: &SharedSyncParams<T, E, S>,
+    ) -> Result<(), PanicError> {
+        let mut post_commit_accumulator =
+            shared_sync_params.hot_state_post_commit_accumulator.acquire();
+        post_commit_accumulator.record(txn_idx, hot_state_rw)?;
+
+        let mut block_limit_processor = shared_sync_params.block_limit_processor.acquire();
+        post_commit_accumulator.drain_ready(&mut block_limit_processor);
         Ok(())
     }
 
@@ -1810,6 +1884,9 @@ where
             self.config.onchain.block_gas_limit_override(),
             num_txns,
         ));
+        let hot_state_post_commit_accumulator = ExplicitSyncWrapper::new(
+            HotStatePostCommitAccumulator::<T>::new(num_txns),
+        );
         let block_epilogue_txn_idx = ExplicitSyncWrapper::new(None);
         let num_txns = num_txns as u32;
 
@@ -1845,6 +1922,7 @@ where
             delayed_field_id_counter: &delayed_field_id_counter,
             start_shared_counter: start_delayed_field_id_counter,
             block_limit_processor: &block_limit_processor,
+            hot_state_post_commit_accumulator: &hot_state_post_commit_accumulator,
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
         };
@@ -2004,6 +2082,9 @@ where
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
         ));
+        let hot_state_post_commit_accumulator = ExplicitSyncWrapper::new(
+            HotStatePostCommitAccumulator::<T>::new(num_txns),
+        );
         let shared_maybe_error = AtomicBool::new(false);
 
         let final_results = ExplicitSyncWrapper::new(
@@ -2033,6 +2114,7 @@ where
             delayed_field_id_counter: &shared_counter,
             start_shared_counter,
             block_limit_processor: &block_limit_processor,
+            hot_state_post_commit_accumulator: &hot_state_post_commit_accumulator,
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
         };
@@ -2437,10 +2519,11 @@ where
                         read_write_summary,
                         approx_output_size,
                     );
+
                     if idx < num_txns {
                         // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns
-                        // tracks only user txns. Includes bcs-fallback discards (which accumulate
-                        // a fee statement before being discarded), consistent with the accumulator.
+                        // tracks only user txns. Includes bcs-fallback discards, which still
+                        // accumulate a fee statement before being discarded.
                         num_committed_user_txns += 1;
                     }
 
@@ -2545,6 +2628,10 @@ where
                         }
                     };
 
+                    let hot_state_rw = block_limit_processor
+                        .is_hot_state_accumulation_enabled()
+                        .then(|| HotStateReadWriteSet::new(&output_before_guard));
+
                     // Apply the writes.
                     let resource_write_set = output_before_guard.resource_write_set();
                     Self::apply_output_sequential(
@@ -2624,6 +2711,13 @@ where
                     if sequential_reads.incorrect_use {
                         return Err(
                             code_invariant_error("Incorrect use in sequential execution").into(),
+                        );
+                    }
+
+                    if let Some(hot_state_rw) = hot_state_rw {
+                        block_limit_processor.accumulate_hot_state_rw(
+                            hot_state_rw.writes.iter(),
+                            hot_state_rw.reads.iter(),
                         );
                     }
 
