@@ -853,6 +853,17 @@ pub trait SpecializerContext {
     /// Publishes `layout` for `ty` and returns its assigned id. Idempotent.
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId;
 
+    /// Publishes the variant-body layouts of `enum_ty` (one per variant, in tag
+    /// order), returning their ids. Idempotent on `enum_ty`: re-publishing the
+    /// same enum reuses the cached ids rather than appending a fresh set.
+    /// Variant bodies have no Move type of their own, so they are keyed by the
+    /// owning enum.
+    fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]>;
+
     /// Publishes a struct descriptor for `struct_ty` (with payload size `size`
     /// and intra-struct heap-pointer offsets `ptr_offsets`), returning the
     /// assigned [`DescriptorId`]. Used for resources spilled to the heap by
@@ -1195,6 +1206,63 @@ fn layout_inline_fields(
     Some((fields, total, max_align))
 }
 
+/// Builds the [`ValueLayout`] for an inline aggregate — a struct, or one enum
+/// variant body — from its field layouts and the published layout id of each
+/// field. `total`/`align` are the aggregate's in-memory size and alignment.
+///
+/// Returns `Ok(None)` when any field's layout is not yet published (the
+/// aggregate is deferred, mirroring a deferred struct). Errors only on an
+/// internal inconsistency (a published id that does not resolve to a layout).
+fn try_build_inline_value_layout(
+    ctx: &impl SpecializerContext,
+    field_layouts: &[VariantFieldLayout],
+    field_ids: &[Option<LayoutId>],
+    total: u32,
+    align: u32,
+) -> Result<Option<ValueLayout>> {
+    let mut layout_fields = Vec::with_capacity(field_layouts.len());
+    let mut fixed_bcs_total: u64 = 0;
+    let mut data_dependent = false;
+    for (field, &fid) in field_layouts.iter().zip(field_ids) {
+        // A field can be sized yet still lack a published layout (e.g. a
+        // `vector<T>` whose element layout is deferred). Defer the aggregate.
+        let Some(id) = fid else {
+            return Ok(None);
+        };
+        let Some(child) = ctx.layout(id) else {
+            bail!("published layout id does not resolve to a layout");
+        };
+        layout_fields.push(FieldValueLayout {
+            offset: field.offset,
+            id,
+        });
+        match child.fixed_bcs_size {
+            Some(bcs_sz) => fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64),
+            None => data_dependent = true,
+        }
+    }
+
+    let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
+        None
+    } else {
+        Some(fixed_bcs_total as u32)
+    };
+    // No pointers and no padding exactly when the packed BCS size equals the
+    // in-memory size: a pointer field makes the BCS size data-dependent
+    // (`None`), and alignment padding makes it strictly smaller than `total`.
+    let mut flags = LayoutFlags::empty();
+    if fixed_bcs_size == Some(total) {
+        flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
+    }
+    Ok(Some(ValueLayout::struct_layout(
+        total,
+        align,
+        fixed_bcs_size,
+        flags,
+        layout_fields.into_boxed_slice(),
+    )))
+}
+
 /// Recursive post-order DFS that visits every nominal reachable from the given
 /// type and, as a side effect, publishes its GC vector descriptors,
 /// `NominalLayout`s, and `ValueLayout`s. Returns the type's [`LayoutId`] when one
@@ -1325,58 +1393,25 @@ fn discover_type_metadata(
                     else {
                         return Ok(None);
                     };
-                    // TODO: remove legacy size/layout.
-                    let mut nominal_fields = Vec::with_capacity(fields.len());
-                    let mut layout_fields = Vec::with_capacity(fields.len());
-                    let mut fixed_bcs_total: u64 = 0;
-                    let mut data_dependent = false;
-
-                    for (field, &fid) in field_layouts.iter().zip(&field_ids) {
-                        // A field can be sized yet still lack a published layout:
-                        // `vector<T>` always reports an 8-byte pointer, but its
-                        // layout is deferred until the element layout and vector
-                        // descriptor exist. Defer the nominal too, rather than
-                        // treating this as an invariant violation.
-                        let Some(id) = fid else {
-                            return Ok(None);
-                        };
-                        let Some(child) = ctx.layout(id) else {
-                            bail!("published layout id does not resolve to a layout");
-                        };
-                        nominal_fields.push(FieldLayout::new(field.offset, field.ty));
-                        layout_fields.push(FieldValueLayout {
-                            offset: field.offset,
-                            id,
-                        });
-                        match child.fixed_bcs_size {
-                            Some(bcs_sz) => {
-                                fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64)
-                            },
-                            None => data_dependent = true,
-                        }
-                    }
-                    ctx.set_nominal_layout(ty, total, max_align, Some(&nominal_fields))?;
-
-                    let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
-                        None
-                    } else {
-                        Some(fixed_bcs_total as u32)
-                    };
-                    // The struct has no pointers and no padding exactly when
-                    // its packed BCS size equals its in-memory size: a pointer
-                    // field makes the BCS size data-dependent (`None`), and any
-                    // alignment padding makes it strictly smaller than `total`.
-                    let mut flags = LayoutFlags::empty();
-                    if fixed_bcs_size == Some(total) {
-                        flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
-                    }
-                    let value_layout = ValueLayout::struct_layout(
+                    // Defer the whole struct if any field's layout is not yet
+                    // published (e.g. a `vector<T>` whose element layout is
+                    // deferred), before recording any nominal layout.
+                    let Some(value_layout) = try_build_inline_value_layout(
+                        &*ctx,
+                        &field_layouts,
+                        &field_ids,
                         total,
                         max_align,
-                        fixed_bcs_size,
-                        flags,
-                        layout_fields.into_boxed_slice(),
-                    );
+                    )?
+                    else {
+                        return Ok(None);
+                    };
+                    // TODO: remove legacy size/layout.
+                    let nominal_fields = field_layouts
+                        .iter()
+                        .map(|field| FieldLayout::new(field.offset, field.ty))
+                        .collect::<Vec<_>>();
+                    ctx.set_nominal_layout(ty, total, max_align, Some(&nominal_fields))?;
                     Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },
                 Some(FieldTypes::Enum(variants)) => {
@@ -1392,32 +1427,43 @@ fn discover_type_metadata(
                     let mut variant_layouts: Vec<Vec<VariantFieldLayout>> =
                         Vec::with_capacity(variants.len());
                     let mut variant_ptr_offsets: Vec<Vec<u32>> = Vec::with_capacity(variants.len());
+                    // One struct layout per variant body, for the enum value
+                    // layout. Collected (not yet published) while every
+                    // variant's fields have a published layout; abandoned on the
+                    // first miss. Published as one keyed set after the loop.
+                    let mut variant_value_layouts: Vec<ValueLayout> =
+                        Vec::with_capacity(variants.len());
                     let mut max_data_size = 0u32;
                     let mut all_sized = true;
+                    let mut all_value_layouts = true;
 
                     'variants: for variant_fields in &variants {
                         // Substitute each field type by the enum's own type
                         // args (mirrors the Struct arm), then recurse so nested
-                        // vec/struct/enum descriptors get published.
+                        // vec/struct/enum descriptors and layouts get published,
+                        // capturing each field's layout id.
                         let fields = variant_fields
                             .iter()
                             .map(|field_ty| ctx.subst_type(*field_ty, *nominal_ty_args))
                             .collect::<Result<Vec<_>>>()?;
+                        let mut field_ids = Vec::with_capacity(fields.len());
                         for &field_ty in &fields {
-                            discover_type_metadata(
+                            field_ids.push(discover_type_metadata(
                                 ctx,
                                 field_ty,
                                 EMPTY_TYPE_LIST,
                                 visited,
                                 descriptors,
-                            )?;
+                            )?);
                         }
 
                         // Per-variant layout: offsets are data-region-relative
                         // (0-based after the tag).
-                        let Some((variant_layout, variant_size, _)) = layout_inline_fields(&fields)
+                        let Some((variant_layout, variant_size, variant_align)) =
+                            layout_inline_fields(&fields)
                         else {
                             all_sized = false;
+                            all_value_layouts = false;
                             break 'variants;
                         };
                         // GC pointer offsets: each field's inner pointer offsets
@@ -1426,8 +1472,26 @@ fn discover_type_metadata(
                             variant_layout.iter().map(|field| (field.offset, field.ty)),
                         ) else {
                             all_sized = false;
+                            all_value_layouts = false;
                             break 'variants;
                         };
+
+                        // Build + publish this variant's value layout (a struct
+                        // over its fields). Once any variant defers, stop — the
+                        // enum value layout cannot be built.
+                        if all_value_layouts {
+                            match try_build_inline_value_layout(
+                                &*ctx,
+                                &variant_layout,
+                                &field_ids,
+                                variant_size,
+                                variant_align,
+                            )? {
+                                Some(layout) => variant_value_layouts.push(layout),
+                                None => all_value_layouts = false,
+                            }
+                        }
+
                         max_data_size = max_data_size.max(variant_size);
                         variant_layouts.push(variant_layout);
                         variant_ptr_offsets.push(ptr_offsets);
@@ -1449,14 +1513,28 @@ fn discover_type_metadata(
                             descriptor_id,
                             variants: variant_layouts,
                         });
+
+                        // Publish the enum value layout when every variant
+                        // body resolved. `size` is the heap payload (tag + widest
+                        // variant region, 8-aligned) the allocator needs. The
+                        // variant bodies are published as one set keyed by the
+                        // enum type (idempotent), so re-discovering the enum
+                        // reuses them rather than orphaning a fresh set.
+                        if all_value_layouts {
+                            debug_assert_eq!(variant_value_layouts.len(), variants.len());
+                            let variant_ids =
+                                ctx.publish_variant_layouts(ty, variant_value_layouts);
+                            let value_layout =
+                                ValueLayout::frozen_enum(descriptor_id, variant_ids, size);
+                            return Ok(Some(ctx.publish_layout(ty, value_layout)));
+                        }
                     }
 
-                    // TODO: consider reconciling `EnumLayout`, `ValueLayout::open_enum`, and the enum descriptor.
-                    // The enum's `ValueLayout` is the open-enum shape regardless
-                    // of whether the variant field layout was derivable; the
-                    // value-traversal walk resolves variants lazily.
-                    let value_layout = ValueLayout::open_enum(ty, *nominal_ty_args);
-                    Ok(Some(ctx.publish_layout(ty, value_layout)))
+                    // The enum's variant bodies are not all resolvable yet, so
+                    // defer its value layout (mirrors a deferred struct). Only
+                    // reachable in the partial-load module pre-pass, never in
+                    // per-function lowering.
+                    Ok(None)
                 },
             }
         },
