@@ -54,6 +54,8 @@ pub enum DataRequest {
     GetTransactionDataWithProof(GetTransactionDataWithProofRequest), // Fetches transaction data with a proof
     GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest), // Optimistically fetches new transaction data with a proof
     SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest), // Subscribes to transaction data with a proof
+
+    GetHotStateValuesWithProof(StateValuesWithProofRequest), // Fetches a list of hot states with a proof
 }
 
 impl DataRequest {
