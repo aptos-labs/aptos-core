@@ -21,7 +21,10 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
-    state_value_chunk::{build_value_chunk_proof, jmt_leaves_with_values, value_chunk_with_proof},
+    state_value_chunk::{
+        build_hot_value_chunk_proof, build_value_chunk_proof, jmt_leaves_with_values,
+        value_chunk_with_proof,
+    },
     utils::{
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
@@ -69,7 +72,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
-        hot_state::HotStateValue,
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
@@ -1504,6 +1507,19 @@ impl StateStore {
         self.hot_state_merkle_db.get_leaf_count(version)
     }
 
+    /// Returns the lowest servable version for hot state value chunks (the earliest
+    /// persisted hot state Merkle snapshot), or `None` if this node does not serve
+    /// hot state. Hot state does not start from version 0.
+    pub fn hot_state_min_servable_version(&self) -> Result<Option<Version>> {
+        if self.hot_state_config.delete_on_restart {
+            return Ok(None);
+        }
+
+        self.state_db
+            .hot_state_merkle_db
+            .get_earliest_state_snapshot_version()
+    }
+
     /// Walks the hot state Merkle tree at `version` from `first_index` and yields up to
     /// `chunk_size` hot state leaves, each pairing the full key with its [`HotStateValue`] (the
     /// value or vacancy plus `hot_since_version`).
@@ -1525,6 +1541,22 @@ impl StateStore {
             Ok((key, value))
         })
         .take(chunk_size))
+    }
+
+    /// Assembles a [`HotStateValueChunkWithProof`] for the given hot state leaves, with a range
+    /// proof against the hot state Merkle root at `version`.
+    pub fn get_hot_state_value_chunk_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        raw_values: Vec<(StateKey, HotStateValue)>,
+    ) -> Result<HotStateValueChunkWithProof> {
+        build_hot_value_chunk_proof(
+            self.hot_state_merkle_db.as_ref(),
+            version,
+            first_index,
+            raw_values,
+        )
     }
 
     // state sync doesn't query for the progress, but keeps its record by itself.

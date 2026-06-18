@@ -32,7 +32,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        hot_state::HotStateValue,
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -847,6 +847,25 @@ impl DbReader for AptosDB {
                 as Box<
                     dyn Iterator<Item = Result<(StateKey, HotStateValue)>> + '_,
                 >)
+        })
+    }
+
+    fn get_hot_state_value_chunk_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        raw_values: Vec<(StateKey, HotStateValue)>,
+    ) -> Result<HotStateValueChunkWithProof> {
+        gauged_api("get_hot_state_value_chunk_proof", || {
+            self.error_if_hot_state_merkle_pruned("Hot state merkle", version)?;
+            self.state_store
+                .get_hot_state_value_chunk_proof(version, first_index, raw_values)
+        })
+    }
+
+    fn get_hot_state_snapshot_min_servable_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_hot_state_snapshot_min_servable_version", || {
+            self.state_store.hot_state_min_servable_version()
         })
     }
 

@@ -274,6 +274,18 @@ impl ShardedJmtMerkleDb {
         Ok(None)
     }
 
+    /// Returns the earliest version holding a state snapshot (JMT root), or `None`
+    /// if the tree is empty.
+    pub fn get_earliest_state_snapshot_version(&self) -> Result<Option<Version>> {
+        let mut iter = self.metadata_db().iter::<JellyfishMerkleNodeSchema>()?;
+        iter.seek_to_first();
+        match iter.next().transpose()? {
+            // The root (empty nibble path) sorts first within a version.
+            Some((key, _node)) => Ok(Some(key.version())),
+            None => Ok(None),
+        }
+    }
+
     pub(crate) fn create_jmt_commit_batch_for_shard(
         &self,
         version: Version,

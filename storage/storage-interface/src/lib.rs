@@ -17,7 +17,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        hot_state::HotStateValue,
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -470,6 +470,20 @@ pub trait DbReader: Send + Sync {
             first_index: usize,
             chunk_size: usize,
         ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, HotStateValue)>> + '_>>;
+
+        /// Assembles a hot state value chunk with a range proof against the hot state Merkle root
+        /// at `version`.
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> Result<HotStateValueChunkWithProof>;
+
+        /// Returns the lowest servable version for hot state value chunks (the earliest
+        /// persisted hot state Merkle snapshot), or `None` if this node does not serve
+        /// hot state.
+        fn get_hot_state_snapshot_min_servable_version(&self) -> Result<Option<Version>>;
 
         /// Returns if the state store pruner is enabled.
         fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;
