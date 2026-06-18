@@ -73,6 +73,23 @@ pub fn non_interactive_env_set() -> bool {
     }
 }
 
+/// Returns true if stdin is connected to an interactive terminal (TTY).
+pub fn stdin_is_interactive() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdin().is_terminal()
+}
+
+/// Returns true if the CLI should avoid interactive prompts entirely.
+///
+/// This is the case when [`NON_INTERACTIVE_ENV_VAR`] has been set explicitly, or
+/// when stdin is not a TTY (e.g. it is closed, piped, or redirected from
+/// `/dev/null`), which is the typical situation for coding agents and CI. In
+/// these situations a prompt cannot be answered, so callers should fail fast
+/// with an actionable error rather than block.
+pub fn is_non_interactive() -> bool {
+    non_interactive_env_set() || !stdin_is_interactive()
+}
+
 /// Reads a line from input
 pub fn read_line(input_name: &str) -> CliTypedResult<String> {
     let mut input_buf = String::new();
@@ -197,13 +214,16 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
         };
     }
 
-    // No answer has been provided. If we're running non-interactively, we cannot
-    // ask the user, so fail fast with an actionable error rather than blocking.
-    if non_interactive_env_set() {
+    // No answer has been provided. If we're running non-interactively (either the
+    // env var is set, or stdin is not a TTY), we cannot ask the user, so fail fast
+    // with an actionable error rather than block on a prompt that can't be answered.
+    if is_non_interactive() {
         return Err(CliError::CommandArgumentError(format!(
-            "Refusing to prompt for confirmation because {} is set: \"{}\". \
-             Re-run with `--assume-yes` to confirm or `--assume-no` to decline.",
-            NON_INTERACTIVE_ENV_VAR, prompt
+            "Cannot prompt for confirmation in a non-interactive session: \"{}\". \
+             Re-run with `--assume-yes` to confirm or `--assume-no` to decline \
+             (or configure a default with `aptos config set-global-config \
+             --default-prompt-response yes`).",
+            prompt
         )));
     }
 
