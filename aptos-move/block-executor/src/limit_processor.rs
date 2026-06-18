@@ -124,8 +124,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 
     /// Feeds the hot state accumulator with the keys the transaction read (the VM-observed
-    /// read set carried by the output) and the keys it writes. Called per transaction in
-    /// commit order.
+    /// read set carried by the output) and the keys it writes.
     pub(crate) fn accumulate_hot_state_rw<'a>(
         &mut self,
         writes: impl Iterator<Item = &'a T::Key>,
