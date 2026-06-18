@@ -159,6 +159,8 @@ pub enum DataResponse {
     // TODO: eventually we should deprecate all the old response types.
     TransactionDataWithProof(TransactionDataWithProofResponse),
     NewTransactionDataWithProof(NewTransactionDataWithProofResponse),
+
+    HotStateValueChunkWithProof(HotStateValueChunkWithProof),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
