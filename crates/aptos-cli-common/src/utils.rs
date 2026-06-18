@@ -205,8 +205,20 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
         return Ok(());
     }
 
+    let non_interactive = is_non_interactive();
+
     // An explicit global default response (if any) is honored before prompting.
-    if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
+    // In non-interactive mode, prefer the actionable prompt error even if the
+    // global config cannot be loaded (e.g. missing/unwritable home directory).
+    let default_response = if non_interactive {
+        GlobalConfig::load()
+            .ok()
+            .and_then(|cfg| cfg.get_default_prompt_response())
+    } else {
+        GlobalConfig::load()?.get_default_prompt_response()
+    };
+
+    if let Some(response) = default_response {
         return if response {
             Ok(())
         } else {
@@ -217,7 +229,7 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
     // No answer has been provided. If we're running non-interactively (either the
     // env var is set, or stdin is not a TTY), we cannot ask the user, so fail fast
     // with an actionable error rather than block on a prompt that can't be answered.
-    if is_non_interactive() {
+    if non_interactive {
         return Err(CliError::CommandArgumentError(format!(
             "Cannot prompt for confirmation in a non-interactive session: \"{}\". \
              Re-run with `--assume-yes` to confirm or `--assume-no` to decline \
