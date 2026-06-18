@@ -1597,3 +1597,26 @@ pub static DECRYPTION_PIPELINE_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// The dense decryption round consumed by the most recent key-producing block.
+/// Decoupled from the consensus round; advances only on blocks that produce a
+/// decryption key. Watch alongside `TRUSTED_SETUP_NUM_ROUNDS` to track how much
+/// trusted-setup capacity remains in the current epoch.
+pub static DECRYPTION_ROUND: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_decryption_round",
+        "The dense decryption round consumed by the most recent key-producing block."
+    )
+    .unwrap()
+});
+
+/// The trusted-setup capacity (`num_rounds`) for the current epoch. The epoch
+/// can decrypt at most this many key-producing blocks before encrypted txns
+/// start failing with `TrustedSetupExhausted`.
+pub static TRUSTED_SETUP_NUM_ROUNDS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_trusted_setup_num_rounds",
+        "Trusted-setup capacity (max decryption rounds) for the current epoch."
+    )
+    .unwrap()
+});

@@ -29,7 +29,7 @@ fun call_bool(): bool {
 === micro-ops ===
 // module 0x66::test
 
-fun identity(): skipped (not all types are concrete)
+fun identity(): skipped (generic function not instantiated)
 
 fun call_u64() {
   frame_data_size: 8
