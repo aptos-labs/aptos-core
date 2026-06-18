@@ -2422,6 +2422,9 @@ mod simulate_flag_tests {
 
 /// Run a view function
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Read on-chain state via a view function
+  $ aptos move view --function-id 0x1::coin::balance --type-args 0x1::aptos_coin::AptosCoin --args address:0xc0ffee")]
 pub struct ViewFunction {
     #[clap(flatten)]
     pub(crate) entry_function_args: EntryFunctionArguments,
