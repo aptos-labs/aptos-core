@@ -341,7 +341,7 @@ struct Opt {
     #[clap(long)]
     skip_paranoid_checks: bool,
 
-    #[clap(long)]
+    #[clap(long, default_value_t = true)]
     use_blockstm_v2: bool,
 }
 
