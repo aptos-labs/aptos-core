@@ -1326,6 +1326,7 @@ fn try_build_inline_value_layout(
     let mut layout_fields = Vec::with_capacity(field_layouts.len());
     let mut fixed_bcs_total: u64 = 0;
     let mut data_dependent = false;
+    let mut all_bytes_valid = true;
     for (field, &fid) in field_layouts.iter().zip(field_ids) {
         // A field can be sized yet still lack a published layout (e.g. a
         // `vector<T>` whose element layout is deferred). Defer the aggregate.
@@ -1343,6 +1344,7 @@ fn try_build_inline_value_layout(
             Some(bcs_sz) => fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64),
             None => data_dependent = true,
         }
+        all_bytes_valid &= child.all_byte_patterns_valid();
     }
 
     let fixed_bcs_size = if data_dependent || fixed_bcs_total > u32::MAX as u64 {
@@ -1356,6 +1358,11 @@ fn try_build_inline_value_layout(
     let mut flags = LayoutFlags::empty();
     if fixed_bcs_size == Some(total) {
         flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
+        // Blittable on deserialize only when no field reaches a `bool`, which
+        // needs per-byte validation that a single `memcpy` would skip.
+        if all_bytes_valid {
+            flags |= LayoutFlags::ALL_BYTE_PATTERNS_VALID;
+        }
     }
     Ok(Some(ValueLayout::struct_layout(
         total,
