@@ -39,8 +39,10 @@ use std::{collections::BTreeMap, path::PathBuf};
 /// derivation path or index accordingly.
 #[derive(Debug, Parser)]
 #[clap(after_help = "Examples:
-  # Rotate to a new private key and save it as a new profile
-  $ aptos account rotate-key --new-private-key 0x<new_key> --save-to-profile rotated
+  # Rotate to a new key read from a file and save it as a new profile.
+  # Prefer --new-private-key-file over --new-private-key so the key is not
+  # exposed via shell history, process listings, or CI logs.
+  $ aptos account rotate-key --new-private-key-file new_key.txt --save-to-profile rotated
 
   # Rotate without saving a new profile, skipping confirmation prompts
   $ aptos account rotate-key --new-private-key-file new_key.txt --skip-saving-profile --assume-yes")]
