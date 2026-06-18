@@ -491,11 +491,11 @@ impl AptosVM {
         BLOCKSTM_V2_ENABLED.set(blockstm_v2_enabled).ok();
     }
 
-    /// Get the blockstm v2 enabled flag if already set, otherwise return default (true)
+    /// Get the blockstm v2 enabled flag if already set, otherwise return default (false)
     pub fn get_blockstm_v2_enabled() -> bool {
         match BLOCKSTM_V2_ENABLED.get() {
             Some(blockstm_v2_enabled) => *blockstm_v2_enabled,
-            None => true,
+            None => false,
         }
     }
 
