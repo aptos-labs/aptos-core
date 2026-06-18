@@ -108,6 +108,9 @@ pub enum RuntimeError {
 
     #[error("BCS deserialize: {remaining} trailing byte(s) after value")]
     BCSRemainingInput { remaining: usize },
+
+    #[error("BCS deserialize: non-canonical bool byte {byte}")]
+    BCSInvalidBool { byte: u8 },
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -140,9 +143,11 @@ impl IntoExecutionError for RuntimeError {
             | VecAllocSizeOverflow
             | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
 
-            BCSEof | BCSInvalidUleb | BCSSequenceTooLong { .. } | BCSRemainingInput { .. } => {
-                ExecutionErrorKind::InvalidOperation
-            },
+            BCSEof
+            | BCSInvalidUleb
+            | BCSSequenceTooLong { .. }
+            | BCSRemainingInput { .. }
+            | BCSInvalidBool { .. } => ExecutionErrorKind::InvalidOperation,
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
             ResourceProvider(e) => e.kind(),

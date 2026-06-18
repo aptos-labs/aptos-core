@@ -595,12 +595,13 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     // TODO: This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     //
-    // If no padding or no pointers, value's BCS bytes are exactly its
-    // in-memory image.
+    // If every byte pattern is valid (no padding, no pointers, no `bool`), the
+    // value's BCS bytes are exactly its in-memory image. A `bool` is excluded
+    // because only `0`/`1` are canonical and a raw copy would skip that check.
     // TODO(correctness): breaks on big-endian hosts. This writes the
     // little-endian BCS bytes verbatim, but the in-memory representation is
     // native-endian, so the two only match on little-endian hosts.
-    if layout.has_no_pointers_no_padding() {
+    if layout.all_byte_patterns_valid() {
         let n = layout.size as usize;
         let src = read_slice(bytes, cursor, n)?;
         // SAFETY: caller ensures `n` bytes can be written to `dst` and it is
@@ -610,11 +611,19 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     }
 
     match &layout.kind {
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address => {
-            Err(unreachable("Primitive layouts must be handled by fast-path").into())
+        LayoutKind::Bool => {
+            // BCS encodes a `bool` as a single canonical byte: `0` or `1`. Any
+            // other value is rejected rather than blitted into the slot.
+            let byte = read_slice(bytes, cursor, 1)?[0];
+            if byte > 1 {
+                return Err(RuntimeError::BCSInvalidBool { byte }.into());
+            }
+            // SAFETY: caller ensures one byte can be written to `dst`.
+            unsafe { std::ptr::write(dst, byte) };
+            Ok(())
+        },
+        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => {
+            Err(unreachable("Integer and address layouts must be handled by fast-path").into())
         },
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
@@ -668,9 +677,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // as guaranteed by the allocator.
             unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
 
-            if elem_layout.has_no_pointers_no_padding() {
-                // If elements have no padding and no pointers, element bytes
-                // equal their BCS bytes.
+            if elem_layout.all_byte_patterns_valid() {
+                // If every element byte pattern is valid, element bytes equal
+                // their BCS bytes. A `bool` element is excluded so each byte is
+                // validated by the per-element walk below.
                 // TODO(correctness): breaks on big-endian hosts, for the same
                 // reason as the scalar fast path above: native-endian in-memory
                 // bytes equal the little-endian BCS bytes only on little-endian
@@ -871,7 +881,7 @@ mod tests {
     use mono_move_core::{
         align_up_u32,
         types::U64_TY,
-        value_layout::{U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
+        value_layout::{BOOL_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
     };
     use serde::Serialize;
@@ -1033,6 +1043,107 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn deserialize_bool_canonical() {
+        let table = ValueLayoutTable::new();
+        let layout = table.layout(BOOL_LAYOUT_ID).unwrap();
+        // A bool reaches the per-byte walk, not the blit fast path.
+        assert!(layout.has_no_pointers_no_padding());
+        assert!(!layout.all_byte_patterns_valid());
+
+        let mut heap = Heap::new(64);
+        for byte in [0u8, 1] {
+            let mut slot = 0xFFu8;
+            let mut cursor = 0;
+            unsafe {
+                deserialize_impl(&table, &mut heap, layout, &[byte], &mut cursor, &mut slot)
+                    .unwrap()
+            };
+            assert_eq!(slot, byte);
+            assert_eq!(cursor, 1);
+        }
+    }
+
+    #[test]
+    fn deserialize_rejects_non_canonical_bool() {
+        let table = ValueLayoutTable::new();
+        let layout = table.layout(BOOL_LAYOUT_ID).unwrap();
+        let mut heap = Heap::new(64);
+        let mut slot = 0u8;
+        let mut cursor = 0;
+        let result =
+            unsafe { deserialize_impl(&table, &mut heap, layout, &[2u8], &mut cursor, &mut slot) };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSInvalidBool { byte: 2 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn deserialize_rejects_non_canonical_bool_in_vector() {
+        let mut table = ValueLayoutTable::new();
+        let vid = table.push(U64_TY, vector_layout(BOOL_LAYOUT_ID));
+        let layout = table.layout(vid).unwrap();
+        let mut heap = Heap::new(4096);
+        // Length 2, then a canonical `1` and a non-canonical `2`.
+        let bytes = [0x02u8, 0x01, 0x02];
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+            )
+        };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSInvalidBool { byte: 2 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn deserialize_rejects_non_canonical_bool_in_struct() {
+        // `{u8, bool}`: no padding (BCS 2 == size 2), so blittable for
+        // serialize/equals, but the bool field keeps it off the deserialize
+        // fast path so the bad byte is caught.
+        let mut table = ValueLayoutTable::new();
+        let layout = build_struct_layout(&table, 2, vec![(0, U8_LAYOUT_ID), (1, BOOL_LAYOUT_ID)]);
+        assert!(layout.has_no_pointers_no_padding());
+        assert!(!layout.all_byte_patterns_valid());
+        let id = table.push(U64_TY, layout);
+        let layout = table.layout(id).unwrap();
+
+        let mut heap = Heap::new(64);
+        // u8 = 5, then a non-canonical bool byte.
+        let bytes = [0x05u8, 0x02];
+        let mut slot = [0u8; 2];
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                slot.as_mut_ptr(),
+            )
+        };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSInvalidBool { byte: 2 }
+            ))
+        ));
+    }
+
     /// Builds a struct layout from field offsets/ids and the in-memory size,
     /// deriving the const BCS size and no-padding flag as the specializer does.
     fn build_struct_layout(
@@ -1042,16 +1153,22 @@ mod tests {
     ) -> ValueLayout {
         let mut const_total = 0u64;
         let mut data_dependent = false;
+        let mut all_bytes_valid = true;
         for &(_, id) in &fields {
-            match table.layout(id).unwrap().fixed_serialized_size() {
+            let child = table.layout(id).unwrap();
+            match child.fixed_serialized_size() {
                 Some(n) => const_total += n as u64,
                 None => data_dependent = true,
             }
+            all_bytes_valid &= child.all_byte_patterns_valid();
         }
         let const_bcs = (!data_dependent).then_some(const_total as u32);
         let mut flags = LayoutFlags::empty();
         if const_bcs == Some(size) {
             flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
+            if all_bytes_valid {
+                flags |= LayoutFlags::ALL_BYTE_PATTERNS_VALID;
+            }
         }
         let field_layouts = fields
             .into_iter()

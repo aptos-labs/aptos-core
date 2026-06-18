@@ -55,6 +55,12 @@ bitflags! {
         /// This value has no heap pointers and no padding. That is, it can be
         /// serialized in one `memcpy` and compared for equality with `memcmp`.
         const NO_POINTERS_NO_PADDING = 0b0000_0001;
+        /// Every byte pattern of this value's in-memory image is a valid value,
+        /// so deserialization needs no per-byte validation and can copy the BCS
+        /// bytes in one `memcpy`. Holds for integers and addresses but not for
+        /// `bool` (only `0`/`1` are canonical). An aggregate has this flag only
+        /// when it has no padding, no pointers, and no `bool` reachable.
+        const ALL_BYTE_PATTERNS_VALID = 0b0000_0010;
     }
 }
 
@@ -153,6 +159,13 @@ impl ValueLayout {
         self.flags.contains(LayoutFlags::NO_POINTERS_NO_PADDING)
     }
 
+    /// Returns true if every byte pattern of this value's in-memory size is a
+    /// valid value, so deserialization can blit the BCS bytes without per-byte
+    /// validation. False for anything that reaches a `bool`.
+    pub fn all_byte_patterns_valid(&self) -> bool {
+        self.flags.contains(LayoutFlags::ALL_BYTE_PATTERNS_VALID)
+    }
+
     /// The fixed BCS size of a value of this type, or [`None`] when
     /// data-dependent.
     pub fn fixed_serialized_size(&self) -> Option<u32> {
@@ -236,7 +249,7 @@ impl ValueLayout {
             size: 32,
             align: MAX_ALIGN as u32,
             fixed_bcs_size: Some(32),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::Address,
         }
     }
@@ -325,7 +338,7 @@ impl ValueLayout {
             size,
             align,
             fixed_bcs_size: Some(size),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::UnsignedInt,
         }
     }
@@ -335,7 +348,7 @@ impl ValueLayout {
             size,
             align,
             fixed_bcs_size: Some(size),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::SignedInt,
         }
     }
