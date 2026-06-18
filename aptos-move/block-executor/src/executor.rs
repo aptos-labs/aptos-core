@@ -1274,7 +1274,7 @@ where
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        let trace = last_input_output.record_materialized_txn_output(
+        let (trace, hot_state_rw) = last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
             materialized_resource_write_set
@@ -1323,6 +1323,14 @@ where
                     txn_idx, err
                 )));
             }
+        }
+
+        // Accumulated here in post-commit to keep it off the serial commit path. Order across
+        // workers is irrelevant: the promotion set is `reads \ writes` over the block.
+        if let Some(hot_state_rw) = hot_state_rw {
+            let mut block_limit_processor = shared_sync_params.block_limit_processor.acquire();
+            block_limit_processor
+                .accumulate_hot_state_rw(hot_state_rw.writes.iter(), hot_state_rw.reads.iter());
         }
 
         Ok(())
@@ -2546,9 +2554,10 @@ where
                         }
                     };
 
-                    // Feed only committed transactions to the hot-state accumulator, in commit
-                    // order: bcs-fallback discards have continued above, and genuine discards
-                    // carry empty read/write sets.
+                    // Feed only committed transactions to the hot-state accumulator: bcs-fallback
+                    // discards continued above, and genuine discards carry empty read/write sets.
+                    // The write set already covers every key materialization turns into a write
+                    // (in-place delayed-field and group changes), so feeding it here is complete.
                     if block_limit_processor.is_hot_state_accumulation_enabled() {
                         block_limit_processor.accumulate_hot_state_rw(
                             output_before_guard.storage_keys_written(),

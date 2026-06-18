@@ -42,6 +42,20 @@ use triomphe::Arc as TriompheArc;
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
+pub(crate) struct HotStateReadWriteSet<T: Transaction> {
+    pub(crate) writes: Vec<T::Key>,
+    pub(crate) reads: Vec<T::Key>,
+}
+
+impl<T: Transaction> HotStateReadWriteSet<T> {
+    pub(crate) fn new(output: &impl BeforeMaterializationOutput<T>) -> Self {
+        Self {
+            writes: output.storage_keys_written().cloned().collect(),
+            reads: output.storage_keys_read().cloned().collect(),
+        }
+    }
+}
+
 macro_rules! with_success_or_skip_rest {
     // The simple form for a single method call.
     ($self:ident, $txn_idx:ident, $f:ident, $fallback:expr) => {
@@ -116,6 +130,7 @@ struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T>> {
     output: Option<O>,
     maybe_read_write_summary: Option<ReadWriteSummary<T>>,
     maybe_approx_output_size: Option<u64>,
+    hot_state_rw: Option<HotStateReadWriteSet<T>>,
     output_status_kind: OutputStatusKind,
 }
 
@@ -125,6 +140,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
             output: None,
             maybe_read_write_summary: None,
             maybe_approx_output_size: None,
+            hot_state_rw: None,
             output_status_kind,
         }
     }
@@ -158,12 +174,16 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
                             output_before_guard.get_write_summary(),
                         )
                     });
+                let hot_state_rw = block_gas_limit_type
+                    .add_block_limit_outcome_onchain()
+                    .then(|| HotStateReadWriteSet::new(&output_before_guard));
                 drop(output_before_guard);
 
                 Self {
                     output: Some(output),
                     maybe_approx_output_size,
                     maybe_read_write_summary,
+                    hot_state_rw,
                     output_status_kind: if is_skip_rest {
                         OutputStatusKind::SkipRest
                     } else {
@@ -351,12 +371,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             maybe_read_write_summary,
             output_wrapper.maybe_approx_output_size,
         );
-        if block_limit_processor.is_hot_state_accumulation_enabled() {
-            block_limit_processor.accumulate_hot_state_rw(
-                output_before_guard.storage_keys_written(),
-                output_before_guard.storage_keys_read(),
-            );
-        }
 
         if txn_idx < num_txns - 1
             && block_limit_processor.should_end_block_parallel()
@@ -671,17 +685,33 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         delta_writes: Vec<(T::Key, WriteOp)>,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-    ) -> Result<Trace, PanicError> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |mut t| t.incorporate_materialized_txn_output(
-                delta_writes,
-                patched_resource_write_set,
-                patched_events
-            ),
-            Ok(Trace::empty())
-        )
+    ) -> Result<(Trace, Option<HotStateReadWriteSet<T>>), PanicError> {
+        let mut wrapper = self.output_wrappers[txn_idx as usize].lock();
+        let status_kind = wrapper.output_status_kind.clone();
+        match (&status_kind, &mut wrapper.output) {
+            (OutputStatusKind::Success, Some(output))
+            | (OutputStatusKind::SkipRest, Some(output)) => {
+                let trace = output.incorporate_materialized_txn_output(
+                    delta_writes,
+                    patched_resource_write_set,
+                    patched_events,
+                )?;
+                Ok((trace, wrapper.hot_state_rw.take()))
+            },
+            (OutputStatusKind::Abort(_), None)
+            | (OutputStatusKind::SpeculativeExecutionAbortError, None)
+            | (OutputStatusKind::DelayedFieldsCodeInvariantError, None)
+            | (OutputStatusKind::None, None) => Ok((Trace::empty(), None)),
+            (OutputStatusKind::Success, None)
+            | (OutputStatusKind::SkipRest, None)
+            | (OutputStatusKind::Abort(_), Some(_))
+            | (OutputStatusKind::SpeculativeExecutionAbortError, Some(_))
+            | (OutputStatusKind::DelayedFieldsCodeInvariantError, Some(_))
+            | (OutputStatusKind::None, Some(_)) => Err(code_invariant_error(format!(
+                "Inconsistent wrapper status kind {:?} and output {:?}",
+                status_kind, wrapper.output
+            ))),
+        }
     }
 
     // Must be executed after parallel execution is done, grabs outputs.
