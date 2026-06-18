@@ -2474,6 +2474,12 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 
 /// Run a Move script
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Compile and run a Move script, passing typed arguments
+  $ aptos move run-script --script-path sources/my_script.move --args u64:1000
+
+  # Run a script non-interactively (for scripts/agents)
+  $ aptos move run-script --script-path sources/my_script.move --assume-yes")]
 pub struct RunScript {
     #[clap(flatten)]
     pub txn_options: TransactionOptions,
