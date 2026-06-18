@@ -40,6 +40,7 @@ use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::{Display, Formatter},
+    rc::Rc,
 };
 
 mod fat_type;
@@ -113,7 +114,15 @@ pub struct MoveValueAnnotator<V> {
     fat_struct_inst_cache: RefCell<BTreeMap<(StructName, Vec<FatType>), FatStructRef>>,
     /// A cache for whether type tags represent types with tables
     contains_tables_cache: RefCell<BTreeMap<TypeTag, bool>>,
+    /// Caches resolved captured types per closure signature, so many closures
+    /// with the same signature resolve only once. Like the caches above, this
+    /// affects the `Limiter`, which is fine on a read path.
+    captured_tys_cache: RefCell<BTreeMap<ClosureCapturedTysCacheKey, Rc<Vec<FatType>>>>,
 }
+
+/// Cache key for resolved captured types: the closure's defining module,
+/// function, type arguments, and capture mask.
+type ClosureCapturedTysCacheKey = (ModuleId, Identifier, Vec<TypeTag>, ClosureMask);
 
 impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     pub fn new(module_viewer: V) -> Self {
@@ -122,6 +131,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             fat_struct_def_cache: RefCell::default(),
             fat_struct_inst_cache: RefCell::default(),
             contains_tables_cache: RefCell::default(),
+            captured_tys_cache: RefCell::default(),
         }
     }
 
@@ -734,6 +744,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         }
 
         let annotate_values = |values: &[MoveValue], tys: &[FatType], limit: &mut Limiter| {
+            anyhow::ensure!(
+                values.len() == tys.len() && tys.len() == field_names.len(),
+                "struct field count mismatch: {} values, {} types, {} names",
+                values.len(),
+                tys.len(),
+                field_names.len(),
+            );
             values
                 .iter()
                 .zip(tys)
@@ -821,6 +838,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         // the raw, nameless layouts stored with the closure, at the cost of requiring
         // the defining module to be loadable at the read version.
         let captured_tys = self.resolve_captured_types(module_id, fun_id, ty_args, *mask, limit)?;
+        let captured_tys = captured_tys.as_deref().map_or(&[][..], Vec::as_slice);
         anyhow::ensure!(
             captured.len() == captured_tys.len(),
             "captured value/type count mismatch: {} values, {} types",
@@ -829,7 +847,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         );
         let captured = captured
             .iter()
-            .zip(&captured_tys)
+            .zip(captured_tys)
             .map(|((_layout, value), ty)| self.annotate_value(value, ty, limit))
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(AnnotatedMoveClosure {
@@ -852,17 +870,22 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         ty_args: &[TypeTag],
         mask: ClosureMask,
         limit: &mut Limiter,
-    ) -> anyhow::Result<Vec<FatType>> {
+    ) -> anyhow::Result<Option<Rc<Vec<FatType>>>> {
         if mask.captured_count() == 0 {
-            return Ok(vec![]);
+            return Ok(None);
         }
+        let key = (module_id.clone(), fun_id.to_owned(), ty_args.to_vec(), mask);
+        if let Some(tys) = self.captured_tys_cache.borrow().get(&key) {
+            return Ok(Some(tys.clone()));
+        }
+
         let captured_tys = self.resolve_captured_parameter_types(module_id, fun_id, mask, limit)?;
 
         let ty_args = ty_args
             .iter()
             .map(|ty| self.resolve_type_impl(ty, limit))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        captured_tys
+        let resolved = captured_tys
             .into_iter()
             .map(|ty| {
                 if ty_args.is_empty() {
@@ -872,7 +895,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                         .map_err(anyhow::Error::from)
                 }
             })
-            .collect::<anyhow::Result<Vec<_>>>()
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        let resolved = Rc::new(resolved);
+        self.captured_tys_cache
+            .borrow_mut()
+            .insert(key, resolved.clone());
+        Ok(Some(resolved))
     }
 
     /// Resolves only the captured parameter types of a function, selected by the
