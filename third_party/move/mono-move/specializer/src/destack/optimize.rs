@@ -79,8 +79,8 @@ fn copy_propagation(func: &mut FunctionIR) {
             // a full def: mut borrows (writes go through the ref) and
             // `WriteLocalField` (partial write).
             if let Instr::MutBorrowLoc(_, src)
-            | Instr::MutBorrowLocField(_, _, src)
-            | Instr::WriteLocalField(_, src, _) = instr
+            | Instr::MutBorrowLocField(_, _, _, src)
+            | Instr::WriteLocalField(_, _, src, _) = instr
             {
                 subst.remove(src);
                 subst.retain(|_, v| v != src);

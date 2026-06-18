@@ -405,6 +405,7 @@ fn test_db_indexer_data() {
         (false, "0x1::aptos_governance::GovernanceConfig"),
         (false, "0x1::aptos_governance::GovernanceEvents"),
         (false, "0x1::chunky_dkg_config::ChunkyDKGConfig"),
+        (false, "0x1::decryption::PerBlockDecryptionKeyV2"),
         (false, "0x1::randomness_config::RandomnessConfig"),
         (false, "0x1::transaction_limits::TxnLimitsConfig"),
         (false, "0x1::staking_config::StakingRewardsConfig"),

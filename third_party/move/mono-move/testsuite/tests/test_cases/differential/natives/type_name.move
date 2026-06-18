@@ -35,7 +35,20 @@ module 0x1::main {
         0x1::type_info::type_name<Bar<Bar<u64>>>()
     }
 
-    // TODO: cover function and enum types once the specializer supports them.
+    enum Choice<T> has drop {
+        A,
+        B { value: T },
+    }
+
+    public fun enum_name(): String {
+        0x1::type_info::type_name<Choice<u64>>()
+    }
+
+    public fun nested_enum_name(): String {
+        0x1::type_info::type_name<Bar<Choice<address>>>()
+    }
+
+    // TODO: cover function types once the specializer supports them.
 }
 
 // RUN: execute 0x1::main::u64_name
@@ -55,3 +68,9 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::nested_struct_name
 // CHECK: results: "0x1::main::Bar<0x1::main::Bar<u64>>"
+
+// RUN: execute 0x1::main::enum_name
+// CHECK: results: "0x1::main::Choice<u64>"
+
+// RUN: execute 0x1::main::nested_enum_name
+// CHECK: results: "0x1::main::Bar<0x1::main::Choice<address>>"

@@ -176,7 +176,7 @@ impl BlockAnalysis {
             });
             // Both shapes yield a `&mut` into the local's storage.
             if let Instr::MutBorrowLoc(_, local @ Slot::Home(_))
-            | Instr::MutBorrowLocField(_, _, local @ Slot::Home(_)) = instr
+            | Instr::MutBorrowLocField(_, _, _, local @ Slot::Home(_)) = instr
             {
                 home_mut_borrow_pos.entry(*local).or_default().push(i);
             }

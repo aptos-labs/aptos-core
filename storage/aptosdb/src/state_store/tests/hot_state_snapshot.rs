@@ -5,11 +5,18 @@
 
 use crate::{db::test_helper::arb_blocks_to_commit_with_params, AptosDB};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_jellyfish_merkle::{
+    mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
+};
 use aptos_storage_interface::{DbReader, Result as DbResult};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
+    state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
+        state_key::StateKey,
+        state_value::StateValue,
+    },
     transaction::{
         BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionToCommit, Version,
@@ -17,7 +24,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use proptest::prelude::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 fn key(seed: &str) -> StateKey {
     StateKey::raw(seed.as_bytes())
@@ -93,6 +100,95 @@ fn collect_paged(
         out.extend(chunk);
     }
     out
+}
+
+/// Walks the whole hot state at `version`: read up to `chunk_size` leaves with the iterator, then
+/// wrap each batch in a range proof. Returns the proof-carrying chunks in order.
+fn collect_chunks_with_proof(
+    db: &AptosDB,
+    version: Version,
+    chunk_size: usize,
+) -> Vec<HotStateValueChunkWithProof> {
+    let mut chunks = vec![];
+    let mut first_index = 0;
+    loop {
+        let raw_values = collect_chunk(db, version, first_index, chunk_size);
+        if raw_values.is_empty() {
+            break;
+        }
+        let num_values = raw_values.len();
+        chunks.push(
+            db.get_hot_state_value_chunk_proof(version, first_index, raw_values)
+                .unwrap(),
+        );
+        first_index += num_values;
+    }
+    chunks
+}
+
+fn assert_chunks_reconstruct_root(version: Version, chunks: &[HotStateValueChunkWithProof]) {
+    assert!(!chunks.is_empty(), "no chunks to verify");
+    // Every chunk of the same snapshot carries the same root, and only the final chunk is last.
+    let root_hash = chunks[0].root_hash;
+    let last = chunks.len() - 1;
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert_eq!(chunk.root_hash, root_hash);
+        assert_eq!(chunk.is_last_chunk(), i == last);
+    }
+
+    let store = Arc::new(MockTreeStore::<StateKey>::new(
+        false, /* allow_overwrite */
+    ));
+    let mut restore = JellyfishMerkleRestore::new(
+        Arc::clone(&store),
+        version,
+        root_hash,
+        false, /* async */
+    )
+    .unwrap();
+    for chunk in chunks {
+        let leaves: Vec<_> = chunk
+            .raw_values
+            .iter()
+            .map(|(k, hsv)| (k, hsv.hash()))
+            .collect();
+        restore.add_chunk_impl(leaves, chunk.proof.clone()).unwrap();
+    }
+    restore.finish_impl().unwrap();
+
+    let restored_root = JellyfishMerkleTree::new(store.as_ref())
+        .get_root_hash(version)
+        .unwrap();
+    assert_eq!(restored_root, root_hash);
+}
+
+fn assert_chunks_match_full(
+    chunks: &[HotStateValueChunkWithProof],
+    full: &[(StateKey, HotStateValue)],
+) {
+    let mut next_index = 0;
+    for chunk in chunks {
+        assert!(
+            !chunk.raw_values.is_empty(),
+            "chunk at index {next_index} is empty"
+        );
+
+        let first_index = next_index;
+        let last_index = first_index + chunk.raw_values.len() - 1;
+        assert!(
+            last_index < full.len(),
+            "chunk range {first_index}..={last_index} exceeds full length {}",
+            full.len()
+        );
+        assert_eq!(chunk.first_index as usize, first_index);
+        assert_eq!(chunk.last_index as usize, last_index);
+        assert_eq!(chunk.first_key, chunk.raw_values.first().unwrap().0.hash());
+        assert_eq!(chunk.last_key, chunk.raw_values.last().unwrap().0.hash());
+        assert_eq!(chunk.raw_values, full[first_index..=last_index]);
+
+        next_index += chunk.raw_values.len();
+    }
+    assert_eq!(next_index, full.len());
 }
 
 #[test]
@@ -185,11 +281,16 @@ fn test_hot_state_chunk_iter_at_older_checkpoint() {
 
     // Reading the older snapshot sees the state as of v0 only.
     assert_eq!(db.get_hot_state_item_count(0).unwrap(), 2);
-    let at_v0: BTreeMap<_, _> = collect_chunk(&db, 0, 0, usize::MAX).into_iter().collect();
+    let v0_full = collect_chunk(&db, 0, 0, usize::MAX);
+    let at_v0: BTreeMap<_, _> = v0_full.iter().cloned().collect();
     assert_eq!(at_v0[&key("a")].value_opt(), Some(&val(b"a0")));
     assert_eq!(at_v0[&key("a")].hot_since_version(), 0);
     assert_eq!(at_v0[&key("b")].value_opt(), Some(&val(b"b0")));
     assert!(!at_v0.contains_key(&key("c")));
+
+    let v0_chunks = collect_chunks_with_proof(&db, 0, 1);
+    assert_chunks_match_full(&v0_chunks, &v0_full);
+    assert_chunks_reconstruct_root(0, &v0_chunks);
 
     // At v1, `b` is untouched — its value and `hot_since_version` are still those from v0, even
     // though its JMT leaf now sits under a newer (v1) snapshot.
@@ -201,6 +302,67 @@ fn test_hot_state_chunk_iter_at_older_checkpoint() {
     assert_eq!(at_v1[&key("b")].hot_since_version(), 0);
     assert_eq!(at_v1[&key("c")].value_opt(), Some(&val(b"c1")));
     assert_eq!(at_v1[&key("c")].hot_since_version(), 1);
+}
+
+#[test]
+fn test_hot_state_chunk_with_proof() {
+    let tmp = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp);
+
+    // A mix of occupied and vacant (deleted) hot entries across two checkpoints.
+    let last = commit_blocks(&db, vec![
+        vec![
+            (key("a"), Some(val(b"a0"))),
+            (key("b"), Some(val(b"b0"))),
+            (key("c"), Some(val(b"c0"))),
+        ],
+        vec![
+            (key("a"), None), // vacant
+            (key("d"), Some(val(b"d1"))),
+            (key("e"), Some(val(b"e1"))),
+        ],
+    ]);
+    let count = db.get_hot_state_item_count(last).unwrap();
+    assert_eq!(count, 5); // a (vacant), b, c, d, e
+
+    let iter_items = collect_chunk(&db, last, 0, usize::MAX);
+
+    // A single full chunk: its index/key range and values line up with the iterator output, and it
+    // is the last chunk.
+    let full = db
+        .get_hot_state_value_chunk_proof(last, 0, iter_items.clone())
+        .unwrap();
+    assert_eq!(full.first_index, 0);
+    assert_eq!(full.last_index as usize, count - 1);
+    assert_eq!(full.first_key, iter_items.first().unwrap().0.hash());
+    assert_eq!(full.last_key, iter_items.last().unwrap().0.hash());
+    assert_eq!(full.raw_values, iter_items);
+    assert!(full.is_last_chunk());
+    assert_chunks_reconstruct_root(last, &[full]);
+
+    // Paginated at various sizes: chunk metadata lines up with the single-pass read and every
+    // chunk verifies against the hot state root.
+    for chunk_size in [1, 2, 3, 5] {
+        let chunks = collect_chunks_with_proof(&db, last, chunk_size);
+        assert_chunks_match_full(&chunks, &iter_items);
+        assert_chunks_reconstruct_root(last, &chunks);
+    }
+}
+
+#[test]
+fn test_hot_state_chunk_proof_empty_errors() {
+    let tmp = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp);
+    let version = commit_blocks(&db, vec![vec![(key("a"), Some(val(b"a0")))]]);
+
+    // An empty chunk has no rightmost key to anchor a range proof on.
+    let err = db
+        .get_hot_state_value_chunk_proof(version, 0, vec![])
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("empty"),
+        "expected an empty-chunk error, got: {err}"
+    );
 }
 
 /// The hot state expected at the latest checkpoint: every key ever written, keyed by key hash,
@@ -268,6 +430,14 @@ proptest! {
             prop_assert_eq!(k, key);
             prop_assert_eq!(hsv.value_opt(), value.as_ref());
             prop_assert_eq!(hsv.hot_since_version(), *ver);
+        }
+
+        // The proof path produces chunks whose metadata lines up with the single-pass read and
+        // reconstructs the hot state Merkle root (what the receiving node verifies).
+        let chunks = collect_chunks_with_proof(&db, ckpt, chunk_size);
+        assert_chunks_match_full(&chunks, &full);
+        if !full.is_empty() {
+            assert_chunks_reconstruct_root(ckpt, &chunks);
         }
 
         // Paging in `chunk_size`-sized steps reconstructs the same sequence.
