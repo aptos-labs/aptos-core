@@ -2283,6 +2283,12 @@ impl CliCommand<&'static str> for CleanPackage {
 
 /// Run a Move function
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Call an entry function with typed arguments
+  $ aptos move run --function-id 0x1::aptos_account::transfer --args address:0xc0ffee u64:1000
+
+  # Call an entry function non-interactively (for scripts/agents)
+  $ aptos move run --function-id 0xc0ffee::message::set_message --args string:hello --assume-yes")]
 pub struct RunFunction {
     #[clap(flatten)]
     pub entry_function_args: EntryFunctionArguments,
