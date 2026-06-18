@@ -18,7 +18,7 @@
 //! TODO: We will need descriptor IDs for non-inline structs and enums later.
 
 use crate::{
-    types::{view_type, InternedType, InternedTypeList, Type},
+    types::{view_type, InternedType, Type},
     DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
@@ -103,12 +103,20 @@ pub enum LayoutKind {
         elem_id: LayoutId,
         descriptor_id: DescriptorId,
     },
-    /// An enum whose variants are resolved lazily on every walk (upgradable).
-    /// TODO: not yet implemented; the walks error on this kind.
-    /// TODO: add closed enum (for framework, frozen ones)
-    OpenEnum {
-        ty: InternedType,
-        ty_args: InternedTypeList,
+    /// An enum whose variant layouts are fixed: an 8-byte heap-pointer slot
+    /// pointing at an enum object. Each variant body has its own published
+    /// layout, which may itself contain enums, vectors, or structs.
+    ///
+    /// TODO: today only frozen (non-upgradable) enums get this layout. Use it
+    /// for all enums once the upgrade story is finalized.
+    FrozenEnum {
+        descriptor_id: DescriptorId,
+        /// One layout per variant body, indexed by variant tag.
+        variants: Box<[LayoutId]>,
+        /// Size of the enum object's data region: the 8-byte tag plus the
+        /// widest variant body, rounded up to 8-byte alignment. Sized to the
+        /// largest variant so any variant fits.
+        max_size_across_variants: u32,
     },
     /// A reference (16-byte fat pointer). All references share this layout.
     Ref,
@@ -293,14 +301,22 @@ impl ValueLayout {
         }
     }
 
-    /// Layout for an open enum.
-    pub fn open_enum(ty: InternedType, ty_args: InternedTypeList) -> ValueLayout {
+    /// Layout for a frozen enum.
+    pub fn frozen_enum(
+        descriptor_id: DescriptorId,
+        variants: Box<[LayoutId]>,
+        max_size_across_variants: u32,
+    ) -> ValueLayout {
         Self {
             size: 8,
             align: MAX_ALIGN as u32,
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
-            kind: LayoutKind::OpenEnum { ty, ty_args },
+            kind: LayoutKind::FrozenEnum {
+                descriptor_id,
+                variants,
+                max_size_across_variants,
+            },
         }
     }
 

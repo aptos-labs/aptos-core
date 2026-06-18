@@ -825,6 +825,14 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         self.loader.guard.publish_layout(ty, layout)
     }
 
+    fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]> {
+        self.loader.guard.publish_variant_layouts(enum_ty, variants)
+    }
+
     fn publish_struct_descriptor(
         &self,
         struct_ty: InternedType,
