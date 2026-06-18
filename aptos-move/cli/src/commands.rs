@@ -297,6 +297,12 @@ pub enum Template {
 /// This will create a directory for a Move package and a corresponding
 /// `Move.toml` file.
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Create a new package named 'hello_blockchain' in the current directory
+  $ aptos move init --name hello_blockchain
+
+  # Create a package with named addresses
+  $ aptos move init --name my_dapp --named-addresses alice=0x1234,module_owner=_")]
 pub struct InitPackage {
     /// Name of the new Move package
     #[clap(long)]
