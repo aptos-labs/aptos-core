@@ -252,7 +252,8 @@ fn display_instr(
         // --- Unary: dst := op src ---
         Instr::UnaryOp(d, op, s) => {
             write_dst(f, *d)?;
-            write!(f, "{} {}", unary_op_name(op), slot_name(*s))
+            write_unary_op(f, op)?;
+            write!(f, " {}", slot_name(*s))
         },
         // --- Binary: dst := op lhs, rhs ---
         Instr::BinaryOp(d, op, l, r) => {
@@ -599,23 +600,12 @@ fn display_instr(
     }
 }
 
-fn unary_op_name(op: &UnaryOp) -> &'static str {
+fn write_unary_op(f: &mut fmt::Formatter<'_>, op: &UnaryOp) -> fmt::Result {
     match op {
-        UnaryOp::CastU8 => "cast_u8",
-        UnaryOp::CastU16 => "cast_u16",
-        UnaryOp::CastU32 => "cast_u32",
-        UnaryOp::CastU64 => "cast_u64",
-        UnaryOp::CastU128 => "cast_u128",
-        UnaryOp::CastU256 => "cast_u256",
-        UnaryOp::CastI8 => "cast_i8",
-        UnaryOp::CastI16 => "cast_i16",
-        UnaryOp::CastI32 => "cast_i32",
-        UnaryOp::CastI64 => "cast_i64",
-        UnaryOp::CastI128 => "cast_i128",
-        UnaryOp::CastI256 => "cast_i256",
-        UnaryOp::Not => "not",
-        UnaryOp::Negate => "negate",
-        UnaryOp::FreezeRef => "freeze_ref",
+        UnaryOp::Cast(to) => write!(f, "cast_{to}"),
+        UnaryOp::Not => f.write_str("not"),
+        UnaryOp::Negate => f.write_str("negate"),
+        UnaryOp::FreezeRef => f.write_str("freeze_ref"),
     }
 }
 

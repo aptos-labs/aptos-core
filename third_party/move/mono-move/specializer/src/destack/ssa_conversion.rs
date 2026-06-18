@@ -13,7 +13,7 @@ use anyhow::{anyhow, bail, ensure, Context, Result};
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Interner, PreparedModule,
+    IntTy, Interner, PreparedModule,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -441,18 +441,18 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::And => self.convert_binop(BinaryOp::And, true)?,
 
             // --- Unary ops (result type specified) ---
-            B::CastU8 => self.convert_unop(UnaryOp::CastU8, ty::U8_TY)?,
-            B::CastU16 => self.convert_unop(UnaryOp::CastU16, ty::U16_TY)?,
-            B::CastU32 => self.convert_unop(UnaryOp::CastU32, ty::U32_TY)?,
-            B::CastU64 => self.convert_unop(UnaryOp::CastU64, ty::U64_TY)?,
-            B::CastU128 => self.convert_unop(UnaryOp::CastU128, ty::U128_TY)?,
-            B::CastU256 => self.convert_unop(UnaryOp::CastU256, ty::U256_TY)?,
-            B::CastI8 => self.convert_unop(UnaryOp::CastI8, ty::I8_TY)?,
-            B::CastI16 => self.convert_unop(UnaryOp::CastI16, ty::I16_TY)?,
-            B::CastI32 => self.convert_unop(UnaryOp::CastI32, ty::I32_TY)?,
-            B::CastI64 => self.convert_unop(UnaryOp::CastI64, ty::I64_TY)?,
-            B::CastI128 => self.convert_unop(UnaryOp::CastI128, ty::I128_TY)?,
-            B::CastI256 => self.convert_unop(UnaryOp::CastI256, ty::I256_TY)?,
+            B::CastU8 => self.convert_cast(IntTy::U8)?,
+            B::CastU16 => self.convert_cast(IntTy::U16)?,
+            B::CastU32 => self.convert_cast(IntTy::U32)?,
+            B::CastU64 => self.convert_cast(IntTy::U64)?,
+            B::CastU128 => self.convert_cast(IntTy::U128)?,
+            B::CastU256 => self.convert_cast(IntTy::U256)?,
+            B::CastI8 => self.convert_cast(IntTy::I8)?,
+            B::CastI16 => self.convert_cast(IntTy::I16)?,
+            B::CastI32 => self.convert_cast(IntTy::I32)?,
+            B::CastI64 => self.convert_cast(IntTy::I64)?,
+            B::CastI128 => self.convert_cast(IntTy::I128)?,
+            B::CastI256 => self.convert_cast(IntTy::I256)?,
             B::Not => self.convert_unop(UnaryOp::Not, ty::BOOL_TY)?,
             // --- Unary ops (result type derived from operand) ---
             B::Negate => {
@@ -1069,6 +1069,11 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         self.current_block_instrs.push(Instr::UnaryOp(dst, op, src));
         self.push_slot(dst);
         Ok(())
+    }
+
+    /// Convert a cast op, whose result type is the cast target itself.
+    fn convert_cast(&mut self, to: IntTy) -> Result<()> {
+        self.convert_unop(UnaryOp::Cast(to), to.interned_ty())
     }
 }
 
