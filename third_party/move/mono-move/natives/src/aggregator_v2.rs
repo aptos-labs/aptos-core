@@ -296,7 +296,7 @@ fn native_read<C: NativeContext, T: UnsignedInt>(ctx: &C) -> Result<NativeStatus
     let value = aggregator.read_value();
     let max_value = aggregator.read_max_value();
     if value > max_value {
-        return Err(VMInternalError::InvariantViolation(format!(
+        return Err(VMInternalError::invariant_violation(format!(
             "Aggregator read returned value greater than max: {value} > {max_value}"
         )));
     }

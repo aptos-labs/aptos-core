@@ -19,4 +19,4 @@ pub use registry::{
     NativeRegistryError, NativeResolver, NoNatives,
 };
 pub use result::{NativeStatus, VMInternalError};
-pub use value::{Opaque, Ref, VMValue, Vector};
+pub use value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector};

@@ -229,6 +229,9 @@ fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
 struct Layouts {
     /// Type to layout ID mapping. Types are concrete.
     by_ty: DashMap<InternedType, LayoutId, ahash::RandomState>,
+    /// Enum type to the layout IDs of its per-variant bodies. Variant bodies
+    /// may not have a Move type of their own, so they are keyed in this map.
+    enum_variants_by_type: DashMap<InternedType, Box<[LayoutId]>, ahash::RandomState>,
     /// All existing layouts in ID order. `boxcar::Vec` is an append-only
     /// concurrent vector: entries are pushed through a shared `&` reference and
     /// are never moved, so [`LayoutId`] indices stay stable and concurrent
@@ -248,6 +251,7 @@ impl Layouts {
     fn new() -> Self {
         Self {
             by_ty: DashMap::default(),
+            enum_variants_by_type: DashMap::default(),
             table: initial_layouts(),
         }
     }
@@ -255,8 +259,13 @@ impl Layouts {
     /// Resets layout table and type to layout ID mappings. Reserved layouts
     /// are added back to the layout table.
     fn reset(&mut self) {
-        let Self { by_ty, table } = self;
+        let Self {
+            by_ty,
+            enum_variants_by_type,
+            table,
+        } = self;
         by_ty.clear();
+        enum_variants_by_type.clear();
         *table = initial_layouts();
     }
 }
@@ -778,6 +787,30 @@ impl<'ctx> ExecutionGuard<'ctx> {
             let idx = self.ctx.layouts.table.push(layout);
             LayoutId::from_usize(idx)
         })
+    }
+
+    /// Publishes the variant-body layouts of enum and returns their [`LayoutId`]s.
+    pub fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]> {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(ids) = self.ctx.layouts.enum_variants_by_type.get(&enum_ty) {
+            return ids.clone();
+        }
+        self.ctx
+            .layouts
+            .enum_variants_by_type
+            .entry(enum_ty)
+            .or_insert_with(|| {
+                variants
+                    .into_iter()
+                    .map(|layout| LayoutId::from_usize(self.ctx.layouts.table.push(layout)))
+                    .collect()
+            })
+            .clone()
     }
 
     /// Looks up a type previously interned from a signature token of `module`.

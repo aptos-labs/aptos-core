@@ -3375,6 +3375,7 @@ dependencies = [
  "bcs 0.1.4",
  "dir-diff",
  "file_diff",
+ "move-command-line-common",
  "move-core-types",
  "move-package",
  "move-unit-test",
@@ -12855,16 +12856,20 @@ dependencies = [
  "move-core-types",
  "shared-dsa",
  "specializer",
- "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "blake2-rfc",
  "mono-move-core",
  "move-core-types",
+ "ripemd",
+ "sha2 0.9.9",
  "sha3 0.9.1",
+ "siphasher 0.3.11",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -12894,7 +12899,6 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -12904,6 +12908,7 @@ dependencies = [
  "anyhow",
  "aptos-framework-natives",
  "aptos-gas-schedule",
+ "aptos-move-stdlib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
@@ -12925,7 +12930,6 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-prover-test-utils",
- "move-stdlib",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",

@@ -21,7 +21,10 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
-    state_value_chunk::{build_value_chunk_proof, jmt_leaves_with_values, value_chunk_with_proof},
+    state_value_chunk::{
+        build_hot_value_chunk_proof, build_value_chunk_proof, jmt_leaves_with_values,
+        value_chunk_with_proof,
+    },
     utils::{
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
@@ -69,7 +72,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
-        hot_state::HotStateValue,
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
@@ -1496,6 +1499,50 @@ impl StateStore {
             version,
             first_index,
             state_key_values,
+        )
+    }
+
+    /// Returns the number of hot state items (leaves of the hot state Merkle tree) at `version`.
+    pub fn get_hot_state_item_count(&self, version: Version) -> Result<usize> {
+        self.hot_state_merkle_db.get_leaf_count(version)
+    }
+
+    /// Walks the hot state Merkle tree at `version` from `first_index` and yields up to
+    /// `chunk_size` hot state leaves, each pairing the full key with its [`HotStateValue`] (the
+    /// value or vacancy plus `hot_since_version`).
+    pub fn get_hot_state_value_chunk_iter(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, HotStateValue)>> + Send + Sync + use<>> {
+        let store = Arc::clone(self);
+        Ok(JellyfishMerkleIterator::new_by_index(
+            Arc::clone(&self.hot_state_merkle_db),
+            version,
+            first_index,
+        )?
+        .map(move |res| {
+            let (key_hash, (key, leaf_version)) = res?;
+            let value = store.expect_hot_state_value_by_version(key_hash, leaf_version)?;
+            Ok((key, value))
+        })
+        .take(chunk_size))
+    }
+
+    /// Assembles a [`HotStateValueChunkWithProof`] for the given hot state leaves, with a range
+    /// proof against the hot state Merkle root at `version`.
+    pub fn get_hot_state_value_chunk_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        raw_values: Vec<(StateKey, HotStateValue)>,
+    ) -> Result<HotStateValueChunkWithProof> {
+        build_hot_value_chunk_proof(
+            self.hot_state_merkle_db.as_ref(),
+            version,
+            first_index,
+            raw_values,
         )
     }
 
