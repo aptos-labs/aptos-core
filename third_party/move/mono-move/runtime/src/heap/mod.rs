@@ -27,8 +27,9 @@ use crate::{
 use mono_move_core::{
     align_max, checked_align_max,
     native::{NativeABI, NativeExtensions},
-    DescriptorId, DescriptorProvider, FrameOffset, Function, ObjectDescriptorInner, RootPool,
-    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
+    types::InternedType,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
+    RootPool, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
     ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
 use std::ptr::NonNull;
@@ -285,6 +286,88 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
             try_alloc(heap).map_err(AllocationError::into_runtime_error)
         },
         Err(e) => Err(e.into_runtime_error()),
+    }
+}
+
+/// Deep-copies the value tree at `root`.
+/// Automatically runs GC and retries when out of memory.
+///
+/// # Safety
+///
+/// `root` must point to the data region of a live object whose header is at
+/// `root - OBJECT_HEADER_SIZE`.
+pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    root: NonNull<u8>,
+) -> RuntimeResult<NonNull<u8>> {
+    // SAFETY: `root` is a live object (this function's contract).
+    let root_guard = unsafe { extra_roots.root_object(root.as_ptr()) };
+    // SAFETY: the rooted object is live, so its (possibly relocated) pointer is
+    // non-null.
+    match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr())) } {
+        Ok(ptr) => Ok(ptr),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+            // SAFETY: the handle kept the source live across GC; re-read its
+            // relocated, still-non-null pointer.
+            unsafe {
+                heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr()))
+                    .map_err(AllocationError::into_runtime_error)
+            }
+        },
+    }
+}
+
+/// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
+/// runs out of heap, collects garbage once (with the given roots) and retries.
+/// The deserialize counterpart to [`alloc_or_gc`] / [`deep_copy_or_gc`].
+///
+/// # Safety
+///
+/// `dst` must be writable for `ty`'s layout size, and `bytes` must not alias the
+/// heap, since a GC may relocate heap objects.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn deserialize_or_gc<
+    L: LayoutProvider + ?Sized,
+    P: DescriptorProvider + ?Sized,
+>(
+    layouts: &L,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    frame_ptr: *mut u8,
+    top_frame: TopFrame<'_>,
+) -> RuntimeResult<()> {
+    // SAFETY: forwarded from this function's contract.
+    match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
+        Ok(()) => Ok(()),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(
+                heap,
+                provider,
+                rws,
+                extra_roots,
+                extensions,
+                frame_ptr,
+                top_frame,
+            )?;
+            // SAFETY: as above.
+            unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
+                .map_err(AllocationError::into_runtime_error)
+        },
     }
 }
 

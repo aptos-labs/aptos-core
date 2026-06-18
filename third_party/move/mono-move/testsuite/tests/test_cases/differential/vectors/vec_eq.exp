@@ -2,21 +2,6 @@
 // Bytecode version v10
 module 0x1::test
 // Function definition at index 0
-fun build(l0: u64, l1: u64): vector<u64>
-    local l2: vector<u64>
-    vec_pack <u64>, 0
-    st_loc l2
-    mut_borrow_loc l2
-    move_loc l0
-    vec_push_back <u64>
-    // @5
-    mut_borrow_loc l2
-    move_loc l1
-    vec_push_back <u64>
-    move_loc l2
-    ret
-
-// Function definition at index 1
 fun cmp(l0: u64, l1: u64, l2: u64, l3: u64): u64
     move_loc l0
     move_loc l1
@@ -31,6 +16,21 @@ fun cmp(l0: u64, l1: u64, l2: u64, l3: u64): u64
     ret
     // @10
 l0: ld_u64 42
+    ret
+
+// Function definition at index 1
+fun build(l0: u64, l1: u64): vector<u64>
+    local l2: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l2
+    mut_borrow_loc l2
+    move_loc l0
+    vec_push_back <u64>
+    // @5
+    mut_borrow_loc l2
+    move_loc l1
+    vec_push_back <u64>
+    move_loc l2
     ret
 
 // Function definition at index 2
@@ -103,22 +103,6 @@ fun neq_ref(l0: u64, l1: u64, l2: u64, l3: u64): bool
 === stackless ===
 // module 0x1::test
 
-fun build(r0, r1): vector<u64> {
-  slots: params(2), locals(1), temps(1)
-    r0: u64
-    r1: u64
-    r2: vector<u64>
-    r3: &mut vector<u64>
-  code:
-  L0:
-    0: r2 := vec_pack u64, 0, []
-    1: r3 := mut_borrow_loc r2
-    2: vec_push_back u64, r3, r0
-    3: r3 := mut_borrow_loc r2
-    4: vec_push_back u64, r3, r1
-    5: ret [r2]
-}
-
 fun cmp(r0, r1, r2, r3): u64 {
   slots: params(4), locals(0), temps(2), xfer(2)
     r0: u64
@@ -138,6 +122,22 @@ fun cmp(r0, r1, r2, r3): u64 {
   L0:
     5: r5 := ld_u64 42
     6: ret [r5]
+}
+
+fun build(r0, r1): vector<u64> {
+  slots: params(2), locals(1), temps(1)
+    r0: u64
+    r1: u64
+    r2: vector<u64>
+    r3: &mut vector<u64>
+  code:
+  L0:
+    0: r2 := vec_pack u64, 0, []
+    1: r3 := mut_borrow_loc r2
+    2: vec_push_back u64, r3, r0
+    3: r3 := mut_borrow_loc r2
+    4: vec_push_back u64, r3, r1
+    5: ret [r2]
 }
 
 fun eq(r0, r1, r2, r3): bool {
@@ -218,22 +218,6 @@ fun neq_ref(r0, r1, r2, r3): bool {
 === micro-ops ===
 // module 0x1::test
 
-fun build() {
-  frame_data_size: 40
-  entry_gas: 124
-  code:
-    0: VecNew [16]
-    1: SlotBorrow [24] <- &[16]
-    2: VecPushBack [24].push([0], size=8, desc=0)
-    3: SlotBorrow [24] <- &[16]
-    4: VecPushBack [24].push([8], size=8, desc=0)
-    5: Move8 [0] <- [16]
-    6: Return
-  safe_point_layouts:
-    2: []
-    4: []
-}
-
 fun cmp() {
   frame_data_size: 48
   entry_gas: 153
@@ -252,6 +236,22 @@ fun cmp() {
     11: StoreImm8 [40] <- #42
     12: Move8 [0] <- [40]
     13: Return
+}
+
+fun build() {
+  frame_data_size: 40
+  entry_gas: 124
+  code:
+    0: VecNew [16]
+    1: SlotBorrow [24] <- &[16]
+    2: VecPushBack [24].push([0], size=8, desc=0)
+    3: SlotBorrow [24] <- &[16]
+    4: VecPushBack [24].push([8], size=8, desc=0)
+    5: Move8 [0] <- [16]
+    6: Return
+  safe_point_layouts:
+    2: []
+    4: []
 }
 
 fun eq() {

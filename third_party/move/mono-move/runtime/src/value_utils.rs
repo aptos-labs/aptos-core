@@ -37,7 +37,6 @@ use std::cmp::Ordering;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values, etc.).
-#[allow(dead_code)]
 pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     ty: InternedType,
