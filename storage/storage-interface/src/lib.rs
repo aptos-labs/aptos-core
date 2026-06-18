@@ -480,6 +480,11 @@ pub trait DbReader: Send + Sync {
             raw_values: Vec<(StateKey, HotStateValue)>,
         ) -> Result<HotStateValueChunkWithProof>;
 
+        /// Returns the lowest servable version for hot state value chunks (the earliest
+        /// persisted hot state Merkle snapshot), or `None` if this node does not serve
+        /// hot state.
+        fn get_hot_state_snapshot_min_servable_version(&self) -> Result<Option<Version>>;
+
         /// Returns if the state store pruner is enabled.
         fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;
 

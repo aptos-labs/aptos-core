@@ -53,6 +53,8 @@ pub enum DataRequest {
     GetTransactionDataWithProof(GetTransactionDataWithProofRequest), // Fetches transaction data with a proof
     GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest), // Optimistically fetches new transaction data with a proof
     SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest), // Subscribes to transaction data with a proof
+
+    GetHotStateValuesWithProof(StateValuesWithProofRequest), // Fetches a list of hot states with a proof
 }
 
 impl DataRequest {
@@ -65,6 +67,7 @@ impl DataRequest {
             Self::GetNumberOfStatesAtVersion(_) => "get_number_of_states_at_version",
             Self::GetServerProtocolVersion => "get_server_protocol_version",
             Self::GetStateValuesWithProof(_) => "get_state_values_with_proof",
+            Self::GetHotStateValuesWithProof(_) => "get_hot_state_values_with_proof",
             Self::GetStorageServerSummary => "get_storage_server_summary",
             Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",

@@ -3,7 +3,7 @@
 
 use crate::{
     refresh_cached_storage_summary,
-    storage::StorageReader,
+    storage::{StorageReader, StorageReaderInterface},
     tests::{
         mock,
         mock::{MockClient, MockDatabaseReader},
@@ -46,6 +46,7 @@ async fn test_refresh_cached_storage_summary() {
     let db_reader = create_db_reader_with_expectations(
         lowest_version,
         state_prune_window,
+        lowest_version,
         highest_ledger_info.clone(),
     );
     let storage_reader = StorageReader::new(
@@ -164,6 +165,7 @@ async fn test_get_storage_server_summary_advance_time() {
     let db_reader = create_db_reader_with_expectations(
         lowest_version,
         state_prune_window,
+        lowest_version,
         highest_ledger_info.clone(),
     );
 
@@ -222,6 +224,7 @@ async fn test_get_storage_server_summary_notification() {
     let db_reader = create_db_reader_with_expectations(
         lowest_version,
         state_prune_window,
+        lowest_version,
         highest_ledger_info.clone(),
     );
 
@@ -267,11 +270,46 @@ async fn test_get_storage_server_summary_notification() {
     }
 }
 
+#[tokio::test]
+async fn test_get_storage_server_summary_clamps_states_to_hot_state() {
+    // Create test data where the earliest hot state root sits inside the cold
+    // state range (i.e. above its lower end).
+    let highest_version = 1000;
+    let highest_epoch = 430;
+    let lowest_version = 11;
+    let state_prune_window = 200;
+    let hot_state_min_version = 900;
+    let highest_ledger_info =
+        utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+
+    // Create the storage reader over a mock db
+    let db_reader = create_db_reader_with_expectations(
+        lowest_version,
+        state_prune_window,
+        hot_state_min_version,
+        highest_ledger_info,
+    );
+    let storage_reader = StorageReader::new(
+        StorageServiceConfig::default(),
+        Arc::new(db_reader),
+        TimeService::mock(),
+    );
+
+    // The cold state range is [801, 1000]; reusing it for hot state clamps the
+    // advertised range up to the earliest hot state root (900).
+    let data_summary = storage_reader.get_data_summary().unwrap();
+    assert_eq!(
+        data_summary.states,
+        Some(CompleteDataRange::new(hot_state_min_version, highest_version).unwrap()),
+    );
+}
+
 /// Creates a mock database reader with the necessary
 /// expectations to satisfy the storage server summary request.
 fn create_db_reader_with_expectations(
     lowest_version: Version,
     state_prune_window: usize,
+    hot_state_min_version: Version,
     highest_ledger_info: LedgerInfoWithSignatures,
 ) -> MockDatabaseReader {
     // Create the mock reader
@@ -293,6 +331,9 @@ fn create_db_reader_with_expectations(
     db_reader
         .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
+    db_reader
+        .expect_get_hot_state_snapshot_min_servable_version()
+        .returning(move || Ok(Some(hot_state_min_version)));
     db_reader
 }
 

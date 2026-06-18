@@ -40,6 +40,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -333,6 +334,8 @@ mock! {
 
         fn is_state_merkle_pruner_enabled(&self) -> aptos_storage_interface::Result<bool>;
 
+        fn get_hot_state_snapshot_min_servable_version(&self) -> aptos_storage_interface::Result<Option<Version>>;
+
         fn get_persisted_auxiliary_info_iterator(
             &self,
             start_version: Version,
@@ -389,6 +392,20 @@ mock! {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> aptos_storage_interface::Result<StateValueChunkWithProof>;
+
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, HotStateValue)>>>>;
+
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> aptos_storage_interface::Result<HotStateValueChunkWithProof>;
     }
 }
 
@@ -417,6 +434,9 @@ pub fn create_mock_db_with_summary_updates(
     db_reader
         .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
+    db_reader
+        .expect_get_hot_state_snapshot_min_servable_version()
+        .returning(move || Ok(Some(lowest_version)));
 
     db_reader
 }
