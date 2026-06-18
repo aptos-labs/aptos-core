@@ -12,7 +12,7 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig, NodeResourceOverride,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig,
+    BlockGasLimitType, FeatureFlag, Features, OnChainConsensusConfig, OnChainExecutionConfig,
 };
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
@@ -41,6 +41,20 @@ pub(crate) fn get_land_blocking_test(
     Some(test)
 }
 
+fn compatibility_test_features() -> Features {
+    let mut features = Features::default();
+    // Keep mixed-version forge tests aligned with mainnet/testnet, where this
+    // feature is not enabled yet. When enabled, old and new binaries can
+    // disagree on the hotness portion of transaction outputs.
+    features.disable(FeatureFlag::HOTNESS_IN_EPILOGUE);
+    features
+}
+
+fn set_compatibility_test_features(helm_values: &mut serde_yaml::Value) {
+    helm_values["chain"]["initial_features_override"] =
+        serde_yaml::to_value(compatibility_test_features()).expect("must serialize");
+}
+
 pub(crate) fn compat() -> ForgeConfig {
     ForgeConfig::default()
         .with_suite_name("compat".into())
@@ -50,6 +64,7 @@ pub(crate) fn compat() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] =
                 SimpleValidatorUpgrade::EPOCH_DURATION_SECS.into();
+            set_compatibility_test_features(helm_values);
         }))
 }
 
@@ -61,6 +76,7 @@ pub(crate) fn framework_upgrade() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] =
                 FrameworkUpgrade::EPOCH_DURATION_SECS.into();
+            set_compatibility_test_features(helm_values);
         }))
         // Genesis enables chunky DKG (decryption) by default. This test upgrades
         // only half the validators to the new binary, which would emit
