@@ -3947,6 +3947,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "regex",
  "reqwest 0.11.23",
  "serde",
  "serde_json",
@@ -3972,6 +3973,29 @@ dependencies = [
  "move-core-types",
  "move-model",
  "serde",
+]
+
+[[package]]
+name = "aptos-release-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-release-builder",
+ "aptos-rest-client",
+ "aptos-types",
+ "chrono",
+ "clap 4.5.60",
+ "git2 0.16.1",
+ "hex",
+ "move-command-line-common",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "sha2 0.9.9",
+ "tempfile",
+ "tokio",
+ "toml 0.7.8",
+ "url",
 ]
 
 [[package]]

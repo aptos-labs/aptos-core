@@ -1,0 +1,9 @@
+{
+  "feature_version": 31,
+  "entries": [
+    ["txn.large_transaction_cutoff", 600],
+    ["txn.max_execution_gas", 1000000000],
+    ["instr.add", 65],
+    ["instr.mul", 90]
+  ]
+}

@@ -1,0 +1,191 @@
+# Generates a framework release bundle from a release branch and PRs it to
+# aptos-networks. See aptos-move/aptos-release-tool for the underlying CLI.
+#
+# The workflow file lives on main, but the tool is BUILT FROM THE RELEASE
+# BRANCH: the new gas schedule is compiled into the binary, so the binary must
+# come from the branch being released, not from main.
+name: "Generate Release Bundle"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_branch:
+        description: "Release branch to generate from (e.g. aptos-release-v1.45)"
+        required: true
+        type: string
+      release_config:
+        description: "Path to the release config on that branch"
+        required: false
+        type: string
+        default: "aptos-move/aptos-release-tool/data/framework-release.yaml"
+      dry_run:
+        description: "Generate and verify only; do not PR it to aptos-networks"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generate-release-bundle-${{ inputs.release_branch }}
+  cancel-in-progress: false
+
+env:
+  # Where bundles live inside aptos-networks: framework-releases/<version>/.
+  BUNDLE_BASE_DIR: framework-releases
+
+jobs:
+  generate-bundle:
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    # Expose user-supplied free-text inputs as env vars so they are referenced as
+    # "$RELEASE_*" in run: scripts, never interpolated into the script body.
+    env:
+      RELEASE_BRANCH: ${{ inputs.release_branch }}
+      RELEASE_CONFIG: ${{ inputs.release_config }}
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_branch }}
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+        with:
+          ADDITIONAL_KEY: release-bundle
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Determine bundle name
+        id: bundle
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pyyaml
+          # Reads the release config's `name` (the bundle name) and emits bundle_name.
+          python aptos-move/aptos-release-tool/scripts/bundle_name.py "$RELEASE_CONFIG"
+          echo "source_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build aptos-release-tool
+        run: cargo build --release -p aptos-release-tool
+
+      - name: Generate bundle
+        run: |
+          set -euo pipefail
+          target/release/aptos-release-tool generate-bundle \
+            --release-config "$RELEASE_CONFIG" \
+            --bundle "$RUNNER_TEMP/${{ steps.bundle.outputs.bundle_name }}"
+
+      # generate-bundle verifies on success already; run it again as a
+      # dedicated step so verification is visible in the job UI.
+      - name: Verify bundle
+        run: |
+          target/release/aptos-release-tool verify-bundle \
+            --bundle "$RUNNER_TEMP/${{ steps.bundle.outputs.bundle_name }}"
+
+      - name: Write step summary
+        id: digest
+        run: |
+          set -euo pipefail
+          BUNDLE_DIR="$RUNNER_TEMP/${{ steps.bundle.outputs.bundle_name }}"
+          DIGEST=$(sed -n 's/^digest[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$BUNDLE_DIR/bundle.toml")
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Release bundle: ${{ steps.bundle.outputs.bundle_name }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Source branch | \`$RELEASE_BRANCH\` |"
+            echo "| Source commit | \`${{ steps.bundle.outputs.source_commit }}\` |"
+            echo "| Digest | \`${DIGEST}\` |"
+            echo "| Dry run | \`${{ inputs.dry_run }}\` |"
+            echo ""
+            echo "### Files"
+            echo '```'
+            (cd "$RUNNER_TEMP" && find "${{ steps.bundle.outputs.bundle_name }}" -type f | sort)
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Uploaded on every run (including non-dry runs) so the exact artifact
+      # that was PR'd can be downloaded and inspected independently.
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.bundle.outputs.bundle_name }}
+          path: ${{ runner.temp }}/${{ steps.bundle.outputs.bundle_name }}
+          if-no-files-found: error
+
+      - name: Checkout aptos-networks
+        if: ${{ !inputs.dry_run }}
+        uses: actions/checkout@v4
+        with:
+          repository: aptos-labs/aptos-networks
+          token: ${{ secrets.APTOS_BOT_PAT }}
+          path: aptos-networks
+
+      - name: Stage bundle into aptos-networks
+        if: ${{ !inputs.dry_run }}
+        id: stage
+        run: |
+          set -euo pipefail
+          DEST="aptos-networks/$BUNDLE_BASE_DIR/${{ steps.bundle.outputs.version }}"
+          REGENERATED=false
+          if [ -d "$DEST" ]; then
+            REGENERATED=true
+            rm -rf "$DEST"
+          fi
+          mkdir -p "$(dirname "$DEST")"
+          cp -r "$RUNNER_TEMP/${{ steps.bundle.outputs.bundle_name }}" "$DEST"
+          echo "regenerated=${REGENERATED}" >> "$GITHUB_OUTPUT"
+
+      - name: Write PR body
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          BODY="$RUNNER_TEMP/pr-body.md"
+          {
+            if [ "${{ steps.stage.outputs.regenerated }}" = "true" ]; then
+              echo "> [!WARNING]"
+              echo "> This **replaces an existing bundle** of the same name (e.g. regeneration after cherry-picks). Review the diff carefully."
+              echo ""
+            fi
+            echo "Release bundle generated by [\`generate-release-bundle\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Bundle | \`${{ steps.bundle.outputs.bundle_name }}\` |"
+            echo "| Path | \`$BUNDLE_BASE_DIR/${{ steps.bundle.outputs.version }}\` |"
+            echo "| Source branch | \`$RELEASE_BRANCH\` |"
+            echo "| Source commit | \`${{ github.repository }}@${{ steps.bundle.outputs.source_commit }}\` |"
+            echo "| Digest | \`${{ steps.digest.outputs.digest }}\` |"
+            echo ""
+            echo "Reviewers: read \`summary/\` and tick the sign-off checkboxes in this PR."
+            echo "Ticking boxes does not invalidate checksums; any other edit to the bundle does."
+          } > "$BODY"
+
+      - name: Create PR to aptos-networks
+        if: ${{ !inputs.dry_run }}
+        id: create-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # pin@v8
+        with:
+          token: ${{ secrets.APTOS_BOT_PAT }}
+          path: aptos-networks
+          base: main
+          # Deterministic branch name: re-running for the same bundle updates
+          # the existing PR instead of opening a new one.
+          branch: bundle/${{ steps.bundle.outputs.version }}
+          delete-branch: true
+          title: "[release-bundle] ${{ steps.bundle.outputs.bundle_name }}"
+          body-path: ${{ runner.temp }}/pr-body.md
+          commit-message: "[release-bundle] Add ${{ steps.bundle.outputs.bundle_name }} (from ${{ inputs.release_branch }} @ ${{ steps.bundle.outputs.source_commit }})"
+
+      - name: Log PR URL
+        if: ${{ !inputs.dry_run && steps.create-pr.outputs.pull-request-url }}
+        run: |
+          {
+            echo ""
+            echo "### Pull request"
+            echo "${{ steps.create-pr.outputs.pull-request-url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
