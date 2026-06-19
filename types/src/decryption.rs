@@ -58,16 +58,23 @@ impl BlockTxnDecryptionKey {
     }
 }
 
+/// Mirror of `aptos_framework::decryption::PerBlockDecryptionKeyV2`.
+/// Read once per epoch in `build_root`: its existence marks that dense
+/// decryption-round tracking is active (blocks emit `BlockMetadataExt::V3`),
+/// and `next_decryption_round` seeds the in-memory round chain. Not used on
+/// the steady-state hot path.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct OnchainPerBlockDecryptionKey {
+pub struct OnchainPerBlockDecryptionKeyV2 {
     pub epoch: u64,
-    pub round: u64,
+    pub block_round: u64,
     pub decryption_key: Option<Vec<u8>>,
+    pub decryption_round: Option<u64>,
+    pub next_decryption_round: u64,
 }
 
-impl OnChainConfig for OnchainPerBlockDecryptionKey {
+impl OnChainConfig for OnchainPerBlockDecryptionKeyV2 {
     const MODULE_IDENTIFIER: &'static str = "decryption";
-    const TYPE_IDENTIFIER: &'static str = "PerBlockDecryptionKey";
+    const TYPE_IDENTIFIER: &'static str = "PerBlockDecryptionKeyV2";
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -82,3 +89,13 @@ impl move_core_types::move_resource::MoveStructType for PerEpochEncryptionKeyRes
 }
 
 impl MoveResource for PerEpochEncryptionKeyResource {}
+
+/// Decryption payload emitted by the consensus pipeline for a block that
+/// produced a key: the per-block decryption key paired with the dense
+/// `decryption_round` it consumed. Wrap in `Option` at the call site to
+/// indicate "no key for this block".
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DecryptionPayload {
+    pub key: BlockTxnDecryptionKey,
+    pub decryption_round: u64,
+}
