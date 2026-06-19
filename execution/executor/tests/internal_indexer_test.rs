@@ -134,7 +134,6 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
 
 #[test]
 fn test_db_indexer_data() {
-    use std::{thread, time::Duration};
     // create test db
     let (aptos_db, core_account) = create_test_db();
     let total_version = aptos_db.expect_synced_version();
@@ -157,7 +156,7 @@ fn test_db_indexer_data() {
         .process_a_batch(start_version, total_version)
         .unwrap();
     // wait for the commit to finish
-    thread::sleep(Duration::from_millis(100));
+    db_indexer.flush().unwrap();
     // indexer has process all the transactions
     assert_eq!(
         internal_indexer_db.get_persisted_version().unwrap(),
