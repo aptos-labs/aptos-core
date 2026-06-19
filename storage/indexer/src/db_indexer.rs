@@ -49,28 +49,41 @@ use std::{
     thread,
 };
 
+/// Message sent to the background committer thread.
+pub(crate) enum CommitMessage {
+    Write(SchemaBatch),
+    /// Ack once all preceding writes have been committed, so callers can block
+    /// until the committer catches up.
+    Flush(Sender<()>),
+    Stop,
+}
+
 pub struct DBCommitter {
     db: Arc<DB>,
-    receiver: Receiver<Option<SchemaBatch>>,
+    receiver: Receiver<CommitMessage>,
 }
 
 impl DBCommitter {
-    pub fn new(db: Arc<DB>, receiver: Receiver<Option<SchemaBatch>>) -> Self {
+    pub(crate) fn new(db: Arc<DB>, receiver: Receiver<CommitMessage>) -> Self {
         Self { db, receiver }
     }
 
     pub fn run(&self) {
         loop {
-            let batch_opt = self
+            let msg = self
                 .receiver
                 .recv()
-                .expect("Failed to receive batch from DB Indexer");
-            if let Some(batch) = batch_opt {
-                self.db
-                    .write_schemas(batch)
-                    .expect("Failed to write batch to indexer db");
-            } else {
-                break;
+                .expect("Failed to receive message from DB Indexer");
+            match msg {
+                CommitMessage::Write(batch) => {
+                    self.db
+                        .write_schemas(batch)
+                        .expect("Failed to write batch to indexer db");
+                },
+                CommitMessage::Flush(ack) => {
+                    let _ = ack.send(());
+                },
+                CommitMessage::Stop => break,
             }
         }
     }
@@ -305,7 +318,7 @@ impl InternalIndexerDB {
 pub struct DBIndexer {
     pub indexer_db: InternalIndexerDB,
     pub main_db_reader: Arc<dyn DbReader>,
-    sender: Sender<Option<SchemaBatch>>,
+    sender: Sender<CommitMessage>,
     committer_handle: Option<thread::JoinHandle<()>>,
     pub event_v2_translation_engine: EventV2TranslationEngine,
 }
@@ -314,8 +327,8 @@ impl Drop for DBIndexer {
     fn drop(&mut self) {
         if let Some(handle) = self.committer_handle.take() {
             self.sender
-                .send(None)
-                .expect("Failed to send None to DBIndexer committer");
+                .send(CommitMessage::Stop)
+                .expect("Failed to send Stop to DBIndexer committer");
             handle
                 .join()
                 .expect("DBIndexer committer thread fails to join");
@@ -547,9 +560,23 @@ impl DBIndexer {
             &MetadataValue::Version(version - 1),
         )?;
         self.sender
-            .send(Some(batch))
+            .send(CommitMessage::Write(batch))
             .map_err(|e| AptosDbError::Other(e.to_string()))?;
         Ok(version)
+    }
+
+    /// Block until the committer has persisted every batch sent so far. Writes
+    /// are committed asynchronously, so callers that need to read back their own
+    /// writes (e.g. tests) must flush first.
+    pub fn flush(&self) -> Result<()> {
+        let (ack_tx, ack_rx) = mpsc::channel();
+        self.sender
+            .send(CommitMessage::Flush(ack_tx))
+            .map_err(|e| AptosDbError::Other(e.to_string()))?;
+        ack_rx
+            .recv()
+            .map_err(|e| AptosDbError::Other(e.to_string()))?;
+        Ok(())
     }
 
     pub fn translate_event_v2_to_v1(
