@@ -1,0 +1,135 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x99::noncapturing
+// Function definition at index 0
+fun call_double_twice(l0: u64): u64
+    local l1: |u64|u64 has copy + drop
+    pack_closure double, 0
+    st_loc l1
+    copy_loc l0
+    copy_loc l1
+    call_closure <|u64|u64 has copy + drop>
+    // @5
+    move_loc l0
+    move_loc l1
+    call_closure <|u64|u64 has copy + drop>
+    add
+    ret
+
+// Function definition at index 1
+fun call_identity(l0: u64): u64
+    local l1: |u64|u64 has drop
+    pack_closure identity, 0
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    call_closure <|u64|u64 has drop>
+    // @5
+    ret
+
+// Function definition at index 2
+fun double(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 3
+fun identity(l0: u64): u64
+    move_loc l0
+    ret
+
+=== stackless ===
+// module 0x99::noncapturing
+
+fun call_double_twice(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: |u64|u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r1 := pack_closure double, 0, []
+    1: [r2] := call_closure [|u64|u64], [r0, r1]
+    2: [r3] := call_closure [|u64|u64], [r0, r1]
+    3: r3 := add r2, r3
+    4: ret [r3]
+}
+
+fun call_identity(r0): u64 {
+  slots: params(1), locals(1), temps(1)
+    r0: u64
+    r1: |u64|u64
+    r2: u64
+  code:
+  L0:
+    0: r1 := pack_closure identity, 0, []
+    1: [r2] := call_closure [|u64|u64], [r0, r1]
+    2: ret [r2]
+}
+
+fun double(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := add r0, r0
+    1: ret [r1]
+}
+
+fun identity(r0): u64 {
+  slots: params(1), locals(0), temps(0)
+    r0: u64
+  code:
+  L0:
+    0: ret [r0]
+}
+=== micro-ops ===
+// module 0x99::noncapturing
+
+fun call_double_twice() {
+  frame_data_size: 32
+  entry_gas: 244
+  code:
+    0: PackClosure [8] <- func_ref=Unresolved(double), mask=0, captured_desc=<none>, captured=[]
+    1: CallClosure closure=[8], provided_args=[[0](8)]
+    2: Move8 [16] <- [56]
+    3: CallClosure closure=[8], provided_args=[[0](8)]
+    4: Move8 [24] <- [56]
+    5: AddU64 [24] <- [16] + [24]
+    6: Move8 [0] <- [24]
+    7: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun call_identity() {
+  frame_data_size: 24
+  entry_gas: 151
+  code:
+    0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[]
+    1: CallClosure closure=[8], provided_args=[[0](8)]
+    2: Move8 [16] <- [48]
+    3: Move8 [0] <- [16]
+    4: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun double() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: AddU64 [8] <- [0] + [0]
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun identity() {
+  frame_data_size: 8
+  entry_gas: 54
+  code:
+    0: Return
+}

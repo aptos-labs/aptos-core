@@ -1,0 +1,62 @@
+\documentclass[runningheads]{llncs}
+
+\input{prelude.tex}
+
+\begin{document}
+
+\title{Defense-in-Depth Runtime Safety in Move}
+\titlerunning{Defense-in-Depth Runtime Safety in Move}
+
+\author{Victor Gao \and
+        Wolfgang Grieskamp\thanks{Corresponding authors: Wolfgang Grieskamp (\email{wg@aptoslabs.com}) and Vineeth Kashyap (\email{vineeth@aptoslabs.com}).} \and
+        Vineeth Kashyap \and
+        George Mitenkov \and \\
+        Teng Zhang \and
+        Runtian Zhou \and
+        Andrea Cappa \and
+        Marco Ilardi}
+\authorrunning{V. Gao et al.}
+\institute{Aptos Labs, Palo Alto, USA}
+
+\maketitle
+
+\begin{abstract}
+Move is a smart-contract language used to execute transactions on the Aptos blockchain.
+Move programs execute in a sandboxed VM as typed bytecode.
+The VM statically verifies foundational safety properties like type safety and reference safety at code loading time.
+In principle, this design gives strong guarantees for Move.
+However, the static verification logic is complex and continually evolving with the language; like any software, it is not immune to bugs.
+In a live blockchain setting, a missed rule violation can translate directly into loss of assets, forged authority, or unrecoverable corruption of on-chain state.
+For this reason, Aptos relies on defense-in-depth \emph{runtime safety checks} that independently verify the critical invariants during execution, providing protection against latent verifier bugs and malicious bytecode.
+This paper motivates and describes the runtime safety checks for Move on Aptos.
+\keywords{Move \and Smart contracts \and Type safety \and Reference safety.}
+\end{abstract}
+
+\input{intro}
+\input{move}
+\input{checks}
+\input{trusted}
+\input{async}
+\input{perf}
+\input{concl}
+
+\begin{credits}
+\vspace{0.0ex}
+\paragraph{Acknowledgement.} Aptos auditor firm OtterSec under lead of Robert Chen highly influenced this work.
+\vspace{-0.5ex}
+\paragraph{Rights retention.} For the purpose of open access, the authors have applied a Creative Commons Attribution (CC BY) 4.0 license to any Author Accepted Manuscript version arising from this submission.
+\vspace{-0.5ex}
+\paragraph{\discintname}
+All authors are employees of Aptos Labs and may hold equity in the
+company. The work described is implemented in the Aptos blockchain.
+\end{credits}
+
+\bibliographystyle{splncs04}
+\bibliography{biblio}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

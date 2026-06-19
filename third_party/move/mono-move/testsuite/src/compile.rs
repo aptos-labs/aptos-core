@@ -39,19 +39,39 @@ pub fn compile(source: &str, kind: SourceKind) -> Result<Vec<CompiledModule>> {
     }
 }
 
+pub const TEST_UTILS_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/test_utils/test_utils.move"
+);
+
 /// Compile a Move source file at `path` into all contained modules.
 ///
 /// The full Move stdlib is injected as dependencies.
 pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
-    let options = Options {
+    run_compiler(Options {
         sources: vec![path.to_string_lossy().into_owned()],
-        dependencies: move_stdlib::move_stdlib_files(),
-        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        dependencies: aptos_move_stdlib::move_stdlib_files(),
+        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
-    };
+    })
+}
 
+/// Compile the Move stdlib into its modules, so they can be published into a
+/// test's storage.
+pub fn compile_move_stdlib() -> Result<Vec<CompiledModule>> {
+    run_compiler(Options {
+        sources: aptos_move_stdlib::move_stdlib_files(),
+        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
+        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
+        language_version: Some(LanguageVersion::latest_stable()),
+        ..Options::default()
+    })
+}
+
+/// Run the v2 compiler and collect the produced modules (scripts dropped).
+fn run_compiler(options: Options) -> Result<Vec<CompiledModule>> {
     let mut errors = Buffer::no_color();
     let result = {
         let mut emitter = options.error_emitter(&mut errors);
@@ -76,14 +96,25 @@ pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
 
 /// Compile Move source text into all contained modules.
 ///
-/// Inherits the stdlib-injecting behavior of [`compile_move_path`].
+/// The Move stdlib and the `test_utils` library are injected as dependencies,
+/// so test sources can reference both.
 pub fn compile_move_source(source: &str) -> Result<Vec<CompiledModule>> {
     let tmp_dir = tempfile::tempdir().context("failed to create temp dir")?;
     let path = tmp_dir.path().join("sources.move");
     std::fs::File::create(&path)
         .and_then(|mut f| f.write_all(source.as_bytes()))
         .context("failed to write temp source file")?;
-    compile_move_path(&path)
+
+    let mut dependencies = aptos_move_stdlib::move_stdlib_files();
+    dependencies.push(TEST_UTILS_PATH.to_string());
+    run_compiler(Options {
+        sources: vec![path.to_string_lossy().into_owned()],
+        dependencies,
+        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
+        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
+        language_version: Some(LanguageVersion::latest_stable()),
+        ..Options::default()
+    })
 }
 
 /// Assemble `.masm` source text into a single module.

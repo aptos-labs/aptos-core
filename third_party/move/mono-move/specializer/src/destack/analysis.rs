@@ -176,7 +176,7 @@ impl BlockAnalysis {
             });
             // Both shapes yield a `&mut` into the local's storage.
             if let Instr::MutBorrowLoc(_, local @ Slot::Home(_))
-            | Instr::MutBorrowLocField(_, _, local @ Slot::Home(_)) = instr
+            | Instr::MutBorrowLocField(_, _, _, local @ Slot::Home(_)) = instr
             {
                 home_mut_borrow_pos.entry(*local).or_default().push(i);
             }
@@ -750,13 +750,13 @@ fn assert_xfer_invariants(
     }
 }
 
-/// Returns `(rets, args)` for `Call` / `CallGeneric`. `CallClosure` is
+/// Returns `(rets, args)` for `Call`. `CallClosure` is
 /// intentionally excluded: Xfer precoloring leaves closure calls alone
 /// (they still count as call boundaries via `clobbers_xfer`, just not
 /// destructured for slot inspection).
 #[inline]
 fn call_rets_and_args(instr: &Instr) -> Option<(&[Slot], &[Slot])> {
-    if let Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) = instr {
+    if let Instr::Call(rets, _, _, args) = instr {
         Some((rets, args))
     } else {
         None
@@ -834,9 +834,9 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
             // (arg positionality).
             if clobbers_xfer(instr) {
                 let (rets, args): (&[Slot], &[Slot]) = match instr {
-                    Instr::Call(rets, _, args)
-                    | Instr::CallGeneric(rets, _, args)
-                    | Instr::CallClosure(rets, _, args) => (rets, args),
+                    Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
+                        (rets, args)
+                    },
                     _ => unreachable!("clobbers_xfer matches only Call variants"),
                 };
                 // Structural invariants (arg positionality, return Xfer prefix,
@@ -913,6 +913,7 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mono_move_core::types::EMPTY_TYPE_LIST;
     use move_binary_format::file_format::FunctionHandleIndex;
 
     /// Wide call signatures (past `SmallBitVec`'s inline-storage
@@ -921,7 +922,12 @@ mod tests {
     fn analyze_handles_wide_call_signatures() {
         // 200 args exercises `SmallBitVec`'s heap-allocated path.
         let args: Vec<Slot> = (0..200).map(Slot::Vid).collect();
-        let instrs = vec![Instr::Call(vec![], FunctionHandleIndex(0), args)];
+        let instrs = vec![Instr::Call(
+            vec![],
+            FunctionHandleIndex(0),
+            EMPTY_TYPE_LIST,
+            args,
+        )];
         let analysis = BlockAnalysis::analyze(&instrs);
         assert_eq!(analysis.max_xfer_positions, 200);
     }

@@ -1257,14 +1257,6 @@ impl ModuleBuilder<'_, '_> {
                             {
                                 self.validate_target_signature(&fun_decl, &loc, signature);
                             }
-
-                            // TODO: to be revisited once we have high-order function
-                            if fun_decl.kind == FunctionKind::Inline {
-                                self.parent.error(
-                                    &loc,
-                                    "functional spec blocks for inline functions are not supported yet",
-                                );
-                            }
                         },
                         SpecBlockContext::Struct(..) | SpecBlockContext::Module => (),
                         SpecBlockContext::Schema(..) => {
@@ -1884,9 +1876,10 @@ impl ModuleBuilder<'_, '_> {
                 signature,
                 modifies,
                 reads,
+                weight,
                 body,
                 ..
-            } => self.def_ana_spec_fun(*uninterpreted, signature, modifies, reads, body),
+            } => self.def_ana_spec_fun(*uninterpreted, signature, modifies, reads, *weight, body),
             ModifiesOf {
                 fun_param,
                 params,
@@ -2091,6 +2084,7 @@ impl ModuleBuilder<'_, '_> {
                 patterns,
                 lemma,
                 args,
+                weight,
             } => self.def_ana_proof_forall_apply(
                 &proof_loc,
                 context,
@@ -2098,6 +2092,7 @@ impl ModuleBuilder<'_, '_> {
                 patterns,
                 lemma,
                 args,
+                *weight,
                 proof_locals,
                 in_post,
             ),
@@ -2302,6 +2297,7 @@ impl ModuleBuilder<'_, '_> {
         patterns: &[Vec<EA::Exp>],
         lemma_access: &EA::ModuleAccess,
         args: &[EA::Exp],
+        weight: Option<u32>,
         proof_locals: &[(Loc, Symbol, Type)],
         in_post: bool,
     ) -> Option<Proof> {
@@ -2431,6 +2427,7 @@ impl ModuleBuilder<'_, '_> {
             translated_patterns,
             lemma_qid,
             translated_args,
+            weight,
         ))
     }
 
@@ -3382,8 +3379,22 @@ impl ModuleBuilder<'_, '_> {
         _signature: &EA::FunctionSignature,
         modifies: &[EA::Exp],
         reads: &[EA::Type],
+        weight: Option<u32>,
         body: &EA::FunctionBody,
     ) {
+        // Stash `[weight = N]` in the spec fun's properties for the Boogie backend.
+        if let Some(n) = weight {
+            use num::BigInt;
+            let weight_sym = self.symbol_pool().make("weight");
+            self.spec_funs[self.spec_fun_index]
+                .spec
+                .borrow_mut()
+                .properties
+                .insert(
+                    weight_sym,
+                    PropertyValue::Value(Value::Number(BigInt::from(n))),
+                );
+        }
         if !modifies.is_empty() || !reads.is_empty() {
             let entry = &self.spec_funs[self.spec_fun_index];
             let type_params = entry.type_params.clone();

@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true, features = ["cloneable-private-keys"] }
@@ -26,6 +29,3 @@ once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }
-
-[features]
-default = []

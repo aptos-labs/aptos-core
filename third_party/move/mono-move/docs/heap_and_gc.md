@@ -140,14 +140,14 @@ All pointers must be updated after memory moves during GC. Missing a pointer lea
 2. **Pointer-slot accuracy** — `Function::frame_layout` (and, at safe points, the matching `safe_point_layouts` entry) together exactly match slots that hold live heap pointers.
 3. **Object header integrity** — `descriptor_id` and `size` live at fixed negative offsets (`obj_ptr - 8` and `obj_ptr - 4`) and are set by the allocator; user-emitted micro-ops only access offsets within the data region (≥ 0) so they cannot reach the header.
 
-### Auxiliary GC Roots: `PinnedRoots`
+### Auxiliary GC Roots: `RootPool`
 
 Stack frames are the primary root set, but some situations need to keep a heap pointer live before it's been stored anywhere a frame layout describes. Two examples:
 
 - **Fused multi-allocation micro-ops** (e.g. `PackClosure`) that allocate one object, then a second that may trigger GC while the first isn't yet linked into the frame.
 - **Native functions** (future) whose Rust code holds a heap pointer in a local variable across a call that may trigger GC.
 
-`PinnedRoots` is a handle-table root set — callers `pin(ptr)` to obtain a `PinGuard`, and the GC scans the table in addition to the call stack. Guards are RAII and support arbitrary drop order. This is conceptually the same mechanism as JNI local refs or V8 `Local<T>`.
+`RootPool` is a handle-table root set — callers `root_object(ptr)` to obtain an RAII handle, and the GC scans the pool in addition to the call stack, rewriting rooted pointers in place when objects relocate. Handles support arbitrary drop order. This is conceptually the same mechanism as JNI local refs or V8 `Local<T>`.
 
 ### Type Safety
 

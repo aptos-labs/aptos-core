@@ -97,6 +97,11 @@
               "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
               "type": "string",
               "const": "function_usage"
+            },
+            {
+              "description": "Returns per-module facts: functions, structs, constants, friends,\nattributes, and source locations.",
+              "type": "string",
+              "const": "facts"
             }
           ]
         }
@@ -298,6 +303,28 @@
           "type": "string",
           "default": null,
           "nullable": true
+        },
+        "trace": {
+          "description": "When true, capture a structured trace into the response. Adds\nexactly one `state_view { version, with_overrides }` entry per\nreplay (whichever path the simulator took). Off by default; the\nwrapper costs one extra indirection on every storage read.",
+          "type": "boolean",
+          "default": false
+        },
+        "trace_storage_reads": {
+          "description": "When true, additionally record one `storage_read` entry per\nstate-view read. Off by default because a single replay typically\nissues hundreds of reads, which crowd out the single `state_view`\nevent. Only consulted when `trace` is true.",
+          "type": "boolean",
+          "default": false
+        },
+        "max_trace_events": {
+          "description": "Maximum number of trace entries before truncation. Defaults to 500.\nOnly consulted when `trace` is true.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 500
+        },
+        "redact_storage_keys": {
+          "description": "When true, `storage_read` trace entries omit the `Debug`-formatted\n`StateKey`. Defaults to true. Only consulted when both `trace` and\n`trace_storage_reads` are true.",
+          "type": "boolean",
+          "default": true
         }
       },
       "required": [

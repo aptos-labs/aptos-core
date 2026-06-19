@@ -11,6 +11,7 @@ use crate::{
     ledger_db::LedgerDb,
     position_merkle_batch_committer::PositionMerkleBatchCommitter,
     position_merkle_db::PositionMerkleDb,
+    position_pruner::PositionPruner,
     position_snapshot_committer::{
         merklize_position, PositionSnapshotToCommit, POSITION_BATCH_CHANNEL_SIZE,
     },
@@ -125,6 +126,7 @@ impl PositionBufferedState {
         last_snapshot: PositionStateWithSummary,
         target_items: usize,
         out_current_state: Arc<Mutex<PositionLedgerStateWithSummary>>,
+        position_pruner: Arc<PositionPruner>,
     ) -> Self {
         *out_current_state.lock() =
             PositionLedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
@@ -139,7 +141,8 @@ impl PositionBufferedState {
             POSITION_BATCH_CHANNEL_SIZE,
             last_snapshot.clone(),
             move |batch_receiver| {
-                PositionMerkleBatchCommitter::new(batch_merkle_db, batch_receiver).run();
+                PositionMerkleBatchCommitter::new(batch_merkle_db, batch_receiver, position_pruner)
+                    .run();
             },
             move |last_snapshot, input| {
                 merklize_position(

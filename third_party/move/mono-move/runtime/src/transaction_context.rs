@@ -6,23 +6,23 @@
 //
 // TODO: move out of the runtime once a layer above it exists.
 
-use crate::ExecutionContext;
+use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::ProductionNativeRegistry,
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ResourceProvider,
+    native::NativeExtensions,
+    types::{InternedType, InternedTypeList},
+    ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
+    LayoutProvider, ObjectDescriptor, ResourceProvider, ValueLayout,
 };
-use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
 
 /// Per-transaction execution context. Maintains per-transaction state
 /// (gas meter, read-set of loaded modules) and serves the interpreter's
 /// runtime queries against it.
-pub struct TransactionContext<'guard, 'ctx, G: GasMeter> {
+pub struct TransactionContext<'guard, 'ctx> {
     loader: Loader<'guard, 'ctx>,
     read_set: ModuleReadSet<'guard>,
-    gas_meter: G,
+    gas_meter: GasMeter,
     // TODO(refactor):
     //   We need to move resource read-set here, as well as heap and some
     //   other fields from interpreter context which should live longer than
@@ -33,15 +33,17 @@ pub struct TransactionContext<'guard, 'ctx, G: GasMeter> {
     //
     // TODO: Enforce that `natives` here and the `NativeResolver` passed
     // to `loader` are the same instance.
-    natives: &'guard ProductionNativeRegistry<G>,
+    natives: &'guard ProductionNativeRegistry,
+    /// Per-transaction native extensions, shared across native calls.
+    extensions: NativeExtensions,
 }
 
-impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
+impl<'guard, 'ctx> TransactionContext<'guard, 'ctx> {
     pub fn new(
         loader: Loader<'guard, 'ctx>,
-        gas_meter: G,
+        gas_meter: GasMeter,
         resource_provider: &'guard dyn ResourceProvider,
-        natives: &'guard ProductionNativeRegistry<G>,
+        natives: &'guard ProductionNativeRegistry,
     ) -> Self {
         Self {
             loader,
@@ -49,7 +51,15 @@ impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
             gas_meter,
             resource_provider,
             natives,
+            extensions: NativeExtensions::new(),
         }
+    }
+
+    /// Install the per-transaction native extensions. Replaces any previously
+    /// installed set.
+    pub fn with_extensions(mut self, extensions: NativeExtensions) -> Self {
+        self.extensions = extensions;
+        self
     }
 
     /// Returns the transaction's read-set.
@@ -58,19 +68,37 @@ impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
     }
 }
 
-impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 'ctx, G> {
-    type GasMeter = G;
-
-    fn gas_meter(&mut self) -> &mut G {
+impl ExecutionContext for TransactionContext<'_, '_> {
+    fn gas_meter(&mut self) -> &mut GasMeter {
         &mut self.gas_meter
     }
 
-    fn natives(&self) -> &ProductionNativeRegistry<G> {
+    fn natives(&self) -> &ProductionNativeRegistry {
         self.natives
     }
 
-    fn natives_and_gas_meter(&mut self) -> (&ProductionNativeRegistry<G>, &mut G) {
-        (self.natives, &mut self.gas_meter)
+    fn extensions(&self) -> &NativeExtensions {
+        &self.extensions
+    }
+
+    fn native_call_borrows(
+        &mut self,
+    ) -> (
+        &ProductionNativeRegistry,
+        &dyn DescriptorProvider,
+        &dyn LayoutProvider,
+        &dyn ResourceProvider,
+        &mut GasMeter,
+        &NativeExtensions,
+    ) {
+        (
+            self.natives,
+            self.loader.guard(),
+            self.loader.guard(),
+            self.resource_provider,
+            &mut self.gas_meter,
+            &self.extensions,
+        )
     }
 
     /// Looks up cross-module targets in the read-set, falling back to
@@ -90,13 +118,36 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         )
     }
 
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &[u8])> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        Ok((
+            module.interned_constant_type_at(idx),
+            module.constant_data_at(idx),
+        ))
+    }
+
     fn resource_provider(&self) -> &dyn ResourceProvider {
         self.resource_provider
     }
 }
 
-impl<'guard, 'ctx, G: GasMeter> DescriptorProvider for TransactionContext<'guard, 'ctx, G> {
+impl DescriptorProvider for TransactionContext<'_, '_> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.loader.guard().descriptor(id)
+    }
+}
+
+impl LayoutProvider for TransactionContext<'_, '_> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard().layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard().layout_id(ty)
     }
 }

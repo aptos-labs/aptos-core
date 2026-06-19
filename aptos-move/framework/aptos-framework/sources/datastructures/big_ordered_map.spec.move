@@ -81,18 +81,18 @@ spec aptos_framework::big_ordered_map {
         ensures !spec_contains_key(self, key);
         ensures spec_get(old(self), key) == result;
         ensures spec_len(old(self)) == spec_len(self) + 1;
-        ensures spec_unchanged_except_at(self, old(self), key);
+        ensures spec_unchanged_except_at(self, key);
         // ensures forall k: K where k != key: spec_contains_key(self, k) ==> spec_get(self, k) == spec_get(old(self), k);
         // ensures forall k: K where k != key: spec_contains_key(old(self), k) == spec_contains_key(self, k);
     }
 
     spec fun spec_unchanged_except_at<K: drop + copy + store, V: store>(
-        new_map: BigOrderedMap<K, V>, old_map: BigOrderedMap<K, V>, key: &K
+        self: &mut BigOrderedMap<K, V>, key: &K
     ): bool {
         (forall k: K where k != key:
-            spec_contains_key(new_map, k) == spec_contains_key(old_map, k))
-        && (forall k: K where k != key && spec_contains_key(old_map, k):
-            spec_get(new_map, k) == spec_get(old_map, k))
+            spec_contains_key(self, k) == spec_contains_key(old(self), k))
+        && (forall k: K where k != key && spec_contains_key(old(self), k):
+            spec_get(self, k) == spec_get(old(self), k))
     }
 
     spec remove_or_none<K: drop + copy + store, V: store>(
@@ -113,7 +113,7 @@ spec aptos_framework::big_ordered_map {
             option::is_none(result)
             && spec_len(self) == spec_len(old(self))
         );
-        ensures spec_unchanged_except_at(self, old(self), key);
+        ensures spec_unchanged_except_at(self, key);
     }
 
     spec is_empty {
@@ -228,7 +228,7 @@ spec aptos_framework::big_ordered_map {
             self), key)));
         ensures !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
         ensures spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
-        ensures spec_unchanged_except_at(self, old(self), key);
+        ensures spec_unchanged_except_at(self, key);
     }
 
     spec add_all {
@@ -279,7 +279,7 @@ spec aptos_framework::big_ordered_map {
         ensures result_2 == spec_get(old(self), result_1);
         ensures !spec_contains_key(self, result_1);
         ensures spec_len(self) == spec_len(old(self)) - 1;
-        ensures spec_unchanged_except_at(self, old(self), result_1);
+        ensures spec_unchanged_except_at(self, result_1);
         ensures forall k: K where spec_contains_key(old(self), k) && k != result_1:
             std::cmp::compare(result_1, k) == std::cmp::Ordering::Less;
     }
@@ -291,7 +291,7 @@ spec aptos_framework::big_ordered_map {
         ensures result_2 == spec_get(old(self), result_1);
         ensures !spec_contains_key(self, result_1);
         ensures spec_len(self) == spec_len(old(self)) - 1;
-        ensures spec_unchanged_except_at(self, old(self), result_1);
+        ensures spec_unchanged_except_at(self, result_1);
         ensures forall k: K where spec_contains_key(old(self), k) && k != result_1:
             std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
     }
@@ -379,7 +379,7 @@ spec aptos_framework::big_ordered_map {
         // unchanged for every key; values for keys other than self.key are preserved.
         ensures spec_contains_key(map, self.key);
         ensures spec_len(map) == spec_len(old(map));
-        ensures spec_unchanged_except_at(map, old(map), self.key);
+        ensures spec_unchanged_except_at(map, self.key);
     }
 
     spec internal_find_with_path {
@@ -404,7 +404,7 @@ spec aptos_framework::big_ordered_map {
         ensures result == spec_get(old(map), self.iterator.key);
         ensures !spec_contains_key(map, self.iterator.key);
         ensures spec_len(map) == spec_len(old(map)) - 1;
-        ensures spec_unchanged_except_at(map, old(map), self.iterator.key);
+        ensures spec_unchanged_except_at(map, self.iterator.key);
     }
 
     spec internal_leaf_new_begin_iter {

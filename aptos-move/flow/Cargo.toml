@@ -7,9 +7,17 @@ authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
-publish = { workspace = true }
+publish = false
 repository = { workspace = true }
 rust-version = { workspace = true }
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ bin }-v{ version }/{ bin }-v{ version }-{ target }.zip"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/{ bin }-v{ version }/{ bin }-v{ version }-{ target }.zip"
 
 [[bin]]
 name = "move-flow"
@@ -19,6 +27,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-cli = { workspace = true }
 aptos-move-debugger = { workspace = true }
@@ -26,6 +35,8 @@ aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
+aptos-vm-types = { workspace = true }
+async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
@@ -55,17 +66,10 @@ url = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]
+aptos-crypto = { workspace = true }
 aptos-package-builder = { workspace = true }
 move-core-types = { workspace = true }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 rmcp = { workspace = true, features = ["client"] }
 tempfile = { workspace = true }
-
-[package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/{ bin }-v{ version }/{ bin }-v{ version }-{ target }.zip"
-bin-dir = "{ bin }{ binary-ext }"
-pkg-fmt = "zip"
-
-[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
-pkg-url = "{ repo }/releases/download/{ bin }-v{ version }/{ bin }-v{ version }-{ target }.zip"

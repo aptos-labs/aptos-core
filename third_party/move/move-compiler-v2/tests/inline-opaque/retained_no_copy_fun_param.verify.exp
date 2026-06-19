@@ -1,0 +1,68 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::retained_no_copy_fun_param {
+    private fun caller(x: u64): u64 {
+        Add<u64>(retained_no_copy_fun_param::twice(closure#0retained_no_copy_fun_param::__lambda__1__caller(), x), retained_no_copy_fun_param::twice_copy(closure#0retained_no_copy_fun_param::__lambda__2__caller(), x))
+    }
+    private inline fun twice(f: |u64|u64,x: u64): u64 {
+        (f)((f)(x))
+    }
+    spec {
+      ensures exists m: u64: TypeDomain<u64>(): And(ensures_of($t0, $t1, m), ensures_of($t0, m, result0()));
+    }
+
+    private inline fun twice_copy(f: |u64|u64 has copy + drop,x: u64): u64 {
+        (f)((f)(x))
+    }
+    spec {
+      ensures exists m: u64: TypeDomain<u64>(): And(ensures_of($t0, $t1, m), ensures_of($t0, m, result0()));
+    }
+
+    private fun __lambda__1__caller(y: u64): u64 {
+        Add<u64>(y, 1)
+    }
+    private fun __lambda__2__caller(y: u64): u64 {
+        Add<u64>(y, 1)
+    }
+} // end 0x42::retained_no_copy_fun_param
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::retained_no_copy_fun_param {
+    fun caller(x: u64): u64 {
+        twice(|x| lambda__1__caller(x), x) + twice_copy(|x| lambda__2__caller(x), x)
+    }
+    inline fun twice(f: |u64|u64, x: u64): u64 {
+        f(f(x))
+    }
+
+    spec twice(f: |u64|u64, x: u64): u64 {
+        pragma opaque = true;
+        ensures exists m: u64: ensures_of<f>(x, m) && ensures_of<f>(m, result);
+    }
+
+    inline fun twice_copy(f: |u64|u64 has copy + drop, x: u64): u64 {
+        f(f(x))
+    }
+
+    spec twice_copy(f: |u64|u64 has copy + drop, x: u64): u64 {
+        pragma opaque = true;
+        ensures exists m: u64: ensures_of<f>(x, m) && ensures_of<f>(m, result);
+    }
+
+    fun lambda__1__caller(y: u64): u64 {
+        y + 1
+    }
+    fun lambda__2__caller(y: u64): u64 {
+        y + 1
+    }
+}
+
+
+Diagnostics:
+error: local `f` of type `|u64|u64` does not have the `copy` ability
+  ┌─ tests/inline-opaque/retained_no_copy_fun_param.move:8:11
+  │
+8 │         f(f(x))
+  │         --^^^^-
+  │         │ │
+  │         │ copy needed here because value is still in use
+  │         used here

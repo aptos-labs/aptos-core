@@ -11,7 +11,10 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
+use aptos_types::{
+    dkg::DKGState,
+    on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig},
+};
 use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness in the following steps.
@@ -32,6 +35,8 @@ async fn enable_feature_1() {
             // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
+            // Chunky DKG depends on randomness + vtxns; keep it off here too.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;

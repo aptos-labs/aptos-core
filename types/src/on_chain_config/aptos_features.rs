@@ -190,6 +190,15 @@ pub enum FeatureFlag {
     /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
     /// state root hash, so it is committed to the ledger accumulator.
     TRANSACTION_INFO_V1 = 117,
+    /// Umbrella auth flag for the native-trading subsystem; the per-store
+    /// flags below gate the actual writes. Both must be on to write.
+    TRADING_NATIVE = 118,
+    /// Gates native-position writes.
+    NATIVE_POSITION = 119,
+    /// Gates native-orderbook writes.
+    NATIVE_ORDERBOOK = 120,
+    /// Gates native-collateral writes.
+    NATIVE_COLLATERAL = 121,
 }
 
 impl FeatureFlag {
@@ -304,6 +313,8 @@ impl FeatureFlag {
             Self::VERSIONED_TRANSACTION_VALIDATION,
             Self::STORAGE_SLOT_NATIVES,
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
+            Self::HOTNESS_IN_EPILOGUE,
+            Self::ENCRYPTED_TRANSACTIONS,
         ]
     }
 }

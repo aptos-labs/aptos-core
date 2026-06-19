@@ -26,10 +26,9 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
-    ModuleProvider,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
+    LayoutProvider, ModuleId, ModuleProvider, ValueLayout,
 };
-use mono_move_gas::GasMeter;
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FieldLayout, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot,
@@ -134,7 +133,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     pub fn load_module(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         match &self.policy {
@@ -158,7 +157,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     pub fn load_function(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -222,6 +221,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // lock a second time to publish the result. Splitting the read and
         // the install keeps the lock window short for the common hit case
         // and avoids holding it across lowering work.
+        //
+        // TODO(perf): the cache key distinguishes instantiations that
+        // differ only in phantom type arguments even though their lowered
+        // code is identical. A per-callee mask of the type parameters that
+        // actually affect lowering would let the key ignore the rest;
+        // same-package callers could also stop forwarding unused ty_args,
+        // but upgradable code can't (the caller can't tell which params the
+        // callee currently needs).
         if let Some((function, function_ms)) =
             module.get_instantiated_function_ptr(func_name, ty_args)
         {
@@ -241,7 +248,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn lower_function_with_ty_args(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         module: &LoadedModule,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -258,9 +265,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 });
             },
         };
+        // TODO(gas): the lowering work needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
-        let vec_descriptors = try_discover_types_for_lowering_in_function(
+        let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
+            self.guard,
             module.ir(),
             func_ir,
             ty_args,
@@ -287,7 +296,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             func_ir,
             ty_args,
             self.guard,
-            vec_descriptors,
+            descriptors,
             self.natives,
         )
         .map_err(LoaderError::Specializer)?
@@ -317,7 +326,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_lazy_with_lazy_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         read_set.record_pending_loading(id)?;
@@ -339,7 +348,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_package(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         let package = match self.guard.get_module(id) {
@@ -427,7 +436,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_lazy_with_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         let module = match self.guard.get_module(id) {
@@ -467,7 +476,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn ensure_ready_for_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -501,7 +510,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn charge_mandatory_set_for_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -528,7 +537,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn compute_mandatory_set_for_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -540,7 +549,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // Per-function lowering re-walks types and rebuilds its own
         // descriptor map; only the side-effecting publish-to-guard
         // matters here.
-        let _ = try_discover_types_for_lowering_in_module(&mut walker, module.ir())
+        let _ = try_discover_types_for_lowering_in_module(&mut walker, self.guard, module.ir())
             .map_err(LoaderError::Specializer)?;
 
         // Set the mandatory set for the module. Because of concurrency, it is
@@ -620,7 +629,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn record_loaded_and_charge_slots<F>(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         slots: &[LoadedModuleSlot],
         mut on_read_set_miss: F,
     ) -> LoaderResult<()>
@@ -654,7 +663,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn charge_non_read_set_slots(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         slots: &[LoadedModuleSlot],
     ) -> LoaderResult<()> {
         self.record_loaded_and_charge_slots(read_set, gas_meter, slots, |read_set, slot| {
@@ -779,5 +788,60 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
 
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
         self.loader.guard.vec_descriptor_for(elem_ty)
+    }
+
+    fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets))
+    }
+
+    fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_captured_data_descriptor(values_size, pointer_offsets))
+    }
+
+    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard.layout_id_for(ty)
+    }
+
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard.layout(id)
+    }
+
+    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        self.loader.guard.publish_layout(ty, layout)
+    }
+
+    fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]> {
+        self.loader.guard.publish_variant_layouts(enum_ty, variants)
+    }
+
+    fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
     }
 }

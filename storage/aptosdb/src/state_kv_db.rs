@@ -46,6 +46,22 @@ use std::{
     time::Instant,
 };
 
+/// Distinct values of a nibble. Byte 0 of a key hash is the shard in its high nibble plus a low
+/// nibble, so each shard owns `NIBBLE_VALUES` consecutive byte-0 values.
+const NIBBLE_VALUES: usize = 16;
+/// Number of concurrent key-hash sub-ranges scanned per shard when loading hot state on restart.
+const NUM_HOT_LOAD_SUBSCANS: usize = 16;
+const _: () = assert!(
+    NUM_STATE_SHARDS == NIBBLE_VALUES,
+    "hot-state sub-range math treats the shard as the high nibble of byte 0",
+);
+const _: () = assert!(
+    NUM_HOT_LOAD_SUBSCANS >= 1
+        && NUM_HOT_LOAD_SUBSCANS <= NIBBLE_VALUES
+        && NIBBLE_VALUES.is_multiple_of(NUM_HOT_LOAD_SUBSCANS),
+    "NUM_HOT_LOAD_SUBSCANS must evenly divide a nibble's values (one of 1, 2, 4, 8, 16)",
+);
+
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
         "hot_state_kv_db"
@@ -129,34 +145,11 @@ impl StateKvDb {
         };
         let state_kv_metadata_db_path = Self::metadata_db_path(metadata_db_root_path, is_hot);
 
-        let state_kv_metadata_db = Arc::new(Self::open_db(
-            state_kv_metadata_db_path.clone(),
-            metadata_db_name(is_hot),
-            &state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-            is_hot,
-            delete_on_restart,
-        )?);
-
-        info!(
-            state_kv_metadata_db_path = state_kv_metadata_db_path,
-            is_hot = is_hot,
-            "Opened state kv metadata db!"
-        );
-
-        let state_kv_db_shards = (0..NUM_STATE_SHARDS)
-            .into_par_iter()
-            .map(|shard_id| {
-                let shard_root_path = if is_hot {
-                    db_paths.hot_state_kv_db_shard_root_path(shard_id)
-                } else {
-                    db_paths.state_kv_db_shard_root_path(shard_id)
-                };
-                let db = Self::open_shard(
-                    shard_root_path,
-                    shard_id,
+        let (metadata_db, shards) = std::thread::scope(|s| {
+            let metadata_handle = s.spawn(|| {
+                let db = Self::open_db(
+                    state_kv_metadata_db_path.clone(),
+                    metadata_db_name(is_hot),
                     &state_kv_db_config,
                     env,
                     block_cache,
@@ -165,17 +158,55 @@ impl StateKvDb {
                     delete_on_restart,
                 )
                 .unwrap_or_else(|e| {
-                    let db_type = if is_hot { "hot state kv" } else { "state kv" };
-                    panic!("Failed to open {db_type} db shard {shard_id}: {e:?}.")
+                    panic!("Failed to open state kv metadata db (is_hot: {is_hot}): {e:?}.")
                 });
                 Arc::new(db)
-            })
-            .collect::<Vec<_>>()
+            });
+
+            let shard_handles: Vec<_> = (0..NUM_STATE_SHARDS)
+                .map(|shard_id| {
+                    s.spawn(move || {
+                        let shard_root_path = if is_hot {
+                            db_paths.hot_state_kv_db_shard_root_path(shard_id)
+                        } else {
+                            db_paths.state_kv_db_shard_root_path(shard_id)
+                        };
+                        let db = Self::open_shard(
+                            shard_root_path,
+                            shard_id,
+                            &state_kv_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            is_hot,
+                            delete_on_restart,
+                        )
+                        .unwrap_or_else(|e| {
+                            let db_type = if is_hot { "hot state kv" } else { "state kv" };
+                            panic!("Failed to open {db_type} db shard {shard_id}: {e:?}.")
+                        });
+                        Arc::new(db)
+                    })
+                })
+                .collect();
+
+            // Joined in shard-id order so each array index matches its shard id.
+            let shards = shard_handles
+                .into_iter()
+                .map(|handle| handle.join().expect("State kv shard open thread panicked"))
+                .collect::<Vec<_>>();
+            let metadata_db = metadata_handle
+                .join()
+                .expect("State kv metadata open thread panicked");
+            (metadata_db, shards)
+        });
+
+        let state_kv_db_shards: [_; NUM_STATE_SHARDS] = shards
             .try_into()
-            .unwrap();
+            .expect("Collected exactly NUM_STATE_SHARDS shards");
 
         let state_kv_db = Self {
-            inner: ShardedKvDb::new(state_kv_metadata_db, state_kv_db_shards),
+            inner: ShardedKvDb::new(metadata_db, state_kv_db_shards),
             is_hot,
         };
 
@@ -291,10 +322,6 @@ impl StateKvDb {
 
     pub(crate) fn db_shard(&self, shard_id: usize) -> &DB {
         self.inner.shard(shard_id)
-    }
-
-    pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
-        Arc::clone(self.inner.shard(shard_id))
     }
 
     pub(crate) fn num_shards(&self) -> usize {
@@ -444,10 +471,37 @@ impl StateKvDb {
 
         let start = Instant::now();
 
-        let shards: [_; NUM_STATE_SHARDS] = (0..NUM_STATE_SHARDS)
+        // Scan each shard's key-hash space in NUM_HOT_LOAD_SUBSCANS contiguous ranges concurrently.
+        // The scan is I/O-latency-bound on a cold restart (one random seek per live key), so we run
+        // it on dedicated threads rather than the rayon pool (sized to the core count) to let the
+        // blocking scans oversubscribe and raise the read queue depth.
+        let mut per_shard_entries: [_; NUM_STATE_SHARDS] = std::array::from_fn(|_| Vec::new());
+        std::thread::scope(|scope| {
+            let mut handles = vec![];
+            for shard_id in 0..NUM_STATE_SHARDS {
+                for sub in 0..NUM_HOT_LOAD_SUBSCANS {
+                    let handle = scope.spawn(move || {
+                        self.scan_shard_range(shard_id, sub, snapshot_version)
+                            .unwrap_or_else(|e| {
+                                panic!(
+                                    "Failed to scan hot state shard {shard_id} sub-range {sub} \
+                                     at snapshot version {snapshot_version}: {e:?}"
+                                )
+                            })
+                    });
+                    handles.push((shard_id, handle));
+                }
+            }
+            for (shard_id, handle) in handles {
+                let entries = handle.join().expect("Hot state load thread panicked");
+                per_shard_entries[shard_id].extend(entries);
+            }
+        });
+
+        let shards: [_; NUM_STATE_SHARDS] = per_shard_entries
             .into_par_iter()
-            .map(|shard_id| self.load_shard(shard_id, snapshot_version))
-            .collect::<Result<Vec<_>>>()?
+            .map(Self::assemble_lru_chain)
+            .collect::<Vec<_>>()
             .try_into()
             .expect("Collected exactly NUM_STATE_SHARDS results");
 
@@ -464,47 +518,69 @@ impl StateKvDb {
         Ok(shards)
     }
 
-    fn load_shard(
-        &self,
-        shard_id: usize,
-        snapshot_version: Version,
-    ) -> Result<LoadedHotStateShard> {
-        let entries = self.scan_shard_entries(shard_id, snapshot_version)?;
-        let loaded = Self::assemble_lru_chain(entries);
-        Ok(loaded)
+    /// Key-hash bounds `[lo, hi)` of sub-range `sub` within `shard_id`. Byte 0 of a key hash holds
+    /// the shard in its high nibble; its 16 low-nibble values are split into NUM_HOT_LOAD_SUBSCANS
+    /// equal groups, one per sub-range. `hi == None` (no upper bound) occurs only for the last
+    /// sub-range of the last shard, whose upper edge 0x100 overflows byte 0.
+    fn shard_subscan_bounds(shard_id: usize, sub: usize) -> (HashValue, Option<HashValue>) {
+        let hash_with_byte0 = |byte0: usize| {
+            let mut bytes = [0u8; HashValue::LENGTH];
+            bytes[0] = byte0 as u8;
+            HashValue::new(bytes)
+        };
+
+        // `shard_id` is byte 0's high nibble, hence the `* NIBBLE_VALUES`; each sub-range spans
+        // `span` low-nibble values, so the next starts `span` further.
+        let span = NIBBLE_VALUES / NUM_HOT_LOAD_SUBSCANS;
+        let lo_byte0 = shard_id * NIBBLE_VALUES + sub * span;
+        let hi_byte0 = lo_byte0 + span;
+
+        let lo = hash_with_byte0(lo_byte0);
+        // `hi_byte0 == NUM_STATE_SHARDS * NIBBLE_VALUES` (0x100) overflows byte 0 — no upper bound.
+        let hi = (hi_byte0 < NUM_STATE_SHARDS * NIBBLE_VALUES).then(|| hash_with_byte0(hi_byte0));
+        (lo, hi)
     }
 
-    // TODO(HotState): The current implementation does a full scan per shard. This can be
-    // further sped up (e.g. parallel within-shard scan, prefix-seek per key group, or maintaining
-    // a separate index), but is left for later since correctness matters more at this stage.
-    /// Scans a single shard DB and returns the most recent hot entry per key_hash as of
-    /// `snapshot_version`. Entries newer than the snapshot are skipped. Evicted keys are excluded.
-    /// The returned entries have uninitialized LRU pointers.
-    fn scan_shard_entries(
+    fn next_key_hash(key_hash: HashValue) -> Option<HashValue> {
+        let mut bytes = *key_hash.as_ref();
+        for byte in bytes.iter_mut().rev() {
+            if *byte == u8::MAX {
+                *byte = 0;
+            } else {
+                *byte += 1;
+                return Some(HashValue::new(bytes));
+            }
+        }
+        None
+    }
+
+    /// Scans one key-hash sub-range of a shard DB and returns the most recent hot entry per
+    /// key_hash as of `snapshot_version`. Entries newer than the snapshot are skipped. Evicted keys
+    /// are excluded. The returned entries have uninitialized LRU pointers.
+    fn scan_shard_range(
         &self,
         shard_id: usize,
+        sub: usize,
         snapshot_version: Version,
     ) -> Result<Vec<(HashValue, Version, StateSlotKind)>> {
+        let (lo, hi) = Self::shard_subscan_bounds(shard_id, sub);
+
+        // Below we seek across key_hash boundaries to skip stale versions of a key. The CF has a
+        // prefix bloom filter on key_hash (production config), so without total-order seek the
+        // bloom excludes the SST for the absent next prefix and the scan stops after one key.
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_total_order_seek(true);
         let mut iter = self
             .db_shard(shard_id)
-            .iter::<HotStateValueByKeyHashSchema>()?;
-        iter.seek_to_first();
+            .iter_with_opts::<HotStateValueByKeyHashSchema>(read_opts)?;
+        iter.seek(&(lo, Version::MAX))?;
 
         let mut entries = Vec::new();
-        let mut current_key_hash: Option<HashValue> = None;
-        let mut found_for_current = false;
 
-        for item in iter {
-            let ((key_hash, hot_since_version), entry_opt) = item?;
-
-            // New key group?
-            if current_key_hash != Some(key_hash) {
-                current_key_hash = Some(key_hash);
-                found_for_current = false;
-            }
-
-            if found_for_current {
-                continue;
+        while let Some(((key_hash, hot_since_version), entry_opt)) = iter.next().transpose()? {
+            // Stop once the scan crosses into the next sub-range.
+            if hi.is_some_and(|hi| key_hash >= hi) {
+                break;
             }
 
             // Skip entries newer than the snapshot version — they will be replayed.
@@ -513,26 +589,32 @@ impl StateKvDb {
             }
 
             // This is the most recent entry for this key_hash at the snapshot version.
-            found_for_current = true;
-
-            let kind = match entry_opt {
-                None => continue, // Evicted — not hot.
+            if let Some(kind) = match entry_opt {
+                None => None, // Evicted — not hot.
                 Some(HotStateEntry::Occupied {
                     value,
                     value_version,
-                }) => StateSlotKind::HotOccupied {
+                }) => Some(StateSlotKind::HotOccupied {
                     value_version,
                     value,
                     hot_since_version,
                     lru_info: LRUEntry::uninitialized(),
-                },
-                Some(HotStateEntry::Vacant) => StateSlotKind::HotVacant {
+                }),
+                Some(HotStateEntry::Vacant) => Some(StateSlotKind::HotVacant {
                     hot_since_version,
                     lru_info: LRUEntry::uninitialized(),
-                },
-            };
+                }),
+            } {
+                entries.push((key_hash, hot_since_version, kind));
+            }
 
-            entries.push((key_hash, hot_since_version, kind));
+            // Older versions for this key_hash sort immediately after this row.
+            // Jump to the next key group.
+            if let Some(next_key_hash) = Self::next_key_hash(key_hash) {
+                iter.seek(&(next_key_hash, Version::MAX))?;
+            } else {
+                break;
+            }
         }
 
         Ok(entries)

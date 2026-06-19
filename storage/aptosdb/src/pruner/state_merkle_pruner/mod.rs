@@ -11,15 +11,8 @@ mod test;
 
 use crate::{
     metrics::{OTHER_TIMERS_SECONDS, PRUNER_VERSIONS},
-    pruner::{
-        db_pruner::DBPruner,
-        state_merkle_pruner::{
-            generics::StaleNodeIndexSchemaTrait,
-            state_merkle_metadata_pruner::StateMerkleMetadataPruner,
-            state_merkle_shard_pruner::StateMerkleShardPruner,
-        },
-    },
-    state_merkle_db::StateMerkleDb,
+    pruner::{db_pruner::DBPruner, state_merkle_pruner::generics::MerklePrunerSchema},
+    sharded_jmt_merkle_db::ShardedJmtMerkleDb,
 };
 use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -30,35 +23,38 @@ use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
+// Re-exported for the native-position merkle pruner.
+pub(in crate::pruner) use state_merkle_metadata_pruner::StateMerkleMetadataPruner;
+pub(in crate::pruner) use state_merkle_shard_pruner::StateMerkleShardPruner;
 use std::{
     marker::PhantomData,
+    ops::Deref,
     sync::{atomic::Ordering, Arc},
 };
 
 /// Responsible for pruning the state tree.
-pub struct StateMerklePruner<S> {
+pub struct StateMerklePruner<M> {
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
     /// Overall progress, updated when the whole version is done.
     progress: AtomicVersion,
 
-    metadata_pruner: StateMerkleMetadataPruner<S>,
+    metadata_pruner: StateMerkleMetadataPruner<M>,
     // Non-empty iff sharding is enabled.
-    shard_pruners: Vec<StateMerkleShardPruner<S>>,
+    shard_pruners: Vec<StateMerkleShardPruner<M>>,
 
-    _phantom: PhantomData<S>,
+    _phantom: PhantomData<M>,
 }
 
-impl<S: StaleNodeIndexSchemaTrait> DBPruner for StateMerklePruner<S>
+impl<M: MerklePrunerSchema> DBPruner for StateMerklePruner<M>
 where
-    StaleNodeIndex: KeyCodec<S>,
+    StaleNodeIndex: KeyCodec<M::StaleIndexSchema>,
 {
     fn name(&self) -> &'static str {
-        S::name()
+        M::name()
     }
 
     fn prune(&self, batch_size: usize) -> Result<Version> {
-        // TODO(grao): Consider separate pruner metrics, and have a label for pruner name.
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_merkle_pruner__prune"]);
         let mut progress = self.progress();
         let target_version = self.target_version();
@@ -68,7 +64,7 @@ where
         }
 
         info!(
-            name = S::name(),
+            name = M::name(),
             current_progress = progress,
             target_version = target_version,
             "Start pruning..."
@@ -81,7 +77,7 @@ where
             {
                 self.prune_shards(progress, target_version_for_this_round, batch_size)?;
                 progress = target_version_for_this_round;
-                info!(name = S::name(), progress = progress);
+                info!(name = M::name(), progress = progress);
                 self.record_progress(target_version_for_this_round);
             } else {
                 self.prune_shards(progress, target_version, batch_size)?;
@@ -90,7 +86,7 @@ where
             }
         }
 
-        info!(name = S::name(), progress = target_version, "Done pruning.");
+        info!(name = M::name(), progress = target_version, "Done pruning.");
 
         Ok(target_version)
     }
@@ -102,7 +98,7 @@ where
     fn set_target_version(&self, target_version: Version) {
         self.target_version.store(target_version, Ordering::SeqCst);
         PRUNER_VERSIONS
-            .with_label_values(&[S::name(), "target"])
+            .with_label_values(&[M::name(), "target"])
             .set(target_version as i64);
     }
 
@@ -113,17 +109,17 @@ where
     fn record_progress(&self, progress: Version) {
         self.progress.store(progress, Ordering::SeqCst);
         PRUNER_VERSIONS
-            .with_label_values(&[S::name(), "progress"])
+            .with_label_values(&[M::name(), "progress"])
             .set(progress as i64);
     }
 }
 
-impl<S: StaleNodeIndexSchemaTrait> StateMerklePruner<S>
+impl<M: MerklePrunerSchema> StateMerklePruner<M>
 where
-    StaleNodeIndex: KeyCodec<S>,
+    StaleNodeIndex: KeyCodec<M::StaleIndexSchema>,
 {
-    pub fn new(state_merkle_db: Arc<StateMerkleDb>) -> Result<Self> {
-        info!(name = S::name(), "Initializing...");
+    pub fn new<D: Deref<Target = ShardedJmtMerkleDb>>(state_merkle_db: Arc<D>) -> Result<Self> {
+        info!(name = M::name(), "Initializing...");
 
         let metadata_pruner = StateMerkleMetadataPruner::new(state_merkle_db.metadata_db_arc());
         let metadata_progress = metadata_pruner.progress()?;
@@ -131,7 +127,7 @@ where
         info!(
             metadata_progress = metadata_progress,
             "Created {} metadata pruner, start catching up all shards.",
-            S::name(),
+            M::name(),
         );
 
         let num_shards = state_merkle_db.num_shards();
@@ -149,11 +145,11 @@ where
             progress: AtomicVersion::new(metadata_progress),
             metadata_pruner,
             shard_pruners,
-            _phantom: std::marker::PhantomData,
+            _phantom: PhantomData,
         };
 
         info!(
-            name = pruner.name(),
+            name = M::name(),
             progress = metadata_progress,
             "Initialized."
         );
@@ -175,7 +171,8 @@ where
                         .prune(current_progress, target_version, batch_size)
                         .map_err(|err| {
                             anyhow!(
-                                "Failed to prune state merkle shard {}: {err}",
+                                "Failed to prune {} shard {}: {err}",
+                                M::name(),
                                 shard_pruner.shard_id(),
                             )
                         })
@@ -193,7 +190,7 @@ where
         let mut indices = Vec::new();
         let mut read_opts = ReadOptions::default();
         read_opts.fill_cache(false);
-        let mut iter = state_merkle_db_shard.iter_with_opts::<S>(read_opts)?;
+        let mut iter = state_merkle_db_shard.iter_with_opts::<M::StaleIndexSchema>(read_opts)?;
         iter.seek(&StaleNodeIndex {
             stale_since_version: start_version,
             node_key: NodeKey::new_empty_path(0),

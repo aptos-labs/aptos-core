@@ -469,6 +469,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "fail",
+ "flate2",
  "futures",
  "hex",
  "itertools 0.13.0",
@@ -3320,7 +3321,9 @@ version = "1.0.4"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
+ "aptos-crypto",
  "aptos-framework",
+ "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-move-cli",
  "aptos-move-debugger",
@@ -3329,6 +3332,8 @@ dependencies = [
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
+ "aptos-vm-types",
+ "async-trait",
  "clap 4.5.60",
  "codespan-reporting",
  "legacy-move-compiler",
@@ -3370,6 +3375,7 @@ dependencies = [
  "bcs 0.1.4",
  "dir-diff",
  "file_diff",
+ "move-command-line-common",
  "move-core-types",
  "move-package",
  "move-unit-test",
@@ -3478,6 +3484,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "criterion",
+ "fail",
  "futures",
  "futures-util",
  "hex",
@@ -3815,6 +3822,20 @@ dependencies = [
  "bcs 0.1.4",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "aptos-position-natives"
+version = "0.1.0"
+dependencies = [
+ "aptos-native-interface",
+ "aptos-types",
+ "better_any",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
 ]
 
 [[package]]
@@ -4792,6 +4813,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-sdk",
+ "aptos-types",
  "async-trait",
  "clap 4.5.60",
  "log",
@@ -5131,6 +5153,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-move-stdlib",
  "aptos-native-interface",
+ "aptos-position-natives",
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
@@ -6663,6 +6686,12 @@ dependencies = [
  "serde_repr",
  "serde_with",
 ]
+
+[[package]]
+name = "boxcar"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36f64beae40a84da1b4b26ff2761a5b895c12adc41dc25aaee1c4f2bbfe97a6e"
 
 [[package]]
 name = "brotli"
@@ -8774,6 +8803,7 @@ dependencies = [
  "aptos-move-e2e-test-harness",
  "aptos-mvhashmap",
  "aptos-package-builder",
+ "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-simulation",
@@ -8786,6 +8816,7 @@ dependencies = [
  "hex",
  "memory-stats",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-core-types",
  "move-coverage",
  "move-model",
@@ -9941,6 +9972,19 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "futures_codec"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad004dd81205978a2bba6c566ed70535ccf88c0be34649e628186474603f43ca"
+dependencies = [
+ "bytes",
+ "futures-sink",
+ "futures-util",
+ "memchr",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -12772,19 +12816,14 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.11.0",
  "bytes",
+ "fxhash",
  "mono-move-alloc",
- "mono-move-gas",
  "move-binary-format",
  "move-core-types",
  "shared-dsa",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "mono-move-gas"
-version = "0.1.0"
-dependencies = [
+ "smallvec",
  "thiserror 1.0.69",
 ]
 
@@ -12794,7 +12833,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
- "arc-swap",
+ "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
  "mono-move-alloc",
@@ -12812,21 +12851,25 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-global-context",
  "mono-move-testsuite",
  "move-core-types",
  "shared-dsa",
  "specializer",
- "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "blake2-rfc",
  "mono-move-core",
  "move-core-types",
+ "ripemd",
+ "sha2 0.9.9",
+ "sha3 0.9.1",
+ "siphasher 0.3.11",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -12841,40 +12884,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "mono-move-programs"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "legacy-move-compiler",
- "mono-move-alloc",
- "mono-move-core",
- "mono-move-gas",
- "mono-move-runtime",
- "move-binary-format",
- "move-compiler-v2",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "rand 0.7.3",
- "tempfile",
-]
-
-[[package]]
 name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
+ "hashbrown 0.14.3",
  "mono-move-alloc",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-loader",
  "move-core-types",
  "num-bigint 0.3.3",
  "paste",
  "proptest",
  "rand 0.7.3",
- "thiserror 1.0.69",
+ "serde",
 ]
 
 [[package]]
@@ -12882,13 +12906,20 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework-natives",
+ "aptos-gas-schedule",
+ "aptos-move-stdlib",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-types",
+ "bcs 0.1.4",
  "bytes",
  "codespan-reporting",
+ "criterion",
  "datatest-stable",
  "legacy-move-compiler",
  "libtest-mimic",
  "mono-move-core",
- "mono-move-gas",
  "mono-move-global-context",
  "mono-move-loader",
  "mono-move-natives",
@@ -12898,8 +12929,9 @@ dependencies = [
  "move-compiler-v2",
  "move-core-types",
  "move-model",
+ "move-package",
  "move-prover-test-utils",
- "move-stdlib",
+ "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
@@ -13483,6 +13515,7 @@ name = "move-resource-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "fxhash",
  "hex",
  "move-binary-format",
  "move-bytecode-utils",
@@ -15359,6 +15392,7 @@ dependencies = [
  "serde_urlencoded",
  "serde_yaml 0.9.30",
  "smallvec",
+ "sse-codec",
  "sync_wrapper 1.0.1",
  "tempfile",
  "thiserror 1.0.69",
@@ -18442,9 +18476,7 @@ name = "specializer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
  "mono-move-core",
- "mono-move-gas",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -18507,6 +18539,17 @@ checksum = "8baeff88f34ed0691978ec34440140e1572b68c7dd4a495fd14a3dc1944daa80"
 dependencies = [
  "base64ct",
  "der 0.8.0",
+]
+
+[[package]]
+name = "sse-codec"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a395a858c7ff5c4b42aeab0501e07c978ac5e1ae5059f301884dab3fa405f47"
+dependencies = [
+ "futures-io",
+ "futures_codec",
+ "memchr",
 ]
 
 [[package]]

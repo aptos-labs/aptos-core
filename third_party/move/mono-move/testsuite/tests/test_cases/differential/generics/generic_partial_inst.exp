@@ -29,7 +29,7 @@ fun caller(r0, r1): u64 {
     r1: _0
   code:
   L0:
-    0: [x0] := call identity, [r0, r1]
+    0: [x0] := call identity<u64, _0>, [r0, r1]
     1: ret [x0]
 }
 
@@ -39,7 +39,7 @@ fun entry(r0): u64 {
   code:
   L0:
     0: x0 := ld_u64 42
-    1: [x0] := call caller, [x0, r0]
+    1: [x0] := call caller<u64>, [x0, r0]
     2: ret [x0]
 }
 
@@ -54,17 +54,17 @@ fun identity(r0, r1): _0 {
 === micro-ops ===
 // module 0x1::test
 
-fun caller(): skipped (not all types are concrete)
+fun caller(): skipped (generic function not instantiated)
 
 fun entry() {
   frame_data_size: 8
+  entry_gas: 118
   code:
-    0: Charge #18
-    1: StoreImm8 [32] <- #42
-    2: Move8 [40] <- [0]
-    3: CallIndirect 0x1::test::caller<u64>
-    4: Move8 [0] <- [32]
-    5: Return
+    0: StoreImm8 [32] <- #42
+    1: Move8 [40] <- [0]
+    2: CallIndirect 0x1::test::caller<u64>
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
-fun identity(): skipped (not all types are concrete)
+fun identity(): skipped (generic function not instantiated)

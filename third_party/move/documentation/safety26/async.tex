@@ -1,0 +1,19 @@
+\section{Asynchronous Checking}
+\label{sec:async}
+
+Aptos executes blocks of transactions in parallel using \emph{Block-STM}~\cite{BlockSTM}, an optimistic concurrency-control protocol in which a pool of worker threads speculatively runs transactions out of order and re-validates them against later-published writes; executions that lose a race are aborted and re-executed.
+Block-STM also tracks when each transaction is committed.
+If there is not enough parallelism in the block due to read-write conflicts, worker capacity remains unused.
+
+That idle capacity can be used to run the runtime safety checks \emph{asynchronously}.
+The VM performs no runtime checks but logs a compact \emph{execution trace} for each transaction, containing only control-flow shape.
+When a transaction is committed, an idle worker replays the transaction's trace by abstractly interpreting the bytecode along the recorded path and runs the checks of \S\ref{sec:type} and \S\ref{sec:ability}.
+A violation found during replay aborts the block before its writes are persisted on-chain.
+
+Asynchronous checks run on committed transactions only, so speculative executions do not pay their cost.
+They fail only when a static-verifier bug is being exploited, so an attacker cannot consistently slow the network by triggering such failures.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

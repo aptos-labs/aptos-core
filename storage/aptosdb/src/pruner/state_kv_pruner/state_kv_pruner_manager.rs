@@ -4,21 +4,28 @@
 use crate::{
     metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
     pruner::{
-        pruner_manager::PrunerManager, pruner_utils, pruner_worker::PrunerWorker,
-        state_kv_pruner::StateKvPruner,
+        pruner_manager::PrunerManager,
+        pruner_utils,
+        pruner_worker::PrunerWorker,
+        state_kv_pruner::{generics::StateValuePrunerSchema, StateKvPruner},
     },
+    schema::db_metadata::{DbMetadataSchema, DbMetadataValue},
+    sharded_kv_db::ShardedKvDb,
     state_kv_db::StateKvDb,
 };
 use aptos_config::config::LedgerPrunerConfig;
+use aptos_schemadb::schema::SeekKeyCodec;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use std::sync::{atomic::Ordering, Arc};
+use std::{
+    marker::PhantomData,
+    ops::Deref,
+    sync::{atomic::Ordering, Arc},
+};
 
 /// The `PrunerManager` for `StateKvPruner`.
-pub(crate) struct StateKvPrunerManager {
-    state_kv_db: Arc<StateKvDb>,
-    /// Pruner name for metrics and logging.
-    name: &'static str,
+pub(crate) struct StateKvPrunerManager<S, D = StateKvDb> {
+    state_kv_db: Arc<D>,
     /// DB version window, which dictates how many version of state values to keep.
     prune_window: Version,
     /// It is None iff the pruner is not enabled.
@@ -27,10 +34,17 @@ pub(crate) struct StateKvPrunerManager {
     pruning_batch_size: usize,
     /// The minimal readable version for the ledger data.
     min_readable_version: AtomicVersion,
+
+    _phantom: PhantomData<S>,
 }
 
-impl PrunerManager for StateKvPrunerManager {
-    type Pruner = StateKvPruner;
+impl<S, D> PrunerManager for StateKvPrunerManager<S, D>
+where
+    S: StateValuePrunerSchema,
+    D: Deref<Target = ShardedKvDb> + Send + Sync + 'static,
+    Version: SeekKeyCodec<S::StaleIndexSchema>,
+{
+    type Pruner = StateKvPruner<S>;
 
     fn is_pruner_enabled(&self) -> bool {
         self.pruner_worker.is_some()
@@ -61,10 +75,13 @@ impl PrunerManager for StateKvPrunerManager {
             .store(min_readable_version, Ordering::SeqCst);
 
         PRUNER_VERSIONS
-            .with_label_values(&[self.name, "min_readable"])
+            .with_label_values(&[S::name(), "min_readable"])
             .set(min_readable_version as i64);
 
-        self.state_kv_db.write_pruner_progress(min_readable_version)
+        self.state_kv_db.metadata_db().put::<DbMetadataSchema>(
+            &S::pruner_progress_key(),
+            &DbMetadataValue::Version(min_readable_version),
+        )
     }
 
     #[cfg(test)]
@@ -83,14 +100,13 @@ impl PrunerManager for StateKvPrunerManager {
     }
 }
 
-impl StateKvPrunerManager {
-    pub fn new(state_kv_db: Arc<StateKvDb>, state_kv_pruner_config: LedgerPrunerConfig) -> Self {
-        let name = if state_kv_db.is_hot() {
-            "hot_state_kv_pruner"
-        } else {
-            "state_kv_pruner"
-        };
-
+impl<S, D> StateKvPrunerManager<S, D>
+where
+    S: StateValuePrunerSchema,
+    D: Deref<Target = ShardedKvDb> + Send + Sync + 'static,
+    Version: SeekKeyCodec<S::StaleIndexSchema>,
+{
+    pub(crate) fn new(state_kv_db: Arc<D>, state_kv_pruner_config: LedgerPrunerConfig) -> Self {
         let pruner_worker = if state_kv_pruner_config.enable {
             Some(Self::init_pruner(
                 Arc::clone(&state_kv_db),
@@ -101,40 +117,39 @@ impl StateKvPrunerManager {
         };
 
         let min_readable_version =
-            pruner_utils::get_state_kv_pruner_progress(&state_kv_db).expect("Must succeed.");
+            pruner_utils::get_state_kv_pruner_progress::<S>(&state_kv_db).expect("Must succeed.");
 
         PRUNER_VERSIONS
-            .with_label_values(&[name, "min_readable"])
+            .with_label_values(&[S::name(), "min_readable"])
             .set(min_readable_version as i64);
 
         Self {
             state_kv_db,
-            name,
             prune_window: state_kv_pruner_config.prune_window,
             pruner_worker,
             pruning_batch_size: state_kv_pruner_config.batch_size,
             min_readable_version: AtomicVersion::new(min_readable_version),
+            _phantom: PhantomData,
         }
     }
 
     fn init_pruner(
-        state_kv_db: Arc<StateKvDb>,
+        state_kv_db: Arc<D>,
         state_kv_pruner_config: LedgerPrunerConfig,
     ) -> PrunerWorker {
-        let is_hot = state_kv_db.is_hot();
-        let pruner =
-            Arc::new(StateKvPruner::new(state_kv_db).expect("Failed to create state kv pruner."));
+        let pruner = Arc::new(
+            StateKvPruner::<S>::new(state_kv_db).expect("Failed to create state kv pruner."),
+        );
 
         PRUNER_WINDOW
-            .with_label_values(&[pruner.name])
+            .with_label_values(&[S::name()])
             .set(state_kv_pruner_config.prune_window as i64);
 
         PRUNER_BATCH_SIZE
-            .with_label_values(&[pruner.name])
+            .with_label_values(&[S::name()])
             .set(state_kv_pruner_config.batch_size as i64);
 
-        let worker_name = if is_hot { "hot_state_kv" } else { "state_kv" };
-        PrunerWorker::new(pruner, state_kv_pruner_config.batch_size, worker_name)
+        PrunerWorker::new(pruner, state_kv_pruner_config.batch_size, S::worker_name())
     }
 
     fn set_pruner_target_db_version(&self, latest_version: Version) {
@@ -144,7 +159,7 @@ impl StateKvPrunerManager {
             .store(min_readable_version, Ordering::SeqCst);
 
         PRUNER_VERSIONS
-            .with_label_values(&[self.name, "min_readable"])
+            .with_label_values(&[S::name(), "min_readable"])
             .set(min_readable_version as i64);
 
         self.pruner_worker

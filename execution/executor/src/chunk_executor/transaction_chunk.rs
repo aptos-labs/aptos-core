@@ -96,7 +96,7 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
-        let onchain_config = chunk_onchain_config(&state_view);
+        let onchain_config = chunk_onchain_config(&state_view)?;
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
@@ -140,7 +140,7 @@ impl TransactionChunk for ChunkToApply {
             first_version: _,
         } = self;
 
-        let onchain_config = chunk_onchain_config(&state_view);
+        let onchain_config = chunk_onchain_config(&state_view)?;
         DoGetExecutionOutput::by_transaction_output(
             transactions,
             transaction_outputs,

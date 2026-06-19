@@ -1,10 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Low-level memory utilities: aligned buffer and raw pointer helpers.
+//! Owned VM memory buffer ([`MemoryRegion`]) and heap-object header access. The
+//! raw value read/write helpers live in [`mono_move_core::memory`] and are
+//! re-exported here.
 
-use crate::VEC_DATA_OFFSET;
-use mono_move_core::{DescriptorId, MAX_ALIGN};
+use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
+pub use mono_move_core::memory::*;
+use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET, MAX_ALIGN};
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
@@ -54,107 +57,40 @@ impl Drop for MemoryRegion {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Raw pointer helpers
-// ---------------------------------------------------------------------------
-
-/// # Safety
-/// `base.add(byte_offset)` must be valid and point to an initialized `u8`.
-#[inline(always)]
-pub unsafe fn read_u8(base: *const u8, byte_offset: impl Into<usize>) -> u8 {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { base.add(byte_offset.into()).read() }
-}
-
-/// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u64`.
-#[inline(always)]
-pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (base.add(byte_offset.into()) as *const u64).read() }
-}
-
-/// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and writable for a `u64`.
-#[inline(always)]
-pub unsafe fn write_u64(base: *mut u8, byte_offset: impl Into<usize>, val: u64) {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (base.add(byte_offset.into()) as *mut u64).write(val) }
-}
-
-/// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and point to an initialized pointer.
-#[inline(always)]
-pub unsafe fn read_ptr(base: *const u8, byte_offset: impl Into<usize>) -> *mut u8 {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (base.add(byte_offset.into()) as *const *mut u8).read() }
-}
-
-/// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and writable for a pointer.
-#[inline(always)]
-pub unsafe fn write_ptr(base: *mut u8, byte_offset: impl Into<usize>, ptr: *const u8) {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (base.add(byte_offset.into()) as *mut *const u8).write(ptr) }
-}
-
-/// Byte offset of the scalar `offset` half within a 16-byte fat pointer; the
-/// `base` half occupies the first 8 bytes.
-const FAT_PTR_OFFSET_HALF: usize = 8;
-
-/// Read a 16-byte fat pointer `(base, offset)` whose base half starts at
-/// `byte_offset`.
+/// Reads a vector's length, treating the null pointer as the empty vector.
 ///
 /// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and point to an initialized
-/// 16-byte fat pointer.
-#[inline(always)]
-pub unsafe fn read_fat_ptr(base: *const u8, byte_offset: impl Into<usize>) -> (*mut u8, u64) {
-    let byte_offset = byte_offset.into();
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe {
-        (
-            read_ptr(base, byte_offset),
-            read_u64(base, byte_offset + FAT_PTR_OFFSET_HALF),
-        )
+///
+/// `ptr` is null or points to a vector allocation.
+pub unsafe fn read_vec_len(ptr: *mut u8) -> u64 {
+    if ptr.is_null() {
+        0
+    } else {
+        // SAFETY: caller guarantees this is a vector.
+        unsafe { read_u64(ptr, VEC_LENGTH_OFFSET) }
     }
 }
 
-/// Write a 16-byte fat pointer `(ptr, offset)` whose base half starts at
-/// `byte_offset`.
+/// Reads an enum heap object's variant tag.
 ///
 /// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and writable for a 16-byte
-/// fat pointer.
+///
+/// `obj_ptr` points to the data region of an enum heap object.
 #[inline(always)]
-pub unsafe fn write_fat_ptr(
-    base: *mut u8,
-    byte_offset: impl Into<usize>,
-    ptr: *const u8,
-    offset: u64,
-) {
-    let byte_offset = byte_offset.into();
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe {
-        write_ptr(base, byte_offset, ptr);
-        write_u64(base, byte_offset + FAT_PTR_OFFSET_HALF, offset);
-    }
+pub unsafe fn read_enum_tag(obj_ptr: *const u8) -> u64 {
+    // SAFETY: caller guarantees this is an enum object.
+    unsafe { read_u64(obj_ptr, ENUM_TAG_OFFSET) }
 }
 
+/// Writes an enum heap object's variant tag.
+///
 /// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u32`.
+///
+/// `obj_ptr` points to the data region of an enum heap object.
 #[inline(always)]
-pub unsafe fn read_u32(base: *const u8, byte_offset: impl Into<usize>) -> u32 {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (base.add(byte_offset.into()) as *const u32).read() }
-}
-
-/// # Safety
-/// `base.add(byte_offset)` must be valid, aligned, and writable for a `u32`.
-#[inline(always)]
-pub unsafe fn write_u32(base: *mut u8, byte_offset: impl Into<usize>, val: u32) {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (base.add(byte_offset.into()) as *mut u32).write(val) }
+pub unsafe fn write_enum_tag(obj_ptr: *mut u8, tag: u64) {
+    // SAFETY: caller guarantees this is an enum object.
+    unsafe { write_u64(obj_ptr, ENUM_TAG_OFFSET, tag) }
 }
 
 /// Pointer to the `idx`-th element inside a vector's data region.

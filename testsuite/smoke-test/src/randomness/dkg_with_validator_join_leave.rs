@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use aptos_types::on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -26,6 +26,9 @@ async fn dkg_with_validator_join_leave() {
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            // This test toggles the validator set; chunky DKG reconfigs race
+            // with leave_validator_set, so keep it off.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build()
         .await;

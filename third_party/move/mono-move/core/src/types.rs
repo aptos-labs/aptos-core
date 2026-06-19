@@ -71,6 +71,9 @@ pub type Alignment = u32;
 /// Offset in bytes of struct fields in flat memory.
 pub type FieldOffset = u32;
 
+/// An enum variant's discriminant (the tag stored at `ENUM_TAG_OFFSET`).
+pub type VariantTag = u64;
+
 /// Pointer to an arena-interned [`Type`]. Pointer equality implies structural
 /// equality because the global interner deduplicates types. The alias hides
 /// the raw `GlobalArenaPtr<Type>` form throughout the codebase.
@@ -155,7 +158,7 @@ pub fn view_name(ptr: InternedIdentifier) -> &'static str {
 /// Converts `&mut T` to `&T` by interning the immutable counterpart. Errors
 /// if `mut_ref` is not a [`Type::MutRef`].
 ///
-/// Reads through `view_type` and therefore inherits its safety contract.
+/// Inherits safety contract of [`view_type`].
 pub fn convert_mut_to_immut_ref(
     interner: &impl Interner,
     mut_ref: InternedType,
@@ -169,12 +172,46 @@ pub fn convert_mut_to_immut_ref(
 /// Strips the reference from `&T` or `&mut T`, returning `T`. Errors if
 /// `ref_ty` is not a reference type.
 ///
-/// Reads through `view_type` and therefore inherits its safety contract.
+/// Inherits safety contract of [`view_type`].
 pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
     let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
         anyhow::bail!("strip_ref: expected reference type");
     };
     Ok(*inner)
+}
+
+/// Whether `ty` contains no [`Type::TypeParam`] node.
+///
+/// Inherits safety contract of [`view_type`].
+/// TODO: convert to non-recursive.
+pub fn is_closed_type(ty: InternedType) -> bool {
+    match view_type(ty) {
+        Type::TypeParam { .. } => false,
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer => true,
+        Type::Vector { elem } => is_closed_type(*elem),
+        Type::ImmutRef { inner } | Type::MutRef { inner } => is_closed_type(*inner),
+        Type::Nominal { ty_args, .. } => {
+            view_type_list(*ty_args).iter().copied().all(is_closed_type)
+        },
+        Type::Function { args, results, .. } => {
+            view_type_list(*args).iter().copied().all(is_closed_type)
+                && view_type_list(*results).iter().copied().all(is_closed_type)
+        },
+    }
 }
 
 /// Layout for struct fields:
@@ -375,6 +412,33 @@ impl Type {
         })
     }
 
+    /// The short kind word for this type (`"u64"`, `"vector"`, `"struct"`, ...).
+    /// Mirrors the legacy VM's `TypeTag::to_short_string`.
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            Type::Bool => "bool",
+            Type::U8 => "u8",
+            Type::U16 => "u16",
+            Type::U32 => "u32",
+            Type::U64 => "u64",
+            Type::U128 => "u128",
+            Type::U256 => "u256",
+            Type::I8 => "i8",
+            Type::I16 => "i16",
+            Type::I32 => "i32",
+            Type::I64 => "i64",
+            Type::I128 => "i128",
+            Type::I256 => "i256",
+            Type::Address => "address",
+            Type::Signer => "signer",
+            Type::Vector { .. } => "vector",
+            Type::Nominal { .. } => "struct",
+            Type::Function { .. } => "function",
+            Type::ImmutRef { .. } | Type::MutRef { .. } => "reference",
+            Type::TypeParam { .. } => "type parameter",
+        }
+    }
+
     /// True iff this is `Type::U64`. Used by the specializer to gate the
     /// u64-specialized micro-op fast paths.
     #[inline(always)]
@@ -519,6 +583,20 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
             Ok(())
         },
     }
+}
+
+/// Renders an interned type to its textual representation (see [`display_type`]).
+//
+// TODO: this traversal is unbounded; replace with a metered, depth-bounded
+// version.
+pub fn type_to_string(ty: InternedType) -> String {
+    struct Disp(InternedType);
+    impl fmt::Display for Disp {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            display_type(f, self.0)
+        }
+    }
+    Disp(ty).to_string()
 }
 
 /// Writes an interned type list as `T0, T1, ...`.

@@ -82,6 +82,17 @@ impl<'guard> ModuleReadSet<'guard> {
         self.inner.get(&id).copied()
     }
 
+    /// Returns the loaded module for `id`. Callers that resolve a module they
+    /// are already executing from rely on it being present and loaded, so a
+    /// missing or still-pending entry is an invariant violation.
+    pub fn get_loaded(&self, id: ArenaRef<'guard, ModuleId>) -> LoaderResult<&'guard LoadedModule> {
+        match self.get(id) {
+            Some(ModuleRead::Loaded { module, .. }) => Ok(module),
+            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
+            None => invariant_violation!(UnexpectedReadSetMiss),
+        }
+    }
+
     /// Records a module that is about to be loaded. Used so a load that fails
     /// due to deserialization / verification still leaves the read in the set.
     pub fn record_pending_loading(&mut self, id: ArenaRef<'guard, ModuleId>) -> LoaderResult<()> {

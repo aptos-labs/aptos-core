@@ -1339,13 +1339,13 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let built_package =
             build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
-        let url = self
+        let client = self
             .txn_options
             .rest_options
-            .url(&self.txn_options.profile_options)?;
+            .client(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given object address.
-        let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
+        let registry = CachedPackageRegistry::create(client, self.object_address, false).await?;
         let package = registry
             .get_package(built_package.name())
             .await
@@ -1613,13 +1613,13 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         // Get the `PackageRegistry` at the given code object address.
         let upgrade_policy = match &self.txn_options.session {
             None => {
-                let url = self
+                let client = self
                     .txn_options
                     .rest_options
-                    .url(&self.txn_options.profile_options)?;
+                    .client(&self.txn_options.profile_options)?;
 
                 let registry =
-                    CachedPackageRegistry::create(url, self.object_address, false).await?;
+                    CachedPackageRegistry::create(client, self.object_address, false).await?;
                 let package_info = registry
                     .get_package(package.name())
                     .await
@@ -2039,8 +2039,8 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account, self.bytecode).await?;
+        let client = self.rest_options.client(&self.profile_options)?;
+        let registry = CachedPackageRegistry::create(client, self.account, self.bytecode).await?;
         let output_dir = dir_default_to_current(self.output_dir)?;
 
         let package = registry
@@ -2123,8 +2123,8 @@ impl CliCommand<&'static str> for VerifyPackage {
         let compiled_metadata = pack.extract_metadata()?;
 
         // Now pull the compiled package
-        let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account, false).await?;
+        let client = self.rest_options.client(&self.profile_options)?;
+        let registry = CachedPackageRegistry::create(client, self.account, false).await?;
         let package = registry
             .get_package(pack.name())
             .await
@@ -2199,8 +2199,8 @@ impl CliCommand<&'static str> for ListPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account, false).await?;
+        let client = self.rest_options.client(&self.profile_options)?;
+        let registry = CachedPackageRegistry::create(client, self.account, false).await?;
         match self.query {
             MoveListQuery::Packages => {
                 for name in registry.package_names() {

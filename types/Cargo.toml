@@ -12,6 +12,20 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ['poem-openapi']
+
+[features]
+default = []
+testing = ["aptos-crypto/fuzzing"]
+fuzzing = [
+    "proptest",
+    "proptest-derive",
+    "aptos-crypto/fuzzing",
+    "move-core-types/fuzzing",
+    "arbitrary",
+]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-batch-encryption = { workspace = true }
@@ -95,17 +109,6 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 
-[features]
-default = []
-testing = ["aptos-crypto/fuzzing"]
-fuzzing = [
-    "proptest",
-    "proptest-derive",
-    "aptos-crypto/fuzzing",
-    "move-core-types/fuzzing",
-    "arbitrary",
-]
-
 [[bench]]
 name = "keyless"
 harness = false
@@ -113,6 +116,3 @@ harness = false
 [[bench]]
 name = "state_key"
 harness = false
-
-[package.metadata.cargo-machete]
-ignored = ['poem-openapi']

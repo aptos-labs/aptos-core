@@ -13,6 +13,7 @@ pub mod context;
 mod error_converter;
 mod events;
 mod failpoint;
+mod headers_sanity_check;
 mod index;
 mod log;
 pub mod metrics;

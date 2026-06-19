@@ -215,7 +215,16 @@ spec aptos_framework::stake {
             );
 
         let config = staking_config::get();
-        let voting_power = get_voting_power(stake_pool);
+        let merge_expired_pending_inactive = stake_pool.locked_until_secs > 0
+            && timestamp::spec_now_seconds() >= stake_pool.locked_until_secs;
+        let effective_pending_inactive = if (merge_expired_pending_inactive) {
+            0
+        } else {
+            stake_pool.pending_inactive.value
+        };
+        let voting_power = stake_pool.active.value
+            + stake_pool.pending_active.value
+            + effective_pending_inactive;
 
         let minimum_stake = config.minimum_stake;
         let maximum_stake = config.maximum_stake;

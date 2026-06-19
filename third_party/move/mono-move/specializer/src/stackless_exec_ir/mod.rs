@@ -9,14 +9,14 @@
 mod display;
 pub(crate) mod instr_utils;
 
+pub use mono_move_core::CmpKind;
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
     IntTy, PreparedModule,
 };
 use move_binary_format::file_format::{
-    ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
-    FunctionInstantiationIndex, IdentifierIndex, VariantFieldHandleIndex,
-    VariantFieldInstantiationIndex,
+    ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, IdentifierIndex,
+    VariantFieldHandleIndex,
 };
 use move_core_types::{
     function::ClosureMask,
@@ -24,6 +24,7 @@ use move_core_types::{
 };
 
 /// Named slot operand.
+/// TODO: consider renaming this enum to `NamedSlot`, to contrast with `SizedSlot`.
 ///
 /// - `Home` — frame-local storage: parameters, declared locals, and temporaries
 ///   due to destackification. These map 1:1 to frame slots.
@@ -65,68 +66,11 @@ pub struct Label(pub u16);
 /// Unary operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
-    CastU8,
-    CastU16,
-    CastU32,
-    CastU64,
-    CastU128,
-    CastU256,
-    CastI8,
-    CastI16,
-    CastI32,
-    CastI64,
-    CastI128,
-    CastI256,
+    /// Cast the operand to the given integer type, aborting if it doesn't fit.
+    Cast(IntTy),
     Not,
     Negate,
     FreezeRef,
-}
-
-impl UnaryOp {
-    /// Returns the target [`IntTy`] if the operation is a cast operation,
-    /// otherwise `None`.
-    pub fn cast_target_ty(self) -> Option<IntTy> {
-        Some(match self {
-            UnaryOp::CastU8 => IntTy::U8,
-            UnaryOp::CastU16 => IntTy::U16,
-            UnaryOp::CastU32 => IntTy::U32,
-            UnaryOp::CastU64 => IntTy::U64,
-            UnaryOp::CastU128 => IntTy::U128,
-            UnaryOp::CastU256 => IntTy::U256,
-            UnaryOp::CastI8 => IntTy::I8,
-            UnaryOp::CastI16 => IntTy::I16,
-            UnaryOp::CastI32 => IntTy::I32,
-            UnaryOp::CastI64 => IntTy::I64,
-            UnaryOp::CastI128 => IntTy::I128,
-            UnaryOp::CastI256 => IntTy::I256,
-            UnaryOp::Not | UnaryOp::Negate | UnaryOp::FreezeRef => return None,
-        })
-    }
-}
-
-/// Comparison operations that produce a boolean result.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CmpOp {
-    Lt,
-    Gt,
-    Le,
-    Ge,
-    Eq,
-    Neq,
-}
-
-impl CmpOp {
-    /// Return the logically negated comparison.
-    pub fn negate(self) -> Self {
-        match self {
-            CmpOp::Lt => CmpOp::Ge,
-            CmpOp::Ge => CmpOp::Lt,
-            CmpOp::Gt => CmpOp::Le,
-            CmpOp::Le => CmpOp::Gt,
-            CmpOp::Eq => CmpOp::Neq,
-            CmpOp::Neq => CmpOp::Eq,
-        }
-    }
 }
 
 /// Binary operations.
@@ -142,7 +86,7 @@ pub enum BinaryOp {
     BitXor,
     Shl,
     Shr,
-    Cmp(CmpOp),
+    Cmp(CmpKind),
     Or,
     And,
 }
@@ -172,8 +116,11 @@ const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
 /// A stackless IR instruction with explicit named-slot operands.
 ///
-/// TODO: convert variants to struct-style (named fields) so call sites read
-/// `Instr::Pack { dst, ty, args }` rather than positional tuples.
+/// TODO:
+/// (1) convert variants to struct-style (named fields) so call sites read
+/// `Instr::Move { dst, src }` rather than positional tuples.
+/// (2) add description for each instruction variant.
+/// (3) change uses of raw integers into newtypes/type-aliases.
 #[derive(Clone)]
 pub enum Instr {
     // --- Loads ---
@@ -207,100 +154,92 @@ pub enum Instr {
     /// `dst = op(lhs_slot, immediate)` — binary op with immediate right operand
     BinaryOpImm(Slot, BinaryOp, Slot, ImmValue),
 
-    // --- Struct (second field is the interned struct `Type`; generic
-    // variants additionally carry an interned type-argument list) ---
+    // --- Struct (second field is the interned struct `Type`) ---
     //
-    // Contract: for the non-generic `Pack` / `Unpack`, the carried
-    // `InternedType` MUST be a fully-substituted concrete `Type::Nominal`
-    // — no `Type::TypeParam` in any constituent, and its `NominalLayout`
-    // must be populated.
-    //
-    // TODO: depending on how we pre-intern types, we may be able to unify
-    // some of instructions here.
+    // Contract: the carried `InternedType` is the instantiated nominal, with
+    // the instantiation's type arguments already applied. Inside a generic
+    // function it may still contain the enclosing function's `TypeParam`s.
     Pack(Slot, InternedType, Vec<Slot>),
-    PackGeneric(Slot, InternedType, Vec<Slot>),
     Unpack(Vec<Slot>, InternedType, Slot),
-    UnpackGeneric(Vec<Slot>, InternedType, Slot),
 
-    // --- Variant (enum type + variant ordinal) ---
+    // --- Variant (enum type + variant ordinal; same type contract as
+    // `Pack`/`Unpack`) ---
     PackVariant(Slot, InternedType, u16, Vec<Slot>),
-    PackVariantGeneric(Slot, InternedType, u16, Vec<Slot>),
     UnpackVariant(Vec<Slot>, InternedType, u16, Slot),
-    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, Slot),
     TestVariant(Slot, InternedType, u16, Slot),
-    TestVariantGeneric(Slot, InternedType, u16, Slot),
 
     // --- References ---
+    //
+    // Field ops carry `(instantiated owner type, non-generic field handle)`:
+    // the handle gives the field position; the owner type has the same contract
+    // as `Pack`/`Unpack`.
     ImmBorrowLoc(Slot, Slot),
     MutBorrowLoc(Slot, Slot),
-    ImmBorrowField(Slot, FieldHandleIndex, Slot),
-    MutBorrowField(Slot, FieldHandleIndex, Slot),
-    ImmBorrowFieldGeneric(Slot, FieldInstantiationIndex, Slot),
-    MutBorrowFieldGeneric(Slot, FieldInstantiationIndex, Slot),
-    ImmBorrowVariantField(Slot, VariantFieldHandleIndex, Slot),
-    MutBorrowVariantField(Slot, VariantFieldHandleIndex, Slot),
-    ImmBorrowVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
-    MutBorrowVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
+    ImmBorrowField(Slot, InternedType, FieldHandleIndex, Slot),
+    MutBorrowField(Slot, InternedType, FieldHandleIndex, Slot),
+    ImmBorrowVariantField(Slot, InternedType, VariantFieldHandleIndex, Slot),
+    MutBorrowVariantField(Slot, InternedType, VariantFieldHandleIndex, Slot),
     ReadRef(Slot, Slot),
     /// `*dst_ref = src_val`
     WriteRef(Slot, Slot),
 
     // --- Fused field access (borrow+read/write combined) ---
     /// `dst = src_ref.field` (imm_borrow_field + read_ref)
-    ReadField(Slot, FieldHandleIndex, Slot),
-    ReadFieldGeneric(Slot, FieldInstantiationIndex, Slot),
+    ReadField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `dst_ref.field = val` (mut_borrow_field + write_ref)
-    WriteField(FieldHandleIndex, Slot, Slot),
-    WriteFieldGeneric(FieldInstantiationIndex, Slot, Slot),
-    ReadVariantField(Slot, VariantFieldHandleIndex, Slot),
-    ReadVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
-    WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
-    WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
+    WriteField(InternedType, FieldHandleIndex, Slot, Slot),
+    ReadVariantField(Slot, InternedType, VariantFieldHandleIndex, Slot),
+    WriteVariantField(InternedType, VariantFieldHandleIndex, Slot, Slot),
 
     // --- Fused inline-struct field access (borrow_loc + field op combined) ---
     /// `dst = &local.field` (imm_borrow_loc + imm_borrow_field on an inline struct local)
-    ImmBorrowLocField(Slot, FieldHandleIndex, Slot),
+    ImmBorrowLocField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `dst = &mut local.field`
-    MutBorrowLocField(Slot, FieldHandleIndex, Slot),
+    MutBorrowLocField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `dst = local.field` (imm_borrow_loc + read_field on an inline struct local)
-    ReadLocalField(Slot, FieldHandleIndex, Slot),
+    ReadLocalField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `local.field = src` (mut_borrow_loc + write_field on an inline struct local)
-    WriteLocalField(FieldHandleIndex, Slot, Slot),
+    WriteLocalField(InternedType, FieldHandleIndex, Slot, Slot),
 
     // --- Globals (struct type is the interned `Type` for the named
-    // resource; generic variants carry the instantiated nominal) ---
+    // resource; same type contract as `Pack`/`Unpack`) ---
     Exists(Slot, InternedType, Slot),
-    ExistsGeneric(Slot, InternedType, Slot),
     MoveFrom(Slot, InternedType, Slot),
-    MoveFromGeneric(Slot, InternedType, Slot),
     /// `(struct_ty, signer, val)`
     MoveTo(InternedType, Slot, Slot),
-    MoveToGeneric(InternedType, Slot, Slot),
     ImmBorrowGlobal(Slot, InternedType, Slot),
-    ImmBorrowGlobalGeneric(Slot, InternedType, Slot),
     MutBorrowGlobal(Slot, InternedType, Slot),
-    MutBorrowGlobalGeneric(Slot, InternedType, Slot),
 
     // --- Calls ---
-    Call(Vec<Slot>, FunctionHandleIndex, Vec<Slot>),
-    CallGeneric(Vec<Slot>, FunctionInstantiationIndex, Vec<Slot>),
+    //
+    // Carries `(inner FunctionHandleIndex, target ty_args)`: the handle gives the
+    // callee identity; `ty_args` is the instantiation's type arguments, and is
+    // `EMPTY_TYPE_LIST` for a non-generic call. Same type contract as
+    // `Pack`/`Unpack` — inside a generic function the args may still contain the
+    // enclosing function's `TypeParam`s.
+    Call(Vec<Slot>, FunctionHandleIndex, InternedTypeList, Vec<Slot>),
 
-    // --- Closures ---
-    PackClosure(Slot, FunctionHandleIndex, ClosureMask, Vec<Slot>),
-    PackClosureGeneric(Slot, FunctionInstantiationIndex, ClosureMask, Vec<Slot>),
+    // --- Closures (same `(inner handle, target ty_args)` contract as `Call`) ---
+    PackClosure(
+        Slot,
+        FunctionHandleIndex,
+        InternedTypeList,
+        ClosureMask,
+        Vec<Slot>,
+    ),
     /// `CallClosure(rets, signature_types, args)` — `signature_types` is the
     /// interned list of types from the closure's signature (arg types followed
     /// by result types, matching the source `SignatureIndex`).
     CallClosure(Vec<Slot>, InternedTypeList, Vec<Slot>),
 
     // --- Vector (second field is the vector's element type) ---
-    VecPack(Slot, InternedType, u16, Vec<Slot>),
+    VecPack(Slot, InternedType, Vec<Slot>),
     VecLen(Slot, InternedType, Slot),
     VecImmBorrow(Slot, InternedType, Slot, Slot),
     VecMutBorrow(Slot, InternedType, Slot, Slot),
     VecPushBack(InternedType, Slot, Slot),
     VecPopBack(Slot, InternedType, Slot),
-    VecUnpack(Vec<Slot>, InternedType, u16, Slot),
+    VecUnpack(Vec<Slot>, InternedType, Slot),
     VecSwap(InternedType, Slot, Slot, Slot),
 
     // --- Control flow ---
@@ -308,12 +247,16 @@ pub enum Instr {
     BrTrue(Label, Slot),
     BrFalse(Label, Slot),
     /// `BrCmp(target, op, lhs, rhs)` — branch to `target` if `op(lhs, rhs)` is true.
-    BrCmp(Label, CmpOp, Slot, Slot),
+    BrCmp(Label, CmpKind, Slot, Slot),
     /// `BrCmpImm(target, op, src, imm)` — branch to `target` if `op(src, imm)` is true.
-    BrCmpImm(Label, CmpOp, Slot, ImmValue),
+    BrCmpImm(Label, CmpKind, Slot, ImmValue),
     Ret(Vec<Slot>),
     Abort(Slot),
     AbortMsg(Slot, Slot),
+
+    // --- Test intrinsics ---
+    /// Triggers a garbage collection.
+    ForceGC,
 }
 
 impl Instr {
@@ -342,53 +285,33 @@ impl Instr {
             Instr::BinaryOp(..) => "BinaryOp",
             Instr::BinaryOpImm(..) => "BinaryOpImm",
             Instr::Pack(..) => "Pack",
-            Instr::PackGeneric(..) => "PackGeneric",
             Instr::Unpack(..) => "Unpack",
-            Instr::UnpackGeneric(..) => "UnpackGeneric",
             Instr::PackVariant(..) => "PackVariant",
-            Instr::PackVariantGeneric(..) => "PackVariantGeneric",
             Instr::UnpackVariant(..) => "UnpackVariant",
-            Instr::UnpackVariantGeneric(..) => "UnpackVariantGeneric",
             Instr::TestVariant(..) => "TestVariant",
-            Instr::TestVariantGeneric(..) => "TestVariantGeneric",
             Instr::ImmBorrowLoc(..) => "ImmBorrowLoc",
             Instr::MutBorrowLoc(..) => "MutBorrowLoc",
             Instr::ImmBorrowField(..) => "ImmBorrowField",
             Instr::MutBorrowField(..) => "MutBorrowField",
-            Instr::ImmBorrowFieldGeneric(..) => "ImmBorrowFieldGeneric",
-            Instr::MutBorrowFieldGeneric(..) => "MutBorrowFieldGeneric",
             Instr::ImmBorrowVariantField(..) => "ImmBorrowVariantField",
             Instr::MutBorrowVariantField(..) => "MutBorrowVariantField",
-            Instr::ImmBorrowVariantFieldGeneric(..) => "ImmBorrowVariantFieldGeneric",
-            Instr::MutBorrowVariantFieldGeneric(..) => "MutBorrowVariantFieldGeneric",
             Instr::ReadRef(..) => "ReadRef",
             Instr::WriteRef(..) => "WriteRef",
             Instr::ReadField(..) => "ReadField",
-            Instr::ReadFieldGeneric(..) => "ReadFieldGeneric",
             Instr::WriteField(..) => "WriteField",
-            Instr::WriteFieldGeneric(..) => "WriteFieldGeneric",
             Instr::ReadVariantField(..) => "ReadVariantField",
-            Instr::ReadVariantFieldGeneric(..) => "ReadVariantFieldGeneric",
             Instr::WriteVariantField(..) => "WriteVariantField",
-            Instr::WriteVariantFieldGeneric(..) => "WriteVariantFieldGeneric",
             Instr::ImmBorrowLocField(..) => "ImmBorrowLocField",
             Instr::MutBorrowLocField(..) => "MutBorrowLocField",
             Instr::ReadLocalField(..) => "ReadLocalField",
             Instr::WriteLocalField(..) => "WriteLocalField",
             Instr::Exists(..) => "Exists",
-            Instr::ExistsGeneric(..) => "ExistsGeneric",
             Instr::MoveFrom(..) => "MoveFrom",
-            Instr::MoveFromGeneric(..) => "MoveFromGeneric",
             Instr::MoveTo(..) => "MoveTo",
-            Instr::MoveToGeneric(..) => "MoveToGeneric",
             Instr::ImmBorrowGlobal(..) => "ImmBorrowGlobal",
-            Instr::ImmBorrowGlobalGeneric(..) => "ImmBorrowGlobalGeneric",
             Instr::MutBorrowGlobal(..) => "MutBorrowGlobal",
-            Instr::MutBorrowGlobalGeneric(..) => "MutBorrowGlobalGeneric",
             Instr::Call(..) => "Call",
-            Instr::CallGeneric(..) => "CallGeneric",
             Instr::PackClosure(..) => "PackClosure",
-            Instr::PackClosureGeneric(..) => "PackClosureGeneric",
             Instr::CallClosure(..) => "CallClosure",
             Instr::VecPack(..) => "VecPack",
             Instr::VecLen(..) => "VecLen",
@@ -406,6 +329,7 @@ impl Instr {
             Instr::Ret(..) => "Ret",
             Instr::Abort(..) => "Abort",
             Instr::AbortMsg(..) => "AbortMsg",
+            Instr::ForceGC => "ForceGC",
         }
     }
 }

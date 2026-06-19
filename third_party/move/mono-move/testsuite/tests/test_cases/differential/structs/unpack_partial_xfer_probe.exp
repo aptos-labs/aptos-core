@@ -38,31 +38,31 @@ fun trigger(): u64 {
 
 fun pair_provider() {
   frame_data_size: 32
+  entry_gas: 156
   code:
-    0: Charge #60
-    1: StoreImm8 [0] <- #10
-    2: StoreImm8 [8] <- #20
-    3: Move8 [24] <- [8]
-    4: Move8 [16] <- [0]
-    5: Move(16) [0] <- [16]
-    6: Return
+    0: StoreImm8 [0] <- #10
+    1: StoreImm8 [8] <- #20
+    2: Move8 [24] <- [8]
+    3: Move8 [16] <- [0]
+    4: Move(16) [0] <- [16]
+    5: Return
 }
 
 fun id() {
   frame_data_size: 8
+  entry_gas: 54
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 155
   code:
-    0: Charge #29
-    1: CallIndirect 0x66::unpack_partial_xfer_probe::pair_provider
-    2: Move8 [0] <- [32]
-    3: Move8 [32] <- [40]
-    4: CallIndirect 0x66::unpack_partial_xfer_probe::id
-    5: AddU64 [0] <- [0] + [32]
-    6: Return
+    0: CallIndirect 0x66::unpack_partial_xfer_probe::pair_provider
+    1: Move8 [0] <- [32]
+    2: Move8 [32] <- [40]
+    3: CallIndirect 0x66::unpack_partial_xfer_probe::id
+    4: AddU64 [0] <- [0] + [32]
+    5: Return
 }

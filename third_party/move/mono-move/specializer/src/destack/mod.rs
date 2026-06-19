@@ -8,6 +8,7 @@ pub mod optimize;
 mod slot_alloc;
 mod ssa_conversion;
 mod ssa_function;
+mod test_utils;
 mod translate;
 
 use crate::stackless_exec_ir::ModuleIR;

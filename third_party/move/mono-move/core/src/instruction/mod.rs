@@ -114,21 +114,23 @@
 //!   heap pointers.
 
 use crate::{
-    align::MAX_ALIGN,
-    interner::{InternedIdentifier, InternedModuleId},
+    align::{align_up, MAX_ALIGN},
+    interner::{view_function_ref, InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{FrameSlot, NativeABI, NativeIdx},
-    types::{display_type, display_type_list, InternedType, InternedTypeList},
+    types::{
+        display_type, display_type_list, view_name, InternedType, InternedTypeList, VariantTag,
+    },
     FunctionPtr,
 };
+use move_binary_format::file_format::ConstantPoolIndex;
 use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
-mod gas;
 mod unspecialized;
-pub use gas::MicroOpGasSchedule;
 pub use unspecialized::{
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand,
+    CmpKind, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
+    JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, ShiftOperand, ValueCmpOp, ValueRefCmpOp,
 };
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
@@ -184,41 +186,45 @@ impl std::fmt::Display for DescriptorId {
     }
 }
 
-/// A sized view into a frame slot: its byte offset and width.
-//
-// TODO: reconcile with `SlotInfo` (same shape, different provenance).
-// Also: add alignment information once the layout admits non-8-byte
-// fields, otherwise callers that pack `SizedSlot`s back-to-back (e.g.
-// captured data) will produce mis-aligned fields.
+/// Sized frame slot: a region of the frame with a byte offset (relative to
+/// frame pointer), size (in bytes), and alignment (in bytes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SizedSlot {
     pub offset: FrameOffset,
     pub size: u32,
+    pub align: u32,
 }
 
 /// Reference to the target function of a closure.
 ///
-/// Conceptually an enum. The concrete in-memory representation of this enum
-/// (tag size, padding, payload layout) inside closure heap objects is given
-/// by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
+/// Its in-memory representation inside a closure heap object (tag, padding,
+/// payload) is given by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
 #[derive(Clone)]
 pub enum ClosureFuncRef {
     /// Local function, already monomorphized and materialized.
     Resolved(FunctionPtr),
-    // `Unresolved { ... }` — cross-module form, TBD. Resolved lazily at call
-    // time. Its payload will mirror whatever representation cross-module
-    // calls end up using.
+    /// Function named symbolically by its `(module, name, type args)` identity,
+    /// resolved to a pointer lazily at call time.
+    Unresolved(InternedFunctionRef),
 }
 
 impl fmt::Display for ClosureFuncRef {
+    // SAFETY: the `Resolved` arm's `as_ref_unchecked` and `Unresolved` arm's
+    // `view_*` helpers are sound only because display happens while the guard
+    // keeps the arena and function pointers alive. TODO: have a safe display
+    // impl that takes the guard.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ClosureFuncRef::Resolved(ptr) => {
-                // SAFETY: Micro-ops are currently displayed only during execution
-                // when the guard is held.
-                // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
                 write!(f, "Resolved({})", func.name())
+            },
+            ClosureFuncRef::Unresolved(func_ref) => {
+                write!(
+                    f,
+                    "Unresolved({})",
+                    view_name(view_function_ref(*func_ref).func_name)
+                )
             },
         }
     }
@@ -236,13 +242,19 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
-    /// Descriptor for the allocated `ClosureCapturedData` (Materialized)
-    /// object. `Some` iff this closure captures at least one value;
-    /// otherwise `None` and no captured-data object is allocated.
+    /// GC trace descriptor for the allocated `ClosureCapturedData`
+    /// (Materialized) object. `Some` iff this closure captures at least one
+    /// value; otherwise `None` and no captured-data object is allocated. A
+    /// pointer-free capture uses the reserved `TRIVIAL_DESCRIPTOR_ID` (trace
+    /// nothing); a pointer-bearing capture uses a `CapturedData` descriptor
+    /// listing the heap-pointer offsets.
     ///
     /// The closure object's own descriptor is implicit: it is always the
     /// reserved `CLOSURE_DESCRIPTOR_ID` slot in the descriptor table.
     pub captured_data_descriptor_id: Option<DescriptorId>,
+    /// Byte width of the captured values region: the natural-aligned layout of
+    /// `captured`. `0` for a non-capturing closure.
+    pub values_size: u32,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -260,6 +272,31 @@ pub struct CallClosureOp {
     pub provided_args: Vec<SizedSlot>,
 }
 
+/// Operand data for [`MicroOp::VecPack`].
+#[derive(Clone, Debug)]
+pub struct VecPackOp {
+    /// Frame slot that receives the vector's heap pointer.
+    pub dst: FrameOffset,
+    /// GC trace descriptor for the allocated vector object.
+    pub descriptor_id: DescriptorId,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// Element sources (in the current frame), in element order.
+    pub srcs: Vec<FrameOffset>,
+}
+
+/// Operand data for [`MicroOp::VecUnpack`].
+#[derive(Clone, Debug)]
+pub struct VecUnpackOp {
+    /// Frame slot holding the vector's heap pointer (by value, not a
+    /// reference).
+    pub src: FrameOffset,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// Element destinations (in the current frame), in element order.
+    pub dsts: Vec<FrameOffset>,
+}
+
 #[derive(Clone)]
 pub enum MicroOp {
     //======================================================================
@@ -273,11 +310,32 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
+    /// Store an immediate byte (1 byte) at the `dst` frame slot.
+    /// Can be used for various 1-byte values (`bool`, `u8`, `i8`).
+    StoreImm1 {
+        dst: FrameOffset,
+        imm: u8,
+    },
+
+    /// Store 2 immediate bytes into the destination slot. Same LE convention
+    /// as `StoreImm8`: `u16.to_le_bytes()` / `i16.to_le_bytes()`.
+    StoreImm2 {
+        dst: FrameOffset,
+        imm: [u8; 2],
+    },
+
+    /// Store 4 immediate bytes into the destination slot. Same LE convention
+    /// as `StoreImm8`: `u32.to_le_bytes()` / `i32.to_le_bytes()`.
+    StoreImm4 {
+        dst: FrameOffset,
+        imm: [u8; 4],
+    },
+
     /// Store 8 immediate bytes into the destination slot. `imm` is the
     /// little-endian (LE) byte representation of the value:
     /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
-    /// two's-complement) for signed. Narrower primitives (`u8`/`u16`/`u32`/
-    /// `i8`/`i16`/`i32`/`bool`) are widened to 8 bytes by the lowerer.
+    /// two's-complement) for signed. The 2/4-byte primitives (`u16`/`u32`/
+    /// `i16`/`i32`) are widened to 8 bytes by the lowerer.
     StoreImm8 {
         dst: FrameOffset,
         imm: [u8; 8],
@@ -490,6 +548,47 @@ pub enum MicroOp {
     IntCast(IntCastOp),
 
     //======================================================================
+    // Comparison & boolean logic (1-byte boolean results)
+    //======================================================================
+    // Invariant: every boolean slot read or written here holds exactly
+    // `0` (false) or `1` (true). Out-of-range values (2, 3, ...) are not
+    // valid booleans and are never produced by these ops.
+    //======================================================================
+    /// `dst = (lhs <op> rhs)`, writing a 1-byte boolean. See [`IntCmpOp`].
+    IntCmp(IntCmpOp),
+
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality over aggregate
+    /// values (vectors, structs). `lhs`/`rhs` are the operand slots; a vector
+    /// slot holds a pointer to its heap data, which the comparison reads
+    /// through. See [`ValueCmpOp`].
+    ValueCmp(ValueCmpOp),
+
+    /// `dst = (lhs == rhs)` (or `!=`), a structural equality where `lhs`/`rhs`
+    /// hold references (16-byte fat pointers) read through to the operand
+    /// values. See [`ValueRefCmpOp`].
+    ValueRefCmp(ValueRefCmpOp),
+
+    /// `dst = !src`, both `dst` and `src` are 1-byte booleans.
+    BoolNot {
+        dst: FrameOffset,
+        src: FrameOffset,
+    },
+
+    /// `dst = lhs AND rhs`; `dst`, `lhs`, `rhs` are 1-byte booleans.
+    BoolAnd {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = lhs OR rhs`; `dst`, `lhs`, `rhs` are 1-byte booleans.
+    BoolOr {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    //======================================================================
     // Control flow
     //======================================================================
     // Fused compare-and-branch (no separate cmp + flags).
@@ -545,21 +644,66 @@ pub enum MicroOp {
     Return,
 
     /// Unconditional jump.
+    ///
+    /// `gas` is the cost of the destination block, charged before
+    /// the jump transfers control.
     Jump {
         target: CodeOffset,
+        gas: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
+    ///
+    /// `gas_taken` / `gas_fallthrough` are the costs of the taken and
+    /// fallthrough destination blocks. The interpreter charges exactly one,
+    /// for the block it transfers into, before updating the pc. (Shared by
+    /// all conditional jumps below.)
+    ///
+    /// TODO: if instruction size becomes a concern, move these gas costs out
+    /// of the jump variants into a per-pc side table.
     JumpNotZeroU64 {
         target: CodeOffset,
         src: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
+
+    /// Jump to `target` if the byte at `src` is **not** zero.
+    JumpNotZeroByte {
+        target: CodeOffset,
+        src: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
+    },
+
+    /// Jump to `target` if the byte at `src` **is** zero.
+    JumpZeroByte {
+        target: CodeOffset,
+        src: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
+    },
+
+    /// Unspecialized fused compare-and-branch: jump to `target` if
+    /// `op(lhs, rhs)` holds, dispatching on the operand type.
+    JumpIntCmp(JumpIntCmpOp),
+
+    /// Fused structural-equality compare-and-branch: jump to `target` if
+    /// `lhs == rhs` (or `!=`) over inline values. See [`JumpValueCmpOp`].
+    JumpValueCmp(JumpValueCmpOp),
+
+    /// Fused structural-equality compare-and-branch where `lhs`/`rhs` hold
+    /// references (16-byte fat pointers) read through to the operand values.
+    /// See [`JumpValueRefCmpOp`].
+    JumpValueRefCmp(JumpValueRefCmpOp),
 
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.
     JumpGreaterEqualU64Imm {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **<** `imm`.
@@ -567,6 +711,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **>** `imm`.
@@ -574,6 +720,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if the u64 at `src` is **<=** `imm`.
@@ -581,6 +729,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
@@ -588,6 +738,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` >= u64 at `rhs`.
@@ -595,6 +747,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` != u64 at `rhs`.
@@ -602,6 +756,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u64,
+        gas_fallthrough: u64,
     },
 
     /// Abort the current execution with a u64 abort code, read from
@@ -628,7 +784,6 @@ pub enum MicroOp {
     // `elem_size` is baked into each instruction (statically known).
     //
     // May want:
-    // - VecSwap (native in Move's vector module),
     // - VecMoveRange (bulk move between vectors) — tricky: this is
     //   really a memcpy between two heap-allocated regions, but we
     //   currently have no vector-to-vector addressing mode,
@@ -690,6 +845,40 @@ pub enum MicroOp {
         idx: FrameOffset,
         src: FrameOffset,
         elem_size: u32,
+    },
+
+    /// Create a vector of exactly [`VecPackOp::srcs`]`.len()` elements: one
+    /// allocation at exact capacity (this part MAY TRIGGER GC), then one
+    /// element copy per source slot, then the heap pointer is written to
+    /// [`VecPackOp::dst`].
+    ///
+    /// Use `VecNew` fast path instead (null pointer, no allocation), when
+    /// [`VecPackOp::srcs`] are empty.
+    VecPack(Box<VecPackOp>),
+
+    /// Destructure a vector into [`VecUnpackOp::dsts`]`.len()` element slots.
+    /// [`VecUnpackOp::src`] holds the vector's heap pointer by value. Errors
+    /// unless the vector's length equals [`VecUnpackOp::dsts`]`.len()` exactly
+    /// (in either direction); a null pointer is the empty vector, so unpack
+    /// with zero [`VecUnpackOp::dsts`] succeeds on it.
+    VecUnpack(Box<VecUnpackOp>),
+
+    /// Swap vector[idx_a] and vector[idx_b]. `vec_ref` is a 16-byte fat pointer
+    /// whose target holds the vector's heap pointer; `idx_a`/`idx_b` are u64
+    /// slots. Errors if either index is out of bounds. Equal indices are valid.
+    VecSwap {
+        vec_ref: FrameOffset,
+        idx_a: FrameOffset,
+        idx_b: FrameOffset,
+        elem_size: u32,
+    },
+
+    /// Creates a vector from the constant pool, allocating it on the heap and
+    /// writing the data pointer into `dst`. The empty-vector constant creates
+    /// a null pointer. MAY TRIGGER GC.
+    StoreImmVec {
+        dst: FrameOffset,
+        idx: ConstantPoolIndex,
     },
 
     //======================================================================
@@ -860,26 +1049,14 @@ pub enum MicroOp {
     },
 
     //======================================================================
-    // Gas metering
-    //======================================================================
-    // Inserted by the instrumentation pass; never emitted directly by user code.
-    //======================================================================
-    /// Charge a pre-computed static gas cost for the current basic block.
-    /// The interpreter must call the gas meter and abort on exhaustion.
-    Charge {
-        cost: u64,
-    },
-
-    //======================================================================
     // Global storage
     //======================================================================
     // Access to published resources. In every op `addr` holds the account
     // address and `ty` the resource type. Reads and writes are tracked in the
     // per-transaction read-write set.
     //======================================================================
-    /// Write a boolean into the destination slot `dst`: whether a resource of
-    /// type `ty` exists at the address in `addr`. The boolean is currently
-    /// widened to 8 bytes.
+    /// Write a 1-byte boolean into the destination slot `dst`: whether a
+    /// resource of type `ty` exists at the address in `addr`.
     Exists {
         dst: FrameOffset,
         addr: FrameOffset,
@@ -923,13 +1100,11 @@ pub enum MicroOp {
         ty: InternedType,
     },
 
-    /// Move the owned value in the source slot `src` into global storage as a
-    /// resource of type `ty` at the address in `addr`. `src` holds an 8-byte
-    /// owned heap pointer. Aborts if the resource already exists.
+    /// Move the heap-allocated value pointer from the source slot `src` into global
+    /// storage map as a resource of type `ty`, published under the address of the
+    /// signer referenced by the `signer_ref`.
     MoveTo {
-        // TODO(correctness):
-        //   Move requires this to be a signer, using address for simplicity for now.
-        addr: FrameOffset,
+        signer_ref: FrameOffset,
         ty: InternedType,
         src: FrameOffset,
     },
@@ -946,17 +1121,13 @@ pub enum MicroOp {
     },
 
     /// Unconditionally trigger a garbage collection cycle.
-    /// Useful for testing GC correctness.
+    /// Useful for testing GC correctness. Should not be emitted
+    /// in production code.
     ForceGC,
 
     //======================================================================
     // Missing instructions
     //======================================================================
-    // - **Comparison**: Eq, Neq, Lt, Gt, Le, Ge (standalone, not fused
-    //   with branch — for when the result is used as a value).
-    // - **Casting**: truncation and widening between integer types,
-    //   including signed casts.
-    // - **Boolean**: logical Not, And, Or (distinct from bitwise).
     // - **Runtime instrumentation**: tracing, profiling, coverage hooks.
     //======================================================================
 
@@ -976,18 +1147,154 @@ pub enum MicroOp {
 
     /// Call a closure. Reads the closure at `closure_src`, interleaves its
     /// captured values with the provided arguments into the callee's
-    /// parameter region (using the mask and the callee's `param_sizes`),
+    /// parameter region (using the mask and the callee's `param_slots`),
     /// then performs the standard call protocol.
     ///
     /// For v0 this only supports `ClosureFuncRef::Resolved` closures whose
     /// captured data is `Materialized`. A raw-captured-data path (for
     /// closures loaded from storage) is future work.
     CallClosure(Box<CallClosureOp>),
+
+    //======================================================================
+    // Enums
+    //======================================================================
+    /// Test an enum's variant tag through a reference. `enum_ref` is a 16-byte
+    /// fat pointer to the slot holding the enum's heap pointer; it is
+    /// dereferenced to obtain the heap object. Writes a 1-byte boolean into
+    /// `dst`: whether the u64 tag at `ENUM_TAG_OFFSET` equals `variant`.
+    EnumTestTag {
+        dst: FrameOffset,
+        enum_ref: FrameOffset,
+        variant: VariantTag,
+    },
+
+    /// Borrow a variant field through an enum reference, selecting the field's
+    /// object byte offset by the runtime variant tag. `enum_ref` is a 16-byte
+    /// fat pointer to the slot holding the enum's heap pointer.
+    ///
+    /// Reads the u64 tag at `ENUM_TAG_OFFSET`; if `offsets[tag]` is `Some(off)`,
+    /// writes a field reference (fat pointer to `heap_ptr + off`) into `dst`.
+    /// If `None` (the runtime variant does not declare the field), aborts with
+    /// a variant mismatch (expected Move semantics).
+    ///
+    /// `off` is the full object-relative offset (already includes
+    /// `ENUM_DATA_OFFSET`); indexing by tag handles a field shared across
+    /// variants that sits at different byte offsets in each. An access whose
+    /// handle covers every variant, all placing the field at one fixed offset,
+    /// uses the static `enum_borrow` (`HeapBorrow`) fast path instead.
+    EnumBorrowVariantField {
+        dst: FrameOffset,
+        enum_ref: FrameOffset,
+        // TODO(perf): the boxed slice is a separate allocation and a
+        // pointer-chase + `Option` discriminant test on the hot path. For the
+        // common small variant counts, an inline `[u32; N]` with a sentinel for
+        // absent (offsets are ≪ `u32::MAX`) plus an explicit bounds check would
+        // avoid the indirection. This is the divergent-offset path only (the
+        // uniform case takes the static `enum_borrow`), so it is cold; revisit
+        // if it profiles hot. Must keep `size_of::<MicroOp>() == 48`.
+        offsets: Box<[Option<u32>]>,
+    },
+
+    /// Abort with a variant mismatch unless the enum at `enum_ptr` has variant
+    /// tag `variant`. `enum_ptr` is the heap-pointer **value** (as consumed by
+    /// `UnpackVariant`), not a reference; the tag is read at `ENUM_TAG_OFFSET`.
+    /// Emitted before `UnpackVariant`'s field loads so by-value destructuring
+    /// of the wrong variant aborts instead of reading another variant's bytes.
+    EnumCheckVariant {
+        enum_ptr: FrameOffset,
+        variant: VariantTag,
+    },
+
+    /// Allocate an enum heap object, write its variant `tag` at
+    /// `ENUM_TAG_OFFSET`, and store the heap pointer to `dst`. Fuses
+    /// `PackVariant`'s `HeapNew` + tag store. `descriptor_id` must name an
+    /// `Enum`. **MAY TRIGGER GC.**
+    EnumNew {
+        dst: FrameOffset,
+        descriptor_id: DescriptorId,
+        variant: VariantTag,
+    },
+
+    /// Read a variant field by value through an enum reference at a static
+    /// object-relative `offset`. The uniform-offset fast path: the access's
+    /// handle covers every variant, all placing the field at the same offset,
+    /// so no runtime tag dispatch or mismatch check is needed. Derefs the
+    /// 16-byte `enum_ref` fat pointer to the heap object (a double deref), then
+    /// copies `size` bytes from `obj + offset` into `dst`. Fuses the
+    /// `HeapBorrow` + `ReadRef` (the divergent path still routes through a
+    /// scratch reference).
+    ///
+    // TODO: nothing here is enum-specific — this reads any field through a
+    // reference at a static offset. Rename to a non-enum-specific name as part
+    // of a naming-consistency pass.
+    EnumReadVariantField {
+        dst: FrameOffset,
+        enum_ref: FrameOffset,
+        offset: u32,
+        size: u32,
+    },
+
+    /// Write a variant field by value through an enum reference at a static
+    /// object-relative `offset` (uniform-offset fast path; see
+    /// [`MicroOp::EnumReadVariantField`]). Derefs the 16-byte `enum_ref` fat
+    /// pointer to the heap object, then copies `size` bytes from `src` into
+    /// `obj + offset`. Fuses `HeapBorrow` + `WriteRef` (the divergent path
+    /// still routes through a scratch reference).
+    ///
+    // TODO: nothing here is enum-specific — this writes any field through a
+    // reference at a static offset, and is reusable when fusing. Rename to a
+    // non-enum-specific name as part of a naming-consistency pass.
+    EnumWriteVariantField {
+        enum_ref: FrameOffset,
+        offset: u32,
+        src: FrameOffset,
+        size: u32,
+    },
+
+    /// Make a freshly byte-copied value at `base` independent: deep-copy each
+    /// owned heap-pointer in it. `base` is both source and destination (the
+    /// pointers are read from, and the fresh copies written back to, `base+off`
+    /// — an in-place fixup). `offsets` are the byte offsets, within the value at
+    /// `base`, of the owned heap pointers (an enum/vector value is one pointer
+    /// at offset 0; an inline aggregate has one per heap-backed field). Emitted
+    /// after any operation that materializes an owned copy of a heap-backed
+    /// value (`Copy`, `ReadRef`, `Read*Field`). **MAY TRIGGER GC.**
+    ///
+    // TODO(perf): add a `DeepCopyHeapPtr { base }` specialization for the common
+    // whole-enum/vector copy (a single pointer at offset 0). It avoids both the
+    // boxed `offsets` slice and the per-op `Vec` allocations the batched path
+    // uses.
+    DeepCopyHeapPtrs {
+        base: FrameOffset,
+        offsets: Box<[u32]>,
+    },
 }
 
+/// Write a comma-separated list of frame offsets as `[o0], [o1], ...`.
+fn write_offset_list(f: &mut fmt::Formatter<'_>, offsets: &[FrameOffset]) -> fmt::Result {
+    for (pos, offset) in offsets.iter().enumerate() {
+        if pos > 0 {
+            write!(f, ", ")?;
+        }
+        write!(f, "[{}]", offset.0)?;
+    }
+    Ok(())
+}
+
+// TODO: make gas costs optional in this output. Most tests don't care about
+// costs, but some want to print and assert them.
 impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            MicroOp::StoreImm1 { dst, imm } => {
+                write!(f, "StoreImm1 [{}] <- #{}", dst.0, imm)
+            },
+            MicroOp::StoreImm2 { dst, imm } => {
+                write!(f, "StoreImm2 [{}] <- #{}", dst.0, u16::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm4 { dst, imm } => {
+                write!(f, "StoreImm4 [{}] <- #{}", dst.0, u32::from_le_bytes(*imm))
+            },
             MicroOp::StoreImm8 { dst, imm } => {
                 write!(f, "StoreImm8 [{}] <- #{}", dst.0, u64::from_le_bytes(*imm))
             },
@@ -1109,6 +1416,38 @@ impl fmt::Display for MicroOp {
                 "IntCast.{}->{} [{}] <- [{}]",
                 op.from, op.to, op.dst.0, op.src.0
             ),
+            MicroOp::IntCmp(op) => write!(
+                f,
+                "IntCmp [{}] <- [{}] {} {}",
+                op.dst.0, op.lhs.0, op.op, op.rhs
+            ),
+            MicroOp::ValueCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "ValueCmp [{}] <- [{}] {} [{}] : ",
+                    op.dst.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
+            MicroOp::ValueRefCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "ValueRefCmp [{}] <- *[{}] {} *[{}] : ",
+                    op.dst.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)
+            },
+            MicroOp::BoolNot { dst, src } => {
+                write!(f, "BoolNot [{}] <- ![{}]", dst.0, src.0)
+            },
+            MicroOp::BoolAnd { dst, lhs, rhs } => {
+                write!(f, "BoolAnd [{}] <- [{}] & [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::BoolOr { dst, lhs, rhs } => {
+                write!(f, "BoolOr [{}] <- [{}] | [{}]", dst.0, lhs.0, rhs.0)
+            },
             MicroOp::CallIndirect {
                 module_id,
                 func_name,
@@ -1170,31 +1509,125 @@ impl fmt::Display for MicroOp {
             MicroOp::AbortMsg { code, message } => {
                 write!(f, "AbortMsg code=[{}] msg=[{}]", code.0, message.0)
             },
-            MicroOp::Jump { target } => {
-                write!(f, "Jump @{}", target.0)
+            MicroOp::Jump { target, gas } => {
+                write!(f, "Jump @{} gas={}", target.0, gas)
             },
-            MicroOp::JumpNotZeroU64 { target, src } => {
-                write!(f, "JumpNotZeroU64 @{} [{}]", target.0, src.0)
-            },
-            MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
+            MicroOp::JumpNotZeroU64 {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpGreaterEqualU64Imm @{} [{}] >= #{}",
-                    target.0, src.0, imm
+                    "JumpNotZeroU64 @{} [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, gas_taken, gas_fallthrough
                 )
             },
-            MicroOp::JumpGreaterU64Imm { target, src, imm } => {
-                write!(f, "JumpGreaterU64Imm @{} [{}] > #{}", target.0, src.0, imm)
-            },
-            MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
+            MicroOp::JumpNotZeroByte {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => write!(
+                f,
+                "JumpNotZeroByte @{} [{}] gas_taken={} gas_fallthrough={}",
+                target.0, src.0, gas_taken, gas_fallthrough
+            ),
+            MicroOp::JumpZeroByte {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => write!(
+                f,
+                "JumpZeroByte @{} [{}] gas_taken={} gas_fallthrough={}",
+                target.0, src.0, gas_taken, gas_fallthrough
+            ),
+            MicroOp::JumpIntCmp(op) => write!(
+                f,
+                "JumpIntCmp @{} [{}] {} {} gas_taken={} gas_fallthrough={}",
+                op.target.0, op.lhs.0, op.op, op.rhs, op.gas_taken, op.gas_fallthrough
+            ),
+            MicroOp::JumpValueCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
                 write!(
                     f,
-                    "JumpLessEqualU64Imm @{} [{}] <= #{}",
-                    target.0, src.0, imm
+                    "JumpValueCmp @{} [{}] {} [{}] : ",
+                    op.target.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)?;
+                write!(
+                    f,
+                    " gas_taken={} gas_fallthrough={}",
+                    op.gas_taken, op.gas_fallthrough
                 )
             },
-            MicroOp::JumpLessU64 { target, lhs, rhs } => {
-                write!(f, "JumpLessU64 @{} [{}] < [{}]", target.0, lhs.0, rhs.0)
+            MicroOp::JumpValueRefCmp(op) => {
+                let rel = if op.negate { "!=" } else { "==" };
+                write!(
+                    f,
+                    "JumpValueRefCmp @{} *[{}] {} *[{}] : ",
+                    op.target.0, op.lhs.0, rel, op.rhs.0
+                )?;
+                display_type(f, op.ty)?;
+                write!(
+                    f,
+                    " gas_taken={} gas_fallthrough={}",
+                    op.gas_taken, op.gas_fallthrough
+                )
+            },
+            MicroOp::JumpGreaterEqualU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpGreaterEqualU64Imm @{} [{}] >= #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpGreaterU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpGreaterU64Imm @{} [{}] > #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpLessEqualU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpLessEqualU64Imm @{} [{}] <= #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpLessU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpLessU64 @{} [{}] < [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
+                )
             },
             MicroOp::VecNew { dst } => {
                 write!(f, "VecNew [{}]", dst.0)
@@ -1248,6 +1681,31 @@ impl fmt::Display for MicroOp {
                     "VecStoreElem [{}][[{}]] <- [{}] (size={})",
                     vec_ref.0, idx.0, src.0, elem_size
                 )
+            },
+            MicroOp::VecPack(op) => {
+                write!(f, "VecPack [{}] <- [", op.dst.0)?;
+                write_offset_list(f, &op.srcs)?;
+                write!(f, "] (size={}, desc={})", op.elem_size, op.descriptor_id)
+            },
+            MicroOp::VecUnpack(op) => {
+                write!(f, "VecUnpack [")?;
+                write_offset_list(f, &op.dsts)?;
+                write!(f, "] <- [{}] (size={})", op.src.0, op.elem_size)
+            },
+            MicroOp::VecSwap {
+                vec_ref,
+                idx_a,
+                idx_b,
+                elem_size,
+            } => {
+                write!(
+                    f,
+                    "VecSwap [{}][[{}]] <-> [{}][[{}]] (size={})",
+                    vec_ref.0, idx_a.0, vec_ref.0, idx_b.0, elem_size
+                )
+            },
+            MicroOp::StoreImmVec { dst, idx } => {
+                write!(f, "StoreImmVec [{}] <- const[{}]", dst.0, idx.0)
             },
             MicroOp::SlotBorrow { dst, local } => {
                 write!(f, "SlotBorrow [{}] <- &[{}]", dst.0, local.0)
@@ -1371,28 +1829,47 @@ impl fmt::Display for MicroOp {
             MicroOp::StoreRandomU64 { dst } => {
                 write!(f, "StoreRandomU64 [{}]", dst.0)
             },
-            MicroOp::JumpLessU64Imm { target, src, imm } => {
-                write!(f, "JumpLessU64Imm @{} [{}] < #{}", target.0, src.0, imm)
-            },
-            MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpLessU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpGreaterEqualU64 @{} [{}] >= [{}]",
-                    target.0, lhs.0, rhs.0
+                    "JumpLessU64Imm @{} [{}] < #{} gas_taken={} gas_fallthrough={}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
                 )
             },
-            MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpGreaterEqualU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpNotEqualU64 @{} [{}] != [{}]",
-                    target.0, lhs.0, rhs.0
+                    "JumpGreaterEqualU64 @{} [{}] >= [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpNotEqualU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpNotEqualU64 @{} [{}] != [{}] gas_taken={} gas_fallthrough={}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
                 )
             },
             MicroOp::ForceGC => {
                 write!(f, "ForceGC")
-            },
-            MicroOp::Charge { cost } => {
-                write!(f, "Charge #{}", cost)
             },
             MicroOp::PackClosure(op) => {
                 write!(
@@ -1447,10 +1924,85 @@ impl fmt::Display for MicroOp {
                 display_type(f, *ty)?;
                 write!(f, "> [{}] <- addr=[{}], ty=", dst.0, addr.0)
             },
-            MicroOp::MoveTo { addr, ty, src } => {
+            MicroOp::MoveTo {
+                signer_ref,
+                ty,
+                src,
+            } => {
                 write!(f, "MoveTo<")?;
                 display_type(f, *ty)?;
-                write!(f, "> addr=[{}], src=[{}]", addr.0, src.0)
+                write!(f, "> signer=[{}], src=[{}]", signer_ref.0, src.0)
+            },
+            MicroOp::EnumTestTag {
+                dst,
+                enum_ref,
+                variant,
+            } => {
+                write!(
+                    f,
+                    "EnumTestTag [{}] <- (*[{}]).tag == #{}",
+                    dst.0, enum_ref.0, variant
+                )
+            },
+            MicroOp::EnumBorrowVariantField {
+                dst,
+                enum_ref,
+                offsets,
+            } => {
+                write!(
+                    f,
+                    "EnumBorrowVariantField [{}] <- &(*[{}]) by tag {:?}",
+                    dst.0, enum_ref.0, offsets
+                )
+            },
+            MicroOp::EnumCheckVariant { enum_ptr, variant } => {
+                write!(
+                    f,
+                    "EnumCheckVariant assert [{}].tag == #{}",
+                    enum_ptr.0, variant
+                )
+            },
+            MicroOp::EnumNew {
+                dst,
+                descriptor_id,
+                variant,
+            } => {
+                write!(
+                    f,
+                    "EnumNew [{}] desc={} tag #{}",
+                    dst.0, descriptor_id, variant
+                )
+            },
+            MicroOp::EnumReadVariantField {
+                dst,
+                enum_ref,
+                offset,
+                size,
+            } => {
+                write!(
+                    f,
+                    "EnumReadVariantField({}) [{}] <- (*[{}]).{}",
+                    size, dst.0, enum_ref.0, offset
+                )
+            },
+            MicroOp::EnumWriteVariantField {
+                enum_ref,
+                offset,
+                src,
+                size,
+            } => {
+                write!(
+                    f,
+                    "EnumWriteVariantField({}) (*[{}]).{} <- [{}]",
+                    size, enum_ref.0, offset, src.0
+                )
+            },
+            MicroOp::DeepCopyHeapPtrs { base, offsets } => {
+                write!(
+                    f,
+                    "DeepCopyHeapPtrs [{}] deep-copy ptrs at {:?}",
+                    base.0, offsets
+                )
             },
         }
     }
@@ -1490,6 +2042,20 @@ pub const ENUM_TAG_OFFSET: usize = 0;
 
 /// Offset where enum variant field data begins (after the tag).
 pub const ENUM_DATA_OFFSET: usize = 8;
+
+/// Offset of the `length` field within a vector object's data region.
+/// Vectors put the length at the very start of the data region; element 0
+/// begins at [`VEC_DATA_OFFSET`].
+pub const VEC_LENGTH_OFFSET: usize = 0;
+
+/// Offset where vector element data begins (after the `length` field).
+/// Capacity is not stored; it is derived from the header's `size_in_bytes`
+/// field: `capacity = (size_in_bytes - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size`.
+pub const VEC_DATA_OFFSET: usize = 8;
+
+// Element 0 must land on a `MAX_ALIGN`-aligned offset so any element type
+// (whose alignment is ≤ `MAX_ALIGN`) is naturally aligned.
+const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
 
 // ---------------------------------------------------------------------------
 // Closure object layout
@@ -1537,13 +2103,15 @@ pub const FUNC_REF_PAYLOAD_OFFSET: usize = 8;
 
 /// `ClosureFuncRef::Resolved` tag value.
 pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
-// Future: `FUNC_REF_TAG_UNRESOLVED: u8 = 1`
+/// `ClosureFuncRef::Unresolved` tag value. Payload is a thin
+/// `InternedFunctionRef` pointer resolved lazily at call time.
+pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 
 // ---------------------------------------------------------------------------
 // ClosureCapturedData object layout (Materialized)
 // ---------------------------------------------------------------------------
 //
-//   Data region: [tag(1)] [padding(7)] [captured values packed in param order]
+//   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [captured values @ 8, packed in param order]
 //
 // Offsets below are relative to the data start (the object pointer). The
 // 8-byte header lives at `obj_ptr - 8`.
@@ -1551,10 +2119,14 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 // Captured values are packed tightly, in the order of their parameter
 // positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
 // Total count is implied by `mask.captured_count()`. Individual sizes are
-// read from the target function's `param_sizes` at call time.
+// read from the target function's `param_slots` at call time.
 
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
 pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
+
+/// Byte offset of the exact captured values-region size (`u32`) within the
+/// captured-data object's prefix.
+pub const CAPTURED_DATA_VALUES_SIZE_OFFSET: usize = 4;
 
 /// Byte offset where captured values begin (after tag + padding).
 pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
@@ -1563,20 +2135,52 @@ pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
 // Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
 
+/// Places the next captured value of `(size, align)` after `cursor` bytes at its
+/// natural alignment, returning `(value_offset, next_cursor)`. The values region
+/// is 8-aligned and pointer-bearing types are ≥ 8-aligned, so natural alignment
+/// keeps every captured pointer 8-aligned for the GC.
+///
+/// Single source of truth for the captured-data layout: all producers and
+/// consumers must use it so written offsets, pointer offsets, and read offsets
+/// agree.
+pub fn next_captured_value_offset(cursor: usize, size: usize, align: usize) -> (usize, usize) {
+    let offset = align_up(cursor, align);
+    (offset, offset + size)
+}
+
+/// Total byte width of a captured-data values region holding `slots` (each a
+/// `(size, align)` pair) laid out via [`next_captured_value_offset`]. The
+/// size-only companion to that helper, for callers that need the region size
+/// without the per-value offsets.
+pub fn captured_values_size(slots: impl IntoIterator<Item = (u32, u32)>) -> u32 {
+    let mut cursor = 0usize;
+    for (size, align) in slots {
+        (_, cursor) = next_captured_value_offset(cursor, size as usize, align as usize);
+    }
+    cursor as u32
+}
+
 impl MicroOp {
     /// Returns `true` if this op can trigger GC in the current frame.
     pub fn is_allocating(&self) -> bool {
         match self {
             // Allocating: may trigger GC.
             MicroOp::HeapNew { .. }
+            | MicroOp::EnumNew { .. }
             | MicroOp::VecPushBack { .. }
+            | MicroOp::VecPack(_)
+            | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
+            | MicroOp::DeepCopyHeapPtrs { .. }
             | MicroOp::ForceGC => true,
 
             // Non-allocating.
-            MicroOp::StoreImm8 { .. }
+            MicroOp::StoreImm1 { .. }
+            | MicroOp::StoreImm2 { .. }
+            | MicroOp::StoreImm4 { .. }
+            | MicroOp::StoreImm8 { .. }
             | MicroOp::StoreImm16 { .. }
             | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
@@ -1605,6 +2209,11 @@ impl MicroOp {
             | MicroOp::Return
             | MicroOp::Jump { .. }
             | MicroOp::JumpNotZeroU64 { .. }
+            | MicroOp::JumpNotZeroByte { .. }
+            | MicroOp::JumpZeroByte { .. }
+            | MicroOp::JumpIntCmp(_)
+            | MicroOp::JumpValueCmp(_)
+            | MicroOp::JumpValueRefCmp(_)
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
             | MicroOp::JumpGreaterU64Imm { .. }
@@ -1619,6 +2228,8 @@ impl MicroOp {
             | MicroOp::VecPopBack { .. }
             | MicroOp::VecLoadElem { .. }
             | MicroOp::VecStoreElem { .. }
+            | MicroOp::VecUnpack(_)
+            | MicroOp::VecSwap { .. }
             | MicroOp::SlotBorrow { .. }
             | MicroOp::VecBorrow { .. }
             | MicroOp::HeapBorrow { .. }
@@ -1632,7 +2243,6 @@ impl MicroOp {
             | MicroOp::HeapMoveTo8 { .. }
             | MicroOp::HeapMoveToImm8 { .. }
             | MicroOp::HeapMoveTo { .. }
-            | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::CallClosure(_)
             | MicroOp::IntAdd(_)
@@ -1649,7 +2259,18 @@ impl MicroOp {
             | MicroOp::IntCast(_)
             | MicroOp::Exists { .. }
             | MicroOp::BorrowGlobal { .. }
-            | MicroOp::MoveTo { .. } => false,
+            | MicroOp::MoveTo { .. }
+            | MicroOp::IntCmp(_)
+            | MicroOp::ValueCmp(_)
+            | MicroOp::ValueRefCmp(_)
+            | MicroOp::BoolNot { .. }
+            | MicroOp::BoolAnd { .. }
+            | MicroOp::BoolOr { .. }
+            | MicroOp::EnumTestTag { .. }
+            | MicroOp::EnumBorrowVariantField { .. }
+            | MicroOp::EnumCheckVariant { .. }
+            | MicroOp::EnumReadVariantField { .. }
+            | MicroOp::EnumWriteVariantField { .. } => false,
         }
     }
 
@@ -1659,6 +2280,14 @@ impl MicroOp {
     // is exactly what each Heap* op's `offset` field already names — the
     // header lives at a negative offset and is invisible to per-type
     // layouts.
+    //
+    // TODO: remove the unused helpers `struct_load8`, `struct_load`,
+    // `struct_store8`, `struct_store`, `struct_borrow`, `enum_get_tag`, and
+    // `enum_set_tag`. Lowering never emits their patterns (structs are
+    // frame-inline, resources move whole objects, and tag access is fused
+    // into `EnumNew`/`EnumTestTag`/`EnumCheckVariant`/
+    // `EnumBorrowVariantField`); their last emitters were the hand-built
+    // micro-op tests, since ported to differential Move tests.
 
     pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
@@ -1780,6 +2409,86 @@ impl MicroOp {
             obj_ref,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
         }
+    }
+
+    pub fn enum_test_tag(enum_ref: FrameOffset, variant: VariantTag, dst: FrameOffset) -> Self {
+        MicroOp::EnumTestTag {
+            dst,
+            enum_ref,
+            variant,
+        }
+    }
+
+    /// Tag-dispatched variant-field borrow. `data_relative_offsets[tag]` is the
+    /// field's data-region-relative offset in that variant, or `None` if the
+    /// variant does not declare the field (borrowing it aborts). Offsets are
+    /// shifted by `ENUM_DATA_OFFSET` to full object-relative offsets, matching
+    /// `enum_borrow`.
+    pub fn enum_borrow_variant_field(
+        enum_ref: FrameOffset,
+        data_relative_offsets: &[Option<u32>],
+        dst: FrameOffset,
+    ) -> Self {
+        let offsets = data_relative_offsets
+            .iter()
+            .map(|maybe_offset| maybe_offset.map(|offset| ENUM_DATA_OFFSET as u32 + offset))
+            .collect();
+        MicroOp::EnumBorrowVariantField {
+            dst,
+            enum_ref,
+            offsets,
+        }
+    }
+
+    pub fn enum_check_variant(enum_ptr: FrameOffset, variant: VariantTag) -> Self {
+        MicroOp::EnumCheckVariant { enum_ptr, variant }
+    }
+
+    pub fn enum_new(dst: FrameOffset, descriptor_id: DescriptorId, variant: u16) -> Self {
+        MicroOp::EnumNew {
+            dst,
+            descriptor_id,
+            variant: variant as u64,
+        }
+    }
+
+    /// Uniform-offset variant-field read by value. `field_offset` is
+    /// data-region-relative and shifted by `ENUM_DATA_OFFSET` to a full
+    /// object-relative offset, matching [`MicroOp::enum_borrow`].
+    pub fn enum_read_variant_field(
+        enum_ref: FrameOffset,
+        field_offset: u32,
+        dst: FrameOffset,
+        size: u32,
+    ) -> Self {
+        MicroOp::EnumReadVariantField {
+            dst,
+            enum_ref,
+            offset: ENUM_DATA_OFFSET as u32 + field_offset,
+            size,
+        }
+    }
+
+    /// Uniform-offset variant-field write by value; offset handling mirrors
+    /// [`MicroOp::enum_read_variant_field`].
+    pub fn enum_write_variant_field(
+        enum_ref: FrameOffset,
+        field_offset: u32,
+        src: FrameOffset,
+        size: u32,
+    ) -> Self {
+        MicroOp::EnumWriteVariantField {
+            enum_ref,
+            offset: ENUM_DATA_OFFSET as u32 + field_offset,
+            src,
+            size,
+        }
+    }
+
+    /// Deep-copy the owned heap pointers at the given byte offsets within the
+    /// value at `base`, making a freshly byte-copied value independent.
+    pub fn deep_copy_heap_ptrs(base: FrameOffset, offsets: Box<[u32]>) -> Self {
+        MicroOp::DeepCopyHeapPtrs { base, offsets }
     }
 }
 

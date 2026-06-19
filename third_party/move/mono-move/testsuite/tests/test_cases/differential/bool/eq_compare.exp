@@ -1,0 +1,79 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun compare(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    call eq
+    br_false l0
+    ld_u64 10
+    // @5
+    ret
+l0: ld_u64 42
+    ret
+
+// Function definition at index 1
+fun eq(l0: u64, l1: u64): bool
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun compare(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1), xfer(2)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: [x0] := call eq, [r0, r1]
+    1: br_false L0, x0
+  L1:
+    2: r2 := ld_u64 10
+    3: ret [r2]
+  L0:
+    4: r2 := ld_u64 42
+    5: ret [r2]
+}
+
+fun eq(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: bool
+  code:
+  L0:
+    0: r2 := eq r0, r1
+    1: ret [r2]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun compare() {
+  frame_data_size: 24
+  entry_gas: 65
+  code:
+    0: Move8 [56] <- [8]
+    1: Move8 [48] <- [0]
+    2: CallIndirect 0x1::test::eq
+    3: JumpZeroByte @7 [48] gas_taken=56 gas_fallthrough=56
+    4: StoreImm8 [16] <- #10
+    5: Move8 [0] <- [16]
+    6: Return
+    7: StoreImm8 [16] <- #42
+    8: Move8 [0] <- [16]
+    9: Return
+}
+
+fun eq() {
+  frame_data_size: 24
+  entry_gas: 17
+  code:
+    0: IntCmp [16] <- [0] == u64 [8]
+    1: Move(1) [0] <- [16]
+    2: Return
+}

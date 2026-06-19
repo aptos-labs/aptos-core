@@ -3,8 +3,7 @@
 
 //! Integration tests for type interning and metadata resolution.
 
-use mono_move_core::{native::NoNatives, Interner};
-use mono_move_gas::NoOpGasMeter;
+use mono_move_core::{native::NoNatives, GasMeter, Interner};
 use mono_move_global_context::{view_type, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_testsuite::InMemoryModuleProvider;
@@ -47,7 +46,7 @@ module 0x1::a {
     );
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas_meter = NoOpGasMeter;
+    let mut gas_meter = GasMeter::with_max_budget();
 
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("a"));
     let ir = loader

@@ -117,6 +117,13 @@ impl TestConfig {
             ..self
         }
     }
+
+    fn compile_verify_code(self, on: bool) -> Self {
+        Self {
+            options: self.options.clone().set_compile_verify_code(on),
+            ..self
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Default)]
@@ -323,6 +330,31 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .exp(Experiment::LIFT_INLINE_FUNS)
                 .exp_off(Experiment::KEEP_INLINE_FUNS)
                 .lang(LanguageVersion::V2_2)
+        },
+        // Tests for inline functions with `pragma opaque` which are retained
+        // (not expanded) in verify mode, with lambda arguments lifted.
+        TestConfig {
+            name: "inline-opaque",
+            runner: |p| run_test(p, get_config_by_name("inline-opaque")),
+            include: vec!["/inline-opaque/"],
+            exp_suffix: Some("verify.exp"),
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+            ..config()
+                .lang(LanguageVersion::V2_4)
+                .compile_verify_code(true)
+        },
+        // The same tests in normal compilation mode, where the functions are
+        // expanded as usual and the opaque specs are dropped.
+        TestConfig {
+            name: "inline-opaque-off",
+            runner: |p| run_test(p, get_config_by_name("inline-opaque-off")),
+            include: vec!["/inline-opaque/"],
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+            ..config().lang(LanguageVersion::V2_4)
         },
         // Tests for simplifier in full mode, with code elimination
         TestConfig {
@@ -700,7 +732,8 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     logging::setup_logging_for_testing(None);
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
-    options.compile_verify_code = path_str.contains("/verification/verify/");
+    options.compile_verify_code =
+        options.compile_verify_code || path_str.contains("/verification/verify/");
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
@@ -808,13 +841,20 @@ fn run_flow_similar_to_compiler(config: &TestConfig, options: &Options) -> anyho
                 out.push_str("\n============ disassembled file-format ==================\n");
                 out.push_str(&disassemble_compiled_units(&units)?);
             }
-            let annotated_units = annotate_units(units);
-            if run_bytecode_verifier(&annotated_units, &mut env) {
-                out.push_str("\n============ bytecode verification succeeded ========\n");
+            if options.compile_verify_code {
+                // Mirror `run_move_compiler_to_model`: in verify mode, the bytecode
+                // verifier is skipped since generated code is only translated for
+                // the prover and may contain constructs the VM rejects.
+                out.push_str("\n============ bytecode verification skipped (verify mode) ====\n");
             } else {
-                out.push_str("\n============ bytecode verification failed ========\n");
+                let annotated_units = annotate_units(units);
+                if run_bytecode_verifier(&annotated_units, &mut env) {
+                    out.push_str("\n============ bytecode verification succeeded ========\n");
+                } else {
+                    out.push_str("\n============ bytecode verification failed ========\n");
+                }
+                check_diags(out, &env, options);
             }
-            check_diags(out, &env, options);
         }
     }
 

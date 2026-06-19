@@ -51,37 +51,44 @@ fun test_read_and_add(r0): u64 {
 === micro-ops ===
 // module 0x66::field_ref_fusion
 
-fun read_field_val(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun read_field_val() {
+  frame_data_size: 24
+  entry_gas: 17
+  code:
+    0: Move(1) [16] <- [8]
+    1: Move(1) [0] <- [16]
+    2: Return
+}
 
 fun read_and_add() {
   frame_data_size: 24
+  entry_gas: 85
   code:
-    0: Charge #33
-    1: ReadRef [16] <- *[0] (size=8)
-    2: AddU64Imm [16] <- [16] + #1
-    3: Move8 [0] <- [16]
-    4: Return
+    0: ReadRef [16] <- *[0] (size=8)
+    1: AddU64Imm [16] <- [16] + #1
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun read_field_ref_twice() {
   frame_data_size: 48
+  entry_gas: 113
   code:
-    0: Charge #61
-    1: SlotBorrow [16] <- &[0]
-    2: ReadRef [32] <- *[16] (size=8)
-    3: ReadRef [40] <- *[16] (size=8)
-    4: AddU64 [40] <- [32] + [40]
-    5: Move8 [0] <- [40]
-    6: Return
+    0: SlotBorrow [16] <- &[0]
+    1: ReadRef [32] <- *[16] (size=8)
+    2: ReadRef [40] <- *[16] (size=8)
+    3: AddU64 [40] <- [32] + [40]
+    4: Move8 [0] <- [40]
+    5: Return
 }
 
 fun test_read_and_add() {
   frame_data_size: 16
+  entry_gas: 142
   code:
-    0: Charge #18
-    1: Move8 [8] <- [0]
-    2: SlotBorrow [40] <- &[8]
-    3: CallIndirect 0x66::field_ref_fusion::read_and_add
-    4: Move8 [0] <- [40]
-    5: Return
+    0: Move8 [8] <- [0]
+    1: SlotBorrow [40] <- &[8]
+    2: CallIndirect 0x66::field_ref_fusion::read_and_add
+    3: Move8 [0] <- [40]
+    4: Return
 }

@@ -12,6 +12,21 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["aptos-crypto", "aptos-move-stdlib"]
+
+[lib]
+doctest = false
+
+[features]
+default = []
+fuzzing = ["aptos-framework-natives/fuzzing", "aptos-types/fuzzing"]
+testing = [
+    "aptos-framework-natives/testing",
+    "aptos-move-stdlib/testing",
+    "aptos-crypto/fuzzing",
+]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -58,14 +73,3 @@ move-prover-test-utils = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 regex = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-framework-natives/fuzzing", "aptos-types/fuzzing"]
-testing = ["aptos-framework-natives/testing", "aptos-move-stdlib/testing", "aptos-crypto/fuzzing"]
-
-[lib]
-doctest = false
-
-[package.metadata.cargo-machete]
-ignored = ["aptos-crypto", "aptos-move-stdlib"]

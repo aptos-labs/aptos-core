@@ -339,6 +339,6 @@ Vector micro-ops compute the address of element `i` as `vec_ptr + VEC_DATA_OFFSE
 
 If a future change introduces a vector element with alignment > 8 — most plausibly via [§8.2](#82-stronger-alignment-for-u128--u256--address--signer)'s stronger-alignment proposal for `address` / `u256` — the correct data offset becomes `align_up(8, elem_align)`, which varies per vector. Unlike struct or enum field offsets — which are baked into each access op at specialization time — vector access uses an indexed pattern (`base + data_offset + i * elem_size`), so the data offset must be expressible as a single value the runtime can use across every elem load, store, push, pop, and growth on a given vector.
 
-The current micro-op design has no channel for this: `VecLoadElem`, `VecStoreElem`, `VecPushBack`, `VecPopBack`, `AllocVec`, and `GrowVec` all rely on a hardcoded `VEC_DATA_OFFSET`. Bridging the gap would require adding per-vector or per-instruction data-offset metadata, or globally raising `VEC_DATA_OFFSET`, each with its own cost profile.
+The current micro-op design has no channel for this: every vector access, allocation, and growth path relies on a hardcoded `VEC_DATA_OFFSET`. Bridging the gap would require adding per-vector or per-instruction data-offset metadata, or globally raising `VEC_DATA_OFFSET`, each with its own cost profile.
 
 This is an open design question. It does not block MonoMove at `MAX_ALIGN = 8`, but it does need to be answered before any change that admits vector elements with alignment > 16.
