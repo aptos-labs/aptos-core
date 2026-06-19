@@ -117,14 +117,10 @@ pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> 
 // Other instruction utilities
 // =============================================================================
 
-/// Call-like instructions (`Call`, `CallGeneric`, `CallClosure`) that clobber
-/// Xfer slots.
+/// Call-like instructions (`Call`, `CallClosure`) that clobber Xfer slots.
 #[inline]
 pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
-    matches!(
-        instr,
-        Instr::Call(..) | Instr::CallGeneric(..) | Instr::CallClosure(..)
-    )
+    matches!(instr, Instr::Call(..) | Instr::CallClosure(..))
 }
 
 /// Resource type carried by a global-storage instruction (`exists`,
@@ -160,7 +156,6 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
         | Instr::ReadVariantField(..)
         | Instr::WriteVariantField(..)
         | Instr::PackClosure(..)
-        | Instr::PackClosureGeneric(..)
         | Instr::CallClosure(..)
         | Instr::VecPack(..)
         | Instr::VecLen(..)
@@ -195,7 +190,6 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
         | Instr::ReadRef(..)
         | Instr::WriteRef(..)
         | Instr::Call(..)
-        | Instr::CallGeneric(..)
         | Instr::Branch(..)
         | Instr::BrTrue(..)
         | Instr::BrFalse(..)
@@ -262,7 +256,6 @@ pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedTy
         | Instr::ImmBorrowGlobal(..)
         | Instr::MutBorrowGlobal(..)
         | Instr::PackClosure(..)
-        | Instr::PackClosureGeneric(..)
         | Instr::CallClosure(..)
         | Instr::VecPack(..)
         | Instr::VecLen(..)
@@ -299,7 +292,6 @@ pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedTy
         | Instr::ReadRef(..)
         | Instr::WriteRef(..)
         | Instr::Call(..)
-        | Instr::CallGeneric(..)
         | Instr::Branch(..)
         | Instr::BrTrue(..)
         | Instr::BrFalse(..)
@@ -369,9 +361,7 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::ImmBorrowGlobal(..)
         | Instr::MutBorrowGlobal(..)
         | Instr::Call(..)
-        | Instr::CallGeneric(..)
         | Instr::PackClosure(..)
-        | Instr::PackClosureGeneric(..)
         | Instr::CallClosure(..)
         | Instr::VecPack(..)
         | Instr::VecLen(..)
@@ -445,10 +435,8 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::MoveTo(_, _, _)
         | Instr::ImmBorrowGlobal(_, _, _)
         | Instr::MutBorrowGlobal(_, _, _)
-        | Instr::Call(_, _, _)
-        | Instr::CallGeneric(_, _, _)
-        | Instr::PackClosure(_, _, _, _)
-        | Instr::PackClosureGeneric(_, _, _, _)
+        | Instr::Call(_, _, _, _)
+        | Instr::PackClosure(_, _, _, _, _)
         | Instr::CallClosure(_, _, _)
         | Instr::VecPack(_, _, _)
         | Instr::VecLen(_, _, _)
@@ -644,14 +632,11 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*addr, &mut f);
         },
 
-        Instr::Call(rets, _, args)
-        | Instr::CallGeneric(rets, _, args)
-        | Instr::CallClosure(rets, _, args) => {
+        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
             defs::<DEFS>(rets, &mut f);
             uses::<USES>(args, &mut f);
         },
-        Instr::PackClosure(dst, _, _, captured)
-        | Instr::PackClosureGeneric(dst, _, _, captured) => {
+        Instr::PackClosure(dst, _, _, _, captured) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(captured, &mut f);
         },
@@ -891,9 +876,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Call(rets, _, args)
-        | Instr::CallGeneric(rets, _, args)
-        | Instr::CallClosure(rets, _, args) => {
+        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
             if DEFS {
                 rewrite_slots(rets, &mut f);
             }
@@ -901,8 +884,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slots(args, &mut f);
             }
         },
-        Instr::PackClosure(dst, _, _, captured)
-        | Instr::PackClosureGeneric(dst, _, _, captured) => {
+        Instr::PackClosure(dst, _, _, _, captured) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }

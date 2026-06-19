@@ -25,7 +25,7 @@ impl SSAFunction {
     pub(crate) fn with_test_utils_passes(mut self, module: &PreparedModule) -> Result<Self> {
         for block in &mut self.blocks {
             for instr in &mut block.instrs {
-                if let Instr::Call(rets, handle, args) = instr
+                if let Instr::Call(rets, handle, _, args) = instr
                     && is_force_gc(module, *handle)
                 {
                     if !rets.is_empty() || !args.is_empty() {

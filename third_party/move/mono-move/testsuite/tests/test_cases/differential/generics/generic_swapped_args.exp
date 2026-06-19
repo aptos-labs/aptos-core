@@ -22,7 +22,7 @@ fun entry(r0): u64 {
   code:
   L0:
     0: x0 := ld_u64 99
-    1: [x0] := call pick_second, [x0, r0]
+    1: [x0] := call pick_second<u64, u64>, [x0, r0]
     2: ret [x0]
 }
 

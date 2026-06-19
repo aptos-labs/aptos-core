@@ -177,14 +177,10 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         | Instr::MutBorrowGlobal(..) => GLOBAL,
 
         // --- Calls ---
-        Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) => {
-            call_cost(cx, args, rets)?
-        },
+        Instr::Call(rets, _, _, args) => call_cost(cx, args, rets)?,
 
         // --- Closures ---
-        Instr::PackClosure(_, _, _, args) | Instr::PackClosureGeneric(_, _, _, args) => {
-            PACK_CLOSURE + sum_move(cx, args)?
-        },
+        Instr::PackClosure(_, _, _, _, args) => PACK_CLOSURE + sum_move(cx, args)?,
         Instr::CallClosure(rets, _, args) => call_cost(cx, args, rets)?,
 
         // --- Vector ---

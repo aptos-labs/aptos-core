@@ -381,6 +381,69 @@ mod tests {
         );
     }
 
+    /// Mirrors the overlay model in `State::update`: the committed (persisted) hot state lags
+    /// while speculatively executed blocks stack as overlay layers; `flush` is the background
+    /// committer catching up and collapsing the overlay into the committed base.
+    struct OverlayTest {
+        committed: Arc<Mutex<HotState>>,
+        /// Base of the current overlay view; advances to `top` on every flush.
+        base: MapLayer<HashValue, StateSlot>,
+        /// Top of the current overlay view.
+        top: MapLayer<HashValue, StateSlot>,
+        overlay: LayeredMap<HashValue, StateSlot>,
+        /// Cumulative overlay slots since the last flush, replayed into `committed` on flush.
+        unflushed: HashMap<HashValue, StateSlot>,
+    }
+
+    impl OverlayTest {
+        fn new_empty() -> Self {
+            let committed = Arc::new(Mutex::new(HotState {
+                inner: HashMap::new(),
+                head: None,
+                tail: None,
+            }));
+            let base = MapLayer::new_family("test");
+            let top = base.clone();
+            let overlay = top.view_layers_after(&base);
+            Self {
+                committed,
+                base,
+                top,
+                overlay,
+                unflushed: HashMap::new(),
+            }
+        }
+
+        fn committed_view(&self) -> Arc<dyn HotStateView> {
+            Arc::clone(&self.committed) as Arc<dyn HotStateView>
+        }
+
+        /// Stacks one block's resulting slots as a new overlay layer, mirroring
+        /// `overlay.new_layer(&new_items)` in `State::update`.
+        fn stack(&mut self, updates: &[(HashValue, StateSlot)]) {
+            self.top = self.overlay.new_layer(updates);
+            self.overlay = self.top.view_layers_after(&self.base);
+            for (key_hash, slot) in updates {
+                self.unflushed.insert(*key_hash, slot.clone());
+            }
+        }
+
+        /// Collapses the overlay into the committed base. Hot slots are persisted; cold (evicted)
+        /// slots are dropped, matching how the base only retains hot entries.
+        fn flush(&mut self) {
+            let mut committed = self.committed.lock().unwrap();
+            for (key_hash, slot) in self.unflushed.drain() {
+                if slot.is_hot() {
+                    committed.inner.insert(key_hash, slot);
+                } else {
+                    committed.inner.remove(&key_hash);
+                }
+            }
+            self.base = self.top.clone();
+            self.overlay = self.top.view_layers_after(&self.base);
+        }
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(20))]
 
@@ -452,6 +515,94 @@ mod tests {
                 );
 
                 test_obj.commit_updates(updates, new_head, new_tail, new_num_items);
+                head = new_head;
+                tail = new_tail;
+                num_items = new_num_items;
+                total_value_bytes = new_total_value_bytes;
+            }
+        }
+
+        /// Like `test_empty_overlay`, but each block's result is layered into a non-empty
+        /// overlay (periodically flushed into committed). Exercises the
+        /// `pending -> overlay -> committed` fall-through in `get_slot`, eviction walking the LRU
+        /// chain through overlay-resident neighbors, and the cold-slots-in-overlay branch in
+        /// `delete` — none of which the empty-overlay test can reach.
+        #[test]
+        fn test_nonempty_overlay(
+            blocks_and_flushes in (hash_set(any::<StateKey>(), 1..50), 1..10usize)
+                .prop_flat_map(|(keys, num_blocks)| {
+                    let pool: Vec<_> = keys.into_iter().collect();
+                    let blocks: Vec<_> = (0..num_blocks)
+                        .map(|_| vec((sample::select(pool.clone()), arb_hot_slot_kind()), 1..100))
+                        .collect();
+                    (blocks, vec(any::<bool>(), num_blocks))
+                }),
+            capacity in (1..10usize).prop_map(|n| NonZeroUsize::new(n).unwrap()),
+        ) {
+            let (blocks, flushes) = blocks_and_flushes;
+            let mut test_obj = OverlayTest::new_empty();
+            let mut head = None;
+            let mut tail = None;
+            let mut num_items = 0;
+            let mut total_value_bytes = 0;
+            // Unbounded oracle: a block can temporarily exceed capacity before eviction.
+            let mut naive_lru = LruCache::unbounded();
+
+            for (updates, flush) in itertools::zip_eq(blocks, flushes) {
+                let mut lru = HotStateLRU::new(
+                    capacity,
+                    test_obj.committed_view(),
+                    &test_obj.overlay,
+                    head,
+                    tail,
+                    num_items,
+                    total_value_bytes,
+                );
+                lru.validate();
+
+                for (key, kind) in updates {
+                    let key_hash = *key.crypto_hash_ref();
+                    let slot = StateSlot::new(key.clone(), kind);
+                    lru.insert(&key, slot.clone());
+                    naive_lru.put(key_hash, slot);
+                    lru.validate();
+                    assert_lru_equal(&lru, &naive_lru);
+                }
+
+                let actual_evicted = lru.maybe_evict();
+                let mut expected_evicted = Vec::new();
+                while naive_lru.len() > capacity.get() {
+                    expected_evicted.push(naive_lru.pop_lru().unwrap());
+                }
+                itertools::zip_eq(actual_evicted, expected_evicted).for_each(|(actual, expected)| {
+                    assert_eq!(actual.0, expected.0);
+                    assert_eq!(actual.1.into_state_value_opt(), expected.1.into_state_value_opt());
+                });
+                lru.validate();
+                assert_lru_equal(&lru, &naive_lru);
+
+                let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
+                    lru.into_updates();
+
+                assert_eq!(new_head, naive_lru.peek_mru().map(|(k, _)| *k));
+                assert_eq!(new_tail, naive_lru.peek_lru().map(|(k, _)| *k));
+                assert_eq!(new_num_items, naive_lru.len());
+                assert_eq!(
+                    new_total_value_bytes,
+                    naive_lru.iter().map(|(_, s)| s.size()).sum::<usize>(),
+                );
+
+                let new_items: Vec<_> = new_items.into_iter().collect();
+                test_obj.stack(&new_items);
+                if flush {
+                    test_obj.flush();
+                    // Once the committer fully catches up, committed holds exactly the live hot set.
+                    assert_eq!(
+                        test_obj.committed.lock().unwrap().inner.len(),
+                        new_num_items,
+                    );
+                }
+
                 head = new_head;
                 tail = new_tail;
                 num_items = new_num_items;

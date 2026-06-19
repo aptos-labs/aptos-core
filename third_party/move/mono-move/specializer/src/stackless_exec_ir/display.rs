@@ -5,13 +5,10 @@
 //! entity handles (functions, fields, variants) resolve via `CompiledModule`.
 
 use super::{BinaryOp, CmpKind, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
-use mono_move_core::types::{display_type, display_type_list};
+use mono_move_core::types::{display_type, display_type_list, InternedTypeList};
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{
-        FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureToken,
-        VariantFieldHandleIndex,
-    },
+    file_format::{FieldHandleIndex, FunctionHandleIndex, SignatureToken, VariantFieldHandleIndex},
     CompiledModule,
 };
 use std::fmt;
@@ -130,9 +127,15 @@ fn func_name(module: &CompiledModule, idx: FunctionHandleIndex) -> String {
     module.identifier_at(handle.name).to_string()
 }
 
-fn func_inst_name(module: &CompiledModule, idx: FunctionInstantiationIndex) -> String {
-    let inst = &module.function_instantiations[idx.0 as usize];
-    func_name(module, inst.handle)
+/// Writes `<t0, t1, ...>` for a call/closure's type arguments, or nothing when
+/// the list is empty (a non-generic target).
+fn write_ty_args(f: &mut fmt::Formatter<'_>, ty_args: InternedTypeList) -> fmt::Result {
+    if !ty_args.is_empty() {
+        write!(f, "<")?;
+        display_type_list(f, ty_args)?;
+        write!(f, ">")?;
+    }
+    Ok(())
 }
 
 fn field_name(module: &CompiledModule, idx: FieldHandleIndex) -> String {
@@ -473,40 +476,19 @@ fn display_instr(
         },
 
         // --- Calls ---
-        Instr::Call(rets, idx, args) => {
+        Instr::Call(rets, idx, ty_args, args) => {
             write_dsts(f, rets)?;
-            write!(f, "call {}, {}", func_name(module, *idx), slot_names(args))
-        },
-        Instr::CallGeneric(rets, idx, args) => {
-            write_dsts(f, rets)?;
-            write!(
-                f,
-                "call {}, {}",
-                func_inst_name(module, *idx),
-                slot_names(args)
-            )
+            write!(f, "call {}", func_name(module, *idx))?;
+            write_ty_args(f, *ty_args)?;
+            write!(f, ", {}", slot_names(args))
         },
 
         // --- Closures ---
-        Instr::PackClosure(d, idx, mask, captured) => {
+        Instr::PackClosure(d, idx, ty_args, mask, captured) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "pack_closure {}, {}, {}",
-                func_name(module, *idx),
-                mask,
-                slot_names(captured)
-            )
-        },
-        Instr::PackClosureGeneric(d, idx, mask, captured) => {
-            write_dst(f, *d)?;
-            write!(
-                f,
-                "pack_closure {}, {}, {}",
-                func_inst_name(module, *idx),
-                mask,
-                slot_names(captured)
-            )
+            write!(f, "pack_closure {}", func_name(module, *idx))?;
+            write_ty_args(f, *ty_args)?;
+            write!(f, ", {}, {}", mask, slot_names(captured))
         },
         Instr::CallClosure(rets, sig_types, args) => {
             write_dsts(f, rets)?;

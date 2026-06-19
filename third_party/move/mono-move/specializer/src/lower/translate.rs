@@ -1270,10 +1270,7 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Calls ---
-            Instr::Call(rets, _handle_idx, args) => {
-                self.lower_call(func_ir, args, rets)?;
-            },
-            Instr::CallGeneric(rets, _inst_idx, args) => {
+            Instr::Call(rets, _handle_idx, _ty_args, args) => {
                 self.lower_call(func_ir, args, rets)?;
             },
 
@@ -1627,8 +1624,7 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Closures ---
-            Instr::PackClosure(dst, _, mask, captured)
-            | Instr::PackClosureGeneric(dst, _, mask, captured) => {
+            Instr::PackClosure(dst, _, _, mask, captured) => {
                 // Target identity (with composed type arguments for the
                 // generic form) + captured-data descriptor were resolved in
                 // `try_build_context`; read them positionally.

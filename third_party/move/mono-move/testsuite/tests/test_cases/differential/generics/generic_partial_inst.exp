@@ -29,7 +29,7 @@ fun caller(r0, r1): u64 {
     r1: _0
   code:
   L0:
-    0: [x0] := call identity, [r0, r1]
+    0: [x0] := call identity<u64, _0>, [r0, r1]
     1: ret [x0]
 }
 
@@ -39,7 +39,7 @@ fun entry(r0): u64 {
   code:
   L0:
     0: x0 := ld_u64 42
-    1: [x0] := call caller, [x0, r0]
+    1: [x0] := call caller<u64>, [x0, r0]
     2: ret [x0]
 }
 
