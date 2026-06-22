@@ -233,6 +233,29 @@ impl Heap {
             gc_count: 0,
         }
     }
+
+    /// Rewinds the bump pointer to the start of the buffer, discarding all allocations. The buffer
+    /// is retained (no reallocation), so it's the cheap way to reuse one heap across runs.
+    ///
+    /// The caller must ensure no live references into the heap remain (reset the interpreter's frame
+    /// and root set first, via [`InterpreterContext::reset`](crate::InterpreterContext::reset)).
+    pub fn reset(&mut self) {
+        self.bump_ptr = self.buffer.as_ptr();
+        self.gc_count = 0;
+    }
+
+    /// Bump-allocates one object of `total_size` bytes (header + payload), stamps the header with
+    /// `descriptor_id`, and returns the data pointer (payload start; the header occupies the
+    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Returns `None` if
+    /// the heap is full. Does not run GC.
+    pub fn alloc_object(
+        &mut self,
+        total_size: usize,
+        descriptor_id: DescriptorId,
+    ) -> Option<std::ptr::NonNull<u8>> {
+        let ptr = heap_alloc(self, total_size, descriptor_id).ok()?;
+        std::ptr::NonNull::new(ptr)
+    }
 }
 
 /// Outcome of a bump-allocation attempt.
