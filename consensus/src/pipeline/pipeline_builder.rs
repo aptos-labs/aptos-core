@@ -408,6 +408,7 @@ impl PipelineBuilder {
         };
         let decryption_fut = spawn_ready_fut(DecryptionResult {
             decrypted_txns: Vec::new(),
+            retry_txns: Vec::new(),
             regular_txns: Vec::new(),
             max_txns_from_block_to_execute: None,
             block_gas_limit: None,
@@ -776,6 +777,8 @@ impl PipelineBuilder {
         let mut tracker = Tracker::start_waiting("prepare", &block);
         let DecryptionResult {
             decrypted_txns,
+            // Excluded from execution; re-proposed via the quorum store.
+            retry_txns: _,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
