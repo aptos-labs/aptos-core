@@ -97,7 +97,11 @@ pub enum DecryptionOutcome {
 
 #[derive(Clone, Debug)]
 pub struct DecryptionResult {
+    /// Txns to execute (decrypted + non-retryable failures, which discard).
     pub decrypted_txns: Vec<SignedTransaction>,
+    /// Retryable failures, excluded from execution and re-proposed via the
+    /// quorum store. Carried for metrics only.
+    pub retry_txns: Vec<SignedTransaction>,
     pub regular_txns: Vec<SignedTransaction>,
     pub max_txns_from_block_to_execute: Option<u64>,
     pub block_gas_limit: Option<u64>,

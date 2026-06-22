@@ -76,7 +76,6 @@ use aptos_types::{
             AbstractAuthenticationData, AnySignature, AuthenticationProof, TransactionAuthenticator,
         },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
-        encrypted_payload::DecryptionFailureReason,
         signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
@@ -2185,47 +2184,21 @@ impl AptosVM {
             Err(_) => return unwrap_or_discard!(Err(deprecated_module_bundle!())),
         };
 
-        // Re-queue without charging gas or bumping the sequence number when the
-        // decryption pipeline marked this txn for retry: either the per-block
-        // batch limit was reached, or the block carried an epoch-ending vtxn so
-        // decryption was skipped to avoid leaking sender intent.
-        if let Some(reason) = txn.payload().decryption_failure_reason() {
-            let message = match reason {
-                DecryptionFailureReason::BatchLimitReached => {
-                    Some("Encrypted transaction exceeded batch limit; retrying")
-                },
-                DecryptionFailureReason::ExecuteBlockLimitReached => {
-                    Some("Encrypted transaction exceeded execute-block limit; retrying")
-                },
-                DecryptionFailureReason::EpochEndRetry => {
-                    Some("Block contained an epoch-ending vtxn; retrying encrypted txn next epoch")
-                },
-                // TODO(ibalajiarun): TrustedSetupExhausted is an operational
-                // condition (the epoch outlived the trusted setup's num_rounds);
-                // falling through here charges the user gas + bumps their seq#
-                // for a system issue. Alert on the
-                // `aptos_consensus_decryption_pipeline_txns_count{category="trusted_setup_exhausted"}`
-                // counter so ops can extend the setup before users are affected.
-                // Revisit to use a Discard path that does not charge.
-                DecryptionFailureReason::CryptoFailure
-                | DecryptionFailureReason::ConfigUnavailable
-                | DecryptionFailureReason::DecryptionKeyUnavailable
-                | DecryptionFailureReason::ClaimedEntryFunctionMismatch
-                | DecryptionFailureReason::PayloadHashMismatch
-                | DecryptionFailureReason::EpochMismatch
-                | DecryptionFailureReason::TrustedSetupExhausted => None,
-            };
-            if let Some(message) = message {
-                return (
-                    VMStatus::Error {
-                        status_code: StatusCode::UNKNOWN_STATUS,
-                        sub_status: None,
-                        message: Some(message.to_string()),
-                    },
-                    VMOutput::empty_with_status(TransactionStatus::Retry),
-                );
-            }
-        }
+        // Retryable decryption failures (BatchLimitReached / ExecuteBlockLimitReached
+        // / EpochEndRetry) are kept out of the executed block by the consensus
+        // decryption pipeline (see `DecryptionResult::retry_txns`): they stay
+        // uncommitted and are re-proposed via the quorum store. They must never
+        // reach execution — emitting a `TransactionStatus::Retry` output here would
+        // be committed/materialized by Block-STM and violate its materialization
+        // invariant (`check_materialization`). Non-retryable failures (e.g.
+        // CryptoFailure, TrustedSetupExhausted) still execute and discard as usual.
+        debug_assert!(
+            !txn.payload()
+                .decryption_failure_reason()
+                .is_some_and(|reason| reason.is_retryable()),
+            "retryable decryption failure reached the VM; consensus must exclude it \
+             from the executed set"
+        );
 
         let multisig_address = txn.multisig_address();
         let result = if let Some(multisig_address) = multisig_address {

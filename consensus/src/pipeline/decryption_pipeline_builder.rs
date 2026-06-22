@@ -150,6 +150,7 @@ impl PipelineBuilder {
             );
             return Ok(DecryptionResult {
                 decrypted_txns: failed_txns,
+                retry_txns: Vec::new(),
                 regular_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
@@ -172,6 +173,7 @@ impl PipelineBuilder {
                 );
                 return Ok(DecryptionResult {
                     decrypted_txns: failed_txns,
+                    retry_txns: Vec::new(),
                     regular_txns,
                     max_txns_from_block_to_execute,
                     block_gas_limit,
@@ -265,6 +267,7 @@ async fn decrypt_observer_path(
     };
     Ok(DecryptionResult {
         decrypted_txns,
+        retry_txns: Vec::new(),
         regular_txns,
         max_txns_from_block_to_execute,
         block_gas_limit,
@@ -307,6 +310,7 @@ async fn decrypt_validator_path(
         let _ = derived_self_key_share_tx.send(None);
         return Ok(DecryptionResult {
             decrypted_txns: Vec::new(),
+            retry_txns: Vec::new(),
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -334,6 +338,7 @@ async fn decrypt_validator_path(
         );
         return Ok(DecryptionResult {
             decrypted_txns: failed_txns,
+            retry_txns: Vec::new(),
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -351,10 +356,11 @@ async fn decrypt_validator_path(
             encrypted_txns.len()
         );
         let _ = derived_self_key_share_tx.send(None);
-        let failed_txns =
+        let retry_txns =
             mark_txns_failed_decryption(encrypted_txns, DecryptionFailureReason::EpochEndRetry);
         return Ok(DecryptionResult {
-            decrypted_txns: failed_txns,
+            decrypted_txns: Vec::new(),
+            retry_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -407,9 +413,10 @@ async fn decrypt_validator_path(
     // If the cap left no encrypted txns to decrypt, short-circuit before crypto.
     if encrypted_txns.is_empty() {
         let _ = derived_self_key_share_tx.send(None);
-        let decrypted_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
+        let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
-            decrypted_txns,
+            decrypted_txns: Vec::new(),
+            retry_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -543,14 +550,10 @@ async fn decrypt_validator_path(
                 )
             })
             .collect();
-        let decrypted_txns = [
-            failed_txns,
-            batch_limit_exceeded_txns,
-            execute_limit_exceeded_txns,
-        ]
-        .concat();
+        let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
-            decrypted_txns,
+            decrypted_txns: failed_txns,
+            retry_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -643,12 +646,7 @@ async fn decrypt_validator_path(
         execute_limit_exceeded_txns.len(),
         regular_txns.len(),
     );
-    let decrypted_txns = [
-        decrypted_txns,
-        batch_limit_exceeded_txns,
-        execute_limit_exceeded_txns,
-    ]
-    .concat();
+    let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
 
     let block_txn_dec_key = BlockTxnDecryptionKey::from_secret_shared_key(&decryption_key)
         .context("Decryption key serialization failed")?;
@@ -662,6 +660,7 @@ async fn decrypt_validator_path(
 
     Ok(DecryptionResult {
         decrypted_txns,
+        retry_txns,
         regular_txns,
         max_txns_from_block_to_execute,
         block_gas_limit,
@@ -682,7 +681,10 @@ fn record_decryption_metrics(result: &DecryptionResult) {
     let mut trusted_setup_exhausted = 0u64;
     let mut entry_fun_mismatch = 0u64;
 
-    for txn in &result.decrypted_txns {
+    // retry_txns hold the retryable failures (batch/execute-limit, epoch-end);
+    // chain them in so their reason counters stay accurate now that they no
+    // longer live in decrypted_txns.
+    for txn in result.decrypted_txns.iter().chain(result.retry_txns.iter()) {
         let Some(ep) = txn.payload().as_encrypted_payload() else {
             continue;
         };
@@ -944,6 +946,7 @@ mod tests {
         async move {
             Ok(DecryptionResult {
                 decrypted_txns: Vec::new(),
+                retry_txns: Vec::new(),
                 regular_txns: Vec::new(),
                 max_txns_from_block_to_execute: None,
                 block_gas_limit: None,
@@ -1071,19 +1074,22 @@ mod tests {
             .collect();
 
         // One txn per FailedDecryption variant + one Decrypted + two regular.
+        // The retryable reasons live in retry_txns; metrics must count both vecs.
         let result = DecryptionResult {
             decrypted_txns: vec![
                 make_decrypted_txn(),
                 make_failed_decryption_txn(DecryptionFailureReason::CryptoFailure),
-                make_failed_decryption_txn(DecryptionFailureReason::BatchLimitReached),
                 make_failed_decryption_txn(DecryptionFailureReason::ConfigUnavailable),
                 make_failed_decryption_txn(DecryptionFailureReason::DecryptionKeyUnavailable),
                 make_failed_decryption_txn(DecryptionFailureReason::PayloadHashMismatch),
                 make_failed_decryption_txn(DecryptionFailureReason::EpochMismatch),
-                make_failed_decryption_txn(DecryptionFailureReason::EpochEndRetry),
                 make_failed_decryption_txn(DecryptionFailureReason::ClaimedEntryFunctionMismatch),
-                make_failed_decryption_txn(DecryptionFailureReason::ExecuteBlockLimitReached),
                 make_failed_decryption_txn(DecryptionFailureReason::TrustedSetupExhausted),
+            ],
+            retry_txns: vec![
+                make_failed_decryption_txn(DecryptionFailureReason::BatchLimitReached),
+                make_failed_decryption_txn(DecryptionFailureReason::EpochEndRetry),
+                make_failed_decryption_txn(DecryptionFailureReason::ExecuteBlockLimitReached),
             ],
             regular_txns: vec![make_regular_txn(), make_regular_txn()],
             max_txns_from_block_to_execute: None,
@@ -1397,8 +1403,9 @@ mod tests {
         .await
         .expect("should succeed");
 
-        assert_eq!(result.decrypted_txns.len(), 2);
-        for txn in &result.decrypted_txns {
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.retry_txns.len(), 2);
+        for txn in &result.retry_txns {
             assert_failed_with(txn, &DecryptionFailureReason::EpochEndRetry);
         }
         assert_eq!(result.regular_txns.len(), 1);
@@ -1431,9 +1438,10 @@ mod tests {
         .await
         .expect("should succeed");
 
-        assert_eq!(result.decrypted_txns.len(), 1);
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.retry_txns.len(), 1);
         assert_failed_with(
-            &result.decrypted_txns[0],
+            &result.retry_txns[0],
             &DecryptionFailureReason::EpochEndRetry,
         );
         assert_eq!(result.outcome, tracked_no_key(0));
@@ -1548,11 +1556,65 @@ mod tests {
         .await
         .expect("should succeed");
 
-        assert_eq!(result.decrypted_txns.len(), 3);
-        for txn in &result.decrypted_txns {
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.retry_txns.len(), 3);
+        for txn in &result.retry_txns {
             assert_failed_with(txn, &DecryptionFailureReason::ExecuteBlockLimitReached);
         }
         assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.outcome, tracked_no_key(0));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_batch_limit_marks_excess_as_retry() {
+        // max_batch_size=2 fires the batch limit; max_txns=0 caps the remainder,
+        // keeping the path on the pre-crypto short-circuit. Both the batch-limit
+        // and execute-limit excess must land in retry_txns (not decrypted_txns).
+        let ctx = TestContext::new_with_capacity(vec![100], 2, 2);
+        let block = make_block(None);
+        let encrypted = vec![
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+        ];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            vec![],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            Some(0),
+            None,
+            Some(0),
+        )
+        .await
+        .expect("should succeed");
+
+        assert!(result.decrypted_txns.is_empty());
+        // 2 over the batch limit + 2 over the execute limit, all re-queued.
+        assert_eq!(result.retry_txns.len(), 4);
+        let batch_limited = result
+            .retry_txns
+            .iter()
+            .filter(|txn| {
+                matches!(
+                    txn.payload().as_encrypted_payload(),
+                    Some(EncryptedPayload::FailedDecryption {
+                        reason: DecryptionFailureReason::BatchLimitReached,
+                        ..
+                    })
+                )
+            })
+            .count();
+        assert_eq!(batch_limited, 2);
         assert_eq!(result.outcome, tracked_no_key(0));
         assert!(key_share_rx.await.unwrap().is_none());
     }
