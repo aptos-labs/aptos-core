@@ -1896,10 +1896,6 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
-        // TODO(testing): add an ld_const test that fills the heap so the first
-        // deserialize fails and the GC-then-retry path inside `deserialize_or_gc`
-        // runs. Needs a `ForceGC` native to drive it deterministically in the
-        // differential suite.
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
             deserialize_or_gc(
