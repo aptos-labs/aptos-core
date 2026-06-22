@@ -118,6 +118,14 @@ pub struct GenesisConfiguration {
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
+    /// Whether to create the `decryption` resources (including
+    /// `PerBlockDecryptionKeyV2`) during genesis. Production genesis always
+    /// does (`true`), so a fresh decryption-enabled chain emits
+    /// `BlockMetadataExt::V3` from the first epoch. Tests can set this to
+    /// `false` to boot in the pre-resource state, so the chain emits the
+    /// legacy `V2` until the first `reconfiguration_with_dkg` lazily creates
+    /// the resource and flips it to `V3` — exercising the V2->V3 cutover.
+    pub initialize_decryption_at_genesis: bool,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -352,7 +360,9 @@ pub fn encode_genesis_change_set(
     );
     initialize_chunky_dkg(&mut session, &module_storage, &mut traversal_context);
     initialize_epoch_timeout_config(&mut session, &module_storage, &mut traversal_context);
-    initialize_decryption(&mut session, &module_storage, &mut traversal_context);
+    if genesis_config.initialize_decryption_at_genesis {
+        initialize_decryption(&mut session, &module_storage, &mut traversal_context);
+    }
     initialize_on_chain_governance(
         &mut session,
         &module_storage,
@@ -1476,6 +1486,7 @@ pub fn generate_test_genesis(
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
+            initialize_decryption_at_genesis: true,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1529,6 +1540,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
         keyless_groth16_vk: None,
+        initialize_decryption_at_genesis: true,
     }
 }
 
