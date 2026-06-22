@@ -211,7 +211,7 @@ pub enum ClosureFuncRef {
 impl fmt::Display for ClosureFuncRef {
     // SAFETY: the `Resolved` arm's `as_ref_unchecked` and `Unresolved` arm's
     // `view_*` helpers are sound only because display happens while the guard
-    // keeps the arena and function pointers alive. TODO: have a safe display
+    // keeps the arena and function pointers alive. TODO(completeness): have a safe display
     // impl that takes the guard.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -529,7 +529,7 @@ pub enum MicroOp {
     // unspecialized vs. promoted to dedicated variants follows the
     // specialization principle described in [`unspecialized`].
     //
-    // TODO: heap-boxing wide imm operands inside [`IntOperand`] costs an
+    // TODO(perf): heap-boxing wide imm operands inside [`IntOperand`] costs an
     // allocation and a pointer-chase per micro-op. A side-table keyed by
     // `pc` would improve cache locality and let the inline op stay
     // pointer-free; revisit once we have profiling data to motivate it.
@@ -615,7 +615,7 @@ pub enum MicroOp {
 
     /// Call a function via direct pointer. Same calling convention as
     /// [`MicroOp::CallIndirect`].
-    // TODO: Currently dead code — the specializer never emits this. A follow-up
+    // TODO(perf): Currently dead code — the specializer never emits this. A follow-up
     // pass should patch same-module `CallIndirect` sites to `CallDirect` once
     // the target is known to live in the same module.
     CallDirect {
@@ -626,10 +626,10 @@ pub enum MicroOp {
     /// meaning that the specializer has already emitted micro-ops to place arguments
     /// into the callee's argument region.
     ///
-    /// TODO: [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
+    /// TODO(perf): [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
     /// and see if we want to move it into a side table instead.
     ///
-    /// TODO: revisit `is_allocating()` for this op when heap allocation
+    /// TODO(correctness): revisit `is_allocating()` for this op when heap allocation
     /// within natives is sorted out.
     CallNative {
         native_idx: NativeIdx,
@@ -659,7 +659,7 @@ pub enum MicroOp {
     /// for the block it transfers into, before updating the pc. (Shared by
     /// all conditional jumps below.)
     ///
-    /// TODO: if instruction size becomes a concern, move these gas costs out
+    /// TODO(perf): if instruction size becomes a concern, move these gas costs out
     /// of the jump variants into a per-pc side table.
     JumpNotZeroU64 {
         target: CodeOffset,
@@ -1224,7 +1224,7 @@ pub enum MicroOp {
     /// `HeapBorrow` + `ReadRef` (the divergent path still routes through a
     /// scratch reference).
     ///
-    // TODO: nothing here is enum-specific — this reads any field through a
+    // TODO(cleanup): nothing here is enum-specific — this reads any field through a
     // reference at a static offset. Rename to a non-enum-specific name as part
     // of a naming-consistency pass.
     EnumReadVariantField {
@@ -1241,7 +1241,7 @@ pub enum MicroOp {
     /// `obj + offset`. Fuses `HeapBorrow` + `WriteRef` (the divergent path
     /// still routes through a scratch reference).
     ///
-    // TODO: nothing here is enum-specific — this writes any field through a
+    // TODO(cleanup): nothing here is enum-specific — this writes any field through a
     // reference at a static offset, and is reusable when fusing. Rename to a
     // non-enum-specific name as part of a naming-consistency pass.
     EnumWriteVariantField {
@@ -1281,7 +1281,7 @@ fn write_offset_list(f: &mut fmt::Formatter<'_>, offsets: &[FrameOffset]) -> fmt
     Ok(())
 }
 
-// TODO: make gas costs optional in this output. Most tests don't care about
+// TODO(testing): make gas costs optional in this output. Most tests don't care about
 // costs, but some want to print and assert them.
 impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1455,7 +1455,7 @@ impl fmt::Display for MicroOp {
             } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
-                // TODO: Have a safe display impl that takes guard.
+                // TODO(completeness): Have a safe display impl that takes guard.
                 let module_id = unsafe { module_id.as_ref_unchecked() };
                 let addr = module_id.address().short_str_lossless();
                 let module_name = unsafe { module_id.name().as_ref_unchecked() };
@@ -1471,7 +1471,7 @@ impl fmt::Display for MicroOp {
             MicroOp::CallDirect { ptr } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
-                // TODO: Have a safe display impl that takes guard.
+                // TODO(completeness): Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
                 write!(f, "CallDirect {}", func.name())
             },
@@ -2281,83 +2281,7 @@ impl MicroOp {
     // header lives at a negative offset and is invisible to per-type
     // layouts.
     //
-    // TODO: remove the unused helpers `struct_load8`, `struct_load`,
-    // `struct_store8`, `struct_store`, `struct_borrow`, `enum_get_tag`, and
-    // `enum_set_tag`. Lowering never emits their patterns (structs are
-    // frame-inline, resources move whole objects, and tag access is fused
-    // into `EnumNew`/`EnumTestTag`/`EnumCheckVariant`/
-    // `EnumBorrowVariantField`); their last emitters were the hand-built
-    // micro-op tests, since ported to differential Move tests.
-
-    pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
-        MicroOp::HeapMoveFrom8 {
-            dst,
-            heap_ptr,
-            offset: field_offset,
-        }
-    }
-
-    pub fn struct_load(
-        heap_ptr: FrameOffset,
-        field_offset: u32,
-        dst: FrameOffset,
-        size: u32,
-    ) -> Self {
-        MicroOp::HeapMoveFrom {
-            dst,
-            heap_ptr,
-            offset: field_offset,
-            size,
-        }
-    }
-
-    pub fn struct_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
-        MicroOp::HeapMoveTo8 {
-            heap_ptr,
-            offset: field_offset,
-            src,
-        }
-    }
-
-    pub fn struct_store(
-        heap_ptr: FrameOffset,
-        field_offset: u32,
-        src: FrameOffset,
-        size: u32,
-    ) -> Self {
-        MicroOp::HeapMoveTo {
-            heap_ptr,
-            offset: field_offset,
-            src,
-            size,
-        }
-    }
-
-    pub fn struct_borrow(obj_ref: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
-        MicroOp::HeapBorrow {
-            dst,
-            obj_ref,
-            offset: field_offset,
-        }
-    }
-
     // ----- Enum helpers (variant fields live after the 8-byte tag) -----
-
-    pub fn enum_get_tag(heap_ptr: FrameOffset, dst: FrameOffset) -> Self {
-        MicroOp::HeapMoveFrom8 {
-            dst,
-            heap_ptr,
-            offset: ENUM_TAG_OFFSET as u32,
-        }
-    }
-
-    pub fn enum_set_tag(heap_ptr: FrameOffset, variant: u16) -> Self {
-        MicroOp::HeapMoveToImm8 {
-            heap_ptr,
-            offset: ENUM_TAG_OFFSET as u32,
-            imm: variant as u64,
-        }
-    }
 
     pub fn enum_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
@@ -2498,7 +2422,7 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // TODO:
+        // TODO(perf):
         //   Size is dominated by indirect call: refactor to keep variant size
         //   small and keep call metadata in a side table.
         assert_eq!(std::mem::size_of::<MicroOp>(), 48);

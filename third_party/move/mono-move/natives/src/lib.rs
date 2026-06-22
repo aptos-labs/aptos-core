@@ -55,7 +55,7 @@ pub use type_info::make_all_type_info_natives;
 /// [`Dispatch::Monomorphic`] carrying that instantiation's type arguments. The
 /// consumer interns these into a `NativeName` registry key.
 //
-// TODO: this duplicates `NativeName`'s shape. We keep it separate because
+// TODO(cleanup): this duplicates `NativeName`'s shape. We keep it separate because
 // `NativeName` holds arena-interned ids that require an `ExecutionGuard`, which
 // is unavailable when these tables are built statically. Revisit if interning
 // becomes available earlier.
@@ -99,7 +99,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
 /// Parses a fully-qualified function name (e.g. "0x1::natives::u64_add")
 /// into its component parts. Panics on malformed input.
 //
-// TODO: replace with a proper parser. See if one already exists in
+// TODO(cleanup): replace with a proper parser. See if one already exists in
 // move-core-types.
 pub(crate) fn parse_qualified_native_name(qname: &str) -> (AccountAddress, Identifier, Identifier) {
     let mut parts = qname.split("::");

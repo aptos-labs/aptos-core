@@ -154,7 +154,7 @@ fn execute(
 // ---------------------------------------------------------------------------
 
 /// A reference is a 16-byte fat pointer (8-byte base + 8-byte offset).
-/// TODO: this reference size should be a shared constant, not redefined here.
+/// TODO(cleanup): this reference size should be a shared constant, not redefined here.
 const REFERENCE_SIZE: u32 = 16;
 
 /// Write each argument into the root frame at its parameter-slot offset,
@@ -332,7 +332,7 @@ fn adjudicate(result: TestResult, expected: &Option<ExpectedFailure>) -> TestOut
     // The program failed; judge it against the expectation, matching on the
     // abort code only.
     //
-    // TODO: a non-abort expected error (e.g. `arithmetic_error`) is currently
+    // TODO(completeness): a non-abort expected error (e.g. `arithmetic_error`) is currently
     // satisfied by any failure; match it against mono-move's own error
     // categories instead. Fine for now: move-stdlib and aptos-framework only
     // use abort-code (or bare) expected failures.

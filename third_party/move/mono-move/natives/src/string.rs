@@ -12,7 +12,7 @@ use mono_move_core::native::{
 ///
 /// Returns true if `v` is valid UTF-8.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_check_utf8<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `&vector<u8>`.
     let s: Ref<Vector<u8>> = unsafe { ctx.arg(0)? };

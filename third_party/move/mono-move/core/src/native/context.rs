@@ -33,7 +33,7 @@ use move_core_types::account_address::AccountAddress;
 /// to its components through interior mutability. This is to allow handle-based value
 /// representations that are tied to the lifetime of the native call and can safely survive GC.
 //
-// TODO: add a gas-charging API (e.g. `charge_gas`). Natives currently meter no
+// TODO(metering): add a gas-charging API (e.g. `charge_gas`). Natives currently meter no
 // gas; the gas meter is already plumbed into `ProductionNativeContext`.
 pub trait NativeContext {
     /// Number of positional arguments declared by the native's ABI.
@@ -176,7 +176,7 @@ pub trait NativeContext {
 
     /// Whether a resource of type `ty` exists at `address` in global storage.
     //
-    // TODO: see if the specializer can lower the caller (object::exists_at) to
+    // TODO(cleanup): see if the specializer can lower the caller (object::exists_at) to
     // the `Exists` micro-op directly, dropping this native path.
     fn resource_exists(
         &self,

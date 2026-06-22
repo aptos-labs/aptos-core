@@ -151,7 +151,7 @@ impl Hash for TypeInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         use Type::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
@@ -279,7 +279,7 @@ impl PartialEq for TypeInternerKey {
     fn eq(&self, other: &Self) -> bool {
         use Type::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         // SAFETY: It is safe to dereference pointers because the caller
         // ensures they remain valid during the lifetime of the key.
@@ -379,7 +379,7 @@ impl Hash for SignatureTokenKey<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         use SignatureToken::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         match self.0 {
             Bool => {
@@ -549,7 +549,7 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
     fn equivalent(&self, key: &TypeInternerKey) -> bool {
         use SignatureToken::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.

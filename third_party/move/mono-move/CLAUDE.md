@@ -1,0 +1,3 @@
+# mono-move
+
+@AGENTS.md

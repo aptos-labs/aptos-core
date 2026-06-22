@@ -40,7 +40,7 @@ impl NativeExtension for ObjectContextExtension {
 
 /// `0x1::object::create_user_derived_object_address_impl(source: address, derive_from: address): address`
 //
-// TODO: charge gas (constant cost) once the gas API lands.
+// TODO(metering): charge gas (constant cost) once the gas API lands.
 pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {
@@ -63,8 +63,8 @@ pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
 ///
 /// Whether a resource of type `T` exists at `object`.
 //
-// TODO: charge gas (base + per-byte-loaded) once the gas API lands.
-// TODO: consider lowering this in the specializer to the `Exists` micro-op
+// TODO(metering): charge gas (base + per-byte-loaded) once the gas API lands.
+// TODO(perf): consider lowering this in the specializer to the `Exists` micro-op
 // directly, dropping the native path.
 pub fn native_exists_at<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `address`.

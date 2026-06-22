@@ -10,7 +10,7 @@
 //! enforced by [`mono_move_core::ObjectDescriptor`]'s constructors at
 //! publish time.
 //!
-//! TODO:
+//! TODO(cleanup):
 //! 1. Call this something other than verifier (well-formedness checker) to
 //!    avoid ambiguity with bytecode verifier.
 //! 2. Replace various hard-coded constants with named constants.
@@ -277,7 +277,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             // Div / Mod imm: reject `imm == 0` statically — at runtime it
             // would always abort, so this is dead-code-with-a-bomb.
             //
-            // TODO: this changes the surface vs the old VM, which aborted
+            // TODO(cleanup): this changes the surface vs the old VM, which aborted
             // at runtime with a `DIV_BY_ZERO` status code. The cleanest
             // fix is probably for the specializer to detect `imm == 0` and
             // emit an explicit `Abort(DIV_BY_ZERO)` instead of `*U64Imm`,
@@ -335,7 +335,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             //     in-bounds slots of width `op.rhs.byte_width()`.
             //   - Bitwise ops reject signed operands.
             //
-            // TODO: also statically reject `IntDiv`/`IntMod` with an
+            // TODO(cleanup): also statically reject `IntDiv`/`IntMod` with an
             // imm-zero rhs. Same for u64 variants (currently the u64
             // variants statically error out) and shifts. Revisit once we
             // have a clearer policy on what the specializer is allowed
@@ -361,7 +361,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             // amount is statically range-checked for the imm form, and
             // signedness of `ty` is checked at runtime via the dispatcher.
             //
-            // TODO: as noted above for div/mod, the static imm range check
+            // TODO(cleanup): as noted above for div/mod, the static imm range check
             // turns a runtime abort into a verification error — revisit.
             MicroOp::IntShl(op) | MicroOp::IntShr(op) => {
                 let size = op.ty.byte_width() as u32;
@@ -1247,7 +1247,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 
-    // TODO: validate branch gas fields are populated.
+    // TODO(metering): validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.get().len();
         if (target.0 as usize) >= code_len {

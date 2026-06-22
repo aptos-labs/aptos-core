@@ -31,7 +31,7 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
         // SAFETY: A `&'static T` is always non-null and well-aligned, so
         // converting it to `NonNull<T>` is sound.
         //
-        // TODO: once the workspace MSRV is bumped to 1.89+, replace this
+        // TODO(cleanup): once the workspace MSRV is bumped to 1.89+, replace this
         // with `NonNull::from_ref(data)` and drop the `unsafe` block.
         GlobalArenaPtr(unsafe { NonNull::new_unchecked(data as *const T as *mut T) })
     }

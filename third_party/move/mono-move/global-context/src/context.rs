@@ -153,7 +153,7 @@ struct Descriptors {
     /// via DashMap; the first publisher for a given `elem_ty` takes a shard
     /// write-lock once.
     //
-    // TODO: unify the per-kind type-keyed caches (`vector_by_elem`,
+    // TODO(cleanup): unify the per-kind type-keyed caches (`vector_by_elem`,
     // `enum_by_type`, `struct_by_ty`) into one map keyed on the full
     // `InternedType` (`vector<T>` instead of `T`).
     // `captured_data_by_pointer_offsets` is keyed by shape, not type, and
@@ -692,7 +692,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// `enum_ty`. `variant_pointer_offsets[v]` are the heap-pointer byte
     /// offsets (relative to the data region after the tag) for variant `v`.
     ///
-    /// TODO: `enum_by_type` (and the sibling `vector_by_elem` /
+    /// TODO(correctness): `enum_by_type` (and the sibling `vector_by_elem` /
     /// captured-data caches) key on a version-agnostic `InternedType`. This is
     /// sound only while the interner, descriptor table, and module cache are
     /// reset together (`reset_all_caches`) and no in-place module-version
@@ -935,7 +935,7 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         self.intern_identifier_internal(identifier)
     }
 
-    // TODO:
+    // TODO(perf, metering):
     //   1. Non-recursive implementation.
     //   2. Current implementation is O(N^2) because hashes of inner types are
     //      not cached, and have to be recomputed on insertion.

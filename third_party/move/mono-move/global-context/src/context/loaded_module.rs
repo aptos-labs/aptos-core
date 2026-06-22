@@ -162,7 +162,7 @@ pub struct LoadedModule {
     ///    functions are stored in [`Self::functions`].
     /// 2. The type arguments are fully concrete — they're the actual
     ///    runtime types the function was monomorphized for.
-    // TODO: revisit data structure used for actual monomorphized function storage.
+    // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
     instantiated_functions:
         Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
 }
@@ -184,7 +184,7 @@ impl LoadedModule {
                     function_indices.insert(name, idx);
                 },
                 None => {
-                    // TODO: For natives we also need to add a function?
+                    // TODO(completeness): For natives we also need to add a function?
                 },
             }
         }
@@ -278,7 +278,7 @@ impl Drop for LoadedModule {
     //      is dropped. In this case just-leaked box was never published into
     //      any slot, so it has no aliases by construction.
     //
-    // TODO: `FunctionPtr`s in other modules' `CallDirect` ops are only sound
+    // TODO(correctness): `FunctionPtr`s in other modules' `CallDirect` ops are only sound
     //   if callers are evicted with direct callees. (or their code is de-optimized).
     fn drop(&mut self) {
         self.functions.retain(|_, cell| {

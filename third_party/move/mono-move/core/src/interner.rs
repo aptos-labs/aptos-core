@@ -68,7 +68,7 @@ pub fn view_function_ref(ptr: InternedFunctionRef) -> &'static FunctionRef {
 /// Implementations deduplicate allocations, so that pointer equality implies
 /// structural equality.
 ///
-/// TODO(limits): enforce a type-size limit (potentially, when interning) so
+/// TODO(metering): enforce a type-size limit (potentially, when interning) so
 /// that very large types are not allowed to be created.
 pub trait Interner {
     /// Returns a type parameter with the specified index. Note that pointer

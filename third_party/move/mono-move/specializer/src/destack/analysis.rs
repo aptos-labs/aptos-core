@@ -148,7 +148,7 @@ impl BlockAnalysis {
         // as conflicts).
         let mut home_mut_borrow_pos: UnorderedMap<Slot, Vec<usize>> = UnorderedMap::new();
 
-        // [TODO]: we can reduce the number of passes over instructions.
+        // TODO(perf): we can reduce the number of passes over instructions.
         for (i, instr) in instrs.iter().enumerate() {
             for_each_use(instr, |slot| match slot {
                 Slot::Vid(_) => {

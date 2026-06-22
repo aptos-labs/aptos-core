@@ -31,7 +31,7 @@
 //! The cast micro-op ([`MicroOp::IntCast`]) is also tested here, in the
 //! cast section at the end, reusing the same single-op harness.
 //!
-//! TODO: Revisit endianness. Interpreter uses native order for built-in types.
+//! TODO(correctness): Revisit endianness. Interpreter uses native order for built-in types.
 //! I256/U256 currently do not have other endianness exposed.
 
 mod common;

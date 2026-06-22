@@ -24,7 +24,7 @@ use move_core_types::{
 };
 
 /// Named slot operand.
-/// TODO: consider renaming this enum to `NamedSlot`, to contrast with `SizedSlot`.
+/// TODO(cleanup): consider renaming this enum to `NamedSlot`, to contrast with `SizedSlot`.
 ///
 /// - `Home` — frame-local storage: parameters, declared locals, and temporaries
 ///   due to destackification. These map 1:1 to frame slots.
@@ -116,7 +116,7 @@ const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
 /// A stackless IR instruction with explicit named-slot operands.
 ///
-/// TODO:
+/// TODO(cleanup):
 /// (1) convert variants to struct-style (named fields) so call sites read
 /// `Instr::Move { dst, src }` rather than positional tuples.
 /// (2) add description for each instruction variant.

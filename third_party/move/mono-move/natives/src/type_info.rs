@@ -17,12 +17,12 @@ use move_core_types::account_address::AccountAddress;
 ///
 /// Returns the fully-qualified name of `T` as a string.
 //
-// TODO: charge gas for the (currently unbounded) type traversal.
+// TODO(metering): charge gas for the (currently unbounded) type traversal.
 //
-// TODO: `type_to_string` is a placeholder — check it against the canonical
+// TODO(correctness, metering): `type_to_string` is a placeholder — check it against the canonical
 // string format the legacy VM uses.
 //
-// TODO: with monomorphization the name is known at specialization time, so the
+// TODO(completeness): with monomorphization the name is known at specialization time, so the
 // specializer could write it directly rather than going through a native.
 pub fn native_type_name<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let name = type_to_string(ctx.ty_arg(0)?);
@@ -83,10 +83,10 @@ impl<'a> VMValue<'a> for TypeInfo<'a> {
 /// Reflection API that gives `T`'s defining address, module name, and type name.
 /// Aborts if `T` is not a struct.
 //
-// TODO: with monomorphization `T` is fully known at specialization time, so the
+// TODO(completeness): with monomorphization `T` is fully known at specialization time, so the
 // specializer could synthesize this `TypeInfo` directly rather than via a native.
 //
-// TODO: double check that the result matches the legacy VM's completely.
+// TODO(correctness): double check that the result matches the legacy VM's completely.
 pub fn native_type_of<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let (address, module_name, struct_name) = match view_type(ctx.ty_arg(0)?) {
         Type::Nominal {

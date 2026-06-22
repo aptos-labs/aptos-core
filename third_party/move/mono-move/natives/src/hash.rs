@@ -12,7 +12,7 @@ use sha3::Sha3_256;
 
 /// `0x1::hash::sha2_256(data: vector<u8>): vector<u8>`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
@@ -30,7 +30,7 @@ pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 
 /// `0x1::hash::sha3_256(data: vector<u8>): vector<u8>`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_sha3_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };

@@ -6,9 +6,9 @@
 //! MonoMove currently does not support parallelisation via delayed fields and
 //! all aggregator operations are sequential.
 //!
-//! TODO(perf): delayed fields integration needed.
-//! TODO(gas): missing gas charging for natives.
-//! TODO: support DerivedStringSnapshot.
+//! TODO(completeness): delayed fields integration needed.
+//! TODO(metering): missing gas charging for natives.
+//! TODO(completeness): support DerivedStringSnapshot.
 
 use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::{

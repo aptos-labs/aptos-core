@@ -14,7 +14,7 @@ pub use mono_move_core::{
 #[derive(Debug)]
 pub enum RuntimeStatus {
     Success,
-    // TODO: carry the abort's `Location` (which module raised it) once
+    // TODO(completeness): carry the abort's `Location` (which module raised it) once
     // we have a `Location` type defined.
     Aborted { code: u64, message: Option<String> },
 }

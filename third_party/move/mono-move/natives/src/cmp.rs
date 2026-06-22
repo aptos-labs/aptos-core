@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 
 /// `0x1::cmp::compare<T>(first: &T, second: &T): Ordering`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_compare<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: args 0 and 1 are `&T`, whose pointee type is `ty`.

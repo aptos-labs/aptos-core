@@ -13,7 +13,7 @@ use move_core_types::identifier::Identifier;
 ///
 /// Returns true if `s` is valid UTF-8 spelling a Move identifier.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_is_identifier<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `&vector<u8>`.
     let s: Ref<Vector<u8>> = unsafe { ctx.arg(0)? };

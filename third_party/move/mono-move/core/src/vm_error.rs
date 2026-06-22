@@ -3,7 +3,7 @@
 
 //! Internal error enums for the loader and interpreter subsystems.
 //!
-//! TODO: consider moving into a separate crate.
+//! TODO(cleanup): consider moving into a separate crate.
 
 use crate::{
     ExecutionErrorKind, GasExhaustedError, IntTy, IntoExecutionError, ResourceProviderError,
@@ -75,7 +75,7 @@ pub enum RuntimeError {
     #[error("stack overflow")]
     StackOverflow,
 
-    // TODO: also report how many bytes were free after GC.
+    // TODO(cleanup): also report how many bytes were free after GC.
     #[error("out of heap memory after GC (requested {requested} bytes)")]
     OutOfHeapMemory { requested: usize },
 
@@ -358,32 +358,32 @@ pub enum LoaderError {
         name: String,
     },
 
-    /// TODO: temporary until natives are supported.
+    /// TODO(completeness): temporary until natives are supported.
     #[error("Function IR missing")]
     FunctionIrMissing,
 
-    /// TODO: temporary until nominal types are supported.
+    /// TODO(completeness): temporary until nominal types are supported.
     #[error("Failed to lower function: {reason}")]
     LoweringSkipped { reason: &'static str },
 
-    /// TODO: replace once the deserializer has its own error type.
+    /// TODO(cleanup): replace once the deserializer has its own error type.
     #[error(transparent)]
     Deserialization(anyhow::Error),
 
-    /// TODO: replace once the verifier has its own error type.
+    /// TODO(cleanup): replace once the verifier has its own error type.
     #[error(transparent)]
     Verification(anyhow::Error),
 
     /// Catch-all for `ModuleProvider` failures.
-    /// TODO: figure out the right error type(s) here.
+    /// TODO(cleanup): figure out the right error type(s) here.
     #[error(transparent)]
     ModuleProvider(anyhow::Error),
 
-    /// TODO: replace once the global context has its own error type.
+    /// TODO(cleanup): replace once the global context has its own error type.
     #[error(transparent)]
     GlobalContext(anyhow::Error),
 
-    /// TODO: replace once the specializer has its own error type.
+    /// TODO(cleanup): replace once the specializer has its own error type.
     #[error(transparent)]
     Specializer(anyhow::Error),
 
@@ -401,7 +401,7 @@ impl IntoExecutionError for LoaderError {
                 ExecutionErrorKind::LinkingError
             },
 
-            // TODO: delegate to the inner errors once they have their own types.
+            // TODO(cleanup): delegate to the inner errors once they have their own types.
             Deserialization(_)
             | Verification(_)
             | ModuleProvider(_)
