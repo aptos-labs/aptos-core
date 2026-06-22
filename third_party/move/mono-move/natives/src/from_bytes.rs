@@ -15,7 +15,7 @@ use mono_move_core::native::{
 /// Deserializes `bytes` as a value of type `T`; a malformed encoding propagates
 /// as a VM error.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is `vector<u8>`, passed by value.

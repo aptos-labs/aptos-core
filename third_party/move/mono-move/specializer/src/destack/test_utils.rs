@@ -21,7 +21,7 @@ impl SSAFunction {
     /// Replace calls to the test-utils intrinsics with their dedicated IR
     /// instructions.
     ///
-    // TODO: add feature gating so this pass is test-only.
+    // TODO(testing): add feature gating so this pass is test-only.
     pub(crate) fn with_test_utils_passes(mut self, module: &PreparedModule) -> Result<Self> {
         for block in &mut self.blocks {
             for instr in &mut block.instrs {

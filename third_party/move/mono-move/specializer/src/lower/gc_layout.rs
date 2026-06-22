@@ -29,7 +29,7 @@ pub fn derive_frame_layout(
     home_slot_types: &[InternedType],
 ) -> Result<DerivedFrameLayout> {
     let mut heap_ptr_offsets = vec![];
-    // TODO: consider whether `LoweringContext::home_slots` should carry
+    // TODO(cleanup): consider whether `LoweringContext::home_slots` should carry
     // each slot's type directly, so we wouldn't need to zip with a
     // separate `home_slot_types` slice here.
     for (slot, &ty) in ctx.home_slots.iter().zip(home_slot_types.iter()) {
@@ -37,7 +37,7 @@ pub fn derive_frame_layout(
             heap_ptr_offsets.push(FrameOffset(slot.offset.0 + rel));
         }
     }
-    // TODO: revisit whether sort and dedup is necessary here or if invariants
+    // TODO(cleanup): revisit whether sort and dedup is necessary here or if invariants
     // established beforehand guarantee them already.
     heap_ptr_offsets.sort_by_key(|o| o.0);
     heap_ptr_offsets.dedup();
@@ -141,7 +141,7 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
         // 8-byte heap pointers (variant fields live on the heap object,
         // traced via the enum descriptor, not the frame).
         //
-        // TODO: rewrite without recursion or add a depth/visited bound;
+        // TODO(metering): rewrite without recursion or add a depth/visited bound;
         // a malformed or racing `NominalLayout` publisher could otherwise
         // produce a cyclic layout that blows the stack here.
         Type::Nominal { .. } => {

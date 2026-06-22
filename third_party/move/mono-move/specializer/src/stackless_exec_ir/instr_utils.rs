@@ -219,7 +219,7 @@ pub(crate) enum NominalKind {
 /// their nominals are found via `resource_type_in_instr`, the slot-type walk,
 /// and captured-data discovery.
 ///
-/// TODO: reconcile various type-in-instr discovery methods.
+/// TODO(cleanup): reconcile various type-in-instr discovery methods.
 pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedType, NominalKind)> {
     match instr {
         // Carry the instantiated struct type directly.
@@ -376,7 +376,7 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
 }
 
 /// Extract the destination slot and immediate value from a load instruction.
-// TODO: the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
+// TODO(perf): the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
 // a `Box` here, even when `try_fuse_immediate_binop` decides not to fuse.
 // Consider splitting `extract_imm_value` into a cheap "would this fuse?"
 // check + a separate constructor, or otherwise pulling allocation behind

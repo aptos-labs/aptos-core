@@ -46,8 +46,6 @@
 //! layouts are stored per-module and resolved at runtime.
 //!
 //! ## Generic structs
-//!
-//! TODO: support substitution
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId},
@@ -122,7 +120,7 @@ impl InternedTypeList {
 // Rust has no way to spell that. Callers must not store these references
 // beyond the scope where the above invariants hold.
 //
-// TODO (design follow-up): the `&'static` widening makes these references
+// TODO(cleanup): the `&'static` widening makes these references
 // effectively raw pointers at the type level — the "arena is alive" proof is
 // carried only in docs, not in the types. Consider tying the returned
 // reference to a witness value instead:
@@ -183,7 +181,7 @@ pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
 /// Whether `ty` contains no [`Type::TypeParam`] node.
 ///
 /// Inherits safety contract of [`view_type`].
-/// TODO: convert to non-recursive.
+/// TODO(metering): convert to non-recursive.
 pub fn is_closed_type(ty: InternedType) -> bool {
     match view_type(ty) {
         Type::TypeParam { .. } => false,
@@ -242,7 +240,7 @@ impl FieldLayout {
 /// and `None` when they are not (today: enums, whose layout can change on
 /// module upgrade). `Some(_)` is therefore not a "this is a struct" marker —
 /// once `#[frozen]` enums land, frozen enums will also carry `Some(_)` since
-/// their variants cannot change. TODO: replace this side-channel with a
+/// their variants cannot change. TODO(cleanup): replace this side-channel with a
 /// more explicit shape (e.g., a dedicated enum) once frozen enums are wired
 /// in.
 pub struct NominalLayout {
@@ -273,7 +271,7 @@ impl NominalLayout {
         }
     }
 
-    // TODO: This API is test-only for now, will change, so ignore safety.
+    // TODO(testing): This API is test-only for now, will change, so ignore safety.
     pub fn field_layouts(&self) -> Option<&[FieldLayout]> {
         self.fields.map(|p| unsafe { p.as_ref_unchecked() })
     }
@@ -330,7 +328,7 @@ pub enum Type {
     /// enums. Enums are always pointer-sized today, because new variants may
     /// be added on module upgrade.
     ///
-    /// TODO: `#[frozen]` enums (e.g., `Option`) cannot gain new variants on
+    /// TODO(completeness): `#[frozen]` enums (e.g., `Option`) cannot gain new variants on
     /// upgrade, so they should cache per-variant field offsets in the layout
     /// slot rather than indirecting through a pointer. This will need to be
     /// wired in once the frozen-enum attribute is supported end-to-end.
@@ -340,7 +338,7 @@ pub enum Type {
     /// `Drop`), which is harmless only as long as layout owns no non-arena
     /// memory - keep it that way.
     Nominal {
-        // TODO: Make this a pointer to a named-type struct holding these pointers.
+        // TODO(cleanup): Make this a pointer to a named-type struct holding these pointers.
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -394,7 +392,7 @@ impl Type {
             // References are 16-byte fat pointers, 8-byte aligned.
             Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
 
-            // Function values - TODO: for now use heap pointer values.
+            // Function values - TODO(completeness): for now use heap pointer values.
             Type::Function { .. } => (8, 8),
 
             // Nominal types (struct/enum): the layout slot may be empty for
@@ -587,7 +585,7 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
 
 /// Renders an interned type to its textual representation (see [`display_type`]).
 //
-// TODO: this traversal is unbounded; replace with a metered, depth-bounded
+// TODO(metering): this traversal is unbounded; replace with a metered, depth-bounded
 // version.
 pub fn type_to_string(ty: InternedType) -> String {
     struct Disp(InternedType);

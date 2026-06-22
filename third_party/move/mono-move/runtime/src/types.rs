@@ -31,7 +31,7 @@ pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 pub(crate) const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
 /// Maximum size of an `AbortMsg` message, in bytes.
-/// TODO: make this configurable in some VM config.
+/// TODO(cleanup): make this configurable in some VM config.
 pub(crate) const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
 
 /// Byte offset of `saved_pc` within frame metadata.

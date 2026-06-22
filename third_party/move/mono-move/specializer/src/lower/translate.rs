@@ -58,7 +58,7 @@ pub(super) struct LoweredFunction {
     pub safe_points: Vec<SafePointEntry>,
 }
 
-/// TODO: move this constant into a shared location and reuse elsewhere.
+/// TODO(cleanup): move this constant into a shared location and reuse elsewhere.
 /// Byte width of an enum value in a frame slot: an 8-byte heap pointer.
 const ENUM_PTR_SIZE: u32 = 8;
 
@@ -348,7 +348,7 @@ impl<'a> LoweringState<'a> {
                 heap_ptr_offsets
                     .extend(rels.into_iter().map(|r| FrameOffset(ts.slot.offset.0 + r)));
             }
-            // TODO: revisit the need to sort and dedup.
+            // TODO(cleanup): revisit the need to sort and dedup.
             heap_ptr_offsets.sort_by_key(|o| o.0);
             heap_ptr_offsets.dedup();
             self.pending_safe_points.push(SafePointEntry {
@@ -574,6 +574,9 @@ impl<'a> LoweringState<'a> {
                     imm: 0,
                 })?;
             },
+            // TODO(correctness): audit every integer-width use across the
+            // specializer and confirm each is the correct width (slot sizes,
+            // immediate widths, sign extension).
             // 1-byte integers store directly into their 1-byte slot.
             Instr::LdU8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
@@ -667,7 +670,7 @@ impl<'a> LoweringState<'a> {
                 // `StoreImm`. Vectors are heap-allocated at runtime from the
                 // constant pool, so they keep their own micro-op.
                 //
-                // TODO(endianness): revisit this when we fix the endianness
+                // TODO(correctness): revisit this when we fix the endianness
                 // story for the VM.
                 match ty {
                     Type::Bool | Type::U8 | Type::I8 => {
@@ -745,7 +748,7 @@ impl<'a> LoweringState<'a> {
 
             // --- Binary ops ---
             Instr::BinaryOp(dst, op, lhs, rhs) => {
-                // TODO: BinaryOp / BinaryOpImm share most of their shape
+                // TODO(cleanup): BinaryOp / BinaryOpImm share most of their shape
                 // (operand resolution + per-kind emit); consider factoring
                 // out the common skeleton once cast / cmp ops settle.
                 let lhs_info = self.slot(*lhs)?;
@@ -881,7 +884,7 @@ impl<'a> LoweringState<'a> {
 
             // --- Binary ops with immediate ---
             Instr::BinaryOpImm(dst, op, src, imm) => {
-                // TODO: see [`Instr::BinaryOp`] above on factoring out the
+                // TODO(cleanup): see [`Instr::BinaryOp`] above on factoring out the
                 // shared skeleton between the reg-reg and imm forms.
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
@@ -1056,7 +1059,7 @@ impl<'a> LoweringState<'a> {
                 UnaryOp::FreezeRef => {
                     // Runtime no-op: &mut T and &T share the same 16-byte
                     // fat-pointer representation. Propagate the slot value.
-                    // TODO: fold this away at the stackless exec IR level so
+                    // TODO(cleanup): fold this away at the stackless exec IR level so
                     // lowering emits nothing at all.
                     let src_info = self.slot(*src)?;
                     let dst_info = self.def_slot(*dst)?;
@@ -1082,7 +1085,7 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             Instr::ReadRef(dst, ref_src) => {
-                // TODO: `size` could equivalently come from `dst_info.size`
+                // TODO(perf): `size` could equivalently come from `dst_info.size`
                 // (the loaded value's slot) — IR typing forces it to equal
                 // the ref's pointee size. `ref_pointee_size` is the more
                 // type-faithful path; `dst_info.size` would be cheaper.
@@ -1097,7 +1100,7 @@ impl<'a> LoweringState<'a> {
                 self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
             Instr::WriteRef(ref_dst, src) => {
-                // TODO: `size` could equivalently come from `src_info.size`
+                // TODO(perf): `size` could equivalently come from `src_info.size`
                 // (the value being written) — IR typing forces it to equal
                 // the ref's pointee size. `ref_pointee_size` is the more
                 // type-faithful path; `src_info.size` would be cheaper.
@@ -1369,7 +1372,7 @@ impl<'a> LoweringState<'a> {
                 }
             },
             Instr::VecUnpack(dsts, elem_ty, src) => {
-                // TODO: the Move compiler only emits `VecUnpack` with count 0,
+                // TODO(completeness): the Move compiler only emits `VecUnpack` with count 0,
                 // but handwritten bytecode may use it with any count. If we
                 // restrict to count 0, we can apply simplifications.
                 let elem_size =
@@ -1546,7 +1549,7 @@ impl<'a> LoweringState<'a> {
                     })
                     .collect();
                 let mut indices: Vec<usize> = (0..fields.len()).collect();
-                // TODO: check if we can have cheaper checks for reverse/forward emit safety
+                // TODO(perf): check if we can have cheaper checks for reverse/forward emit safety
                 // in the presence of alignments.
                 if parallel_copy::reverse_emit_is_safe(&copies) {
                     indices.reverse();
@@ -2122,7 +2125,7 @@ impl<'a> LoweringState<'a> {
         // Decreasing-j arg emit: reverse iteration places each value
         // before any later copy could clobber its source. Identity
         // copies (src == dst) are elided.
-        // [TODO] Consider an optimization: if we can safely do a bulk move here.
+        // TODO(perf): consider an optimization: if we can safely do a bulk move here.
         for (j, arg_slot) in args.iter().enumerate().rev() {
             let arg_info = self.slot(*arg_slot)?;
             let dst_off = cs.arg_slots[j].slot.offset;

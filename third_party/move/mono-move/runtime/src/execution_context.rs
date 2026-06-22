@@ -71,7 +71,7 @@ pub trait ExecutionContext {
 ///
 /// Intended for tests and benches that don't exercise cross-module dispatch.
 ///
-// TODO: migrate to a real impl and remove this.
+// TODO(cleanup): migrate to a real impl and remove this.
 pub struct LocalExecutionContext<'r> {
     gas_meter: GasMeter,
     natives: ProductionNativeRegistry,

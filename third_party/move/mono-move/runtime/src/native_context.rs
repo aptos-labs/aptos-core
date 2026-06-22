@@ -69,7 +69,7 @@ pub struct ProductionNativeContext<'a> {
     frame_ptr: *mut u8,
     /// Gas meter for the current transaction.
     ///
-    /// TODO: Expose to native functions.
+    /// TODO(completeness): Expose to native functions.
     #[allow(dead_code)]
     gas: UnsafeCell<&'a mut GasMeter>,
     /// The VM's heap -- used by the natives to allocate new heap objects.
@@ -90,7 +90,7 @@ pub struct ProductionNativeContext<'a> {
 }
 
 impl<'a> ProductionNativeContext<'a> {
-    // TODO: revisit this lint.
+    // TODO(cleanup): revisit this lint.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frame_ptr: *mut u8,
@@ -221,7 +221,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // the length check makes the copy in-bounds. `bytes` is a valid
         // representation of the slot's type, per this method's contract.
         //
-        // TODO: `bytes` must NOT alias the return slot it is written to.
+        // TODO(correctness): `bytes` must NOT alias the return slot it is written to.
         // This is currently ensured by the `return_started` flag and the absence
         // of value types that reference the frame.
         // Re-audit this if new value APIs are added.
@@ -478,7 +478,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(Boxed::from_handle(unsafe { self.pool.root_object(obj) }))
     }
 
-    // TODO(replay): `value_ty` on these table ops is currently unused; wire it
+    // TODO(completeness): `value_ty` on these table ops is currently unused; wire it
     // to the storage provider so a working-map miss can deserialize from storage.
     fn table_contains(
         &self,
@@ -542,7 +542,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(Some(Ref::from_handle(handle)))
     }
 
-    // TODO: See if there's a way to separate out argument-reading from boxing.
+    // TODO(cleanup): See if there's a way to separate out argument-reading from boxing.
     //       Currently they are both handled here for GC-safety.
     fn box_arg<'a>(
         &'a self,

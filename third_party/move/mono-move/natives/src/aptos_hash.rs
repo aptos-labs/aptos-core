@@ -20,7 +20,7 @@ use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 /// back as a `vector<u8>` in return slot 0. Shared by every hash whose result
 /// is a byte vector.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 fn native_hash<C: NativeContext>(
     ctx: &C,
     hash: impl FnOnce(&[u8]) -> Vec<u8>,
@@ -52,7 +52,7 @@ pub fn native_keccak256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInt
 
 /// `0x1::aptos_hash::sip_hash(bytes: vector<u8>): u64`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_sip_hash<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };

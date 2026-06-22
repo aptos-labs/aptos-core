@@ -21,7 +21,7 @@ pub fn native_swap<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternal
     unsafe {
         let left: Ref<Opaque> = ctx.arg(0)?;
         let right: Ref<Opaque> = ctx.arg(1)?;
-        // TODO(security): `swap_nonoverlapping` would be UB if the two referents
+        // TODO(correctness): `swap_nonoverlapping` would be UB if the two referents
         // ever alias. Move borrow rules forbid that, but it's unclear whether
         // Block-STM speculative execution can transiently produce aliasing
         // references — so swap via a temporary, which is sound either way until

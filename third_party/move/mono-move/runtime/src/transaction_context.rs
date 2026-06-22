@@ -4,7 +4,7 @@
 //! Transaction context that wires the [`Loader`] into the interpreter's
 //! cross-module dispatch path.
 //
-// TODO: move out of the runtime once a layer above it exists.
+// TODO(cleanup): move out of the runtime once a layer above it exists.
 
 use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext};
 use mono_move_core::{
@@ -23,15 +23,15 @@ pub struct TransactionContext<'guard, 'ctx> {
     loader: Loader<'guard, 'ctx>,
     read_set: ModuleReadSet<'guard>,
     gas_meter: GasMeter,
-    // TODO(refactor):
+    // TODO(cleanup):
     //   We need to move resource read-set here, as well as heap and some
     //   other fields from interpreter context which should live longer than
     //   a single interpreter session.
     resource_provider: &'guard dyn ResourceProvider,
-    // TODO: Move the native registry off the per-transaction context and
+    // TODO(cleanup): Move the native registry off the per-transaction context and
     // onto a long-lived owner (e.g. the global context).
     //
-    // TODO: Enforce that `natives` here and the `NativeResolver` passed
+    // TODO(correctness): Enforce that `natives` here and the `NativeResolver` passed
     // to `loader` are the same instance.
     natives: &'guard ProductionNativeRegistry,
     /// Per-transaction native extensions, shared across native calls.

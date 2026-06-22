@@ -148,7 +148,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
     }
 
-    // TODO: Revisit the handling of native functions here.
+    // TODO(cleanup): Revisit the handling of native functions here.
     //
     // Need to make sure:
     // 1. A registered native function impl does not shadow a Move-body function with the same name.
@@ -265,7 +265,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 });
             },
         };
-        // TODO(gas): the lowering work needs to be charged deterministically.
+        // TODO(metering): the lowering work needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
@@ -302,7 +302,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         .map_err(LoaderError::Specializer)?
         {
             LoweringOutcome::Built(f) => f,
-            // TODO: drop this arm — together with the `LoweringOutcome`
+            // TODO(cleanup): drop this arm — together with the `LoweringOutcome`
             // enum and the corresponding `BuildContextOutcome::Skipped`
             // paths in the specializer — once `try_build_context`
             // handles nominal types and partial concretization. At that
@@ -586,7 +586,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 address: *id.address(),
                 name: id.name().to_string(),
             })?;
-        // TODO: placeholder cost model — byte length of the module. Replace
+        // TODO(metering): placeholder cost model — byte length of the module. Replace
         // with a proper cost function (bucketed by size, verifier cost, etc.).
         let cost = bytes.len() as u64;
         let compiled_module = self
@@ -596,7 +596,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         self.module_provider
             .verify_module(&compiled_module)
             .map_err(LoaderError::Verification)?;
-        // TODO:
+        // TODO(cleanup):
         //   This can run verification twice because destack runs it and we verified before.
         //   Destack should take a hook so we can add more things to verify.
         let module_ir =
@@ -721,7 +721,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         let module = match self.read_set.get(id) {
             Some(ModuleRead::Loaded { module, .. }) => module,
             Some(ModuleRead::Pending) => {
-                // TODO: should be `invariant_violation!(ReadSetEntryNotLoaded)`.
+                // TODO(correctness): should be `invariant_violation!(ReadSetEntryNotLoaded)`.
                 // The specializer needs a typed error first, without creating
                 // a circular dependency with `LoaderError`.
                 anyhow::bail!("All modules have to be loaded or not present")

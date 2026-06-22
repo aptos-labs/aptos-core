@@ -6,7 +6,7 @@ use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
 //
-// TODO: check whether there's already an equivalent (offset, size) type
+// TODO(cleanup): check whether there's already an equivalent (offset, size) type
 // defined elsewhere in the codebase that could be reused instead.
 #[derive(Debug, Clone, Copy)]
 pub struct FrameSlot {
