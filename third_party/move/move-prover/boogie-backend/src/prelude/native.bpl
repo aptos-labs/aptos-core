@@ -597,13 +597,14 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 {%- endif %}
 
 {%- if impl.fun_keys != "" and impl.fun_spec_has_key != "" %}
-// All keys in the map as a `vector<K>`. Never aborts. Routed through
-// `fun_spec_has_key` rather than `ContainsTable`/`EncodeKey` directly to avoid
-// the `$EncodeKey`-pair multi-pattern blow-up observed historically.
+// All keys in the map as a `vector<K>`. Never aborts. Membership uses the
+// `$IsEqual`-based `$ContainsVec'K'` defined per-K-instantiation earlier in the
+// prelude, not raw Boogie `==`. This is the same machinery `vector::spec_contains`
+// uses, and keeps the biconditional sound uniformly across K — primitive or not.
 procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec ({{K}})) {
     assume LenVec(result) == LenTable(t);
     assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
-        (ContainsVec(result, k) <==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+        ($ContainsVec'{{instance.0.suffix}}'(result, k) <==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
 }
 {%- endif %}
 
@@ -620,21 +621,21 @@ procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: V
 
 {%- if impl.fun_to_vec_pair != "" and impl.fun_spec_has_key != "" %}
 // Consume the map, returning keys and values as parallel vectors. Never aborts.
-// Key vector: same shape as `fun_keys`. Value vector: only the length is
-// promised (see `fun_values` rationale).
+// Key vector: same `$ContainsVec'K'`-based membership shape as `fun_keys`.
+// Value vector: only the length is promised (see `fun_values` rationale).
 procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (result_keys: Vec ({{K}}), result_values: Vec ({{V}})) {
     assume LenVec(result_keys) == LenTable(t);
     assume LenVec(result_values) == LenTable(t);
     assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
-        (ContainsVec(result_keys, k) <==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+        ($ContainsVec'{{instance.0.suffix}}'(result_keys, k) <==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
 }
 {%- endif %}
 
 {%- if impl.fun_new_from != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" %}
 // Build a map from parallel key/value vectors. Aborts when lengths differ or any
-// key appears more than once. The value-placement postcondition uses
-// `ReadVec(keys_arg, i)` as the trigger anchor — bounded by the program's known
-// indices, avoiding the `forall k :: spec_get(t, k)` blow-up pattern.
+// key appears more than once. Membership uses `$ContainsVec'K'` (semantic
+// equality via `$IsEqual`), consistent with the spec function semantics; the
+// value-placement assume is index-anchored on `ReadVec(keys_arg, i)`.
 procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys_arg: Vec ({{K}}), values_arg: Vec ({{V}})) returns (result: ({{Self}})) {
     if (LenVec(keys_arg) != LenVec(values_arg)) {
         call $ExecFailureAbort();
@@ -647,7 +648,7 @@ procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys_arg: Vec ({{K}}), values_a
     }
     assume LenTable(result) == LenVec(keys_arg);
     assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
-        (ContainsVec(keys_arg, k) <==> {{impl.fun_spec_has_key}}{{S}}(result, k)));
+        ($ContainsVec'{{instance.0.suffix}}'(keys_arg, k) <==> {{impl.fun_spec_has_key}}{{S}}(result, k)));
     assume (forall i: int :: i >= 0 && i < LenVec(keys_arg) ==>
         {{impl.fun_spec_get}}{{S}}(result, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
 }

@@ -19,8 +19,9 @@ use move_model::{
     },
     pragmas::{
         INTRINSIC_FUN_MAP_BORROW_BACK, INTRINSIC_FUN_MAP_BORROW_FRONT, INTRINSIC_FUN_MAP_GET,
-        INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT,
-        INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_UPSERT,
+        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY,
+        INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY,
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT,
         INTRINSIC_TYPE_MAP,
     },
     symbol::Symbol,
@@ -341,9 +342,23 @@ impl Analyzer<'_> {
         // trigger set as `cmp::compare<K>` keeps the emission and declaration
         // gates in sync.
         let option_k_roles_lazy = cmp_k_roles;
+        // Eager: vector<K> for every Map<K, V> instance whose `keys` /
+        // `to_vec_pair` / `new_from` is bound. Those templates use
+        // `$ContainsVec'K'` in their postconditions (the `$IsEqual`-based
+        // semantic-equality vector membership, defined per-K in `native.bpl`).
+        // The per-K declaration is only emitted when K is in `vec_inst`, so we
+        // need to register it here when the K type appears only via an OM
+        // intrinsic call (the call goes to `native_inst`, not through ordinary
+        // local-variable analysis paths that would propagate `vector<K>`).
+        let vec_k_roles_eager = [
+            INTRINSIC_FUN_MAP_KEYS,
+            INTRINSIC_FUN_MAP_TO_VEC_PAIR,
+            INTRINSIC_FUN_MAP_NEW_FROM,
+        ];
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
+        let mut vec_k_to_register: Vec<Type> = vec![];
         for (struct_qid, ty_args) in self.info.table_inst.iter() {
             let Some(decl) = intrinsics.get_decl_for_struct(struct_qid) else {
                 continue;
@@ -354,6 +369,14 @@ impl Analyzer<'_> {
             if needs_option_v {
                 for (_k, v) in ty_args.iter() {
                     option_v_to_register.push(v.clone());
+                }
+            }
+            let needs_vec_k = vec_k_roles_eager
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            if needs_vec_k {
+                for (k, _v) in ty_args.iter() {
+                    vec_k_to_register.push(k.clone());
                 }
             }
             for role in &cmp_k_roles {
@@ -390,6 +413,9 @@ impl Analyzer<'_> {
             {
                 self.add_type(&Type::Struct(option_qid.module_id, option_qid.id, vec![ty]));
             }
+        }
+        for ty in vec_k_to_register {
+            self.info.vec_inst.insert(ty);
         }
         if let Some(cmp_mid) = cmp_mid {
             for ty in cmp_k_to_register {
