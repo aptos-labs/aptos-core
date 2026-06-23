@@ -302,11 +302,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Calibrated with scripts/algebra-gas's SHA2-256 baseline on a 5,281-byte Nitro
         // attestation document plus AWS Nitro Root G1 DER fixture. The benchmark measured
-        // ~4.66ms, with gas_per_ns ~= 285.47, for ~1.33B internal gas.
+        // ~4.66ms, with gas_per_ns ~= 2,854.73, for ~13.3B internal gas.
         [aws_nitro_verify_attestation_base: InternalGas, "aws_nitro_utils.verify_attestation.base", 1_000_000],
-        [aws_nitro_verify_attestation_per_byte: InternalGasPerByte, "aws_nitro_utils.verify_attestation.per_byte", 252_000],
+        [aws_nitro_verify_attestation_per_byte: InternalGasPerByte, "aws_nitro_utils.verify_attestation.per_byte", 2_520_000],
         [aws_nitro_verify_and_parse_attestation_base: InternalGas, "aws_nitro_utils.verify_and_parse_attestation.base", 1_050_000],
-        [aws_nitro_verify_and_parse_attestation_per_byte: InternalGasPerByte, "aws_nitro_utils.verify_and_parse_attestation.per_byte", 252_000],
+        [aws_nitro_verify_and_parse_attestation_per_byte: InternalGasPerByte, "aws_nitro_utils.verify_and_parse_attestation.per_byte", 2_520_000],
 
         [transaction_context_get_txn_hash_base: InternalGas, { 10.. => "transaction_context.get_txn_hash.base" }, 7350],
         [transaction_context_get_script_hash_base: InternalGas, "transaction_context.get_script_hash.base", 7350],
