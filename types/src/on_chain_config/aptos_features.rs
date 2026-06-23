@@ -190,6 +190,10 @@ pub enum FeatureFlag {
     /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
     /// state root hash, so it is committed to the ledger accumulator.
     TRANSACTION_INFO_V1 = 117,
+    /// When enabled, the gas refund in the epilogue mints APT directly as a fungible asset
+    /// via the paired `MintRef`, instead of minting a coin and converting it. This avoids
+    /// touching the legacy coin supply aggregator (v1), reducing Block-STM contention.
+    GAS_REFUND_FA_MINT = 118,
 }
 
 impl FeatureFlag {
@@ -306,6 +310,7 @@ impl FeatureFlag {
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
+            Self::GAS_REFUND_FA_MINT,
         ]
     }
 }
@@ -539,6 +544,10 @@ impl Features {
 
     pub fn is_transaction_info_v1_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
+    }
+
+    pub fn is_gas_refund_fa_mint_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::GAS_REFUND_FA_MINT)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

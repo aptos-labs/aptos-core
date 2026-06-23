@@ -168,6 +168,7 @@ pub enum FeatureFlag {
     AllowFriendEntryVisibilityDowngrade,
     HotnessInEpilogue,
     TransactionInfoV1,
+    GasRefundFaMint,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -439,6 +440,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::HotnessInEpilogue => AptosFeatureFlag::HOTNESS_IN_EPILOGUE,
             FeatureFlag::TransactionInfoV1 => AptosFeatureFlag::TRANSACTION_INFO_V1,
+            FeatureFlag::GasRefundFaMint => AptosFeatureFlag::GAS_REFUND_FA_MINT,
         }
     }
 }
@@ -637,6 +639,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::HOTNESS_IN_EPILOGUE => FeatureFlag::HotnessInEpilogue,
             AptosFeatureFlag::TRANSACTION_INFO_V1 => FeatureFlag::TransactionInfoV1,
+            AptosFeatureFlag::GAS_REFUND_FA_MINT => FeatureFlag::GasRefundFaMint,
         }
     }
 }
