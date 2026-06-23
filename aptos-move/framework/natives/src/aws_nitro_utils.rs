@@ -30,11 +30,11 @@ use move_vm_types::{
 };
 use sha2_0_10_6::{Digest as Sha2Digest, Sha256, Sha384, Sha512};
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, str::FromStr};
+use std::collections::VecDeque;
 use webpki::{EndEntityCert, TrustAnchor};
 use x509_parser::x509::SubjectPublicKeyInfo;
 
-static SUPPORTED_SIG_ALGS: &[&webpki::SignatureAlgorithm] = &[
+pub(crate) static SUPPORTED_SIG_ALGS: &[&webpki::SignatureAlgorithm] = &[
     &webpki::ECDSA_P256_SHA256,
     &webpki::ECDSA_P256_SHA384,
     &webpki::ECDSA_P384_SHA256,
@@ -100,18 +100,17 @@ macro_rules! verify_signature {
         let verifying_key: $curve::ecdsa::VerifyingKey = verify_cose!(
             $curve::ecdsa::VerifyingKey::from_encoded_point(&encoded_point,)
         )?;
-        let hex_string = hex::encode($signature);
-        let sig = verify_cose!($curve::ecdsa::Signature::from_str(&hex_string))?;
+        let sig = verify_cose!($curve::ecdsa::Signature::from_slice($signature))?;
         verify_cose!(verifying_key.verify_prehash($digest, &sig))
     }};
 }
 
-struct NitroPublicKey<'a> {
+pub(crate) struct NitroPublicKey<'a> {
     spki: &'a SubjectPublicKeyInfo<'a>,
 }
 
 impl<'a> NitroPublicKey<'a> {
-    fn new(spki: &'a SubjectPublicKeyInfo<'a>) -> Result<Self> {
+    pub(crate) fn new(spki: &'a SubjectPublicKeyInfo<'a>) -> Result<Self> {
         if spki.algorithm.algorithm.to_id_string() != "1.2.840.10045.2.1" {
             bail!("attestation signing certificate does not contain an EC public key");
         }
@@ -175,7 +174,7 @@ fn total_attestation_and_root_bytes(attestation_bytes: &[u8], trusted_roots: &[V
         })
 }
 
-fn validate_cert_trust_chain_with_roots(
+pub(crate) fn validate_cert_trust_chain_with_roots(
     target: &[u8],
     intermediates: &[&[u8]],
     trusted_root_certs: &[Vec<u8>],
@@ -209,7 +208,7 @@ fn validate_cert_trust_chain_with_roots(
     Ok(())
 }
 
-fn validate_cose_signature(
+pub(crate) fn validate_cose_signature(
     signing_cert_public_key: &dyn SigningPublicKey,
     cose_sign_1_decoded: &CoseSign1,
 ) -> Result<()> {
