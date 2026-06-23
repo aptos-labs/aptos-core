@@ -127,6 +127,17 @@ impl VMValueCast<Closure> for Value {
 
 impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // Experiment-only detection: a function value reached a format-sensitive
+        // serialization context (table key, event, or bcs native). Its bytes would
+        // serve as an address or commitment, so a V1->V2 format change would strand
+        // or break it. The backtrace identifies the call site.
+        if self.ctx.panic_on_function_value {
+            panic!(
+                "function value serialized in a format-sensitive context \
+                 (table key / event / bcs native)"
+            );
+        }
+
         let Closure(fun, captured) = self.value;
         let fun_ext = self
             .ctx

@@ -667,6 +667,7 @@ fn serialize_key(
 ) -> PartialVMResult<Vec<u8>> {
     ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
         .with_func_args_deserialization(function_value_extension)
+        .with_panic_on_function_value()
         .serialize(key, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key"))
 }

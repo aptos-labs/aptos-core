@@ -70,6 +70,7 @@ fn native_to_bytes(
     let serialized_value = match ValueSerDeContext::new(max_value_nest_depth)
         .with_legacy_signer()
         .with_func_args_deserialization(&function_value_extension)
+        .with_panic_on_function_value()
         .serialize(&val, &layout)?
     {
         Some(serialized_value) => serialized_value,

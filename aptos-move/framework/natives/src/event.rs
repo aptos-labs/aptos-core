@@ -127,6 +127,7 @@ fn native_write_to_event_store(
     let blob = ValueSerDeContext::new(max_value_nest_depth)
         .with_delayed_fields_serde()
         .with_func_args_deserialization(&function_value_extension)
+        .with_panic_on_function_value()
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -304,6 +305,7 @@ fn native_write_module_event_to_store(
     let blob = ValueSerDeContext::new(max_value_nest_depth)
         .with_delayed_fields_serde()
         .with_func_args_deserialization(&function_value_extension)
+        .with_panic_on_function_value()
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new_invariant_violation(

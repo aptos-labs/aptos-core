@@ -99,6 +99,11 @@ pub struct ValueSerDeContext<'a> {
     pub(crate) legacy_signer: bool,
     /// Maximum allowed depth of a VM value. Enforced by serializer.
     pub(crate) max_value_nested_depth: Option<u64>,
+    /// Experiment-only: panic if a function value (closure) is serialized through
+    /// this context. Set at format-sensitive call sites (table key, events, bcs
+    /// natives) to detect on-chain closures whose bytes serve as an address or
+    /// commitment. Never enable on a deployed build.
+    pub(crate) panic_on_function_value: bool,
 }
 
 impl<'a> ValueSerDeContext<'a> {
@@ -109,7 +114,16 @@ impl<'a> ValueSerDeContext<'a> {
             delayed_fields_extension: None,
             legacy_signer: false,
             max_value_nested_depth,
+            panic_on_function_value: false,
         }
+    }
+
+    /// Experiment-only: panic if a function value (closure) is serialized through
+    /// this context. See [`Self::panic_on_function_value`]. Never enable on a
+    /// deployed build.
+    pub fn with_panic_on_function_value(mut self) -> Self {
+        self.panic_on_function_value = true;
+        self
     }
 
     /// Serialize signer with legacy format to maintain backwards compatibility.
@@ -145,6 +159,7 @@ impl<'a> ValueSerDeContext<'a> {
             delayed_fields_extension: None,
             legacy_signer: self.legacy_signer,
             max_value_nested_depth: self.max_value_nested_depth,
+            panic_on_function_value: self.panic_on_function_value,
         }
     }
 
