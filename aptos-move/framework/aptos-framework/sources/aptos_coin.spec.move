@@ -36,6 +36,8 @@ spec aptos_framework::aptos_coin {
 
     spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         use aptos_framework::aggregator_factory;
+        // Raised above the default 40s because of prover timeout (property proved).
+        pragma verify_duration_estimate = 80;
 
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
