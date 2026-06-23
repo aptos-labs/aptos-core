@@ -458,12 +458,7 @@ procedure {:inline 2} {{impl.fun_get}}{{S}}(t: ({{Self}}), k: {{K}}) returns (re
 {%- endif %}
 
 {%- if impl.fun_borrow_front != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" and not instance.0.is_type_param and not instance.1.is_type_param and instance.0.cmp_available %}
-// Smallest key under `cmp::compare` ordering. Aborts (as an unspecified execution
-// failure, matching `vector::borrow(0)` on an empty vector) when the map is empty.
-// Uses the bound `fun_spec_has_key`/`fun_spec_get` symbols rather than the underlying
-// `ContainsTable`/`GetTable` primitives so the inferred trigger on the forall matches
-// the one used by hand-written abstract specs that reference the same spec functions —
-// otherwise Z3's MBQI picks different instantiation candidates and verification slows.
+// Smallest key under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{K}}, v: {{V}}) {
     if (LenTable(t) == 0) {
         call $ExecFailureAbort();
@@ -473,7 +468,7 @@ procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{
     assume $IsValid'{{instance.1.suffix}}'(v);
     assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume v == {{impl.fun_spec_get}}{{S}}(t, k);
-    assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
@@ -481,9 +476,7 @@ procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{
 {%- endif %}
 
 {%- if impl.fun_borrow_back != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" and not instance.0.is_type_param and not instance.1.is_type_param and instance.0.cmp_available %}
-// Largest key under `cmp::compare` ordering. Aborts when the map is empty (Move
-// source computes `length - 1`, which underflows on an empty vector — modeled here
-// as an unspecified execution failure).
+// Largest key under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K}}, v: {{V}}) {
     if (LenTable(t) == 0) {
         call $ExecFailureAbort();
@@ -493,7 +486,7 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
     assume $IsValid'{{instance.1.suffix}}'(v);
     assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume v == {{impl.fun_spec_get}}{{S}}(t, k);
-    assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
@@ -501,8 +494,7 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
 {%- endif %}
 
 {%- if impl.fun_pop_front != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" and not instance.0.is_type_param and not instance.1.is_type_param and instance.0.cmp_available %}
-// Remove and return the smallest entry under `cmp::compare` ordering. Aborts
-// when the map is empty (matching `vector::remove(0)` on an empty vector).
+// Remove and return the smallest entry under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_pop_front}}{{S}}(m: $Mutation ({{Self}}))
 returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
     var t: {{Self}};
@@ -515,7 +507,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
     assume $IsValid'{{instance.1.suffix}}'(v);
     assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume v == {{impl.fun_spec_get}}{{S}}(t, k);
-    assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
@@ -524,8 +516,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
 {%- endif %}
 
 {%- if impl.fun_pop_back != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" and not instance.0.is_type_param and not instance.1.is_type_param and instance.0.cmp_available %}
-// Remove and return the largest entry under `cmp::compare` ordering. Aborts
-// when the map is empty (matching `vector::pop_back` on an empty vector).
+// Remove and return the largest entry under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_pop_back}}{{S}}(m: $Mutation ({{Self}}))
 returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
     var t: {{Self}};
@@ -538,7 +529,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
     assume $IsValid'{{instance.1.suffix}}'(v);
     assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume v == {{impl.fun_spec_get}}{{S}}(t, k);
-    assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
@@ -546,12 +537,12 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
 }
 {%- endif %}
 
-{%- if impl.fun_prev_key != "" and impl.fun_spec_has_key != "" and not instance.0.is_type_param and not instance.1.is_type_param and instance.0.cmp_available %}
+{%- if impl.fun_prev_key != "" and impl.fun_spec_has_key != "" and not instance.0.is_type_param and not instance.1.is_type_param and not instance.0.is_bv and instance.0.cmp_available %}
 // Largest key strictly less than `key` under `cmp::compare`, wrapped in `Option<K>`
 // (None when no such key exists). Never aborts.
 procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: $1_option_Option{{SK}}) {
     var k: {{K}};
-    if ((exists k_p: {{K}} :: $IsValid'{{instance.0.suffix}}'(k_p)
+    if ((exists k_p: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k_p)} $IsValid'{{instance.0.suffix}}'(k_p)
             && {{impl.fun_spec_has_key}}{{S}}(t, k_p)
             && $1_cmp_$compare'{{instance.0.suffix}}'(k_p, key) == $1_cmp_Ordering_Less())) {
         assume $IsValid'{{instance.0.suffix}}'(k);
@@ -559,7 +550,7 @@ procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) return
         assume $1_cmp_$compare'{{instance.0.suffix}}'(k, key) == $1_cmp_Ordering_Less();
         // k is the *largest* such predecessor: any other in-map k_p that is also
         // < key must satisfy k > k_p.
-        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+        assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
             !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
             {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(other, key) == $1_cmp_Ordering_Less() ==>
@@ -571,12 +562,12 @@ procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 }
 {%- endif %}
 
-{%- if impl.fun_next_key != "" and impl.fun_spec_has_key != "" and not instance.0.is_type_param and not instance.1.is_type_param and instance.0.cmp_available %}
+{%- if impl.fun_next_key != "" and impl.fun_spec_has_key != "" and not instance.0.is_type_param and not instance.1.is_type_param and not instance.0.is_bv and instance.0.cmp_available %}
 // Smallest key strictly greater than `key` under `cmp::compare`, wrapped in `Option<K>`
 // (None when no such key exists). Never aborts.
 procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: $1_option_Option{{SK}}) {
     var k: {{K}};
-    if ((exists k_p: {{K}} :: $IsValid'{{instance.0.suffix}}'(k_p)
+    if ((exists k_p: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k_p)} $IsValid'{{instance.0.suffix}}'(k_p)
             && {{impl.fun_spec_has_key}}{{S}}(t, k_p)
             && $1_cmp_$compare'{{instance.0.suffix}}'(k_p, key) == $1_cmp_Ordering_Greater())) {
         assume $IsValid'{{instance.0.suffix}}'(k);
@@ -584,7 +575,7 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
         assume $1_cmp_$compare'{{instance.0.suffix}}'(k, key) == $1_cmp_Ordering_Greater();
         // k is the *smallest* such successor: any other in-map k_p that is also
         // > key must satisfy k < k_p.
-        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+        assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
             !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
             {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(other, key) == $1_cmp_Ordering_Greater() ==>
@@ -597,22 +588,24 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 {%- endif %}
 
 {%- if impl.fun_keys != "" and impl.fun_spec_has_key != "" %}
-// All keys in the map as a `vector<K>`. Never aborts. Routed through
-// `fun_spec_has_key` rather than `ContainsTable`/`EncodeKey` directly to avoid
-// the `$EncodeKey`-pair multi-pattern blow-up observed historically.
+// All keys in the map as a `vector<K>`. Never aborts. The membership biconditional
+// is split into two implications so each direction gets a legal trigger
+// ($ContainsVec cannot be a pattern: its inline body is an `exists`).
 procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec ({{K}})) {
     assume LenVec(result) == LenTable(t);
-    assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
-        (ContainsVec(result, k) <==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+    assume (forall i: int :: {ReadVec(result, i)} InRangeVec(result, i) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(result, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, k) ==> $ContainsVec'{{instance.0.suffix}}'(result, k));
+    assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
+        InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
+        !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
 }
 {%- endif %}
 
 {%- if impl.fun_values != "" %}
-// All values in the map as a `vector<V>`. Never aborts. Only the length is
-// promised — value-presence under `cmp` ordering would need a `forall k :: ...
-// spec_get(t, k)` shape that drags `spec_get` into the trigger set; the
-// historical SimpleMap/SmartTable timeouts came from exactly that pattern.
-// Callers needing more information can use `to_vec_pair` and reason over keys.
+// All values in the map as a `vector<V>`. Never aborts. Only length is promised;
+// callers needing value/key correspondence should use `to_vec_pair`.
 procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: Vec ({{V}})) {
     assume LenVec(result) == LenTable(t);
 }
@@ -620,44 +613,49 @@ procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: V
 
 {%- if impl.fun_to_vec_pair != "" and impl.fun_spec_has_key != "" %}
 // Consume the map, returning keys and values as parallel vectors. Never aborts.
-// Key vector: same shape as `fun_keys`. Value vector: only the length is
-// promised (see `fun_values` rationale).
+// Key-vector membership mirrors `fun_keys` (split biconditional, see there);
+// value-vector is length-only.
 procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (result_keys: Vec ({{K}}), result_values: Vec ({{V}})) {
     assume LenVec(result_keys) == LenTable(t);
     assume LenVec(result_values) == LenTable(t);
-    assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
-        (ContainsVec(result_keys, k) <==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+    assume (forall i: int :: {ReadVec(result_keys, i)} InRangeVec(result_keys, i) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(result_keys, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, k) ==> $ContainsVec'{{instance.0.suffix}}'(result_keys, k));
+    assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
+        InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i != j ==>
+        !$IsEqual'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)));
 }
 {%- endif %}
 
 {%- if impl.fun_new_from != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" %}
 // Build a map from parallel key/value vectors. Aborts when lengths differ or any
-// key appears more than once. The value-placement postcondition uses
-// `ReadVec(keys_arg, i)` as the trigger anchor — bounded by the program's known
-// indices, avoiding the `forall k :: spec_get(t, k)` blow-up pattern.
+// key appears more than once.
 procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys_arg: Vec ({{K}}), values_arg: Vec ({{V}})) returns (result: ({{Self}})) {
     if (LenVec(keys_arg) != LenVec(values_arg)) {
         call $ExecFailureAbort();
         return;
     }
-    if ((exists i: int, j: int :: i >= 0 && i < LenVec(keys_arg) && j >= 0 && j < LenVec(keys_arg)
+    if ((exists i: int, j: int :: {ReadVec(keys_arg, i), ReadVec(keys_arg, j)} i >= 0 && i < LenVec(keys_arg) && j >= 0 && j < LenVec(keys_arg)
             && i != j && $IsEqual'{{instance.0.suffix}}'(ReadVec(keys_arg, i), ReadVec(keys_arg, j)))) {
         call $ExecFailureAbort();
         return;
     }
     assume LenTable(result) == LenVec(keys_arg);
-    assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
-        (ContainsVec(keys_arg, k) <==> {{impl.fun_spec_has_key}}{{S}}(result, k)));
-    assume (forall i: int :: i >= 0 && i < LenVec(keys_arg) ==>
+    assume (forall i: int :: {ReadVec(keys_arg, i)} InRangeVec(keys_arg, i) ==>
+        {{impl.fun_spec_has_key}}{{S}}(result, ReadVec(keys_arg, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(result, k) ==> $ContainsVec'{{instance.0.suffix}}'(keys_arg, k));
+    assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
         {{impl.fun_spec_get}}{{S}}(result, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
 }
 {%- endif %}
 
-{%- if impl.fun_add_all != "" and impl.fun_spec_has_key != "" %}
-// Add multiple key/value pairs. Aborts on length mismatch, any input key
-// already present, or duplicates among input keys. Postconditions preserve
-// original keys and assert presence of all input keys; full mapping equivalence
-// omitted to avoid `forall k :: spec_get(t, k)` triggers.
+{%- if impl.fun_add_all != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" %}
+// Add multiple key/value pairs. Aborts on length mismatch, any input key already
+// present, or duplicates among input keys. Values at input keys are set from
+// `values_arg`; values at pre-existing keys are unconstrained (a `forall k ::
+// spec_get(t, k) == spec_get(t_new, k)` shape would violate trigger discipline).
 procedure {:inline 2} {{impl.fun_add_all}}{{S}}(m: $Mutation ({{Self}}), keys_arg: Vec ({{K}}), values_arg: Vec ({{V}}))
 returns (m': $Mutation ({{Self}})) {
     var t, t_new: {{Self}};
@@ -666,28 +664,38 @@ returns (m': $Mutation ({{Self}})) {
         call $ExecFailureAbort();
         return;
     }
-    if ((exists i: int :: i >= 0 && i < LenVec(keys_arg) && {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(keys_arg, i)))) {
+    if ((exists i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) && {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(keys_arg, i)))) {
         call $ExecFailureAbort();
         return;
     }
-    if ((exists i: int, j: int :: i >= 0 && i < LenVec(keys_arg) && j >= 0 && j < LenVec(keys_arg)
+    if ((exists i: int, j: int :: {ReadVec(keys_arg, i), ReadVec(keys_arg, j)} i >= 0 && i < LenVec(keys_arg) && j >= 0 && j < LenVec(keys_arg)
             && i != j && $IsEqual'{{instance.0.suffix}}'(ReadVec(keys_arg, i), ReadVec(keys_arg, j)))) {
         call $ExecFailureAbort();
         return;
     }
     assume LenTable(t_new) == LenTable(t) + LenVec(keys_arg);
-    assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
-    assume (forall i: int :: i >= 0 && i < LenVec(keys_arg) ==>
+    assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
         {{impl.fun_spec_has_key}}{{S}}(t_new, ReadVec(keys_arg, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t_new, k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k)
+         || (exists i: int :: i >= 0 && i < LenVec(keys_arg)
+             && $IsEqual'{{instance.0.suffix}}'(k, ReadVec(keys_arg, i)))));
+    assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
+        {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
     m' := $UpdateMutation(m, t_new);
 }
 {%- endif %}
 
-{%- if impl.fun_upsert_all != "" and impl.fun_spec_has_key != "" %}
-// Upsert multiple key/value pairs. Aborts only on length mismatch. Promises
-// presence of input keys; original keys not guaranteed preserved (an input
-// duplicate may overwrite an existing entry).
+{%- if impl.fun_upsert_all != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" %}
+// Upsert multiple key/value pairs. Aborts only on length mismatch. Post-state
+// key set = pre-existing keys ∪ input keys (no phantoms). Value assignment
+// respects last-write-wins under duplicate input keys: for each index `i`, if no
+// later index `j` carries the same key, `spec_get(t_new, keys[i]) == values[i]`.
+// Values at pre-existing keys not in `keys_arg` are unconstrained (would need
+// trigger-unsafe `forall k :: spec_get` shape).
 procedure {:inline 2} {{impl.fun_upsert_all}}{{S}}(m: $Mutation ({{Self}}), keys_arg: Vec ({{K}}), values_arg: Vec ({{V}}))
 returns (m': $Mutation ({{Self}})) {
     var t, t_new: {{Self}};
@@ -696,20 +704,40 @@ returns (m': $Mutation ({{Self}})) {
         call $ExecFailureAbort();
         return;
     }
-    assume (forall i: int :: i >= 0 && i < LenVec(keys_arg) ==>
+    // Exact length needs a distinct-count over `keys_arg`; `>= LenVec(keys_arg)`
+    // would be unsound under duplicate input keys, so only these bounds hold.
+    assume LenTable(t_new) >= LenTable(t);
+    assume LenTable(t_new) <= LenTable(t) + LenVec(keys_arg);
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
+    assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
         {{impl.fun_spec_has_key}}{{S}}(t_new, ReadVec(keys_arg, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t_new, k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k)
+         || (exists i: int :: i >= 0 && i < LenVec(keys_arg)
+             && $IsEqual'{{instance.0.suffix}}'(k, ReadVec(keys_arg, i)))));
+    assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
+        (forall j: int :: {ReadVec(keys_arg, j)} j > i && j < LenVec(keys_arg) ==>
+            !$IsEqual'{{instance.0.suffix}}'(ReadVec(keys_arg, j), ReadVec(keys_arg, i))) ==>
+        {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
     m' := $UpdateMutation(m, t_new);
 }
 {%- endif %}
 
 {%- if impl.fun_append != "" and impl.fun_spec_has_key != "" %}
 // Merge `other` into `self`, overwriting on overlapping keys. Never aborts.
-// Result is the union of both maps (as a key set).
+// Length: bounded on both sides — exact size depends on overlap, which we don't model.
+// Under-specified: value semantics (which of `t`/`other` wins per key) is not
+// modeled — would require `forall k :: spec_get(t_new, k) == ...` shape.
 procedure {:inline 2} {{impl.fun_append}}{{S}}(m: $Mutation ({{Self}}), other: ({{Self}}))
 returns (m': $Mutation ({{Self}})) {
     var t, t_new: {{Self}};
     t := $Dereference(m);
-    assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
+    assume LenTable(t_new) >= LenTable(t);
+    assume LenTable(t_new) >= LenTable(other);
+    assume LenTable(t_new) <= LenTable(t) + LenTable(other);
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
     m' := $UpdateMutation(m, t_new);
@@ -718,17 +746,19 @@ returns (m': $Mutation ({{Self}})) {
 
 {%- if impl.fun_append_disjoint != "" and impl.fun_spec_has_key != "" %}
 // Merge `other` into `self`. Aborts if any key in `other` is already in `self`.
+// Under-specified: values from both maps survive in `t_new` (disjoint) but the
+// per-key `spec_get(t_new, k) == spec_get(t\|other, k)` mapping is not modeled.
 procedure {:inline 2} {{impl.fun_append_disjoint}}{{S}}(m: $Mutation ({{Self}}), other: ({{Self}}))
 returns (m': $Mutation ({{Self}})) {
     var t, t_new: {{Self}};
     t := $Dereference(m);
-    if ((exists k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k)
+    if ((exists k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k), {{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k)
             && {{impl.fun_spec_has_key}}{{S}}(t, k) && {{impl.fun_spec_has_key}}{{S}}(other, k))) {
         call $ExecFailureAbort();
         return;
     }
     assume LenTable(t_new) == LenTable(t) + LenTable(other);
-    assume (forall k: {{K}} :: $IsValid'{{instance.0.suffix}}'(k) ==>
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
     m' := $UpdateMutation(m, t_new);
@@ -736,9 +766,10 @@ returns (m': $Mutation ({{Self}})) {
 {%- endif %}
 
 {%- if impl.fun_trim != "" %}
-// Split the map at `at`. Retains [0, at) in self under cmp order, returns the
-// suffix [at, len). Aborts if `at > len(self)`. Element membership is not
-// modeled (would need ordering-aware splits); callers see length only.
+// Split the map at `at`. Retains [0, at) in self, returns [at, len). Aborts if
+// `at > len(self)`. The key sets form a set-level partition of the original keys;
+// which keys land on which side (the `at` smallest stay) is ordering-dependent
+// and not modeled.
 procedure {:inline 2} {{impl.fun_trim}}{{S}}(m: $Mutation ({{Self}}), at: int)
 returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
     var t, t_new: {{Self}};
@@ -749,20 +780,29 @@ returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
     }
     assume LenTable(t_new) == at;
     assume LenTable(result) == LenTable(t) - at;
+{%- if impl.fun_spec_has_key != "" %}
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t_new, k) ==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(result, k) ==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k) ==>
+            ({{impl.fun_spec_has_key}}{{S}}(t_new, k) || {{impl.fun_spec_has_key}}{{S}}(result, k))));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k), {{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        !({{impl.fun_spec_has_key}}{{S}}(t_new, k) && {{impl.fun_spec_has_key}}{{S}}(result, k)));
+{%- endif %}
     m' := $UpdateMutation(m, t_new);
 }
 {%- endif %}
 
 {%- if impl.fun_replace_key_inplace != "" and impl.fun_spec_has_key != "" %}
-// Rename `old_key` to `new_key`, keeping the entry at the same position.
-// Definitely aborts when `old_key` is absent. Additionally, the Move
-// implementation aborts when `new_key` violates the surrounding
-// `cmp::compare<K>` order (must be strictly greater than the predecessor and
-// strictly less than the successor). Modeling that precisely would need a
-// `spec_kth_key` / iterator abstraction not currently in the table theory, so
-// the order violation is modeled as a nondeterministic abort. Callers cannot
-// soundly conclude this call returns successfully purely from `old_key`
-// existence — they must establish the order precondition separately.
+// Rename `old_key` to `new_key`, keeping the entry's position. Aborts when
+// `old_key` is absent, and nondeterministically to model the Move-level abort on
+// `new_key` violating the surrounding `cmp::compare<K>` order — callers must
+// establish that precondition to conclude success. On success, membership is
+// modeled: `old_key` is gone (if distinct from `new_key`), `new_key` is present,
+// all other keys unchanged. Value at `new_key` is not modeled (would need
+// trigger-unsafe `forall k :: spec_get` shape).
 procedure {:inline 2} {{impl.fun_replace_key_inplace}}{{S}}(m: $Mutation ({{Self}}), old_key: {{K}}, new_key: {{K}})
 returns (m': $Mutation ({{Self}})) {
     var t, t_new: {{Self}};
@@ -772,11 +812,21 @@ returns (m': $Mutation ({{Self}})) {
         call $ExecFailureAbort();
         return;
     }
+    if ($IsEqual'{{instance.0.suffix}}'(old_key, new_key)) {
+        m' := m;
+        return;
+    }
     if (may_abort_on_order) {
         call $ExecFailureAbort();
         return;
     }
     assume LenTable(t_new) == LenTable(t);
+    assume !{{impl.fun_spec_has_key}}{{S}}(t_new, old_key);
+    assume {{impl.fun_spec_has_key}}{{S}}(t_new, new_key);
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        !$IsEqual'{{instance.0.suffix}}'(k, old_key) ==>
+        !$IsEqual'{{instance.0.suffix}}'(k, new_key) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k) == {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
     m' := $UpdateMutation(m, t_new);
 }
 {%- endif %}
