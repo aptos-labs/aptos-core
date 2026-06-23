@@ -19,9 +19,15 @@ use move_model::{
     },
     pragmas::{
         INTRINSIC_FUN_MAP_BORROW_BACK, INTRINSIC_FUN_MAP_BORROW_FRONT, INTRINSIC_FUN_MAP_GET,
-        INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT,
-        INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_UPSERT,
-        INTRINSIC_TYPE_MAP,
+        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY,
+        INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY,
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL, INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM, INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM, INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL,
+        INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
     },
     symbol::Symbol,
     ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
@@ -55,11 +61,9 @@ pub struct MonoInfo {
     pub tuple_inst: BTreeSet<Vec<Type>>,
     pub table_inst: BTreeMap<QualifiedId<StructId>, BTreeSet<(Type, Type)>>,
     pub native_inst: BTreeMap<ModuleId, BTreeSet<Vec<Type>>>,
-    /// Type instantiations observed at calls to intrinsic-bound (or native) Move
-    /// functions, keyed by callee function id. `info.funs` is not populated for
-    /// these callees (the `analyze_bytecode` branch records them in
-    /// `native_inst` only), so the post-pass uses this map to identify which
-    /// intrinsic roles were actually called and for which K.
+    /// Type instantiations observed at calls to intrinsic/native functions, keyed by
+    /// callee. `info.funs` isn't populated for these callees, so post-passes use this
+    /// map to ask which intrinsic roles were called and with which type args.
     pub intrinsic_calls: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
     pub all_types: BTreeSet<Type>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
@@ -241,9 +245,8 @@ impl MonoAnalysisProcessor {
         }
         // Analyze functions
         analyzer.analyze_funs();
-        // Intrinsic role templates may build values of types (e.g. `Option<V>` for the
-        // `map_upsert` role) that no Move source directly references; without this pass
-        // mono would not emit the corresponding Boogie declarations.
+        // Intrinsic role templates build values of types no Move source references
+        // directly (e.g. `Option<V>` from `map_upsert`); register them explicitly.
         analyzer.register_intrinsic_associated_types();
         let Analyzer {
             mut info,
@@ -267,9 +270,7 @@ struct Analyzer<'a> {
     inst_opt: Option<Vec<Type>>,
 }
 
-/// Locate the `0x1::option::Option` struct. Returns `None` when the module is not in the
-/// model — in which case any intrinsic referencing `Option` would have been rejected
-/// during compilation, so nothing more to register. Pinned to `0x1` because the backend
+/// Locate the `0x1::option::Option` struct. Pinned to `0x1` because the backend
 /// hard-codes `$1_option_*` Boogie symbols.
 fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
     let option_module_sym = env.symbol_pool().make("option");
@@ -303,26 +304,26 @@ fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
 impl Analyzer<'_> {
     /// Register companion types needed by intrinsic role templates that no Move source
     /// references directly:
-    ///
-    /// 1. `Option<V>` for roles whose template constructs Option results (`map_upsert`,
-    ///    `map_remove_or_none`, `map_get`). Registered for every `Map<K, V>` instance
-    ///    bound to those roles.
-    ///
-    /// 2. `cmp::compare<K>` for ordering roles (`map_borrow_front`, ...). Registered
-    ///    **lazily** — only when `mono_info.intrinsic_calls` records an actual call to
-    ///    that role's bound Move function with K in its type args.
+    ///  - `Option<V>` (eager) for roles building Option results (`map_upsert`,
+    ///    `map_remove_or_none`, `map_get`).
+    ///  - `vector<K>` (eager) for roles returning key vectors (`map_keys`,
+    ///    `map_to_vec_pair`, `map_new_from`) so `$ContainsVec'K'` gets emitted.
+    ///  - `cmp::compare<K>` and `Option<K>` (lazy) for ordering roles — registered only
+    ///    when `intrinsic_calls` records an actual call with K.
+    ///  - Abort-condition spec funs (`spec_aborts_empty`, `spec_aborts_add_all`, ...)
+    ///    referenced from `abort_spec_fun` intrinsic pragmas — needed so
+    ///    `SpecTranslator::translate_spec_funs` emits their declarations when a caller
+    ///    uses `aborts_of<f>(...)`. Native spec funs (simple_map) are still safe to
+    ///    include: `translate_spec_fun` skips them (their bodies come from the prelude).
     fn register_intrinsic_associated_types(&mut self) {
         let option_qid = find_option_struct(self.env);
         let cmp_mid = find_cmp_module(self.env);
         let intrinsics = self.env.get_intrinsics();
-        // Eager: Option<V> for every bound instance (cheap, no contained-type cascade
-        // because V is usually primitive or already in scope).
         let option_v_roles = [
             INTRINSIC_FUN_MAP_UPSERT,
             INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
             INTRINSIC_FUN_MAP_GET,
         ];
-        // Lazy: cmp::compare<K> only when an ordering role with K is actually called.
         let cmp_k_roles = [
             INTRINSIC_FUN_MAP_BORROW_FRONT,
             INTRINSIC_FUN_MAP_BORROW_BACK,
@@ -331,19 +332,32 @@ impl Analyzer<'_> {
             INTRINSIC_FUN_MAP_PREV_KEY,
             INTRINSIC_FUN_MAP_NEXT_KEY,
         ];
-        // Lazy: Option<K> on the same trigger set as `cmp_k_roles`. Although
-        // only `prev_key` / `next_key` actually return `Option<K>`, their
-        // procedure templates are emission-gated on `cmp_available` (set by ANY
-        // cmp role call). So when e.g. `borrow_front` is the only role called on
-        // a fresh K, `cmp_available` becomes true, `prev_key`/`next_key` get
-        // emitted, and their `$1_option_Option'K'` return type would reference an
-        // undeclared `Option` instantiation. Registering `Option<K>` on the same
-        // trigger set as `cmp::compare<K>` keeps the emission and declaration
-        // gates in sync.
+        // Option<K> tracks all cmp roles (not just prev/next): prev_key/next_key
+        // templates are emitted whenever `cmp_available` is set, and reference `Option<K>`.
         let option_k_roles_lazy = cmp_k_roles;
+        let vec_k_roles_eager = [
+            INTRINSIC_FUN_MAP_KEYS,
+            INTRINSIC_FUN_MAP_TO_VEC_PAIR,
+            INTRINSIC_FUN_MAP_NEW_FROM,
+        ];
+        let abort_spec_fun_roles = [
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+        ];
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
+        let mut vec_k_to_register: Vec<Type> = vec![];
+        let mut spec_fun_to_register: Vec<(QualifiedId<SpecFunId>, Vec<Type>)> = vec![];
         for (struct_qid, ty_args) in self.info.table_inst.iter() {
             let Some(decl) = intrinsics.get_decl_for_struct(struct_qid) else {
                 continue;
@@ -354,6 +368,14 @@ impl Analyzer<'_> {
             if needs_option_v {
                 for (_k, v) in ty_args.iter() {
                     option_v_to_register.push(v.clone());
+                }
+            }
+            let needs_vec_k = vec_k_roles_eager
+                .iter()
+                .any(|name| decl.get_fun_triple(self.env, name).is_some());
+            if needs_vec_k {
+                for (k, _v) in ty_args.iter() {
+                    vec_k_to_register.push(k.clone());
                 }
             }
             for role in &cmp_k_roles {
@@ -382,6 +404,33 @@ impl Analyzer<'_> {
                     }
                 }
             }
+            for role in &abort_spec_fun_roles {
+                let Some(spec_fun_qid) = decl.lookup_spec_fun(self.env, role) else {
+                    continue;
+                };
+                for (k, v) in ty_args.iter() {
+                    spec_fun_to_register.push((spec_fun_qid, vec![k.clone(), v.clone()]));
+                }
+            }
+            // The backend sets `cmp_available` for K from ALL `cmp::compare<K>`
+            // instances in `native_inst[cmp]` — including direct user calls that
+            // never went through an ordering role. When prev_key/next_key are
+            // bound, their templates then emit referencing `Option<K>`, so it
+            // must be registered for those K's too.
+            if let Some(cmp_mid) = cmp_mid {
+                let prev_next_bound = [INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_NEXT_KEY]
+                    .iter()
+                    .any(|name| decl.get_fun_triple(self.env, name).is_some());
+                if prev_next_bound {
+                    if let Some(cmp_actuals) = self.info.native_inst.get(&cmp_mid) {
+                        for (k, _v) in ty_args.iter() {
+                            if cmp_actuals.contains(&vec![k.clone()]) {
+                                option_k_to_register.push(k.clone());
+                            }
+                        }
+                    }
+                }
+            }
         }
         if let Some(option_qid) = option_qid {
             for ty in option_v_to_register
@@ -391,6 +440,9 @@ impl Analyzer<'_> {
                 self.add_type(&Type::Struct(option_qid.module_id, option_qid.id, vec![ty]));
             }
         }
+        for ty in vec_k_to_register {
+            self.info.vec_inst.insert(ty);
+        }
         if let Some(cmp_mid) = cmp_mid {
             for ty in cmp_k_to_register {
                 self.info
@@ -399,6 +451,13 @@ impl Analyzer<'_> {
                     .or_default()
                     .insert(vec![ty]);
             }
+        }
+        for (spec_fun_qid, ty_args) in spec_fun_to_register {
+            self.info
+                .spec_funs
+                .entry(spec_fun_qid)
+                .or_default()
+                .insert(ty_args);
         }
     }
 
@@ -672,10 +731,8 @@ impl Analyzer<'_> {
                         .entry(callee_env.module_env.get_id())
                         .or_default()
                         .insert(actuals.clone());
-                    // Also record the callee at function granularity so post-passes that
-                    // need to ask "was role R called with K?" can answer it (the module-
-                    // keyed `native_inst` view collapses different functions on the same
-                    // module).
+                    // Also record at function granularity: `native_inst` is keyed per
+                    // module, so it can't answer "was role R called with K?".
                     self.info
                         .intrinsic_calls
                         .entry(mid.qualified(*fid))

@@ -78,11 +78,9 @@ struct TypeInfo {
     has_native_equality: bool,
     is_bv: bool,
     is_type_param: bool,
-    /// True iff `$1_cmp_$compare'<suffix>'` is emitted in the Boogie prelude (i.e. the
-    /// suffix appears in `cmp_instances`). Only meaningful for K types stored in
-    /// `MapImpl::insts`; defaults to false everywhere else. Templates that reference
-    /// the cmp function for K must guard on this to skip instances where the cmp
-    /// function would be undeclared.
+    /// True iff `$1_cmp_$compare'<suffix>'` is emitted in the prelude. Only set on K
+    /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
+    /// avoid undeclared-function errors.
     cmp_available: bool,
 }
 
@@ -400,11 +398,8 @@ pub fn add_prelude(
     let mut cmp_instances = filter_native_with_contained_types(CMP_MODULE);
     cmp_instances.sort();
     cmp_instances.dedup();
-    // Mark each `MapImpl` instance's K with `cmp_available = true` iff the K's suffix is
-    // in `cmp_instances`. Intrinsic templates that reference `$1_cmp_$compare'K'` (e.g.
-    // ordering roles) use this flag to skip emission for K's that have no cmp function
-    // emitted, avoiding undeclared-function compile errors without polluting
-    // `native_inst[cmp]` with K's whose ordering API is never actually called.
+    // Mark each MapImpl's K as `cmp_available` when its suffix is in `cmp_instances`,
+    // so ordering-role templates can skip K's without an emitted cmp function.
     let cmp_k_suffixes: BTreeSet<String> = cmp_instances
         .iter()
         .map(|(_, ti)| ti.suffix.clone())

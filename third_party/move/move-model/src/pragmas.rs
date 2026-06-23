@@ -283,6 +283,34 @@ pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW: &str = "map_spec_aborts_borrow";
 /// `[spec] fun map_spec_aborts_empty<K, V>(m: Map<K, V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY: &str = "map_spec_aborts_empty";
 
+/// Abort condition for `map_add_all`: length mismatch, any input key already present,
+/// or duplicates among input keys.
+/// `[spec] fun map_spec_aborts_add_all<K, V>(m: Map<K, V>, keys: vector<K>, values: vector<V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL: &str = "map_spec_aborts_add_all";
+
+/// Abort condition for `map_new_from`: length mismatch or duplicates among input keys.
+/// `[spec] fun map_spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM: &str = "map_spec_aborts_new_from";
+
+/// Abort condition for `map_append_disjoint`: any key in `other` already present in `self`.
+/// `[spec] fun map_spec_aborts_append_disjoint<K, V>(m: Map<K, V>, other: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT: &str = "map_spec_aborts_append_disjoint";
+
+/// Abort condition for `map_trim`: `at` exceeds map length.
+/// `[spec] fun map_spec_aborts_trim<K, V>(m: Map<K, V>, at: u64): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM: &str = "map_spec_aborts_trim";
+
+/// Abort condition for `map_upsert_all`: input vector lengths differ.
+/// `[spec] fun map_spec_aborts_upsert_all<K, V>(m: Map<K, V>, keys: vector<K>, values: vector<V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL: &str = "map_spec_aborts_upsert_all";
+
+/// Abort condition for `map_replace_key_inplace`: `old_key` absent, or `old_key`
+/// differs from `new_key` (over-approximates the cmp-order-violation abort path,
+/// which the template models nondeterministically).
+/// `[spec] fun map_spec_aborts_replace_key_inplace<K, V>(m: Map<K, V>, old_key: K, new_key: K): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE: &str =
+    "map_spec_aborts_replace_key_inplace";
+
 /// Definition of an intrinsic function associated with an intrinsic type.
 ///
 /// For Move functions, `spec_fun` and `abort_spec_fun` encode the counterpart spec function names
@@ -410,15 +438,15 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_NEW_FROM,
-                IntrinsicFunDef::move_fun(None, None),
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM)),
             ),
             (
                 INTRINSIC_FUN_MAP_ADD_ALL,
-                IntrinsicFunDef::move_fun(None, None),
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL)),
             ),
             (
                 INTRINSIC_FUN_MAP_UPSERT_ALL,
-                IntrinsicFunDef::move_fun(None, None),
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL)),
             ),
             (
                 INTRINSIC_FUN_MAP_APPEND,
@@ -426,15 +454,21 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_APPEND_DISJOINT,
-                IntrinsicFunDef::move_fun(None, None),
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT),
+                ),
             ),
             (
                 INTRINSIC_FUN_MAP_TRIM,
-                IntrinsicFunDef::move_fun(None, None),
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM)),
             ),
             (
                 INTRINSIC_FUN_MAP_REPLACE_KEY_INPLACE,
-                IntrinsicFunDef::move_fun(None, None),
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE),
+                ),
             ),
             (
                 INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
@@ -481,6 +515,30 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE,
                 IntrinsicFunDef::spec_fun(),
             ),
         ])

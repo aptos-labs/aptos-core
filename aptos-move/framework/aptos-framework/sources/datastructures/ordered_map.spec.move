@@ -1,13 +1,9 @@
 spec aptos_framework::ordered_map {
 
     // The ordering bindings below (`map_borrow_front`/`back`, `map_pop_front`/`back`,
-    // `map_prev_key`/`next_key`) model OrderedMap's behavior in terms of `cmp::compare<K>`.
-    // They presume `cmp::compare<K>` is a strict total order on the inhabited K values:
-    // antisymmetric, transitive, and total (every two distinct keys are comparable as
-    // strictly Less or Greater). Built-in K types (integers, bool, address, vector<u8>,
-    // string) satisfy this. User-defined K types used as OrderedMap keys must too —
-    // verification of an OrderedMap user against this spec block is sound only when
-    // the K type's `cmp::compare` is a strict total order.
+    // `map_prev_key`/`next_key`) presume `cmp::compare<K>` is a strict total order on K.
+    // Built-in K types satisfy this; user-defined K types must too for this spec block
+    // to be sound.
     spec OrderedMap {
         pragma intrinsic = map,
             map_new = new,
@@ -43,6 +39,12 @@ spec aptos_framework::ordered_map {
             map_spec_len = spec_len,
             map_spec_has_key = spec_contains_key,
             map_spec_aborts_empty = spec_aborts_empty,
+            map_spec_aborts_add_all = spec_aborts_add_all,
+            map_spec_aborts_new_from = spec_aborts_new_from,
+            map_spec_aborts_append_disjoint = spec_aborts_append_disjoint,
+            map_spec_aborts_trim = spec_aborts_trim,
+            map_spec_aborts_upsert_all = spec_aborts_upsert_all,
+            map_spec_aborts_replace_key_inplace = spec_aborts_replace_key_inplace,
             map_is_empty = is_empty;
     }
 
@@ -54,6 +56,36 @@ spec aptos_framework::ordered_map {
 
     spec fun spec_aborts_empty<K, V>(t: OrderedMap<K, V>): bool {
         spec_len(t) == 0
+    }
+
+    spec fun spec_aborts_add_all<K, V>(m: OrderedMap<K, V>, keys: vector<K>, values: vector<V>): bool {
+        len(keys) != len(values)
+            || (exists i in 0..len(keys): spec_contains_key(m, keys[i]))
+            || (exists i in 0..len(keys), j in 0..len(keys) where i != j: keys[i] == keys[j])
+    }
+
+    spec fun spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool {
+        len(keys) != len(values)
+            || (exists i in 0..len(keys), j in 0..len(keys) where i != j: keys[i] == keys[j])
+    }
+
+    spec fun spec_aborts_append_disjoint<K, V>(m: OrderedMap<K, V>, other: OrderedMap<K, V>): bool {
+        exists k: K: spec_contains_key(m, k) && spec_contains_key(other, k)
+    }
+
+    spec fun spec_aborts_trim<K, V>(m: OrderedMap<K, V>, at: u64): bool {
+        at > spec_len(m)
+    }
+
+    spec fun spec_aborts_upsert_all<K, V>(_m: OrderedMap<K, V>, keys: vector<K>, values: vector<V>): bool {
+        len(keys) != len(values)
+    }
+
+    // Over-approximates the template's cmp-order-violation abort path (modeled
+    // nondeterministically): when `old_key != new_key`, returns true even though
+    // the actual call may succeed if the order precondition holds.
+    spec fun spec_aborts_replace_key_inplace<K, V>(m: OrderedMap<K, V>, old_key: K, new_key: K): bool {
+        !spec_contains_key(m, old_key) || old_key != new_key
     }
 
     spec length {
