@@ -205,6 +205,10 @@ pub enum FeatureFlag {
     /// When enabled, execution populates `TransactionInfoV1`'s hot state root hash, so it
     /// is committed to the ledger accumulator. Requires `TRANSACTION_INFO_V1`.
     HOT_STATE_ROOT_IN_TXN_INFO = 123,
+    /// When enabled, the gas refund in the epilogue mints APT directly as a fungible asset
+    /// via the paired `MintRef`, instead of minting a coin and converting it. This avoids
+    /// touching the legacy coin supply aggregator (v1), reducing Block-STM contention.
+    GAS_REFUND_FA_MINT = 124,
 }
 
 impl FeatureFlag {
@@ -562,6 +566,10 @@ impl Features {
 
     pub fn is_hot_state_root_in_txn_info_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO)
+    }
+
+    pub fn is_gas_refund_fa_mint_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::GAS_REFUND_FA_MINT)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

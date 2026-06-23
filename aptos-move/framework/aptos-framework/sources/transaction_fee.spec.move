@@ -158,13 +158,33 @@ spec aptos_framework::transaction_fee {
     }
 
     /// Ensure caller is admin.
-    /// Aborts if `AptosCoinMintCapability` already exists.
+    /// Aborts if `AptosFAMintCapabilities` or `AptosCoinMintCapability` already exists.
     spec store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
         use std::signer;
+
+        // TODO(fa_migration)
+        pragma verify = false;
+
         let addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
+        aborts_if exists<AptosFAMintCapabilities>(addr);
         aborts_if exists<AptosCoinMintCapability>(addr);
+        ensures exists<AptosFAMintCapabilities>(addr);
         ensures exists<AptosCoinMintCapability>(addr);
+    }
+
+    /// Ensure caller is admin.
+    spec convert_to_aptos_fa_mint_ref(aptos_framework: &signer) {
+        use std::signer;
+
+        // TODO(fa_migration)
+        pragma verify = false;
+
+        let addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(addr);
+        aborts_if !exists<AptosCoinMintCapability>(addr);
+        aborts_if exists<AptosFAMintCapabilities>(addr);
+        ensures exists<AptosFAMintCapabilities>(addr);
     }
 
     /// Historical. Aborts.

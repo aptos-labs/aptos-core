@@ -174,6 +174,7 @@ pub enum FeatureFlag {
     NativeCollateral,
     ComputeTradingNativeStateRoots,
     HotStateRootInTxnInfo,
+    GasRefundFaMint,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -453,6 +454,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS
             },
             FeatureFlag::HotStateRootInTxnInfo => AptosFeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO,
+            FeatureFlag::GasRefundFaMint => AptosFeatureFlag::GAS_REFUND_FA_MINT,
         }
     }
 }
@@ -659,6 +661,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::ComputeTradingNativeStateRoots
             },
             AptosFeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO => FeatureFlag::HotStateRootInTxnInfo,
+            AptosFeatureFlag::GAS_REFUND_FA_MINT => FeatureFlag::GasRefundFaMint,
         }
     }
 }
