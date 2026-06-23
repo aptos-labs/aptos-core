@@ -3,8 +3,10 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
+use aptos_api_types::{mime_types, Epoch};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_storage_interface::DbReader;
+use warp::http::header::{ACCEPT, CONTENT_TYPE};
 use warp::test::request;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -61,7 +63,7 @@ async fn test_get_latest_sealed_epoch_range() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_current_open_epoch_returns_invalid_input() {
+async fn test_get_current_open_epoch_range() {
     let mut context = new_test_context(current_function_name!());
     force_end_epoch(&mut context).await;
 
@@ -71,13 +73,121 @@ async fn test_get_current_open_epoch_returns_invalid_input() {
         .unwrap()
         .ledger_info()
         .next_block_epoch();
+    let previous_epoch_last_version = epoch_ending_version(&context, current_open_epoch - 1);
+    let resp = context.get(&epoch_path(current_open_epoch)).await;
+
+    assert_eq!(resp["epoch"], current_open_epoch.to_string());
+    assert_eq!(
+        resp["first_version"],
+        (previous_epoch_last_version + 1).to_string(),
+    );
+    assert!(resp["last_version"].is_null());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_current_epoch_default_route() {
+    let mut context = new_test_context(current_function_name!());
+    force_end_epoch(&mut context).await;
+
+    let current_open_epoch = context
+        .context
+        .get_latest_ledger_info_with_signatures()
+        .unwrap()
+        .ledger_info()
+        .next_block_epoch();
+    let previous_epoch_last_version = epoch_ending_version(&context, current_open_epoch - 1);
+    let resp = context.get("/epochs").await;
+
+    assert_eq!(resp["epoch"], current_open_epoch.to_string());
+    assert_eq!(
+        resp["first_version"],
+        (previous_epoch_last_version + 1).to_string(),
+    );
+    assert!(resp["last_version"].is_null());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_future_epoch_returns_invalid_input() {
+    let mut context = new_test_context(current_function_name!());
+    force_end_epoch(&mut context).await;
+
+    let future_epoch = context
+        .context
+        .get_latest_ledger_info_with_signatures()
+        .unwrap()
+        .ledger_info()
+        .next_block_epoch()
+        + 1;
     let resp = context
         .expect_status_code(400)
-        .get(&epoch_path(current_open_epoch))
+        .get(&epoch_path(future_epoch))
         .await;
 
     assert_eq!(resp["error_code"], "invalid_input");
-    assert!(resp["message"].as_str().unwrap().contains("still open"));
+    assert!(resp["message"]
+        .as_str()
+        .unwrap()
+        .contains("has not started"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_current_open_epoch_bcs() {
+    let mut context = new_test_context(current_function_name!());
+    force_end_epoch(&mut context).await;
+
+    let current_open_epoch = context
+        .context
+        .get_latest_ledger_info_with_signatures()
+        .unwrap()
+        .ledger_info()
+        .next_block_epoch();
+    let previous_epoch_last_version = epoch_ending_version(&context, current_open_epoch - 1);
+    let resp = context
+        .reply(
+            request()
+                .method("GET")
+                .path(&format!("/v1{}", epoch_path(current_open_epoch)))
+                .header(ACCEPT, mime_types::BCS),
+        )
+        .await;
+
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.headers()[CONTENT_TYPE], mime_types::BCS);
+
+    let epoch: Epoch = bcs::from_bytes(resp.body()).unwrap();
+    assert_eq!(epoch.epoch.0, current_open_epoch);
+    assert_eq!(epoch.first_version.0, previous_epoch_last_version + 1);
+    assert_eq!(epoch.last_version, None);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_current_epoch_default_route_bcs() {
+    let mut context = new_test_context(current_function_name!());
+    force_end_epoch(&mut context).await;
+
+    let current_open_epoch = context
+        .context
+        .get_latest_ledger_info_with_signatures()
+        .unwrap()
+        .ledger_info()
+        .next_block_epoch();
+    let previous_epoch_last_version = epoch_ending_version(&context, current_open_epoch - 1);
+    let resp = context
+        .reply(
+            request()
+                .method("GET")
+                .path("/v1/epochs")
+                .header(ACCEPT, mime_types::BCS),
+        )
+        .await;
+
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.headers()[CONTENT_TYPE], mime_types::BCS);
+
+    let epoch: Epoch = bcs::from_bytes(resp.body()).unwrap();
+    assert_eq!(epoch.epoch.0, current_open_epoch);
+    assert_eq!(epoch.first_version.0, previous_epoch_last_version + 1);
+    assert_eq!(epoch.last_version, None);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -101,8 +211,17 @@ async fn test_openapi_spec_includes_epoch_route_and_schema() {
     assert_eq!(resp.status(), 200);
     let resp: serde_json::Value = serde_json::from_slice(resp.body()).unwrap();
 
+    assert!(resp["paths"].get("/epochs").is_some());
     assert!(resp["paths"].get("/epochs/{epoch}").is_some());
     assert!(resp["components"]["schemas"].get("Epoch").is_some());
+    assert!(resp["components"]["schemas"]["Epoch"]["properties"]
+        .get("last_version")
+        .is_some());
+    assert!(!resp["components"]["schemas"]["Epoch"]["required"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|field| field == "last_version"));
 }
 
 fn epoch_path(epoch: u64) -> String {

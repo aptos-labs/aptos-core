@@ -40,7 +40,7 @@ pub enum ApiTags {
     /// Access to events
     Events,
 
-    /// Access to sealed epochs
+    /// Access to epoch version ranges
     Epochs,
 
     /// Experimental APIs, no guarantees

@@ -5,20 +5,21 @@ use crate::U64;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-/// The version range for a sealed epoch.
+/// The version range for an epoch. The current open epoch may not have a last
+/// version yet.
 #[derive(Clone, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
 pub struct Epoch {
     pub epoch: U64,
     pub first_version: U64,
-    pub last_version: U64,
+    pub last_version: Option<U64>,
 }
 
 impl Epoch {
-    pub fn new(epoch: u64, first_version: u64, last_version: u64) -> Self {
+    pub fn new(epoch: u64, first_version: u64, last_version: Option<u64>) -> Self {
         Self {
             epoch: epoch.into(),
             first_version: first_version.into(),
-            last_version: last_version.into(),
+            last_version: last_version.map(Into::into),
         }
     }
 }
