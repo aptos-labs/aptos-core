@@ -21,7 +21,7 @@ doctest = false
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing"]
-testing = ["aptos-crypto/fuzzing"]
+testing = ["aptos-aggregator/testing", "aptos-crypto/fuzzing"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -79,3 +79,8 @@ x509-parser = "0.14"
 
 [dev-dependencies]
 claims = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "aws_nitro_utils"
+harness = false

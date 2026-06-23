@@ -223,7 +223,7 @@ fn validate_cose_signature(
     }
 }
 
-fn validate_and_parse_attestation_doc_with_roots(
+pub(crate) fn validate_and_parse_attestation_doc_with_roots(
     attestation_bytes: &[u8],
     trusted_root_certs: &[Vec<u8>],
     unix_time_secs: u64,
