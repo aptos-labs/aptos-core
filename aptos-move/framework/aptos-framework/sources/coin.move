@@ -450,6 +450,20 @@ module aptos_framework::coin {
         borrow_global<PairedFungibleAssetRefs>(metadata_addr).mint_ref_opt.is_some()
     }
 
+    /// Return an independent, standalone copy of the paired fungible asset's `MintRef`, derived
+    /// from a `MintCapability`. Unlike `get_paired_mint_ref`, which flash-borrows the single
+    /// stored `MintRef` out of `PairedFungibleAssetRefs` and requires it to be returned via a
+    /// `MintRefReceipt`, this leaves the stored ref in place and hands back an owned `MintRef`
+    /// that the caller can store permanently (e.g. in `transaction_fee`) and use without any
+    /// per-call read-modify-write of the shared `PairedFungibleAssetRefs` resource. Mirrors
+    /// `get_paired_burn_copy_ref`.
+    public(friend) fun get_paired_mint_copy_ref<CoinType>(
+        mint_cap: &MintCapability<CoinType>
+    ): MintRef acquires CoinConversionMap, PairedFungibleAssetRefs {
+        let mint_ref = borrow_paired_mint_ref(mint_cap);
+        mint_ref.generate_mint_copy_ref()
+    }
+
     /// Get the `MintRef` of paired fungible asset of a coin type from `MintCapability`.
     public fun get_paired_mint_ref<CoinType>(
         _: &MintCapability<CoinType>
@@ -593,6 +607,21 @@ module aptos_framework::coin {
         let burn_ref_opt =
             &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).burn_ref_opt;
         burn_ref_opt.fill(burn_ref);
+    }
+
+    inline fun borrow_paired_mint_ref<CoinType>(
+        _: &MintCapability<CoinType>
+    ): &MintRef {
+        let metadata = assert_paired_metadata_exists<CoinType>();
+        let metadata_addr = metadata.object_address();
+        assert!(
+            exists<PairedFungibleAssetRefs>(metadata_addr),
+            error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND)
+        );
+        let mint_ref_opt =
+            &borrow_global<PairedFungibleAssetRefs>(metadata_addr).mint_ref_opt;
+        assert!(mint_ref_opt.is_some(), error::not_found(EMINT_REF_NOT_FOUND));
+        mint_ref_opt.borrow()
     }
 
     inline fun borrow_paired_burn_ref<CoinType>(
@@ -1712,6 +1741,35 @@ module aptos_framework::coin {
         assert!(paired_mint_ref_exists<FakeMoney>(), 0);
         assert!(paired_transfer_ref_exists<FakeMoney>(), 0);
         assert!(paired_burn_ref_exists<FakeMoney>(), 0);
+
+        move_to(
+            account,
+            FakeMoneyCapabilities { burn_cap, freeze_cap, mint_cap }
+        );
+    }
+
+    #[test(account = @aptos_framework)]
+    fun test_get_paired_mint_copy_ref(
+        account: &signer
+    ) acquires CoinConversionMap, CoinInfo, PairedFungibleAssetRefs {
+        let account_addr = signer::address_of(account);
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) =
+            initialize_and_register_fake_money(account, 1, true);
+        let metadata = ensure_paired_metadata<FakeMoney>();
+
+        // Copying the mint ref must NOT take it out of the pairing.
+        assert!(paired_mint_ref_exists<FakeMoney>(), 0);
+        let mint_ref = get_paired_mint_copy_ref(&mint_cap);
+        assert!(paired_mint_ref_exists<FakeMoney>(), 0);
+
+        // The copy mints the same FA as the original pairing.
+        let fa = mint_ref.mint(100);
+        assert!(fungible_asset::asset_metadata(&fa) == metadata, 0);
+        primary_fungible_store::deposit(account_addr, fa);
+        assert!(
+            primary_fungible_store::balance(account_addr, metadata) == 100, 0
+        );
 
         move_to(
             account,

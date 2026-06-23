@@ -240,6 +240,10 @@ spec aptos_framework::aptos_account {
         pragma verify = false;
     }
 
+    spec mint_to_fungible_store_for_gas(ref: &MintRef, account: address, amount: u64) {
+        pragma verify = false;
+    }
+
     spec transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, to: address, amount: u64) {
         pragma verify = false;
     }
