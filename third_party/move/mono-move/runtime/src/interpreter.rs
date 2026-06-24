@@ -24,9 +24,8 @@ use crate::{
     },
     native_context::ProductionNativeContext,
     types::{
-        StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
+        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
     value_utils, ExecutionContext,
 };
@@ -55,19 +54,30 @@ use std::ptr::{null, NonNull};
 // Runtime state
 // ---------------------------------------------------------------------------
 
+/// The interpreter's machine registers.
+///
+/// It is intended that the dispatch loop copies these into a local copy, which
+/// hopefully gets mapped to real CPU registers.
+///
+/// Taking references against these registers should be handled with utmost care --
+/// a reference mustn't escape into a non-inlined function, otherwise it may force
+/// the compiler to spill the registers to the stack.
+#[derive(Clone, Copy)]
+pub(crate) struct MachineRegisters {
+    pub(crate) pc: usize,
+    pub(crate) fp: *mut u8,
+    pub(crate) func: NonNull<Function>,
+}
+
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
     /// Per-transaction context (function resolution, gas counters,
     /// descriptor table, etc.).
     pub(crate) exec_ctx: &'a mut T,
 
-    pub(crate) pc: usize,
-    /// Pointer to the currently executing function.
-    pub(crate) current_func: NonNull<Function>,
-    /// Absolute pointer into the linear stack memory. Operand accesses are a
-    /// single addition (`fp + offset`).
-    /// Recomputed only during calls and returns.
-    pub(crate) frame_ptr: *mut u8,
+    /// Machine registers at rest. The dispatch loop works on a local copy and
+    /// writes it back here on exit.
+    pub(crate) registers: MachineRegisters,
 
     pub(crate) stack: MemoryRegion,
     pub(crate) heap: Heap,
@@ -112,9 +122,11 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
 
         Self {
             exec_ctx,
-            pc: 0,
-            current_func: NonNull::from(entry),
-            frame_ptr,
+            registers: MachineRegisters {
+                pc: 0,
+                fp: frame_ptr,
+                func: NonNull::from(entry),
+            },
             stack,
             heap: Heap::new(heap_size),
             root_pool: RootPool::new(),
@@ -193,9 +205,9 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
-        self.frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
-        self.pc = 0;
-        self.current_func = NonNull::from(func);
+        self.registers.fp = unsafe { base.add(FRAME_METADATA_SIZE) };
+        self.registers.pc = 0;
+        self.registers.func = NonNull::from(func);
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
@@ -209,7 +221,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         if func.zero_frame {
             unsafe {
                 std::ptr::write_bytes(
-                    self.frame_ptr.add(func.param_region_size),
+                    self.registers.fp.add(func.param_region_size),
                     0,
                     func.extended_frame_size - func.param_region_size,
                 );
@@ -313,7 +325,15 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         values: &[u64],
     ) -> RuntimeResult<u64> {
         let n = values.len() as u64;
-        let ptr = alloc_vec!(self, self.frame_ptr, descriptor_id, 8, n)?;
+        let ptr = alloc_vec!(
+            self,
+            self.registers.fp,
+            self.registers.pc,
+            self.registers.func,
+            descriptor_id,
+            8,
+            n
+        )?;
         unsafe {
             write_u64(ptr, VEC_LENGTH_OFFSET, n);
             let data = ptr.add(VEC_DATA_OFFSET);
@@ -842,45 +862,59 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         target: CodeOffset,
         gas_taken: u64,
         gas_fallthrough: u64,
-    ) -> RuntimeResult<StepResult> {
+        regs: &mut MachineRegisters,
+    ) -> RuntimeResult<()> {
         if cond {
             self.exec_ctx.gas_meter().charge(gas_taken)?;
-            self.pc = target.into();
+            regs.pc = target.into();
         } else {
             self.exec_ctx.gas_meter().charge(gas_fallthrough)?;
-            self.pc += 1;
+            regs.pc += 1;
         }
-        Ok(StepResult::Continue)
+        Ok(())
     }
 
-    #[inline(always)]
-    pub fn step(&mut self) -> RuntimeResult<StepResult> {
-        // SAFETY: Current function is always a valid, non-null pointer because
-        // it is derived from function reference (e.g., entrypoint) or when
-        // executing a call instruction, which stores a valid pointer.
-        let func = unsafe { self.current_func.as_ref() };
+    // TEMP(review): `#[rustfmt::skip]` keeps `run`'s body at the pre-fold
+    // indentation so the diff shows only real changes. Remove before landing
+    // (then `cargo +nightly fmt` re-indents the loop body).
+    #[rustfmt::skip]
+    pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
+        // Hoist the machine registers into a local so the dispatch loop keeps
+        // them in CPU registers rather than reloading from `self.registers`
+        // each iteration. Only sync back to `self` on exit.
+        let mut regs = self.registers;
 
-        let code = func.code.get();
+        // Charge the entry function's entry block before any of its instructions run.
+        let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
+        self.exec_ctx.gas_meter().charge(entry_gas)?;
 
-        if self.pc >= code.len() {
-            invariant_violation!(PcOutOfBounds {
-                pc: self.pc,
-                func_name: func.name().to_string(),
-                code_len: code.len(),
-            });
-        }
+        let outcome = loop {
+            // SAFETY: Current function is always a valid, non-null pointer because
+            // it is derived from function reference (e.g., entrypoint) or when
+            // executing a call instruction, which stores a valid pointer.
+            let func = unsafe { regs.func.as_ref() };
 
-        let fp = self.frame_ptr;
-        let instr = &code[self.pc];
+            let code = func.code.get();
 
-        // SAFETY: fp points into the interpreter's linear stack; all byte
-        // offsets are within the current frame (enforced by the bytecode
-        // compiler). Heap pointers read from the frame are kept valid by GC.
-        unsafe {
-            // TODO(perf): explore faster dispatch -- super-instructions (fuse
-            // common sequences like load+compare+branch), threaded/computed-goto
-            // dispatch, and copy-and-patch JIT.
-            match *instr {
+            if regs.pc >= code.len() {
+                invariant_violation!(PcOutOfBounds {
+                    pc: regs.pc,
+                    func_name: func.name().to_string(),
+                    code_len: code.len(),
+                });
+            }
+
+            let fp = regs.fp;
+            let instr = &code[regs.pc];
+
+            // SAFETY: fp points into the interpreter's linear stack; all byte
+            // offsets are within the current frame (enforced by the bytecode
+            // compiler). Heap pointers read from the frame are kept valid by GC.
+            unsafe {
+                // TODO(perf): explore faster dispatch -- super-instructions (fuse
+                // common sequences like load+compare+branch), threaded/computed-goto
+                // dispatch, and copy-and-patch JIT.
+                match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
                 MicroOp::CallIndirect {
                     module_id,
@@ -902,10 +936,12 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         .map_err(RuntimeError::Loader)?;
                     // SAFETY: `target` points to a `Function`, which is not reclaimed during
                     // execution as guaranteed by the execution guard.
-                    return self.call(func, fp, target.as_ref_unchecked());
+                    self.call(func, &mut regs, target.as_ref_unchecked())?;
+                    continue;
                 },
                 MicroOp::CallDirect { ptr } => {
-                    return self.call(func, fp, ptr.as_ref_unchecked());
+                    self.call(func, &mut regs, ptr.as_ref_unchecked())?;
+                    continue;
                 },
 
                 MicroOp::CallNative {
@@ -913,7 +949,13 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     ty_args,
                     ref abi,
                 } => {
-                    return self.exec_call_native(func, fp, native_idx, ty_args, abi);
+                    // On abort, halt; otherwise native success falls through to
+                    // the common tail, which advances the pc by one.
+                    if let Some((code, message)) =
+                        self.exec_call_native(func, regs, native_idx, ty_args, abi)?
+                    {
+                        break RuntimeStatus::Aborted { code, message };
+                    }
                 },
 
                 MicroOp::JumpNotZeroU64 {
@@ -922,12 +964,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, src) != 0,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpNotZeroByte {
@@ -938,12 +982,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 } => {
                     // Read as `u8` only to test against zero; the byte's sign is
                     // irrelevant.
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u8(fp, src) != 0,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpZeroByte {
@@ -954,21 +1000,25 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 } => {
                     // Read as `u8` only to test against zero; the byte's sign is
                     // irrelevant.
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u8(fp, src) == 0,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpIntCmp(ref op) => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         int_cmp_bool(fp, op.lhs, op.op, &op.rhs),
                         op.target,
                         op.gas_taken,
                         op.gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpValueCmp(ref op) => {
@@ -977,12 +1027,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let a = fp.add(op.lhs.into());
                     let b = fp.add(op.rhs.into());
                     let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
-                    return self.cond_branch(
+                    self.cond_branch(
                         eq ^ op.negate,
                         op.target,
                         op.gas_taken,
                         op.gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpValueRefCmp(ref op) => {
@@ -996,12 +1048,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         rb.add(ro as usize),
                         op.ty,
                     )?;
-                    return self.cond_branch(
+                    self.cond_branch(
                         eq ^ op.negate,
                         op.target,
                         op.gas_taken,
                         op.gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpGreaterEqualU64Imm {
@@ -1011,12 +1065,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, src) >= imm,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpLessU64Imm {
@@ -1026,12 +1082,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, src) < imm,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpGreaterU64Imm {
@@ -1041,12 +1099,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, src) > imm,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpLessEqualU64Imm {
@@ -1056,12 +1116,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, src) <= imm,
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpLessU64 {
@@ -1071,12 +1133,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, lhs) < read_u64(fp, rhs),
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpGreaterEqualU64 {
@@ -1086,12 +1150,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, lhs) >= read_u64(fp, rhs),
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::JumpNotEqualU64 {
@@ -1101,18 +1167,20 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     gas_taken,
                     gas_fallthrough,
                 } => {
-                    return self.cond_branch(
+                    self.cond_branch(
                         read_u64(fp, lhs) != read_u64(fp, rhs),
                         target,
                         gas_taken,
                         gas_fallthrough,
-                    );
+                        &mut regs,
+                    )?;
+                    continue;
                 },
 
                 MicroOp::Jump { target, gas } => {
                     self.exec_ctx.gas_meter().charge(gas)?;
-                    self.pc = target.into();
-                    return Ok(StepResult::Continue);
+                    regs.pc = target.into();
+                    continue;
                 },
 
                 MicroOp::Return => {
@@ -1121,23 +1189,23 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let saved_func_ptr =
                         read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
                     if saved_func_ptr.is_null() {
-                        return Ok(StepResult::Done);
+                        break RuntimeStatus::Success;
                     }
                     // SAFETY: We have just checked that the saved function
                     // pointer is non-null.
-                    self.current_func = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+                    regs.func = NonNull::new_unchecked(saved_func_ptr as *mut Function);
 
-                    self.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
-                    self.frame_ptr = read_ptr(meta, META_SAVED_FP_OFFSET);
-                    return Ok(StepResult::Continue);
+                    regs.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
+                    regs.fp = read_ptr(meta, META_SAVED_FP_OFFSET);
+                    continue;
                 },
 
                 MicroOp::Abort { code } => {
                     let code = read_u64(fp, code);
-                    return Ok(StepResult::Aborted {
+                    break RuntimeStatus::Aborted {
                         code,
                         message: None,
-                    });
+                    };
                 },
 
                 MicroOp::AbortMsg { code, message } => {
@@ -1161,10 +1229,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
                             .map_err(|_| RuntimeError::InvalidAbortMessage)?
                     };
-                    return Ok(StepResult::Aborted {
+                    break RuntimeStatus::Aborted {
                         code,
                         message: Some(message),
-                    });
+                    };
                 },
 
                 // ----- Arithmetic -----
@@ -1175,7 +1243,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
                 MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
                 MicroOp::StoreImmVec { dst, idx } => {
-                    self.exec_store_imm_vec(dst, idx)?;
+                    self.exec_store_imm_vec(regs, dst, idx)?;
                 },
 
                 // Add
@@ -1188,12 +1256,12 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     })?
                 },
                 MicroOp::AddU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_add).ok_or_else(|| {
-                        RuntimeError::ArithmeticOverflow {
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_add).ok_or_else(
+                        || RuntimeError::ArithmeticOverflow {
                             op: ArithOp::Add,
                             ty: IntTy::U64,
-                        }
-                    })?
+                        },
+                    )?
                 },
 
                 // Sub
@@ -1206,12 +1274,12 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     })?
                 },
                 MicroOp::SubU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub).ok_or_else(|| {
-                        RuntimeError::ArithmeticUnderflow {
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub).ok_or_else(
+                        || RuntimeError::ArithmeticUnderflow {
                             op: ArithOp::Sub,
                             ty: IntTy::U64,
-                        }
-                    })?
+                        },
+                    )?
                 },
                 // dst = imm - src, so flip the operand order.
                 MicroOp::RSubU64Imm { dst, src, imm } => {
@@ -1232,12 +1300,12 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     })?
                 },
                 MicroOp::MulU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul).ok_or_else(|| {
-                        RuntimeError::ArithmeticOverflow {
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul).ok_or_else(
+                        || RuntimeError::ArithmeticOverflow {
                             op: ArithOp::Mul,
                             ty: IntTy::U64,
-                        }
-                    })?
+                        },
+                    )?
                 },
 
                 // Div / Mod
@@ -1279,18 +1347,26 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 // Bitwise (infallible)
-                MicroOp::BitAndU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a & b),
-                MicroOp::BitOrU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a | b),
-                MicroOp::BitXorU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a ^ b),
+                MicroOp::BitAndU64 { dst, lhs, rhs } => {
+                    binop_u64(fp, dst, lhs, rhs, |a, b| a & b)
+                },
+                MicroOp::BitOrU64 { dst, lhs, rhs } => {
+                    binop_u64(fp, dst, lhs, rhs, |a, b| a | b)
+                },
+                MicroOp::BitXorU64 { dst, lhs, rhs } => {
+                    binop_u64(fp, dst, lhs, rhs, |a, b| a ^ b)
+                },
 
                 // Shifts
-                MicroOp::ShlU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| v << s)
-                    .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
-                        op: ArithOp::Shl,
-                        ty: IntTy::U64,
-                        shift_amount,
-                        bit_width: 64,
-                    })?,
+                MicroOp::ShlU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
+                    v << s
+                })
+                .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
+                    op: ArithOp::Shl,
+                    ty: IntTy::U64,
+                    shift_amount,
+                    bit_width: 64,
+                })?,
                 // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
                 // cannot wrap or trigger UB. Asserted below in debug builds as a
                 // defensive check.
@@ -1298,13 +1374,15 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
                     imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                 },
-                MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| v >> s)
-                    .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
-                        op: ArithOp::Shr,
-                        ty: IntTy::U64,
-                        shift_amount,
-                        bit_width: 64,
-                    })?,
+                MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
+                    v >> s
+                })
+                .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
+                    op: ArithOp::Shr,
+                    ty: IntTy::U64,
+                    shift_amount,
+                    bit_width: 64,
+                })?,
                 // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
                 // cannot wrap or trigger UB. Asserted below in debug builds as a
                 // defensive check.
@@ -1319,7 +1397,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::ForceGC => {
-                    gc_collect!(self)?;
+                    gc_collect!(self, regs.fp, regs.pc, regs.func)?;
                 },
 
                 MicroOp::Move8 { dst, src } => {
@@ -1356,7 +1434,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let mut vec_ptr = read_ptr(ref_base, ref_off as usize);
 
                     if vec_ptr.is_null() {
-                        vec_ptr = alloc_vec!(self, fp, descriptor_id, elem_size, 4)?;
+                        vec_ptr =
+                            alloc_vec!(self, fp, regs.pc, regs.func, descriptor_id, elem_size, 4)?;
                         // Re-read base after potential GC.
                         let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                         write_ptr(ref_base, ref_off as usize, vec_ptr);
@@ -1368,7 +1447,15 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         / elem_size as usize) as u64;
 
                     if len >= cap_in_elems {
-                        vec_ptr = grow_vec_ref!(self, fp, vec_ref.into(), elem_size, len + 1)?;
+                        vec_ptr = grow_vec_ref!(
+                            self,
+                            fp,
+                            regs.pc,
+                            regs.func,
+                            vec_ref.into(),
+                            elem_size,
+                            len + 1
+                        )?;
                     }
 
                     std::ptr::copy_nonoverlapping(
@@ -1448,7 +1535,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::VecPack(ref op) => {
-                    self.exec_vec_pack(fp, op)?;
+                    self.exec_vec_pack(regs, op)?;
                 },
 
                 MicroOp::VecUnpack(ref op) => {
@@ -1562,7 +1649,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
                 // ----- Heap object instructions (structs and enums) -----
                 MicroOp::HeapNew { dst, descriptor_id } => {
-                    let ptr = alloc_obj!(self, fp, descriptor_id)?;
+                    let ptr = alloc_obj!(self, fp, regs.pc, regs.func, descriptor_id)?;
                     write_ptr(fp, dst, ptr);
                 },
 
@@ -1637,10 +1724,11 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::PackClosure(ref op) => {
-                    self.exec_pack_closure(fp, op)?;
+                    self.exec_pack_closure(regs, op)?;
                 },
                 MicroOp::CallClosure(ref op) => {
-                    return self.exec_call_closure(func, fp, op);
+                    regs = self.exec_call_closure(func, regs, op)?;
+                    continue;
                 },
 
                 MicroOp::IntAdd(ref op) => exec_int_add(fp, op)?,
@@ -1685,7 +1773,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     {
                         EntryPtr::Writable(ptr) => ptr,
                         EntryPtr::NonWritable(ptr) => {
-                            let ptr = self.deep_copy(ptr)?;
+                            let ptr = self.deep_copy(regs, ptr)?;
                             self.read_write_set.commit_borrow_global_mut(&key, ptr);
                             ptr
                         },
@@ -1704,7 +1792,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let ptr = match entry_ptr {
                         EntryPtr::Writable(ptr) => ptr,
                         EntryPtr::NonWritable(ptr) => {
-                            let ptr = self.deep_copy(ptr)?;
+                            let ptr = self.deep_copy(regs, ptr)?;
                             self.read_write_set.commit_move_from(&key);
                             ptr
                         },
@@ -1821,7 +1909,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     descriptor_id,
                     variant,
                 } => {
-                    let obj_ptr = alloc_obj!(self, fp, descriptor_id)?;
+                    let obj_ptr = alloc_obj!(self, fp, regs.pc, regs.func, descriptor_id)?;
                     // No safe point between the allocation and these
                     // non-allocating writes: stamp the tag through the fresh
                     // pointer, then publish it to `dst`.
@@ -1892,46 +1980,52 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         // pointer at one offset. Uses single-root `deep_copy`,
                         // avoiding the batch's per-op `Vec`s.
                         if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
-                            let new = self.deep_copy(src)?;
+                            let new = self.deep_copy(regs, src)?;
                             write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
                         }
                     } else {
                         let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
                         let mut sources: Vec<NonNull<u8>> = Vec::with_capacity(offsets.len());
                         for &off in offsets.iter() {
-                            if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
+                            if let Some(src) =
+                                NonNull::new(read_ptr(fp, (base.0 + off) as usize))
+                            {
                                 live_offsets.push(off);
                                 sources.push(src);
                             }
                         }
-                        let copies = self.deep_copy_batch(&sources)?;
+                        let copies = self.deep_copy_batch(regs, &sources)?;
                         for (off, new) in live_offsets.iter().zip(copies) {
                             write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
                         }
                     }
                 },
             }
-        }
+            }
 
-        self.pc += 1;
-        Ok(StepResult::Continue)
+            regs.pc += 1;
+        };
+
+        self.registers = regs;
+        Ok(outcome)
     }
 
     /// Allocates vector from constant pool and writes data pointer into `dst`.
+    #[inline(never)]
     fn exec_store_imm_vec(
         &mut self,
+        regs: MachineRegisters,
         dst: FrameOffset,
         idx: ConstantPoolIndex,
     ) -> RuntimeResult<()> {
-        // SAFETY: `current_func` points to the live, currently-executing
-        // function.
-        let module_id = unsafe { self.current_func.as_ref() }.module_id;
+        // SAFETY: `regs.func` points to the live, currently-executing function.
+        let module_id = unsafe { regs.func.as_ref() }.module_id;
         let (ty, bytes) = self.exec_ctx.load_constant(module_id, idx)?;
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
         unsafe {
-            let dst = self.frame_ptr.add(usize::from(dst));
+            let dst = regs.fp.add(usize::from(dst));
             deserialize_or_gc(
                 self.exec_ctx,
                 &mut self.heap,
@@ -1942,10 +2036,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 &mut self.read_write_set,
                 &self.root_pool,
                 self.exec_ctx.extensions(),
-                self.frame_ptr,
+                regs.fp,
                 crate::heap::TopFrame::Function {
-                    func: self.current_func,
-                    pc: self.pc,
+                    func: regs.func,
+                    pc: regs.pc,
                 },
             )
         }
@@ -1958,16 +2052,32 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// - `fp` is the current frame pointer.
+    /// - `regs.fp` is the current frame pointer.
     /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
-    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+    // Outlined to keep the dispatch loop small: an inlined body here adds to
+    // the register pressure that competes for `fp`'s register across the loop.
+    #[inline(never)]
+    unsafe fn exec_vec_pack(
+        &mut self,
+        regs: MachineRegisters,
+        op: &VecPackOp,
+    ) -> RuntimeResult<()> {
+        let fp = regs.fp;
         let count = op.srcs.len() as u64;
         // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
         // payload byte is overwritten below before the op returns and no GC can
         // intervene afterwards. A fully-initialized-payload alloc variant would
         // avoid the dead memset. Padding needs to be carefully considered for
         // the optimization.
-        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        let vec_ptr = alloc_vec!(
+            self,
+            fp,
+            regs.pc,
+            regs.func,
+            op.descriptor_id,
+            op.elem_size,
+            count
+        )?;
         unsafe {
             write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
             for (elem_idx, src) in op.srcs.iter().enumerate() {
@@ -2022,7 +2132,11 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE`.
-    unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
+    unsafe fn deep_copy(
+        &mut self,
+        regs: MachineRegisters,
+        root: NonNull<u8>,
+    ) -> RuntimeResult<NonNull<u8>> {
         // SAFETY: by this function's contract `root` points to a live object.
         unsafe {
             deep_copy_or_gc(
@@ -2031,10 +2145,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 &mut self.read_write_set,
                 &self.root_pool,
                 self.exec_ctx.extensions(),
-                self.frame_ptr,
+                regs.fp,
                 TopFrame::Function {
-                    func: self.current_func,
-                    pc: self.pc,
+                    func: regs.func,
+                    pc: regs.pc,
                 },
                 root,
             )
@@ -2058,6 +2172,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// header is at `source - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy_batch(
         &mut self,
+        regs: MachineRegisters,
         sources: &[NonNull<u8>],
     ) -> RuntimeResult<Vec<NonNull<u8>>> {
         // SAFETY: each source is a live object (caller contract); the handle
@@ -2089,7 +2204,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         if !needs_gc {
             return Ok(out);
         }
-        gc_collect!(self)?;
+        gc_collect!(self, regs.fp, regs.pc, regs.func)?;
         out.clear();
         for guard in &guards {
             // SAFETY: as above, after relocation.
@@ -2128,20 +2243,26 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// - `fp` is the current frame pointer.
+    /// - `regs.fp` is the current frame pointer.
     /// - Each `op.captured` slot is in-bounds for the current frame (the
     ///   verifier checks this).
     /// - The closure descriptor must list `CLOSURE_CAPTURED_DATA_PTR_OFFSET`
     ///   (relative to the data segment, so `32 - 8 = 24`) in its
     ///   `pointer_offsets`, so GC traces the captured-data pointer after
     ///   the closure is reachable via the frame slot.
-    unsafe fn exec_pack_closure(&mut self, fp: *mut u8, op: &PackClosureOp) -> RuntimeResult<()> {
+    #[inline(never)]
+    unsafe fn exec_pack_closure(
+        &mut self,
+        regs: MachineRegisters,
+        op: &PackClosureOp,
+    ) -> RuntimeResult<()> {
+        let fp = regs.fp;
         unsafe {
             // Fast path: non-capturing closure. Skip the second allocation
             // and leave `captured_data_ptr` as the zeroed/null value written
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
-                let closure = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
+                let closure = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
                 self.write_closure_func_ref_and_mask(closure, op);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
@@ -2155,7 +2276,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // skipped). Rooting keeps the closure live across the second
             // allocation and lets GC update the rooted slot in-place if
             // the object is relocated.
-            let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
+            let closure_ptr = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
             // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
             let closure_root = self.root_pool.root_object(closure_ptr);
 
@@ -2167,7 +2288,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             let captured_desc_id = op
                 .captured_data_descriptor_id
                 .expect("verifier ensures Some when captured is non-empty");
-            let captured_data = alloc_captured_data!(self, fp, op.values_size, captured_desc_id)?;
+            let captured_data = alloc_captured_data!(
+                self,
+                fp,
+                regs.pc,
+                regs.func,
+                op.values_size,
+                captured_desc_id
+            )?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
             // Persist the exact values-region size so `CallClosure` can validate
             // a lazily-resolved callee's captured layout against it; the header
@@ -2250,7 +2378,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// # Safety
     ///
     /// - `func` is the currently executing function (caller).
-    /// - `fp` is the current frame pointer.
+    /// - `regs` carries the caller's machine registers.
     /// - `op.closure_src` holds a non-null heap pointer to a valid closure
     ///   object.
     /// - The callee's `param_slots` list has one (offset, size) entry per
@@ -2259,12 +2387,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// - The captured values in the captured-data object are packed in
     ///   param order and their sizes match the corresponding `param_slots`
     ///   entries (enforced by `PackClosure`).
+    #[inline(never)]
     unsafe fn exec_call_closure(
         &mut self,
         func: &Function,
-        fp: *mut u8,
+        mut regs: MachineRegisters,
         op: &CallClosureOp,
-    ) -> RuntimeResult<StepResult> {
+    ) -> RuntimeResult<MachineRegisters> {
+        let fp = regs.fp;
         unsafe {
             let closure = read_ptr(fp, op.closure_src);
             if closure.is_null() {
@@ -2449,7 +2579,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // Standard call protocol: save metadata and switch to the
             // callee frame. Use the unchecked variant — we already
             // validated the stack above.
-            self.call_unchecked(func, fp, callee, new_fp)
+            self.call_unchecked(func, &mut regs, callee, new_fp)?;
+            Ok(regs)
         }
     }
 
@@ -2482,17 +2613,19 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// `callee` must point to a valid, live `Function`. `fp` must be the
-    /// current frame pointer and `caller` the currently executing function.
+    /// `callee` must point to a valid, live `Function`. `regs` must carry the
+    /// caller's machine registers and `caller` be the currently executing
+    /// function.
     #[inline(always)]
     unsafe fn call(
         &mut self,
         caller: &Function,
-        fp: *mut u8,
+        regs: &mut MachineRegisters,
         callee: &Function,
-    ) -> RuntimeResult<StepResult> {
-        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee.extended_frame_size)? };
-        unsafe { self.call_unchecked(caller, fp, callee, new_fp) }
+    ) -> RuntimeResult<()> {
+        let new_fp =
+            unsafe { self.check_stack_for_call(caller, regs.fp, callee.extended_frame_size)? };
+        unsafe { self.call_unchecked(caller, regs, callee, new_fp) }
     }
 
     /// Perform the standard call protocol after the caller has already
@@ -2503,7 +2636,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// # Safety
     ///
     /// In addition to the contract on [`Self::call`], `new_fp` must equal
-    /// `fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
+    /// `regs.fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
     /// `new_fp + callee.extended_frame_size` must be within the stack
     /// (i.e., the caller has already passed the check that
     /// [`Self::check_stack_for_call`] performs).
@@ -2511,10 +2644,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     unsafe fn call_unchecked(
         &mut self,
         caller: &Function,
-        fp: *mut u8,
+        regs: &mut MachineRegisters,
         callee: &Function,
         new_fp: *mut u8,
-    ) -> RuntimeResult<StepResult> {
+    ) -> RuntimeResult<()> {
         // Charge the callee's entry block before any of its instructions run.
         self.exec_ctx.gas_meter().charge(callee.entry_gas)?;
         unsafe {
@@ -2526,12 +2659,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 let zero_size = callee.extended_frame_size - callee.param_region_size;
                 std::ptr::write_bytes(new_fp.add(callee.param_region_size), 0, zero_size);
             }
-            self.write_frame_metadata(caller, fp);
-            self.frame_ptr = new_fp;
+            // Save the caller's registers into its frame metadata before
+            // switching `regs` to the callee.
+            self.write_frame_metadata(caller, regs);
         }
-        self.pc = 0;
-        self.current_func = NonNull::from(callee);
-        Ok(StepResult::Continue)
+        regs.fp = new_fp;
+        regs.pc = 0;
+        regs.func = NonNull::from(callee);
+        Ok(())
     }
 
     /// Write the calling-convention frame metadata `(saved_pc, saved_fp,
@@ -2541,18 +2676,18 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// `caller` must be the currently executing function and `fp` the
-    /// current frame pointer.
+    /// `caller` must be the currently executing function and `regs` must carry the
+    /// caller's machine registers.
     #[inline(always)]
-    unsafe fn write_frame_metadata(&self, caller: &Function, fp: *mut u8) {
+    unsafe fn write_frame_metadata(&self, caller: &Function, regs: &MachineRegisters) {
         unsafe {
-            let meta = fp.add(caller.param_and_local_sizes_sum);
-            write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
-            write_ptr(meta, META_SAVED_FP_OFFSET, fp);
+            let meta = regs.fp.add(caller.param_and_local_sizes_sum);
+            write_u64(meta, META_SAVED_PC_OFFSET, (regs.pc + 1) as u64);
+            write_ptr(meta, META_SAVED_FP_OFFSET, regs.fp);
             write_ptr(
                 meta,
                 META_SAVED_FUNC_PTR_OFFSET,
-                self.current_func.as_ptr() as *const u8,
+                regs.func.as_ptr() as *const u8,
             );
         }
     }
@@ -2561,23 +2696,23 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// `caller` must be the currently executing function and `fp` the
-    /// current frame pointer.
+    /// `caller` must be the currently executing function and `regs` must carry the
+    /// caller's machine registers.
     unsafe fn exec_call_native(
         &mut self,
         caller: &Function,
-        fp: *mut u8,
+        regs: MachineRegisters,
         native_idx: NativeIdx,
         ty_args: InternedTypeList,
         abi: &NativeABI,
-    ) -> RuntimeResult<StepResult> {
+    ) -> RuntimeResult<Option<(u64, Option<String>)>> {
         // Check if we have enough space on the stack to allocate the native's frame.
         let new_fp =
-            unsafe { self.check_stack_for_call(caller, fp, abi.total_frame_size() as usize)? };
+            unsafe { self.check_stack_for_call(caller, regs.fp, abi.total_frame_size() as usize)? };
 
         // Write frame metadata just like normal calls. This is still needed
         // as some natives may want to inspect the call stack.
-        unsafe { self.write_frame_metadata(caller, fp) };
+        unsafe { self.write_frame_metadata(caller, &regs) };
 
         // Zero out return-slot bytes that extend past the args, for extra safety.
         if abi.total_frame_size() > abi.args_end() {
@@ -2590,8 +2725,11 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             }
         }
 
-        let saved_fp = self.frame_ptr;
-        self.frame_ptr = new_fp;
+        // The native's own allocations scan GC roots from `self.registers.fp`,
+        // so point it at the native frame for the duration of the call, then
+        // restore the caller frame.
+        let saved_fp = regs.fp;
+        self.registers.fp = new_fp;
         let result = {
             let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
                 self.exec_ctx.native_call_borrows();
@@ -2621,35 +2759,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             );
             func(&ctx)
         };
-        self.frame_ptr = saved_fp;
+        self.registers.fp = saved_fp;
 
         match result {
-            Ok(NativeStatus::Success) => {
-                self.pc += 1;
-                Ok(StepResult::Continue)
-            },
-            Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
+            // `None` => the caller (`run`) advances the pc past the native call
+            // via the common fall-through tail; `Some` halts with an abort.
+            Ok(NativeStatus::Success) => Ok(None),
+            Ok(NativeStatus::Abort { code, message }) => Ok(Some((code, message))),
             Err(e) => Err(e.into_runtime_error()),
-        }
-    }
-
-    // TODO(perf): Hoist pc, fp, and current_func into local variables in the run loop
-    // instead of reading/writing self.pc, self.frame_ptr, self.current_func each
-    // iteration. LLVM can't keep them in registers because heap operations
-    // (VecPushBack, etc.) take &mut self, which may alias these fields.
-    // Write back only on CallFunc/Return.
-    pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
-        // Charge the entry function's entry block before any of its instructions run.
-        let func = unsafe { self.current_func.as_ref() };
-        self.exec_ctx.gas_meter().charge(func.entry_gas)?;
-        loop {
-            match self.step()? {
-                StepResult::Continue => {},
-                StepResult::Done => return Ok(RuntimeStatus::Success),
-                StepResult::Aborted { code, message } => {
-                    return Ok(RuntimeStatus::Aborted { code, message })
-                },
-            }
         }
     }
 }
