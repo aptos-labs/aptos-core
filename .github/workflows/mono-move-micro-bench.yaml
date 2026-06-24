@@ -1,4 +1,4 @@
-name: "mono-move-bench"
+name: "mono-move-micro-bench"
 on:
   workflow_dispatch:
   # Untrusted PR code runs on a self-hosted runner. Restricted to same-repo PRs
@@ -8,7 +8,7 @@ on:
     types: [labeled, opened, synchronize, reopened]
 
 concurrency:
-  group: mono-move-bench-${{ github.event.pull_request.number || github.ref }}
+  group: mono-move-micro-bench-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -16,7 +16,7 @@ permissions:
   pull-requests: write # Post the sticky benchmark comment.
 
 jobs:
-  mono-move-bench:
+  mono-move-micro-bench:
     # Dispatch, or a same-repo (non-fork) PR carrying the `mono-move` label.
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -25,7 +25,7 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: benchmark-c3d-60
-    timeout-minutes: 120
+    timeout-minutes: 30
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -73,7 +73,7 @@ jobs:
         if: ${{ always() && github.event.number != null }}
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
-          header: mono-move-bench
+          header: mono-move-micro-bench
           recreate: true
           path: ${{ runner.temp }}/mono-move-bench.md
 

@@ -11,7 +11,7 @@
 #
 #   run.sh calibrate-noise [--out <file>]
 #       Run the benches twice on the current checkout (identical code both times)
-#       and report the runner's noise floor, to pick threshold_pct in config.json.
+#       and report the runner's noise floor, to pick threshold_percent in config.json.
 #
 # Because `ab` checks out other refs in the repo, run this script from a COPY
 # placed OUTSIDE the working tree (e.g. $RUNNER_TEMP/perf), or the checkout will

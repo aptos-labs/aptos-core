@@ -34,8 +34,8 @@ ABSENT = "absent"
 def load_config(path):
     with open(path) as f:
         cfg = json.load(f)
-    # `threshold_pct` is a percentage (3.0 == 3%); the CI bounds are ratios.
-    cfg["threshold"] = cfg["threshold_pct"] / 100.0
+    # `threshold_percent` is a percentage (3.0 == 3%); the CI bounds are ratios.
+    cfg["threshold"] = cfg["threshold_percent"] / 100.0
     return cfg
 
 
@@ -126,7 +126,7 @@ VERDICT_CELL = {
 
 
 def render_markdown(results, cfg):
-    threshold_pct = cfg["threshold_pct"]
+    threshold_percent = cfg["threshold_percent"]
     n_reg = sum(1 for r in results if r["verdict"] == REGRESSION)
     n_imp = sum(1 for r in results if r["verdict"] == IMPROVEMENT)
     n_ok = sum(1 for r in results if r["verdict"] == NOISE)
@@ -134,9 +134,9 @@ def render_markdown(results, cfg):
     n_absent = sum(1 for r in results if r["verdict"] == ABSENT)
 
     if n_reg:
-        headline = f"{n_reg} regression(s) beyond ±{threshold_pct:g}% noise band"
+        headline = f"{n_reg} regression(s) beyond ±{threshold_percent:g}% noise band"
     else:
-        headline = f"No regressions beyond ±{threshold_pct:g}% noise band"
+        headline = f"No regressions beyond ±{threshold_percent:g}% noise band"
 
     lines = [
         "### mono-move benchmark gate",
@@ -144,7 +144,7 @@ def render_markdown(results, cfg):
         headline,
         "",
         f"`{n_ok} ok · {n_imp} improved · {n_new} new · {n_absent} absent` "
-        f"(threshold T = ±{threshold_pct:g}%, criterion mean CI vs `main`)",
+        f"(threshold T = ±{threshold_percent:g}%, criterion mean CI vs `main`)",
         "",
         "| Benchmark | mean Δ | 95% CI | median (main → PR) | Verdict |",
         "| --- | ---: | :---: | :---: | :--- |",
@@ -188,7 +188,7 @@ def emit_json_lines(results, cfg):
             "ci_hi_pct": None if r["ci_hi"] is None else r["ci_hi"] * 100.0,
             "base_median_ns": r["base_median_ns"],
             "new_median_ns": r["new_median_ns"],
-            "threshold_pct": cfg["threshold_pct"],
+            "threshold_percent": cfg["threshold_percent"],
         }
         print(json.dumps(line))
 
@@ -234,7 +234,7 @@ def cmd_calibrate_noise(args, cfg):
     suggested = math.ceil(floor_pct / 0.5) * 0.5 + 0.5
     print()
     print(f"observed noise floor: {floor_pct:.2f}%")
-    print(f"suggested threshold_pct: {suggested:.1f}  (set in config.json)")
+    print(f"suggested threshold_percent: {suggested:.1f}  (set in config.json)")
     return 0
 
 

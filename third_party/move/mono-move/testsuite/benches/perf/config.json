@@ -1,5 +1,5 @@
 {
-  "threshold_pct": 3.0,
+  "threshold_percent": 3.0,
   "mono_benches": [
     { "id": "fib/mono" },
     { "id": "nested_loop/mono" },
