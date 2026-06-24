@@ -22,8 +22,9 @@ use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, GetTransactionDataWithProofRequest,
-        StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
-        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+        HotStateValuesWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     responses::{
         DataResponse, ServerProtocolVersion, StorageServerSummary, StorageServiceResponse,
@@ -427,6 +428,12 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetTransactionDataWithProof(request) => {
                 self.get_transaction_data_with_proof(request)
             },
+            DataRequest::GetHotStateValuesWithProof(request) => {
+                self.get_hot_state_value_chunk_with_proof(request)
+            },
+            DataRequest::GetNumberOfHotStatesAtVersion(version) => {
+                self.get_number_of_hot_states_at_version(*version)
+            },
             _ => Err(Error::UnexpectedErrorEncountered(format!(
                 "Received an unexpected request: {:?}",
                 request
@@ -473,6 +480,32 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         Ok(DataResponse::StateValueChunkWithProof(
             state_value_chunk_with_proof,
+        ))
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        request: &HotStateValuesWithProofRequest,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let hot_state_value_chunk_with_proof = self.storage.get_hot_state_value_chunk_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+        )?;
+
+        Ok(DataResponse::HotStateValueChunkWithProof(
+            hot_state_value_chunk_with_proof,
+        ))
+    }
+
+    fn get_number_of_hot_states_at_version(
+        &self,
+        version: Version,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let number_of_hot_states = self.storage.get_number_of_hot_states(version)?;
+
+        Ok(DataResponse::NumberOfHotStatesAtVersion(
+            number_of_hot_states,
         ))
     }
 

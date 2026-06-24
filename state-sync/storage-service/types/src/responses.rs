@@ -4,14 +4,14 @@
 use crate::{
     requests::{
         DataRequest::{
-            GetEpochEndingLedgerInfos, GetNewTransactionDataWithProof,
+            GetEpochEndingLedgerInfos, GetHotStateValuesWithProof, GetNewTransactionDataWithProof,
             GetNewTransactionOutputsWithProof, GetNewTransactionsOrOutputsWithProof,
-            GetNewTransactionsWithProof, GetNumberOfStatesAtVersion, GetServerProtocolVersion,
-            GetStateValuesWithProof, GetStorageServerSummary, GetTransactionDataWithProof,
-            GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof,
-            GetTransactionsWithProof, SubscribeTransactionDataWithProof,
-            SubscribeTransactionOutputsWithProof, SubscribeTransactionsOrOutputsWithProof,
-            SubscribeTransactionsWithProof,
+            GetNewTransactionsWithProof, GetNumberOfHotStatesAtVersion, GetNumberOfStatesAtVersion,
+            GetServerProtocolVersion, GetStateValuesWithProof, GetStorageServerSummary,
+            GetTransactionDataWithProof, GetTransactionOutputsWithProof,
+            GetTransactionsOrOutputsWithProof, GetTransactionsWithProof,
+            SubscribeTransactionDataWithProof, SubscribeTransactionOutputsWithProof,
+            SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
         },
         TransactionDataRequestType,
     },
@@ -26,7 +26,7 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{
         TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, Version,
@@ -158,6 +158,11 @@ pub enum DataResponse {
     // TODO: eventually we should deprecate all the old response types.
     TransactionDataWithProof(TransactionDataWithProofResponse),
     NewTransactionDataWithProof(NewTransactionDataWithProofResponse),
+
+    // Hot state responses (used by fast sync to bootstrap the hot state).
+    // Note: new variants must be appended (BCS serializes enums by declaration order).
+    HotStateValueChunkWithProof(HotStateValueChunkWithProof),
+    NumberOfHotStatesAtVersion(u64),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -193,6 +198,12 @@ impl DataResponse {
             Self::NumberOfStatesAtVersion(_) => Self::get_number_of_states_at_version_label(),
             Self::ServerProtocolVersion(_) => Self::get_server_protocol_version_label(),
             Self::StateValueChunkWithProof(_) => Self::get_state_value_chunk_with_proof_label(),
+            Self::HotStateValueChunkWithProof(_) => {
+                Self::get_hot_state_value_chunk_with_proof_label()
+            },
+            Self::NumberOfHotStatesAtVersion(_) => {
+                Self::get_number_of_hot_states_at_version_label()
+            },
             Self::StorageServerSummary(_) => Self::get_storage_server_summary_label(),
             Self::TransactionOutputsWithProof(_) => {
                 Self::get_transaction_outputs_with_proof_label()
@@ -257,6 +268,16 @@ impl DataResponse {
     /// Returns a label for the state value chunk with proof response
     pub fn get_state_value_chunk_with_proof_label() -> &'static str {
         "state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the hot state value chunk with proof response
+    pub fn get_hot_state_value_chunk_with_proof_label() -> &'static str {
+        "hot_state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the number of hot states at version response
+    pub fn get_number_of_hot_states_at_version_label() -> &'static str {
+        "number_of_hot_states_at_version"
     }
 
     /// Returns a label for the storage server summary response
@@ -725,6 +746,28 @@ impl DataSummary {
                 .map(|range| range.contains(*version))
                 .unwrap_or(false),
             GetStateValuesWithProof(request) => {
+                let proof_version = request.version;
+
+                let can_serve_states = self
+                    .states
+                    .map(|range| range.contains(request.version))
+                    .unwrap_or(false);
+
+                let can_create_proof = self
+                    .synced_ledger_info
+                    .as_ref()
+                    .map(|li| li.ledger_info().version() >= proof_version)
+                    .unwrap_or(false);
+
+                can_serve_states && can_create_proof
+            },
+            // Hot state is gated on the same advertised range as cold state for now.
+            // TODO(HotState): advertise and gate on a dedicated, pruner-aware hot state range.
+            GetNumberOfHotStatesAtVersion(version) => self
+                .states
+                .map(|range| range.contains(*version))
+                .unwrap_or(false),
+            GetHotStateValuesWithProof(request) => {
                 let proof_version = request.version;
 
                 let can_serve_states = self
