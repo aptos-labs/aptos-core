@@ -99,7 +99,7 @@ impl NativeExtensions {
     /// Same contract as [`NativeExtension::relocate_roots`]: `relocate` must not
     /// re-enter the heap/GC and must return valid relocated addresses.
     ///
-    /// TODO: this currently has one major issue -- if this is called while a native extension is
+    /// TODO(correctness): this currently has one major issue -- if this is called while a native extension is
     /// borrowed, it will error. Figure out how we can guarantee exclusive access to the pointers
     /// safely during GC.
     pub unsafe fn relocate_all_roots(

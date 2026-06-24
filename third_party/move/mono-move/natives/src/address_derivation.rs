@@ -4,7 +4,7 @@
 //! Address derivations replicated from
 //! `aptos_types::transaction::authenticator::AuthenticationKey`.
 //
-// TODO: unify with aptos-core's `AuthenticationKey` so we don't end up having two
+// TODO(completeness, cleanup): unify with aptos-core's `AuthenticationKey` so we don't end up having two
 // duplicate implementation of the same scheme and derivation algorithm.
 
 use mono_move_core::native::TableHandle;

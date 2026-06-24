@@ -91,7 +91,7 @@ pub fn align_up_u32(offset: u32, align: u32) -> u32 {
 #[inline(always)]
 pub fn checked_align_up_u32(offset: u32, align: u32) -> Option<u32> {
     debug_assert!(align > 0 && align.is_power_of_two());
-    // TODO: establish a systematic rule for choosing the checked vs unchecked
+    // TODO(cleanup): establish a systematic rule for choosing the checked vs unchecked
     // alignment helpers. Prefer checked by default; switch a call site to the
     // unchecked `align_up_u32` only where its bound is documented and proven.
     u32::try_from(checked_align_up(offset as usize, align as usize)?).ok()

@@ -18,14 +18,14 @@ const ALREADY_EXISTS: u64 = (100 << 8) + 7;
 /// Table entry not found (`error::invalid_argument(101)`).
 const NOT_FOUND: u64 = (101 << 8) + 7;
 
-// TODO: revisit these abort codes alongside the other native abort codes -- they
+// TODO(cleanup): revisit these abort codes alongside the other native abort codes -- they
 // are unhelpful as-is. In particular, a missing entry on borrow could surface a
 // runtime error (as resource borrows do) rather than an abort that hides the
 // reason.
 
 /// `0x1::table::new_table_handle<K, V>(): address`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_new_table_handle<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let handle = ctx
         .get_extension::<TransactionContextExtension>()?
@@ -50,7 +50,7 @@ fn handle_and_key<C: NativeContext>(
 
 /// `0x1::table::add_box<K, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>)`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_add_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let (handle, key) = handle_and_key(ctx)?;
     let descriptor = ctx.required_descriptor(0).ok_or_else(|| {
@@ -84,21 +84,21 @@ fn borrow_box<C: NativeContext>(ctx: &C, mutable: bool) -> Result<NativeStatus, 
 
 /// `0x1::table::borrow_box<K, V, B>(table: &Table<K, V>, key: K): &Box<V>`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_borrow_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     borrow_box(ctx, false)
 }
 
 /// `0x1::table::borrow_box_mut<K, V, B>(table: &mut Table<K, V>, key: K): &mut Box<V>`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_borrow_box_mut<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     borrow_box(ctx, true)
 }
 
 /// `0x1::table::contains_box<K, V, B>(table: &Table<K, V>, key: K): bool`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_contains_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let (handle, key) = handle_and_key(ctx)?;
     let exists = ctx.table_contains(handle.get(), &key, ctx.ty_arg(2)?)?;
@@ -109,7 +109,7 @@ pub fn native_contains_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VM
 
 /// `0x1::table::remove_box<K, V, B>(table: &mut Table<K, V>, key: K): Box<V>`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_remove_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let (handle, key) = handle_and_key(ctx)?;
     match ctx.table_remove(handle.get(), &key, ctx.ty_arg(2)?)? {
@@ -132,7 +132,7 @@ pub fn native_remove_box<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMIn
 
 /// `0x1::table::destroy_empty_box<K, V, B>(table: &Table<K, V>)`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_destroy_empty_box<C: NativeContext>(
     _ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {
@@ -143,7 +143,7 @@ pub fn native_destroy_empty_box<C: NativeContext>(
 
 /// `0x1::table::drop_unchecked_box<K, V, B>(table: Table<K, V>)`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_drop_unchecked_box<C: NativeContext>(
     _ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {

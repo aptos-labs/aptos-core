@@ -79,7 +79,7 @@ impl RootPool {
     /// A null or non-heap `ptr` is technically sound but tracks nothing. This is
     /// relied upon for empty vectors, which are represented as a null data pointer.
     //
-    // TODO: every object gets a slot, including empty vectors (a null pointer),
+    // TODO(cleanup): every object gets a slot, including empty vectors (a null pointer),
     // for a uniform representation. We could reserve a placeholder (e.g.
     // `usize::MAX`) for "nothing to track", but the exact rule needs thought —
     // exclude only null, or all non-heap pointers?

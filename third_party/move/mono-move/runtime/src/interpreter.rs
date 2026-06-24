@@ -145,7 +145,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     /// lockstep, so a single [`Self::rollback`] depth undoes a checkpoint's
     /// effects across both.
     //
-    // TODO: move to execution context
+    // TODO(cleanup): move to execution context
     pub fn checkpoint(&mut self) -> RuntimeResult<()> {
         self.read_write_set.checkpoint();
         self.exec_ctx
@@ -159,7 +159,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     /// depth is an invariant violation. The read-write set rolls back first, so
     /// an underflow is caught before any extension is touched.
     //
-    // TODO: move to execution context
+    // TODO(cleanup): move to execution context
     pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
         self.read_write_set.rollback(n)?;
         self.exec_ctx
@@ -168,17 +168,17 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             .map_err(VMInternalError::into_runtime_error)
     }
 
-    /// TODO: move to execution context
+    /// TODO(cleanup): move to execution context
     pub fn checkpoint_depth(&self) -> usize {
         self.read_write_set.checkpoint_depth()
     }
 
-    /// TODO: move to execution context
+    /// TODO(cleanup): move to execution context
     pub fn current_epoch(&self) -> u64 {
         self.read_write_set.current_epoch()
     }
 
-    /// TODO: move to execution context
+    /// TODO(cleanup): move to execution context
     pub fn journal_len(&self) -> usize {
         self.read_write_set.journal_len()
     }
@@ -187,7 +187,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
     ///
-    // TODO: invoke() is test-only for now. When used with real gas budgets,
+    // TODO(cleanup): invoke() is test-only for now. When used with real gas budgets,
     // decide whether to reset the gas meter here.
     pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
@@ -309,7 +309,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
 // compile to a handful of direct memory ops (e.g. AddU64 is 4 movs +
 // addq + jae + jmp).
 //
-// TODO: re-verify inlining after non-trivial changes to the helpers,
+// TODO(perf): re-verify inlining after non-trivial changes to the helpers,
 // the call sites, or the rustc/LLVM versions the workspace pins to.
 
 /// `dst <- op(lhs_slot, rhs_slot)` (infallible).
@@ -418,7 +418,7 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
 /// Read a `T`-sized value from `base + byte_offset`. Aligned access for
 /// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
 ///
-/// TODO: this reads with native endianness, but `StoreImm*` writes immediates
+/// TODO(correctness): this reads with native endianness, but `StoreImm*` writes immediates
 /// as little-endian bytes. Consistent on LE hosts (all current targets); force
 /// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
 ///
@@ -843,6 +843,9 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         // offsets are within the current frame (enforced by the bytecode
         // compiler). Heap pointers read from the frame are kept valid by GC.
         unsafe {
+            // TODO(perf): explore faster dispatch -- super-instructions (fuse
+            // common sequences like load+compare+branch), threaded/computed-goto
+            // dispatch, and copy-and-patch JIT.
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
                 MicroOp::CallIndirect {
@@ -850,7 +853,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     func_name,
                     ty_args,
                 } => {
-                    // TODO: full flow should be like this:
+                    // TODO(perf): full flow should be like this:
                     //
                     //   1. IC lookup:
                     //      - Hit:  return pointer,
@@ -1110,7 +1113,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let message = if len == 0 {
                         String::new()
                     } else {
-                        // TODO: charge gas for abort message bytes.
+                        // TODO(metering): charge gas for abort message bytes.
                         if len > ABORT_MESSAGE_SIZE_LIMIT {
                             return Err(RuntimeError::AbortMessageTooLong {
                                 len,
@@ -1291,7 +1294,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::Move { dst, src, size } => {
-                    // TODO: consider adding a provably non-overlapping variant of this op.
+                    // TODO(perf): consider adding a provably non-overlapping variant of this op.
                     // Overlap-safe `copy`: `dst` and `src` may partially overlap.
                     // E.g. the return-value shuffle may move results in the same home region.
                     std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
@@ -1838,7 +1841,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     // `base` independent (Move value semantics). Null (e.g. an
                     // empty vector) stays null.
                     //
-                    // TODO(gas): the IR-level cost of the materializing
+                    // TODO(metering): the IR-level cost of the materializing
                     // instruction charges only the shallow byte move, not this
                     // heap-graph copy. Change charging to reflect at least the
                     // amount of work done.
@@ -1893,10 +1896,6 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
-        // TODO: add an ld_const test that fills the heap so the first
-        // deserialize fails and the GC-then-retry path inside `deserialize_or_gc`
-        // runs. Needs a `ForceGC` native to drive it deterministically in the
-        // differential suite.
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
             deserialize_or_gc(
@@ -2086,7 +2085,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// triggered by the second allocation preserves the closure (even
     /// before it's written to `op.dst`) and relocates our local pointer.
     ///
-    // TODO: swap the generic [`RootPool`] machinery here for a
+    // TODO(perf): swap the generic [`RootPool`] machinery here for a
     // `Heap::reserve(n)` API that pre-secures headroom for both
     // allocations so the second `alloc_obj` can never trigger GC.
     // The pool is still justified for native functions but is overkill for
@@ -2140,7 +2139,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // a lazily-resolved callee's captured layout against it; the header
             // records only the alignment-rounded allocation size.
             //
-            // TODO: persisting only the total lets `CallClosure` check totals but
+            // TODO(correctness): persisting only the total lets `CallClosure` check totals but
             // not the per-capture `(size, align)` breakdown. Persist that layout
             // here to enable element-wise validation of an `Unresolved` callee.
             write_u32(
@@ -2295,6 +2294,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     }
                     let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
                     if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
+                        // TODO(completeness): only the Materialized captured-data tag is supported.
                         todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported now)", cap_tag);
                     }
                     // The resolved callee's captured `values_size` must equal the
@@ -2302,7 +2302,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     // alignment-rounded header), rejecting signature skew before
                     // the copy loop reads the bytes at the callee's offsets.
                     //
-                    // TODO: this compares only the *total* values_size, so a
+                    // TODO(correctness): this compares only the *total* values_size, so a
                     // same-total but different per-capture `(size, align)` layout
                     // (a cross-module skew) still passes and is read at the wrong
                     // per-value offsets. The `Resolved` path is fully covered by
@@ -2340,7 +2340,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // parameter order) with provided arguments (from the caller's
             // frame).
             //
-            // TODO: replace this interleaving scheme with one where the
+            // TODO(perf): replace this interleaving scheme with one where the
             // specializer pre-writes provided arguments into the callee's
             // parameter region at the call site (densely packed, in
             // parameter order — exactly the same codegen as a regular
@@ -2567,7 +2567,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     registry_size: registry.len(),
                 })
             })?;
-            // TODO: eventually pass the interpreter context itself rather than
+            // TODO(cleanup): eventually pass the interpreter context itself rather than
             // unpacking `gas_meter` / `heap` / `read_write_set` (and giving
             // access to the loader + global context). Need to first work out
             // whether that's sound under the context's interior-mutability model
@@ -2599,7 +2599,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         }
     }
 
-    // TODO: Hoist pc, fp, and current_func into local variables in the run loop
+    // TODO(perf): Hoist pc, fp, and current_func into local variables in the run loop
     // instead of reading/writing self.pc, self.frame_ptr, self.current_func each
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.

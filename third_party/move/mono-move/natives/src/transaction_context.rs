@@ -13,7 +13,7 @@ use mono_move_core::native::{
 
 /// Per-transaction context backing the `transaction_context` natives.
 //
-// TODO: source `transaction_index` / `reserved_byte` from aptos-core's
+// TODO(completeness): source `transaction_index` / `reserved_byte` from aptos-core's
 // `UserTransactionContext` rather than carrying them as plain fields, and model
 // the "transaction index not available" case.
 pub struct TransactionContextExtension {
@@ -62,7 +62,7 @@ impl TransactionContextExtension {
 impl NativeExtension for TransactionContextExtension {
     unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
 
-    // TODO: In the legacy VM, the AUID and the monotonic counter reset at every session start.
+    // TODO(completeness): In the legacy VM, the AUID and the monotonic counter reset at every session start.
     // However because each legacy VM session gets a fresh `session_hash` / `session_counter`,
     // the derived IDs and counters are still guaranteed to be unique across the whole transaction.
     // In some sense, this is a mechanism to accommodate the legacy VM's insufficient session model.
@@ -91,7 +91,7 @@ const COUNTER_OVERFLOW_ABORT_CODE: u64 = (3 << 16) | 2;
 /// Returns a freshly derived address, which is guaranteed to be unique within
 /// the transaction.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_generate_unique_address<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {
@@ -108,7 +108,7 @@ pub fn native_generate_unique_address<C: NativeContext>(
 /// Packs `reserved_byte || timestamp_us || transaction_index || session_counter
 /// || local_counter` into a value that strictly increases within a session.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_monotonically_increasing_counter_internal<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {

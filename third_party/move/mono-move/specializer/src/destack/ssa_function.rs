@@ -27,7 +27,7 @@ pub(crate) struct SSAFunction {
 impl SSAFunction {
     /// Run all pre-allocation instruction fusion passes.
     pub(crate) fn with_fusion_passes(mut self) -> Self {
-        // [TODO]: right now, we have each different fusion operation to be a separate pass.
+        // TODO(perf): right now, we have each different fusion operation to be a separate pass.
         // This is easier to reason about, but we could make it more efficient by
         // combining the passes.
         for block in &mut self.blocks {

@@ -18,7 +18,7 @@ const OPTION_SOME_TAG: u64 = 1;
 /// BCS-serializes the referenced value; a serialization failure propagates as a
 /// VM error.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_to_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is the reference `&T`, whose pointee type is `ty`.
@@ -36,7 +36,7 @@ pub fn native_to_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 /// Returns the BCS serialized size of the referenced value; a serialization
 /// failure propagates as a VM error.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is the reference `&T`, whose pointee type is `ty`.
@@ -52,7 +52,7 @@ pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> Result<NativeStatus,
 ///
 /// `Some(n)` if every value of `T` serializes to `n` bytes, else `None`.
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_constant_serialized_size<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {

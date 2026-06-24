@@ -103,7 +103,7 @@ pub struct CallSiteInfo {
 /// These are conceptually the native's resource types -- fetching them from
 /// the callee's arguments is merely a convenience.
 //
-// TODO: Instead of hard-coding them here, figure out a way to allow natives to declare them.
+// TODO(completeness): Instead of hard-coding them here, figure out a way to allow natives to declare them.
 fn resource_types_for_native(
     interner: &impl Interner,
     module_id: InternedModuleId,
@@ -277,7 +277,7 @@ pub struct LoweringDescriptors {
     /// Type -> published descriptor id: a `vector<T>` for vector descriptors,
     /// or a resource struct type for `move_to`/`move_from` descriptors.
     ///
-    /// TODO: rename to a type-generic name now that it also holds struct
+    /// TODO(cleanup): rename to a type-generic name now that it also holds struct
     /// descriptors, and extend to enum descriptors.
     pub vec: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
@@ -288,7 +288,7 @@ pub struct LoweringDescriptors {
 }
 
 /// Frame layout for one function.
-/// [TODO]: a few raw-`u32` fields remain (sizes/alignments); migrate
+/// TODO(cleanup): a few raw-`u32` fields remain (sizes/alignments); migrate
 /// them to dedicated newtypes for consistency with `FrameOffset`.
 pub struct LoweringContext<'a> {
     /// Module the function lives in; gives lowering access to the
@@ -310,7 +310,7 @@ pub struct LoweringContext<'a> {
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
     pub num_xfer_positions: u16,
-    /// TODO: we should consider unifying the various scratch slots below,
+    /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
     /// live at a time, and they have the same GC invariant.
     /// Frame offset of the cycle-breaking scratch slot used by
@@ -361,7 +361,7 @@ pub struct LoweringContext<'a> {
     /// Invariant: contains an entry for every vector or resource type used in
     /// this function.
     pub descriptors: UnorderedMap<InternedType, DescriptorId>,
-    /// TODO: consider reconciling with the descriptors map above.
+    /// TODO(cleanup): consider reconciling with the descriptors map above.
     /// Concrete enum type -> its descriptor + per-variant field layout.
     ///
     /// Invariant: contains an entry for every enum type whose concrete
@@ -457,7 +457,7 @@ pub fn try_build_context<'a>(
 ) -> Result<BuildContextOutcome<'a>> {
     // 1. Reject `ty_args` whose length doesn't match the declared type
     // parameter count.
-    // TODO: this should not be reachable from valid execution, but the current
+    // TODO(correctness): this should not be reachable from valid execution, but the current
     // snapshot printing can reach it for publish-time views.
     let declared_ty_params = module_ir
         .module
@@ -476,10 +476,10 @@ pub fn try_build_context<'a>(
     // its alignment. This can leave gaps between a small slot followed
     // by a higher-aligned one.
     //
-    // TODO: consider a smarter packing (e.g. sort by descending
+    // TODO(perf): consider a smarter packing (e.g. sort by descending
     // alignment, or bin-pack smaller slots into padding holes) to
     // shrink frame size.
-    // TODO: Expose a substitution API that takes and returns non-canonicalized
+    // TODO(perf): Expose a substitution API that takes and returns non-canonicalized
     // slices of `InternedType`. Today `subst_type_list` operates on
     // `InternedTypeList`, so we have to round-trip `func_ir.home_slot_types`
     // through `type_list_of` to intern it just so substitution accepts it.
@@ -549,7 +549,7 @@ pub fn try_build_context<'a>(
     //    least two copies, so single-return (and no-return) functions
     //    can never need scratch.
     //
-    //    TODO: tighten further by walking the IR's `Ret` instructions
+    //    TODO(perf): tighten further by walking the IR's `Ret` instructions
     //    and detecting whether any copy graph actually contains a
     //    cycle. That would let multi-return functions whose Ret
     //    copies are all identity or otherwise acyclic skip the slot
@@ -612,7 +612,7 @@ pub fn try_build_context<'a>(
         needs_variant_field_scratch.then(|| reserve_slot(&mut frame_data_size, 16));
     let enum_ptr_scratch = needs_enum_ptr_scratch.then(|| reserve_slot(&mut frame_data_size, 8));
 
-    // TODO: we need to revisit the complexity and performance of this function
+    // TODO(perf): we need to revisit the complexity and performance of this function
     // after support for generic monomorphization is in place.
     // 7. Lay out every callee-frame region in a single IR-order pass: regular
     //    calls (`Call`) and closures (`PackClosure`/`CallClosure`) are disjoint
@@ -649,7 +649,7 @@ pub fn try_build_context<'a>(
                 );
                 let (callee_module_id, callee_func_name) =
                     callee_identity(&module_ir.module, *handle_idx);
-                // TODO: support native closure targets. `CallClosure` resolves
+                // TODO(completeness): support native closure targets. `CallClosure` resolves
                 // via `load_function`, which has no IR for natives, so skip them.
                 if natives
                     .resolve(callee_module_id, callee_func_name, closure_ty_args)
@@ -709,7 +709,7 @@ pub fn try_build_context<'a>(
             CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
         let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, handle_idx);
-        // TODO: The native registry is trusted unconditionally here.
+        // TODO(correctness): The native registry is trusted unconditionally here.
         //
         // Consider cross-checking against the callee module's `is_native` flag
         // against the callee module's `is_native` flag so a registered impl cannot
@@ -991,7 +991,7 @@ pub fn try_lower_function(
         entry_gas,
         mut safe_points,
     } = lower_function(func_ir, &ctx)?;
-    // TODO: drop this sort if we can guarantee the input is already
+    // TODO(perf): drop this sort if we can guarantee the input is already
     // sorted. `pc_map` is monotone and `emit` pushes in code-offset
     // order, so it's structurally a no-op today — kept as a safety
     // net for now.
@@ -1105,7 +1105,7 @@ fn try_discover_types_for_lowering_in_function_impl(
     for instr in func_ir.instrs() {
         // Calls: walk param + return signature lists.
         //
-        // TODO: closure-call signatures are not walked, and
+        // TODO(completeness): closure-call signatures are not walked, and
         // `discover_type_metadata` stops at `Type::Function`. Verify that:
         // closure args/results are always materialized in home-slot temps (or
         // reached via the return/direct-call walks), so their nominals are
@@ -1340,9 +1340,9 @@ fn try_build_inline_value_layout(
 /// type, then publishes a vector descriptor and records the assigned
 /// `DescriptorId` in `descriptors`.
 ///
-/// TODO: For fields, we need to check borrow instructions to make sure the
+/// TODO(correctness): For fields, we need to check borrow instructions to make sure the
 ///       offsets are calculated for them.
-/// TODO: Make this not recursive.
+/// TODO(metering): Make this not recursive.
 fn discover_type_metadata(
     ctx: &mut impl SpecializerContext,
     ty: InternedType,
@@ -1474,7 +1474,7 @@ fn discover_type_metadata(
                     else {
                         return Ok(None);
                     };
-                    // TODO: remove legacy size/layout.
+                    // TODO(cleanup): remove legacy size/layout.
                     let nominal_fields = field_layouts
                         .iter()
                         .map(|field| FieldLayout::new(field.offset, field.ty))

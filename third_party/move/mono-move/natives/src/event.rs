@@ -32,7 +32,7 @@ pub struct EventEntry {
 
 /// Per-transaction store of emitted events, in emission order.
 ///
-/// TODO: This is currently implemented as a Rust struct, but should eventually be moved to
+/// TODO(cleanup): This is currently implemented as a Rust struct, but should eventually be moved to
 /// the VM's own heap.
 #[derive(Default)]
 pub struct EventStore {
@@ -104,7 +104,7 @@ impl NativeExtension for EventStore {
 
 /// `0x1::event::write_module_event_to_store<T>(msg: T)`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_write_module_event_to_store<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {
@@ -138,7 +138,7 @@ pub fn native_write_module_event_to_store<C: NativeContext>(
 
 /// `0x1::event::write_to_event_store<T>(guid: vector<u8>, count: u64, msg: T)`
 //
-// TODO: charge gas.
+// TODO(metering): charge gas.
 pub fn native_write_to_event_store<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {

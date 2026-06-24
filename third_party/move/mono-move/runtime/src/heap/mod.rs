@@ -697,7 +697,7 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 
 /// Identifies the top stack frame for GC root scanning.
 //
-// TODO: revisit whether this enum is the cleanest representation.
+// TODO(cleanup): revisit whether this enum is the cleanest representation.
 #[derive(Clone, Copy)]
 pub(crate) enum TopFrame<'a> {
     /// A regular Move function frame; `pc` selects the safe-point supplement.
@@ -814,7 +814,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 
     // Phase 1d: native extension roots.
     //
-    // TODO(correctness, security): a native holding an extension borrow across an
+    // TODO(correctness): a native holding an extension borrow across an
     // allocation makes this a hard error; revisit how to guarantee exclusive
     // access here (e.g. relocating only the disjoint root set).
     unsafe {

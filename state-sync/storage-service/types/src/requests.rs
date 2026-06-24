@@ -53,6 +53,11 @@ pub enum DataRequest {
     GetTransactionDataWithProof(GetTransactionDataWithProofRequest), // Fetches transaction data with a proof
     GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest), // Optimistically fetches new transaction data with a proof
     SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest), // Subscribes to transaction data with a proof
+
+    // Hot state requests (used by fast sync to bootstrap the hot state).
+    // Note: new variants must be appended (BCS serializes enums by declaration order).
+    GetHotStateValuesWithProof(HotStateValuesWithProofRequest), // Fetches a list of hot states with a proof
+    GetNumberOfHotStatesAtVersion(Version), // Fetches the number of hot states at the specified version
 }
 
 impl DataRequest {
@@ -65,6 +70,8 @@ impl DataRequest {
             Self::GetNumberOfStatesAtVersion(_) => "get_number_of_states_at_version",
             Self::GetServerProtocolVersion => "get_server_protocol_version",
             Self::GetStateValuesWithProof(_) => "get_state_values_with_proof",
+            Self::GetHotStateValuesWithProof(_) => "get_hot_state_values_with_proof",
+            Self::GetNumberOfHotStatesAtVersion(_) => "get_number_of_hot_states_at_version",
             Self::GetStorageServerSummary => "get_storage_server_summary",
             Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
@@ -345,6 +352,15 @@ pub struct StateValuesWithProofRequest {
     pub version: u64,     // The version to fetch the state values at
     pub start_index: u64, // The index to start fetching state values (inclusive)
     pub end_index: u64,   // The index to stop fetching state values (inclusive)
+}
+
+/// A storage service request for fetching a list of hot state
+/// values at a specified version.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct HotStateValuesWithProofRequest {
+    pub version: u64,     // The version to fetch the hot state values at
+    pub start_index: u64, // The index to start fetching hot state values (inclusive)
+    pub end_index: u64,   // The index to stop fetching hot state values (inclusive)
 }
 
 /// A storage service request for fetching a transaction output list with a

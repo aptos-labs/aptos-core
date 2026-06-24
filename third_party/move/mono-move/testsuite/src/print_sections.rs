@@ -100,7 +100,7 @@ fn push_module_banner(out: &mut String, module: &CompiledModule) {
 
 /// Lower each function in `module_ir`, returning `(name, result)` pairs.
 //
-// TODO: we render only at publish time, so there is no way to render
+// TODO(completeness): we render only at publish time, so there is no way to render
 // instantiated generics. Figure out what is the best way to print
 // their code.
 fn lower_functions(

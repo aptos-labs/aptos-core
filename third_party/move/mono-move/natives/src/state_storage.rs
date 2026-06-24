@@ -66,7 +66,7 @@ impl<'a> VMValue<'a> for Usage {
 
 /// `0x1::state_storage::get_state_storage_usage_only_at_epoch_beginning(): Usage`
 //
-// TODO: charge gas (constant cost) once the gas API lands.
+// TODO(metering): charge gas (constant cost) once the gas API lands.
 pub fn native_get_state_storage_usage_only_at_epoch_beginning<C: NativeContext>(
     ctx: &C,
 ) -> Result<NativeStatus, VMInternalError> {

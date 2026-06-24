@@ -14,12 +14,12 @@
 //!   serialization fast-path via memcpy or integer comparison are broken for
 //!   big endian hosts.
 //!
-//! TODO:
+//! TODO(cleanup):
 //!   Unify these value walks (serialize, deserialize, equals, compare) under a
 //!   shared visitor/fold abstraction instead of four parallel recursive
 //!   implementations.
 //!
-//! TODO(test):
+//! TODO(testing):
 //!   Add differential tests for these walks against the existing Move VM.
 
 use crate::{
@@ -57,7 +57,7 @@ pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
     base: *const u8,
     ty: InternedType,
 ) -> RuntimeResult<usize> {
-    // TODO: Implement a more efficient serialized size implementation:
+    // TODO(perf): Implement a more efficient serialized size implementation:
     //   - Use constant serialized size as fast path
     //   - Avoid allocations into buffer when serializing.
     unsafe { serialize(layouts, base, ty).map(|bytes| bytes.len()) }
@@ -99,7 +99,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     layout: &ValueLayout,
     out: &mut Vec<u8>,
 ) -> RuntimeResult<()> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     if layout.has_no_pointers_no_padding() {
         // SAFETY: for values with no padding and pointers, value's in-memory
@@ -190,6 +190,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             Ok(())
         },
         LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("References cannot be serialized")),
@@ -236,7 +237,7 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     b: *const u8,
     id: LayoutId,
 ) -> RuntimeResult<bool> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
 
@@ -346,6 +347,7 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             }
         },
         LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Equality runs on pointee types only")),
@@ -403,7 +405,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     b: *const u8,
     id: LayoutId,
 ) -> RuntimeResult<Ordering> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
     match &layout.kind {
@@ -413,7 +415,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // matching width and compare numerically. `from_le_bytes` keeps
             // this correct on any host endianness.
             //
-            // TODO: These are unaligned, little-endian numeric reads, distinct
+            // TODO(cleanup): These are unaligned, little-endian numeric reads, distinct
             // from the aligned native-endian helpers in `memory.rs`. Endianness
             // makes unifying the two non-trivial; revisit whether a shared set
             // of typed read helpers can serve both.
@@ -535,6 +537,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             }
         },
         LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Comparison runs on pointee types only")),
@@ -592,7 +595,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     cursor: &mut usize,
     dst: *mut u8,
 ) -> AllocationResult<()> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     //
     // If every byte pattern is valid (no padding, no pointers, no `bool`), the
@@ -756,6 +759,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             Ok(())
         },
         LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
@@ -805,7 +809,7 @@ fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> RuntimeResul
     Ok(slice)
 }
 
-// TODO: See if we can reuse move-binary-format's uleb128 APIs instead of
+// TODO(cleanup): See if we can reuse move-binary-format's uleb128 APIs instead of
 // reimplementing the encode/decode here.
 
 /// Writes ULEB128-encoded length data.

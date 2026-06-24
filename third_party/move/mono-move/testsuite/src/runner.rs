@@ -68,7 +68,7 @@ struct Output {
 /// A [`StateStorageView`] over empty storage that serves a fixed usage, for
 /// exercising the legacy `state_storage` native in the differential tests.
 //
-// TODO: replace with a real state view if tests need natives that read actual
+// TODO(testing): replace with a real state view if tests need natives that read actual
 // stored state.
 struct MockEmptyStateStorage {
     usage: StateStorageUsage,
@@ -419,7 +419,7 @@ fn execute_function_v1(
         &mut traversal_context,
         &ModuleId::new(*address, module_name.to_owned()),
         function_name,
-        // TODO: support type arguments.
+        // TODO(completeness): support type arguments.
         &[],
     ) {
         Ok(function) => function,

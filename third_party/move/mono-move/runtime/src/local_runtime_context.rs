@@ -25,7 +25,7 @@ use mono_move_loader::LoaderResult;
 /// Like `LocalExecutionContext`, `load_function` always errors — this is not a
 /// substitute for the production `TransactionContext`.
 //
-// TODO: migrate to a real impl and remove this (mirrors the TODO on
+// TODO(cleanup): migrate to a real impl and remove this (mirrors the TODO on
 // `LocalExecutionContext` in `mono_move_core`).
 pub struct LocalRuntimeContext<'r> {
     inner: LocalExecutionContext<'r>,

@@ -294,7 +294,7 @@ impl fmt::Display for IntOperand {
 ///     in-bounds frame regions of width `rhs.byte_width()`.
 ///   - For bitwise kinds (BitAnd / BitOr / BitXor), `rhs` is unsigned.
 ///
-/// TODO: consider reverse-imm variants (e.g. `dst = imm - lhs` for `Sub`,
+/// TODO(perf): consider reverse-imm variants (e.g. `dst = imm - lhs` for `Sub`,
 /// and equivalents for `Div`/`Mod`) — non-commutative ops can't express
 /// `imm op slot` with the current shape and instead need a separate slot
 /// load + binop, which is one extra micro-op per such case.
@@ -324,7 +324,7 @@ impl fmt::Display for ShiftOperand {
 /// `dst = lhs <direction> rhs`. Aborts if `rhs >= ty.bit_width()`.
 /// Invariant: `ty` is unsigned (verifier-enforced).
 ///
-/// TODO: consider folding into [`IntBinaryOp`] (letting [`IntOperand`]
+/// TODO(cleanup): consider folding into [`IntBinaryOp`] (letting [`IntOperand`]
 /// carry the always-`u8` shift amount). Kept separate today since shifts
 /// don't share the binary dispatch path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

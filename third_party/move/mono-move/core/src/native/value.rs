@@ -317,7 +317,7 @@ impl<'a, V> Vector<'a, V> {
         self.len() == 0
     }
 
-    // TODO: Other vector APIs, added on-demand.
+    // TODO(completeness): Other vector APIs, added on-demand.
 }
 
 impl Vector<'_, u8> {
