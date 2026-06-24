@@ -88,6 +88,10 @@ pub trait NativeContext {
     /// The `i`-th type argument.
     fn ty_arg(&self, i: usize) -> Result<InternedType, VMInternalError>;
 
+    /// In-memory byte size of a value of type `ty`. Errors if the type has no
+    /// published layout (e.g. an unresolved generic or an unloaded module).
+    fn value_size(&self, ty: InternedType) -> Result<u32, VMInternalError>;
+
     /// Returns a copy of the `i`-th argument's raw in-frame bytes -- a low-level
     /// API for natives that need to operate on generic opaque values.
     fn arg_raw(&self, i: usize) -> Result<Vec<u8>, VMInternalError>;

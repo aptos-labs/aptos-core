@@ -17,7 +17,7 @@
 //! header.
 
 use crate::{
-    types::{view_type, InternedType, Type},
+    types::{intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type},
     DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
@@ -475,6 +475,16 @@ pub trait LayoutProvider {
     fn layout_by_ty(&self, ty: InternedType) -> Option<&ValueLayout> {
         let id = self.layout_id(ty)?;
         self.layout(id)
+    }
+
+    /// In-memory size and alignment of a value of type `ty`. Intrinsic shapes
+    /// (primitives, references, vectors, functions) resolve without the table;
+    /// nominal types resolve through their published [`ValueLayout`]. Returns
+    /// [`None`] for unresolved type parameters and for nominals whose layout
+    /// has not been published yet.
+    fn size_and_align(&self, ty: InternedType) -> Option<(Size, Alignment)> {
+        intrinsic_slot_size_and_align(view_type(ty))
+            .or_else(|| self.layout_by_ty(ty).map(|l| (l.size, l.align)))
     }
 }
 

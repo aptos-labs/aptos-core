@@ -27,7 +27,7 @@ use crate::{
     stackless_exec_ir::{Instr, Slot},
 };
 use anyhow::{bail, Result};
-use mono_move_core::types::InternedType;
+use mono_move_core::{types::InternedType, LayoutProvider};
 use move_binary_format::file_format::FieldHandleIndex;
 
 // --- Loads ---
@@ -98,6 +98,9 @@ pub(crate) trait CostContext {
     /// substitutes types here only to read monomorphized sizes,
     /// duplicating the substitution lowering already performs.
     fn concrete_ty(&self, ty: InternedType) -> Result<InternedType>;
+
+    /// Published value layouts, used to resolve concrete type sizes.
+    fn layouts(&self) -> &dyn LayoutProvider;
 }
 
 /// Total move cost over a list of source slots.
@@ -137,7 +140,7 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
 
         // --- Structs ---
         Instr::Pack(_, struct_ty, _) | Instr::Unpack(_, struct_ty, _) => move_bytes(
-            concrete_type_size(cx.concrete_ty(*struct_ty)?, "struct type")?,
+            concrete_type_size(cx.layouts(), cx.concrete_ty(*struct_ty)?, "struct type")?,
         ),
 
         // --- Enums ---
@@ -151,8 +154,12 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         | Instr::MutBorrowField(..)
         | Instr::ImmBorrowVariantField(..)
         | Instr::MutBorrowVariantField(..) => BORROW,
-        Instr::ReadRef(_, ref_src) => read_write_ref(ref_pointee_size(cx.slot_ty(*ref_src)?)?),
-        Instr::WriteRef(ref_dst, _) => read_write_ref(ref_pointee_size(cx.slot_ty(*ref_dst)?)?),
+        Instr::ReadRef(_, ref_src) => {
+            read_write_ref(ref_pointee_size(cx.layouts(), cx.slot_ty(*ref_src)?)?)
+        },
+        Instr::WriteRef(ref_dst, _) => {
+            read_write_ref(ref_pointee_size(cx.layouts(), cx.slot_ty(*ref_dst)?)?)
+        },
 
         // --- Fused field access (borrow + read/write) ---
         Instr::ReadField(_, owner, fh, _) => {
@@ -188,18 +195,20 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> Result<u64> {
         Instr::VecLen(..) => VEC_LEN,
         Instr::VecImmBorrow(..) | Instr::VecMutBorrow(..) => VEC_BORROW,
         Instr::VecPushBack(elem_ty, _, _) | Instr::VecPopBack(_, elem_ty, _) => vec_elem(
-            concrete_type_size(cx.concrete_ty(*elem_ty)?, "vector elem type")?,
+            concrete_type_size(cx.layouts(), cx.concrete_ty(*elem_ty)?, "vector elem type")?,
         ),
         Instr::VecUnpack(dsts, elem_ty, _) => {
             VEC_NEW
                 + dsts.len() as u64
                     * move_bytes(concrete_type_size(
+                        cx.layouts(),
                         cx.concrete_ty(*elem_ty)?,
                         "vector elem type",
                     )?)
         },
         Instr::VecSwap(elem_ty, _, _, _) => {
             2 * vec_elem(concrete_type_size(
+                cx.layouts(),
                 cx.concrete_ty(*elem_ty)?,
                 "vector elem type",
             )?)

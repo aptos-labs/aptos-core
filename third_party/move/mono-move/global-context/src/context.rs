@@ -50,19 +50,18 @@
 //!   - Trade-off: minor memory waste for lower lock contention.
 
 use crate::maintenance_config::MaintenanceConfig;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
-    reserved_layout_id, reserved_layouts, types::NominalLayout, DescriptorId, DescriptorProvider,
-    FrameOffset, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    ValueLayout, TRIVIAL_DESCRIPTOR_ID,
+    reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
+    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor, ValueLayout,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::OnceLock,
 };
 
 // Submodules: to split implementation into smaller pieces.
@@ -81,8 +80,8 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 mod types;
 pub use types::{
-    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
-    InternedType, InternedTypeList, Type,
+    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, InternedType,
+    InternedTypeList, Type,
 };
 use types::{TypeInternerKey, TypeListInternerKey};
 
@@ -515,12 +514,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
         unsafe { ptr.as_ref_unchecked() }
     }
 
-    /// Interns a nominal (struct or enum) identity without populating its
-    /// layout. The returned pointer can be used immediately in IR, but
-    /// [`Type::size_and_align`] and [`Type::layout`] will return [`None`]
-    /// until [`Self::set_nominal_layout`] is called for this type. Callers
-    /// using this in cross-module contexts must tolerate the missing layout
-    /// until a layout-population pass runs.
+    /// Interns a nominal (struct or enum) identity. The returned pointer can be
+    /// used immediately in IR.
     pub fn intern_nominal(
         &self,
         module_id: InternedModuleId,
@@ -531,87 +526,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
             module_id,
             name,
             ty_args,
-            layout: OnceLock::new(),
         });
         self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Allocates the field-layout slice in the arena (when `fields` is
-    /// `Some`), builds a [`NominalLayout`] and installs it into the type's
-    /// layout slot. Pass `Some(&fields)` for structs and `None` for enums.
-    /// Returns an error if `ty` is not a nominal type.
-    ///
-    /// Setting layouts concurrently is safe: the layout stores canonical
-    /// field type pointers and so is structurally identical across threads.
-    pub fn set_nominal_layout(
-        &self,
-        ty: InternedType,
-        size: u32,
-        align: u32,
-        fields: Option<&[FieldLayout]>,
-    ) -> Result<()> {
-        let slot = match view_type(ty) {
-            Type::Nominal { layout: slot, .. } => slot,
-            Type::Bool
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256
-            | Type::I8
-            | Type::I16
-            | Type::I32
-            | Type::I64
-            | Type::I128
-            | Type::I256
-            | Type::Address
-            | Type::Signer
-            | Type::ImmutRef { .. }
-            | Type::MutRef { .. }
-            | Type::Vector { .. }
-            | Type::Function { .. }
-            | Type::TypeParam { .. } => {
-                bail!("set_nominal_layout called on a non-nominal type")
-            },
-        };
-
-        // Fast path: if the layout is already installed, skip the field-slice
-        // allocation entirely. A race can still leak one allocation between
-        // this check and `slot.set` below, but that is bounded and consistent
-        // with the documented arena race trade-off.
-        if slot.get().is_some() {
-            return Ok(());
-        }
-
-        let layout = match fields {
-            Some(fields) => {
-                let fields_ptr = self.global_arena.alloc_slice_copy(fields);
-                NominalLayout::new_struct(size, align, fields_ptr)
-            },
-            None => NominalLayout::new_enum(size, align),
-        };
-        if let Err(other_layout) = slot.set(layout) {
-            let installed_layout = slot.get().expect("Layout was just installed");
-            debug_assert_eq!(installed_layout.size, other_layout.size);
-            debug_assert_eq!(installed_layout.align, other_layout.align);
-            debug_assert_eq!(
-                installed_layout.field_layouts().is_some(),
-                other_layout.field_layouts().is_some()
-            );
-            // Layout computation is deterministic given the type identity,
-            // so per-field offsets must match too.
-            if let (Some(installed), Some(other)) = (
-                installed_layout.field_layouts(),
-                other_layout.field_layouts(),
-            ) {
-                debug_assert_eq!(installed.len(), other.len());
-                for (installed, other) in installed.iter().zip(other.iter()) {
-                    debug_assert_eq!(installed.offset, other.offset);
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Returns the already-published vector-descriptor id for `elem_ty`,
@@ -816,13 +732,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
-    ///
-    /// For nominal types, the returned pointer carries identity but its
-    /// layout slot may still be empty — `set_nominal_layout` runs in a
-    /// separate pass after all field types are interned. Callers consuming
-    /// this in cross-module contexts must tolerate `None` from
-    /// [`Type::size_and_align`] and [`Type::layout`] until the layout-
-    /// population pass completes.
     pub fn try_intern_for_module(
         &self,
         token: &SignatureToken,
@@ -901,7 +810,6 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
             module_id,
             name,
             ty_args,
-            layout: OnceLock::new(),
         });
         self.insert_allocated_type_pointer_internal(ty)
     }
@@ -993,13 +901,11 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
                 module_id,
                 name,
                 ty_args: inner_args,
-                layout,
             } => {
                 let new_inner_args = self.subst_type_list(*inner_args, ty_args)?;
                 if new_inner_args == *inner_args {
                     ty
                 } else {
-                    debug_assert!(layout.get().is_none(), "Layout cannot be set for generics");
                     self.nominal_of(*module_id, *name, new_inner_args)
                 }
             },

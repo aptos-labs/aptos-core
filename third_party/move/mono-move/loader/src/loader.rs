@@ -30,7 +30,7 @@ use mono_move_core::{
     LayoutProvider, ModuleId, ModuleProvider, ValueLayout,
 };
 use mono_move_global_context::{
-    ArenaRef, ExecutionGuard, FieldLayout, FunctionSlot, LoadedModule, LoadedModuleSlot,
+    ArenaRef, ExecutionGuard, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot,
 };
 use shared_dsa::UnorderedSet;
@@ -295,6 +295,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             module.ir(),
             func_ir,
             ty_args,
+            self.guard,
             self.guard,
             descriptors,
             self.natives,
@@ -709,6 +710,16 @@ impl<'a, 'guard, 'ctx> LoweringContext<'a, 'guard, 'ctx> {
     }
 }
 
+impl LayoutProvider for LoweringContext<'_, '_, '_> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard.layout_id(ty)
+    }
+}
+
 impl SpecializerContext for LoweringContext<'_, '_, '_> {
     fn get_fields(
         &mut self,
@@ -752,18 +763,6 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .module
             .interned_field_types(*nominal_name)
             .cloned())
-    }
-
-    fn set_nominal_layout(
-        &self,
-        ty: InternedType,
-        size: u32,
-        align: u32,
-        fields: Option<&[FieldLayout]>,
-    ) -> anyhow::Result<()> {
-        self.loader
-            .guard
-            .set_nominal_layout(ty, size, align, fields)
     }
 
     fn subst_type(
@@ -811,14 +810,6 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .loader
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets))
-    }
-
-    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
-        self.loader.guard.layout_id_for(ty)
-    }
-
-    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
-        self.loader.guard.layout(id)
     }
 
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {

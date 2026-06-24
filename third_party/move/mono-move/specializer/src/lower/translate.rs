@@ -25,8 +25,9 @@ use mono_move_core::{
     types::{is_closed_type, strip_ref, view_type, view_type_list, InternedType, Type},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, DescriptorId, FrameLayoutInfo, FrameOffset,
     IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp,
-    JumpValueCmpOp, JumpValueRefCmpOp, MicroOp, PackClosureOp, SafePointEntry, ShiftOperand,
-    SizedSlot, ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
+    JumpValueCmpOp, JumpValueRefCmpOp, LayoutKind, LayoutProvider, MicroOp, PackClosureOp,
+    SafePointEntry, ShiftOperand, SizedSlot, ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp,
+    FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, VariantFieldHandleIndex,
@@ -185,6 +186,10 @@ impl gas::CostContext for LoweringState<'_> {
     fn concrete_ty(&self, ty: InternedType) -> Result<InternedType> {
         LoweringState::concrete_ty(self, ty)
     }
+
+    fn layouts(&self) -> &dyn LayoutProvider {
+        self.ctx.layouts
+    }
 }
 
 impl<'a> LoweringState<'a> {
@@ -217,23 +222,44 @@ impl<'a> LoweringState<'a> {
         Ok(ty)
     }
 
+    /// Per-field `(offset, size, align)` of a concrete struct type, read from
+    /// its published value layout: byte offsets from the struct layout, and each
+    /// field's size and alignment from its child layout. Errors if `struct_ty`
+    /// has no published layout or is not a struct. `op` labels the caller.
+    fn struct_field_layouts(
+        &self,
+        struct_ty: InternedType,
+        op: &str,
+    ) -> Result<Vec<(u32, u32, u32)>> {
+        let layout = self
+            .ctx
+            .layouts
+            .layout_by_ty(struct_ty)
+            .ok_or_else(|| anyhow::anyhow!("{}: struct type has no populated layout", op))?;
+        let LayoutKind::Struct { fields } = &layout.kind else {
+            bail!("{}: nominal type is not a struct (no field layouts)", op);
+        };
+        fields
+            .iter()
+            .map(|f| {
+                let child =
+                    self.ctx.layouts.layout(f.id).ok_or_else(|| {
+                        anyhow::anyhow!("{}: field layout id does not resolve", op)
+                    })?;
+                Ok((f.offset, child.size, child.align))
+            })
+            .collect()
+    }
+
     /// Resolve a `FieldHandleIndex` against the struct type `struct_ty`
     /// and return `(field_byte_offset, field_byte_size)`.
     fn resolve_field(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<(u32, u32)> {
-        let layout = view_type(struct_ty)
-            .layout()
-            .ok_or_else(|| anyhow::anyhow!("struct type has no layout populated"))?;
-        let fields = layout
-            .field_layouts()
-            .ok_or_else(|| anyhow::anyhow!("nominal type is not a struct (no field layouts)"))?;
+        let fields = self.struct_field_layouts(struct_ty, "field access")?;
         let pos = self.ctx.module.field_position_at(fh) as usize;
-        let field = fields
+        let (offset, size, _align) = *fields
             .get(pos)
             .ok_or_else(|| anyhow::anyhow!("field index {} out of range for struct", pos))?;
-        let (size, _) = view_type(field.ty())
-            .size_and_align()
-            .ok_or_else(|| anyhow::anyhow!("field type has no concrete size"))?;
-        Ok((field.offset, size))
+        Ok((offset, size))
     }
 
     /// Resolve a `VariantFieldHandleIndex` against `enum_ty`'s derived
@@ -339,7 +365,7 @@ impl<'a> LoweringState<'a> {
             let code_offset = CodeOffset(self.out_buf.len() as u32);
             let mut heap_ptr_offsets = Vec::with_capacity(self.xfer_bindings.len());
             for ts in self.xfer_bindings.iter().flatten() {
-                let rels = type_pointer_offsets(ts.ty).with_context(|| {
+                let rels = type_pointer_offsets(self.ctx.layouts, ts.ty).with_context(|| {
                     format!(
                         "deriving safe-point heap pointer offsets at code_offset {}",
                         code_offset.0
@@ -462,7 +488,7 @@ impl<'a> LoweringState<'a> {
         ) {
             return Ok(());
         }
-        let offsets = type_pointer_offsets(dst_ty)?;
+        let offsets = type_pointer_offsets(self.ctx.layouts, dst_ty)?;
         if !offsets.is_empty() {
             self.emit(MicroOp::deep_copy_heap_ptrs(
                 dst_off,
@@ -489,7 +515,7 @@ impl<'a> LoweringState<'a> {
 
     /// Size in bytes of `ref_slot`'s pointee.
     fn ref_pointee_size(&self, ref_slot: Slot) -> Result<u32> {
-        super::context::ref_pointee_size(self.slot_interned_type(ref_slot)?)
+        super::context::ref_pointee_size(self.ctx.layouts, self.slot_interned_type(ref_slot)?)
     }
 
     /// Emit one byte-copy from `src` to `dst_offset`. Caller is
@@ -1323,8 +1349,11 @@ impl<'a> LoweringState<'a> {
             },
             Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx)
             | Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx) => {
-                let elem_size =
-                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let elem_size = concrete_type_size(
+                    self.ctx.layouts,
+                    self.concrete_ty(*elem_ty)?,
+                    "vector elem type",
+                )?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let idx_info = self.slot(*idx)?;
                 let dst_info = self.def_slot(*dst)?;
@@ -1337,8 +1366,11 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             Instr::VecPopBack(dst, elem_ty, vec_ref) => {
-                let elem_size =
-                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let elem_size = concrete_type_size(
+                    self.ctx.layouts,
+                    self.concrete_ty(*elem_ty)?,
+                    "vector elem type",
+                )?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::VecPopBack {
@@ -1356,8 +1388,11 @@ impl<'a> LoweringState<'a> {
                         dst: dst_typed.slot.offset,
                     })?;
                 } else {
-                    let elem_size =
-                        concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                    let elem_size = concrete_type_size(
+                        self.ctx.layouts,
+                        self.concrete_ty(*elem_ty)?,
+                        "vector elem type",
+                    )?;
                     let descriptor_id = self.vector_descriptor_id("VecPack", dst_typed.ty)?;
                     let srcs = elems
                         .iter()
@@ -1375,8 +1410,11 @@ impl<'a> LoweringState<'a> {
                 // TODO(completeness): the Move compiler only emits `VecUnpack` with count 0,
                 // but handwritten bytecode may use it with any count. If we
                 // restrict to count 0, we can apply simplifications.
-                let elem_size =
-                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let elem_size = concrete_type_size(
+                    self.ctx.layouts,
+                    self.concrete_ty(*elem_ty)?,
+                    "vector elem type",
+                )?;
                 let src_info = self.slot(*src)?;
                 let dst_offsets = dsts
                     .iter()
@@ -1389,8 +1427,11 @@ impl<'a> LoweringState<'a> {
                 })))?;
             },
             Instr::VecSwap(elem_ty, vec_ref, idx_a, idx_b) => {
-                let elem_size =
-                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let elem_size = concrete_type_size(
+                    self.ctx.layouts,
+                    self.concrete_ty(*elem_ty)?,
+                    "vector elem type",
+                )?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let idx_a_info = self.slot(*idx_a)?;
                 let idx_b_info = self.slot(*idx_b)?;
@@ -1402,8 +1443,11 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             Instr::VecPushBack(elem_ty, vec_ref, val) => {
-                let elem_size =
-                    concrete_type_size(self.concrete_ty(*elem_ty)?, "vector elem type")?;
+                let elem_size = concrete_type_size(
+                    self.ctx.layouts,
+                    self.concrete_ty(*elem_ty)?,
+                    "vector elem type",
+                )?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
                 let descriptor_id = self.vector_descriptor_id("VecPushBack", vec_ty)?;
                 let vec_ref_info = self.slot(*vec_ref)?;
@@ -1511,17 +1555,13 @@ impl<'a> LoweringState<'a> {
                 // After substitution, `struct_ty` must be a concrete nominal
                 // with a populated layout.
                 let struct_ty = self.concrete_ty(*struct_ty)?;
-                let layout = view_type(struct_ty)
-                    .layout()
-                    .ok_or_else(|| anyhow::anyhow!("Pack: struct_ty has no populated layout"))?;
-                let fields = layout.field_layouts().ok_or_else(|| {
-                    anyhow::anyhow!("Pack: nominal type is not a struct (no field layouts)")
-                })?;
-                if fields.len() != args.len() {
+                // (offset, size, align) per field.
+                let field_layouts = self.struct_field_layouts(struct_ty, "Pack")?;
+                if field_layouts.len() != args.len() {
                     bail!(
                         "Pack: arg count {} does not match struct field count {}",
                         args.len(),
-                        fields.len()
+                        field_layouts.len()
                     );
                 }
                 let dst_info = self.def_slot(*dst)?;
@@ -1529,26 +1569,16 @@ impl<'a> LoweringState<'a> {
                     .iter()
                     .map(|s| self.slot(*s))
                     .collect::<Result<Vec<_>>>()?;
-                // Pre-compute (size, align) per field once.
-                let field_widths: Vec<(u32, u32)> = fields
-                    .iter()
-                    .map(|field| {
-                        view_type(field.ty())
-                            .size_and_align()
-                            .ok_or_else(|| anyhow::anyhow!("Pack: field type has no concrete size"))
-                    })
-                    .collect::<Result<_>>()?;
-                let copies: Vec<_> = fields
+                let copies: Vec<_> = field_layouts
                     .iter()
                     .zip(arg_infos.iter())
-                    .zip(field_widths.iter())
-                    .map(|((field, arg_info), &(size, _))| parallel_copy::Copy {
+                    .map(|(&(offset, size, _align), arg_info)| parallel_copy::Copy {
                         src: arg_info.offset,
-                        dst: FrameOffset(dst_info.offset.0 + field.offset),
+                        dst: FrameOffset(dst_info.offset.0 + offset),
                         width: size,
                     })
                     .collect();
-                let mut indices: Vec<usize> = (0..fields.len()).collect();
+                let mut indices: Vec<usize> = (0..field_layouts.len()).collect();
                 // TODO(perf): check if we can have cheaper checks for reverse/forward emit safety
                 // in the presence of alignments.
                 if parallel_copy::reverse_emit_is_safe(&copies) {
@@ -1557,69 +1587,51 @@ impl<'a> LoweringState<'a> {
                     bail!("Pack: neither reverse nor forward emit is overlap-safe");
                 }
                 for i in indices {
-                    let (size, align) = field_widths[i];
-                    self.emit_single_move(
-                        FrameOffset(dst_info.offset.0 + fields[i].offset),
-                        SizedSlot {
-                            offset: arg_infos[i].offset,
-                            size,
-                            align,
-                        },
-                    )?;
+                    let (offset, size, align) = field_layouts[i];
+                    self.emit_single_move(FrameOffset(dst_info.offset.0 + offset), SizedSlot {
+                        offset: arg_infos[i].offset,
+                        size,
+                        align,
+                    })?;
                 }
             },
             Instr::Unpack(dsts, struct_ty, src) => {
                 // See the `Instr::Pack` arm above for the `struct_ty` contract.
                 let struct_ty = self.concrete_ty(*struct_ty)?;
-                let layout = view_type(struct_ty)
-                    .layout()
-                    .ok_or_else(|| anyhow::anyhow!("Unpack: struct_ty has no populated layout"))?;
-                let fields = layout.field_layouts().ok_or_else(|| {
-                    anyhow::anyhow!("Unpack: nominal type is not a struct (no field layouts)")
-                })?;
-                if fields.len() != dsts.len() {
+                let field_layouts = self.struct_field_layouts(struct_ty, "Unpack")?;
+                if field_layouts.len() != dsts.len() {
                     bail!(
                         "Unpack: dst count {} does not match struct field count {}",
                         dsts.len(),
-                        fields.len()
+                        field_layouts.len()
                     );
                 }
                 let src_info = self.slot(*src)?;
-                // Pre-compute (size, align) per field and resolve each dst's
-                // SizedSlot. We do this in a separate pass so we can build the
-                // per-copy view the debug assert needs without interleaving
-                // it with the actual emit.
-                let mut field_widths = Vec::with_capacity(fields.len());
+                // Resolve all dst offsets first so the overlap-safety check can
+                // run before any load is emitted.
                 let mut dst_offsets = Vec::with_capacity(dsts.len());
-                for (field, dst) in fields.iter().zip(dsts.iter()) {
-                    let (size, align) =
-                        view_type(field.ty()).size_and_align().ok_or_else(|| {
-                            anyhow::anyhow!("Unpack: field type has no concrete size")
-                        })?;
-                    field_widths.push((size, align));
-                    let dst_info = self.def_slot(*dst)?;
-                    dst_offsets.push(dst_info.offset);
+                for &dst in dsts.iter() {
+                    dst_offsets.push(self.def_slot(dst)?.offset);
                 }
-                let copies: Vec<_> = fields
+                let copies: Vec<_> = field_layouts
                     .iter()
                     .zip(dst_offsets.iter())
-                    .zip(field_widths.iter())
-                    .map(|((field, dst_off), &(size, _))| parallel_copy::Copy {
-                        src: FrameOffset(src_info.offset.0 + field.offset),
+                    .map(|(&(offset, size, _align), dst_off)| parallel_copy::Copy {
+                        src: FrameOffset(src_info.offset.0 + offset),
                         dst: *dst_off,
                         width: size,
                     })
                     .collect();
-                let mut indices: Vec<usize> = (0..fields.len()).collect();
+                let mut indices: Vec<usize> = (0..field_layouts.len()).collect();
                 if parallel_copy::reverse_emit_is_safe(&copies) {
                     indices.reverse();
                 } else if !parallel_copy::forward_emit_is_safe(&copies) {
                     bail!("Unpack: neither reverse nor forward emit is overlap-safe");
                 }
                 for i in indices {
-                    let (size, align) = field_widths[i];
+                    let (offset, size, align) = field_layouts[i];
                     self.emit_single_move(dst_offsets[i], SizedSlot {
-                        offset: FrameOffset(src_info.offset.0 + fields[i].offset),
+                        offset: FrameOffset(src_info.offset.0 + offset),
                         size,
                         align,
                     })?;
@@ -1713,7 +1725,7 @@ impl<'a> LoweringState<'a> {
                 })?;
                 debug_assert_eq!(
                     dst_info.size,
-                    concrete_type_size(concrete_ty, "move_from resource")?,
+                    concrete_type_size(self.ctx.layouts, concrete_ty, "move_from resource")?,
                     "move_from: dst slot width must equal the resource's heap-object payload size",
                 );
                 self.emit_heap_move_from(dst_info.offset, box_ptr, dst_info.size)?;
@@ -1752,7 +1764,7 @@ impl<'a> LoweringState<'a> {
                 })?;
                 debug_assert_eq!(
                     val_info.size,
-                    concrete_type_size(concrete_ty, "move_to resource")?,
+                    concrete_type_size(self.ctx.layouts, concrete_ty, "move_to resource")?,
                     "move_to: val slot width must equal the descriptor payload size HeapNew allocated",
                 );
                 self.emit_heap_move_to(box_ptr, val_info.offset, val_info.size)?;
@@ -2068,7 +2080,7 @@ impl<'a> LoweringState<'a> {
         let mut heap_ptr_offsets = Vec::new();
         for s in &cs.arg_slots {
             let base = s.slot.offset.0 - callee_base;
-            for rel in type_pointer_offsets(s.ty)? {
+            for rel in type_pointer_offsets(self.ctx.layouts, s.ty)? {
                 heap_ptr_offsets.push(FrameOffset(base + rel));
             }
         }

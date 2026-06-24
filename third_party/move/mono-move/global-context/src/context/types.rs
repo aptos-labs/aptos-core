@@ -3,7 +3,7 @@
 
 //! Type interning infrastructure.
 //!
-//! The pure type model ([`Type`], [`FieldLayout`], [`NominalLayout`], etc.)
+//! The pure type model ([`Type`], etc.)
 //! lives in `mono_move_core::types`. This module provides the interning
 //! machinery that deduplicates types in the global arena, plus cross-format
 //! hashing/equality between [`SignatureToken`]s and interned [`Type`]s.
@@ -218,7 +218,6 @@ impl Hash for TypeInternerKey {
                 module_id,
                 name,
                 ty_args,
-                layout: _,
             } => {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
