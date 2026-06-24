@@ -24,9 +24,16 @@ use aptos_vm_types::storage::StorageGasParameters;
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
+use once_cell::sync::Lazy;
 use sha3::{Digest, Sha3_256};
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use triomphe::Arc as TriompheArc;
+
+static KEYLESS_PVK_CACHE: Lazy<Mutex<HashMap<[u8; 32], Arc<PreparedVerifyingKey<Bn254>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// A runtime environment which can be used for VM initialization and more. Contains features
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
@@ -88,7 +95,7 @@ impl AptosEnvironment {
     /// Returns the prepared verifying key for keyless validation.
     #[inline]
     pub fn keyless_pvk(&self) -> Option<&PreparedVerifyingKey<Bn254>> {
-        self.0.keyless_pvk.as_ref()
+        self.0.keyless_pvk.as_deref()
     }
 
     /// Returns keyless configurations.
@@ -174,7 +181,7 @@ struct Environment {
 
     /// The prepared verification key for keyless accounts. Optional because it might not be set
     /// on-chain or might fail to parse.
-    keyless_pvk: Option<PreparedVerifyingKey<Bn254>>,
+    keyless_pvk: Option<Arc<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
 
@@ -283,7 +290,7 @@ impl Environment {
         let keyless_pvk =
             Groth16VerificationKey::fetch_keyless_config(state_view).and_then(|(vk, vk_bytes)| {
                 sha3_256.update(&vk_bytes);
-                vk.try_into().ok()
+                cached_keyless_pvk(vk, &vk_bytes)
             });
         let keyless_configuration =
             Configuration::fetch_keyless_config(state_view).map(|(config, config_bytes)| {
@@ -316,6 +323,27 @@ impl Environment {
         }
         self
     }
+}
+
+fn cached_keyless_pvk(
+    vk: Groth16VerificationKey,
+    vk_bytes: &[u8],
+) -> Option<Arc<PreparedVerifyingKey<Bn254>>> {
+    let key = Sha3_256::digest(vk_bytes).into();
+    let mut cache = KEYLESS_PVK_CACHE
+        .lock()
+        .expect("keyless prepared verifying key cache mutex poisoned");
+
+    if let Some(pvk) = cache.get(&key) {
+        return Some(pvk.clone());
+    }
+
+    let pvk: Arc<PreparedVerifyingKey<Bn254>> = Arc::new(vk.try_into().ok()?);
+    if cache.len() >= 16 {
+        cache.clear();
+    }
+    cache.insert(key, pvk.clone());
+    Some(pvk)
 }
 
 /// Fetches config from storage and updates the hash if it exists. Returns the fetched config.
