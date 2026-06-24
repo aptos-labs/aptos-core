@@ -65,6 +65,13 @@ impl IntrinsicDecl {
         let sym = symbol_pool.make(name);
         self.intrinsic_to_spec_fun.get(&sym).cloned()
     }
+
+    /// Look up the bound Move function for an intrinsic role by name.
+    pub fn lookup_move_fun(&self, env: &GlobalEnv, name: &str) -> Option<QualifiedId<FunId>> {
+        let symbol_pool = env.symbol_pool();
+        let sym = symbol_pool.make(name);
+        self.intrinsic_to_move_fun.get(&sym).cloned()
+    }
 }
 
 pub(crate) fn process_intrinsic_declaration(
