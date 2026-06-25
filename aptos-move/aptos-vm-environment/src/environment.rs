@@ -25,7 +25,7 @@ use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use triomphe::Arc as TriompheArc;
 
 /// A runtime environment which can be used for VM initialization and more. Contains features
@@ -88,7 +88,15 @@ impl AptosEnvironment {
     /// Returns the prepared verifying key for keyless validation.
     #[inline]
     pub fn keyless_pvk(&self) -> Option<&PreparedVerifyingKey<Bn254>> {
-        self.0.keyless_pvk.as_ref()
+        self.0
+            .keyless_pvk
+            .get_or_init(|| {
+                self.0
+                    .keyless_vk
+                    .as_ref()
+                    .and_then(|vk| PreparedVerifyingKey::try_from(vk).ok())
+            })
+            .as_ref()
     }
 
     /// Returns keyless configurations.
@@ -172,9 +180,14 @@ struct Environment {
     /// Set of timed features enabled in this environment.
     timed_features: TimedFeatures,
 
-    /// The prepared verification key for keyless accounts. Optional because it might not be set
-    /// on-chain or might fail to parse.
-    keyless_pvk: Option<PreparedVerifyingKey<Bn254>>,
+    /// The on-chain verification key for keyless accounts. Optional because it might not be set
+    /// on-chain.
+    keyless_vk: Option<Groth16VerificationKey>,
+    /// The prepared verification key for keyless accounts, initialized on first use. The first
+    /// caller runs preparation synchronously on its current thread, while concurrent callers wait on
+    /// this cell. This avoids scheduling work onto executor/verification pools and therefore cannot
+    /// deadlock by waiting for an idle pool worker.
+    keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
 
@@ -278,12 +291,11 @@ impl Environment {
         );
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
-        // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
-        // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let keyless_pvk =
-            Groth16VerificationKey::fetch_keyless_config(state_view).and_then(|(vk, vk_bytes)| {
+        // We use an `Option` to handle the VK not being set on-chain.
+        let keyless_vk =
+            Groth16VerificationKey::fetch_keyless_config(state_view).map(|(vk, vk_bytes)| {
                 sha3_256.update(&vk_bytes);
-                vk.try_into().ok()
+                vk
             });
         let keyless_configuration =
             Configuration::fetch_keyless_config(state_view).map(|(config, config_bytes)| {
@@ -298,7 +310,8 @@ impl Environment {
             chain_id,
             features,
             timed_features,
-            keyless_pvk,
+            keyless_vk,
+            keyless_pvk: OnceLock::new(),
             keyless_configuration,
             gas_feature_version,
             gas_params,
@@ -332,11 +345,17 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 pub mod tests {
     use super::*;
     use aptos_types::{
+        keyless::{Groth16VerificationKey, KeylessGroupResource, VERIFICATION_KEY_FOR_TESTING},
         on_chain_config::{FeatureFlag, GasScheduleV2},
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
+    use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
     use serde::Serialize;
-    use std::collections::HashMap;
+    use std::{
+        collections::{BTreeMap, HashMap},
+        sync::{Arc, Barrier},
+        thread,
+    };
 
     #[test]
     fn test_new_environment() {
@@ -370,12 +389,85 @@ pub mod tests {
         )]))
     }
 
+    fn state_view_with_keyless_vk(vk: Groth16VerificationKey) -> MockStateView<StateKey> {
+        let keyless_group = KeylessGroupResource {
+            group: BTreeMap::from([(
+                Groth16VerificationKey::struct_tag(),
+                bcs::to_bytes(&vk).unwrap().into(),
+            )]),
+        };
+        MockStateView::new(HashMap::from([(
+            StateKey::resource_group(&CORE_CODE_ADDRESS, &KeylessGroupResource::struct_tag()),
+            StateValue::new_legacy(bcs::to_bytes(&keyless_group).unwrap().into()),
+        )]))
+    }
+
     #[test]
     fn test_environment_eq() {
         let state_view = MockStateView::empty();
         let environment_1 = AptosEnvironment::new(&state_view);
         let environment_2 = AptosEnvironment::new(&state_view);
         assert!(environment_1 == environment_2);
+    }
+
+    #[test]
+    fn test_keyless_pvk_is_prepared_lazily() {
+        let state_view = state_view_with_keyless_vk(Groth16VerificationKey::from(
+            VERIFICATION_KEY_FOR_TESTING.clone(),
+        ));
+
+        let environment = AptosEnvironment::new(&state_view);
+
+        assert!(environment.0.keyless_vk.is_some());
+        assert!(environment.0.keyless_pvk.get().is_none());
+
+        assert!(environment.keyless_pvk().is_some());
+        assert!(environment.0.keyless_pvk.get().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_keyless_pvk_lazy_preparation_handles_concurrent_callers() {
+        let state_view = state_view_with_keyless_vk(Groth16VerificationKey::from(
+            VERIFICATION_KEY_FOR_TESTING.clone(),
+        ));
+
+        let environment = AptosEnvironment::new(&state_view);
+        let num_threads = 16;
+        let barrier = Arc::new(Barrier::new(num_threads));
+
+        assert!(environment.0.keyless_pvk.get().is_none());
+
+        let handles = (0..num_threads)
+            .map(|_| {
+                let environment = environment.clone();
+                let barrier = barrier.clone();
+                thread::spawn(move || {
+                    barrier.wait();
+                    assert!(environment.keyless_pvk().is_some());
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert!(environment.0.keyless_pvk.get().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_malformed_keyless_vk_error_is_cached_lazily() {
+        let mut malformed_vk = Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone());
+        malformed_vk.gamma_abc_g1.pop();
+        let state_view = state_view_with_keyless_vk(malformed_vk);
+
+        let environment = AptosEnvironment::new(&state_view);
+
+        assert!(environment.0.keyless_vk.is_some());
+        assert!(environment.0.keyless_pvk.get().is_none());
+
+        assert!(environment.keyless_pvk().is_none());
+        assert!(environment.0.keyless_pvk.get().unwrap().is_none());
     }
 
     #[test]
