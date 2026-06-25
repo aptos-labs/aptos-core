@@ -37,7 +37,16 @@ pub struct AptosEnvironment(TriompheArc<Environment>);
 impl AptosEnvironment {
     /// Returns new execution environment based on the current state.
     pub fn new(state_view: &impl StateView) -> Self {
-        Self(TriompheArc::new(Environment::new(state_view, false, None)))
+        Self(TriompheArc::new(Environment::new(
+            state_view, false, None, true,
+        )))
+    }
+
+    /// Returns new execution environment for view function execution.
+    pub fn new_for_view_function(state_view: &impl StateView) -> Self {
+        Self(TriompheArc::new(Environment::new(
+            state_view, false, None, false,
+        )))
     }
 
     /// Returns new execution environment based on the current state, also using the provided gas
@@ -50,20 +59,24 @@ impl AptosEnvironment {
             state_view,
             false,
             Some(gas_hook),
+            true,
         )))
     }
 
     /// Returns new execution environment based on the current state, also injecting create signer
     /// native for government proposal simulation. Should not be used for regular execution.
     pub fn new_with_injected_create_signer_for_gov_sim(state_view: &impl StateView) -> Self {
-        Self(TriompheArc::new(Environment::new(state_view, true, None)))
+        Self(TriompheArc::new(Environment::new(
+            state_view, true, None, true,
+        )))
     }
 
     /// Returns new environment but with delayed field optimization enabled. Should only be used by
     /// block executor where this optimization is needed. Note: whether the optimization will be
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
-        let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
+        let env =
+            Environment::new(state_view, false, None, true).try_enable_delayed_field_optimization();
         Self(TriompheArc::new(env))
     }
 
@@ -209,6 +222,7 @@ impl Environment {
         state_view: &impl StateView,
         inject_create_signer_for_gov_sim: bool,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
+        prepare_keyless_pvk: bool,
     ) -> Self {
         // We compute and store a hash of configs in order to distinguish different environments.
         let mut sha3_256 = Sha3_256::new();
@@ -283,7 +297,7 @@ impl Environment {
         let keyless_pvk =
             Groth16VerificationKey::fetch_keyless_config(state_view).and_then(|(vk, vk_bytes)| {
                 sha3_256.update(&vk_bytes);
-                vk.try_into().ok()
+                prepare_keyless_pvk.then(|| vk.try_into().ok()).flatten()
             });
         let keyless_configuration =
             Configuration::fetch_keyless_config(state_view).map(|(config, config_bytes)| {
@@ -332,17 +346,19 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 pub mod tests {
     use super::*;
     use aptos_types::{
+        keyless::{Groth16VerificationKey, KeylessGroupResource, VERIFICATION_KEY_FOR_TESTING},
         on_chain_config::{FeatureFlag, GasScheduleV2},
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
+    use move_core_types::move_resource::MoveStructType;
     use serde::Serialize;
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn test_new_environment() {
         // This creates an empty state.
         let state_view = MockStateView::empty();
-        let env = Environment::new(&state_view, false, None);
+        let env = Environment::new(&state_view, false, None, true);
 
         // Check default values.
         assert_eq!(&env.features, &Features::default());
@@ -370,12 +386,41 @@ pub mod tests {
         )]))
     }
 
+    fn state_view_with_keyless_vk() -> MockStateView<StateKey> {
+        let vk = Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone());
+        let keyless_group = KeylessGroupResource {
+            group: BTreeMap::from([(
+                Groth16VerificationKey::struct_tag(),
+                bcs::to_bytes(&vk).unwrap().into(),
+            )]),
+        };
+        MockStateView::new(HashMap::from([(
+            StateKey::resource_group(
+                &aptos_types::account_config::CORE_CODE_ADDRESS,
+                &KeylessGroupResource::struct_tag(),
+            ),
+            StateValue::new_legacy(bcs::to_bytes(&keyless_group).unwrap().into()),
+        )]))
+    }
+
     #[test]
     fn test_environment_eq() {
         let state_view = MockStateView::empty();
         let environment_1 = AptosEnvironment::new(&state_view);
         let environment_2 = AptosEnvironment::new(&state_view);
         assert!(environment_1 == environment_2);
+    }
+
+    #[test]
+    fn test_view_environment_skips_keyless_pvk_preparation() {
+        let state_view = state_view_with_keyless_vk();
+
+        let environment = AptosEnvironment::new(&state_view);
+        let view_environment = AptosEnvironment::new_for_view_function(&state_view);
+
+        assert!(environment.keyless_pvk().is_some());
+        assert!(view_environment.keyless_pvk().is_none());
+        assert!(environment == view_environment);
     }
 
     #[test]
