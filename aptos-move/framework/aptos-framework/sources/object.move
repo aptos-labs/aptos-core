@@ -51,6 +51,9 @@ module aptos_framework::object {
     const EOBJECT_NOT_TRANSFERRABLE: u64 = 9;
     /// Cannot burn an object that is already burnt.
     const EOBJECT_ALREADY_BURNT: u64 = 10;
+    /// Returned by `exists_at` when its type argument is not a resource (struct) type with the
+    /// `key` ability.
+    const ENOT_A_RESOURCE_TYPE: u64 = 11;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;

@@ -1,0 +1,50 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::target
+
+public fun returns_42(): u64
+    ld_u64 42
+    ret
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::test_module
+
+entry public fun key_ability_rejected()
+    local mod_name: 0x1::string::String
+    local func_name: 0x1::string::String
+    local result: 0x1::result::Result<||u64 has copy+drop+store+key, 0x1::reflect::ReflectionError>
+    local closure: ||u64 has copy+drop+store+key
+
+    // "target"
+    ld_const<vector<u8>> [116, 97, 114, 103, 101, 116]
+    call 0x1::string::utf8
+    st_loc mod_name
+
+    // "returns_42"
+    ld_const<vector<u8>> [114, 101, 116, 117, 114, 110, 115, 95, 52, 50]
+    call 0x1::string::utf8
+    st_loc func_name
+
+    // reflect::resolve<||u64 has copy+drop+store+key>(Alice, &mod, &func)
+    ld_const<address> 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    borrow_loc mod_name
+    borrow_loc func_name
+    call 0x1::reflect::resolve<||u64 has copy+drop+store+key>
+    st_loc result
+
+    move_loc result
+    call 0x1::result::unwrap<||u64 has copy+drop+store+key, 0x1::reflect::ReflectionError>
+    st_loc closure
+
+    move_loc closure
+    call_closure<||u64 has copy+drop+store+key>
+    ld_u64 42
+    eq
+    br_true ok
+    ld_u64 99
+    abort
+ ok: ret
+
+
+//# run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::test_module::key_ability_rejected

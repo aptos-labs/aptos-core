@@ -100,6 +100,7 @@ spec aptos_framework::randomness {
     }
 
     spec u256_integer(): u256 {
+        pragma verify_duration_estimate = 300; // TODO: set because of timeout (property proved)
         pragma unroll = 32;
         include NextBlobAbortsIf;
         ensures [abstract] result == spec_u256_integer();
@@ -107,6 +108,7 @@ spec aptos_framework::randomness {
 
     spec u256_integer_internal(): u256 {
         pragma opaque;
+        pragma verify_duration_estimate = 300; // TODO: set because of timeout (property proved)
         pragma unroll = 32;
         include NextBlobAbortsIf;
     }
@@ -114,18 +116,21 @@ spec aptos_framework::randomness {
     spec fun spec_u256_integer(): u256;
 
     spec u8_range(min_incl: u8, max_excl: u8): u8 {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
     }
 
     spec u64_range(min_incl: u64, max_excl: u64): u64 {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
     }
 
     spec u256_range(min_incl: u256, max_excl: u256): u256 {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
@@ -158,6 +163,7 @@ spec aptos_framework::randomness {
     }
 
     spec u64_range_internal(min_incl: u64, max_excl: u64): u64 {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;

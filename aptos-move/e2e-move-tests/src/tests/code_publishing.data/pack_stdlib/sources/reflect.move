@@ -43,7 +43,6 @@ module std::reflect {
     }
 
     /// Represents errors returned by the reflection API.
-    /// TODO: make this public once language version 2.4 is available
     enum ReflectionError has copy, drop, store {
         /// The passed module or function name is not a valid Move identifier
         InvalidIdentifier,
