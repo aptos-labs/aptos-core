@@ -34,9 +34,14 @@ move-vm-types = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["testing"] }
-move-vm-types = { workspace = true, features = ["testing"] }
 bcs = { workspace = true }
+criterion = { workspace = true }
+move-vm-types = { workspace = true, features = ["testing"] }
 
 [target.'cfg(unix)'.dev-dependencies]
-jemallocator = { workspace = true }
 aptos-jemalloc = { workspace = true, features = ["metered-allocations"] }
+jemallocator = { workspace = true }
+
+[[bench]]
+name = "annotate"
+harness = false
