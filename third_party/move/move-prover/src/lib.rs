@@ -16,7 +16,8 @@ use move_compiler_v2::Experiment;
 use move_model::{
     code_writer::CodeWriter,
     metadata::LATEST_STABLE_COMPILER_VERSION_VALUE,
-    model::{FunId, GlobalEnv, ModuleId, QualifiedId},
+    model::{FunId, FunctionEnv, GlobalEnv, ModuleId, QualifiedId},
+    pragmas::{TIMEOUT_PRAGMA, VERIFY_DURATION_ESTIMATE_PRAGMA},
 };
 use move_prover_boogie_backend::{
     add_prelude,
@@ -276,29 +277,52 @@ pub fn generate_boogie(
     generate_boogie_with_selector(env, options, selector, targets)
 }
 
+/// Mirrors the verify-target predicate inside `BoogieTranslator::is_verified`:
+/// function passes the structural filter and its `verify_duration_estimate`
+/// pragma (if present) fits inside the effective timeout. Used by the
+/// enumeration helpers so per-module / per-VC drivers don't generate `.bpl`
+/// files for targets the translator would silently skip.
+fn function_passes_verify_filter(fun_env: &FunctionEnv, options: &cli::Options) -> bool {
+    if fun_env.is_native_or_intrinsic()
+        || fun_env.is_test_only()
+        || fun_env.is_not_prover_target()
+    {
+        return false;
+    }
+    if let Some(estimate_timeout) = fun_env.get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA) {
+        let timeout = fun_env
+            .get_num_pragma(TIMEOUT_PRAGMA)
+            .unwrap_or(options.backend.vc_timeout);
+        estimate_timeout <= timeout
+    } else {
+        true
+    }
+}
+
 /// Enumerate every (function-id, FunctionVariant::Verification(_)) pair the prover
 /// would emit `$verify` procedures for under the default selector. Source of truth
-/// for the per-VC outer loop. Mirrors the iteration in
-/// `bytecode_translator::translate` but only collects identifiers — no translation.
+/// for the per-VC outer loop. Mirrors `bytecode_translator::translate`'s iteration —
+/// walks **every** module (not only `is_target()` ones, since
+/// `VerificationAnalysisProcessor` can mark functions in non-target modules as
+/// verified when a target-module global invariant must be checked there), filters
+/// functions by the same `is_native_or_intrinsic` / `is_test_only` /
+/// `is_not_prover_target` rules, and applies the `verify_duration_estimate` /
+/// `timeout` pragma check so we don't codegen `.bpl` files whose `$verify`
+/// procedure would be filtered out at translation time.
 ///
 /// V1 simplification: type-instance variants (`VerificationFlavor::Instantiated(_)`)
 /// from `mono_info.funs` are NOT enumerated separately; each base verify target gets
 /// one `.bpl`. Per-VC mode therefore implicitly behaves as if `--skip-instance-check`
-/// were set. Documented under the `per_vc` option.
+/// were set.
 pub fn enumerate_verify_targets(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
+    options: &cli::Options,
 ) -> Vec<(QualifiedId<FunId>, FunctionVariant)> {
     let mut out = Vec::new();
     for module_env in env.get_modules() {
-        if !module_env.is_target() {
-            continue;
-        }
         for fun_env in module_env.get_functions() {
-            if fun_env.is_native_or_intrinsic()
-                || fun_env.is_test_only()
-                || fun_env.is_not_prover_target()
-            {
+            if !function_passes_verify_filter(&fun_env, options) {
                 continue;
             }
             for (variant, _target) in targets.get_targets(&fun_env) {
@@ -312,22 +336,20 @@ pub fn enumerate_verify_targets(
     out
 }
 
-/// Enumerate every module that contains at least one verify target. Stable
-/// iteration order (source-declaration order, matching `env.get_modules`).
+/// Enumerate every module that contains at least one verify target. Same
+/// inclusion rules as `enumerate_verify_targets`: walks every module (so
+/// non-target modules containing verify variants for target-module invariants
+/// are not dropped) and respects the `verify_duration_estimate` pragma.
+/// Stable iteration order (source-declaration order, matching `env.get_modules`).
 pub fn enumerate_modules_with_verify_targets(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
+    options: &cli::Options,
 ) -> Vec<ModuleId> {
     let mut out = Vec::new();
     for module_env in env.get_modules() {
-        if !module_env.is_target() {
-            continue;
-        }
         let has_verify_target = module_env.get_functions().any(|fun_env| {
-            if fun_env.is_native_or_intrinsic()
-                || fun_env.is_test_only()
-                || fun_env.is_not_prover_target()
-            {
+            if !function_passes_verify_filter(&fun_env, options) {
                 return false;
             }
             targets
@@ -435,7 +457,7 @@ fn drive_per_module<W: WriteColor>(
     gen_durations: &mut Vec<Duration>,
     verify_durations: &mut Vec<Duration>,
 ) -> anyhow::Result<()> {
-    let module_list = enumerate_modules_with_verify_targets(env, targets);
+    let module_list = enumerate_modules_with_verify_targets(env, targets, options);
     let parallelism = options.backend.proc_cores.max(1);
     info!(
         "per-module mode: {} modules, parallelism={}",
@@ -479,13 +501,27 @@ fn drive_per_module<W: WriteColor>(
         writer: &CodeWriter::new(env.internal_loc()),
         options: &options.backend,
     };
+    // Analyze each captured result in stable input order. Don't short-circuit on
+    // the first hard error — one .bpl failing (missing prover, bad codegen,
+    // subprocess I/O) shouldn't strand the remaining .bpl results without their
+    // diagnostics or cleanup. Collect any errors and return the first after all
+    // results have been processed.
+    let mut first_err: Option<anyhow::Error> = None;
     for (path, raw) in bpl_paths.iter().zip(raw_results.into_iter()) {
-        wrapper.analyze_subprocess_output(path, raw)?;
+        if let Err(e) = wrapper.analyze_subprocess_output(path, raw) {
+            if first_err.is_none() {
+                first_err = Some(e);
+            }
+        }
         if !options.backend.keep_artifacts {
             std::fs::remove_file(path).unwrap_or_default();
         }
     }
-    Ok(())
+    if let Some(e) = first_err {
+        Err(e)
+    } else {
+        Ok(())
+    }
 }
 
 /// Per-VC driver: enumerate verify targets, emit one `.bpl` per target
@@ -502,7 +538,7 @@ fn drive_per_vc<W: WriteColor>(
     gen_durations: &mut Vec<Duration>,
     verify_durations: &mut Vec<Duration>,
 ) -> anyhow::Result<()> {
-    let target_list = enumerate_verify_targets(env, targets);
+    let target_list = enumerate_verify_targets(env, targets, options);
     let parallelism = options.backend.proc_cores.max(1);
     info!(
         "per-VC mode: {} verify targets, parallelism={}",
@@ -554,16 +590,25 @@ fn drive_per_vc<W: WriteColor>(
         writer: &CodeWriter::new(env.internal_loc()),
         options: &options.backend,
     };
+    // Don't short-circuit on the first hard error — see `drive_per_module` for
+    // the rationale. Match the cleanup `verify_boogie` does for the single-shard
+    // path: drop each .bpl when the user didn't ask to keep artifacts.
+    let mut first_err: Option<anyhow::Error> = None;
     for (path, raw) in bpl_paths.iter().zip(raw_results.into_iter()) {
-        let bpl_existed_before_run = false; // we always create them in phase 1
-        wrapper.analyze_subprocess_output(path, raw)?;
-        // Match the cleanup `verify_boogie` does for the single-shard path: if
-        // the user didn't ask to keep artifacts, drop the .bpl now.
-        if !bpl_existed_before_run && !options.backend.keep_artifacts {
+        if let Err(e) = wrapper.analyze_subprocess_output(path, raw) {
+            if first_err.is_none() {
+                first_err = Some(e);
+            }
+        }
+        if !options.backend.keep_artifacts {
             std::fs::remove_file(path).unwrap_or_default();
         }
     }
-    Ok(())
+    if let Some(e) = first_err {
+        Err(e)
+    } else {
+        Ok(())
+    }
 }
 
 pub fn verify_boogie(
