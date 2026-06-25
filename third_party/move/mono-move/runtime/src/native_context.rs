@@ -250,6 +250,15 @@ impl NativeContext for ProductionNativeContext<'_> {
         })
     }
 
+    fn value_size(&self, ty: InternedType) -> Result<u32, VMInternalError> {
+        self.layouts
+            .size_and_align(ty)
+            .map(|(size, _)| size)
+            .ok_or_else(|| {
+                VMInternalError::invariant_violation("value_size: type has no known layout".into())
+            })
+    }
+
     fn arg_raw(&self, i: usize) -> Result<Vec<u8>, VMInternalError> {
         if self.returns_started.get() {
             return Err(VMInternalError::invariant_violation(format!(
