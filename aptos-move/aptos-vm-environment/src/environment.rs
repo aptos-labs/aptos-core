@@ -185,8 +185,7 @@ struct Environment {
     keyless_vk: Option<Groth16VerificationKey>,
     /// The prepared verification key for keyless accounts, initialized on first use. The first
     /// caller runs preparation synchronously on its current thread, while concurrent callers wait on
-    /// this cell. This avoids scheduling work onto executor/verification pools and therefore cannot
-    /// deadlock by waiting for an idle pool worker.
+    /// this cell and share the same result.
     keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
