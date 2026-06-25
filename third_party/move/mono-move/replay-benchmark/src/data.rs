@@ -23,16 +23,9 @@ use aptos_types::{
     },
 };
 use aptos_vm::move_vm_ext::SessionId;
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
-};
+use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::Path as FsPath,
-    sync::Arc,
-};
+use std::{collections::HashMap, path::Path as FsPath, sync::Arc};
 
 /// The complete read-set a block touched, matching `aptos_replay_benchmark::state_view::ReadSet`.
 /// Keyed by [`StateKey`] (modules, resources, and resource groups all live here).
@@ -64,64 +57,18 @@ impl TStateView for ReadSet {
     }
 }
 
-/// A single Move resource, addressed by `(account, struct tag)`, with its BCS-encoded value.
-pub struct StoredResource {
-    pub address: AccountAddress,
-    pub struct_tag: StructTag,
-    pub blob: Vec<u8>,
-}
-
 impl ReadSet {
     /// Every module's `(id, bytecode)` present in the read-set.
     pub fn modules(&self) -> Vec<(ModuleId, Vec<u8>)> {
         let mut modules = vec![];
         for (key, value) in &self.data {
-            if let Some(Path::Code(module_id)) = access_path_of(key) {
+            if let StateKeyInner::AccessPath(ap) = key.inner()
+                && let Path::Code(module_id) = ap.get_path()
+            {
                 modules.push((module_id, value.bytes().to_vec()));
             }
         }
         modules
-    }
-
-    /// Every individual resource present in the read-set. Resource *groups* are unpacked into
-    /// their member resources, since the bare Move VMs read resources one type at a time and have
-    /// no notion of resource groups.
-    pub fn resources(&self) -> anyhow::Result<Vec<StoredResource>> {
-        let mut resources = vec![];
-        for (key, value) in &self.data {
-            let (address, path) = match (address_of(key), access_path_of(key)) {
-                (Some(address), Some(path)) => (address, path),
-                _ => continue,
-            };
-            match path {
-                Path::Code(_) => {},
-                Path::Resource(struct_tag) => resources.push(StoredResource {
-                    address,
-                    struct_tag,
-                    blob: value.bytes().to_vec(),
-                }),
-                Path::ResourceGroup(group_tag) => {
-                    // A resource group is stored as a BCS map from member struct tag to the
-                    // member's BCS-encoded value.
-                    let members: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(value.bytes())
-                        .with_context(|| {
-                            format!(
-                                "Failed to decode resource group {} at {}",
-                                group_tag.to_canonical_string(),
-                                address
-                            )
-                        })?;
-                    for (struct_tag, blob) in members {
-                        resources.push(StoredResource {
-                            address,
-                            struct_tag,
-                            blob,
-                        });
-                    }
-                },
-            }
-        }
-        Ok(resources)
     }
 }
 
@@ -306,21 +253,4 @@ fn parse_user_transaction(
         },
     };
     Some((sender, entry, user_context, chain_id, session_id))
-}
-
-/// The account address of a `StateKey`, when it is an access-path key.
-fn address_of(key: &StateKey) -> Option<AccountAddress> {
-    match key.inner() {
-        StateKeyInner::AccessPath(ap) => Some(ap.address),
-        _ => None,
-    }
-}
-
-/// The structured `Path` (module / resource / resource group) of a `StateKey`, when it is an
-/// access-path key.
-fn access_path_of(key: &StateKey) -> Option<Path> {
-    match key.inner() {
-        StateKeyInner::AccessPath(ap) => Some(ap.get_path()),
-        _ => None,
-    }
 }

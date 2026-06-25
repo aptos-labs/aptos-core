@@ -478,17 +478,15 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(Boxed::from_handle(unsafe { self.pool.root_object(obj) }))
     }
 
-    // TODO(completeness): `value_ty` on these table ops is currently unused; wire it
-    // to the storage provider so a working-map miss can deserialize from storage.
     fn table_contains(
         &self,
         handle: &TableHandle,
         key: &[u8],
-        _value_ty: InternedType,
+        value_ty: InternedType,
     ) -> Result<bool, VMInternalError> {
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         Ok(rws.exists(self.resource_provider, &storage_key)?)
     }
 
@@ -497,9 +495,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         handle: &TableHandle,
         key: &[u8],
         mutable: bool,
-        _value_ty: InternedType,
+        value_ty: InternedType,
     ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
         let ptr = if mutable {
@@ -593,9 +591,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         handle: &TableHandle,
         key: &[u8],
         value: Boxed<'_, Opaque>,
-        _value_ty: InternedType,
+        value_ty: InternedType,
     ) -> Result<bool, VMInternalError> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         let obj = NonNull::new(value.ptr()).ok_or_else(|| {
             VMInternalError::invariant_violation("table_add: null boxed value".into())
         })?;
@@ -612,9 +610,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-        _value_ty: InternedType,
+        value_ty: InternedType,
     ) -> Result<Option<Boxed<'_, Opaque>>, VMInternalError> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into());
+        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
         let ptr = match rws.try_move_from(self.resource_provider, &storage_key) {

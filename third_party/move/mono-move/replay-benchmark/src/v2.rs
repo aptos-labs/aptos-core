@@ -33,13 +33,16 @@ use mono_move_runtime::{
 };
 use mono_move_testsuite::{build_natives, finalize_events_v2, InMemoryModuleProvider};
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
-use move_core_types::{identifier::IdentStr, language_storage::TypeTag};
+use move_core_types::{
+    identifier::IdentStr,
+    language_storage::{StructTag, TypeTag},
+};
 use std::time::Instant;
 
 /// Effectively unbounded gas budget.
 const GAS_BUDGET: u64 = u64::MAX;
 
-/// The resource arena is sized as `resource bytes * ARENA_BYTES_PER_RESOURCE_BYTE`, with a floor of
+/// The resource arena is sized as `read-set bytes * ARENA_BYTES_PER_RESOURCE_BYTE`, with a floor of
 /// `MIN_ARENA_BYTES` (the flat representation can be larger than BCS).
 const MIN_ARENA_BYTES: usize = 16 * 1024 * 1024;
 const ARENA_BYTES_PER_RESOURCE_BYTE: usize = 8;
@@ -78,12 +81,11 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         &natives,
     );
 
-    let resources = input.read_set.resources()?;
-    let total_resource_bytes: usize = resources.iter().map(|r| r.blob.len()).sum();
-    let arena_size = total_resource_bytes
+    let total_bytes: usize = input.read_set.data.values().map(|v| v.bytes().len()).sum();
+    let arena_size = total_bytes
         .saturating_mul(ARENA_BYTES_PER_RESOURCE_BYTE)
         .max(MIN_ARENA_BYTES);
-    let resource_provider = ReadSetResourceProvider::new(&guard, &resources, arena_size);
+    let resource_provider = ReadSetResourceProvider::new(&guard, &input.read_set, arena_size)?;
 
     let (transaction_index, reserved_byte) = match input.user_context.transaction_index_kind() {
         TransactionIndexKind::BlockExecution { transaction_index } => (transaction_index, 0),
@@ -352,18 +354,23 @@ pub(crate) fn intern_type_tag(guard: &ExecutionGuard, tag: &TypeTag) -> Result<I
         TypeTag::Address => ADDRESS_TY,
         TypeTag::Signer => SIGNER_TY,
         TypeTag::Vector(elem) => guard.vector_of(intern_type_tag(guard, elem)?),
-        TypeTag::Struct(struct_tag) => {
-            let module_id =
-                guard.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
-            let name = guard.identifier_of(struct_tag.name.as_ident_str());
-            let args = struct_tag
-                .type_args
-                .iter()
-                .map(|arg| intern_type_tag(guard, arg))
-                .collect::<Result<Vec<_>>>()?;
-            let ty_args = guard.type_list_of(&args);
-            guard.nominal_of(module_id, name, ty_args)
-        },
+        TypeTag::Struct(struct_tag) => intern_struct_tag(guard, struct_tag)?,
         TypeTag::Function(_) => bail!("function type tags are not supported"),
     })
+}
+
+/// Interns a struct tag into its nominal type.
+pub(crate) fn intern_struct_tag(
+    guard: &ExecutionGuard,
+    struct_tag: &StructTag,
+) -> Result<InternedType> {
+    let module_id = guard.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
+    let name = guard.identifier_of(struct_tag.name.as_ident_str());
+    let args = struct_tag
+        .type_args
+        .iter()
+        .map(|arg| intern_type_tag(guard, arg))
+        .collect::<Result<Vec<_>>>()?;
+    let ty_args = guard.type_list_of(&args);
+    Ok(guard.nominal_of(module_id, name, ty_args))
 }

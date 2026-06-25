@@ -6,7 +6,9 @@
 //! Materialization is lazy because a resource type's layout is only published once the function
 //! that accesses it has been lowered.
 
-use crate::{data::StoredResource, v2::intern_type_tag};
+use crate::{data::ReadSet, v2::intern_struct_tag};
+use anyhow::Result;
+use aptos_types::{access_path::Path, state_store::state_key::inner::StateKeyInner};
 use mono_move_core::{
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
@@ -16,14 +18,20 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap};
-use move_core_types::language_storage::TypeTag;
-use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    ptr::NonNull,
+};
 
-/// Holds the read-set's resource blobs up front and the arena of materialized objects.
+/// Serves the read-set's resources and table items to MonoMove, materializing each on first access.
 pub struct ReadSetResourceProvider<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
-    /// BCS bytes of each read-set resource, keyed the same way MonoMove keys a `borrow_global`.
-    resources: HashMap<InMemoryStorageKey, Vec<u8>>,
+    /// BCS bytes of each resource, keyed by address and interned type.
+    resources: HashMap<(AccountAddress, InternedType), Vec<u8>>,
+    /// BCS bytes of each table item, keyed by table handle and serialized key.
+    table_items: HashMap<(AccountAddress, Vec<u8>), Vec<u8>>,
     materialized: RefCell<Materialized>,
 }
 
@@ -37,27 +45,61 @@ struct Materialized {
 impl<'guard, 'ctx> ReadSetResourceProvider<'guard, 'ctx> {
     pub fn new(
         guard: &'guard ExecutionGuard<'ctx>,
-        resources: &[StoredResource],
+        read_set: &ReadSet,
         heap_size: usize,
-    ) -> Self {
-        let mut blobs = HashMap::new();
-        for resource in resources {
-            let tag = TypeTag::Struct(Box::new(resource.struct_tag.clone()));
-            // Interning needs no layouts; it just produces the key MonoMove will look up.
-            if let Ok(ty) = intern_type_tag(guard, &tag) {
-                blobs.insert(
-                    InMemoryStorageKey::resource(resource.address, ty),
-                    resource.blob.clone(),
-                );
+    ) -> Result<Self> {
+        let mut resources = HashMap::new();
+        let mut table_items = HashMap::new();
+        for (state_key, value) in &read_set.data {
+            match state_key.inner() {
+                StateKeyInner::AccessPath(ap) => match ap.get_path() {
+                    // Modules are ignored.
+                    Path::Code(_) => {},
+                    Path::Resource(struct_tag) => {
+                        let ty = intern_struct_tag(guard, &struct_tag)?;
+                        resources.insert((ap.address, ty), value.bytes().to_vec());
+                    },
+                    // A resource group: add each resource in the group individually.
+                    Path::ResourceGroup(_) => {
+                        let members: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(value.bytes())?;
+                        for (struct_tag, blob) in members {
+                            let ty = intern_struct_tag(guard, &struct_tag)?;
+                            resources.insert((ap.address, ty), blob);
+                        }
+                    },
+                },
+                StateKeyInner::TableItem { handle, key } => {
+                    table_items.insert((handle.0, key.clone()), value.bytes().to_vec());
+                },
+                // Neither resources nor table items.
+                StateKeyInner::Raw(_) | StateKeyInner::TradingNative(_) => {},
             }
         }
-        Self {
+        Ok(Self {
             guard,
-            resources: blobs,
+            resources,
+            table_items,
             materialized: RefCell::new(Materialized {
                 heap: Heap::new(heap_size),
                 cache: HashMap::new(),
             }),
+        })
+    }
+
+    /// Returns the raw blob and the type to materialize it as, or `None` if the key isn't present.
+    fn entry(&self, key: &InMemoryStorageKey) -> Option<(&Vec<u8>, InternedType)> {
+        match key {
+            InMemoryStorageKey::Resource { address, ty } => {
+                Some((self.resources.get(&(*address, *ty))?, *ty))
+            },
+            InMemoryStorageKey::TableItem {
+                handle,
+                key,
+                value_ty,
+            } => Some((
+                self.table_items.get(&(handle.address(), key.to_vec()))?,
+                *value_ty,
+            )),
         }
     }
 }
@@ -72,15 +114,12 @@ impl ResourceProvider for ReadSetResourceProvider<'_, '_> {
             }
         }
 
-        let Some(blob) = self.resources.get(key) else {
-            return Ok(StorageRead::DoesNotExist);
-        };
-        let InMemoryStorageKey::Resource { ty, .. } = key else {
+        let Some((blob, ty)) = self.entry(key) else {
             return Ok(StorageRead::DoesNotExist);
         };
 
         let mut materialized = self.materialized.borrow_mut();
-        match materialize_one(&mut materialized.heap, self.guard, *ty, blob) {
+        match materialize_one(&mut materialized.heap, self.guard, ty, blob) {
             Some(ptr) => {
                 materialized.cache.insert(key.clone(), ptr);
                 Ok(StorageRead::ExternalHeap { ptr, version: 0 })
