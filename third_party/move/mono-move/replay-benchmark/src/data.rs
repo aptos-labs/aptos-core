@@ -53,6 +53,7 @@ impl TStateView for ReadSet {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
+        // TODO(correctness): record the real usage at capture and return it here.
         Ok(StateStorageUsage::new_untracked())
     }
 }

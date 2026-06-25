@@ -12,7 +12,9 @@ use crate::{
     BenchmarkRun,
 };
 use anyhow::{anyhow, bail, Context, Result};
-use aptos_types::transaction::user_transaction_context::TransactionIndexKind;
+use aptos_types::{
+    state_store::TStateView, transaction::user_transaction_context::TransactionIndexKind,
+};
 use bytes::Bytes;
 use mono_move_core::{
     intern_sig_token,
@@ -102,7 +104,11 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         reserved_byte,
     ));
     extensions.add(ObjectContextExtension::new());
-    extensions.add(StorageUsageAtEpochBoundary::new(0, 0));
+    let usage = input.read_set.get_usage()?;
+    extensions.add(StorageUsageAtEpochBoundary::new(
+        usage.items() as u64,
+        usage.bytes() as u64,
+    ));
     extensions.add(EventStore::new());
 
     let mut txn_ctx = TransactionContext::new(

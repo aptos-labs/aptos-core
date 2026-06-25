@@ -40,6 +40,7 @@ impl std::fmt::Display for FailureKind {
 /// A VM-agnostic execution outcome, in one of the three comparable categories.
 pub enum ExecOutcome {
     /// The entry function returned.
+    /// TODO(completeness): also compare write sets.
     Success { events: Vec<String> },
     /// The function executed a Move `abort` with this code. `message` is the optional abort message
     /// (populated only for the message form of abort).

@@ -16,10 +16,8 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
-aptos-framework-natives = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-rest-client = { workspace = true }
-aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
