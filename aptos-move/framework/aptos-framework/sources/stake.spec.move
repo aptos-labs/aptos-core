@@ -504,6 +504,10 @@ spec aptos_framework::stake {
         ensures post_stake_pool.delegated_voter == new_voter;
     }
 
+    spec initialize_pending_transaction_fee {
+        modifies global<PendingTransactionFee>(@aptos_framework);
+    }
+
     spec on_new_epoch {
         pragma verify = false; // TODO: set because of timeout (property proved).
         pragma disable_invariants_in_body;
@@ -661,6 +665,7 @@ spec aptos_framework::stake {
     }
 
     spec distribute_rewards {
+        pragma opaque;
         pragma aborts_if_is_partial;
         include ResourceRequirement;
         requires rewards_rate <= MAX_REWARDS_RATE;
@@ -713,25 +718,26 @@ spec aptos_framework::stake {
                 rewards_rate_denominator
             )
         } else { 0 };
-        let amount = rewards_amount;
         let addr = type_info::type_of<AptosCoin>().account_address;
         aborts_if (rewards_amount > 0) && !exists<coin::CoinInfo<AptosCoin>>(addr);
+        aborts_if (rewards_amount > 0) && (stake.value + rewards_amount > MAX_U64);
         modifies global<coin::CoinInfo<AptosCoin>>(addr);
-        include (rewards_amount > 0) ==>
-            coin::CoinAddAbortsIf<AptosCoin> { amount: amount };
     }
 
     spec get_reconfig_start_time_secs(): u64 {
         include GetReconfigStartTimeRequirement;
+        aborts_if false;
+        ensures result == spec_get_reconfig_start_time_secs();
     }
 
     spec schema GetReconfigStartTimeRequirement {
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        include reconfiguration_state::StartTimeSecsRequirement;
+        include reconfiguration_state::spec_is_in_progress() ==>
+            reconfiguration_state::StartTimeSecsRequirement;
     }
 
     spec fun spec_get_reconfig_start_time_secs(): u64 {
-        if (exists<reconfiguration_state::State>(@aptos_framework)) {
+        if (reconfiguration_state::spec_is_in_progress()) {
             reconfiguration_state::spec_start_time_secs()
         } else {
             timestamp::spec_now_seconds()

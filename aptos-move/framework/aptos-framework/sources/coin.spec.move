@@ -358,6 +358,8 @@ spec aptos_framework::coin {
     }
 
     spec extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
+        pragma opaque;
+        aborts_if false;
         ensures result.value == old(coin).value;
         ensures coin.value == 0;
     }
@@ -477,8 +479,11 @@ spec aptos_framework::coin {
     }
 
     spec merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+        pragma opaque;
+        aborts_if dst_coin.value + source_coin.value > MAX_U64;
         /// [high-level-req-3]
         ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
+        ensures supply<CoinType> == old(supply<CoinType>);
     }
 
     /// An account can only be registered once.

@@ -42,7 +42,7 @@ spec aptos_framework::block {
     ///
     spec module {
         use aptos_framework::chain_status;
-        pragma verify = false;
+        pragma verify = true;
         // After genesis, `BlockResource` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
         // After genesis, `CommitHistory` exist.
@@ -59,7 +59,6 @@ spec aptos_framework::block {
     }
 
     spec block_prologue_common {
-        pragma verify = true;
         pragma opaque;
         include BlockRequirement;
         aborts_if false;
@@ -75,23 +74,32 @@ spec aptos_framework::block {
             old(global<BlockResource>(@aptos_framework).new_block_events.counter);
         ensures global<BlockResource>(@aptos_framework).epoch_interval ==
             old(global<BlockResource>(@aptos_framework).epoch_interval);
+        ensures timestamp::spec_now_microseconds() == timestamp;
     }
 
     spec block_prologue {
-
-        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
-        requires timestamp >= reconfiguration::last_reconfiguration_time();
-        include BlockRequirement;
-        aborts_if false;
+        // Body inlines reconfigure(); defer until reconfigure is opaque.
+        pragma verify = false;
     }
 
     spec block_prologue_ext {
-        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
-        requires timestamp >= reconfiguration::last_reconfiguration_time();
-        include BlockRequirement;
-        include stake::ResourceRequirement;
-        include stake::GetReconfigStartTimeRequirement;
-        aborts_if false;
+        // Body inlines reconfigure(); defer until reconfigure is opaque.
+        pragma verify = false;
+    }
+
+    spec block_prologue_ext_v2 {
+        // Body inlines reconfigure(); defer until reconfigure is opaque.
+        pragma verify = false;
+    }
+
+    spec block_prologue_ext_v3 {
+        // Body inlines reconfigure(); defer until reconfigure is opaque.
+        pragma verify = false;
+    }
+
+    spec block_epilogue {
+        // Defer until stake::record_fee has an opaque spec.
+        pragma verify = false;
     }
 
     spec emit_genesis_block_event {
@@ -138,6 +146,16 @@ spec aptos_framework::block {
         let addr = signer::address_of(aptos_framework);
         let account = global<account::Account>(addr);
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+    }
+
+    spec initialize_commit_history(fx: &signer, max_capacity: u32) {
+        use std::signer;
+        let addr = signer::address_of(fx);
+        aborts_if max_capacity == 0;
+        aborts_if exists<CommitHistory>(addr);
+        ensures exists<CommitHistory>(addr);
+        ensures global<CommitHistory>(addr).max_capacity == max_capacity;
+        ensures global<CommitHistory>(addr).next_idx == 0;
     }
 
     spec schema BlockRequirement {
