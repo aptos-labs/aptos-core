@@ -15,21 +15,16 @@ use crate::{
     BenchmarkRun,
 };
 use anyhow::anyhow;
-use aptos_framework_natives::{
-    aggregator_natives::NativeAggregatorContext,
-    code::NativeCodeContext,
-    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
-    event::NativeEventContext,
-    object::NativeObjectContext,
-    randomness::RandomnessContext,
-    state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
+use aptos_types::{
+    chain_id::ChainId, transaction::user_transaction_context::UserTransactionContext,
 };
-use aptos_table_natives::NativeTableContext;
-use aptos_types::transaction::user_transaction_context::UserTransactionContext;
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
+use aptos_vm::{
+    data_cache::AsMoveResolver,
+    move_vm_ext::{session::make_aptos_extensions, AptosMoveResolver, SessionId},
+};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use mono_move_testsuite::finalize_events_v1;
 use move_binary_format::errors::{VMError, VMResult};
 use move_core_types::{
     identifier::IdentStr,
@@ -38,11 +33,11 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType, VMStatus},
 };
 use move_vm_runtime::{
+    config::VMConfig,
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
-    native_extensions::NativeContextExtensions,
     InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction, Loader,
 };
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
@@ -81,6 +76,8 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> anyhow::Result<Benc
             &args,
             &input.user_context,
             input.chain_id,
+            &input.session_id,
+            env.vm_config(),
         )?;
 
         // Timing: measure only "deserialize args + execute" across many samples.
@@ -94,42 +91,13 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> anyhow::Result<Benc
                 &args,
                 &input.user_context,
                 input.chain_id,
+                &input.session_id,
+                env.vm_config(),
             )
         });
 
         Ok(BenchmarkRun { outcome, samples })
     })
-}
-
-/// Builds the Aptos native context extensions, backed by the read-set resolver and the
-/// transaction's [`UserTransactionContext`]. The transaction hash is stubbed.
-fn build_extensions<'a, R: AptosMoveResolver>(
-    resolver: &'a R,
-    user_context: &UserTransactionContext,
-    chain_id: u8,
-) -> NativeContextExtensions<'a> {
-    let mut extensions = NativeContextExtensions::default();
-    extensions.add(NativeTableContext::new([0u8; 32], resolver));
-    extensions.add(NativeRistrettoPointContext::new());
-    extensions.add(AlgebraContext::new());
-    extensions.add(NativeAggregatorContext::new(
-        [0u8; 32], resolver, false, resolver,
-    ));
-    let mut randomness = RandomnessContext::new();
-    randomness.mark_unbiasable();
-    extensions.add(randomness);
-    extensions.add(NativeTransactionContext::new(
-        vec![0u8; 32],
-        vec![],
-        chain_id,
-        Some(user_context.clone()),
-        0,
-    ));
-    extensions.add(NativeCodeContext::new());
-    extensions.add(NativeStateStorageContext::new(resolver));
-    extensions.add(NativeEventContext::default());
-    extensions.add(NativeObjectContext::default());
-    extensions
 }
 
 fn load<L: InstantiatedFunctionLoader>(
@@ -184,13 +152,21 @@ fn trial<L: Loader + InstantiatedFunctionLoader, R: AptosMoveResolver>(
     ty_args: &[TypeTag],
     args: &[Vec<u8>],
     user_context: &UserTransactionContext,
-    chain_id: u8,
+    chain_id: ChainId,
+    session_id: &SessionId,
+    vm_config: &VMConfig,
 ) -> anyhow::Result<ExecOutcome> {
     let mut data_cache = TransactionDataCache::empty();
     let mut gas_meter = UnmeteredGasMeter;
     let traversal_storage = TraversalStorage::new();
     let mut traversal_context = TraversalContext::new(&traversal_storage);
-    let mut extensions = build_extensions(resolver, user_context, chain_id);
+    let mut extensions = make_aptos_extensions(
+        resolver,
+        chain_id,
+        vm_config,
+        session_id.clone(),
+        Some(user_context.clone()),
+    );
 
     let func = load(loader, module_id, function_name, ty_args)
         .map_err(|e| anyhow!("failed to load entry function: {:?}", e))?;
@@ -204,10 +180,13 @@ fn trial<L: Loader + InstantiatedFunctionLoader, R: AptosMoveResolver>(
         loader,
     );
 
-    match result {
-        Ok(_) => Ok(ExecOutcome::Success),
-        Err(err) => Ok(classify_error(err)),
-    }
+    let outcome = match result {
+        Ok(_) => ExecOutcome::Success {
+            events: finalize_events_v1(&extensions),
+        },
+        Err(err) => classify_error(err),
+    };
+    Ok(outcome)
 }
 
 /// Times a single "deserialize args + execute" region. Per-run state (the empty data cache, fresh
@@ -221,13 +200,21 @@ fn timed_once<L: Loader + InstantiatedFunctionLoader, R: AptosMoveResolver>(
     ty_args: &[TypeTag],
     args: &[Vec<u8>],
     user_context: &UserTransactionContext,
-    chain_id: u8,
+    chain_id: ChainId,
+    session_id: &SessionId,
+    vm_config: &VMConfig,
 ) -> Duration {
     let mut data_cache = TransactionDataCache::empty();
     let mut gas_meter = UnmeteredGasMeter;
     let traversal_storage = TraversalStorage::new();
     let mut traversal_context = TraversalContext::new(&traversal_storage);
-    let mut extensions = build_extensions(resolver, user_context, chain_id);
+    let mut extensions = make_aptos_extensions(
+        resolver,
+        chain_id,
+        vm_config,
+        session_id.clone(),
+        Some(user_context.clone()),
+    );
     let func = load(loader, module_id, function_name, ty_args)
         .expect("entry function was already loaded during setup");
     let call_args = args.to_vec();

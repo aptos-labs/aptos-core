@@ -12,6 +12,7 @@ use crate::{
     BenchmarkRun,
 };
 use anyhow::{anyhow, bail, Context, Result};
+use aptos_types::transaction::user_transaction_context::TransactionIndexKind;
 use bytes::Bytes;
 use mono_move_core::{
     intern_sig_token,
@@ -30,7 +31,7 @@ use mono_move_natives::{
 use mono_move_runtime::{
     ExecutionContext, InterpreterContext, RuntimeError, RuntimeStatus, TransactionContext,
 };
-use mono_move_testsuite::{build_natives, InMemoryModuleProvider};
+use mono_move_testsuite::{build_natives, finalize_events_v2, InMemoryModuleProvider};
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_core_types::{identifier::IdentStr, language_storage::TypeTag};
 use std::time::Instant;
@@ -84,8 +85,20 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         .max(MIN_ARENA_BYTES);
     let resource_provider = ReadSetResourceProvider::new(&guard, &resources, arena_size);
 
+    let (transaction_index, reserved_byte) = match input.user_context.transaction_index_kind() {
+        TransactionIndexKind::BlockExecution { transaction_index } => (transaction_index, 0),
+        TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
+            (transaction_index, 1)
+        },
+        TransactionIndexKind::NotAvailable => (0, 0),
+    };
     let mut extensions = NativeExtensions::new();
-    extensions.add(TransactionContextExtension::new(vec![0u8; 32], 0, 0, 0));
+    extensions.add(TransactionContextExtension::new(
+        input.session_id.txn_hash().to_vec(),
+        input.session_id.session_counter(),
+        transaction_index,
+        reserved_byte,
+    ));
     extensions.add(ObjectContextExtension::new());
     extensions.add(StorageUsageAtEpochBoundary::new(0, 0));
     extensions.add(EventStore::new());
@@ -139,7 +152,12 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         input.entry.args(),
     )?;
     let outcome = match interp.run() {
-        Ok(RuntimeStatus::Success) => ExecOutcome::Success,
+        Ok(RuntimeStatus::Success) => {
+            // Capture events while the trial run's heap is still live (before the timed runs reset
+            // it). SAFETY: the heap objects backing each event value are still live here.
+            let events = unsafe { finalize_events_v2(interp.extensions(), &guard) };
+            ExecOutcome::Success { events }
+        },
         Ok(RuntimeStatus::Aborted { code, message }) => ExecOutcome::Aborted { code, message },
         Err(err) => classify_error(err),
     };

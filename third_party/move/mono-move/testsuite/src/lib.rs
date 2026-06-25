@@ -22,3 +22,4 @@ pub use engine::{
     build_natives, with_loaded_mono_function, with_mono_function, MonoRunner, RunResult,
 };
 pub use module_provider::InMemoryModuleProvider;
+pub use runner::{finalize_events_v1, finalize_events_v2};

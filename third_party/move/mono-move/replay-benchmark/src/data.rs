@@ -8,6 +8,7 @@
 use anyhow::{bail, Context};
 use aptos_types::{
     access_path::Path,
+    chain_id::ChainId,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         state_slot::{StateSlot, StateSlotKind},
@@ -17,10 +18,11 @@ use aptos_types::{
     },
     transaction::{
         user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-        EntryFunction, PersistedAuxiliaryInfo, Transaction, TransactionBlock,
+        EntryFunction, PersistedAuxiliaryInfo, ReplayProtector, Transaction, TransactionBlock,
         TransactionExecutableRef, Version,
     },
 };
+use aptos_vm::move_vm_ext::SessionId;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
@@ -137,7 +139,9 @@ pub struct BenchmarkInput {
     /// abort early without it).
     pub user_context: UserTransactionContext,
     /// The transaction's chain id.
-    pub chain_id: u8,
+    pub chain_id: ChainId,
+    /// The transaction's session id.
+    pub session_id: SessionId,
     /// The complete read-set the transaction's block touched. Shared across the block's
     /// transactions; a superset of any single transaction's reads, which is fine for replay.
     pub read_set: Arc<ReadSet>,
@@ -180,7 +184,7 @@ pub fn load_inputs(
         let mut version = block.begin_version;
         for (i, txn) in block.transactions.iter().enumerate() {
             let aux_info = block.persisted_auxiliary_infos.get(i);
-            if let Some((sender, entry, user_context, chain_id)) =
+            if let Some((sender, entry, user_context, chain_id, session_id)) =
                 parse_user_transaction(txn, aux_info)
             {
                 inputs.push(BenchmarkInput {
@@ -189,6 +193,7 @@ pub fn load_inputs(
                     entry,
                     user_context,
                     chain_id,
+                    session_id,
                     read_set: Arc::clone(&read_set),
                 });
             }
@@ -239,7 +244,13 @@ pub fn load_inputs_from_dir(dir: impl AsRef<FsPath>) -> anyhow::Result<Vec<Bench
 fn parse_user_transaction(
     txn: &Transaction,
     aux_info: Option<&PersistedAuxiliaryInfo>,
-) -> Option<(AccountAddress, EntryFunction, UserTransactionContext, u8)> {
+) -> Option<(
+    AccountAddress,
+    EntryFunction,
+    UserTransactionContext,
+    ChainId,
+    SessionId,
+)> {
     let signed = match txn {
         Transaction::UserTransaction(signed) => signed,
         _ => return None,
@@ -250,7 +261,7 @@ fn parse_user_transaction(
     };
 
     let sender = signed.sender();
-    let chain_id = signed.chain_id().id();
+    let chain_id = signed.chain_id();
     let authenticator = signed.authenticator();
     let secondary_signers = authenticator.secondary_signer_addresses();
     let gas_payer = authenticator.fee_payer_address().unwrap_or(sender);
@@ -274,13 +285,27 @@ fn parse_user_transaction(
         gas_payer,
         signed.max_gas_amount(),
         signed.gas_unit_price(),
-        chain_id,
+        chain_id.id(),
         Some(entry.as_entry_function_payload()),
         None,
         transaction_index_kind,
         false,
     );
-    Some((sender, entry, user_context, chain_id))
+    // Session id from the replay protector (entry functions have no script hash).
+    let session_id = match signed.replay_protector() {
+        ReplayProtector::SequenceNumber(sequence_number) => SessionId::Txn {
+            sender,
+            sequence_number,
+            script_hash: vec![],
+        },
+        ReplayProtector::Nonce(nonce) => SessionId::OrderlessTxn {
+            sender,
+            nonce,
+            expiration_time: signed.expiration_timestamp_secs(),
+            script_hash: vec![],
+        },
+    };
+    Some((sender, entry, user_context, chain_id, session_id))
 }
 
 /// The account address of a `StateKey`, when it is an access-path key.

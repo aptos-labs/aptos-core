@@ -40,22 +40,12 @@ impl std::fmt::Display for FailureKind {
 /// A VM-agnostic execution outcome, in one of the three comparable categories.
 pub enum ExecOutcome {
     /// The entry function returned.
-    Success,
+    Success { events: Vec<String> },
     /// The function executed a Move `abort` with this code. `message` is the optional abort message
     /// (populated only for the message form of abort).
     Aborted { code: u64, message: Option<String> },
     /// A non-abort runtime failure, classified by kind (with detail for reporting).
     Failure { kind: FailureKind, detail: String },
-}
-
-impl ExecOutcome {
-    pub fn category(&self) -> &'static str {
-        match self {
-            ExecOutcome::Success => "success",
-            ExecOutcome::Aborted { .. } => "abort",
-            ExecOutcome::Failure { .. } => "failure",
-        }
-    }
 }
 
 /// The verdict of comparing the two VMs' outcomes.
@@ -81,7 +71,10 @@ pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Cor
     };
 
     match (v1, v2) {
-        (ExecOutcome::Success, ExecOutcome::Success) => Correctness::Match,
+        (
+            ExecOutcome::Success { events: v1_events },
+            ExecOutcome::Success { events: v2_events },
+        ) => compare_events(v1_events, v2_events),
         (
             ExecOutcome::Aborted {
                 code: c1,
@@ -131,8 +124,31 @@ pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Cor
 
 fn describe(outcome: &ExecOutcome) -> String {
     match outcome {
-        ExecOutcome::Success => "success".to_string(),
+        ExecOutcome::Success { .. } => "success".to_string(),
         ExecOutcome::Aborted { code, .. } => format!("abort(code={})", code),
         ExecOutcome::Failure { kind, .. } => format!("failure({})", kind),
     }
+}
+
+/// Compares the events emitted by the two VMs. Each event is a normalized rendering (type, kind,
+/// and payload) produced by the shared testsuite renderers; events are emitted in a deterministic
+/// order, so the sequences must agree element-for-element.
+fn compare_events(v1: &[String], v2: &[String]) -> Correctness {
+    if v1.len() != v2.len() {
+        return Correctness::Mismatch {
+            detail: format!(
+                "different event counts: V1 emitted {}, V2 emitted {}",
+                v1.len(),
+                v2.len()
+            ),
+        };
+    }
+    for (i, (e1, e2)) in v1.iter().zip(v2).enumerate() {
+        if e1 != e2 {
+            return Correctness::Mismatch {
+                detail: format!("event {} differs: V1 [{}], V2 [{}]", i, e1, e2),
+            };
+        }
+    }
+    Correctness::Match
 }
