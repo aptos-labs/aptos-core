@@ -54,6 +54,8 @@ spec aptos_framework::jwks {
     }
 
     spec remove_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>): Option<vector<u8>> {
+        // Raised above the default 40s because of prover timeout (property proved).
+        pragma verify_duration_estimate = 80;
         pragma opaque;
         pragma aborts_if_is_partial;
         aborts_if std::signer::address_of(fx) != @aptos_framework;
