@@ -91,6 +91,11 @@ struct BenchArgs {
     samples: usize,
     #[clap(long, help = "Benchmark at most this many transactions")]
     limit: Option<usize>,
+    #[clap(
+        long,
+        help = "Enable V1 (legacy Move VM) paranoid type checks (default: off)"
+    )]
+    v1_paranoid: bool,
 }
 
 #[derive(Parser)]
@@ -125,6 +130,9 @@ fn main() -> Result<()> {
 }
 
 fn bench(args: BenchArgs) -> Result<()> {
+    // Set once, before V1 builds its VM environment (it's a write-once global).
+    aptos_vm_environment::prod_configs::set_paranoid_type_checks(args.v1_paranoid);
+
     let timing = TimingConfig {
         warmup: args.warmup,
         samples: args.samples,

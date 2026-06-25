@@ -23,8 +23,8 @@ use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
 pub struct ReadSetResourceProvider<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
     /// BCS bytes of each read-set resource, keyed the same way MonoMove keys a `borrow_global`.
-    blobs: HashMap<InMemoryStorageKey, Vec<u8>>,
-    inner: RefCell<Materialized>,
+    resources: HashMap<InMemoryStorageKey, Vec<u8>>,
+    materialized: RefCell<Materialized>,
 }
 
 struct Materialized {
@@ -53,8 +53,8 @@ impl<'guard, 'ctx> ReadSetResourceProvider<'guard, 'ctx> {
         }
         Self {
             guard,
-            blobs,
-            inner: RefCell::new(Materialized {
+            resources: blobs,
+            materialized: RefCell::new(Materialized {
                 heap: Heap::new(heap_size),
                 cache: HashMap::new(),
             }),
@@ -66,23 +66,23 @@ impl ResourceProvider for ReadSetResourceProvider<'_, '_> {
     fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
         // Cache hit?
         {
-            let inner = self.inner.borrow();
-            if let Some(&ptr) = inner.cache.get(key) {
+            let materialized = self.materialized.borrow();
+            if let Some(&ptr) = materialized.cache.get(key) {
                 return Ok(StorageRead::ExternalHeap { ptr, version: 0 });
             }
         }
 
-        let Some(blob) = self.blobs.get(key) else {
+        let Some(blob) = self.resources.get(key) else {
             return Ok(StorageRead::DoesNotExist);
         };
         let InMemoryStorageKey::Resource { ty, .. } = key else {
             return Ok(StorageRead::DoesNotExist);
         };
 
-        let mut inner = self.inner.borrow_mut();
-        match materialize_one(&mut inner.heap, self.guard, *ty, blob) {
+        let mut materialized = self.materialized.borrow_mut();
+        match materialize_one(&mut materialized.heap, self.guard, *ty, blob) {
             Some(ptr) => {
-                inner.cache.insert(key.clone(), ptr);
+                materialized.cache.insert(key.clone(), ptr);
                 Ok(StorageRead::ExternalHeap { ptr, version: 0 })
             },
             None => Ok(StorageRead::DoesNotExist),

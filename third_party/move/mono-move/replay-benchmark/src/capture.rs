@@ -5,7 +5,7 @@
 //! transaction and a chain-backed state view, run it on V1 to record the read-set, then close the
 //! module dependency graph so V2 has every module it needs (not just the ones V1's path loads).
 
-use crate::data::{ReadSet, TransactionBlock};
+use crate::data::ReadSet;
 use anyhow::{anyhow, Context, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
@@ -24,7 +24,7 @@ use aptos_types::{
     },
     transaction::{
         signature_verified_transaction::into_signature_verified_block, AuxiliaryInfo,
-        PersistedAuxiliaryInfo, Transaction, Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionBlock, Version,
     },
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};

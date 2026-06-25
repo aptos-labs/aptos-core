@@ -14,10 +14,11 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use bytes::Bytes;
 use mono_move_core::{
+    intern_sig_token,
     native::NativeExtensions,
     types::{
-        InternedType, ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY,
-        SIGNER_TY, U128_TY, U16_TY, U256_TY, U32_TY, U64_TY, U8_TY,
+        InternedType, InternedTypeList, ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY,
+        I64_TY, I8_TY, SIGNER_TY, U128_TY, U16_TY, U256_TY, U32_TY, U64_TY, U8_TY,
     },
     Function, GasMeter, Interner, LoaderError,
 };
@@ -30,11 +31,7 @@ use mono_move_runtime::{
     ExecutionContext, InterpreterContext, RuntimeError, RuntimeStatus, TransactionContext,
 };
 use mono_move_testsuite::{build_natives, InMemoryModuleProvider};
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::{SignatureToken, StructHandleIndex},
-    CompiledModule,
-};
+use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_core_types::{identifier::IdentStr, language_storage::TypeTag};
 use std::time::Instant;
 
@@ -125,7 +122,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     };
 
     // Classify each parameter as a signer or a value.
-    let params = classify_params(&module, input.entry.function(), &guard, &interned_ty_args)?;
+    let params = classify_params(&module, input.entry.function(), &guard, ty_arg_list)?;
 
     // Sender bytes backing any `&signer` parameter; must outlive every run.
     let signer_bytes = input.sender.into_bytes();
@@ -181,7 +178,7 @@ fn classify_params(
     module: &CompiledModule,
     function_name: &IdentStr,
     guard: &ExecutionGuard,
-    ty_args: &[InternedType],
+    ty_args: InternedTypeList,
 ) -> Result<Vec<ParamKind>> {
     for def in module.function_defs() {
         let handle = module.function_handle_at(def.function);
@@ -204,7 +201,7 @@ fn classify_params(
 fn classify_token(
     guard: &ExecutionGuard,
     module: &CompiledModule,
-    ty_args: &[InternedType],
+    ty_args: InternedTypeList,
     token: &SignatureToken,
 ) -> Result<ParamKind> {
     use SignatureToken as S;
@@ -214,7 +211,7 @@ fn classify_token(
             ParamKind::Signer { by_ref: true }
         },
         other => ParamKind::Value {
-            ty: intern_signature_token(guard, module, ty_args, other)?,
+            ty: guard.subst_type(intern_sig_token(other, module, guard)?, ty_args)?,
         },
     })
 }
@@ -318,6 +315,7 @@ fn classify_loader_error(err: &LoaderError) -> FailureKind {
 
 /// Interns a runtime [`TypeTag`] (e.g. a transaction's type argument, or a resource's struct tag)
 /// into a MonoMove [`InternedType`].
+/// TODO(cleanup): Move to interner.rs.
 pub(crate) fn intern_type_tag(guard: &ExecutionGuard, tag: &TypeTag) -> Result<InternedType> {
     Ok(match tag {
         TypeTag::Bool => BOOL_TY,
@@ -348,72 +346,6 @@ pub(crate) fn intern_type_tag(guard: &ExecutionGuard, tag: &TypeTag) -> Result<I
             let ty_args = guard.type_list_of(&args);
             guard.nominal_of(module_id, name, ty_args)
         },
-        TypeTag::Function(_) => bail!("function types are not supported for interning"),
+        TypeTag::Function(_) => bail!("function type tags are not supported"),
     })
-}
-
-/// Interns a [`SignatureToken`] (a parameter/field type read from a module's bytecode) into a
-/// MonoMove [`InternedType`], resolving struct handles against `module` and substituting type
-/// parameters with the (already-interned) `ty_args`.
-fn intern_signature_token(
-    guard: &ExecutionGuard,
-    module: &CompiledModule,
-    ty_args: &[InternedType],
-    token: &SignatureToken,
-) -> Result<InternedType> {
-    use SignatureToken as S;
-    Ok(match token {
-        S::Bool => BOOL_TY,
-        S::U8 => U8_TY,
-        S::U16 => U16_TY,
-        S::U32 => U32_TY,
-        S::U64 => U64_TY,
-        S::U128 => U128_TY,
-        S::U256 => U256_TY,
-        S::I8 => I8_TY,
-        S::I16 => I16_TY,
-        S::I32 => I32_TY,
-        S::I64 => I64_TY,
-        S::I128 => I128_TY,
-        S::I256 => I256_TY,
-        S::Address => ADDRESS_TY,
-        S::Signer => SIGNER_TY,
-        S::Vector(elem) => guard.vector_of(intern_signature_token(guard, module, ty_args, elem)?),
-        S::Reference(inner) => {
-            guard.immut_ref_of(intern_signature_token(guard, module, ty_args, inner)?)
-        },
-        S::MutableReference(inner) => {
-            guard.mut_ref_of(intern_signature_token(guard, module, ty_args, inner)?)
-        },
-        S::TypeParameter(idx) => *ty_args
-            .get(*idx as usize)
-            .ok_or_else(|| anyhow::anyhow!("type parameter {} out of range", idx))?,
-        S::Struct(handle) => intern_struct(guard, module, *handle, &[])?,
-        S::StructInstantiation(handle, args) => {
-            let args = args
-                .iter()
-                .map(|arg| intern_signature_token(guard, module, ty_args, arg))
-                .collect::<Result<Vec<_>>>()?;
-            intern_struct(guard, module, *handle, &args)?
-        },
-        S::Function(..) => bail!("function types are not supported for interning"),
-    })
-}
-
-fn intern_struct(
-    guard: &ExecutionGuard,
-    module: &CompiledModule,
-    handle: StructHandleIndex,
-    args: &[InternedType],
-) -> Result<InternedType> {
-    let struct_handle = module.struct_handle_at(handle);
-    let module_handle = module.module_handle_at(struct_handle.module);
-    let address = module.address_identifier_at(module_handle.address);
-    let module_name = module.identifier_at(module_handle.name);
-    let struct_name = module.identifier_at(struct_handle.name);
-
-    let module_id = guard.module_id_of(address, module_name);
-    let name = guard.identifier_of(struct_name);
-    let ty_args = guard.type_list_of(args);
-    Ok(guard.nominal_of(module_id, name, ty_args))
 }

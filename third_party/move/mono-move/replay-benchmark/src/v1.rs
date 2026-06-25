@@ -14,7 +14,7 @@ use crate::{
     timing::{collect_samples, TimingConfig},
     BenchmarkRun,
 };
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use aptos_framework_natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
@@ -25,15 +25,11 @@ use aptos_framework_natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_table_natives::NativeTableContext;
-use aptos_types::{
-    on_chain_config::{Features, TimedFeaturesBuilder},
-    transaction::user_transaction_context::UserTransactionContext,
-};
-use aptos_vm::{
-    data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver, natives::aptos_natives,
-};
+use aptos_types::transaction::user_transaction_context::UserTransactionContext;
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
+use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use move_binary_format::errors::{VMError, VMResult};
 use move_core_types::{
     identifier::IdentStr,
@@ -42,25 +38,23 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType, VMStatus},
 };
 use move_vm_runtime::{
-    config::VMConfig,
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
-    AsUnsyncModuleStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction, Loader,
-    RuntimeEnvironment,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction, Loader,
 };
-use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
 use std::time::{Duration, Instant};
 
 /// Runs the entry function on the legacy Move VM, returning its outcome and timing.
 pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> anyhow::Result<BenchmarkRun> {
-    // One-time setup. Modules come from in-memory storage; resources and native-extension data come
-    // from the Aptos resolver over the read-set.
-    let storage = build_storage(input).context("failed to build V1 in-memory module storage")?;
-    let module_storage = storage.as_unsync_module_storage();
+    // One-time setup. The VM environment (features, gas params, VM config) and module storage come
+    // from the transaction's on-chain state in the read-set; resources and native-extension data
+    // come from the Aptos resolver over the same read-set.
+    let env = AptosEnvironment::new(input.read_set.as_ref());
+    let module_storage = input.read_set.as_ref().as_aptos_code_storage(&env);
     let resolver = input.read_set.as_ref().as_move_resolver();
 
     let module_id = input.entry.module().clone();
@@ -105,28 +99,6 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> anyhow::Result<Benc
 
         Ok(BenchmarkRun { outcome, samples })
     })
-}
-
-/// Builds in-memory storage holding the read-set's module bytecode.
-fn build_storage(input: &BenchmarkInput) -> anyhow::Result<InMemoryStorage> {
-    let natives = aptos_natives(
-        LATEST_GAS_FEATURE_VERSION,
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
-        TimedFeaturesBuilder::enable_all().build(),
-        Features::default(),
-    );
-    let vm_config = VMConfig {
-        paranoid_type_checks: false,
-        ..VMConfig::default()
-    };
-    let env = RuntimeEnvironment::new_with_config(natives, vm_config);
-    let mut storage = InMemoryStorage::new_with_runtime_environment(env);
-
-    for (module_id, bytes) in input.read_set.modules() {
-        storage.add_module_bytes(module_id.address(), module_id.name(), bytes.into());
-    }
-    Ok(storage)
 }
 
 /// Builds the Aptos native context extensions, backed by the read-set resolver and the

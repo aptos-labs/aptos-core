@@ -17,7 +17,8 @@ use aptos_types::{
     },
     transaction::{
         user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-        EntryFunction, PersistedAuxiliaryInfo, Transaction, TransactionExecutableRef, Version,
+        EntryFunction, PersistedAuxiliaryInfo, Transaction, TransactionBlock,
+        TransactionExecutableRef, Version,
     },
 };
 use move_core_types::{
@@ -30,19 +31,6 @@ use std::{
     path::Path as FsPath,
     sync::Arc,
 };
-
-/// On-disk representation of a block of transactions, matching
-/// `aptos_replay_benchmark::workload::TransactionBlock`.
-#[derive(Serialize, Deserialize)]
-pub struct TransactionBlock {
-    /// The version of the first transaction in the block.
-    pub begin_version: Version,
-    /// Non-empty list of transactions in a block.
-    pub transactions: Vec<Transaction>,
-    /// Persisted auxiliary info for each transaction, aligned with `transactions`.
-    #[serde(default = "Vec::new")]
-    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
-}
 
 /// The complete read-set a block touched, matching `aptos_replay_benchmark::state_view::ReadSet`.
 /// Keyed by [`StateKey`] (modules, resources, and resource groups all live here).
