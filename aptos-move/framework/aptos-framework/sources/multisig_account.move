@@ -1131,7 +1131,14 @@ module aptos_framework::multisig_account {
         multisig_account_resource.metadata = simple_map::create<String, vector<u8>>();
         let metadata = &mut multisig_account_resource.metadata;
         let i = 0;
-        while (i < num_attributes) {
+        while ({
+            spec {
+                invariant i <= num_attributes;
+                invariant forall k in 0..i: simple_map::spec_contains_key(metadata, keys[k]);
+                invariant forall m in 0..i, n in 0..i: m != n ==> keys[m] != keys[n];
+            };
+            i < num_attributes
+        }) {
             let key = keys[i];
             let value = values[i];
             assert!(

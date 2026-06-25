@@ -106,6 +106,7 @@ spec aptos_framework::randomness {
     }
 
     spec u256_integer_internal(): u256 {
+        pragma opaque;
         pragma unroll = 32;
         include NextBlobAbortsIf;
     }
@@ -119,7 +120,6 @@ spec aptos_framework::randomness {
     }
 
     spec u64_range(min_incl: u64, max_excl: u64): u64 {
-        pragma seed = 2;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
@@ -132,6 +132,13 @@ spec aptos_framework::randomness {
     }
 
     spec safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {
+        aborts_if m < b;
+        aborts_if a < m - b && a + b > MAX_U256;
+        ensures result == spec_safe_add_mod(a, b, m);
+    }
+
+    spec safe_add_mod(a: u256, b: u256, m: u256): u256 {
+        pragma opaque;
         aborts_if m < b;
         aborts_if a < m - b && a + b > MAX_U256;
         ensures result == spec_safe_add_mod(a, b, m);
@@ -151,7 +158,6 @@ spec aptos_framework::randomness {
     }
 
     spec u64_range_internal(min_incl: u64, max_excl: u64): u64 {
-        pragma seed = 2;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;

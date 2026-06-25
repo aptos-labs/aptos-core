@@ -33,3 +33,7 @@ module std::signer {
     /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.
     spec native fun is_txn_signer_addr(a: address): bool;
 }
+
+spec std::signer {
+    spec fun spec_is_permissioned_signer_impl(s: signer): bool;
+}

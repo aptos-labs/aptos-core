@@ -121,6 +121,8 @@ spec aptos_std::big_vector {
         ensures forall idx in 0..self.length()
             where idx != i && idx != j:
             spec_at(self, idx) == spec_at(old(self), idx);
+    } proof {
+        split (i / self.bucket_size) == (j / self.bucket_size);
     }
 
     spec append<T: store>(self: &mut BigVector<T>, other: BigVector<T>) {
