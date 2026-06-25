@@ -1,0 +1,58 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+// PoC: TyParam in target signature binds to a Reference from caller's FuncType.
+// match_ty accepts the binding. Ability check passes (Reference has drop).
+// ty_to_ty_tag then rejects top-level Reference with UNKNOWN_INVARIANT_VIOLATION_ERROR.
+// The error escapes as a VM error instead of ReflectionError::FunctionIncompatibleType.
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::target
+
+public fun drop_it<T: drop>(x: T)
+    move_loc x
+    pop
+    ret
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::poc
+
+entry public fun trigger()
+    local mod_name: 0x1::string::String
+    local func_name: 0x1::string::String
+    local x: u64
+
+    ld_u64 42
+    st_loc x
+
+    // "target"
+    ld_const<vector<u8>> [116, 97, 114, 103, 101, 116]
+    call 0x1::string::utf8
+    st_loc mod_name
+
+    // "drop_it"
+    ld_const<vector<u8>> [100, 114, 111, 112, 95, 105, 116]
+    call 0x1::string::utf8
+    st_loc func_name
+
+    // Push the &u64 argument first (would be popped by call_closure).
+    borrow_loc x
+
+    // reflect::resolve<|&u64|>(Alice, &mod_name, &func_name).unwrap()
+    //   match_ty(TyParam(0), Reference(U64)) binds T=Reference(U64).
+    //   verify_ty_arg_abilities: T: drop, Reference has drop, passes.
+    //   new_resolved_not_capturing calls ty_to_ty_tag(Reference(U64)).
+    //   Top-level Reference is rejected by ty_to_ty_tag with
+    //   UNKNOWN_INVARIANT_VIOLATION_ERROR and escapes as a VM error.
+    ld_const<address> 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    borrow_loc mod_name
+    borrow_loc func_name
+    call 0x1::reflect::resolve<|&u64|>
+    call 0x1::result::unwrap<|&u64|, 0x1::reflect::ReflectionError>
+
+    // Stack type-wise: [&x, closure]. call_closure consumes both.
+    // Runtime never reaches here because resolve fails.
+    call_closure<|&u64|>
+    ret
+
+
+//# run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::poc::trigger

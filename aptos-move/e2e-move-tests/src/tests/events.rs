@@ -51,3 +51,22 @@ fn test_events_ty_tag_size_too_large() {
         ..
     }));
 }
+
+/// `0x1::event::emit` is not reflectable: the verifier's `#[event]`/locality rules
+/// (`validate_emit_calls`) cannot be upheld for a dynamically-resolved function value, so
+/// `reflect::resolve` rejects it with `FunctionNotAccessible`. The entry function asserts this
+/// internally, so a successful transaction confirms the resolution was rejected.
+#[test]
+fn test_event_emit_via_reflection() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("events.data/pack")));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        MemberId::from_str("0x815::test_module::resolve_emit_is_rejected").unwrap(),
+        vec![],
+        vec![]
+    ));
+}

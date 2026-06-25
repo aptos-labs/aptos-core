@@ -24,6 +24,13 @@ module std::reflect {
     /// In order to be accessible, the resolved function must be public. This prevents reflection to
     /// work around the languages modular encapsulation guarantees.
     ///
+    /// A small set of framework functions are additionally forbidden from being resolved (the call
+    /// returns `FunctionNotAccessible`), because their rules are enforced by the bytecode verifier at
+    /// the call site and cannot be upheld for a dynamically-resolved function value. Currently this
+    /// is only `0x1::event::emit`: the verifier restricts emitting an event to the module that
+    /// defines the `#[event]` type, so events are emitted by calling `event::emit` directly rather
+    /// than through reflection.
+    ///
     /// The resolved function can be generic, in which case the instantiation must be inferrible
     /// from the provided `FuncType`. For example, `public fun foo<T>(T)`, with `FunType = |u64|`,
     /// `T = u64` can be derived. If not all type parameters can be inferred, an error will be
@@ -49,7 +56,8 @@ module std::reflect {
         InvalidIdentifier,
         /// The module or function in the module cannot be found.
         FunctionNotFound,
-        /// The function in the module cannot be accessed. The function must be public.
+        /// The function in the module cannot be accessed: it is either not public, or it is one of
+        /// the functions forbidden from reflection (currently `0x1::event::emit`; see `resolve`).
         FunctionNotAccessible,
         /// The function exists and is accessible, but doesn't match the requested `FuncType`
         /// type argument.

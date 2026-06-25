@@ -1691,6 +1691,13 @@ impl<'a> TypeParamMap<'a> {
         match (ty, expected_ty) {
             // The important case, deduce the type params.
             (Type::TyParam(idx), _) => {
+                // A type parameter can never be instantiated with a reference type. Reject such a
+                // binding here so that the inferred instantiation stays well-formed (e.g., it can
+                // be converted to a type tag) rather than producing an invariant violation in a
+                // later stage.
+                if matches!(expected_ty, Type::Reference(_) | Type::MutableReference(_)) {
+                    return false;
+                }
                 use btree_map::Entry::*;
                 match self.map.entry(*idx) {
                     Occupied(occupied_entry) => *occupied_entry.get() == expected_ty,

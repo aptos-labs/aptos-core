@@ -1,0 +1,43 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+// PoC: the #[event] requirement cannot be bypassed via reflection. Resolving 0x1::event::emit is
+// rejected (FunctionNotAccessible), so the emit closure is never constructed and unwrap aborts.
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::poc
+
+struct NotAnEvent has copy+store+drop
+    value: u64
+
+entry public fun emit_without_event_attr()
+    local mod_name: 0x1::string::String
+    local func_name: 0x1::string::String
+    local emit_fn: |NotAnEvent|
+
+    // "event"
+    ld_const<vector<u8>> [101, 118, 101, 110, 116]
+    call 0x1::string::utf8
+    st_loc mod_name
+
+    // "emit"
+    ld_const<vector<u8>> [101, 109, 105, 116]
+    call 0x1::string::utf8
+    st_loc func_name
+
+    // resolve 0x1::event::emit<NotAnEvent>
+    ld_const<address> 0x1
+    borrow_loc mod_name
+    borrow_loc func_name
+    call 0x1::reflect::resolve<|NotAnEvent|>
+    call 0x1::result::unwrap<|NotAnEvent|, 0x1::reflect::ReflectionError>
+    st_loc emit_fn
+
+    // call: emit(NotAnEvent { value: 1337 })
+    ld_u64 1337
+    pack NotAnEvent
+    move_loc emit_fn
+    call_closure<|NotAnEvent|>
+    ret
+
+
+//# run --signers Alice --show-events -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::poc::emit_without_event_attr
