@@ -2926,7 +2926,7 @@ impl AptosVM {
         max_gas_amount: u64,
         make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters) -> G,
     ) -> (ViewFunctionOutput, Option<G>) {
-        let env = AptosEnvironment::new(state_view);
+        let env = AptosEnvironment::new_for_view_function(state_view);
         let vm = AptosVM::new(&env);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
