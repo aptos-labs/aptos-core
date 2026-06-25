@@ -2002,13 +2002,24 @@ fn index_range_check(max: usize) -> impl FnOnce(usize) -> Result<usize, ModelPar
 /// Truncate captured Boogie stdout/stderr for inclusion in a diagnostic
 /// message: when Boogie crashes we want enough context to debug, but a 100k-line
 /// log inlined into the codespan error renders the test output unreadable.
+/// Slices on a UTF-8 char boundary at or before `LIMIT` so non-ASCII bytes
+/// (rare in Boogie/Z3 output but possible) don't panic the prover while it's
+/// reporting a crash.
 fn truncate_for_diag(s: &str) -> String {
     const LIMIT: usize = 500;
     let trimmed = s.trim();
     if trimmed.is_empty() {
         "<empty>".to_string()
     } else if trimmed.len() > LIMIT {
-        format!("{}... ({} more bytes)", &trimmed[..LIMIT], trimmed.len() - LIMIT)
+        let mut cut = LIMIT;
+        while cut > 0 && !trimmed.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        format!(
+            "{}... ({} more bytes)",
+            &trimmed[..cut],
+            trimmed.len() - cut
+        )
     } else {
         trimmed.to_string()
     }
