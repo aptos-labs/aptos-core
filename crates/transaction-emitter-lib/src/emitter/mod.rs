@@ -1106,6 +1106,10 @@ pub struct OrderlessWaitOutcome {
     /// or the per-hash lookup itself errored. Reported separately from expired so the
     /// stat doesn't silently absorb undetected commits.
     pub unresolved: HashMap<AccountAddress, HashSet<HashValue>>,
+    /// Number of txns the per-hash fallback sweep confirmed on-chain. These are counted
+    /// as committed for TPS, but excluded from latency: the sweep runs past the
+    /// expiration deadline, so we don't have a meaningful completion time for them.
+    pub recovered: u64,
     pub sum_of_completion_timestamps_millis: u128,
 }
 
@@ -1121,6 +1125,7 @@ async fn wait_for_orderless_txns(
         return OrderlessWaitOutcome {
             expired: HashMap::new(),
             unresolved: HashMap::new(),
+            recovered: 0,
             sum_of_completion_timestamps_millis: 0,
         };
     }
@@ -1222,7 +1227,6 @@ async fn wait_for_orderless_txns(
     }
 
     classify_pending_orderless_txns(
-        start_time,
         client,
         pending_account_txns,
         fallback_lookup_cap,
@@ -1237,11 +1241,10 @@ async fn wait_for_orderless_txns(
 /// fan out unbounded API calls. Hashes beyond the cap are returned in `unresolved`
 /// rather than being silently bucketed as expired.
 async fn classify_pending_orderless_txns(
-    start_time: Instant,
     client: &RestClient,
     pending_account_txns: HashMap<AccountAddress, HashSet<HashValue>>,
     fallback_lookup_cap: usize,
-    mut sum_of_completion_timestamps_millis: u128,
+    sum_of_completion_timestamps_millis: u128,
 ) -> OrderlessWaitOutcome {
     let mut expired: HashMap<AccountAddress, HashSet<HashValue>> = HashMap::new();
     let mut unresolved: HashMap<AccountAddress, HashSet<HashValue>> = HashMap::new();
@@ -1250,6 +1253,7 @@ async fn classify_pending_orderless_txns(
         return OrderlessWaitOutcome {
             expired,
             unresolved,
+            recovered: 0,
             sum_of_completion_timestamps_millis,
         };
     }
@@ -1283,6 +1287,7 @@ async fn classify_pending_orderless_txns(
         return OrderlessWaitOutcome {
             expired,
             unresolved,
+            recovered: 0,
             sum_of_completion_timestamps_millis,
         };
     }
@@ -1292,7 +1297,6 @@ async fn classify_pending_orderless_txns(
     }))
     .await;
 
-    let millis_elapsed = start_time.elapsed().as_millis();
     let mut recovered = 0u64;
     let attempted = results.len() as u64;
     for (account, hash, result) in results {
@@ -1304,8 +1308,11 @@ async fn classify_pending_orderless_txns(
                     expired.entry(account).or_default().insert(hash);
                 } else {
                     // On-chain (success or VM failure both count as observed/committed).
+                    // Counted as committed for TPS, but deliberately not added to
+                    // sum_of_completion_timestamps_millis: this sweep runs past the
+                    // expiration deadline, so the elapsed time here is not a meaningful
+                    // commit latency. The caller excludes `recovered` from latency stats.
                     recovered += 1;
-                    sum_of_completion_timestamps_millis += millis_elapsed;
                 }
             },
             Err(RestError::Api(resp)) if resp.status_code == reqwest::StatusCode::NOT_FOUND => {
@@ -1334,6 +1341,7 @@ async fn classify_pending_orderless_txns(
     OrderlessWaitOutcome {
         expired,
         unresolved,
+        recovered,
         sum_of_completion_timestamps_millis,
     }
 }

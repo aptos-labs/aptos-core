@@ -389,22 +389,31 @@ impl SubmissionWorker {
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
-                let sum_latency = sum_of_completion_timestamps_millis_seq_nums
-                    .saturating_add(orderless_outcome.sum_of_completion_timestamps_millis)
-                    .saturating_sub(avg_txn_offset_time as u128 * num_committed as u128);
-                let avg_latency = (sum_latency / num_committed as u128) as u64;
-                loop_stats
-                    .latency
-                    .fetch_add(sum_latency as u64, Ordering::Relaxed);
-                loop_stats
-                    .latency_samples
-                    .fetch_add(num_committed as u64, Ordering::Relaxed);
-                loop_stats
-                    .latencies
-                    .record_data_point(avg_latency, num_committed as u64);
+                // Fallback-recovered orderless txns are counted as committed for TPS, but
+                // we have no meaningful commit time for them (the per-hash sweep runs past
+                // the expiration deadline). Exclude them from latency so they don't corrupt
+                // the cycle average / percentiles. `latency_count` therefore matches exactly
+                // the txns that contributed a completion timestamp to the sums above.
+                let latency_count =
+                    num_committed.saturating_sub(orderless_outcome.recovered as usize);
+                if latency_count > 0 {
+                    let sum_latency = sum_of_completion_timestamps_millis_seq_nums
+                        .saturating_add(orderless_outcome.sum_of_completion_timestamps_millis)
+                        .saturating_sub(avg_txn_offset_time as u128 * latency_count as u128);
+                    let avg_latency = (sum_latency / latency_count as u128) as u64;
+                    loop_stats
+                        .latency
+                        .fetch_add(sum_latency as u64, Ordering::Relaxed);
+                    loop_stats
+                        .latency_samples
+                        .fetch_add(latency_count as u64, Ordering::Relaxed);
+                    loop_stats
+                        .latencies
+                        .record_data_point(avg_latency, latency_count as u64);
 
-                // Record Prometheus latency metric (once per committed txn for accurate percentiles)
-                record_latency_ms(avg_latency, num_committed as u64);
+                    // Record Prometheus latency metric (once per committed txn for accurate percentiles)
+                    record_latency_ms(avg_latency, latency_count as u64);
+                }
             }
         }
     }
