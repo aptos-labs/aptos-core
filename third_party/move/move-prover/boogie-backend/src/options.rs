@@ -54,6 +54,29 @@ impl VectorTheory {
     }
 }
 
+/// Partition granularity for verification: how verify targets are grouped into
+/// `.bpl` files.
+///
+/// - `Shard`: one `.bpl` per hash-shard (or one per package when `shards == 1`).
+///   The historical default; Boogie parallelizes procedures inside each shard
+///   via `-vcsCores`. Shards are processed sequentially by the driver.
+/// - `Module`: one `.bpl` per source module that contains verify targets. The
+///   driver runs up to `proc_cores` modules concurrently; `-vcsCores` is forced
+///   to 1 inside each Boogie process to avoid the `proc_cores²` thread fan-out
+///   that empirically triggers Boogie/.NET SIGSEGVs under contention.
+/// - `Vc`: one `.bpl` per (function-id, FunctionVariant::Verification) pair.
+///   `-vcsCores` is also forced to 1; the driver runs up to `proc_cores` Boogie
+///   processes concurrently. Used for the finest isolation and per-VC
+///   diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum, Default)]
+#[clap(rename_all = "kebab-case")]
+pub enum VerifyGranularity {
+    #[default]
+    Shard,
+    Module,
+    Vc,
+}
+
 /// Options to define custom native functions to include in generated Boogie file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomNativeOptions {
@@ -209,6 +232,14 @@ pub struct BoogieOptions {
     /// timeouts.
     #[arg(long)]
     pub split_vcs_by_assert: bool,
+    /// Granularity for partitioning verify targets into `.bpl` files.
+    /// `shard` (default) groups by hash partition (compatible with `--shards`);
+    /// `module` emits one `.bpl` per source module containing verify targets;
+    /// `vc` emits one `.bpl` per verify target (finest granularity).
+    /// `module` and `vc` use the driver-level parallel worker pool sized by
+    /// `--cores` and are mutually exclusive with `--shards > 1`.
+    #[arg(long, value_enum, default_value_t = VerifyGranularity::Shard)]
+    pub granularity: VerifyGranularity,
     /// Maximum number of counterexamples reported per verification
     /// condition.
     #[arg(long, default_value_t = 5)]
@@ -250,6 +281,7 @@ impl Default for BoogieOptions {
             borrow_aggregates: vec![],
             skip_instance_check: false,
             split_vcs_by_assert: false,
+            granularity: VerifyGranularity::Shard,
             error_limit: 5,
         }
     }
@@ -312,16 +344,25 @@ impl BoogieOptions {
             add(&["-vcsSplitOnEveryAssert"]);
         }
         add(&[&format!("-errorLimit:{}", self.error_limit)]);
-        add(&[&format!(
-            "-vcsCores:{}",
-            if self.stable_test_output {
-                // Do not use multiple cores if stable test output is requested.
-                // Error messages may appear in non-deterministic order otherwise.
-                1
-            } else {
-                self.proc_cores
-            }
-        )]);
+        let effective_cores = match self.granularity {
+            // In Module / Vc modes the driver runs multiple Boogie processes
+            // concurrently (up to `proc_cores`). Letting each Boogie also use
+            // `-vcsCores:proc_cores` would multiply the worker thread count to
+            // `proc_cores^2`, oversubscribing the machine and — empirically —
+            // triggering SIGSEGVs from Boogie's .NET runtime under contention.
+            // Force 1 so the driver pool is the sole source of parallelism.
+            VerifyGranularity::Module | VerifyGranularity::Vc => 1,
+            VerifyGranularity::Shard => {
+                if self.stable_test_output {
+                    // Do not use multiple cores if stable test output is requested.
+                    // Error messages may appear in non-deterministic order otherwise.
+                    1
+                } else {
+                    self.proc_cores
+                }
+            },
+        };
+        add(&[&format!("-vcsCores:{}", effective_cores)]);
 
         // TODO: see what we can make out of these flags.
         //add(&["-proverOpt:O:smt.QI.PROFILE=true"]);

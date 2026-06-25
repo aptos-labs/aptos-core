@@ -14,15 +14,20 @@ use log::{debug, info, warn};
 use log::{log_enabled, Level};
 use move_compiler_v2::Experiment;
 use move_model::{
-    code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
+    code_writer::CodeWriter,
+    metadata::LATEST_STABLE_COMPILER_VERSION_VALUE,
+    model::{FunId, GlobalEnv, ModuleId, QualifiedId},
 };
 use move_prover_boogie_backend::{
-    add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
+    add_prelude,
+    boogie_wrapper::{run_boogies_parallel, BoogieWrapper},
+    bytecode_translator::{BoogieTranslator, VerifyTargetSelector},
+    options::VerifyGranularity,
 };
 use move_prover_bytecode_pipeline::{
     number_operation::GlobalNumberOperationState, pipeline_factory,
 };
-use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
+use move_stackless_bytecode::function_target_pipeline::{FunctionTargetsHolder, FunctionVariant};
 use std::{
     fs,
     path::Path,
@@ -153,38 +158,50 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
         "exiting with bytecode transformation errors",
     )?;
 
+    // Reject conflicting partition flags up front. `--shards N` only makes sense
+    // under the default `shard` granularity; combining it with the finer
+    // partitions would silently dilute one or the other.
+    if !matches!(options.backend.granularity, VerifyGranularity::Shard)
+        && options.backend.shards > 1
+    {
+        return Err(anyhow!(
+            "`--shards > 1` only applies to `--granularity shard`. \
+             Use one of `--granularity shard --shards N`, `--granularity module`, \
+             or `--granularity vc`."
+        ));
+    }
+
     let mut gen_durations = vec![];
     let mut verify_durations = vec![];
-    let has_shards = options.backend.shards > 1;
     let output_base_file = options.output_path.clone();
-    for shard in 0..options.backend.shards {
-        // If there are shards, modify the output name
-        if has_shards {
-            options.output_path = Path::new(&output_base_file)
-                .with_extension(format!("shard_{}.bpl", shard + 1))
-                .to_string_lossy()
-                .to_string();
-        }
-        // Generate boogie code.
-        let now = Instant::now();
-        let code_writer = generate_boogie(
+    match options.backend.granularity {
+        VerifyGranularity::Shard => drive_sharded(
             env,
-            &options,
-            if has_shards { Some(shard) } else { None },
+            &mut options,
             &targets,
-        )?;
-        gen_durations.push(now.elapsed());
-        check_errors(
-            env,
-            &options,
+            &output_base_file,
             error_writer,
-            "exiting with condition generation errors",
-        )?;
-
-        // Verify boogie code.
-        let now = Instant::now();
-        verify_boogie(env, &options, &targets, code_writer)?;
-        verify_durations.push(now.elapsed());
+            &mut gen_durations,
+            &mut verify_durations,
+        )?,
+        VerifyGranularity::Module => drive_per_module(
+            env,
+            &mut options,
+            &targets,
+            &output_base_file,
+            error_writer,
+            &mut gen_durations,
+            &mut verify_durations,
+        )?,
+        VerifyGranularity::Vc => drive_per_vc(
+            env,
+            &mut options,
+            &targets,
+            &output_base_file,
+            error_writer,
+            &mut gen_durations,
+            &mut verify_durations,
+        )?,
     }
     options.output_path = output_base_file;
     // Report durations.
@@ -226,17 +243,327 @@ pub fn check_errors<W: WriteColor>(
     }
 }
 
+/// Generate Boogie for the verify targets selected by `selector`. Primary API.
+pub fn generate_boogie_with_selector(
+    env: &GlobalEnv,
+    options: &Options,
+    selector: VerifyTargetSelector,
+    targets: &FunctionTargetsHolder,
+) -> anyhow::Result<CodeWriter> {
+    let writer = CodeWriter::new(env.internal_loc());
+    add_prelude(env, &options.backend, &writer)?;
+    let mut translator =
+        BoogieTranslator::new(env, &options.backend, selector, targets, &writer);
+    translator.translate();
+    Ok(writer)
+}
+
+/// Back-compat wrapper for callers that pass `Option<usize>` shard index. Prefer
+/// `generate_boogie_with_selector` in new code.
 pub fn generate_boogie(
     env: &GlobalEnv,
     options: &Options,
     shard: Option<usize>,
     targets: &FunctionTargetsHolder,
 ) -> anyhow::Result<CodeWriter> {
-    let writer = CodeWriter::new(env.internal_loc());
-    add_prelude(env, &options.backend, &writer)?;
-    let mut translator = BoogieTranslator::new(env, &options.backend, shard, targets, &writer);
-    translator.translate();
-    Ok(writer)
+    let selector = match shard {
+        None => VerifyTargetSelector::All,
+        Some(idx) => VerifyTargetSelector::Shard {
+            idx,
+            total: options.backend.shards,
+        },
+    };
+    generate_boogie_with_selector(env, options, selector, targets)
+}
+
+/// Enumerate every (function-id, FunctionVariant::Verification(_)) pair the prover
+/// would emit `$verify` procedures for under the default selector. Source of truth
+/// for the per-VC outer loop. Mirrors the iteration in
+/// `bytecode_translator::translate` but only collects identifiers — no translation.
+///
+/// V1 simplification: type-instance variants (`VerificationFlavor::Instantiated(_)`)
+/// from `mono_info.funs` are NOT enumerated separately; each base verify target gets
+/// one `.bpl`. Per-VC mode therefore implicitly behaves as if `--skip-instance-check`
+/// were set. Documented under the `per_vc` option.
+pub fn enumerate_verify_targets(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Vec<(QualifiedId<FunId>, FunctionVariant)> {
+    let mut out = Vec::new();
+    for module_env in env.get_modules() {
+        if !module_env.is_target() {
+            continue;
+        }
+        for fun_env in module_env.get_functions() {
+            if fun_env.is_native_or_intrinsic()
+                || fun_env.is_test_only()
+                || fun_env.is_not_prover_target()
+            {
+                continue;
+            }
+            for (variant, _target) in targets.get_targets(&fun_env) {
+                if !variant.is_verified() {
+                    continue;
+                }
+                out.push((fun_env.get_qualified_id(), variant));
+            }
+        }
+    }
+    out
+}
+
+/// Enumerate every module that contains at least one verify target. Stable
+/// iteration order (source-declaration order, matching `env.get_modules`).
+pub fn enumerate_modules_with_verify_targets(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Vec<ModuleId> {
+    let mut out = Vec::new();
+    for module_env in env.get_modules() {
+        if !module_env.is_target() {
+            continue;
+        }
+        let has_verify_target = module_env.get_functions().any(|fun_env| {
+            if fun_env.is_native_or_intrinsic()
+                || fun_env.is_test_only()
+                || fun_env.is_not_prover_target()
+            {
+                return false;
+            }
+            targets
+                .get_targets(&fun_env)
+                .iter()
+                .any(|(variant, _)| variant.is_verified())
+        });
+        if has_verify_target {
+            out.push(module_env.get_id());
+        }
+    }
+    out
+}
+
+/// Sanitize a string for use as a portion of a filename. Replaces characters that
+/// commonly cause shell / path issues with `_`. Stable, deterministic mapping.
+pub fn sanitize_for_filename(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            ':' | '<' | '>' | ',' | ' ' | '/' | '\\' | '"' | '\'' | '#' | '|' | '?' | '*' => '_',
+            other => other,
+        })
+        .collect()
+}
+
+/// Build the per-VC `.bpl` output path: `<base_no_ext>.vc_<sanitized>_<variant>.bpl`.
+fn per_vc_output_path(
+    env: &GlobalEnv,
+    output_base: &str,
+    qid: QualifiedId<FunId>,
+    variant: &FunctionVariant,
+) -> String {
+    let full_name = env.get_function(qid).get_full_name_with_address();
+    let stem = sanitize_for_filename(&format!("{}_{}", full_name, variant));
+    Path::new(output_base)
+        .with_extension(format!("vc_{}.bpl", stem))
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// Build the per-module `.bpl` output path: `<base_no_ext>.module_<sanitized>.bpl`.
+fn per_module_output_path(env: &GlobalEnv, output_base: &str, module_id: ModuleId) -> String {
+    let stem = sanitize_for_filename(&env.get_module(module_id).get_full_name_str());
+    Path::new(output_base)
+        .with_extension(format!("module_{}.bpl", stem))
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// Sharded (or unsharded single-`.bpl`) driver. Preserves existing behavior:
+/// sequential one-`.bpl`-per-shard with Boogie's intra-process parallelism on
+/// procedures inside each `.bpl`.
+fn drive_sharded<W: WriteColor>(
+    env: &GlobalEnv,
+    options: &mut Options,
+    targets: &FunctionTargetsHolder,
+    output_base_file: &str,
+    error_writer: &mut W,
+    gen_durations: &mut Vec<Duration>,
+    verify_durations: &mut Vec<Duration>,
+) -> anyhow::Result<()> {
+    let has_shards = options.backend.shards > 1;
+    for shard in 0..options.backend.shards {
+        if has_shards {
+            options.output_path = Path::new(output_base_file)
+                .with_extension(format!("shard_{}.bpl", shard + 1))
+                .to_string_lossy()
+                .to_string();
+        }
+        let selector = if has_shards {
+            VerifyTargetSelector::Shard {
+                idx: shard,
+                total: options.backend.shards,
+            }
+        } else {
+            VerifyTargetSelector::All
+        };
+        let now = Instant::now();
+        let code_writer = generate_boogie_with_selector(env, options, selector, targets)?;
+        gen_durations.push(now.elapsed());
+        check_errors(
+            env,
+            options,
+            error_writer,
+            "exiting with condition generation errors",
+        )?;
+        let now = Instant::now();
+        verify_boogie(env, options, targets, code_writer)?;
+        verify_durations.push(now.elapsed());
+    }
+    Ok(())
+}
+
+/// Per-module driver: emit one `.bpl` per source module that contains at least
+/// one verify target. Sequential codegen (env extension mutation is not
+/// thread-safe), then parallel verification with up to `proc_cores` Boogie
+/// processes concurrently. Each Boogie process still uses `-vcsCores:proc_cores`
+/// internally to parallelize across the procedures in its module.
+fn drive_per_module<W: WriteColor>(
+    env: &GlobalEnv,
+    options: &mut Options,
+    targets: &FunctionTargetsHolder,
+    output_base_file: &str,
+    error_writer: &mut W,
+    gen_durations: &mut Vec<Duration>,
+    verify_durations: &mut Vec<Duration>,
+) -> anyhow::Result<()> {
+    let module_list = enumerate_modules_with_verify_targets(env, targets);
+    let parallelism = options.backend.proc_cores.max(1);
+    info!(
+        "per-module mode: {} modules, parallelism={}",
+        module_list.len(),
+        parallelism
+    );
+
+    // Phase 1: sequential code generation, one .bpl per module.
+    let mut bpl_paths: Vec<String> = Vec::with_capacity(module_list.len());
+    for module_id in &module_list {
+        options.output_path = per_module_output_path(env, output_base_file, *module_id);
+        let selector = VerifyTargetSelector::Module {
+            module_id: *module_id,
+        };
+        let now = Instant::now();
+        let code_writer = generate_boogie_with_selector(env, options, selector, targets)?;
+        gen_durations.push(now.elapsed());
+        check_errors(
+            env,
+            options,
+            error_writer,
+            "exiting with condition generation errors",
+        )?;
+        code_writer.process_result(|result| fs::write(&options.output_path, result))?;
+        bpl_paths.push(options.output_path.clone());
+    }
+
+    if options.prover.generate_only {
+        return Ok(());
+    }
+
+    // Phase 2: parallel verification across modules; Boogie still uses its
+    // internal `-vcsCores` parallelism within each module's .bpl.
+    let now = Instant::now();
+    let raw_results = run_boogies_parallel(&options.backend, &bpl_paths, parallelism);
+    verify_durations.push(now.elapsed());
+
+    let wrapper = BoogieWrapper {
+        env,
+        targets,
+        writer: &CodeWriter::new(env.internal_loc()),
+        options: &options.backend,
+    };
+    for (path, raw) in bpl_paths.iter().zip(raw_results.into_iter()) {
+        wrapper.analyze_subprocess_output(path, raw)?;
+        if !options.backend.keep_artifacts {
+            std::fs::remove_file(path).unwrap_or_default();
+        }
+    }
+    Ok(())
+}
+
+/// Per-VC driver: enumerate verify targets, emit one `.bpl` per target
+/// sequentially (codegen mutates the env extension and is not thread-safe), then
+/// verify all `.bpl` files in parallel with a driver-managed worker pool.
+/// Errors are buffered into the env's diagnostic stream in stable target order
+/// regardless of completion order, so test baselines stay deterministic.
+fn drive_per_vc<W: WriteColor>(
+    env: &GlobalEnv,
+    options: &mut Options,
+    targets: &FunctionTargetsHolder,
+    output_base_file: &str,
+    error_writer: &mut W,
+    gen_durations: &mut Vec<Duration>,
+    verify_durations: &mut Vec<Duration>,
+) -> anyhow::Result<()> {
+    let target_list = enumerate_verify_targets(env, targets);
+    let parallelism = options.backend.proc_cores.max(1);
+    info!(
+        "per-VC mode: {} verify targets, parallelism={}",
+        target_list.len(),
+        parallelism
+    );
+
+    // Phase 1: sequential code generation. Each target's `.bpl` is written to
+    // disk; the env extension may be mutated here, so this loop is not parallel.
+    let mut bpl_paths: Vec<String> = Vec::with_capacity(target_list.len());
+    for (qid, variant) in &target_list {
+        options.output_path = per_vc_output_path(env, output_base_file, *qid, variant);
+        let selector = VerifyTargetSelector::Single {
+            qid: *qid,
+            variant: variant.clone(),
+        };
+        let now = Instant::now();
+        let code_writer = generate_boogie_with_selector(env, options, selector, targets)?;
+        gen_durations.push(now.elapsed());
+        check_errors(
+            env,
+            options,
+            error_writer,
+            "exiting with condition generation errors",
+        )?;
+        // Persist the .bpl so the worker pool can launch Boogie on it. Mirrors
+        // the persistence step inside `verify_boogie`, factored out here because
+        // we don't want to call Boogie yet — that runs in phase 2.
+        code_writer.process_result(|result| fs::write(&options.output_path, result))?;
+        bpl_paths.push(options.output_path.clone());
+    }
+
+    if options.prover.generate_only {
+        // Skip the verify pass entirely; the .bpl files are the artifact.
+        return Ok(());
+    }
+
+    // Phase 2: parallel verification. Worker threads spawn Boogie subprocesses
+    // (no `GlobalEnv` access — safe across threads). Raw outputs come back in
+    // stable input order so we can analyze them deterministically on this thread.
+    let now = Instant::now();
+    let raw_results = run_boogies_parallel(&options.backend, &bpl_paths, parallelism);
+    let parallel_wall = now.elapsed();
+    verify_durations.push(parallel_wall);
+
+    let wrapper = BoogieWrapper {
+        env,
+        targets,
+        writer: &CodeWriter::new(env.internal_loc()),
+        options: &options.backend,
+    };
+    for (path, raw) in bpl_paths.iter().zip(raw_results.into_iter()) {
+        let bpl_existed_before_run = false; // we always create them in phase 1
+        wrapper.analyze_subprocess_output(path, raw)?;
+        // Match the cleanup `verify_boogie` does for the single-shard path: if
+        // the user didn't ask to keep artifacts, drop the .bpl now.
+        if !bpl_existed_before_run && !options.backend.keep_artifacts {
+            std::fs::remove_file(path).unwrap_or_default();
+        }
+    }
+    Ok(())
 }
 
 pub fn verify_boogie(
