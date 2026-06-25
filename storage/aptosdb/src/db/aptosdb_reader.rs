@@ -7,10 +7,12 @@ use crate::{
         aptosdb_internal::{error_if_too_many_requested, gauged_api},
         AptosDB,
     },
+    position_buffered_state::{PositionLedgerStateWithSummary, PositionStateWithSummary},
     pruner::PrunerManager,
     schema::block_info::BlockInfoSchema,
 };
 use aptos_crypto::HashValue;
+use aptos_jellyfish_merkle::JellyfishMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
@@ -59,6 +61,75 @@ impl DbReader for AptosDB {
     fn get_persisted_state_summary(&self) -> Result<StateSummary> {
         gauged_api("get_persisted_state_summary", || {
             self.state_store.get_persisted_state_summary()
+        })
+    }
+
+    fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary> {
+        gauged_api("get_persisted_position_state_summary", || {
+            // Only reached with the feature on; fail fast (don't fabricate an
+            // empty base) if position storage isn't initialized, so enabling
+            // without ENABLE_TRADING_NATIVE errors here instead of halting later.
+            self.position
+                .as_ref()
+                .and_then(|bundle| bundle.persisted.as_ref())
+                .map(|persisted| persisted.get())
+                .ok_or_else(|| {
+                    AptosDbError::Other(
+                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
+                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
+                            .to_string(),
+                    )
+                })
+        })
+    }
+
+    fn get_pre_committed_position_state_summary(&self) -> Result<PositionLedgerStateWithSummary> {
+        gauged_api("get_pre_committed_position_state_summary", || {
+            // Pre-committed tip from the buffered state (includes committed
+            // writes not yet merklized). Fail fast like
+            // `get_persisted_position_state_summary` when position storage is
+            // absent, so enabling without ENABLE_TRADING_NATIVE errors here.
+            self.position
+                .as_ref()
+                .and_then(|bundle| bundle.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone())
+                .ok_or_else(|| {
+                    AptosDbError::Other(
+                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
+                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
+                            .to_string(),
+                    )
+                })
+        })
+    }
+
+    fn get_position_state_proof_by_version_ext(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<SparseMerkleProofExt> {
+        gauged_api("get_position_state_proof_by_version_ext", || {
+            let bundle = self
+                .position
+                .as_ref()
+                .ok_or_else(|| AptosDbError::Other("native position is not enabled".to_string()))?;
+            // The requested `version` is the persisted base, which tracks the
+            // merkle pruner's target (both advanced by the merkle batch
+            // committer), so live nodes are normally retained. Guard anyway —
+            // like `error_if_state_merkle_pruned` for main state — so a pruned
+            // version returns a typed error instead of panicking in the JMT.
+            if let Some(pruner) = bundle.position_pruner.as_ref() {
+                let min_readable = pruner.state_merkle_pruner.get_min_readable_version();
+                ensure!(
+                    version >= min_readable,
+                    "position state merkle at version {version} is pruned, \
+                     min available version is {min_readable}",
+                );
+            }
+            let tree = JellyfishMerkleTree::new(bundle.merkle_db.as_ref());
+            let (_value, proof) = tree.get_with_proof_ext(key_hash, version, root_depth)?;
+            Ok(proof)
         })
     }
 
@@ -628,10 +699,18 @@ impl DbReader for AptosDB {
                 .get_frozen_subtree_hashes(num_txns)?;
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
+            // Pre-committed position tip, so the executor's reset root block can
+            // seed from it (None when position is disabled).
+            let position_state_summary = self
+                .position
+                .as_ref()
+                .and_then(|bundle| bundle.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone());
             Ok(LedgerSummary {
                 state,
                 state_summary,
                 transaction_accumulator,
+                position_state_summary,
             })
         })
     }

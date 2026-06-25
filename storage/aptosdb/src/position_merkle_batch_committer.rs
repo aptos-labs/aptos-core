@@ -6,6 +6,7 @@
 use crate::{
     common::{run_batch_committer_loop, CommitMessage, MerkleBatch},
     metrics::OTHER_TIMERS_SECONDS,
+    position_buffered_state::{PositionPersistedState, PositionStateWithSummary},
     position_merkle_db::PositionMerkleDb,
     position_pruner::PositionPruner,
     pruner::PrunerManager,
@@ -20,12 +21,17 @@ pub(crate) struct PositionMerkleCommit {
     pub version: Version,
     pub root_hash: HashValue,
     pub batch: MerkleBatch,
+    /// The real in-memory snapshot whose JMT nodes this batch persists.
+    /// Published to `persisted` after the commit so the in-memory chain
+    /// can rebase onto it (see [`PositionPersistedState`]).
+    pub snapshot: PositionStateWithSummary,
 }
 
 pub(crate) struct PositionMerkleBatchCommitter {
     merkle_db: Arc<PositionMerkleDb>,
     receiver: Receiver<CommitMessage<PositionMerkleCommit>>,
     position_pruner: Arc<PositionPruner>,
+    persisted: PositionPersistedState,
 }
 
 impl PositionMerkleBatchCommitter {
@@ -33,11 +39,13 @@ impl PositionMerkleBatchCommitter {
         merkle_db: Arc<PositionMerkleDb>,
         receiver: Receiver<CommitMessage<PositionMerkleCommit>>,
         position_pruner: Arc<PositionPruner>,
+        persisted: PositionPersistedState,
     ) -> Self {
         Self {
             merkle_db,
             receiver,
             position_pruner,
+            persisted,
         }
     }
 
@@ -46,6 +54,7 @@ impl PositionMerkleBatchCommitter {
             merkle_db,
             receiver,
             position_pruner,
+            persisted,
         } = self;
         run_batch_committer_loop(receiver, |commit| {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["position_batch_committer_work"]);
@@ -53,6 +62,7 @@ impl PositionMerkleBatchCommitter {
                 version,
                 root_hash,
                 batch,
+                snapshot,
             } = commit;
             merkle_db
                 .commit(version, batch.top_levels_batch, batch.batches_for_shards)
@@ -70,6 +80,10 @@ impl PositionMerkleBatchCommitter {
             position_pruner
                 .epoch_snapshot_pruner
                 .maybe_set_pruner_target_db_version(version);
+            // Advance the persisted base only now that the JMT nodes at
+            // `version` are on disk, so cold-key proofs against this base
+            // are serviceable.
+            persisted.set(snapshot);
         });
         trace!("Position merkle batch committing thread exit.");
     }
