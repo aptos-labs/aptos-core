@@ -4,7 +4,7 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 //! Loaded representation for runtime types.
 
-use crate::limit::Limiter;
+use crate::limit::Meter;
 use fxhash::FxHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -146,16 +146,10 @@ impl FatStructType {
     pub fn subst(
         &self,
         ty_args: &[FatType],
-        subst_struct: &impl Fn(
-            &FatStructType,
-            &[FatType],
-            &mut Limiter,
-        ) -> PartialVMResult<FatStructRef>,
-        limiter: &mut Limiter,
+        subst_struct: &impl Fn(&FatStructType, &[FatType], &mut Meter) -> PartialVMResult<FatStructRef>,
+        meter: &mut Meter,
     ) -> PartialVMResult<FatStructType> {
-        limiter.charge(std::mem::size_of::<AccountAddress>())?;
-        limiter.charge(self.module.as_bytes().len())?;
-        limiter.charge(self.name.as_bytes().len())?;
+        meter.check()?;
         // self.contains_tables already reflects tables directly used in field types, we
         // only need to combine it here with tables used in type arguments.
         let contains_tables = self.contains_tables || ty_args.iter().any(|t| t.contains_tables());
@@ -167,13 +161,13 @@ impl FatStructType {
             ty_args: self
                 .ty_args
                 .iter()
-                .map(|ty| ty.subst(ty_args, subst_struct, limiter))
+                .map(|ty| ty.subst(ty_args, subst_struct, meter))
                 .collect::<PartialVMResult<_>>()?,
             layout: match &self.layout {
                 FatStructLayout::Singleton(fields) => FatStructLayout::Singleton(
                     fields
                         .iter()
-                        .map(|ty| ty.subst(ty_args, subst_struct, limiter))
+                        .map(|ty| ty.subst(ty_args, subst_struct, meter))
                         .collect::<PartialVMResult<_>>()?,
                 ),
                 FatStructLayout::Variants(variants) => FatStructLayout::Variants(
@@ -182,7 +176,7 @@ impl FatStructType {
                         .map(|fields| {
                             fields
                                 .iter()
-                                .map(|ty| ty.subst(ty_args, subst_struct, limiter))
+                                .map(|ty| ty.subst(ty_args, subst_struct, meter))
                                 .collect::<PartialVMResult<_>>()
                         })
                         .collect::<PartialVMResult<_>>()?,
@@ -200,16 +194,14 @@ impl FatStructType {
         }
     }
 
-    pub fn struct_tag(&self, limiter: &mut Limiter) -> PartialVMResult<StructTag> {
+    pub fn struct_tag(&self, meter: &mut Meter) -> PartialVMResult<StructTag> {
         let ty_args = self
             .ty_args
             .iter()
-            .map(|ty| ty.type_tag(limiter))
+            .map(|ty| ty.type_tag(meter))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        limiter.charge(std::mem::size_of::<AccountAddress>())?;
-        limiter.charge(self.module.as_bytes().len())?;
-        limiter.charge(self.name.as_bytes().len())?;
+        meter.check()?;
 
         Ok(StructTag {
             address: self.address,
@@ -228,15 +220,15 @@ impl FatStructType {
 }
 
 impl FatFunctionType {
-    fn clone_with_limit(&self, limiter: &mut Limiter) -> PartialVMResult<Self> {
-        let clone_slice = |limiter: &mut Limiter, tys: &[FatType]| {
+    fn clone_with_limit(&self, meter: &mut Meter) -> PartialVMResult<Self> {
+        let clone_slice = |meter: &mut Meter, tys: &[FatType]| {
             tys.iter()
-                .map(|ty| ty.clone_with_limit(limiter))
+                .map(|ty| ty.clone_with_limit(meter))
                 .collect::<PartialVMResult<Vec<_>>>()
         };
         Ok(FatFunctionType {
-            args: clone_slice(limiter, &self.args)?,
-            results: clone_slice(limiter, &self.results)?,
+            args: clone_slice(meter, &self.args)?,
+            results: clone_slice(meter, &self.results)?,
             abilities: self.abilities,
         })
     }
@@ -244,51 +236,47 @@ impl FatFunctionType {
     pub fn subst(
         &self,
         ty_args: &[FatType],
-        subst_struct: &impl Fn(
-            &FatStructType,
-            &[FatType],
-            &mut Limiter,
-        ) -> PartialVMResult<FatStructRef>,
-        limiter: &mut Limiter,
+        subst_struct: &impl Fn(&FatStructType, &[FatType], &mut Meter) -> PartialVMResult<FatStructRef>,
+        meter: &mut Meter,
     ) -> PartialVMResult<Self> {
-        let subst_slice = |limiter: &mut Limiter, tys: &[FatType]| {
+        let subst_slice = |meter: &mut Meter, tys: &[FatType]| {
             tys.iter()
-                .map(|ty| ty.subst(ty_args, subst_struct, limiter))
+                .map(|ty| ty.subst(ty_args, subst_struct, meter))
                 .collect::<PartialVMResult<Vec<_>>>()
         };
         Ok(FatFunctionType {
-            args: subst_slice(limiter, &self.args)?,
-            results: subst_slice(limiter, &self.results)?,
+            args: subst_slice(meter, &self.args)?,
+            results: subst_slice(meter, &self.results)?,
             abilities: self.abilities,
         })
     }
 
-    pub fn fun_tag(&self, limiter: &mut Limiter) -> PartialVMResult<FunctionTag> {
-        let tag_slice = |limiter: &mut Limiter, tys: &[FatType]| {
+    pub fn fun_tag(&self, meter: &mut Meter) -> PartialVMResult<FunctionTag> {
+        let tag_slice = |meter: &mut Meter, tys: &[FatType]| {
             tys.iter()
                 .map(|ty| {
                     Ok(match ty {
                         FatType::Reference(ty) => {
-                            FunctionParamOrReturnTag::Reference(ty.type_tag(limiter)?)
+                            FunctionParamOrReturnTag::Reference(ty.type_tag(meter)?)
                         },
                         FatType::MutableReference(ty) => {
-                            FunctionParamOrReturnTag::MutableReference(ty.type_tag(limiter)?)
+                            FunctionParamOrReturnTag::MutableReference(ty.type_tag(meter)?)
                         },
-                        ty => FunctionParamOrReturnTag::Value(ty.type_tag(limiter)?),
+                        ty => FunctionParamOrReturnTag::Value(ty.type_tag(meter)?),
                     })
                 })
                 .collect::<PartialVMResult<Vec<_>>>()
         };
         Ok(FunctionTag {
-            args: tag_slice(limiter, &self.args)?,
-            results: tag_slice(limiter, &self.results)?,
+            args: tag_slice(meter, &self.args)?,
+            results: tag_slice(meter, &self.results)?,
             abilities: self.abilities,
         })
     }
 }
 
 impl FatType {
-    fn clone_with_limit(&self, limit: &mut Limiter) -> PartialVMResult<Self> {
+    fn clone_with_limit(&self, meter: &mut Meter) -> PartialVMResult<Self> {
         use FatType::*;
         Ok(match self {
             TyParam(idx) => TyParam(*idx),
@@ -307,29 +295,25 @@ impl FatType {
             I256 => I256,
             Address => Address,
             Signer => Signer,
-            Vector(ty) => Vector(Box::new(ty.clone_with_limit(limit)?)),
-            Reference(ty) => Reference(Box::new(ty.clone_with_limit(limit)?)),
-            MutableReference(ty) => MutableReference(Box::new(ty.clone_with_limit(limit)?)),
+            Vector(ty) => Vector(Box::new(ty.clone_with_limit(meter)?)),
+            Reference(ty) => Reference(Box::new(ty.clone_with_limit(meter)?)),
+            MutableReference(ty) => MutableReference(Box::new(ty.clone_with_limit(meter)?)),
             Struct(struct_ty) => Struct(struct_ty.clone()),
-            Function(fun_ty) => Function(Box::new(fun_ty.clone_with_limit(limit)?)),
+            Function(fun_ty) => Function(Box::new(fun_ty.clone_with_limit(meter)?)),
         })
     }
 
     pub fn subst(
         &self,
         ty_args: &[FatType],
-        subst_struct: &impl Fn(
-            &FatStructType,
-            &[FatType],
-            &mut Limiter,
-        ) -> PartialVMResult<FatStructRef>,
-        limit: &mut Limiter,
+        subst_struct: &impl Fn(&FatStructType, &[FatType], &mut Meter) -> PartialVMResult<FatStructRef>,
+        meter: &mut Meter,
     ) -> PartialVMResult<FatType> {
         use FatType::*;
 
         let res = match self {
             TyParam(idx) => match ty_args.get(*idx) {
-                Some(ty) => ty.clone_with_limit(limit)?,
+                Some(ty) => ty.clone_with_limit(meter)?,
                 None => {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -357,10 +341,10 @@ impl FatType {
             I256 => I256,
             Address => Address,
             Signer => Signer,
-            Vector(ty) => Vector(Box::new(ty.subst(ty_args, subst_struct, limit)?)),
-            Reference(ty) => Reference(Box::new(ty.subst(ty_args, subst_struct, limit)?)),
+            Vector(ty) => Vector(Box::new(ty.subst(ty_args, subst_struct, meter)?)),
+            Reference(ty) => Reference(Box::new(ty.subst(ty_args, subst_struct, meter)?)),
             MutableReference(ty) => {
-                MutableReference(Box::new(ty.subst(ty_args, subst_struct, limit)?))
+                MutableReference(Box::new(ty.subst(ty_args, subst_struct, meter)?))
             },
 
             Struct(struct_ty) => {
@@ -369,17 +353,17 @@ impl FatType {
                     // by type substitution.
                     Struct(struct_ty.clone())
                 } else {
-                    Struct((*subst_struct)(struct_ty, ty_args, limit)?)
+                    Struct((*subst_struct)(struct_ty, ty_args, meter)?)
                 }
             },
 
-            Function(fun_ty) => Function(Box::new(fun_ty.subst(ty_args, subst_struct, limit)?)),
+            Function(fun_ty) => Function(Box::new(fun_ty.subst(ty_args, subst_struct, meter)?)),
         };
 
         Ok(res)
     }
 
-    pub fn type_tag(&self, limit: &mut Limiter) -> PartialVMResult<TypeTag> {
+    pub fn type_tag(&self, meter: &mut Meter) -> PartialVMResult<TypeTag> {
         use FatType::*;
 
         let res = match self {
@@ -398,9 +382,9 @@ impl FatType {
             I256 => TypeTag::I256,
             Address => TypeTag::Address,
             Signer => TypeTag::Signer,
-            Vector(ty) => TypeTag::Vector(Box::new(ty.type_tag(limit)?)),
-            Struct(struct_ty) => TypeTag::Struct(Box::new(struct_ty.struct_tag(limit)?)),
-            Function(fun_ty) => TypeTag::Function(Box::new(fun_ty.fun_tag(limit)?)),
+            Vector(ty) => TypeTag::Vector(Box::new(ty.type_tag(meter)?)),
+            Struct(struct_ty) => TypeTag::Struct(Box::new(struct_ty.struct_tag(meter)?)),
+            Function(fun_ty) => TypeTag::Function(Box::new(fun_ty.fun_tag(meter)?)),
 
             Reference(_) | MutableReference(_) | TyParam(_) => {
                 return Err(

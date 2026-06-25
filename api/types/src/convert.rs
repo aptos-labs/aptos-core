@@ -19,9 +19,10 @@ use crate::{
     TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload, U64,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
+use aptos_config::config::DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{sample, sample::SampleRate};
-use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_resource_viewer::{AptosValueAnnotator, Meter};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -53,7 +54,7 @@ use move_core_types::{
 };
 use serde_json::Value;
 use std::{
-    collections::BTreeMap,
+    borrow::Borrow,
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     sync::Arc,
@@ -62,6 +63,12 @@ use std::{
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
+
+fn decode_resource_group_with_limit(bytes: &[u8], meter: &mut Meter) -> Result<ResourceGroup> {
+    let group = bcs::from_bytes::<ResourceGroup>(bytes)?;
+    meter.check()?;
+    Ok(group)
+}
 
 /// Recursively substitute generic type parameters in a MoveType with actual type arguments.
 fn substitute_type_in_move_type(
@@ -123,19 +130,72 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
+        Self::new_with_resource_annotation_limit(
+            inner,
+            db,
+            indexer_reader,
+            DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES,
+        )
+    }
+
+    pub fn new_with_resource_annotation_limit(
+        inner: &'a S,
+        db: Arc<dyn DbReader>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
+        max_resource_annotation_bytes: usize,
+    ) -> Self {
         Self {
-            inner: AptosValueAnnotator::new(inner),
+            inner: AptosValueAnnotator::new_with_resource_annotation_limit(
+                inner,
+                max_resource_annotation_bytes,
+            ),
             db,
             indexer_reader,
         }
     }
 
+    /// A fresh annotation [`Meter`] seeded with the annotator's configured byte budget.
+    ///
+    /// Used by the **aggregate-bounded** entry points (`try_into_resources`,
+    /// `try_into_resources_from_resource_group`), where the returned meter is threaded across an
+    /// entire page/group so the whole batch shares one byte budget. `find_resource` also takes a
+    /// fresh meter from this method, but uses it to bound a single resource-group decode in
+    /// isolation.
+    ///
+    /// The **per-call-bounded** entry points (`try_into_resource`, `move_struct_fields`,
+    /// `try_into_move_value`) do not use this — they rely on `self.inner`'s own fresh meter, so
+    /// each call gets an independent budget. The annotator owns the budget value; the converter no
+    /// longer stores its own copy.
+    fn resource_annotation_meter(&self) -> Meter {
+        self.inner.fresh_meter()
+    }
+
+    /// INVARIANT: must stay synchronous. `Meter` reads thread-local live bytes; an `.await`
+    /// between `fresh_meter()` and the `check()`s would measure an unrelated task's thread and
+    /// silently corrupt the budget. Keep the whole annotation tree on one thread, await-free.
+    fn annotate_with_limit<'b, T: Borrow<StructTag>>(
+        &self,
+        data: impl Iterator<Item = (T, &'b [u8])>,
+        meter: &mut Meter,
+    ) -> Result<Vec<MoveResource>> {
+        data.map(|(typ, bytes)| {
+            let annotated = self
+                .inner
+                .view_resource_with_limit(typ.borrow(), bytes, meter)?;
+            let resource: MoveResource = annotated.try_into()?;
+            meter.check()?;
+            Ok(resource)
+        })
+        .collect()
+    }
+
+    // INVARIANT: must stay synchronous — see `annotate_with_limit`. The shared batch `Meter`
+    // measures thread-local live bytes, so this call tree must never `.await`.
     pub fn try_into_resources<'b>(
         &self,
         data: impl Iterator<Item = (StructTag, &'b [u8])>,
     ) -> Result<Vec<MoveResource>> {
-        data.map(|(typ, bytes)| self.inner.view_resource(&typ, bytes)?.try_into())
-            .collect()
+        self.annotate_with_limit(data, &mut self.resource_annotation_meter())
     }
 
     pub fn try_into_resource(&self, tag: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
@@ -168,8 +228,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let key = StateKey::resource_group(&address.into(), &group_tag);
                 match state_view.get_state_value_bytes(&key)? {
                     Some(group_bytes) => {
-                        let group: BTreeMap<StructTag, Bytes> = bcs::from_bytes(&group_bytes)?;
-                        group.get(tag).cloned()
+                        let mut meter = self.resource_annotation_meter();
+                        let group = decode_resource_group_with_limit(&group_bytes, &mut meter)?;
+                        group.get(tag).cloned().map(Bytes::from)
                     },
                     None => None,
                 }
@@ -185,13 +246,16 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         &self,
         bytes: &[u8],
     ) -> Result<Vec<MoveResource>> {
-        let resources_with_tag: Vec<(StructTag, Vec<u8>)> = bcs::from_bytes::<ResourceGroup>(bytes)
-            .map(|map| map.into_iter().collect::<Vec<_>>())?;
-
-        resources_with_tag
-            .iter()
-            .map(|(struct_tag, value_bytes)| self.try_into_resource(struct_tag, value_bytes))
-            .collect::<Result<Vec<_>>>()
+        let mut meter = self.resource_annotation_meter();
+        // Borrow tags straight out of the decoded group: no intermediate Vec, no per-resource
+        // StructTag clone. `group` lives until the end of the function, so the borrows are valid.
+        let group = decode_resource_group_with_limit(bytes, &mut meter)?;
+        self.annotate_with_limit(
+            group
+                .iter()
+                .map(|(tag, value_bytes)| (tag, value_bytes.as_slice())),
+            &mut meter,
+        )
     }
 
     pub fn move_struct_fields(
@@ -1493,6 +1557,13 @@ pub trait AsConverter<R> {
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> MoveConverter<'_, R>;
+
+    fn as_converter_with_resource_annotation_limit(
+        &self,
+        db: Arc<dyn DbReader>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
+        max_resource_annotation_bytes: usize,
+    ) -> MoveConverter<'_, R>;
 }
 
 impl<R: StateView> AsConverter<R> for R {
@@ -1502,6 +1573,20 @@ impl<R: StateView> AsConverter<R> for R {
         indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> MoveConverter<'_, R> {
         MoveConverter::new(self, db, indexer_reader)
+    }
+
+    fn as_converter_with_resource_annotation_limit(
+        &self,
+        db: Arc<dyn DbReader>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
+        max_resource_annotation_bytes: usize,
+    ) -> MoveConverter<'_, R> {
+        MoveConverter::new_with_resource_annotation_limit(
+            self,
+            db,
+            indexer_reader,
+            max_resource_annotation_bytes,
+        )
     }
 }
 

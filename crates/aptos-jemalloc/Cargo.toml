@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+# Enables `current_live_bytes()` to read jemalloc's per-thread allocation
+# counters. Off by default so non-production builds compile a zero-cost no-op.
+metered-allocations = []
+
 [target.'cfg(unix)'.dependencies]
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }

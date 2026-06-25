@@ -23,9 +23,9 @@ use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     transaction::{PersistedAuxiliaryInfo, TransactionSummary},
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
-    AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
-    HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
-    Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
+    EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue, HexEncodedBytes,
+    LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
     TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion, U64,
 };
 use aptos_crypto::signing_message;
@@ -1019,11 +1019,8 @@ impl TransactionsApi {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
-                        state_view
-                            .as_converter(
-                                self.context.db.clone(),
-                                self.context.indexer_reader.clone(),
-                            )
+                        self.context
+                            .as_converter(&state_view)
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
                             .map_err(|err| {
@@ -1034,8 +1031,9 @@ impl TransactionsApi {
                                 )
                             })?
                     },
-                    TransactionData::Pending(txn) => state_view
-                        .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+                    TransactionData::Pending(txn) => self
+                        .context
+                        .as_converter(&state_view)
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
                         .map_err(|err| {
@@ -1236,23 +1234,24 @@ impl TransactionsApi {
 
                 Ok(signed_transaction)
             },
-            SubmitTransactionPost::Json(data) => self
-                .context
-                .latest_state_view_poem(ledger_info)?
-                .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                .try_into_signed_transaction_poem(data.0, self.context.chain_id())
-                .context("Failed to create SignedTransaction from SubmitTransactionRequest")
-                .map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    )
-                })
-                .and_then(|signed_transaction| {
-                    self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
-                    Ok(signed_transaction)
-                }),
+            SubmitTransactionPost::Json(data) => {
+                let state_view = self.context.latest_state_view_poem(ledger_info)?;
+                self.context
+                    .as_converter(&state_view)
+                    .try_into_signed_transaction_poem(data.0, self.context.chain_id())
+                    .context("Failed to create SignedTransaction from SubmitTransactionRequest")
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })
+                    .and_then(|signed_transaction| {
+                        self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
+                        Ok(signed_transaction)
+                    })
+            },
         }
     }
 
@@ -1444,8 +1443,9 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context.latest_state_view_poem(ledger_info)?
-                        .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+                    let state_view = self.context.latest_state_view_poem(ledger_info)?;
+                    self.context
+                        .as_converter(&state_view)
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
@@ -1547,15 +1547,16 @@ impl TransactionsApi {
                         })?;
 
                     // We provide the pending transaction so that users have the hash associated
-                    let pending_txn = state_view
-                            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                            .try_into_pending_transaction_poem(txn)
-                            .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                            .map_err(|err| SubmitTransactionError::internal_with_code(
-                                err,
-                                AptosErrorCode::InternalError,
-                                ledger_info,
-                            ))?;
+                    let pending_txn = self
+                        .context
+                        .as_converter(&state_view)
+                        .try_into_pending_transaction_poem(txn)
+                        .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
+                        .map_err(|err| SubmitTransactionError::internal_with_code(
+                            err,
+                            AptosErrorCode::InternalError,
+                            ledger_info,
+                        ))?;
                     SubmitTransactionResponse::try_from_json((
                         pending_txn,
                         ledger_info,
@@ -1831,8 +1832,9 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let raw_txn: RawTransaction = state_view
-            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+        let raw_txn: RawTransaction = self
+            .context
+            .as_converter(&state_view)
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {

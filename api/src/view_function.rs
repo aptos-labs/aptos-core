@@ -14,8 +14,7 @@ use crate::{
 };
 use anyhow::Context as anyhowContext;
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, MoveValue, ViewFunction, ViewRequest, MAX_RECURSIVE_TYPES_ALLOWED,
-    U64,
+    AptosErrorCode, MoveValue, ViewFunction, ViewRequest, MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_bcs_utils::serialize_uleb128;
 use aptos_types::{state_store::StateView, transaction::ViewFunctionError, vm_status::StatusCode};
@@ -38,8 +37,8 @@ pub fn convert_view_function_error(
 ) -> (String, Option<StatusCode>) {
     match error {
         ViewFunctionError::MoveAbort(status, vm_error_code) => {
-            let vm_status = state_view
-                .as_converter(context.db.clone(), context.indexer_reader.clone())
+            let vm_status = context
+                .as_converter(state_view)
                 .explain_vm_status(status, None);
             (vm_status, *vm_error_code)
         },
@@ -113,8 +112,8 @@ fn view_request(
         })?;
 
     let view_function: ViewFunction = match request {
-        ViewFunctionRequest::Json(data) => state_view
-            .as_converter(context.db.clone(), context.indexer_reader.clone())
+        ViewFunctionRequest::Json(data) => context
+            .as_converter(&state_view)
             .convert_view_function(data.0)
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
@@ -193,8 +192,8 @@ fn view_request(
             BasicResponse::try_from_encoded((ret, &ledger_info, BasicResponseStatus::Ok))
         },
         AcceptType::Json => {
-            let return_types = state_view
-                .as_converter(context.db.clone(), context.indexer_reader.clone())
+            let return_types = context
+                .as_converter(&state_view)
                 .function_return_types(&view_function)
                 .and_then(|tys| {
                     tys.iter()
@@ -213,8 +212,8 @@ fn view_request(
                 .into_iter()
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
-                    state_view
-                        .as_converter(context.db.clone(), context.indexer_reader.clone())
+                    context
+                        .as_converter(&state_view)
                         .try_into_move_value(&ty, &v)
                 })
                 .collect::<anyhow::Result<Vec<_>>>()

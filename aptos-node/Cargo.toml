@@ -23,7 +23,8 @@ consensus-only-perf-test = [
     "aptos-mempool/consensus-only-perf-test",
     "aptos-db/consensus-only-perf-test",
 ]
-default = []
+default = ["metered-allocations"]
+metered-allocations = ["aptos-api/metered-allocations"]
 failpoints = [
     "fail/failpoints",
     "aptos-consensus/failpoints",

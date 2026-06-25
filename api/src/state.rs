@@ -14,9 +14,9 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper,
-    MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
-    RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
+    verify_module_identifier, Address, AptosErrorCode, IdentifierWrapper, MoveModuleBytecode,
+    MoveResource, MoveStructTag, MoveValue, RawStateValueRequest, RawTableItemRequest,
+    TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle, TStateView};
 use move_core_types::language_storage::StructTag;
@@ -286,8 +286,9 @@ impl StateApi {
             })?;
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
-        let bytes = state_view
-            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+        let bytes = self
+            .context
+            .as_converter(&state_view)
             .find_resource(&state_view, address, &tag)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
@@ -305,8 +306,9 @@ impl StateApi {
 
         match accept_type {
             AcceptType::Json => {
-                let resource = state_view
-                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+                let resource = self
+                    .context
+                    .as_converter(&state_view)
                     .try_into_resource(&tag, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
                     .map_err(|err| {
@@ -405,8 +407,7 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let converter =
-            state_view.as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
+        let converter = self.context.as_converter(&state_view);
 
         // Convert key to lookup version for DB
         let vm_key = converter

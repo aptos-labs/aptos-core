@@ -455,11 +455,13 @@ dependencies = [
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-global-constants",
+ "aptos-jemalloc",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-move-stdlib",
  "aptos-proptest-helpers",
+ "aptos-resource-viewer",
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -4057,11 +4059,15 @@ name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-jemalloc",
  "aptos-logger",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-logging",
+ "bcs 0.1.4",
+ "criterion",
  "hashbrown 0.14.3",
  "move-binary-format",
  "move-bytecode-utils",
@@ -4069,6 +4075,7 @@ dependencies = [
  "move-resource-viewer",
  "move-vm-runtime",
  "move-vm-types",
+ "tikv-jemallocator",
 ]
 
 [[package]]

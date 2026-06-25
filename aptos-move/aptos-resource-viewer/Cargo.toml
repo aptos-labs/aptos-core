@@ -12,8 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+metered-allocations = ["aptos-jemalloc/metered-allocations"]
+
 [dependencies]
 anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-jemalloc = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
@@ -30,3 +35,8 @@ move-vm-types = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["testing"] }
 move-vm-types = { workspace = true, features = ["testing"] }
+bcs = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+jemallocator = { workspace = true }
+aptos-jemalloc = { workspace = true, features = ["metered-allocations"] }
