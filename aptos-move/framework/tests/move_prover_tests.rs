@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_framework::{extended_checks, prover::ProverOptions};
+use move_prover_boogie_backend::options::VerifyGranularity;
 use move_binary_format::file_format_common::VERSION_DEFAULT;
 use move_core_types::diag_writer::DiagWriter;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
@@ -17,6 +18,7 @@ const ENV_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY: &str =
     "MVP_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY";
 const ENV_TEST_DISALLOW_TIMEOUT_OVERWRITE: &str = "MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE";
 const ENV_TEST_VC_TIMEOUT: &str = "MVP_TEST_VC_TIMEOUT";
+const ENV_TEST_GRANULARITY: &str = "MVP_TEST_GRANULARITY";
 
 // Note: to run these tests, use:
 //
@@ -50,6 +52,31 @@ fn build_test_options(shards: usize, only_shard: Option<usize>) -> ProverOptions
         .parse::<usize>()
         .ok()
         .or(options.vc_timeout);
+    match read_env_var(ENV_TEST_GRANULARITY).to_ascii_lowercase().as_str() {
+        "" | "shard" => {},
+        "module" => {
+            options.granularity = Some(VerifyGranularity::Module);
+            // module and shards>1 are mutually exclusive; force shards=1.
+            options.shards = Some(1);
+        },
+        "vc" => {
+            options.granularity = Some(VerifyGranularity::Vc);
+            options.shards = Some(1);
+        },
+        other => panic!(
+            "unknown MVP_TEST_GRANULARITY value: {:?}; expected `shard`, `module`, or `vc`",
+            other
+        ),
+    }
+    if let Ok(cores) = read_env_var("MVP_TEST_CORES").parse::<usize>() {
+        options.proc_cores = Some(cores);
+    }
+    if read_env_var("MVP_TEST_DUMP") == "1" {
+        // Keep .bpl artifacts and disable the test-only TempDir wrapping so
+        // they land in the framework crate's cwd instead of a tmp directory.
+        options.dump = true;
+        options.for_test = false;
+    }
     options
 }
 
