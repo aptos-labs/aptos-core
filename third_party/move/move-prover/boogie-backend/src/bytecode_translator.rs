@@ -42,8 +42,8 @@ use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedInstId,
-        StructEnv, StructId,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructEnv, StructId,
     },
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
@@ -100,10 +100,31 @@ enum ApplyFrameAccess {
     WritesAt(Vec<String>),
 }
 
+/// Selects which verify-target functions a single translator/`.bpl` should emit
+/// `$verify` procedures for. Sibling cases of the same partition mechanism so
+/// `granularity = shard | module | vc` map to one of these variants without
+/// duplicating the translator code paths.
+#[derive(Debug, Clone)]
+pub enum VerifyTargetSelector {
+    /// Emit every verify target. Used when sharding is disabled (`shards == 1`)
+    /// and granularity is `Shard`.
+    All,
+    /// Hash partition: include a target iff `hash(full_name) % total == idx`.
+    /// Used by sharded mode with `shards > 1`.
+    Shard { idx: usize, total: usize },
+    /// Per-module partition: include targets in the named module.
+    Module { module_id: ModuleId },
+    /// Per-VC partition: include only the named verify target.
+    Single {
+        qid: QualifiedId<FunId>,
+        variant: FunctionVariant,
+    },
+}
+
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
-    for_shard: Option<usize>,
+    for_selector: VerifyTargetSelector,
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
@@ -241,14 +262,14 @@ impl<'env> BoogieTranslator<'env> {
     pub fn new(
         env: &'env GlobalEnv,
         options: &'env BoogieOptions,
-        for_shard: Option<usize>,
+        for_selector: VerifyTargetSelector,
         targets: &'env FunctionTargetsHolder,
         writer: &'env CodeWriter,
     ) -> Self {
         Self {
             env,
             options,
-            for_shard,
+            for_selector,
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
@@ -277,17 +298,34 @@ impl<'env> BoogieTranslator<'env> {
         if !fun_variant.is_verified() {
             return false;
         }
-        if let Some(shard) = self.for_shard {
-            // Check whether the shard is included.
-            if self.options.only_shard.is_some() && self.options.only_shard != Some(shard + 1) {
-                return false;
-            }
-            // Check whether it is part of the shard.
-            let mut hasher = DefaultHasher::new();
-            fun_target.func_env.get_full_name_str().hash(&mut hasher);
-            if (hasher.finish() as usize) % self.options.shards != shard {
-                return false;
-            }
+        match &self.for_selector {
+            VerifyTargetSelector::All => {},
+            VerifyTargetSelector::Shard { idx, total } => {
+                // Honor `--only-shard` (1-based) when the user opts in.
+                if self.options.only_shard.is_some()
+                    && self.options.only_shard != Some(*idx + 1)
+                {
+                    return false;
+                }
+                let mut hasher = DefaultHasher::new();
+                fun_target.func_env.get_full_name_str().hash(&mut hasher);
+                if (hasher.finish() as usize) % *total != *idx {
+                    return false;
+                }
+            },
+            VerifyTargetSelector::Module { module_id } => {
+                if fun_target.func_env.module_env.get_id() != *module_id {
+                    return false;
+                }
+            },
+            VerifyTargetSelector::Single { qid, variant } => {
+                if fun_target.func_env.get_qualified_id() != *qid {
+                    return false;
+                }
+                if fun_variant != variant {
+                    return false;
+                }
+            },
         }
         // Check whether the estimated duration is too large for configured timeout
         let options = self.options;
@@ -664,14 +702,28 @@ impl<'env> BoogieTranslator<'env> {
 
         // Emit any finalization items required by spec translation.
         self.spec_translator.finalize();
-        let shard_info = if let Some(shard) = self.for_shard {
-            format!(" (for shard #{} of {})", shard + 1, self.options.shards)
-        } else {
-            "".to_string()
+        let selector_info = match &self.for_selector {
+            VerifyTargetSelector::All => String::new(),
+            VerifyTargetSelector::Shard { idx, total } => {
+                format!(" (for shard #{} of {})", idx + 1, total)
+            },
+            VerifyTargetSelector::Module { module_id } => format!(
+                " (for module {})",
+                self.env.get_module(*module_id).get_full_name_str()
+            ),
+            VerifyTargetSelector::Single { qid, variant } => format!(
+                " (for verify target {}::{} [{}])",
+                self.env.get_module(qid.module_id).get_full_name_str(),
+                self.env
+                    .get_function(*qid)
+                    .get_name()
+                    .display(self.env.symbol_pool()),
+                variant
+            ),
         };
         info!(
             "{} verification conditions{}",
-            verified_functions_count, shard_info
+            verified_functions_count, selector_info
         );
     }
 
