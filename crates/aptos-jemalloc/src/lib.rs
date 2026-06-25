@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+mod resident;
 #[cfg(unix)]
 pub use jemallocator;
+pub use resident::current_process_resident_bytes;
 
 #[cfg(unix)]
 mod metrics;

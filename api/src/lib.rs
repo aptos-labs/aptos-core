@@ -16,6 +16,7 @@ mod failpoint;
 mod headers_sanity_check;
 mod index;
 mod log;
+mod memory_admission;
 pub mod metrics;
 mod page;
 mod response;

@@ -12,6 +12,7 @@ use crate::{
     headers_sanity_check::HeadersSanityCheck,
     index::IndexApi,
     log::middleware_log,
+    memory_admission::MemoryAdmission,
     set_failpoints,
     spec::{spec_endpoint_json, spec_endpoint_yaml},
     state::StateApi,
@@ -258,6 +259,8 @@ pub fn attach_poem_to_runtime(
             .with_if(config.api.compression_enabled, Compression::new())
             .with(HeadersSanityCheck::new(size_limit))
             .with(CatchPanic::new().with_handler(panic_handler))
+            // Runs first (LIFO): shed new requests with 503 when over the memory cap.
+            .with(MemoryAdmission::new(config.api.memory_admission_cap_bytes))
             // NOTE: Make sure to keep this after all the `with` middleware.
             .catch_all_error(convert_error)
             .around(middleware_log);

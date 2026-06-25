@@ -64,6 +64,9 @@ pub struct ApiConfig {
     /// it is aborted. Measured via jemalloc per-thread counters on production (jemalloc) builds;
     /// a no-op on builds without the `metered-allocations` reader. Must be > 0 (see `sanitize`).
     pub max_resource_annotation_bytes: usize,
+    /// Process resident-memory cap (bytes) above which the API sheds new requests
+    /// with 503. `0` disables the gate.
+    pub memory_admission_cap_bytes: usize,
     /// Maximum page size for module paginated APIs
     pub max_account_modules_page_size: u16,
     /// Maximum gas unit limit for view functions
@@ -103,6 +106,9 @@ pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
 pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
 const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
 pub const DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES: usize = 100_000_000;
+/// Process resident-memory cap (bytes) above which the API sheds new requests with 503.
+/// `0` disables the gate. Sized relative to machine RAM, not annotation load.
+pub const DEFAULT_MEMORY_ADMISSION_CAP_BYTES: usize = 20_000_000_000;
 const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
 const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
 
@@ -137,6 +143,7 @@ impl Default for ApiConfig {
             max_events_page_size: DEFAULT_MAX_PAGE_SIZE,
             max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,
             max_resource_annotation_bytes: DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES,
+            memory_admission_cap_bytes: DEFAULT_MEMORY_ADMISSION_CAP_BYTES,
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
             max_runtime_workers: None,
@@ -265,6 +272,14 @@ mod tests {
         assert_eq!(
             ApiConfig::default().max_resource_annotation_bytes,
             DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES
+        );
+    }
+
+    #[test]
+    fn test_memory_admission_cap_default() {
+        assert_eq!(
+            ApiConfig::default().memory_admission_cap_bytes,
+            DEFAULT_MEMORY_ADMISSION_CAP_BYTES
         );
     }
 
