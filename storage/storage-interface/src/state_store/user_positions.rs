@@ -3,19 +3,24 @@
 
 //! Per-account layered position index.
 //!
-//! `UserPositions` is the in-memory speculative view that mirrors
-//! `ShardedJmtState<PositionSlot>`'s pipelined shape but is keyed by
+//! `UserPositions` is the in-memory speculative view keyed by
 //! `(exchange, account)` and carries the *decoded* `UserPositionState`
 //! per layer.
+//!
+//! **Values are stored as `Arc<UserPositionState>` in the layered
+//! map.** Layer construction and rebase only refcount-bump untouched
+//! accounts; deep-cloning the inner `BTreeMap` happens once per
+//! actually-written account on the write path.
 //!
 //! **Chain growth bounded by periodic rebase.** `family_root` is
 //! pinned so reads can view-from-root regardless of chain depth (the
 //! scanner's hot path stays decode-free with no durable fallback).
 //! Unbounded growth is avoided via [`UserPositions::rebase`] —
 //! triggered by the merkle batch committer when a snapshot lands.
-//! Rebase walks the current top, collects the full live state, and
-//! seeds a fresh family with one layer holding it; the old family
-//! drops as soon as outstanding speculative references release.
+//! Rebase walks the current top, collects the full live state (one
+//! `Arc` clone per account, no value copy), and seeds a fresh family
+//! with one layer holding it; the old family drops as soon as
+//! outstanding speculative references release.
 
 #![forbid(unsafe_code)]
 
@@ -62,18 +67,20 @@ impl UserPositionState {
 
 /// Multi-version layered per-account position index. Each chunk
 /// pushes one new layer; speculative branches Arc-drop the layer
-/// without disturbing ancestors.
+/// without disturbing ancestors. Layer values are
+/// `Arc<UserPositionState>` so untouched accounts cost a refcount
+/// bump per layer build, not a deep copy.
 ///
 /// `family_root` keeps the family-root layer alive so `get` /
 /// full-walk views can `view_layers_after(family_root)` and see the
-/// whole chain — without that anchor, the parent `Weak` references
-/// could be dropped and `LayeredMap::get` would lose visibility into
-/// older layers. See module-level TODO for the chain-pruning rework.
+/// whole chain — without that pinned reference the parent `Weak`
+/// links could be dropped and `LayeredMap::get` would lose visibility
+/// into older layers.
 #[derive(Clone, Debug)]
 pub struct UserPositions {
     next_version: Version,
-    family_root: Arc<MapLayer<UserPositionKey, UserPositionState>>,
-    top: MapLayer<UserPositionKey, UserPositionState>,
+    family_root: Arc<MapLayer<UserPositionKey, Arc<UserPositionState>>>,
+    top: MapLayer<UserPositionKey, Arc<UserPositionState>>,
 }
 
 impl UserPositions {
@@ -103,11 +110,11 @@ impl UserPositions {
         self.next_version.checked_sub(1)
     }
 
-    pub fn family_root(&self) -> &MapLayer<UserPositionKey, UserPositionState> {
+    pub fn family_root(&self) -> &MapLayer<UserPositionKey, Arc<UserPositionState>> {
         &self.family_root
     }
 
-    pub fn top(&self) -> &MapLayer<UserPositionKey, UserPositionState> {
+    pub fn top(&self) -> &MapLayer<UserPositionKey, Arc<UserPositionState>> {
         &self.top
     }
 
@@ -116,15 +123,20 @@ impl UserPositions {
     }
 
     /// Layered read: returns the top-most `UserPositionState` for
-    /// `key` reachable from the family root.
-    pub fn get(&self, key: &UserPositionKey) -> Option<UserPositionState> {
+    /// `key` reachable from the family root. The returned `Arc` is
+    /// shared with the layer that owns the value — callers wanting
+    /// to mutate must `Arc::make_mut` (or build a fresh state).
+    pub fn get(&self, key: &UserPositionKey) -> Option<Arc<UserPositionState>> {
         self.top.view_layers_after(&self.family_root).get(key)
     }
 
     /// Seed a single base layer above the family root with `seed`.
     /// Used by cold-load to hydrate at startup. `next_version` is
     /// unchanged (set by the caller via `new_at_version`).
-    pub fn with_seeded_base(self, seed: Vec<(UserPositionKey, UserPositionState)>) -> Self {
+    pub fn with_seeded_base(
+        self,
+        seed: Vec<(UserPositionKey, Arc<UserPositionState>)>,
+    ) -> Self {
         let top = self
             .top
             .view_layers_after(&self.family_root)
@@ -143,24 +155,29 @@ impl UserPositions {
     /// references (e.g. per-block `UserPositions` in
     /// `PartialStateComputeResult`) release.
     ///
+    /// Untouched accounts cost only an `Arc::clone` here — the inner
+    /// `BTreeMap<MarketAddress, NativePosition>` is not duplicated.
+    /// Touched accounts already paid their inner-map cost on the
+    /// write path; this walk shares those same `Arc`s.
+    ///
     /// Called by the merkle batch committer when a snapshot lands —
     /// keeps in-memory chain depth bounded by snapshot cadence while
     /// preserving the "in-memory holds all data" invariant the
     /// scanner reads rely on (no durable fallback needed).
     pub fn rebase(&self) -> Self {
-        let entries: Vec<(UserPositionKey, UserPositionState)> =
+        let entries: Vec<(UserPositionKey, Arc<UserPositionState>)> =
             self.top.view_layers_after(&self.family_root).iter().collect();
         Self::new_at_version(self.version(), "position").with_seeded_base(entries)
     }
 
-    /// Push a new layer atop `self`. The new layer's `base_layer`
-    /// field is anchored at `family_root` so reader paths viewing
-    /// from `family_root` see the whole chain across any number of
+    /// Push a new layer atop `self`. The new layer's base is
+    /// anchored at `family_root` so reader paths viewing from
+    /// `family_root` see the whole chain across any number of
     /// extends.
     pub fn extend(
         &self,
         new_version: Version,
-        updates: Vec<(UserPositionKey, UserPositionState)>,
+        updates: Vec<(UserPositionKey, Arc<UserPositionState>)>,
     ) -> Self {
         let top = self
             .top
@@ -174,14 +191,14 @@ impl UserPositions {
     }
 }
 
-/// Streams JMT rows into the `(UserPositionKey, UserPositionState)`
+/// Streams JMT rows into the `(UserPositionKey, Arc<UserPositionState>)`
 /// seed used to initialize the base layer of a [`UserPositions`] at
 /// startup. Memory is bounded by the live position set — one
 /// decoded row at a time, no double-buffering of the durable
 /// snapshot.
 pub fn decode_rows_to_user_position_states<I>(
     rows: I,
-) -> crate::Result<Vec<(UserPositionKey, UserPositionState)>>
+) -> crate::Result<Vec<(UserPositionKey, Arc<UserPositionState>)>>
 where
     I: IntoIterator<Item = crate::Result<(StateKey, StateValue)>>,
 {
@@ -211,7 +228,7 @@ where
             .positions
             .insert(market, position);
     }
-    Ok(by_account.into_iter().collect())
+    Ok(by_account.into_iter().map(|(k, v)| (k, Arc::new(v))).collect())
 }
 
 /// Decoded per-tx Position write captured by the commit applier.
@@ -226,18 +243,28 @@ pub struct PositionWrite {
 }
 
 /// Collapse a chunk's `PositionWrite` stream into one
-/// `UserPositionState` per touched `UserPositionKey`, reading the
-/// base from `current` (the previous committed layer). Writes apply
-/// in arrival order, latest-wins per `(account, market)`.
+/// `Arc<UserPositionState>` per touched `UserPositionKey`, reading
+/// the base from `current` (the previous committed layer). Writes
+/// apply in arrival order, latest-wins per `(account, market)`.
+///
+/// We deep-clone the inner `BTreeMap` once per touched account (when
+/// the prior state is shared with the layered map). Untouched
+/// accounts pay nothing — they stay in their existing layer as
+/// shared `Arc`s.
 pub fn materialize_user_position_updates(
     current: &UserPositions,
     writes: Vec<PositionWrite>,
-) -> Vec<(UserPositionKey, UserPositionState)> {
+) -> Vec<(UserPositionKey, Arc<UserPositionState>)> {
     use std::collections::hash_map::Entry;
     let mut by_account: HashMap<UserPositionKey, UserPositionState> = HashMap::new();
     for w in writes {
         let entry = match by_account.entry(w.position_key) {
-            Entry::Vacant(v) => v.insert(current.get(&w.position_key).unwrap_or_default()),
+            Entry::Vacant(v) => v.insert(
+                current
+                    .get(&w.position_key)
+                    .map(|arc| (*arc).clone())
+                    .unwrap_or_default(),
+            ),
             Entry::Occupied(o) => o.into_mut(),
         };
         match w.value {
@@ -249,7 +276,10 @@ pub fn materialize_user_position_updates(
             },
         }
     }
-    by_account.into_iter().collect()
+    by_account
+        .into_iter()
+        .map(|(k, v)| (k, Arc::new(v)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -276,10 +306,10 @@ mod tests {
         }
     }
 
-    fn user_state(market: AccountAddress, size: u64) -> UserPositionState {
+    fn user_state(market: AccountAddress, size: u64) -> Arc<UserPositionState> {
         let mut positions = BTreeMap::new();
         positions.insert(market, position(size));
-        UserPositionState { positions }
+        Arc::new(UserPositionState { positions })
     }
 
     #[test]
@@ -399,5 +429,35 @@ mod tests {
         assert_eq!(*k, key);
         assert_eq!(state.positions[&market_x].size(), 150);
         assert_eq!(state.positions[&market_y].size(), 50);
+    }
+
+    #[test]
+    fn rebase_shares_value_arcs_for_untouched_accounts() {
+        let key_touched = UserPositionKey {
+            exchange: addr(1),
+            account: addr(2),
+        };
+        let key_quiet = UserPositionKey {
+            exchange: addr(1),
+            account: addr(3),
+        };
+        let market = addr(9);
+
+        let v0 = UserPositions::new_empty("test").extend(
+            0,
+            vec![
+                (key_touched, user_state(market, 100)),
+                (key_quiet, user_state(market, 200)),
+            ],
+        );
+        let v1 = v0.extend(1, vec![(key_touched, user_state(market, 300))]);
+
+        let before = v1.get(&key_quiet).expect("quiet must be present");
+        let rebased = v1.rebase();
+        let after = rebased.get(&key_quiet).expect("quiet must survive rebase");
+
+        // Untouched account's Arc is the *same* allocation as before
+        // the rebase — rebase did not deep-clone its inner BTreeMap.
+        assert!(Arc::ptr_eq(&before, &after));
     }
 }

@@ -115,7 +115,7 @@ impl NativeStateView {
         let key = UserPositionKey { exchange, account };
         self.user_positions
             .get(&key)
-            .map(|us| us.positions.into_iter().collect())
+            .map(|us| us.positions.iter().map(|(k, v)| (*k, v.clone())).collect())
             .unwrap_or_default()
     }
 }
