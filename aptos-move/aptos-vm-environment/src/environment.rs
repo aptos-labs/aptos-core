@@ -183,9 +183,7 @@ struct Environment {
     /// The on-chain verification key for keyless accounts. Optional because it might not be set
     /// on-chain.
     keyless_vk: Option<Groth16VerificationKey>,
-    /// The prepared verification key for keyless accounts, initialized on first use. The first
-    /// caller runs preparation synchronously on its current thread, while concurrent callers wait on
-    /// this cell and share the same result.
+    /// The prepared verification key for keyless accounts, derived lazily from `keyless_vk`.
     keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
@@ -296,6 +294,11 @@ impl Environment {
                 sha3_256.update(&vk_bytes);
                 vk
             });
+        let keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>> = if keyless_vk.is_none() {
+            OnceLock::from(None)
+        } else {
+            OnceLock::new()
+        };
         let keyless_configuration =
             Configuration::fetch_keyless_config(state_view).map(|(config, config_bytes)| {
                 sha3_256.update(&config_bytes);
@@ -310,7 +313,7 @@ impl Environment {
             features,
             timed_features,
             keyless_vk,
-            keyless_pvk: OnceLock::new(),
+            keyless_pvk,
             keyless_configuration,
             gas_feature_version,
             gas_params,
@@ -370,6 +373,8 @@ pub mod tests {
                 .vm_config()
                 .delayed_field_optimization_enabled
         );
+        assert!(env.keyless_vk.is_none());
+        assert!(env.keyless_pvk.get().is_some_and(Option::is_none));
 
         let env = env.try_enable_delayed_field_optimization();
         assert!(
