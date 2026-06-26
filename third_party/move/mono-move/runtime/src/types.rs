@@ -15,6 +15,10 @@ pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 
 pub(crate) const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
+/// Initial capacity, in elements, of a vector allocated lazily on its first
+/// `push_back`.
+pub(crate) const VEC_PUSHBACK_INIT_CAPACITY: u64 = 4;
+
 /// Maximum size of an `AbortMsg` message, in bytes.
 /// TODO(cleanup): make this configurable in some VM config.
 pub(crate) const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
