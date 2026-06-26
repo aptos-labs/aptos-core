@@ -59,9 +59,22 @@ spec aptos_framework::block {
     }
 
     spec block_prologue_common {
-        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        pragma verify = true;
+        pragma opaque;
         include BlockRequirement;
         aborts_if false;
+
+        modifies global<BlockResource>(@aptos_framework);
+        modifies global<CommitHistory>(@aptos_framework);
+        modifies global<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        modifies global<stake::ValidatorPerformance>(@aptos_framework);
+        modifies global<state_storage::StateStorageUsage>(@aptos_framework);
+
+        ensures result == old(global<BlockResource>(@aptos_framework).epoch_interval);
+        ensures global<BlockResource>(@aptos_framework).height ==
+            old(global<BlockResource>(@aptos_framework).new_block_events.counter);
+        ensures global<BlockResource>(@aptos_framework).epoch_interval ==
+            old(global<BlockResource>(@aptos_framework).epoch_interval);
     }
 
     spec block_prologue {
@@ -97,6 +110,9 @@ spec aptos_framework::block {
         let proposer = new_block_event.proposer;
         let timestamp = new_block_event.time_microseconds;
 
+        modifies global<CommitHistory>(@aptos_framework);
+        modifies global<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
@@ -129,6 +145,7 @@ spec aptos_framework::block {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
+        use aptos_framework::permissioned_signer;
 
         vm: signer;
         hash: address;
@@ -141,8 +158,13 @@ spec aptos_framework::block {
 
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
+        // vm must not be a permissioned signer.
+        requires !permissioned_signer::spec_is_permissioned_signer(vm);
         /// [high-level-req-4]
         requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        // proposer must have a stake pool and validator config.
+        requires proposer == @vm_reserved ||
+            (stake::spec_has_stake_pool(proposer) && stake::spec_has_validator_config(proposer));
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);

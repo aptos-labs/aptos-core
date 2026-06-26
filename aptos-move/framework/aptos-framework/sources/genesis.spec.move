@@ -109,7 +109,6 @@ spec aptos_framework::genesis {
     }
 
     spec initialize_validator {
-        pragma verify_duration_estimate = 120;
     }
 
     spec create_initialize_validators_with_commission {
@@ -131,13 +130,10 @@ spec aptos_framework::genesis {
     }
 
     spec create_initialize_validator {
-        pragma verify_duration_estimate = 120;
         include stake::ResourceRequirement;
     }
 
     spec initialize_for_verification {
-        // This function cause timeout (property proved)
-        pragma verify_duration_estimate = 120;
         // We construct `initialize_for_verification` which is a "#[verify_only]" function that
         // simulates the genesis encoding process in `vm-genesis` (written in Rust).
         include InitalizeRequires;

@@ -51,8 +51,6 @@ spec aptos_framework::consensus_config {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
 
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 600;
         include staking_config::StakingRewardsConfigRequirement;
         let addr = signer::address_of(account);
         /// [high-level-req-2]

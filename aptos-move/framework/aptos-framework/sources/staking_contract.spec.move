@@ -101,8 +101,6 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
-        // TODO: set because of timeout (property proved).
-        pragma verify_duration_estimate = 120;
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
 
@@ -304,8 +302,6 @@ spec aptos_framework::staking_contract {
     spec switch_operator_with_same_commission(
         staker: &signer, old_operator: address, new_operator: address
     ) {
-        // TODO: These function passed locally however failed in github CI
-        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
@@ -345,8 +341,6 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
-        // TODO: These function passed locally however failed in github CI
-        pragma verify_duration_estimate = 120;
         // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
 
@@ -360,8 +354,6 @@ spec aptos_framework::staking_contract {
         operator: address,
         staking_contract: &mut StakingContract,
     ) {
-        // TODO: These function passed locally however failed in github CI
-        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;
@@ -391,7 +383,6 @@ spec aptos_framework::staking_contract {
     spec get_staking_contract_amounts_internal(staking_contract: &StakingContract): (
         u64, u64, u64
     ) {
-        pragma verify_duration_estimate = 120;
         include GetStakingContractAmountsAbortsIf;
 
         let pool_address = staking_contract.pool_address;
@@ -631,7 +622,7 @@ spec aptos_framework::staking_contract {
         aborts_if exists<account::Account>(resource_addr)
             && (
                 std::option::is_some(acc.signer_capability_offer.for)
-                    || acc.sequence_number != 0
+                    || acc.sequence_number != (0 as u64)
             );
         aborts_if !exists<account::Account>(resource_addr)
             && len(bcs::to_bytes(resource_addr)) != 32;
