@@ -575,6 +575,17 @@ impl TransactionRestoreBatchController {
         let db_commit_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()
+            // A batch must not span an epoch boundary; see split_at_epoch_endings.
+            .map_ok(|chunk| {
+                stream::iter(
+                    split_at_epoch_endings(chunk, |(.., events)| {
+                        events.iter().any(ContractEvent::is_new_epoch_event)
+                    })
+                    .into_iter()
+                    .map(Result::<_>::Ok),
+                )
+            })
+            .try_flatten()
             .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
@@ -787,5 +798,42 @@ impl TransactionRestoreBatchController {
             })
             .await?;
         Ok(())
+    }
+}
+
+/// Split a batch so no piece crosses an epoch boundary: an epoch-ending txn ends
+/// its piece. KV replay persists `VersionData` only at each piece's last version,
+/// which the first txn of the next epoch reads via `state_storage::on_new_block`.
+fn split_at_epoch_endings<T>(items: Vec<T>, ends_epoch: impl Fn(&T) -> bool) -> Vec<Vec<T>> {
+    let mut batches = Vec::new();
+    let mut batch = Vec::new();
+    for item in items {
+        let ends = ends_epoch(&item);
+        batch.push(item);
+        if ends {
+            batches.push(std::mem::take(&mut batch));
+        }
+    }
+    if !batch.is_empty() {
+        batches.push(batch);
+    }
+    batches
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_at_epoch_endings;
+
+    #[test]
+    fn test_split_at_epoch_endings() {
+        // A negative number marks an epoch-ending item.
+        let split = |items: Vec<i32>| split_at_epoch_endings(items, |v| *v < 0);
+
+        assert!(split(vec![]).is_empty());
+        assert_eq!(split(vec![1, 2, 3]), vec![vec![1, 2, 3]]);
+        assert_eq!(split(vec![1, -2, 3]), vec![vec![1, -2], vec![3]]);
+        // An epoch ending at the end must not yield a trailing empty batch.
+        assert_eq!(split(vec![1, 2, -3]), vec![vec![1, 2, -3]]);
+        assert_eq!(split(vec![-1, -2]), vec![vec![-1], vec![-2]]);
     }
 }
