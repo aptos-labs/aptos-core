@@ -1,12 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    commands::{build_debugger, RestAPI},
-    workload::TransactionBlock,
-};
+use crate::commands::{build_debugger, RestAPI};
 use anyhow::{anyhow, bail};
-use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, Version};
+use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionBlock, Version};
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;

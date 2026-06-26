@@ -27,12 +27,14 @@ impl DoLedgerUpdate {
     ) -> Result<LedgerUpdateOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_ledger_update"]);
 
-        // Assemble `TransactionInfo`s. The variant (V0 vs V1) is driven by whether
-        // `hot_state_checkpoint_hashes` is present: `DoStateCheckpoint` produces `Some`
-        // iff V1 should be emitted, based on the `TRANSACTION_INFO_V1` on-chain feature
-        // threaded via `ExecutionOutput::transaction_info_v1`.
+        // Assemble `TransactionInfo`s. The variant (V0 vs V1) is driven by the
+        // `TRANSACTION_INFO_V1` on-chain feature, threaded via
+        // `ExecutionOutput::transaction_info_v1`. The hot state root hash a V1 carries is
+        // present only when `HOT_STATE_ROOT_IN_TXN_INFO` is also on (`DoStateCheckpoint`
+        // produces `Some` hashes iff so); otherwise the V1 leaves it `None`.
         let (transaction_infos, transaction_info_hashes) = Self::assemble_transaction_infos(
             &execution_output.to_commit,
+            execution_output.transaction_info_v1,
             &state_checkpoint_output.state_checkpoint_hashes,
             state_checkpoint_output
                 .hot_state_checkpoint_hashes
@@ -55,6 +57,7 @@ impl DoLedgerUpdate {
 
     fn assemble_transaction_infos(
         to_commit: &TransactionsWithOutput,
+        transaction_info_v1: bool,
         state_checkpoint_hashes: &[Option<HashValue>],
         hot_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
         position_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
@@ -89,13 +92,13 @@ impl DoLedgerUpdate {
                     .status()
                     .as_kept_status()
                     .expect("Already sorted.");
-                let txn_info = if let Some(hot) = hot_state_checkpoint_hashes {
+                let txn_info = if transaction_info_v1 {
                     TransactionInfo::new_v1(
                         txn.committed_hash(),
                         write_set_hash,
                         event_root_hash,
                         state_checkpoint_hash,
-                        hot[i],
+                        hot_state_checkpoint_hashes.and_then(|hot| hot[i]),
                         txn_output.gas_used(),
                         status,
                         auxiliary_info_hash,

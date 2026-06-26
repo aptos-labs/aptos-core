@@ -65,7 +65,6 @@ spec aptos_framework::staking_proxy {
     spec set_voter(owner: &signer, operator: address, new_voter: address) {
         // TODO: Can't verify `set_vesting_contract_voter`
         pragma aborts_if_is_partial;
-        pragma verify_duration_estimate = 120;
         include SetStakingContractVoter;
         include SetStakePoolVoterAbortsIf;
     }

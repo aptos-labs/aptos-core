@@ -115,7 +115,7 @@ impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
 
 /// Build the native registry mono-move executes against: the synthetic test
 /// natives plus the real production natives, keyed by interned name.
-pub(crate) fn build_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistry {
+pub fn build_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistry {
     let mut natives = ProductionNativeRegistry::new();
     natives
         .register_all(

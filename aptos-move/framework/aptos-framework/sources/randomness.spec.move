@@ -3,7 +3,8 @@ spec aptos_framework::randomness {
     spec module {
         use aptos_framework::chain_status;
         pragma verify = true;
-        invariant [suspendable] chain_status::is_operating() ==> exists<PerBlockRandomness>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==>
+            exists<PerBlockRandomness>(@aptos_framework);
         global var: vector<u8>;
     }
 
@@ -29,12 +30,24 @@ spec aptos_framework::randomness {
         aborts_if framework_addr != @aptos_framework;
     }
 
-    spec on_new_block(vm: &signer, epoch: u64, round: u64, seed_for_new_block: Option<vector<u8>>) {
+    spec on_new_block(
+        vm: &signer,
+        epoch: u64,
+        round: u64,
+        seed_for_new_block: Option<vector<u8>>
+    ) {
         use std::signer;
+        pragma opaque;
+        modifies global<PerBlockRandomness>(@aptos_framework);
         aborts_if signer::address_of(vm) != @vm;
-        ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).seed == seed_for_new_block;
-        ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).epoch == epoch;
-        ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).round == round;
+        ensures exists<PerBlockRandomness>(@aptos_framework) ==>
+            global<PerBlockRandomness>(@aptos_framework).seed == seed_for_new_block;
+        ensures exists<PerBlockRandomness>(@aptos_framework) ==>
+            global<PerBlockRandomness>(@aptos_framework).epoch == epoch;
+        ensures exists<PerBlockRandomness>(@aptos_framework) ==>
+            global<PerBlockRandomness>(@aptos_framework).round == round;
+        ensures !exists<PerBlockRandomness>(@aptos_framework) ==>
+            !exists<PerBlockRandomness>(@aptos_framework);
     }
 
     spec next_32_bytes(): vector<u8> {
@@ -46,7 +59,13 @@ spec aptos_framework::randomness {
         let txn_hash = transaction_context::spec_get_txn_hash();
         let txn_counter = spec_fetch_and_increment_txn_counter();
         ensures len(result) == 32;
-        ensures result == hash::sha3_256(concat(concat(concat(input, seed), txn_hash), txn_counter));
+        ensures result
+            == hash::sha3_256(
+                concat(
+                    concat(concat(input, seed), txn_hash),
+                    txn_counter
+                )
+            );
     }
 
     spec schema NextBlobAbortsIf {
@@ -81,16 +100,12 @@ spec aptos_framework::randomness {
     }
 
     spec u256_integer(): u256 {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 300;
         pragma unroll = 32;
         include NextBlobAbortsIf;
         ensures [abstract] result == spec_u256_integer();
     }
 
     spec u256_integer_internal(): u256 {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 300;
         pragma unroll = 32;
         include NextBlobAbortsIf;
     }
@@ -98,33 +113,22 @@ spec aptos_framework::randomness {
     spec fun spec_u256_integer(): u256;
 
     spec u8_range(min_incl: u8, max_excl: u8): u8 {
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved).
-        pragma opaque;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
     }
 
-
     spec u64_range(min_incl: u64, max_excl: u64): u64 {
-        pragma verify_duration_estimate = 120;
+        pragma seed = 2;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
     }
 
     spec u256_range(min_incl: u256, max_excl: u256): u256 {
-        pragma verify_duration_estimate = 120;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
-    }
-
-    spec permutation(n: u64): vector<u64> {
-        pragma aborts_if_is_partial;
-        // TODO(tengzhang): complete the aborts_if conditions
-        // include n > 1 ==> NextBlobAbortsIf;
-        // aborts_if n > 1 && !exists<PerBlockRandomness>(@aptos_framework);
     }
 
     spec safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {
@@ -134,10 +138,22 @@ spec aptos_framework::randomness {
     }
 
     spec fun spec_safe_add_mod(a: u256, b: u256, m: u256): u256 {
-        if (a < m - b) {
-            a + b
-        } else {
-            a - (m - b)
-        }
+        if (a < m - b) { a + b }
+        else { a - (m - b) }
+    }
+
+    spec permutation(n: u64): vector<u64> {
+        pragma unroll = 1;
+        aborts_if n > 1 && !exists<PerBlockRandomness>(@aptos_framework);
+        aborts_if n > 1 && option::is_none(global<PerBlockRandomness>(@aptos_framework).seed);
+        aborts_if n > 1 && !spec_is_unbiasable();
+        ensures len(result) == n;
+    }
+
+    spec u64_range_internal(min_incl: u64, max_excl: u64): u64 {
+        pragma seed = 2;
+        include NextBlobAbortsIf;
+        aborts_if min_incl >= max_excl;
+        ensures result >= min_incl && result < max_excl;
     }
 }

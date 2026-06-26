@@ -387,8 +387,6 @@ spec aptos_framework::stake {
     }
 
     spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 300;
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
@@ -531,6 +529,7 @@ spec aptos_framework::stake {
         requires chain_status::is_operating();
         // This function should never abort.
         aborts_if false;
+        modifies global<ValidatorPerformance>(@aptos_framework);
 
         let validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
@@ -776,6 +775,8 @@ spec aptos_framework::stake {
 
     spec find_validator {
         pragma opaque;
+        // Override module-level `aborts_if_is_partial` so the declared `aborts_if false` is honored.
+        pragma aborts_if_is_partial = false;
         aborts_if false;
         ensures option::is_none(result) ==>
             (forall i in 0..len(v): v[i].addr != addr);

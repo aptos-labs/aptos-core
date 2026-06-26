@@ -942,6 +942,13 @@ module std::features {
     /// Lifetime: permanent
     const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 122;
 
+    /// When enabled together with `TRANSACTION_INFO_V1`, execution populates
+    /// `TransactionInfoV1`'s hot state root hash, so it is committed to the ledger
+    /// accumulator. Without it, `TransactionInfoV1` is still assembled but the hot state
+    /// root is left out. Requires `TRANSACTION_INFO_V1`.
+    /// Lifetime: permanent
+    const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
+
     // ============================================================================================
     // Feature Flag Implementation
 

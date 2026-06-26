@@ -3773,3 +3773,15 @@ pub struct EphemeralAuxiliaryInfo {
     // onchain?
     pub proposer_index: u64,
 }
+
+/// A block of consecutive transactions.
+#[derive(Serialize, Deserialize)]
+pub struct TransactionBlock {
+    /// The version of the first transaction in the block.
+    pub begin_version: Version,
+    /// Non-empty list of transactions in a block.
+    pub transactions: Vec<Transaction>,
+    /// Persisted auxiliary info for each transaction, aligned with `transactions`.
+    #[serde(default = "Vec::new")]
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+}

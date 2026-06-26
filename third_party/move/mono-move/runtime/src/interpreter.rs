@@ -38,7 +38,7 @@ use mono_move_core::{
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
-    types::{view_type_list, InternedTypeList},
+    types::{view_type_list, InternedType, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
@@ -217,6 +217,17 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
     }
 
+    /// Resets the context to run `func` again from a clean state, reusing the already-allocated
+    /// stack and heap buffers instead of reallocating them. Place arguments with
+    /// [`set_root_arg`](Self::set_root_arg) before calling [`run`](Self::run).
+    pub fn reset(&mut self, func: &Function, gas_budget: u64) {
+        self.invoke(func);
+        self.heap.reset();
+        self.read_write_set = ResourceReadWriteSet::new();
+        self.root_pool = RootPool::new();
+        self.exec_ctx.gas_meter().reset(gas_budget);
+    }
+
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result(&self) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
@@ -268,6 +279,29 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     /// Read a raw heap pointer from the root frame at the given byte offset.
     pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
         unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
+    }
+
+    /// Deserialize a BCS-encoded argument of type `ty` into the root frame at `offset`, allocating
+    /// any nested heap data on this context's heap. Handles struct/vector arguments, unlike
+    /// [`set_root_arg`](Self::set_root_arg) (a raw copy for primitives only).
+    ///
+    /// # Safety
+    ///
+    /// `offset` and `ty` must correspond to a real parameter slot, and `ty` must not be a reference.
+    pub unsafe fn deserialize_root_arg(
+        &mut self,
+        offset: u32,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> RuntimeResult<()> {
+        let dst = unsafe {
+            self.stack
+                .as_ptr()
+                .add(FRAME_METADATA_SIZE + offset as usize)
+        };
+        // SAFETY: `dst` is a slot in the root frame (caller guarantees offset/ty match a
+        // parameter); `exec_ctx` is the LayoutProvider and `heap` is where nested data is boxed.
+        unsafe { value_utils::deserialize_into(&*self.exec_ctx, &mut self.heap, ty, bytes, dst) }
     }
 
     /// Allocate a vector of `u64` values on the heap and return its address

@@ -18,7 +18,7 @@ pub enum TransactionIndexKind {
     NotAvailable,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UserTransactionContext {
     sender: AccountAddress,
     secondary_signers: Vec<AccountAddress>,

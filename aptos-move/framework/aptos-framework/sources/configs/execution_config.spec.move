@@ -14,8 +14,6 @@ spec aptos_framework::execution_config {
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
 
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 600;
         let addr = signer::address_of(account);
         requires chain_status::is_genesis();
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);

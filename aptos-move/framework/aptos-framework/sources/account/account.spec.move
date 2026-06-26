@@ -637,29 +637,48 @@ spec aptos_framework::account {
     }
 
     /// The Account existed under the signer.
-    /// The guid_creation_num of the account resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
+        pragma verify = true;
         let addr = signer::address_of(account_signer);
-        include NewEventHandleAbortsIf {
-            account: account_signer,
-        };
+        include NewEventHandleAbortsIf { account: account_signer };
         modifies global<Account>(addr);
+        ensures exists<Account>(addr);
         /// [high-level-req-11]
-        ensures global<Account>(addr).guid_creation_num == old(global<Account>(addr).guid_creation_num) + 1;
+        ensures old(exists<Account>(addr)) ==>
+            global<Account>(addr).guid_creation_num == old(global<Account>(addr).guid_creation_num) + 1;
+        ensures !old(exists<Account>(addr)) ==>
+            global<Account>(addr).guid_creation_num == 3;
     }
 
-    /// The Account existed under the signer.
-    /// The guid_creation_num of the Account is up to MAX_U64.
     spec new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
+        pragma verify = true;
         include NewEventHandleAbortsIf;
+        modifies global<Account>(signer::address_of(account));
     }
+
     spec schema NewEventHandleAbortsIf {
+        use std::features::{Self, DEFAULT_ACCOUNT_RESOURCE};
         account: &signer;
         let addr = signer::address_of(account);
-        let account = global<Account>(addr);
-        aborts_if !exists<Account>(addr);
-        aborts_if account.guid_creation_num + 1 > MAX_U64;
-        aborts_if account.guid_creation_num + 1 >= MAX_GUID_CREATION_NUM;
+        let feature_on = features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+        let account_exists_pre = exists<Account>(addr);
+        // Feature OFF (legacy): missing Account aborts.
+        aborts_if !account_exists_pre && !feature_on;
+        // Feature ON: missing Account at a reserved address aborts in create_account_if_does_not_exist.
+        aborts_if !account_exists_pre && feature_on
+            && (addr == @vm_reserved || addr == @aptos_framework || addr == @aptos_token);
+        // Vacuous in practice (addresses are 32 bytes) but the prover can't see through bcs::to_bytes.
+        aborts_if !account_exists_pre && feature_on
+            && len(bcs::to_bytes(addr)) != 32;
+        // Pre-existing account uses its current counter; freshly-created has guid_creation_num == 2
+        // (create_account_unchecked initializes via 2 built-in event handles).
+        let creation_num = if (account_exists_pre) {
+            global<Account>(addr).guid_creation_num
+        } else {
+            2
+        };
+        aborts_if creation_num + 1 > MAX_U64;
+        aborts_if creation_num + 1 >= MAX_GUID_CREATION_NUM;
     }
 
     spec register_coin<CoinType>(account_addr: address) {

@@ -24,7 +24,7 @@
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
-    heap::{heap_alloc, AllocationResult, Heap},
+    heap::{heap_alloc, AllocationError, AllocationResult, Heap},
     memory::{read_enum_tag, read_ptr, read_vec_len, write_enum_tag, write_ptr, write_u64},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
@@ -582,6 +582,26 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
         .into());
     }
     Ok(())
+}
+
+/// Like [`deserialize`], but returns a [`RuntimeError`] instead of the crate-internal
+/// `AllocationError`, so external callers can use it. Does not run GC on heap exhaustion; the caller
+/// must ensure the heap has room.
+///
+/// # Safety
+///
+/// Same as [`deserialize`]: `dst` must be writable for `ty`'s in-memory size and outlive the call,
+/// and `ty` must not be a reference.
+pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+) -> RuntimeResult<()> {
+    // SAFETY: forwarded to the caller.
+    unsafe { deserialize(layouts, heap, ty, bytes, dst) }
+        .map_err(AllocationError::into_runtime_error)
 }
 
 /// # Safety

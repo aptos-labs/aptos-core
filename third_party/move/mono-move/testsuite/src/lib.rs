@@ -18,5 +18,8 @@ pub mod v1_test_natives;
 pub use compile::{
     assemble_masm_source, compile, compile_move_path, compile_move_source, SourceKind,
 };
-pub use engine::{with_loaded_mono_function, with_mono_function, MonoRunner, RunResult};
+pub use engine::{
+    build_natives, with_loaded_mono_function, with_mono_function, MonoRunner, RunResult,
+};
 pub use module_provider::InMemoryModuleProvider;
+pub use runner::{finalize_events_v1, finalize_events_v2};

@@ -35,9 +35,6 @@ spec aptos_framework::aptos_coin {
     }
 
     spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
-        use aptos_framework::aggregator_factory;
-        // Raised above the default 40s because of prover timeout (property proved).
-        pragma verify_duration_estimate = 80;
 
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
@@ -45,7 +42,6 @@ spec aptos_framework::aptos_coin {
         aborts_if !string::spec_internal_check_utf8(b"APT");
         aborts_if exists<MintCapStore>(addr);
         aborts_if exists<coin::CoinInfo<AptosCoin>>(addr);
-        aborts_if !exists<aggregator_factory::AggregatorFactory>(addr);
         /// [high-level-req-1]
         ensures exists<MintCapStore>(addr);
         // property 3: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.

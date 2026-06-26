@@ -46,6 +46,8 @@ pub enum InMemoryStorageKey {
         handle: TableHandle,
         // TODO(perf): consider interning these keys later.
         key: Box<[u8]>,
+        /// The stored value's type, needed to materialize the item from storage.
+        value_ty: InternedType,
     },
 }
 
@@ -55,9 +57,13 @@ impl InMemoryStorageKey {
         InMemoryStorageKey::Resource { address, ty }
     }
 
-    /// Builds a table item key from its handle and the serialized key bytes.
-    pub fn table_item(handle: TableHandle, key: Box<[u8]>) -> Self {
-        InMemoryStorageKey::TableItem { handle, key }
+    /// Builds a table item key from its handle, serialized key bytes, and stored value type.
+    pub fn table_item(handle: TableHandle, key: Box<[u8]>, value_ty: InternedType) -> Self {
+        InMemoryStorageKey::TableItem {
+            handle,
+            key,
+            value_ty,
+        }
     }
 
     /// Returns the address a key is anchored at: the publishing address for a
