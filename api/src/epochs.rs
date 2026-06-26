@@ -41,11 +41,11 @@ impl EpochsApi {
 
     /// Get the version range for an epoch
     ///
-    /// Returns the inclusive first ledger version for an epoch and, when available,
-    /// the inclusive last ledger version.
+    /// Returns the inclusive first ledger version for an epoch and the inclusive
+    /// last ledger version when the epoch is sealed.
     ///
     /// Sealed epochs return both `first_version` and `last_version`. The current
-    /// open epoch returns `first_version` and `last_version = null`.
+    /// open epoch returns `first_version` and an explicit `last_version = null`.
     #[oai(
         path = "/epochs/:epoch",
         method = "get",

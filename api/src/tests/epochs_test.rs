@@ -157,7 +157,7 @@ async fn test_get_current_open_epoch_bcs() {
     let epoch: Epoch = bcs::from_bytes(resp.body()).unwrap();
     assert_eq!(epoch.epoch.0, current_open_epoch);
     assert_eq!(epoch.first_version.0, previous_epoch_last_version + 1);
-    assert_eq!(epoch.last_version, None);
+    assert!(epoch.last_version.is_null());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -187,7 +187,7 @@ async fn test_get_current_epoch_default_route_bcs() {
     let epoch: Epoch = bcs::from_bytes(resp.body()).unwrap();
     assert_eq!(epoch.epoch.0, current_open_epoch);
     assert_eq!(epoch.first_version.0, previous_epoch_last_version + 1);
-    assert_eq!(epoch.last_version, None);
+    assert!(epoch.last_version.is_null());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -217,11 +217,15 @@ async fn test_openapi_spec_includes_epoch_route_and_schema() {
     assert!(resp["components"]["schemas"]["Epoch"]["properties"]
         .get("last_version")
         .is_some());
-    assert!(!resp["components"]["schemas"]["Epoch"]["required"]
+    assert!(resp["components"]["schemas"]["Epoch"]["required"]
         .as_array()
         .unwrap()
         .iter()
         .any(|field| field == "last_version"));
+    assert_eq!(
+        resp["components"]["schemas"]["NullableU64"]["oneOf"][1]["type"],
+        "null",
+    );
 }
 
 fn epoch_path(epoch: u64) -> String {
