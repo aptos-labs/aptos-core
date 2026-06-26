@@ -151,7 +151,6 @@ spec aptos_framework::randomness {
     }
 
     spec u64_range_internal(min_incl: u64, max_excl: u64): u64 {
-        pragma seed = 2;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;

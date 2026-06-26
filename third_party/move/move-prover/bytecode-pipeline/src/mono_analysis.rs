@@ -220,7 +220,8 @@ impl MonoAnalysisProcessor {
             done_types: BTreeSet::new(),
             inst_opt: None,
         };
-        // Analyze axioms found in modules.
+        // Seed axioms from all modules unconditionally; cross-module spec funs
+        // (e.g. `object` calling `from_bcs::to_address`) need them.
         for module_env in env.get_modules() {
             for axiom in module_env.get_spec().filter_kind_axiom() {
                 analyzer.analyze_exp(&axiom.exp)

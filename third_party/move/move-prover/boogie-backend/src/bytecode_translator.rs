@@ -42,8 +42,8 @@ use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, StructEnv, StructId,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedInstId,
+        StructEnv, StructId,
     },
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
@@ -53,6 +53,7 @@ use move_model::{
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
     well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
+pub use move_prover_bytecode_pipeline::verify_target::VerifyTargetSelector;
 use move_prover_bytecode_pipeline::{
     mono_analysis,
     mono_analysis::{ClosureInfo, FunParamInfo, StructFieldInfo},
@@ -70,10 +71,7 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 macro_rules! bv_op_not_enabled_error {
     ($bytecode:expr, $fun_target:expr, $env:expr, $loc:expr) => {
@@ -98,27 +96,6 @@ enum ApplyFrameAccess {
     WritesAll,
     /// Resource may be written at specific Boogie address expressions only
     WritesAt(Vec<String>),
-}
-
-/// Selects which verify-target functions a single translator/`.bpl` should emit
-/// `$verify` procedures for. Sibling cases of the same partition mechanism so
-/// `granularity = shard | module | vc` map to one of these variants without
-/// duplicating the translator code paths.
-#[derive(Debug, Clone)]
-pub enum VerifyTargetSelector {
-    /// Emit every verify target. Used when sharding is disabled (`shards == 1`)
-    /// and granularity is `Shard`.
-    All,
-    /// Hash partition: include a target iff `hash(full_name) % total == idx`.
-    /// Used by sharded mode with `shards > 1`.
-    Shard { idx: usize, total: usize },
-    /// Per-module partition: include targets in the named module.
-    Module { module_id: ModuleId },
-    /// Per-VC partition: include only the named verify target.
-    Single {
-        qid: QualifiedId<FunId>,
-        variant: FunctionVariant,
-    },
 }
 
 pub struct BoogieTranslator<'env> {
@@ -298,34 +275,20 @@ impl<'env> BoogieTranslator<'env> {
         if !fun_variant.is_verified() {
             return false;
         }
-        match &self.for_selector {
-            VerifyTargetSelector::All => {},
-            VerifyTargetSelector::Shard { idx, total } => {
-                // Honor `--only-shard` (1-based) when the user opts in.
-                if self.options.only_shard.is_some()
-                    && self.options.only_shard != Some(*idx + 1)
-                {
-                    return false;
-                }
-                let mut hasher = DefaultHasher::new();
-                fun_target.func_env.get_full_name_str().hash(&mut hasher);
-                if (hasher.finish() as usize) % *total != *idx {
-                    return false;
-                }
-            },
-            VerifyTargetSelector::Module { module_id } => {
-                if fun_target.func_env.module_env.get_id() != *module_id {
-                    return false;
-                }
-            },
-            VerifyTargetSelector::Single { qid, variant } => {
-                if fun_target.func_env.get_qualified_id() != *qid {
-                    return false;
-                }
-                if fun_variant != variant {
-                    return false;
-                }
-            },
+        // Honor `--only-shard` (1-based) for sharded mode regardless of which
+        // shard the selector targets.
+        if let VerifyTargetSelector::Shard { idx, .. } = &self.for_selector {
+            if self.options.only_shard.is_some() && self.options.only_shard != Some(*idx + 1) {
+                return false;
+            }
+        }
+        if !self.for_selector.includes(
+            fun_target.func_env.module_env.get_id(),
+            fun_target.func_env.get_qualified_id(),
+            fun_variant,
+            &fun_target.func_env.get_full_name_str(),
+        ) {
+            return false;
         }
         // Check whether the estimated duration is too large for configured timeout
         let options = self.options;

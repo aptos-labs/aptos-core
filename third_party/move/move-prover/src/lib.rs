@@ -30,6 +30,7 @@ use move_prover_bytecode_pipeline::{
 };
 use move_stackless_bytecode::function_target_pipeline::{FunctionTargetsHolder, FunctionVariant};
 use std::{
+    collections::BTreeSet,
     fs,
     path::Path,
     time::{Duration, Instant},
@@ -38,6 +39,26 @@ use std::{
 pub mod cli;
 pub mod inference;
 pub mod package_prove;
+
+/// RAII guard around `GlobalEnv::restrict_primary_targets_to`. Sets the
+/// restriction on construction and clears it on drop so `?` early returns
+/// from inside the per-module loop don't leak the restriction onto callers.
+struct PrimaryTargetGuard<'a> {
+    env: &'a GlobalEnv,
+}
+
+impl<'a> PrimaryTargetGuard<'a> {
+    fn set(env: &'a GlobalEnv, loc: &move_model::model::Loc) -> Self {
+        env.restrict_primary_targets_to(Some(BTreeSet::from([loc.file_id()])));
+        Self { env }
+    }
+}
+
+impl Drop for PrimaryTargetGuard<'_> {
+    fn drop(&mut self) {
+        self.env.restrict_primary_targets_to(None);
+    }
+}
 
 // =================================================================================================
 // Prover API
@@ -244,7 +265,7 @@ pub fn check_errors<W: WriteColor>(
     }
 }
 
-/// Generate Boogie for the verify targets selected by `selector`. Primary API.
+/// Generate Boogie for the verify targets selected by `selector`.
 pub fn generate_boogie_with_selector(
     env: &GlobalEnv,
     options: &Options,
@@ -253,8 +274,7 @@ pub fn generate_boogie_with_selector(
 ) -> anyhow::Result<CodeWriter> {
     let writer = CodeWriter::new(env.internal_loc());
     add_prelude(env, &options.backend, &writer)?;
-    let mut translator =
-        BoogieTranslator::new(env, &options.backend, selector, targets, &writer);
+    let mut translator = BoogieTranslator::new(env, &options.backend, selector, targets, &writer);
     translator.translate();
     Ok(writer)
 }
@@ -283,9 +303,7 @@ pub fn generate_boogie(
 /// enumeration helpers so per-module / per-VC drivers don't generate `.bpl`
 /// files for targets the translator would silently skip.
 fn function_passes_verify_filter(fun_env: &FunctionEnv, options: &cli::Options) -> bool {
-    if fun_env.is_native_or_intrinsic()
-        || fun_env.is_test_only()
-        || fun_env.is_not_prover_target()
+    if fun_env.is_native_or_intrinsic() || fun_env.is_test_only() || fun_env.is_not_prover_target()
     {
         return false;
     }
@@ -375,7 +393,9 @@ pub fn sanitize_for_filename(s: &str) -> String {
         .collect()
 }
 
-/// Build the per-VC `.bpl` output path: `<base_no_ext>.vc_<sanitized>_<variant>.bpl`.
+/// Build the per-VC `.bpl` output path. Includes a hash of the raw
+/// `<full_name>_<variant>` so two targets that flatten to the same sanitized
+/// stem cannot collide (`sanitize_for_filename` is many-to-one).
 fn per_vc_output_path(
     env: &GlobalEnv,
     output_base: &str,
@@ -383,9 +403,13 @@ fn per_vc_output_path(
     variant: &FunctionVariant,
 ) -> String {
     let full_name = env.get_function(qid).get_full_name_with_address();
-    let stem = sanitize_for_filename(&format!("{}_{}", full_name, variant));
+    let raw = format!("{}_{}", full_name, variant);
+    let mut hasher = std::hash::DefaultHasher::new();
+    std::hash::Hash::hash(&raw, &mut hasher);
+    let hash = std::hash::Hasher::finish(&hasher);
+    let stem = sanitize_for_filename(&raw);
     Path::new(output_base)
-        .with_extension(format!("vc_{}.bpl", stem))
+        .with_extension(format!("vc_{}_{:016x}.bpl", stem, hash))
         .to_string_lossy()
         .into_owned()
 }
@@ -443,21 +467,20 @@ fn drive_sharded<W: WriteColor>(
     Ok(())
 }
 
-/// Per-module driver: emit one `.bpl` per source module that contains at least
-/// one verify target. Sequential codegen (env extension mutation is not
-/// thread-safe), then parallel verification with up to `proc_cores` Boogie
-/// processes concurrently. Each Boogie process still uses `-vcsCores:proc_cores`
-/// internally to parallelize across the procedures in its module.
+/// Per-module driver: one `.bpl` per source module with verify targets. Each
+/// module gets its own pipeline rerun via `restrict_primary_targets_to`, so the
+/// `.bpl` matches `move prove -f <module>` content. `check_errors` is deferred
+/// to after all reruns for cross-rerun diagnostic dedup.
 fn drive_per_module<W: WriteColor>(
     env: &GlobalEnv,
     options: &mut Options,
-    targets: &FunctionTargetsHolder,
+    upstream_targets: &FunctionTargetsHolder,
     output_base_file: &str,
     error_writer: &mut W,
     gen_durations: &mut Vec<Duration>,
     verify_durations: &mut Vec<Duration>,
 ) -> anyhow::Result<()> {
-    let module_list = enumerate_modules_with_verify_targets(env, targets, options);
+    let module_list = enumerate_modules_with_verify_targets(env, upstream_targets, options);
     let parallelism = options.backend.proc_cores.max(1);
     info!(
         "per-module mode: {} modules, parallelism={}",
@@ -465,49 +488,70 @@ fn drive_per_module<W: WriteColor>(
         parallelism
     );
 
-    // Phase 1: sequential code generation, one .bpl per module.
+    // Phase 1: per-module pipeline rerun + codegen. Restrict primary targets
+    // only; leaving `verify_scope = All` keeps Rule 3 in
+    // `VerificationAnalysisProcessor` marking cross-module functions that
+    // modify in-scope invariants — those drive part of the closure walk that
+    // populates `MonoInfo`.
     let mut bpl_paths: Vec<String> = Vec::with_capacity(module_list.len());
+    let mut per_module_targets: Vec<FunctionTargetsHolder> = Vec::with_capacity(module_list.len());
+    let mut per_module_writers: Vec<CodeWriter> = Vec::with_capacity(module_list.len());
     for module_id in &module_list {
+        let module_env = env.get_module(*module_id);
         options.output_path = per_module_output_path(env, output_base_file, *module_id);
+        let _scope = PrimaryTargetGuard::set(env, &module_env.get_loc());
+
+        let now = Instant::now();
+        let targets = create_and_process_bytecode(options, env);
         let selector = VerifyTargetSelector::Module {
             module_id: *module_id,
         };
-        let now = Instant::now();
-        let code_writer = generate_boogie_with_selector(env, options, selector, targets)?;
+        let code_writer = generate_boogie_with_selector(env, options, selector, &targets)?;
         gen_durations.push(now.elapsed());
-        check_errors(
-            env,
-            options,
-            error_writer,
-            "exiting with condition generation errors",
-        )?;
         code_writer.process_result(|result| fs::write(&options.output_path, result))?;
         bpl_paths.push(options.output_path.clone());
+        per_module_targets.push(targets);
+        per_module_writers.push(code_writer);
     }
+
+    // PrimaryTargetGuard's Drop cleared the restriction at the end of each
+    // loop iteration; no explicit reset needed.
+
+    // Single deferred error check. `report_diag`'s `shown` fingerprint set
+    // dedupes cross-rerun duplicates of scope-independent diagnostics in one
+    // pass over the accumulated diag list.
+    check_errors(
+        env,
+        options,
+        error_writer,
+        "exiting with bytecode transformation errors",
+    )?;
 
     if options.prover.generate_only {
         return Ok(());
     }
 
-    // Phase 2: parallel verification across modules; Boogie still uses its
-    // internal `-vcsCores` parallelism within each module's .bpl.
+    // Phase 2: parallel verification across modules.
     let now = Instant::now();
-    let raw_results = run_boogies_parallel(&options.backend, &bpl_paths, parallelism);
+    // Clamp num_instances to 1 in the per-worker options: with `proc_cores`
+    // driver workers each running an `num_instances`-portfolio, we would fan
+    // out to `proc_cores × num_instances` concurrent Boogie processes.
+    let mut backend_for_workers = options.backend.clone();
+    backend_for_workers.num_instances = 1;
+    let raw_results = run_boogies_parallel(&backend_for_workers, &bpl_paths, parallelism);
     verify_durations.push(now.elapsed());
 
-    let wrapper = BoogieWrapper {
-        env,
-        targets,
-        writer: &CodeWriter::new(env.internal_loc()),
-        options: &options.backend,
-    };
-    // Analyze each captured result in stable input order. Don't short-circuit on
-    // the first hard error — one .bpl failing (missing prover, bad codegen,
-    // subprocess I/O) shouldn't strand the remaining .bpl results without their
-    // diagnostics or cleanup. Collect any errors and return the first after all
-    // results have been processed.
+    // Analyze each captured result in stable input order against the
+    // FunctionTargetsHolder that produced its `.bpl`. Don't short-circuit on
+    // the first hard error — one `.bpl` failing shouldn't strand the rest.
     let mut first_err: Option<anyhow::Error> = None;
-    for (path, raw) in bpl_paths.iter().zip(raw_results.into_iter()) {
+    for (i, (path, raw)) in bpl_paths.iter().zip(raw_results.into_iter()).enumerate() {
+        let wrapper = BoogieWrapper {
+            env,
+            targets: &per_module_targets[i],
+            writer: &per_module_writers[i],
+            options: &options.backend,
+        };
         if let Err(e) = wrapper.analyze_subprocess_output(path, raw) {
             if first_err.is_none() {
                 first_err = Some(e);
@@ -517,6 +561,15 @@ fn drive_per_module<W: WriteColor>(
             std::fs::remove_file(path).unwrap_or_default();
         }
     }
+    // Flush any verification diagnostics added to the env (counterexamples,
+    // inconclusive results) before surfacing the first hard error; otherwise
+    // diagnostics from earlier `.bpl`s in the loop would be swallowed.
+    let _ = check_errors(
+        env,
+        options,
+        error_writer,
+        "exiting with verification errors",
+    );
     if let Some(e) = first_err {
         Err(e)
     } else {
@@ -524,77 +577,85 @@ fn drive_per_module<W: WriteColor>(
     }
 }
 
-/// Per-VC driver: enumerate verify targets, emit one `.bpl` per target
-/// sequentially (codegen mutates the env extension and is not thread-safe), then
-/// verify all `.bpl` files in parallel with a driver-managed worker pool.
-/// Errors are buffered into the env's diagnostic stream in stable target order
-/// regardless of completion order, so test baselines stay deterministic.
+/// Per-VC driver: one `.bpl` per verify target. Outer loop reruns the pipeline
+/// per module (same narrowing as `drive_per_module`); inner loop slices the
+/// module's targets via `VerifyTargetSelector::Single`. All VCs from one module
+/// share that module's pipeline result.
 fn drive_per_vc<W: WriteColor>(
     env: &GlobalEnv,
     options: &mut Options,
-    targets: &FunctionTargetsHolder,
+    upstream_targets: &FunctionTargetsHolder,
     output_base_file: &str,
     error_writer: &mut W,
     gen_durations: &mut Vec<Duration>,
     verify_durations: &mut Vec<Duration>,
 ) -> anyhow::Result<()> {
-    let target_list = enumerate_verify_targets(env, targets, options);
+    let module_list = enumerate_modules_with_verify_targets(env, upstream_targets, options);
     let parallelism = options.backend.proc_cores.max(1);
+
+    // Phase 1: per-module pipeline rerun (outer), per-VC codegen slice (inner).
+    let mut bpl_paths: Vec<String> = Vec::new();
+    let mut per_bpl_targets: Vec<std::rc::Rc<FunctionTargetsHolder>> = Vec::new();
+    let mut per_bpl_writers: Vec<CodeWriter> = Vec::new();
+    for module_id in &module_list {
+        let module_env = env.get_module(*module_id);
+        let _scope = PrimaryTargetGuard::set(env, &module_env.get_loc());
+
+        let module_targets = std::rc::Rc::new(create_and_process_bytecode(options, env));
+        let vc_list = enumerate_verify_targets_in_module(env, &module_targets, options, *module_id);
+        for (qid, variant) in &vc_list {
+            options.output_path = per_vc_output_path(env, output_base_file, *qid, variant);
+            let selector = VerifyTargetSelector::Single {
+                qid: *qid,
+                variant: variant.clone(),
+            };
+            let now = Instant::now();
+            let code_writer =
+                generate_boogie_with_selector(env, options, selector, &module_targets)?;
+            gen_durations.push(now.elapsed());
+            code_writer.process_result(|result| fs::write(&options.output_path, result))?;
+            bpl_paths.push(options.output_path.clone());
+            per_bpl_targets.push(std::rc::Rc::clone(&module_targets));
+            per_bpl_writers.push(code_writer);
+        }
+    }
     info!(
         "per-VC mode: {} verify targets, parallelism={}",
-        target_list.len(),
+        bpl_paths.len(),
         parallelism
     );
 
-    // Phase 1: sequential code generation. Each target's `.bpl` is written to
-    // disk; the env extension may be mutated here, so this loop is not parallel.
-    let mut bpl_paths: Vec<String> = Vec::with_capacity(target_list.len());
-    for (qid, variant) in &target_list {
-        options.output_path = per_vc_output_path(env, output_base_file, *qid, variant);
-        let selector = VerifyTargetSelector::Single {
-            qid: *qid,
-            variant: variant.clone(),
-        };
-        let now = Instant::now();
-        let code_writer = generate_boogie_with_selector(env, options, selector, targets)?;
-        gen_durations.push(now.elapsed());
-        check_errors(
-            env,
-            options,
-            error_writer,
-            "exiting with condition generation errors",
-        )?;
-        // Persist the .bpl so the worker pool can launch Boogie on it. Mirrors
-        // the persistence step inside `verify_boogie`, factored out here because
-        // we don't want to call Boogie yet — that runs in phase 2.
-        code_writer.process_result(|result| fs::write(&options.output_path, result))?;
-        bpl_paths.push(options.output_path.clone());
-    }
+    // PrimaryTargetGuard's Drop cleared the restriction per iteration.
+
+    check_errors(
+        env,
+        options,
+        error_writer,
+        "exiting with bytecode transformation errors",
+    )?;
 
     if options.prover.generate_only {
-        // Skip the verify pass entirely; the .bpl files are the artifact.
         return Ok(());
     }
 
-    // Phase 2: parallel verification. Worker threads spawn Boogie subprocesses
-    // (no `GlobalEnv` access — safe across threads). Raw outputs come back in
-    // stable input order so we can analyze them deterministically on this thread.
+    // Phase 2: parallel verification.
     let now = Instant::now();
-    let raw_results = run_boogies_parallel(&options.backend, &bpl_paths, parallelism);
-    let parallel_wall = now.elapsed();
-    verify_durations.push(parallel_wall);
+    // Clamp num_instances to 1 in the per-worker options: with `proc_cores`
+    // driver workers each running an `num_instances`-portfolio, we would fan
+    // out to `proc_cores × num_instances` concurrent Boogie processes.
+    let mut backend_for_workers = options.backend.clone();
+    backend_for_workers.num_instances = 1;
+    let raw_results = run_boogies_parallel(&backend_for_workers, &bpl_paths, parallelism);
+    verify_durations.push(now.elapsed());
 
-    let wrapper = BoogieWrapper {
-        env,
-        targets,
-        writer: &CodeWriter::new(env.internal_loc()),
-        options: &options.backend,
-    };
-    // Don't short-circuit on the first hard error — see `drive_per_module` for
-    // the rationale. Match the cleanup `verify_boogie` does for the single-shard
-    // path: drop each .bpl when the user didn't ask to keep artifacts.
     let mut first_err: Option<anyhow::Error> = None;
-    for (path, raw) in bpl_paths.iter().zip(raw_results.into_iter()) {
+    for (i, (path, raw)) in bpl_paths.iter().zip(raw_results.into_iter()).enumerate() {
+        let wrapper = BoogieWrapper {
+            env,
+            targets: &per_bpl_targets[i],
+            writer: &per_bpl_writers[i],
+            options: &options.backend,
+        };
         if let Err(e) = wrapper.analyze_subprocess_output(path, raw) {
             if first_err.is_none() {
                 first_err = Some(e);
@@ -604,11 +665,44 @@ fn drive_per_vc<W: WriteColor>(
             std::fs::remove_file(path).unwrap_or_default();
         }
     }
+    // Flush any verification diagnostics added to the env (counterexamples,
+    // inconclusive results) before surfacing the first hard error; otherwise
+    // diagnostics from earlier `.bpl`s in the loop would be swallowed.
+    let _ = check_errors(
+        env,
+        options,
+        error_writer,
+        "exiting with verification errors",
+    );
     if let Some(e) = first_err {
         Err(e)
     } else {
         Ok(())
     }
+}
+
+/// Like `enumerate_verify_targets` but restricted to one module. Used by the
+/// per-VC driver to slice a per-module pipeline result into per-VC `.bpl`s.
+fn enumerate_verify_targets_in_module(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    options: &cli::Options,
+    module_id: ModuleId,
+) -> Vec<(QualifiedId<FunId>, FunctionVariant)> {
+    let mut out = Vec::new();
+    let module_env = env.get_module(module_id);
+    for fun_env in module_env.get_functions() {
+        if !function_passes_verify_filter(&fun_env, options) {
+            continue;
+        }
+        for (variant, _target) in targets.get_targets(&fun_env) {
+            if !variant.is_verified() {
+                continue;
+            }
+            out.push((fun_env.get_qualified_id(), variant));
+        }
+    }
+    out
 }
 
 pub fn verify_boogie(

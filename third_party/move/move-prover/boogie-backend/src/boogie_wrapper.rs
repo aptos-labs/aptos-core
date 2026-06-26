@@ -222,7 +222,10 @@ impl BoogieWrapper<'_> {
 
     /// Calls boogie and analyzes output.
     pub fn call_boogie_and_verify_output(&self, boogie_file: &str) -> anyhow::Result<()> {
-        let BoogieOutput { mut errors, all_output } = self.call_boogie(boogie_file)?;
+        let BoogieOutput {
+            mut errors,
+            all_output,
+        } = self.call_boogie(boogie_file)?;
         let boogie_log_file = self.options.get_boogie_log_file(boogie_file);
         let log_file_existed = std::path::Path::new(&boogie_log_file).exists();
         debug!("writing boogie log to {}", boogie_log_file);
@@ -312,28 +315,6 @@ impl BoogieWrapper<'_> {
                 }
             ));
         }
-        if !output.status.success() {
-            // Boogie itself crashed or exited non-zero (SIGSEGV is a common
-            // case on large generic code). Promote this to a non-fatal env
-            // diagnostic so the rest of the per-module / per-VC pool can still
-            // run and report — losing one .bpl's verification is much less
-            // disruptive than aborting the entire suite on the first crash.
-            let crash_err = BoogieError {
-                kind: BoogieErrorKind::Internal,
-                loc: self.env.unknown_loc(),
-                message: format!(
-                    "[{}] Boogie process exited with {} (stdout={:?}, stderr={:?})",
-                    bpl_label,
-                    output.status,
-                    truncate_for_diag(&out),
-                    truncate_for_diag(&err)
-                ),
-                execution_trace: vec![],
-                model: None,
-            };
-            self.add_error(&crash_err);
-            return Ok(());
-        }
         if out.trim().starts_with("Unable to monomorphize") {
             return Err(anyhow!(
                 "[{}] Boogie error: {}\n\nstderr:\n{}",
@@ -349,16 +330,47 @@ impl BoogieWrapper<'_> {
                 out
             ));
         }
-        if out.contains("Prover error:") {
-            return Err(anyhow!(
-                "[{}] [internal] boogie exited with prover errors:\n{}",
-                bpl_label,
-                out
-            ));
-        }
+        // Note: a "Prover error:" line (e.g. Z3 hitting "unknown constant" mid-VC
+        // before dying) is recoverable — Boogie may still have produced
+        // per-procedure inconclusive/verification messages on stdout for the
+        // VCs that completed before the crash. We harvest those below instead
+        // of treating the run as a hard error.
         let mut errors = self.extract_verification_errors(&out);
         errors.extend(self.extract_inconclusive_errors(&out));
         errors.extend(self.extract_inconsistency_errors(&out));
+        if !output.status.success() {
+            // Boogie itself crashed or exited non-zero (SIGSEGV is a common
+            // case on large generic code; "Prover died" from Z3 OOM/SIGKILL is
+            // another). Promote this to a non-fatal env diagnostic so the rest
+            // of the per-module / per-VC pool can still run and report.
+            //
+            // If Boogie produced per-VC verification/inconclusive lines before
+            // dying, the extraction above already captured them — those will be
+            // surfaced after the crash note below. Without this ordering, a
+            // Z3-killed-mid-procedure run reports only "process exited" with no
+            // hint of which VCs were in flight.
+            let crash_err = BoogieError {
+                kind: BoogieErrorKind::Internal,
+                loc: self.env.unknown_loc(),
+                message: format!(
+                    "[{}] Boogie process exited with {} (stdout={:?}, stderr={:?})",
+                    bpl_label,
+                    output.status,
+                    truncate_for_diag(&out),
+                    truncate_for_diag(&err)
+                ),
+                execution_trace: vec![],
+                model: None,
+            };
+            self.add_error(&crash_err);
+            for error in &mut errors {
+                error.message = format!("[{}] {}", bpl_label, error.message);
+            }
+            for error in &errors {
+                self.add_error(error);
+            }
+            return Ok(());
+        }
 
         let boogie_log_file = self.options.get_boogie_log_file(boogie_file);
         let log_file_existed = std::path::Path::new(&boogie_log_file).exists();
@@ -2046,8 +2058,18 @@ pub struct RawBoogieResult {
 /// Run Boogie on one `.bpl` file as a subprocess via the existing portfolio
 /// runner. No `GlobalEnv` access. Safe to call from a worker thread.
 pub fn run_boogie_subprocess(options: &BoogieOptions, boogie_file: &str) -> RawBoogieResult {
+    let mut effective = options.clone();
+    // Per-`.bpl` Z3 trace filename — parallel workers otherwise all write to
+    // the same path and clobber each other.
+    if let Some(base) = &options.z3_trace_file {
+        let stem = std::path::Path::new(boogie_file)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        effective.z3_trace_file = Some(format!("{}.{}", base, stem));
+    }
     let task = RunBoogieWithSeeds {
-        options: options.clone(),
+        options: effective,
         boogie_file: boogie_file.to_string(),
     };
     let (seed, subprocess_result) = ProverTaskRunner::run_tasks(
