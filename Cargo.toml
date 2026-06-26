@@ -672,10 +672,10 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
-jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
-jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
-jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
+jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.7.0" }
+jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.7.1" }
+jemalloc_pprof = { version = "0.9", features = ["symbolize"] }
+jemallocator = { package = "tikv-jemallocator", version = "0.7.0", features = [
     "profiling",
     "stats",
     "unprefixed_malloc_on_supported_platforms",
@@ -1010,3 +1010,5 @@ ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+
+tikv-jemalloc-sys = { path = "/home/qinfan/github/jemalloc-sys-shim" }
