@@ -404,7 +404,7 @@ impl PreparedModule {
 /// `SignatureIndex`, and `vector<T>` / `&T` appear repeatedly), this means the
 /// fast path pays one arena allocation + a dedup probe per occurrence instead
 /// of a single probe.
-fn intern_sig_token(
+pub fn intern_sig_token(
     token: &SignatureToken,
     module: &CompiledModule,
     interner: &impl Interner,

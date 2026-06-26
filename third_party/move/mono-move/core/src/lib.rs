@@ -46,7 +46,7 @@ pub use object_descriptor::{
     RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
-    FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
+    intern_sig_token, FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{

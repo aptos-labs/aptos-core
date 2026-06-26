@@ -12893,6 +12893,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-replay-benchmark"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-cached-packages",
+ "aptos-move-debugger",
+ "aptos-rest-client",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "bytes",
+ "clap 4.5.60",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-natives",
+ "mono-move-runtime",
+ "mono-move-testsuite",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "serde",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
