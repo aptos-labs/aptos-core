@@ -99,7 +99,9 @@ pub enum FeatureFlag {
     /// Enabled on mainnet, cannot be disabled.
     _USE_COMPATIBILITY_CHECKER_V2 = 73,
     ENABLE_ENUM_TYPES = 74,
-    ENABLE_RESOURCE_ACCESS_CONTROL = 75,
+    /// Never enabled. Resource access control was removed; access specifiers are
+    /// permanently rejected by the verifier.
+    _DEPRECATED_ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     /// Enabled on mainnet, can never be disabled.
     _REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
     FEDERATED_KEYLESS = 77,
@@ -280,7 +282,6 @@ impl FeatureFlag {
             Self::ALLOW_SERIALIZED_SCRIPT_ARGS,
             Self::_USE_COMPATIBILITY_CHECKER_V2,
             Self::ENABLE_ENUM_TYPES,
-            Self::ENABLE_RESOURCE_ACCESS_CONTROL,
             Self::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             Self::TRANSACTION_SIMULATION_ENHANCEMENT,
             Self::_NATIVE_MEMORY_OPERATIONS,

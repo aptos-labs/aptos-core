@@ -962,7 +962,8 @@ impl<'a> ModuleBuilder<'a> {
                 parameters,
                 return_,
                 type_parameters: fhandle.type_parameters.clone(),
-                access_specifiers: fhandle.access_specifiers.clone(),
+                // Resource access control was removed; never carry access specifiers.
+                access_specifiers: None,
                 attributes: fhandle.attributes.clone(),
             })
         } else {

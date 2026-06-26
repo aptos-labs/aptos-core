@@ -17,23 +17,20 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         Constant, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
-        FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex, SignatureIndex,
+        FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
         StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
         StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
         VariantIndex,
     },
 };
 use move_core_types::{
-    ability::Ability, account_address::AccountAddress, gas_algebra::NumTypeNodes,
-    identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
+    ability::Ability, gas_algebra::NumTypeNodes, identifier::IdentStr, language_storage::ModuleId,
+    vm_status::StatusCode,
 };
 use move_vm_profiler::FnGuard;
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::{
-        runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
-        runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
-    },
+    loaded_data::runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     ty_interner::{InternedTypePool, TypeVecId},
     values::Locals,
 };
@@ -74,16 +71,6 @@ pub(crate) struct Frame {
     pub(crate) caller_value_stack_size: u32,
     // Saved type stack size of the caller that created this frame.
     pub(crate) caller_type_stack_size: u32,
-}
-
-impl AccessSpecifierEnv for Frame {
-    fn eval_address_specifier_function(
-        &self,
-        fun: AddressSpecifierFunction,
-        local: LocalIndex,
-    ) -> PartialVMResult<AccountAddress> {
-        fun.eval(self.locals.copy_loc(local as usize)?)
-    }
 }
 
 macro_rules! build_loaded_function {

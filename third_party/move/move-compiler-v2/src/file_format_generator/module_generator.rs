@@ -29,11 +29,8 @@ use move_core_types::{
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
-    metadata::{
-        lang_feature_versions::LANGUAGE_VERSION_FOR_RAC, CompilationMetadata, CompilerVersion,
-        LanguageVersion, COMPILATION_METADATA_KEY,
-    },
+    ast::Attribute,
+    metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -80,8 +77,6 @@ struct StructAPIIndex {
 /// Internal state of the module code generator
 #[derive(Debug)]
 pub struct ModuleGenerator {
-    /// Whether to generate access specifiers
-    gen_access_specifiers: bool,
     /// Whether to generate function attributes.
     pub(crate) gen_function_attributes: bool,
     /// The module index for which we generate code.
@@ -170,7 +165,6 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_access_specifiers = language_version.is_at_least(LANGUAGE_VERSION_FOR_RAC);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
@@ -199,7 +193,6 @@ impl ModuleGenerator {
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
         let mut genr = Self {
-            gen_access_specifiers,
             gen_function_attributes,
             module_idx: FF::ModuleHandleIndex(0),
             module_to_idx: Default::default(),
@@ -583,18 +576,10 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
-        let access_specifiers = fun_env
-            .get_access_specifiers()
-            .as_ref()
-            .map(|v| {
-                v.iter()
-                    .filter_map(|s| self.access_specifier(ctx, fun_env, s))
-                    .collect_vec()
-            })
-            .and_then(|specs| if specs.is_empty() { None } else { Some(specs) });
-        if !self.gen_access_specifiers && access_specifiers.is_some() {
-            ctx.error(loc, "access specifiers not enabled");
-        }
+        // Resource access control was removed; access specifiers are no longer emitted
+        // into the file format. Legacy `acquires` is carried by the function definition's
+        // acquired-resources list, not the function handle.
+        let access_specifiers = None;
         let attributes = if self.gen_function_attributes {
             ctx.function_attributes(fun_env)
         } else {
@@ -1068,85 +1053,6 @@ impl ModuleGenerator {
                 .insert(struct_env.get_qualified_id(), ret.clone());
         }
         ret
-    }
-
-    pub fn access_specifier(
-        &mut self,
-        ctx: &ModuleContext,
-        fun_env: &FunctionEnv,
-        access_specifier: &AccessSpecifier,
-    ) -> Option<FF::AccessSpecifier> {
-        let kind = match access_specifier.kind {
-            AccessSpecifierKind::Reads => FF::AccessKind::Reads,
-            AccessSpecifierKind::Writes => FF::AccessKind::Writes,
-            AccessSpecifierKind::LegacyAcquires => {
-                // Legacy acquires not represented in file format
-                return None;
-            },
-        };
-        let resource = match &access_specifier.resource.1 {
-            ResourceSpecifier::Any => FF::ResourceSpecifier::Any,
-            ResourceSpecifier::DeclaredAtAddress(addr) => FF::ResourceSpecifier::DeclaredAtAddress(
-                self.address_index(ctx, &access_specifier.resource.0, addr.expect_numerical()),
-            ),
-            ResourceSpecifier::DeclaredInModule(module_id) => {
-                FF::ResourceSpecifier::DeclaredInModule(self.module_index(
-                    ctx,
-                    &access_specifier.resource.0,
-                    &ctx.env.get_module(*module_id),
-                ))
-            },
-            ResourceSpecifier::Resource(struct_id) => {
-                let struct_env = ctx.env.get_struct(struct_id.to_qualified_id());
-                if struct_id.inst.is_empty() {
-                    FF::ResourceSpecifier::Resource(self.struct_index(
-                        ctx,
-                        &access_specifier.loc,
-                        &struct_env,
-                    ))
-                } else {
-                    FF::ResourceSpecifier::ResourceInstantiation(
-                        self.struct_index(ctx, &access_specifier.loc, &struct_env),
-                        self.signature(ctx, &access_specifier.loc, struct_id.inst.to_vec()),
-                    )
-                }
-            },
-        };
-        let address =
-            match &access_specifier.address.1 {
-                AddressSpecifier::Any => FF::AddressSpecifier::Any,
-                AddressSpecifier::Address(addr) => FF::AddressSpecifier::Literal(
-                    self.address_index(ctx, &access_specifier.address.0, addr.expect_numerical()),
-                ),
-                AddressSpecifier::Parameter(name) => {
-                    let param_index = fun_env
-                        .get_parameters()
-                        .iter()
-                        .position(|Parameter(n, _ty, _)| n == name)
-                        .expect("parameter defined") as u8;
-                    FF::AddressSpecifier::Parameter(param_index, None)
-                },
-                AddressSpecifier::Call(fun, name) => {
-                    let param_index = fun_env
-                        .get_parameters()
-                        .iter()
-                        .position(|Parameter(n, _ty, _)| n == name)
-                        .expect("parameter defined") as u8;
-                    let fun_index = self.function_instantiation_index(
-                        ctx,
-                        &access_specifier.address.0,
-                        &ctx.env.get_function(fun.to_qualified_id()),
-                        fun.inst.clone(),
-                    );
-                    FF::AddressSpecifier::Parameter(param_index, Some(fun_index))
-                },
-            };
-        Some(FF::AccessSpecifier {
-            kind,
-            negated: access_specifier.negated,
-            resource,
-            address,
-        })
     }
 
     pub fn function_instantiation_index(

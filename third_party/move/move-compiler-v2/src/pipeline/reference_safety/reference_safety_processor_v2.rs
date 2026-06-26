@@ -123,7 +123,7 @@ use itertools::Itertools;
 use log::{debug, log_enabled, Level};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{AccessSpecifierKind, TempIndex},
+    ast::TempIndex,
     model::{FieldId, FunId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
@@ -1695,34 +1695,29 @@ impl LifetimeAnalysisStep<'_, '_> {
         }
     }
 
-    /// Checks whether a function potentially accesses a global resource which is
-    /// currently borrowed.
+    /// Checks whether a called function acquires a global resource which is currently
+    /// mutably borrowed. A mutable global borrow conflicts with any `acquires` of the
+    /// same resource by the called function.
     fn check_global_access(&mut self, fun_id: QualifiedInstId<FunId>) {
         let fun = self.global_env().get_function(fun_id.to_qualified_id());
         let specifiers = fun.get_access_specifiers().unwrap_or(&[]);
 
         for (global, label) in &self.state.global_to_label_map {
-            let is_mut = self.state.children(label).any(|e| e.kind.is_mut());
-            // We are only checking positive specifiers, as negatives say nothing
-            // about what is accessed.
-            for spec in specifiers.iter().filter(|s| !s.negated) {
+            if !self.state.children(label).any(|e| e.kind.is_mut()) {
+                continue;
+            }
+            for spec in specifiers {
                 if spec
                     .resource
                     .1
                     .matches(self.global_env(), &fun_id.inst, global)
-                    // For mut global borrows, no access is allowed at all. For
-                    // non-mut, write access is not allowed.
-                    // TODO: needs to be updated to use acquired resources instead
-                    //   access specifiers (see v3 code).
-                    && (is_mut || spec.kind.subsumes(&AccessSpecifierKind::Writes))
                 {
                     self.error_with_hints(
                         self.cur_loc(),
                         format!(
-                            "function {} global `{}` which is currently {}borrowed",
+                            "function {} global `{}` which is currently mutably borrowed",
                             spec.kind,
                             self.global_env().display(global),
-                            if is_mut { "mutably " } else { "" }
                         ),
                         "function called here",
                         self.borrow_info(label, |_| true)

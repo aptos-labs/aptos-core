@@ -25,7 +25,6 @@ pub mod module_traversal;
 mod debug;
 pub mod source_locator;
 
-mod access_control;
 mod frame;
 mod frame_type_cache;
 mod native_models_for_runtime_ref_checks;

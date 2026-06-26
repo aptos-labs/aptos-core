@@ -90,7 +90,6 @@ pub struct CompiledModuleStrategyGen {
     parameters_count: SizeRange,
     return_count: SizeRange,
     func_type_params: SizeRange,
-    access_specifiers_count: SizeRange,
     acquires_count: SizeRange,
     random_sigs_count: SizeRange,
     tokens_per_random_sig_count: SizeRange,
@@ -107,7 +106,6 @@ impl CompiledModuleStrategyGen {
             parameters_count: (0..4).into(),
             return_count: (0..3).into(),
             func_type_params: (0..3).into(),
-            access_specifiers_count: (0..8).into(),
             acquires_count: (0..2).into(),
             random_sigs_count: (0..5).into(),
             tokens_per_random_sig_count: (0..5).into(),
@@ -186,7 +184,6 @@ impl CompiledModuleStrategyGen {
                 self.parameters_count.clone(),
                 self.return_count.clone(),
                 self.func_type_params.clone(),
-                self.access_specifiers_count.clone(),
             ),
             1..=self.size,
         );

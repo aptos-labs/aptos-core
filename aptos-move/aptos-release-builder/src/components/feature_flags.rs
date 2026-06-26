@@ -383,7 +383,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::EnableEnumTypes => AptosFeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::EnableResourceAccessControl => {
-                AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL
+                AptosFeatureFlag::_DEPRECATED_ENABLE_RESOURCE_ACCESS_CONTROL
             },
             FeatureFlag::RejectUnstableBytecodeForScript => {
                 AptosFeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
@@ -587,7 +587,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::UseCompatibilityCheckerV2
             },
             AptosFeatureFlag::ENABLE_ENUM_TYPES => FeatureFlag::EnableEnumTypes,
-            AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL => {
+            AptosFeatureFlag::_DEPRECATED_ENABLE_RESOURCE_ACCESS_CONTROL => {
                 FeatureFlag::EnableResourceAccessControl
             },
             AptosFeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {

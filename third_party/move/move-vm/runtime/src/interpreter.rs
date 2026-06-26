@@ -4,7 +4,6 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    access_control::AccessControlState,
     config::VMConfig,
     data_cache::MoveVmDataCache,
     execution_tracing::TraceRecorder,
@@ -32,7 +31,7 @@ use fail::fail_point;
 use itertools::Itertools;
 use move_binary_format::{
     errors::{self, *},
-    file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
+    file_format::{FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -49,7 +48,7 @@ use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
     instr::Instruction,
     limits::check_abort_message_limit,
-    loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
+    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
     values::{
@@ -147,8 +146,6 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     vm_config: &'ctx VMConfig,
     /// Pool of interned types.
     ty_pool: &'ctx InternedTypePool,
-    /// The access control state.
-    access_control: AccessControlState,
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
     /// Loader to resolve functions and modules from remote storage. Ensures all module accesses
@@ -232,7 +229,6 @@ where
             call_stack: CallStack::new(),
             vm_config: loader.runtime_environment().vm_config(),
             ty_pool: loader.runtime_environment().ty_pool(),
-            access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
             loader,
             ty_depth_checker,
@@ -380,11 +376,6 @@ where
         )
         .map_err(|err| self.set_location(err))?;
 
-        // Access control for the new frame.
-        self.access_control
-            .enter_function(&current_frame, &current_frame.function)
-            .map_err(|e| self.set_location(e))?;
-
         trace_recorder.record_entrypoint(current_frame.function.as_ref());
         loop {
             let exit_code = current_frame
@@ -416,9 +407,6 @@ where
 
                     self.call_stack
                         .type_check_return::<RTTCheck>(&mut self.operand_stack, &mut current_frame)
-                        .map_err(|e| set_err_info!(current_frame, e))?;
-                    self.access_control
-                        .exit_function(&current_frame.function)
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
@@ -953,11 +941,6 @@ where
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
 
-        // Access control for the new frame.
-        self.access_control
-            .enter_function(&frame, &frame.function)
-            .map_err(|e| self.set_location(e))?;
-
         std::mem::swap(current_frame, &mut frame);
         self.call_stack.push(frame).map_err(|frame| {
             let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
@@ -1466,32 +1449,21 @@ where
             },
             res.is_ok(),
         )?;
-        self.check_access(
-            runtime_environment,
-            if is_mut {
-                AccessKind::Writes
-            } else {
-                AccessKind::Reads
-            },
-            ty,
-            addr,
-        )?;
+        self.check_resource_reentrancy(runtime_environment, ty)?;
         self.operand_stack.push(res.map_err(|err| {
             err.with_message(format!("Failed to borrow global resource from {:?}", addr))
         })?)?;
         Ok(())
     }
 
-    fn check_access(
+    fn check_resource_reentrancy(
         &self,
         runtime_environment: &RuntimeEnvironment,
-        kind: AccessKind,
         ty: &Type,
-        addr: AccountAddress,
     ) -> PartialVMResult<()> {
-        let (struct_idx, instance) = match ty {
-            Type::Struct { idx, .. } => (*idx, [].as_slice()),
-            Type::StructInstantiation { idx, ty_args, .. } => (*idx, ty_args.as_slice()),
+        let struct_idx = match ty {
+            Type::Struct { idx, .. } => *idx,
+            Type::StructInstantiation { idx, .. } => *idx,
             _ => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1503,14 +1475,9 @@ where
             .struct_name_index_map()
             .idx_to_struct_name(struct_idx)?;
 
-        // Perform resource reentrancy check
+        // Perform resource reentrancy check.
         self.reentrancy_checker
             .check_resource_access(&struct_name)?;
-
-        // Perform resource access control
-        if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
-            self.access_control.check_access(access)?
-        }
         Ok(())
     }
 
@@ -1535,7 +1502,7 @@ where
             },
             exists,
         )?;
-        self.check_access(runtime_environment, AccessKind::Reads, ty, addr)?;
+        self.check_resource_reentrancy(runtime_environment, ty)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
     }
@@ -1564,7 +1531,7 @@ where
                     },
                     Some(&resource),
                 )?;
-                self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
+                self.check_resource_reentrancy(runtime_environment, ty)?;
                 resource
             },
             Err(err) => {
@@ -1611,7 +1578,7 @@ where
                         .expect("After successful move_to, global value is set"),
                     true,
                 )?;
-                self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
+                self.check_resource_reentrancy(runtime_environment, ty)?;
                 Ok(())
             },
             Err((err, resource)) => {
@@ -1889,7 +1856,6 @@ where
 // TODO Determine stack size limits based on gas limit
 const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
-pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {

@@ -60,7 +60,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: true,
     },
-    // Test optimize/no-optimize/etc., except for `/access_control/`
+    // Test optimize/no-optimize/etc.
     TestConfig {
         name: "optimize",
         runner: |p| run(p, get_config_by_name("optimize")),

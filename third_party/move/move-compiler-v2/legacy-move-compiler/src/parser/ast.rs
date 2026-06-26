@@ -254,9 +254,7 @@ pub const ENUM_MODIFIER: &str = "enum";
 /// chain can be wildcards (`*`).
 #[derive(Debug, Clone, PartialEq)]
 pub enum AccessSpecifier_ {
-    Acquires(bool, NameAccessChain, Option<Vec<Type>>, AddressSpecifier),
-    Reads(bool, NameAccessChain, Option<Vec<Type>>, AddressSpecifier),
-    Writes(bool, NameAccessChain, Option<Vec<Type>>, AddressSpecifier),
+    Acquires(NameAccessChain, Option<Vec<Type>>, AddressSpecifier),
 }
 
 pub type AccessSpecifier = Spanned<AccessSpecifier_>;
