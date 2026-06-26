@@ -387,7 +387,17 @@ pub fn add_prelude(
     cmp_struct_types.sort();
     cmp_struct_types.dedup();
     context.insert("cmp_int_instances", &cmp_int_types);
-    env.cmp_types.borrow_mut().extend(cmp_struct_types);
+    // Replace rather than extend: per-shard pruning produces a per-shard
+    // `MonoInfo` and thus a per-shard `cmp_struct_types`. The downstream emitter
+    // (`bytecode_translator::translate` at `:4807`) iterates `env.cmp_types`
+    // and emits `cmp::compare<S>` for each struct, which recursively references
+    // `cmp::compare<field_type>` declarations supplied by `cmp_vector_instances`
+    // / `cmp_int_instances`. Accumulating struct types across shards would
+    // leave shard N emitting cmp for structs whose field types only had their
+    // declarations emitted in earlier shards. For shards=1 or for the
+    // no-prune case, replace and extend produce identical results because
+    // each shard sees the same global `cmp_struct_types`.
+    *env.cmp_types.borrow_mut() = cmp_struct_types.into_iter().collect();
 
     let filter_cmp_instances_with_name_prefix = |name_prefix: &str| {
         cmp_instances

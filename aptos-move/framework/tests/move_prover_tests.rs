@@ -2,10 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_framework::{extended_checks, prover::ProverOptions};
-use move_prover_boogie_backend::options::VerifyGranularity;
 use move_binary_format::file_format_common::VERSION_DEFAULT;
 use move_core_types::diag_writer::DiagWriter;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_prover_boogie_backend::options::VerifyGranularity;
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use regex::Regex;
 use std::{
@@ -52,7 +52,10 @@ fn build_test_options(shards: usize, only_shard: Option<usize>) -> ProverOptions
         .parse::<usize>()
         .ok()
         .or(options.vc_timeout);
-    match read_env_var(ENV_TEST_GRANULARITY).to_ascii_lowercase().as_str() {
+    match read_env_var(ENV_TEST_GRANULARITY)
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "" | "shard" => {},
         "module" => {
             options.granularity = Some(VerifyGranularity::Module);

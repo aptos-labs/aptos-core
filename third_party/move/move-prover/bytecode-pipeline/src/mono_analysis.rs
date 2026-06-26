@@ -221,6 +221,13 @@ impl MonoAnalysisProcessor {
             inst_opt: None,
         };
         // Analyze axioms found in modules.
+        //
+        // Note: this seeds axioms from *all* modules, not just the in-scope
+        // module under `verify_scope = OnlyModule(...)`. Narrowing here is
+        // unsound across cross-module axiom dependencies — e.g. `object`
+        // verifying `from_bcs::to_address` needs the module-level axioms
+        // attached to `from_bcs`'s spec funs. A scope-aware narrowing must
+        // follow the in-scope module's transitive `use` graph (follow-up).
         for module_env in env.get_modules() {
             for axiom in module_env.get_spec().filter_kind_axiom() {
                 analyzer.analyze_exp(&axiom.exp)
@@ -333,6 +340,10 @@ impl Analyzer<'_> {
             .filter(|t| t.can_be_type_argument())
             .cloned()
             .collect::<Vec<_>>();
+        // Mirrors the no-narrowing decision in `MonoAnalysisProcessor::analyze`'s
+        // axiom seeding loop — see the rationale there. Follow-up work: narrow
+        // both this and the seeding loop to the in-scope module's transitive
+        // use graph for true butterfly-effect elimination on axiom changes.
         for module_env in self.env.get_modules() {
             for cond in &module_env.get_spec().conditions {
                 if let ConditionKind::Axiom(params) = &cond.kind {

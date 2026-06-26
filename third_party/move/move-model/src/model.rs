@@ -641,6 +641,15 @@ pub struct GlobalEnv {
     /// A flag which allows to indicate that the whole program including
     /// dependencies should be built.
     pub(crate) everything_is_target: RefCell<bool>,
+    /// Runtime restriction on which files are considered primary targets. When
+    /// `Some`, `is_primary_target()` returns true only for file ids in this set;
+    /// the persistent `file_id_is_primary_target` is ignored for the duration.
+    /// `None` (default) preserves the model's persistent primary-target set.
+    /// Used by the per-module prover driver to temporarily narrow primary
+    /// targets to a single module per pipeline rerun, mirroring the
+    /// CLI `--filter` flag's effect on `VerificationAnalysisProcessor`'s
+    /// invariant-set scoping (Rule 3 in `verification_analysis.rs`).
+    pub(crate) restrict_primary_targets_to: RefCell<Option<BTreeSet<FileId>>>,
     /// Whether the v2 compiler has generated this model.
     /// TODO: replace with a proper version number once we have this in file format
     pub(crate) generated_by_v2: bool,
@@ -720,6 +729,7 @@ impl GlobalEnv {
             extlib_address: None,
             address_alias_map: Default::default(),
             everything_is_target: Default::default(),
+            restrict_primary_targets_to: RefCell::new(None),
             generated_by_v2: false,
             verify_mode: false,
             cmp_types: RefCell::new(Default::default()),
@@ -784,6 +794,18 @@ impl GlobalEnv {
     /// Those tools can temporarily set this to true.
     pub fn treat_everything_as_target(&self, on: bool) {
         *self.everything_is_target.borrow_mut() = on
+    }
+
+    /// Temporarily restrict the primary-target set to the given file ids.
+    /// Pass `None` to clear the restriction and revert to the persistent
+    /// `file_id_is_primary_target` set.
+    ///
+    /// While active, `is_primary_target()` returns true only for file ids in
+    /// the set; this lets a caller (e.g. the per-module prover driver) make
+    /// the model behave as if only one module were `-f`-targeted without
+    /// rebuilding the model.
+    pub fn restrict_primary_targets_to(&self, file_ids: Option<BTreeSet<FileId>>) {
+        *self.restrict_primary_targets_to.borrow_mut() = file_ids;
     }
 
     /// Demote every module matched by `predicate` out of the target /
@@ -3515,8 +3537,14 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true of this module is a primary (test/docgen/warning/prover) target.
+    /// Honors `GlobalEnv::restrict_primary_targets_to` when set, so callers can
+    /// temporarily narrow the primary-target set without mutating the persistent
+    /// `file_id_is_primary_target` map.
     pub fn is_primary_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
+        if let Some(restrict) = self.env.restrict_primary_targets_to.borrow().as_ref() {
+            return restrict.contains(&file_id);
+        }
         self.env.file_id_is_primary_target.contains(&file_id)
     }
 
