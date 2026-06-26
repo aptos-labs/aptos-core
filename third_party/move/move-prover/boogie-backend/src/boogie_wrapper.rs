@@ -222,7 +222,10 @@ impl BoogieWrapper<'_> {
 
     /// Calls boogie and analyzes output.
     pub fn call_boogie_and_verify_output(&self, boogie_file: &str) -> anyhow::Result<()> {
-        let BoogieOutput { mut errors, all_output } = self.call_boogie(boogie_file)?;
+        let BoogieOutput {
+            mut errors,
+            all_output,
+        } = self.call_boogie(boogie_file)?;
         let boogie_log_file = self.options.get_boogie_log_file(boogie_file);
         let log_file_existed = std::path::Path::new(&boogie_log_file).exists();
         debug!("writing boogie log to {}", boogie_log_file);
