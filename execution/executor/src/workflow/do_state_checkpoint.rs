@@ -46,7 +46,7 @@ impl DoStateCheckpoint {
             "state",
         )?;
         let hot_state_checkpoint_hashes = execution_output
-            .transaction_info_v1
+            .hot_state_root_in_txn_info
             .then(|| {
                 Self::get_state_checkpoint_hashes(
                     execution_output,

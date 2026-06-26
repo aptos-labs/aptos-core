@@ -183,6 +183,7 @@ impl DoGetExecutionOutput {
                 .append_state_checkpoint_to_block()
                 .is_some(),
             onchain_config.transaction_info_v1(),
+            onchain_config.hot_state_root_in_txn_info(),
             onchain_config.compute_trading_native_state_roots(),
         )
     }
@@ -225,6 +226,7 @@ impl DoGetExecutionOutput {
             false, // prime_state_cache
             append_state_checkpoint_to_block.is_some(),
             onchain_config.transaction_info_v1(),
+            onchain_config.hot_state_root_in_txn_info(),
             onchain_config.compute_trading_native_state_roots(),
         )
     }
@@ -253,6 +255,7 @@ impl DoGetExecutionOutput {
             true,  // prime state cache
             false, // is_block
             onchain_config.transaction_info_v1(),
+            onchain_config.hot_state_root_in_txn_info(),
             onchain_config.compute_trading_native_state_roots(),
         )?;
 
@@ -368,6 +371,7 @@ impl Parser {
         prime_state_cache: bool,
         is_block: bool,
         transaction_info_v1: bool,
+        hot_state_root_in_txn_info: bool,
         compute_trading_native_state_roots: bool,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
@@ -457,6 +461,7 @@ impl Parser {
             next_epoch_state,
             Planned::place_holder(),
             transaction_info_v1,
+            hot_state_root_in_txn_info,
             compute_trading_native_state_roots,
         );
         let ret = out.clone();
@@ -649,6 +654,7 @@ mod tests {
             auxiliary_infos,
             &state,
             CachedStateView::new_dummy(&state),
+            false,
             false,
             false,
             false,
