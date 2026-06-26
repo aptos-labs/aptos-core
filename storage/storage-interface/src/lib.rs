@@ -44,7 +44,10 @@ pub mod state_store;
 
 use crate::{
     chunk_to_commit::ChunkToCommit,
-    state_store::{state::State, state_summary::StateSummary},
+    state_store::{
+        sharded_jmt_state::PositionStateWithSummary, state::State, state_summary::StateSummary,
+        state_with_summary::LedgerWithSummary,
+    },
 };
 pub use aptos_types::block_info::BlockHeight;
 pub use errors::AptosDbError;
@@ -378,6 +381,31 @@ pub trait DbReader: Send + Sync {
         fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)>;
 
         fn get_persisted_state_summary(&self) -> Result<StateSummary>;
+
+        /// Native-position analog of `get_persisted_state_summary`: the latest
+        /// merklized position summary, used by execution as the freeze base and
+        /// proof source for computing the position state root. Errors when the
+        /// feature is on but native-position storage is absent (i.e.
+        /// `ENABLE_TRADING_NATIVE` is off).
+        fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary>;
+
+        /// The pre-committed position tip (latest + last_checkpoint), including
+        /// committed writes the merklized snapshot in
+        /// `get_persisted_position_state_summary` may not yet reflect. Used by
+        /// execution to seed the parent position summary when no in-memory
+        /// block parent is available.
+        fn get_pre_committed_position_state_summary(
+            &self,
+        ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
+
+        /// Native-position analog of `get_state_proof_by_version_ext`: a
+        /// cold-key proof from the persisted position JMT at `version`.
+        fn get_position_state_proof_by_version_ext(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<SparseMerkleProofExt>;
 
         /// Get the ledger info of the epoch that `known_version` belongs to.
         fn get_epoch_ending_ledger_info(

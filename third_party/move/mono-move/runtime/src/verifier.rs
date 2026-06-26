@@ -18,11 +18,9 @@
 //! 4. For instructions with more than 1 destination, they must be disjoint.
 
 use mono_move_core::{
-    captured_values_size,
-    native::NativeABI,
-    types::{view_type, InternedType},
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
+    captured_values_size, native::NativeABI, types::InternedType, CallClosureOp, ClosureFuncRef,
+    CodeOffset, DescriptorId, DescriptorProvider, FrameOffset, Function, IntBinaryOp,
+    LayoutProvider, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
     CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
@@ -53,7 +51,7 @@ impl fmt::Display for VerificationError {
 
 /// Validate a single function and its pointer slots against the descriptor
 /// provider. Returns an empty `Vec` on success.
-pub fn verify_function<P: DescriptorProvider + ?Sized>(
+pub fn verify_function<P: DescriptorProvider + LayoutProvider + ?Sized>(
     func: &Function,
     provider: &P,
 ) -> Vec<VerificationError> {
@@ -69,7 +67,7 @@ pub fn verify_function<P: DescriptorProvider + ?Sized>(
 
 /// Validate every function in a program against a shared descriptor
 /// provider. Errors from each function are concatenated.
-pub fn verify_program<P: DescriptorProvider + ?Sized>(
+pub fn verify_program<P: DescriptorProvider + LayoutProvider + ?Sized>(
     funcs: &[&Function],
     provider: &P,
 ) -> Vec<VerificationError> {
@@ -84,13 +82,13 @@ pub fn verify_program<P: DescriptorProvider + ?Sized>(
 // Per-function verifier — holds shared state so helpers don't need many args
 // ---------------------------------------------------------------------------
 
-struct FunctionVerifier<'a, P: DescriptorProvider + ?Sized> {
+struct FunctionVerifier<'a, P: DescriptorProvider + LayoutProvider + ?Sized> {
     func: &'a Function,
     provider: &'a P,
     errors: &'a mut Vec<VerificationError>,
 }
 
-impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
+impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
     fn verify(&mut self) {
         let code = self.func.code.get();
 
@@ -1077,7 +1075,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     /// bounds check still fails the function (via the recorded error) rather
     /// than passing on an unknown size.
     fn type_size(&mut self, pc: usize, ty: InternedType) -> u32 {
-        match view_type(ty).size_and_align() {
+        match self.provider.size_and_align(ty) {
             Some((size, _align)) => size,
             None => {
                 self.err(

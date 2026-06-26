@@ -4,19 +4,15 @@
 //! Native for the `mem` module.
 
 use crate::{polymorphic_natives, NativeEntry};
-use mono_move_core::{
-    native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, VMInternalError},
-    types::view_type,
+use mono_move_core::native::{
+    NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, VMInternalError,
 };
 
 /// `0x1::mem::swap<T>(left: &mut T, right: &mut T)`
 ///
 /// Exchanges the values behind the two references.
 pub fn native_swap<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
-    let (size, _) = view_type(ctx.ty_arg(0)?).size_and_align().ok_or_else(|| {
-        VMInternalError::invariant_violation("mem::swap: type argument has no concrete size".into())
-    })?;
-    let size = size as usize;
+    let size = ctx.value_size(ctx.ty_arg(0)?)? as usize;
     // SAFETY: arg 0 / arg 1 are `&mut T`, each holding `size` valid bytes.
     unsafe {
         let left: Ref<Opaque> = ctx.arg(0)?;

@@ -7,15 +7,37 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    SortedSafePointEntries,
+    types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
+    FrameOffset as FO, Function, LayoutId, LayoutProvider, MicroOp, SortedSafePointEntries,
+    ValueLayout,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
-fn trivial_descriptors() -> ObjectDescriptorTable {
+/// A descriptor table paired with an empty layout provider, to satisfy the
+/// verifier's `DescriptorProvider + LayoutProvider` bound. These tests do not
+/// exercise value-comparison operands, the only ops that read a layout.
+struct VerifierProvider(ObjectDescriptorTable);
+
+impl DescriptorProvider for VerifierProvider {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.0.descriptor(id)
+    }
+}
+
+impl LayoutProvider for VerifierProvider {
+    fn layout(&self, _id: LayoutId) -> Option<&ValueLayout> {
+        None
+    }
+
+    fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
+        None
+    }
+}
+
+fn trivial_descriptors() -> VerifierProvider {
     let mut t = ObjectDescriptorTable::new();
     t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
-    t
+    VerifierProvider(t)
 }
 
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
@@ -742,7 +764,7 @@ fn vec_pushback_rejects_non_vector_descriptor() {
     let mut descriptors = ObjectDescriptorTable::new();
     let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
     let func = vec_pushback_func(struct_desc);
-    let errors = verify_function(&func, &descriptors);
+    let errors = verify_function(&func, &VerifierProvider(descriptors));
     assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
         && e.message.contains("not a non-empty Vector or Trivial")));
 }

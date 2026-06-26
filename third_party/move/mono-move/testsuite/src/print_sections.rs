@@ -19,7 +19,7 @@ use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
-    types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Interner, LayoutId, LayoutProvider, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
@@ -127,6 +127,7 @@ fn lower_functions(
                     func_ir,
                     EMPTY_TYPE_LIST,
                     guard,
+                    guard,
                     descriptors,
                     &NoNatives,
                 )
@@ -197,6 +198,16 @@ struct SnapshotLoaderContext<'a, 'guard, 'ctx> {
     module_ir: &'a ModuleIR,
 }
 
+impl LayoutProvider for SnapshotLoaderContext<'_, '_, '_> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.guard.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.guard.layout_id(ty)
+    }
+}
+
 impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
     fn get_fields(
         &mut self,
@@ -211,16 +222,6 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .module
             .interned_field_types(*nominal_name)
             .cloned())
-    }
-
-    fn set_nominal_layout(
-        &self,
-        ty: InternedType,
-        size: u32,
-        align: u32,
-        fields: Option<&[FieldLayout]>,
-    ) -> Result<()> {
-        self.guard.set_nominal_layout(ty, size, align, fields)
     }
 
     fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType> {
@@ -261,14 +262,6 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         Ok(self
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets))
-    }
-
-    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
-        self.guard.layout_id_for(ty)
-    }
-
-    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
-        self.guard.layout(id)
     }
 
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {

@@ -199,6 +199,10 @@ pub enum FeatureFlag {
     NATIVE_ORDERBOOK = 120,
     /// Gates native-collateral writes.
     NATIVE_COLLATERAL = 121,
+    /// When enabled, execution computes the native-position state root at the
+    /// checkpoint stage and commits it to `TransactionInfoV1`, so it is
+    /// consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    COMPUTE_TRADING_NATIVE_STATE_ROOTS = 122,
 }
 
 impl FeatureFlag {
@@ -548,6 +552,10 @@ impl Features {
 
     pub fn is_transaction_info_v1_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
+    }
+
+    pub fn is_compute_trading_native_state_roots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

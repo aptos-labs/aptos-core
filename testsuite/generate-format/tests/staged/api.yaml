@@ -1095,7 +1095,7 @@ TransactionInfoV1:
     - auxiliary_info_hash:
         OPTION:
           TYPENAME: HashValue
-    - placeholder0:
+    - position_state_checkpoint_hash:
         OPTION:
           TYPENAME: HashValue
     - placeholder1:

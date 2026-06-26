@@ -100,17 +100,12 @@ fn get_genesis_validator_address(db: &DbReaderWriter) -> AccountAddress {
         if let Ok(validator_set) = bcs::from_bytes::<ValidatorSet>(validator_set_bytes.bytes()) {
             if !validator_set.active_validators.is_empty() {
                 let validator_addr = validator_set.active_validators[0].account_address;
-                eprintln!(
-                    "DEBUG: Using genesis validator address: {:x}",
-                    validator_addr
-                );
                 return validator_addr;
             }
         }
     }
 
     // Fallback to generated address if we can't read the validator set
-    eprintln!("DEBUG: Could not read genesis validator set, falling back to generated address");
     validator_address()
 }
 

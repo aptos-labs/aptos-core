@@ -400,7 +400,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let mut storage_config = StorageConfig::default();
         storage_config.dir = temp_dir.path().to_path_buf();
-        (storage_config, temp_dir.into_path())
+        (storage_config, temp_dir.keep())
     }
 
     #[test]
