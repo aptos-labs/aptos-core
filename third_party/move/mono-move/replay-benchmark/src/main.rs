@@ -10,7 +10,7 @@
 
 use anyhow::Result;
 use aptos_rest_client::AptosBaseUrl;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use mono_move_replay_benchmark::{
     capture, data, report::TransactionReport, timing::TimingConfig, v1, v2, BenchmarkRun,
 };
@@ -51,6 +51,24 @@ impl From<Network> for AptosBaseUrl {
             Network::Devnet => AptosBaseUrl::Devnet,
             Network::Custom(url) => AptosBaseUrl::Custom(url),
         }
+    }
+}
+
+/// Which VM(s) to run. A single VM lets you profile it without the other in the same process.
+#[derive(Clone, Copy, ValueEnum)]
+enum VMSelection {
+    V1,
+    V2,
+    Both,
+}
+
+impl VMSelection {
+    fn runs_v1(self) -> bool {
+        matches!(self, VMSelection::V1 | VMSelection::Both)
+    }
+
+    fn runs_v2(self) -> bool {
+        matches!(self, VMSelection::V2 | VMSelection::Both)
     }
 }
 
@@ -96,6 +114,14 @@ struct BenchArgs {
         help = "Enable V1 (legacy Move VM) paranoid type checks (default: off)"
     )]
     v1_paranoid: bool,
+    #[clap(
+        long,
+        value_enum,
+        default_value = "both",
+        help = "Which VM(s) to run: v1, v2, or both (default). Use a single VM to profile it \
+                in isolation."
+    )]
+    vm: VMSelection,
 }
 
 #[derive(Parser)]
@@ -163,8 +189,14 @@ fn bench(args: BenchArgs) -> Result<()> {
         let function = format!("{}::{}", input.entry.module(), input.entry.function());
         // Isolate each VM run: a panic (e.g. a MonoMove feature not yet implemented) becomes that
         // VM's failure reason and never aborts the whole benchmark.
-        let v1 = run_vm(|| v1::run(input, &timing));
-        let v2 = run_vm(|| v2::run(input, &timing));
+        let v1 = args
+            .vm
+            .runs_v1()
+            .then(|| run_vm(|| v1::run(input, &timing)));
+        let v2 = args
+            .vm
+            .runs_v2()
+            .then(|| run_vm(|| v2::run(input, &timing)));
         TransactionReport::new(input.version, function, v1, v2).print();
     }
     Ok(())
