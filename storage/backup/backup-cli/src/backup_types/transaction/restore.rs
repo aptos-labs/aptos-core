@@ -587,6 +587,17 @@ impl TransactionRestoreBatchController {
             })
             .try_flatten()
             .map_ok(|chunk| {
+                // A batch must not span an epoch boundary.
+                stream::iter(
+                    split_at_epoch_endings(chunk, |(.., events)| {
+                        events.iter().any(ContractEvent::is_new_epoch_event)
+                    })
+                    .into_iter()
+                    .map(Result::<_>::Ok),
+                )
+            })
+            .try_flatten()
+            .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
                     Vec<_>,
