@@ -18,15 +18,17 @@ use std::collections::HashMap;
 
 pub struct DoStateCheckpoint;
 
+#[bon::bon]
 impl DoStateCheckpoint {
-    pub fn run(
-        execution_output: &ExecutionOutput,
-        parent_state_summary: &LedgerStateSummary,
-        persisted_state_summary: &ProvableStateSummary,
+    #[builder(finish_fn = build)]
+    pub fn run<'a, 'db>(
+        execution_output: &'a ExecutionOutput,
+        parent_state_summary: &'a LedgerStateSummary,
+        persisted_state_summary: &'a ProvableStateSummary<'db>,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         known_hot_state_checkpoints: Option<Vec<Option<HashValue>>>,
-        parent_position_state_summary: Option<&LedgerWithSummary<PositionStateWithSummary>>,
-        persisted_position_state_summary: Option<&ProvablePositionStateSummary>,
+        parent_position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
+        persisted_position_state_summary: Option<&'a ProvablePositionStateSummary<'db>>,
         known_position_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
@@ -72,13 +74,13 @@ impl DoStateCheckpoint {
                 (None, None)
             };
 
-        Ok(StateCheckpointOutput::new(
-            state_summary,
-            state_checkpoint_hashes,
-            hot_state_checkpoint_hashes,
-            position_state_summary,
-            position_state_checkpoint_hashes,
-        ))
+        Ok(StateCheckpointOutput::builder()
+            .state_summary(state_summary)
+            .state_checkpoint_hashes(state_checkpoint_hashes)
+            .maybe_hot_state_checkpoint_hashes(hot_state_checkpoint_hashes)
+            .maybe_position_state_summary(position_state_summary)
+            .maybe_position_state_checkpoint_hashes(position_state_checkpoint_hashes)
+            .build())
     }
 
     /// Computes the position summary (latest + last_checkpoint) and per-txn
