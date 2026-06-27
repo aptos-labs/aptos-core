@@ -439,7 +439,9 @@ impl StateDb {
     }
 }
 
+#[bon::bon]
 impl StateStore {
+    #[builder(finish_fn = build)]
     pub(crate) fn new(
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Arc<StateMerkleDb>,

@@ -607,13 +607,13 @@ impl AptosVM {
         storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
-        FeeStatement::new(
-            gas_used,
-            u64::from(gas_meter.execution_gas_used()),
-            u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_fee_used()),
-            storage_fee_refund,
-        )
+        FeeStatement::builder()
+            .total_charge_gas_units(gas_used)
+            .execution_gas_units(u64::from(gas_meter.execution_gas_used()))
+            .io_gas_units(u64::from(gas_meter.io_gas_used()))
+            .storage_fee_octas(u64::from(gas_meter.storage_fee_used()))
+            .storage_fee_refund_octas(storage_fee_refund)
+            .build()
     }
 
     pub(crate) fn failed_transaction_cleanup(
