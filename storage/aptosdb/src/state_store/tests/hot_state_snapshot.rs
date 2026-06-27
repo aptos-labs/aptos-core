@@ -41,15 +41,14 @@ fn block_epilogue_txn(writes: Vec<(StateKey, Option<StateValue>)>) -> Transactio
     // `Some(..)` state checkpoint hash is what marks the version as a checkpoint; the hash values
     // are irrelevant to the hot state reads under test. `None` auxiliary info hash keeps the
     // commit path from resolving per-transaction auxiliary info.
-    let txn_info = TransactionInfo::new(
-        HashValue::random(),
-        HashValue::random(),
-        HashValue::random(),
-        Some(HashValue::random()),
-        0,
-        ExecutionStatus::Success,
-        None,
-    );
+    let txn_info = TransactionInfo::builder_v0()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .state_checkpoint_hash(HashValue::random())
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
     TransactionToCommit::new(
         Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
         txn_info,
