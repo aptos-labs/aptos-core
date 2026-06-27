@@ -377,12 +377,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 .map(|t| t.state_checkpoint_hash())
                 .collect_vec(),
         );
-        let known_hot_state_checkpoints = output.execution_output.transaction_info_v1.then(|| {
-            txn_infos
-                .iter()
-                .map(|t| t.hot_state_checkpoint_hash())
-                .collect_vec()
-        });
+        let known_hot_state_checkpoints =
+            output.execution_output.hot_state_root_in_txn_info.then(|| {
+                txn_infos
+                    .iter()
+                    .map(|t| t.hot_state_checkpoint_hash())
+                    .collect_vec()
+            });
         let compute_trading_native_state_roots =
             output.execution_output.compute_trading_native_state_roots;
         let known_position_state_checkpoints = compute_trading_native_state_roots.then(|| {
