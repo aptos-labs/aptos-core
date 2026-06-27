@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V49:
+///   - Count the closure function-type node towards type size and depth limits
 /// - V48:
 ///   - TBA
 /// - V47:
