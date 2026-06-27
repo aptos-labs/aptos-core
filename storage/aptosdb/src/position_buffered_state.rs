@@ -109,6 +109,13 @@ impl PositionPersistedState {
 
 pub(crate) const POSITION_TARGET_ITEMS: usize = 200_000;
 
+/// Mirrors `state_store::MAX_WRITE_SETS_AFTER_SNAPSHOT`. Cap on the
+/// startup replay window so a node enabling trading-native from
+/// before its first position snapshot doesn't load arbitrarily many
+/// historical write sets into one `Vec`.
+pub(crate) const MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT: u64 =
+    TARGET_SNAPSHOT_INTERVAL_IN_VERSION * (ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1) * 2;
+
 pub(crate) type PositionBufferedState = crate::common::BufferedState<
     PositionLedgerStateWithSummary,
     PositionStateWithSummary,
@@ -137,6 +144,9 @@ impl PositionBufferedState {
         out_current_state: Arc<Mutex<PositionLedgerStateWithSummary>>,
         position_pruner: Arc<PositionPruner>,
         persisted: PositionPersistedState,
+        user_positions: Arc<
+            Mutex<aptos_storage_interface::state_store::user_positions::UserPositions>,
+        >,
     ) -> Self {
         *out_current_state.lock() =
             PositionLedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
@@ -156,6 +166,7 @@ impl PositionBufferedState {
                     batch_receiver,
                     position_pruner,
                     persisted,
+                    user_positions,
                 )
                 .run();
             },

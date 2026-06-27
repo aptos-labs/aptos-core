@@ -10,6 +10,7 @@ pub mod state_summary;
 pub mod state_update_refs;
 pub mod state_view;
 pub mod state_with_summary;
+pub mod user_positions;
 pub mod versioned_state_value;
 
 use anyhow::{bail, Result};

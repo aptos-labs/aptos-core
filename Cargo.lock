@@ -1306,6 +1306,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "status-line",
+ "thiserror 1.0.69",
  "tokio",
 ]
 

@@ -363,8 +363,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     pub fn update_ledger(&self) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger_total"]);
 
-        let (parent_state_summary, parent_position_state_summary, parent_accumulator, chunk) =
-            self.commit_queue.lock().next_chunk_to_update_ledger()?;
+        let (
+            parent_state_summary,
+            parent_position_state_summary,
+            parent_user_positions,
+            parent_accumulator,
+            chunk,
+        ) = self.commit_queue.lock().next_chunk_to_update_ledger()?;
         let ChunkToUpdateLedger {
             output,
             chunk_verifier,
@@ -407,6 +412,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             parent_position_state_summary.as_ref(),
             position_persisted.as_ref(),
             known_position_state_checkpoints,
+            parent_user_positions.as_ref(),
         )?;
 
         let ledger_update_output = DoLedgerUpdate::run(

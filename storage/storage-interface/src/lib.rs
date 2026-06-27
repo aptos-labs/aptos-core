@@ -46,7 +46,7 @@ use crate::{
     chunk_to_commit::ChunkToCommit,
     state_store::{
         sharded_jmt_state::PositionStateWithSummary, state::State, state_summary::StateSummary,
-        state_with_summary::LedgerWithSummary,
+        state_with_summary::LedgerWithSummary, user_positions::UserPositions,
     },
 };
 pub use aptos_types::block_info::BlockHeight;
@@ -397,6 +397,14 @@ pub trait DbReader: Send + Sync {
         fn get_pre_committed_position_state_summary(
             &self,
         ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
+
+        /// Pre-committed per-account position index. Returned as a
+        /// `LedgerWithSummary` so the executor can chain blocks off
+        /// it. Errors when the feature is on but native-position
+        /// storage is absent.
+        fn get_pre_committed_user_positions(
+            &self,
+        ) -> Result<LedgerWithSummary<UserPositions>>;
 
         /// Native-position analog of `get_state_proof_by_version_ext`: a
         /// cold-key proof from the persisted position JMT at `version`.

@@ -12,6 +12,7 @@ use aptos_storage_interface::{
     state_store::{
         sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
+        user_positions::UserPositions,
     },
     LedgerSummary,
 };
@@ -48,6 +49,7 @@ impl PartialStateComputeResult {
             .set(StateCheckpointOutput::new_empty(
                 ledger_summary.state_summary,
                 ledger_summary.position_state_summary,
+                ledger_summary.user_positions,
             ))
             .expect("First set.");
 
@@ -82,6 +84,13 @@ impl PartialStateComputeResult {
     ) -> Result<Option<&LedgerWithSummary<PositionStateWithSummary>>> {
         self.ensure_state_checkpoint_output()
             .map(|out| out.position_state_summary.as_ref())
+    }
+
+    pub fn ensure_result_user_positions(
+        &self,
+    ) -> Result<Option<&LedgerWithSummary<UserPositions>>> {
+        self.ensure_state_checkpoint_output()
+            .map(|out| out.user_positions.as_ref())
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

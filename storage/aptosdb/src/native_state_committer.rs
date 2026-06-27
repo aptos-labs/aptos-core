@@ -3,7 +3,10 @@
 
 #![forbid(unsafe_code)]
 
+pub use crate::native_state_store::PositionWrite;
+
 use crate::{
+    native_state_store::UserPositionKey,
     position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_metrics::POSITION_WRITES,
     schema::{
@@ -17,28 +20,16 @@ use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     state_store::{
+        native_position::NativePosition,
         state_key::{
             inner::{StateKeyInner, TradingNativeKey},
             StateKey,
         },
-        state_value::StateValue,
     },
     transaction::Version,
     write_set::WriteOp,
 };
 use std::{collections::HashMap, sync::Arc};
-
-#[derive(Clone, Debug)]
-pub struct MerkleLeafUpdate {
-    pub state_key_hash: HashValue,
-    pub state_key: StateKey,
-    pub value_hash: Option<HashValue>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct NativeMerkleLeafUpdates {
-    pub position: Vec<MerkleLeafUpdate>,
-}
 
 /// Per-chunk batches accumulated by `NativeStateCommitter::apply`.
 /// Allocate once per chunk, drive `apply` per transaction, then
@@ -62,23 +53,27 @@ impl NativeStateCommitter {
         Self { position_db }
     }
 
-    /// Accumulate one transaction's Position writes into the
-    /// per-chunk batches. The caller commits once per chunk via
-    /// `PositionDb::commit`.
+    /// Accumulate one transaction's Position writes into the per-chunk
+    /// kv batches and emit the decoded `PositionWrite`s for the caller
+    /// to fold into the layered per-account `UserPositions`.
     pub fn apply<P>(
         &self,
         version: Version,
         position_writes: P,
         sharded_kv_batches: &mut PositionShardedKvBatches,
         in_chunk_prior: &mut InChunkPriorVersions,
-    ) -> Result<NativeMerkleLeafUpdates>
+    ) -> Result<Vec<PositionWrite>>
     where
         P: IntoIterator<Item = (StateKey, WriteOp)>,
     {
-        let mut position_merkle: Vec<MerkleLeafUpdate> = Vec::new();
+        let mut user_position_writes: Vec<PositionWrite> = Vec::new();
         for (state_key, op) in position_writes {
-            match state_key.inner() {
-                StateKeyInner::TradingNative(TradingNativeKey::Position { .. }) => (),
+            let (exchange, account, market) = match state_key.inner() {
+                StateKeyInner::TradingNative(TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                }) => (*exchange, *account, *market),
                 other => {
                     return Err(AptosDbError::Other(format!(
                         "position_write_set contained non-Position StateKey: {other:?}"
@@ -126,16 +121,24 @@ impl NativeStateCommitter {
 
             in_chunk_prior.insert(state_key_hash, version);
 
-            let value_hash = maybe_value.as_ref().map(StateValue::hash);
-            position_merkle.push(MerkleLeafUpdate {
-                state_key_hash,
-                state_key: state_key.clone(),
-                value_hash,
+            // Decode once: the caller folds this into the layered
+            // `UserPositions` and validator-side readers consume
+            // decoded values.
+            let typed = match maybe_value.as_ref() {
+                Some(sv) => Some(NativePosition::deserialize(sv.bytes()).map_err(|e| {
+                    AptosDbError::Other(format!(
+                        "position value at version {version} failed to decode: {e}"
+                    ))
+                })?),
+                None => None,
+            };
+            user_position_writes.push(PositionWrite {
+                position_key: UserPositionKey { exchange, account },
+                market,
+                value: typed,
             });
         }
 
-        Ok(NativeMerkleLeafUpdates {
-            position: position_merkle,
-        })
+        Ok(user_position_writes)
     }
 }

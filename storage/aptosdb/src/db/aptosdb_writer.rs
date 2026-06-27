@@ -13,7 +13,10 @@ use crate::{
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
-    native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
+    native_state_committer::{
+        new_sharded_kv_batches, InChunkPriorVersions, PositionWrite, NativeStateCommitter,
+    },
+    native_state_store::materialize_user_position_updates,
     position_buffered_state::{
         PositionLedgerStateWithSummary, PositionProofReader, PositionSlot, PositionStateWithSummary,
     },
@@ -343,6 +346,11 @@ impl AptosDB {
         // Persist the position KV values + stale index.
         let mut sharded_kv_batches = new_sharded_kv_batches();
         let mut in_chunk_prior = InChunkPriorVersions::new();
+        // Decoded `PositionWrite`s for the whole chunk, in arrival
+        // order. Folded into `bundle.user_positions` once at chunk
+        // end, after the durable `position_db.commit(...)` succeeds.
+        let mut chunk_position_writes: Vec<PositionWrite> = Vec::new();
+
         for (i, output) in chunk.transaction_outputs.iter().enumerate() {
             let version = chunk_first + i as Version;
             let position_writes: Vec<_> = output
@@ -351,7 +359,7 @@ impl AptosDB {
                 .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
                 .collect();
             if !position_writes.is_empty() {
-                committer
+                let writes = committer
                     .apply(
                         version,
                         position_writes,
@@ -359,12 +367,46 @@ impl AptosDB {
                         &mut in_chunk_prior,
                     )
                     .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?;
+                chunk_position_writes.extend(writes);
             }
         }
         bundle
             .kv_db
             .commit(chunk_last_inclusive, None, sharded_kv_batches)
             .map_err(|e| AptosDbError::Other(format!("position_db commit failed: {e}")))?;
+
+        // Advance `bundle.user_positions` for validator-side scanner
+        // reads. Two code paths, each preserving the bundle's
+        // `MapLayer` family (so cold-loaded data stays reachable):
+        //
+        // - `chunk.user_positions = Some(executed)`: the executor
+        //   extended its parent (sourced from `bundle.user_positions`
+        //   via `get_pre_committed_user_positions`) and threaded the
+        //   result through. Publishing `latest()` keeps the bundle
+        //   in the same family the executor extended. This is the
+        //   Phase-1 path: block N+1's execution already saw block N's
+        //   writes via the parent chain.
+        //
+        // - `None`: feature is off OR the executor was bypassed
+        //   (state-sync replay before chunk_executor wiring lands).
+        //   Materialize locally against the bundle's current top, so
+        //   the bundle stays current as a scanner-read structure.
+        //
+        // The two paths are mutually consistent: both extend the same
+        // logical family rooted at the cold-loaded base.
+        match chunk.user_positions {
+            Some(executed) => {
+                *bundle.user_positions.lock() = executed.latest().clone();
+            },
+            None => {
+                if !chunk_position_writes.is_empty() {
+                    let mut user_positions = bundle.user_positions.lock();
+                    let updates =
+                        materialize_user_position_updates(&user_positions, chunk_position_writes);
+                    *user_positions = user_positions.extend(chunk_last_inclusive, updates);
+                }
+            },
+        }
 
         // Advance the position pipeline (merklize + persist + advance the base).
         // Flag on: the summary comes from execution on the chunk; off: compute

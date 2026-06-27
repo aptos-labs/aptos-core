@@ -360,6 +360,8 @@ where
                     .transpose()?;
                 let parent_position_summary =
                     parent_block.output.ensure_result_position_state_summary()?;
+                let parent_user_positions =
+                    parent_block.output.ensure_result_user_positions()?;
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
                     parent_state_summary,
@@ -369,6 +371,7 @@ where
                     parent_position_summary,
                     position_persisted.as_ref(),
                     None,
+                    parent_user_positions,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(
                     &output.execution_output,

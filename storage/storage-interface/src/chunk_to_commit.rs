@@ -8,6 +8,7 @@ use crate::state_store::{
     state_update_refs::StateUpdateRefs,
     state_view::cached_state_view::ShardedStateCache,
     state_with_summary::{LedgerStateWithSummary, LedgerWithSummary, StateWithSummary},
+    user_positions::UserPositions,
     HotStateUpdates,
 };
 use aptos_types::transaction::{
@@ -30,6 +31,12 @@ pub struct ChunkToCommit<'a> {
     /// be persisted/merklized at commit without recomputation. `None` when
     /// native position is disabled.
     pub position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
+    /// Per-account `UserPositions` index computed at execution time
+    /// (alongside `position_state_summary`). Commit publishes this
+    /// onto the bundle's user-positions handle so the validator-side
+    /// scanner sees the latest committed view. `None` when native
+    /// position is disabled.
+    pub user_positions: Option<&'a LedgerWithSummary<UserPositions>>,
     pub is_reconfig: bool,
 }
 
