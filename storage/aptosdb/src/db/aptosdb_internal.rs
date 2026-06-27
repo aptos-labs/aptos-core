@@ -64,13 +64,13 @@ impl AptosDB {
         let state_merkle_db = Arc::new(state_merkle_db);
         let hot_state_kv_db = Arc::new(hot_state_kv_db);
         let state_kv_db = Arc::new(state_kv_db);
-        let state_pruner = StatePruner::new(
-            Arc::clone(&hot_state_merkle_db),
-            Arc::clone(&state_merkle_db),
-            Arc::clone(&hot_state_kv_db),
-            Arc::clone(&state_kv_db),
-            pruner_config,
-        );
+        let state_pruner = StatePruner::builder()
+            .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
+            .state_merkle_db(Arc::clone(&state_merkle_db))
+            .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+            .state_kv_db(Arc::clone(&state_kv_db))
+            .config(pruner_config)
+            .build();
         let state_store = Arc::new(
             StateStore::builder()
                 .ledger_db(Arc::clone(&ledger_db))

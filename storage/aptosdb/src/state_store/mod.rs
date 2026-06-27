@@ -116,7 +116,9 @@ pub(crate) struct StatePruner {
     pub state_kv_pruner: StateKvPrunerManager<ColdStateKv>,
 }
 
+#[bon::bon]
 impl StatePruner {
+    #[builder(finish_fn = build)]
     pub fn new(
         hot_state_merkle_db: Arc<StateMerkleDb>,
         state_merkle_db: Arc<StateMerkleDb>,
@@ -704,13 +706,13 @@ impl StateStore {
         hot_state_kv_db: Arc<StateKvDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
-        let state_pruner = StatePruner::new(
-            Arc::clone(&hot_state_merkle_db),
-            Arc::clone(&state_merkle_db),
-            Arc::clone(&hot_state_kv_db),
-            Arc::clone(&state_kv_db),
-            aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
-        );
+        let state_pruner = StatePruner::builder()
+            .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
+            .state_merkle_db(Arc::clone(&state_merkle_db))
+            .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+            .state_kv_db(Arc::clone(&state_kv_db))
+            .config(aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG)
+            .build();
         let state_db = Arc::new(StateDb {
             ledger_db,
             hot_state_merkle_db,
