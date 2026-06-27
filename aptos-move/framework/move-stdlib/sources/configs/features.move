@@ -884,8 +884,7 @@ module std::features {
     /// Lifetime: permanent
     const HOTNESS_IN_EPILOGUE: u64 = 116;
 
-    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
-    /// state root hash, so it is committed to the ledger accumulator.
+    /// When enabled, execution assembles `TransactionInfoV1` instead of `TransactionInfoV0`.
     /// Lifetime: permanent
     const TRANSACTION_INFO_V1: u64 = 117;
 
@@ -941,6 +940,12 @@ module std::features {
     /// info; the actual Move-side writes to those trees are gated by separate flags.
     /// Lifetime: permanent
     const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 122;
+
+    /// When enabled together with `TRANSACTION_INFO_V1`, execution populates
+    /// `TransactionInfoV1`'s hot state root hash, so it is committed to the ledger
+    /// accumulator. Requires `TRANSACTION_INFO_V1`.
+    /// Lifetime: permanent
+    const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
 
     // ============================================================================================
     // Feature Flag Implementation
