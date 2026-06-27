@@ -394,20 +394,22 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let position_persisted = compute_trading_native_state_roots
             .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
             .transpose()?;
-        let state_checkpoint_output = DoStateCheckpoint::run(
-            &output.execution_output,
-            &parent_state_summary,
-            &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
-            known_state_checkpoints,
-            known_hot_state_checkpoints,
+        let state_checkpoint_output = DoStateCheckpoint::run()
+            .execution_output(&output.execution_output)
+            .parent_state_summary(&parent_state_summary)
+            .persisted_state_summary(&ProvableStateSummary::new_persisted(
+                self.db.reader.as_ref(),
+            )?)
+            .maybe_known_state_checkpoints(known_state_checkpoints)
+            .maybe_known_hot_state_checkpoints(known_hot_state_checkpoints)
             // Parent position summary is chained across chunks by the commit
             // queue (seeded from the pre-committed position tip); the persisted
             // base supplies cold-key proofs. The known-hash check validates the
             // computed root against the committed TransactionInfos.
-            parent_position_state_summary.as_ref(),
-            position_persisted.as_ref(),
-            known_position_state_checkpoints,
-        )?;
+            .maybe_parent_position_state_summary(parent_position_state_summary.as_ref())
+            .maybe_persisted_position_state_summary(position_persisted.as_ref())
+            .maybe_known_position_state_checkpoints(known_position_state_checkpoints)
+            .build()?;
 
         let ledger_update_output = DoLedgerUpdate::run(
             &output.execution_output,

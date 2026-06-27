@@ -29,6 +29,7 @@ aptos-secure-net = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+bon = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
 itertools = { workspace = true }

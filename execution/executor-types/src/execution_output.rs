@@ -28,7 +28,9 @@ pub struct ExecutionOutput {
     inner: Arc<DropHelper<Inner>>,
 }
 
+#[bon::bon]
 impl ExecutionOutput {
+    #[builder(finish_fn = build)]
     pub fn new(
         is_block: bool,
         first_version: Version,

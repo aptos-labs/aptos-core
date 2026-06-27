@@ -45,12 +45,12 @@ impl DoLedgerUpdate {
         // Calculate root hash
         let transaction_accumulator = Arc::new(parent_accumulator.append(&transaction_info_hashes));
 
-        Ok(LedgerUpdateOutput::new(
-            transaction_infos,
-            transaction_info_hashes,
-            transaction_accumulator,
-            parent_accumulator,
-        ))
+        Ok(LedgerUpdateOutput::builder()
+            .transaction_infos(transaction_infos)
+            .transaction_info_hashes(transaction_info_hashes)
+            .transaction_accumulator(transaction_accumulator)
+            .parent_accumulator(parent_accumulator)
+            .build())
     }
 
     fn assemble_transaction_infos(

@@ -443,22 +443,22 @@ impl Parser {
         )?;
         let state_reads = base_state_view.into_memorized_reads();
 
-        let out = ExecutionOutput::new(
-            is_block,
-            first_version,
-            statuses_for_input_txns,
-            to_commit,
-            to_discard,
-            to_retry,
-            result_state,
-            state_reads,
-            hot_state_updates,
-            block_end_info,
-            next_epoch_state,
-            Planned::place_holder(),
-            transaction_info_v1,
-            compute_trading_native_state_roots,
-        );
+        let out = ExecutionOutput::builder()
+            .is_block(is_block)
+            .first_version(first_version)
+            .statuses_for_input_txns(statuses_for_input_txns)
+            .to_commit(to_commit)
+            .to_discard(to_discard)
+            .to_retry(to_retry)
+            .result_state(result_state)
+            .state_reads(state_reads)
+            .hot_state_updates(hot_state_updates)
+            .maybe_block_end_info(block_end_info)
+            .maybe_next_epoch_state(next_epoch_state)
+            .subscribable_events(Planned::place_holder())
+            .transaction_info_v1(transaction_info_v1)
+            .compute_trading_native_state_roots(compute_trading_native_state_roots)
+            .build();
         let ret = out.clone();
         ret.subscribable_events
             .plan(THREAD_MANAGER.get_non_exe_cpu_pool(), move || {
