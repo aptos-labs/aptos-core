@@ -258,15 +258,15 @@ fn test_get_latest_ledger_summary() {
     let auxiliary_info = PersistedAuxiliaryInfo::V1 {
         transaction_index: 0,
     };
-    let txn_info = TransactionInfo::new(
-        HashValue::random(),
-        HashValue::random(),
-        HashValue::random(),
-        Some(state_hash),
-        0,
-        ExecutionStatus::MiscellaneousError(None),
-        Some(auxiliary_info.hash()),
-    );
+    let txn_info = TransactionInfo::builder_v0()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .state_checkpoint_hash(state_hash)
+        .gas_used(0)
+        .status(ExecutionStatus::MiscellaneousError(None))
+        .auxiliary_info_hash(auxiliary_info.hash())
+        .build();
     let root_hash = txn_info.hash();
     let mut txn_to_commit = TransactionToCommit::dummy();
     txn_to_commit.transaction_info = txn_info;
