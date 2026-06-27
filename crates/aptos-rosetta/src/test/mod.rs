@@ -28,7 +28,7 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     test_helpers::transaction_test_helpers::get_test_raw_transaction,
-    transaction::{ExecutionStatus, TransactionInfo, TransactionInfoV0},
+    transaction::{ExecutionStatus, TransactionInfo},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::StructTag};
@@ -84,15 +84,13 @@ fn test_transaction(
                 Ed25519Signature::dummy_signature(),
             ),
         ),
-        info: TransactionInfo::V0(TransactionInfoV0::new(
-            HashValue::random(),
-            HashValue::random(),
-            HashValue::random(),
-            None,
-            178,                      // gas used, chosen arbitrarily
-            ExecutionStatus::Success, // TODO: Add other statuses
-            None,
-        )),
+        info: TransactionInfo::builder_v0()
+            .transaction_hash(HashValue::random())
+            .state_change_hash(HashValue::random())
+            .event_root_hash(HashValue::random())
+            .gas_used(178) // chosen arbitrarily
+            .status(ExecutionStatus::Success) // TODO: Add other statuses
+            .build(),
         events,
         accumulator_root_hash: Default::default(),
         changes,
@@ -646,15 +644,13 @@ fn test_fee_payer_transaction(
                 fee_payer_auth,
             ),
         ),
-        info: TransactionInfo::V0(TransactionInfoV0::new(
-            HashValue::random(),
-            HashValue::random(),
-            HashValue::random(),
-            None,
-            178,
-            ExecutionStatus::Success,
-            None,
-        )),
+        info: TransactionInfo::builder_v0()
+            .transaction_hash(HashValue::random())
+            .state_change_hash(HashValue::random())
+            .event_root_hash(HashValue::random())
+            .gas_used(178)
+            .status(ExecutionStatus::Success)
+            .build(),
         events,
         accumulator_root_hash: Default::default(),
         changes,

@@ -2235,8 +2235,10 @@ pub enum TransactionInfo {
     V1(TransactionInfoV1),
 }
 
+#[bon::bon]
 impl TransactionInfo {
-    pub fn new(
+    #[builder(finish_fn = build)]
+    pub fn builder_v0(
         transaction_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
@@ -2256,7 +2258,8 @@ impl TransactionInfo {
         ))
     }
 
-    pub fn new_v1(
+    #[builder(finish_fn = build)]
+    pub fn builder_v1(
         transaction_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
@@ -2286,28 +2289,27 @@ impl TransactionInfo {
         state_checkpoint_hash: Option<HashValue>,
         status: ExecutionStatus,
     ) -> Self {
-        Self::new(
-            HashValue::default(),
-            HashValue::default(),
-            HashValue::default(),
-            state_checkpoint_hash,
-            gas_used,
-            status,
-            Some(HashValue::default()),
-        )
+        Self::builder_v0()
+            .transaction_hash(HashValue::default())
+            .state_change_hash(HashValue::default())
+            .event_root_hash(HashValue::default())
+            .maybe_state_checkpoint_hash(state_checkpoint_hash)
+            .gas_used(gas_used)
+            .status(status)
+            .auxiliary_info_hash(HashValue::default())
+            .build()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     fn dummy() -> Self {
-        Self::new(
-            HashValue::default(),
-            HashValue::default(),
-            HashValue::default(),
-            None,
-            0,
-            ExecutionStatus::Success,
-            Some(HashValue::default()),
-        )
+        Self::builder_v0()
+            .transaction_hash(HashValue::default())
+            .state_change_hash(HashValue::default())
+            .event_root_hash(HashValue::default())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .auxiliary_info_hash(HashValue::default())
+            .build()
     }
 
     pub fn transaction_hash(&self) -> HashValue {
