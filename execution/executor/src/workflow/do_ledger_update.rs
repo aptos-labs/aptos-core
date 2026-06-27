@@ -90,27 +90,29 @@ impl DoLedgerUpdate {
                     .as_kept_status()
                     .expect("Already sorted.");
                 let txn_info = if let Some(hot) = hot_state_checkpoint_hashes {
-                    TransactionInfo::new_v1(
-                        txn.committed_hash(),
-                        write_set_hash,
-                        event_root_hash,
-                        state_checkpoint_hash,
-                        hot[i],
-                        txn_output.gas_used(),
-                        status,
-                        auxiliary_info_hash,
-                        position_state_checkpoint_hashes.and_then(|p| p[i]),
-                    )
+                    TransactionInfo::builder_v1()
+                        .transaction_hash(txn.committed_hash())
+                        .state_change_hash(write_set_hash)
+                        .event_root_hash(event_root_hash)
+                        .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                        .maybe_hot_state_checkpoint_hash(hot[i])
+                        .gas_used(txn_output.gas_used())
+                        .status(status)
+                        .maybe_auxiliary_info_hash(auxiliary_info_hash)
+                        .maybe_position_state_checkpoint_hash(
+                            position_state_checkpoint_hashes.and_then(|p| p[i]),
+                        )
+                        .build()
                 } else {
-                    TransactionInfo::new(
-                        txn.committed_hash(),
-                        write_set_hash,
-                        event_root_hash,
-                        state_checkpoint_hash,
-                        txn_output.gas_used(),
-                        status,
-                        auxiliary_info_hash,
-                    )
+                    TransactionInfo::builder_v0()
+                        .transaction_hash(txn.committed_hash())
+                        .state_change_hash(write_set_hash)
+                        .event_root_hash(event_root_hash)
+                        .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                        .gas_used(txn_output.gas_used())
+                        .status(status)
+                        .maybe_auxiliary_info_hash(auxiliary_info_hash)
+                        .build()
                 };
                 let txn_info_hash = txn_info.hash();
                 (txn_info, txn_info_hash)
