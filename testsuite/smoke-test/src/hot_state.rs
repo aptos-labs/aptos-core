@@ -4,11 +4,11 @@
 //! Smoke tests for the hot state features.
 //!
 //! `HOTNESS_IN_EPILOGUE` (hot-state promotion in the block epilogue) is on in
-//! every test. `TRANSACTION_INFO_V1` commits the hot state root to the ledger
-//! accumulator, so once it is enabled, a node catching up at all implies its
-//! recomputed hot state roots matched -- that is the verification oracle these
-//! tests lean on. `delete_on_restart` is false everywhere so restarts reload the
-//! persisted hot state rather than wiping it.
+//! every test. `TRANSACTION_INFO_V1` together with `HOT_STATE_ROOT_IN_TXN_INFO`
+//! commits the hot state root to the ledger accumulator, so once they are enabled,
+//! a node catching up at all implies its recomputed hot state roots matched -- that
+//! is the verification oracle these tests lean on. `delete_on_restart` is false
+//! everywhere so restarts reload the persisted hot state rather than wiping it.
 //!
 //! Fast sync and backup/restore are intentionally excluded -- hot state does not
 //! support them yet -- so only apply-outputs and re-execution bootstrapping are
@@ -41,15 +41,18 @@ fn persist_hot_state(config: &mut NodeConfig) {
 }
 
 /// Genesis features for the suite: `HOTNESS_IN_EPILOGUE` is always on;
-/// `TRANSACTION_INFO_V1` is optionally on from the start.
+/// `TRANSACTION_INFO_V1` plus `HOT_STATE_ROOT_IN_TXN_INFO` (which commits the hot
+/// state root to the ledger accumulator) is optionally on from the start.
 fn hot_state_genesis(enable_txn_info_v1: bool) -> InitGenesisConfigFn {
     Arc::new(move |genesis_config| {
         let mut features = Features::default();
         features.enable(FeatureFlag::HOTNESS_IN_EPILOGUE);
         if enable_txn_info_v1 {
             features.enable(FeatureFlag::TRANSACTION_INFO_V1);
+            features.enable(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO);
         } else {
             features.disable(FeatureFlag::TRANSACTION_INFO_V1);
+            features.disable(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO);
         }
         genesis_config.initial_features_override = Some(features);
     })
@@ -68,14 +71,15 @@ async fn generate_load(
     }
 }
 
-/// Enables `TRANSACTION_INFO_V1` through a governance script submitted as root and
-/// waits for it to take effect at the next epoch.
+/// Enables `TRANSACTION_INFO_V1` and `HOT_STATE_ROOT_IN_TXN_INFO` through a governance
+/// script submitted as root and waits for them to take effect at the next epoch. Both
+/// are needed for the hot state root to be committed to the ledger accumulator.
 async fn enable_txn_info_v1_via_governance(
     swarm: &mut LocalSwarm,
     cli: &mut CliTestFramework,
     validator_client: &RestClient,
 ) {
-    info!("Enabling TRANSACTION_INFO_V1 via governance.");
+    info!("Enabling TRANSACTION_INFO_V1 + HOT_STATE_ROOT_IN_TXN_INFO via governance.");
     let root_addr = swarm.chain_info().root_account().address();
     let root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
     let script = format!(
@@ -85,21 +89,24 @@ script {{
 
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        aptos_governance::toggle_features(&framework_signer, vector[{}], vector[]);
+        aptos_governance::toggle_features(&framework_signer, vector[{}, {}], vector[]);
     }}
 }}
 "#,
-        FeatureFlag::TRANSACTION_INFO_V1 as u64
+        FeatureFlag::TRANSACTION_INFO_V1 as u64,
+        FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO as u64,
     );
     cli.run_script(root_idx, &script)
         .await
         .expect("Failed to enable TRANSACTION_INFO_V1 via governance.");
 
-    // The feature applies at the next epoch; wait for it to land on chain.
+    // The features apply at the next epoch; wait for them to land on chain.
     let deadline = Instant::now() + Duration::from_secs(MAX_CATCH_UP_WAIT_SECS);
     loop {
         let features = get_on_chain_resource::<Features>(validator_client).await;
-        if features.is_enabled(FeatureFlag::TRANSACTION_INFO_V1) {
+        if features.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
+            && features.is_enabled(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO)
+        {
             break;
         }
         assert!(
@@ -108,7 +115,7 @@ script {{
         );
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    info!("TRANSACTION_INFO_V1 is now enabled on chain.");
+    info!("TRANSACTION_INFO_V1 + HOT_STATE_ROOT_IN_TXN_INFO are now enabled on chain.");
 }
 
 /// A fullnode rebuilds hot state from genesis using the given sync modes, with
