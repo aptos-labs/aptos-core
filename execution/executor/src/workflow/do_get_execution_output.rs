@@ -185,6 +185,7 @@ impl DoGetExecutionOutput {
                     .is_some(),
             )
             .transaction_info_v1(onchain_config.transaction_info_v1())
+            .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
             .build()
     }
@@ -229,6 +230,7 @@ impl DoGetExecutionOutput {
             .prime_state_cache(false)
             .is_block(append_state_checkpoint_to_block.is_some())
             .transaction_info_v1(onchain_config.transaction_info_v1())
+            .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
             .build()
     }
@@ -257,6 +259,7 @@ impl DoGetExecutionOutput {
             .prime_state_cache(true)
             .is_block(false)
             .transaction_info_v1(onchain_config.transaction_info_v1())
+            .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
             .build()?;
 
@@ -374,6 +377,7 @@ impl Parser {
         prime_state_cache: bool,
         is_block: bool,
         transaction_info_v1: bool,
+        hot_state_root_in_txn_info: bool,
         compute_trading_native_state_roots: bool,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
@@ -463,6 +467,7 @@ impl Parser {
             .maybe_next_epoch_state(next_epoch_state)
             .subscribable_events(Planned::place_holder())
             .transaction_info_v1(transaction_info_v1)
+            .hot_state_root_in_txn_info(hot_state_root_in_txn_info)
             .compute_trading_native_state_roots(compute_trading_native_state_roots)
             .build();
         let ret = out.clone();
@@ -658,6 +663,7 @@ mod tests {
             .prime_state_cache(false)
             .is_block(false)
             .transaction_info_v1(false)
+            .hot_state_root_in_txn_info(false)
             .compute_trading_native_state_roots(false)
             .build()
             .unwrap();
