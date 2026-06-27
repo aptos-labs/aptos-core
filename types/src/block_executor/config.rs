@@ -91,6 +91,7 @@ pub struct BlockExecutorConfigFromOnchain {
     gas_price_to_burn: Option<u64>,
     hotness_in_epilogue: bool,
     transaction_info_v1: bool,
+    hot_state_root_in_txn_info: bool,
     compute_trading_native_state_roots: bool,
 }
 
@@ -107,6 +108,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
             compute_trading_native_state_roots: false,
         }
     }
@@ -119,6 +121,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn: None,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
             compute_trading_native_state_roots: false,
         }
     }
@@ -132,6 +135,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn: None,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
             compute_trading_native_state_roots: false,
         }
     }
@@ -156,6 +160,7 @@ impl BlockExecutorConfigFromOnchain {
             gas_price_to_burn: None,
             hotness_in_epilogue: false,
             transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
             compute_trading_native_state_roots: false,
         }
     }
@@ -168,6 +173,10 @@ impl BlockExecutorConfigFromOnchain {
     pub fn with_features(mut self, features: &Features) -> Self {
         self.hotness_in_epilogue = features.is_hotness_in_epilogue_enabled();
         self.transaction_info_v1 = features.is_transaction_info_v1_enabled();
+        // Requires transaction_info_v1: the hot state root rides in
+        // TransactionInfoV1's hot_state_checkpoint_hash field, which V0 lacks.
+        self.hot_state_root_in_txn_info = features.is_hot_state_root_in_txn_info_enabled()
+            && features.is_transaction_info_v1_enabled();
         // Requires transaction_info_v1 (the root rides in TransactionInfoV1) and
         // hotness_in_epilogue (only the V1 write-set format it enables serializes
         // the native-position extensions; V0 drops them, so output-replay would
@@ -185,6 +194,10 @@ impl BlockExecutorConfigFromOnchain {
 
     pub fn transaction_info_v1(&self) -> bool {
         self.transaction_info_v1
+    }
+
+    pub fn hot_state_root_in_txn_info(&self) -> bool {
+        self.hot_state_root_in_txn_info
     }
 
     pub fn compute_trading_native_state_roots(&self) -> bool {
