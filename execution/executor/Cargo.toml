@@ -41,6 +41,7 @@ aptos-transaction-tracing = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
+bon = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }

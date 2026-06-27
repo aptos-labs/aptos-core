@@ -19,7 +19,9 @@ pub struct StateCheckpointOutput {
     inner: Arc<DropHelper<Inner>>,
 }
 
+#[bon::bon]
 impl StateCheckpointOutput {
+    #[builder(finish_fn = build)]
     pub fn new(
         state_summary: LedgerStateSummary,
         state_checkpoint_hashes: Vec<Option<HashValue>>,

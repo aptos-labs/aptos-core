@@ -782,7 +782,13 @@ async fn test_fee_payer_storage_refund_attributes_to_fee_payer() {
     let (mint_changes, mut mint_events) =
         mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
 
-    let fee_statement = FeeStatement::new(178, 100, 50, 28, storage_refund);
+    let fee_statement = FeeStatement::builder()
+        .total_charge_gas_units(178)
+        .execution_gas_units(100)
+        .io_gas_units(50)
+        .storage_fee_octas(28)
+        .storage_fee_refund_octas(storage_refund)
+        .build();
     mint_events.push(
         fee_statement
             .create_event_v2()
@@ -859,7 +865,13 @@ async fn test_no_fee_payer_storage_refund_attributes_to_sender() {
     let (mint_changes, mut mint_events) =
         mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
 
-    let fee_statement = FeeStatement::new(178, 100, 50, 28, storage_refund);
+    let fee_statement = FeeStatement::builder()
+        .total_charge_gas_units(178)
+        .execution_gas_units(100)
+        .io_gas_units(50)
+        .storage_fee_octas(28)
+        .storage_fee_refund_octas(storage_refund)
+        .build();
     mint_events.push(
         fee_statement
             .create_event_v2()
@@ -943,7 +955,13 @@ async fn test_storage_refund_exceeds_gas_fee() {
     let (mint_changes, mut mint_events) =
         mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
 
-    let fee_statement = FeeStatement::new(gas_used, 100, 50, 28, storage_refund);
+    let fee_statement = FeeStatement::builder()
+        .total_charge_gas_units(gas_used)
+        .execution_gas_units(100)
+        .io_gas_units(50)
+        .storage_fee_octas(28)
+        .storage_fee_refund_octas(storage_refund)
+        .build();
     mint_events.push(
         fee_statement
             .create_event_v2()
