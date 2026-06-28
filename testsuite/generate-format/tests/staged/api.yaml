@@ -229,6 +229,10 @@ BlockMetadataExt:
       V2:
         NEWTYPE:
           TYPENAME: BlockMetadataWithRandAndDecKey
+    3:
+      V3:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandAndDecPayload
 BlockMetadataWithRandAndDecKey:
   STRUCT:
     - id:
@@ -247,6 +251,24 @@ BlockMetadataWithRandAndDecKey:
     - decryption_key:
         OPTION:
           TYPENAME: BlockTxnDecryptionKey
+BlockMetadataWithRandAndDecPayload:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
+    - decryption_payload:
+        OPTION:
+          TYPENAME: DecryptionPayload
 BlockMetadataWithRandomness:
   STRUCT:
     - id:
@@ -380,6 +402,11 @@ DecryptionFailureReason:
       TrustedSetupExhausted: UNIT
     9:
       ExecuteBlockLimitReached: UNIT
+DecryptionPayload:
+  STRUCT:
+    - key:
+        TYPENAME: BlockTxnDecryptionKey
+    - decryption_round: U64
 DepositEvent:
   STRUCT:
     - amount: U64
@@ -1068,7 +1095,7 @@ TransactionInfoV1:
     - auxiliary_info_hash:
         OPTION:
           TYPENAME: HashValue
-    - placeholder0:
+    - position_state_checkpoint_hash:
         OPTION:
           TYPENAME: HashValue
     - placeholder1:

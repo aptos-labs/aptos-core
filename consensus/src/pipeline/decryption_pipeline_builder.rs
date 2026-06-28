@@ -15,11 +15,13 @@ use aptos_batch_encryption::{
 use aptos_consensus_types::{
     block::Block,
     common::Author,
-    pipelined_block::{DecryptionResult, MaterializeResult, TaskFuture, TaskResult},
+    pipelined_block::{
+        DecryptionOutcome, DecryptionResult, MaterializeResult, TaskFuture, TaskResult,
+    },
 };
 use aptos_logger::{error, info, warn};
 use aptos_types::{
-    decryption::BlockTxnDecryptionKey,
+    decryption::{BlockTxnDecryptionKey, DecryptionPayload},
     secret_sharing::{
         Ciphertext, DecryptionKey, EvalProof, SecretShare, SecretShareConfig, SecretShareMetadata,
         SecretSharedKey,
@@ -68,6 +70,7 @@ impl PipelineBuilder {
     /// What it does: Decrypt encrypted transactions in the block
     pub(crate) async fn decrypt_encrypted_txns(
         materialize_fut: TaskFuture<MaterializeResult>,
+        parent_decrypt_fut: TaskFuture<DecryptionResult>,
         block: Arc<Block>,
         author: Author,
         is_decryption_enabled: bool,
@@ -79,6 +82,7 @@ impl PipelineBuilder {
     ) -> TaskResult<DecryptionResult> {
         let result = Self::decrypt_encrypted_txns_inner(
             materialize_fut,
+            parent_decrypt_fut,
             block,
             author,
             is_decryption_enabled,
@@ -103,6 +107,7 @@ impl PipelineBuilder {
 
     async fn decrypt_encrypted_txns_inner(
         materialize_fut: TaskFuture<MaterializeResult>,
+        parent_decrypt_fut: TaskFuture<DecryptionResult>,
         block: Arc<Block>,
         author: Author,
         is_decryption_enabled: bool,
@@ -114,6 +119,21 @@ impl PipelineBuilder {
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
         let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
+        // `chained_round` is the dense round THIS block would consume if it
+        // produces a key. It flows through from the parent unchanged; the +1
+        // lives in `key_outcome`, only on the path that actually produces a
+        // key. The chain is seeded per epoch by `build_root` from the
+        // on-chain `PerBlockDecryptionKeyV2` resource; `None` means the resource
+        // doesn't exist yet (legacy mode: digest keyed by consensus round,
+        // block emits V2 — identical to older binaries).
+        let parent_decrypt = parent_decrypt_fut.await?;
+        let chained_round = match &parent_decrypt.outcome {
+            DecryptionOutcome::RoundTracked {
+                next_decryption_round,
+                payload: _,
+            } => Some(*next_decryption_round),
+            DecryptionOutcome::Legacy(_) | DecryptionOutcome::Disabled => None,
+        };
         tracker.start_working();
 
         // Single partition point: split encrypted from regular transactions once
@@ -130,10 +150,11 @@ impl PipelineBuilder {
             );
             return Ok(DecryptionResult {
                 decrypted_txns: failed_txns,
+                retry_txns: Vec::new(),
                 regular_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
-                decryption_key: None,
+                outcome: DecryptionOutcome::Disabled,
             });
         }
 
@@ -152,10 +173,11 @@ impl PipelineBuilder {
                 );
                 return Ok(DecryptionResult {
                     decrypted_txns: failed_txns,
+                    retry_txns: Vec::new(),
                     regular_txns,
                     max_txns_from_block_to_execute,
                     block_gas_limit,
-                    decryption_key: Some(None),
+                    outcome: no_key_outcome(chained_round),
                 });
             }
 
@@ -166,6 +188,7 @@ impl PipelineBuilder {
                 observer_decrypted_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
+                chained_round,
             )
             .await;
         };
@@ -180,8 +203,37 @@ impl PipelineBuilder {
             secret_shared_key_rx,
             max_txns_from_block_to_execute,
             block_gas_limit,
+            chained_round,
         )
         .await
+    }
+}
+
+/// Outcome for a block that produced no key: the chained round (if any)
+/// passes through unchanged.
+fn no_key_outcome(chained_round: Option<u64>) -> DecryptionOutcome {
+    match chained_round {
+        None => DecryptionOutcome::Legacy(None),
+        Some(round) => DecryptionOutcome::RoundTracked {
+            next_decryption_round: round,
+            payload: None,
+        },
+    }
+}
+
+/// Outcome for a block that produced `key`: in round-tracked mode this block
+/// consumed `round`, so the next key-producing block's candidate is one
+/// higher.
+fn key_outcome(chained_round: Option<u64>, key: BlockTxnDecryptionKey) -> DecryptionOutcome {
+    match chained_round {
+        None => DecryptionOutcome::Legacy(Some(key)),
+        Some(round) => DecryptionOutcome::RoundTracked {
+            next_decryption_round: round + 1,
+            payload: Some(DecryptionPayload {
+                key,
+                decryption_round: round,
+            }),
+        },
     }
 }
 
@@ -194,6 +246,7 @@ async fn decrypt_observer_path(
     observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     max_txns_from_block_to_execute: Option<u64>,
     block_gas_limit: Option<u64>,
+    chained_round: Option<u64>,
 ) -> TaskResult<DecryptionResult> {
     let maybe_key = secret_shared_key_rx
         .await
@@ -208,12 +261,17 @@ async fn decrypt_observer_path(
 
     let decrypted_txns = observer_decrypted_txns.unwrap_or_default();
 
+    let outcome = match dec_key {
+        Some(key) => key_outcome(chained_round, key),
+        None => no_key_outcome(chained_round),
+    };
     Ok(DecryptionResult {
         decrypted_txns,
+        retry_txns: Vec::new(),
         regular_txns,
         max_txns_from_block_to_execute,
         block_gas_limit,
-        decryption_key: Some(dec_key),
+        outcome,
     })
 }
 
@@ -240,27 +298,36 @@ async fn decrypt_validator_path(
     secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
     max_txns_from_block_to_execute: Option<u64>,
     block_gas_limit: Option<u64>,
+    chained_round: Option<u64>,
 ) -> TaskResult<DecryptionResult> {
+    // The round that keys the digest. Round-tracked mode uses the dense
+    // counter chained from the parent; legacy mode (the on-chain resource
+    // doesn't exist yet) uses the consensus round, matching older binaries
+    // bit-for-bit so mixed validator sets derive identical digests.
+    let digest_round = chained_round.unwrap_or_else(|| block.round());
     // Short-circuit if no encrypted transactions: skip all crypto operations
     if encrypted_txns.is_empty() {
         let _ = derived_self_key_share_tx.send(None);
         return Ok(DecryptionResult {
             decrypted_txns: Vec::new(),
+            retry_txns: Vec::new(),
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            decryption_key: Some(None),
+            outcome: no_key_outcome(chained_round),
         });
     }
 
-    // Trusted setup capacity is fixed for the epoch. Once block.round() reaches
-    // num_rounds, no further encrypted txns can be decrypted in this epoch —
-    // mark them all as TrustedSetupExhausted (non-retryable in-epoch).
+    // Trusted setup capacity check. In round-tracked mode the dense counter
+    // is compared, so empty blocks no longer consume capacity; legacy mode
+    // still burns one slot per consensus round.
     let num_rounds = secret_share_config.digest_key().num_rounds();
-    if block.round() >= num_rounds as u64 {
+    counters::TRUSTED_SETUP_NUM_ROUNDS.set(num_rounds as i64);
+    if digest_round >= num_rounds as u64 {
         error!(
-            "Block round {} >= trusted setup num_rounds {}; marking {} encrypted txns as TrustedSetupExhausted",
+            "Block round {} digest_round {} >= trusted setup num_rounds {}; marking {} encrypted txns as TrustedSetupExhausted",
             block.round(),
+            digest_round,
             num_rounds,
             encrypted_txns.len()
         );
@@ -271,10 +338,11 @@ async fn decrypt_validator_path(
         );
         return Ok(DecryptionResult {
             decrypted_txns: failed_txns,
+            retry_txns: Vec::new(),
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            decryption_key: Some(None),
+            outcome: no_key_outcome(chained_round),
         });
     }
 
@@ -288,14 +356,15 @@ async fn decrypt_validator_path(
             encrypted_txns.len()
         );
         let _ = derived_self_key_share_tx.send(None);
-        let failed_txns =
+        let retry_txns =
             mark_txns_failed_decryption(encrypted_txns, DecryptionFailureReason::EpochEndRetry);
         return Ok(DecryptionResult {
-            decrypted_txns: failed_txns,
+            decrypted_txns: Vec::new(),
+            retry_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            decryption_key: Some(None),
+            outcome: no_key_outcome(chained_round),
         });
     }
 
@@ -344,13 +413,14 @@ async fn decrypt_validator_path(
     // If the cap left no encrypted txns to decrypt, short-circuit before crypto.
     if encrypted_txns.is_empty() {
         let _ = derived_self_key_share_tx.send(None);
-        let decrypted_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
+        let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
-            decrypted_txns,
+            decrypted_txns: Vec::new(),
+            retry_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            decryption_key: Some(None),
+            outcome: no_key_outcome(chained_round),
         });
     }
 
@@ -366,15 +436,13 @@ async fn decrypt_validator_path(
         })
         .collect();
 
-    // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
-    // Safe: TrustedSetupExhausted check above guarantees block.round() < num_rounds.
-    let encryption_round = block.round();
+    // Safe: TrustedSetupExhausted check above guarantees digest_round < num_rounds.
     let digest_key = secret_share_config.digest_key_arc();
     let (txn_ciphertexts, digest, proofs_promise) = tokio::task::spawn_blocking(move || {
         monitor!(
             "decryption_digest",
             DIGEST_POOL.install(|| {
-                FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)
+                FPTXWeighted::digest(&digest_key, &txn_ciphertexts, digest_round)
                     .map(|(digest, proofs_promise)| (txn_ciphertexts, digest, proofs_promise))
             })
         )
@@ -482,18 +550,14 @@ async fn decrypt_validator_path(
                 )
             })
             .collect();
-        let decrypted_txns = [
-            failed_txns,
-            batch_limit_exceeded_txns,
-            execute_limit_exceeded_txns,
-        ]
-        .concat();
+        let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
-            decrypted_txns,
+            decrypted_txns: failed_txns,
+            retry_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            decryption_key: Some(None),
+            outcome: no_key_outcome(chained_round),
         });
     };
 
@@ -582,22 +646,25 @@ async fn decrypt_validator_path(
         execute_limit_exceeded_txns.len(),
         regular_txns.len(),
     );
-    let decrypted_txns = [
-        decrypted_txns,
-        batch_limit_exceeded_txns,
-        execute_limit_exceeded_txns,
-    ]
-    .concat();
+    let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
 
     let block_txn_dec_key = BlockTxnDecryptionKey::from_secret_shared_key(&decryption_key)
         .context("Decryption key serialization failed")?;
 
+    // This block produced a key, consuming `digest_round`. In round-tracked
+    // mode that's the dense decryption round; track it so capacity headroom
+    // (`TRUSTED_SETUP_NUM_ROUNDS - DECRYPTION_ROUND`) is observable.
+    if chained_round.is_some() {
+        counters::DECRYPTION_ROUND.set(digest_round as i64);
+    }
+
     Ok(DecryptionResult {
         decrypted_txns,
+        retry_txns,
         regular_txns,
         max_txns_from_block_to_execute,
         block_gas_limit,
-        decryption_key: Some(Some(block_txn_dec_key)),
+        outcome: key_outcome(chained_round, block_txn_dec_key),
     })
 }
 
@@ -614,7 +681,10 @@ fn record_decryption_metrics(result: &DecryptionResult) {
     let mut trusted_setup_exhausted = 0u64;
     let mut entry_fun_mismatch = 0u64;
 
-    for txn in &result.decrypted_txns {
+    // retry_txns hold the retryable failures (batch/execute-limit, epoch-end);
+    // chain them in so their reason counters stay accurate now that they no
+    // longer live in decrypted_txns.
+    for txn in result.decrypted_txns.iter().chain(result.retry_txns.iter()) {
         let Some(ep) = txn.payload().as_encrypted_payload() else {
             continue;
         };
@@ -861,6 +931,32 @@ mod tests {
         .shared()
     }
 
+    fn tracked_no_key(round: u64) -> DecryptionOutcome {
+        DecryptionOutcome::RoundTracked {
+            next_decryption_round: round,
+            payload: None,
+        }
+    }
+
+    fn parent_decrypt_ok(decryption_round: u64) -> TaskFuture<DecryptionResult> {
+        parent_decrypt_with_outcome(tracked_no_key(decryption_round))
+    }
+
+    fn parent_decrypt_with_outcome(outcome: DecryptionOutcome) -> TaskFuture<DecryptionResult> {
+        async move {
+            Ok(DecryptionResult {
+                decrypted_txns: Vec::new(),
+                retry_txns: Vec::new(),
+                regular_txns: Vec::new(),
+                max_txns_from_block_to_execute: None,
+                block_gas_limit: None,
+                outcome,
+            })
+        }
+        .boxed()
+        .shared()
+    }
+
     fn assert_failed_with(txn: &SignedTransaction, expected: &DecryptionFailureReason) {
         match txn
             .payload()
@@ -978,24 +1074,27 @@ mod tests {
             .collect();
 
         // One txn per FailedDecryption variant + one Decrypted + two regular.
+        // The retryable reasons live in retry_txns; metrics must count both vecs.
         let result = DecryptionResult {
             decrypted_txns: vec![
                 make_decrypted_txn(),
                 make_failed_decryption_txn(DecryptionFailureReason::CryptoFailure),
-                make_failed_decryption_txn(DecryptionFailureReason::BatchLimitReached),
                 make_failed_decryption_txn(DecryptionFailureReason::ConfigUnavailable),
                 make_failed_decryption_txn(DecryptionFailureReason::DecryptionKeyUnavailable),
                 make_failed_decryption_txn(DecryptionFailureReason::PayloadHashMismatch),
                 make_failed_decryption_txn(DecryptionFailureReason::EpochMismatch),
-                make_failed_decryption_txn(DecryptionFailureReason::EpochEndRetry),
                 make_failed_decryption_txn(DecryptionFailureReason::ClaimedEntryFunctionMismatch),
-                make_failed_decryption_txn(DecryptionFailureReason::ExecuteBlockLimitReached),
                 make_failed_decryption_txn(DecryptionFailureReason::TrustedSetupExhausted),
+            ],
+            retry_txns: vec![
+                make_failed_decryption_txn(DecryptionFailureReason::BatchLimitReached),
+                make_failed_decryption_txn(DecryptionFailureReason::EpochEndRetry),
+                make_failed_decryption_txn(DecryptionFailureReason::ExecuteBlockLimitReached),
             ],
             regular_txns: vec![make_regular_txn(), make_regular_txn()],
             max_txns_from_block_to_execute: None,
             block_gas_limit: None,
-            decryption_key: Some(None),
+            outcome: DecryptionOutcome::Disabled,
         };
         record_decryption_metrics(&result);
 
@@ -1030,6 +1129,7 @@ mod tests {
 
         let result = PipelineBuilder::decrypt_encrypted_txns_inner(
             materialize_ok(input),
+            parent_decrypt_ok(0),
             make_block(None),
             AccountAddress::random(),
             false, // is_decryption_enabled
@@ -1047,7 +1147,7 @@ mod tests {
             assert_failed_with(txn, &DecryptionFailureReason::ConfigUnavailable);
         }
         assert_eq!(result.regular_txns.len(), 1);
-        assert_eq!(result.decryption_key, None);
+        assert_eq!(result.outcome, DecryptionOutcome::Disabled);
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
@@ -1063,6 +1163,7 @@ mod tests {
 
         let result = PipelineBuilder::decrypt_encrypted_txns_inner(
             materialize_ok(input),
+            parent_decrypt_ok(0),
             make_block(None),
             AccountAddress::random(),
             true,
@@ -1081,7 +1182,7 @@ mod tests {
             &DecryptionFailureReason::ConfigUnavailable,
         );
         assert_eq!(result.regular_txns.len(), 1);
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
@@ -1100,6 +1201,7 @@ mod tests {
 
         let result = PipelineBuilder::decrypt_encrypted_txns_inner(
             materialize_ok(input),
+            parent_decrypt_ok(0),
             make_block(None),
             AccountAddress::random(),
             true,
@@ -1122,7 +1224,7 @@ mod tests {
                 .unwrap(),
             EncryptedPayload::Decrypted { .. }
         ));
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
     }
 
     #[tokio::test]
@@ -1132,6 +1234,7 @@ mod tests {
 
         let err = PipelineBuilder::decrypt_encrypted_txns_inner(
             materialize_err(),
+            parent_decrypt_ok(0),
             make_block(None),
             AccountAddress::random(),
             true,
@@ -1169,12 +1272,16 @@ mod tests {
             Some(observer_decrypted.clone()),
             None,
             None,
+            Some(0),
         )
         .await
         .expect("should succeed");
 
         assert_eq!(result.decrypted_txns.len(), 2);
-        assert!(matches!(result.decryption_key, Some(Some(_))));
+        assert!(matches!(result.outcome, DecryptionOutcome::RoundTracked {
+            next_decryption_round: 1,
+            payload: Some(_),
+        }));
         assert_eq!(result.regular_txns.len(), 1);
     }
 
@@ -1191,12 +1298,13 @@ mod tests {
             Some(observer_decrypted.clone()),
             None,
             None,
+            Some(0),
         )
         .await
         .expect("should succeed");
 
         assert_eq!(result.decrypted_txns.len(), 1);
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
     }
 
     #[tokio::test]
@@ -1204,12 +1312,12 @@ mod tests {
         let (skey_tx, skey_rx) = oneshot::channel();
         skey_tx.send(None).unwrap();
 
-        let result = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None)
+        let result = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None, Some(0))
             .await
             .expect("should succeed");
 
         assert!(result.decrypted_txns.is_empty());
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
     }
 
     #[tokio::test]
@@ -1217,7 +1325,7 @@ mod tests {
         let (skey_tx, skey_rx) = oneshot::channel::<Option<SecretSharedKey>>();
         drop(skey_tx);
 
-        let err = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None)
+        let err = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None, Some(0))
             .await
             .expect_err("should error");
         assert!(format!("{}", err).contains("secret_shared_key_rx dropped"));
@@ -1229,9 +1337,10 @@ mod tests {
         let (skey_tx, skey_rx) = oneshot::channel();
         skey_tx.send(None).unwrap();
 
-        let result = decrypt_observer_path(vec![], regular.clone(), skey_rx, None, None, None)
-            .await
-            .expect("should succeed");
+        let result =
+            decrypt_observer_path(vec![], regular.clone(), skey_rx, None, None, None, Some(0))
+                .await
+                .expect("should succeed");
 
         assert_eq!(result.regular_txns.len(), regular.len());
     }
@@ -1257,19 +1366,20 @@ mod tests {
             skey_rx,
             None,
             None,
+            Some(0),
         )
         .await
         .expect("should succeed");
 
         assert!(result.decrypted_txns.is_empty());
         assert_eq!(result.regular_txns.len(), 1);
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn validator_path_dkg_result_vtxn_marks_all_epoch_end_retry() {
-        // num_rounds=2 so block.round()=1 doesn't trigger TrustedSetupExhausted.
+        // num_rounds=2 so decryption_round=0 doesn't trigger TrustedSetupExhausted.
         let ctx = TestContext::new_with_capacity(vec![100], 1, 2);
         let block = make_block(Some(vec![dkg_vtxn()]));
         let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
@@ -1288,22 +1398,24 @@ mod tests {
             skey_rx,
             None,
             None,
+            Some(0),
         )
         .await
         .expect("should succeed");
 
-        assert_eq!(result.decrypted_txns.len(), 2);
-        for txn in &result.decrypted_txns {
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.retry_txns.len(), 2);
+        for txn in &result.retry_txns {
             assert_failed_with(txn, &DecryptionFailureReason::EpochEndRetry);
         }
         assert_eq!(result.regular_txns.len(), 1);
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn validator_path_chunky_dkg_result_vtxn_marks_all_epoch_end_retry() {
-        // num_rounds=2 so block.round()=1 doesn't trigger TrustedSetupExhausted.
+        // num_rounds=2 so decryption_round=0 doesn't trigger TrustedSetupExhausted.
         let ctx = TestContext::new_with_capacity(vec![100], 1, 2);
         let block = make_block(Some(vec![chunky_dkg_vtxn()]));
         let encrypted = vec![make_encrypted_txn()];
@@ -1321,29 +1433,30 @@ mod tests {
             skey_rx,
             None,
             None,
+            Some(0),
         )
         .await
         .expect("should succeed");
 
-        assert_eq!(result.decrypted_txns.len(), 1);
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.retry_txns.len(), 1);
         assert_failed_with(
-            &result.decrypted_txns[0],
+            &result.retry_txns[0],
             &DecryptionFailureReason::EpochEndRetry,
         );
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn validator_path_round_exceeds_num_rounds_marks_trusted_setup_exhausted() {
-        // TestContext::new uses num_rounds=1; make_block uses round=1, so the
-        // round check fires. Setting max_txns_from_block_to_execute=Some(0)
+        // TestContext::new uses num_rounds=1; pass decryption_round=1 to fire
+        // the trusted-setup check. Setting max_txns_from_block_to_execute=Some(0)
         // also verifies that TrustedSetupExhausted takes precedence over
-        // ExecuteBlockLimitReached. (See the dkg-vtxn precedence test below
-        // for precedence over EpochEndRetry.)
+        // ExecuteBlockLimitReached.
         let ctx = TestContext::new(vec![100]);
         let block = make_block(None);
-        assert!(block.round() >= ctx.secret_share_config.digest_key().num_rounds() as u64);
+        let num_rounds = ctx.secret_share_config.digest_key().num_rounds() as u64;
         let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
         let regular = vec![make_regular_txn()];
 
@@ -1360,6 +1473,7 @@ mod tests {
             skey_rx,
             Some(0),
             None,
+            Some(num_rounds),
         )
         .await
         .expect("should succeed");
@@ -1369,17 +1483,17 @@ mod tests {
             assert_failed_with(txn, &DecryptionFailureReason::TrustedSetupExhausted);
         }
         assert_eq!(result.regular_txns.len(), 1);
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(num_rounds));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn validator_path_trusted_setup_exhausted_wins_over_epoch_end_retry() {
-        // Both `block.round() >= num_rounds` and a DKG vtxn are present;
+        // Both decryption_round >= num_rounds and a DKG vtxn are present;
         // TrustedSetupExhausted should win since it's checked first.
         let ctx = TestContext::new(vec![100]);
         let block = make_block(Some(vec![dkg_vtxn()]));
-        assert!(block.round() >= ctx.secret_share_config.digest_key().num_rounds() as u64);
+        let num_rounds = ctx.secret_share_config.digest_key().num_rounds() as u64;
         let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
 
         let (key_share_tx, key_share_rx) = oneshot::channel();
@@ -1395,6 +1509,7 @@ mod tests {
             skey_rx,
             None,
             None,
+            Some(num_rounds),
         )
         .await
         .expect("should succeed");
@@ -1403,7 +1518,7 @@ mod tests {
         for txn in &result.decrypted_txns {
             assert_failed_with(txn, &DecryptionFailureReason::TrustedSetupExhausted);
         }
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(num_rounds));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 
@@ -1436,16 +1551,182 @@ mod tests {
             skey_rx,
             Some(0),
             None,
+            Some(0),
         )
         .await
         .expect("should succeed");
 
-        assert_eq!(result.decrypted_txns.len(), 3);
-        for txn in &result.decrypted_txns {
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.retry_txns.len(), 3);
+        for txn in &result.retry_txns {
             assert_failed_with(txn, &DecryptionFailureReason::ExecuteBlockLimitReached);
         }
         assert_eq!(result.regular_txns.len(), 1);
-        assert_eq!(result.decryption_key, Some(None));
+        assert_eq!(result.outcome, tracked_no_key(0));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_batch_limit_marks_excess_as_retry() {
+        // max_batch_size=2 fires the batch limit; max_txns=0 caps the remainder,
+        // keeping the path on the pre-crypto short-circuit. Both the batch-limit
+        // and execute-limit excess must land in retry_txns (not decrypted_txns).
+        let ctx = TestContext::new_with_capacity(vec![100], 2, 2);
+        let block = make_block(None);
+        let encrypted = vec![
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+        ];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            vec![],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            Some(0),
+            None,
+            Some(0),
+        )
+        .await
+        .expect("should succeed");
+
+        assert!(result.decrypted_txns.is_empty());
+        // 2 over the batch limit + 2 over the execute limit, all re-queued.
+        assert_eq!(result.retry_txns.len(), 4);
+        let batch_limited = result
+            .retry_txns
+            .iter()
+            .filter(|txn| {
+                matches!(
+                    txn.payload().as_encrypted_payload(),
+                    Some(EncryptedPayload::FailedDecryption {
+                        reason: DecryptionFailureReason::BatchLimitReached,
+                        ..
+                    })
+                )
+            })
+            .count();
+        assert_eq!(batch_limited, 2);
+        assert_eq!(result.outcome, tracked_no_key(0));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    // ---------- legacy mode (no on-chain PerBlockDecryptionKeyV2 resource) ----------
+
+    #[tokio::test]
+    async fn routing_legacy_parent_keeps_legacy_mode() {
+        let encrypted = vec![make_encrypted_txn()];
+        let mut input = encrypted.clone();
+        input.push(make_regular_txn());
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = PipelineBuilder::decrypt_encrypted_txns_inner(
+            materialize_ok(input),
+            parent_decrypt_with_outcome(DecryptionOutcome::Legacy(None)),
+            make_block(None),
+            AccountAddress::random(),
+            true,
+            None, // maybe_secret_share_config
+            key_share_tx,
+            skey_rx,
+            false, // observer_enabled
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.outcome, DecryptionOutcome::Legacy(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn observer_legacy_with_key_emits_legacy_key() {
+        let ctx = TestContext::new(vec![100]);
+        let metadata = crate::rand::secret_sharing::test_utils::create_metadata(1, 1);
+        let key =
+            crate::rand::secret_sharing::test_utils::create_secret_shared_key(&ctx, &metadata);
+
+        let (skey_tx, skey_rx) = oneshot::channel();
+        skey_tx.send(Some(key)).unwrap();
+
+        let result = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None, None)
+            .await
+            .expect("should succeed");
+
+        assert!(matches!(result.outcome, DecryptionOutcome::Legacy(Some(_))));
+    }
+
+    #[tokio::test]
+    async fn validator_path_legacy_capacity_check_uses_consensus_round() {
+        // num_rounds=1 and the block's consensus round is 1: in legacy mode
+        // the digest is keyed by the consensus round, so the trusted-setup
+        // check fires even though no dense round was ever consumed.
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(None);
+        assert_eq!(block.round(), 1);
+        let encrypted = vec![make_encrypted_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            vec![],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+            None, // legacy: no chained round
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 1);
+        assert_failed_with(
+            &result.decrypted_txns[0],
+            &DecryptionFailureReason::TrustedSetupExhausted,
+        );
+        assert_eq!(result.outcome, DecryptionOutcome::Legacy(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_legacy_empty_encrypted_short_circuits() {
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(None);
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            vec![],
+            vec![make_regular_txn()],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+            None, // legacy: no chained round
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.outcome, DecryptionOutcome::Legacy(None));
         assert!(key_share_rx.await.unwrap().is_none());
     }
 }

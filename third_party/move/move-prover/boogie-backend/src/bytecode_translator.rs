@@ -718,6 +718,14 @@ impl<'env> BoogieTranslator<'env> {
                 if pos > 0 {
                     emit!(self.writer, ", ")
                 }
+                // Captured immutable references are plain values in the prover,
+                // consistent with the elimination of immutable references in the
+                // bytecode pipeline (both at pack sites and in function signatures).
+                let captured_ty = if captured_ty.is_immutable_reference() {
+                    captured_ty.skip_reference()
+                } else {
+                    captured_ty
+                };
                 emit!(
                     self.writer,
                     "p{}_v{}: {}",

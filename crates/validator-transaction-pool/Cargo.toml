@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+fuzzing = []
+
 [dependencies]
 aptos-channels = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -22,6 +25,3 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
-
-[features]
-fuzzing = []

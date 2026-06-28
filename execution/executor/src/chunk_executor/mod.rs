@@ -24,7 +24,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state::State, state_summary::ProvableStateSummary,
+        state::State,
+        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
@@ -362,7 +363,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     pub fn update_ledger(&self) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger_total"]);
 
-        let (parent_state_summary, parent_accumulator, chunk) =
+        let (parent_state_summary, parent_position_state_summary, parent_accumulator, chunk) =
             self.commit_queue.lock().next_chunk_to_update_ledger()?;
         let ChunkToUpdateLedger {
             output,
@@ -376,19 +377,40 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 .map(|t| t.state_checkpoint_hash())
                 .collect_vec(),
         );
-        let known_hot_state_checkpoints = output.execution_output.transaction_info_v1.then(|| {
+        let known_hot_state_checkpoints =
+            output.execution_output.hot_state_root_in_txn_info.then(|| {
+                txn_infos
+                    .iter()
+                    .map(|t| t.hot_state_checkpoint_hash())
+                    .collect_vec()
+            });
+        let compute_trading_native_state_roots =
+            output.execution_output.compute_trading_native_state_roots;
+        let known_position_state_checkpoints = compute_trading_native_state_roots.then(|| {
             txn_infos
                 .iter()
-                .map(|t| t.hot_state_checkpoint_hash())
+                .map(|t| t.position_state_checkpoint_hash())
                 .collect_vec()
         });
-        let state_checkpoint_output = DoStateCheckpoint::run(
-            &output.execution_output,
-            &parent_state_summary,
-            &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
-            known_state_checkpoints,
-            known_hot_state_checkpoints,
-        )?;
+        let position_persisted = compute_trading_native_state_roots
+            .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+            .transpose()?;
+        let state_checkpoint_output = DoStateCheckpoint::run()
+            .execution_output(&output.execution_output)
+            .parent_state_summary(&parent_state_summary)
+            .persisted_state_summary(&ProvableStateSummary::new_persisted(
+                self.db.reader.as_ref(),
+            )?)
+            .maybe_known_state_checkpoints(known_state_checkpoints)
+            .maybe_known_hot_state_checkpoints(known_hot_state_checkpoints)
+            // Parent position summary is chained across chunks by the commit
+            // queue (seeded from the pre-committed position tip); the persisted
+            // base supplies cold-key proofs. The known-hash check validates the
+            // computed root against the committed TransactionInfos.
+            .maybe_parent_position_state_summary(parent_position_state_summary.as_ref())
+            .maybe_persisted_position_state_summary(position_persisted.as_ref())
+            .maybe_known_position_state_checkpoints(known_position_state_checkpoints)
+            .build()?;
 
         let ledger_update_output = DoLedgerUpdate::run(
             &output.execution_output,

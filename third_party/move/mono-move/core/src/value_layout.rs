@@ -15,10 +15,9 @@
 //! are deep and built on demand. They meet at one point: a [`LayoutKind::Vector`]
 //! carries the [`DescriptorId`] so that deserialization can add it to the value
 //! header.
-//! TODO: We will need descriptor IDs for non-inline structs and enums later.
 
 use crate::{
-    types::{view_type, InternedType, InternedTypeList, Type},
+    types::{intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type},
     DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
@@ -55,6 +54,12 @@ bitflags! {
         /// This value has no heap pointers and no padding. That is, it can be
         /// serialized in one `memcpy` and compared for equality with `memcmp`.
         const NO_POINTERS_NO_PADDING = 0b0000_0001;
+        /// Every byte pattern of this value's in-memory image is a valid value,
+        /// so deserialization needs no per-byte validation and can copy the BCS
+        /// bytes in one `memcpy`. Holds for integers and addresses but not for
+        /// `bool` (only `0`/`1` are canonical). An aggregate has this flag only
+        /// when it has no padding, no pointers, and no `bool` reachable.
+        const ALL_BYTE_PATTERNS_VALID = 0b0000_0010;
     }
 }
 
@@ -91,7 +96,7 @@ pub enum LayoutKind {
     /// An `address` or `signer` (32 bytes).
     Address,
     /// An inline struct: fields laid out flat in the parent's payload.
-    /// TODO: for non-inline structs, we need a descriptor ID.
+    /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
     Struct {
         /// Byte offsets and IDs of each field within the struct payload.
         fields: Box<[FieldValueLayout]>,
@@ -103,12 +108,19 @@ pub enum LayoutKind {
         elem_id: LayoutId,
         descriptor_id: DescriptorId,
     },
-    /// An enum whose variants are resolved lazily on every walk (upgradable).
-    /// TODO: not yet implemented; the walks error on this kind.
-    /// TODO: add closed enum (for framework, frozen ones)
-    OpenEnum {
-        ty: InternedType,
-        ty_args: InternedTypeList,
+    /// An enum whose variant layouts are fixed: an 8-byte heap-pointer slot
+    /// pointing at an enum object. Each variant body has its own published
+    /// layout, which may itself contain enums, vectors, or structs.
+    ///
+    /// TODO(completeness): revisit with upgrade story, might not need to be frozen.
+    FrozenEnum {
+        descriptor_id: DescriptorId,
+        /// One layout per variant body, indexed by variant tag.
+        variants: Box<[LayoutId]>,
+        /// Size of the enum object's data region: the 8-byte tag plus the
+        /// widest variant body, rounded up to 8-byte alignment. Sized to the
+        /// largest variant so any variant fits.
+        max_size_across_variants: u32,
     },
     /// A reference (16-byte fat pointer). All references share this layout.
     Ref,
@@ -143,6 +155,13 @@ impl ValueLayout {
     /// Returns true if a value of this layout has no padding and no pointers.
     pub fn has_no_pointers_no_padding(&self) -> bool {
         self.flags.contains(LayoutFlags::NO_POINTERS_NO_PADDING)
+    }
+
+    /// Returns true if every byte pattern of this value's in-memory size is a
+    /// valid value, so deserialization can blit the BCS bytes without per-byte
+    /// validation. False for anything that reaches a `bool`.
+    pub fn all_byte_patterns_valid(&self) -> bool {
+        self.flags.contains(LayoutFlags::ALL_BYTE_PATTERNS_VALID)
     }
 
     /// The fixed BCS size of a value of this type, or [`None`] when
@@ -228,7 +247,7 @@ impl ValueLayout {
             size: 32,
             align: MAX_ALIGN as u32,
             fixed_bcs_size: Some(32),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::Address,
         }
     }
@@ -293,14 +312,22 @@ impl ValueLayout {
         }
     }
 
-    /// Layout for an open enum.
-    pub fn open_enum(ty: InternedType, ty_args: InternedTypeList) -> ValueLayout {
+    /// Layout for a frozen enum.
+    pub fn frozen_enum(
+        descriptor_id: DescriptorId,
+        variants: Box<[LayoutId]>,
+        max_size_across_variants: u32,
+    ) -> ValueLayout {
         Self {
             size: 8,
             align: MAX_ALIGN as u32,
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
-            kind: LayoutKind::OpenEnum { ty, ty_args },
+            kind: LayoutKind::FrozenEnum {
+                descriptor_id,
+                variants,
+                max_size_across_variants,
+            },
         }
     }
 
@@ -309,7 +336,7 @@ impl ValueLayout {
             size,
             align,
             fixed_bcs_size: Some(size),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::UnsignedInt,
         }
     }
@@ -319,7 +346,7 @@ impl ValueLayout {
             size,
             align,
             fixed_bcs_size: Some(size),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::SignedInt,
         }
     }
@@ -449,9 +476,35 @@ pub trait LayoutProvider {
         let id = self.layout_id(ty)?;
         self.layout(id)
     }
+
+    /// In-memory size and alignment of a value of type `ty`. Intrinsic shapes
+    /// (primitives, references, vectors, functions) resolve without the table;
+    /// nominal types resolve through their published [`ValueLayout`]. Returns
+    /// [`None`] for unresolved type parameters and for nominals whose layout
+    /// has not been published yet.
+    fn size_and_align(&self, ty: InternedType) -> Option<(Size, Alignment)> {
+        intrinsic_slot_size_and_align(view_type(ty))
+            .or_else(|| self.layout_by_ty(ty).map(|l| (l.size, l.align)))
+    }
 }
 
-// TODO: Test-only, remove when local execution context is refactored and removed.
+/// A `LayoutProvider` with no layouts; every lookup returns `None`.
+pub struct NoLayoutProvider;
+
+/// Shared `NoLayoutProvider` instance.
+pub static NO_LAYOUT_PROVIDER: NoLayoutProvider = NoLayoutProvider;
+
+impl LayoutProvider for NoLayoutProvider {
+    fn layout(&self, _id: LayoutId) -> Option<&ValueLayout> {
+        None
+    }
+
+    fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
+        None
+    }
+}
+
+// TODO(testing): Test-only, remove when local execution context is refactored and removed.
 pub struct ValueLayoutTable {
     table: Vec<ValueLayout>,
     by_ty: HashMap<InternedType, LayoutId>,

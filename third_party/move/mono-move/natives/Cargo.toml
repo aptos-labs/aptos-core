@@ -14,3 +14,10 @@ rust-version = { workspace = true }
 [dependencies]
 mono-move-core = { workspace = true }
 move-core-types = { workspace = true }
+
+blake2-rfc = { workspace = true }
+ripemd = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+siphasher = { workspace = true }
+tiny-keccak = { workspace = true }

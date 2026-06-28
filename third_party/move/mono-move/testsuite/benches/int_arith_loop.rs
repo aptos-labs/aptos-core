@@ -30,10 +30,10 @@ fn bench_int_arith_loop(c: &mut Criterion) {
             .warm_up_time(std::time::Duration::from_secs(1))
             .measurement_time(std::time::Duration::from_secs(3));
 
-        group.bench_function("native/u64", |b| {
+        group.bench_function("native_u64", |b| {
             b.iter(|| black_box(native_u64_loop(ITERS)));
         });
-        group.bench_function("native/i64", |b| {
+        group.bench_function("native_i64", |b| {
             b.iter(|| black_box(native_i64_loop(ITERS)));
         });
 
@@ -44,7 +44,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
             IdentStr::new("int_arith_loop").unwrap(),
             IdentStr::new("u64_loop").unwrap(),
             |runner| {
-                group.bench_function("mono/u64", |b| {
+                group.bench_function("mono_u64", |b| {
                     b.iter(|| black_box(runner.call_words(&[ITERS]).unwrap()));
                 });
             },
@@ -57,7 +57,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
             IdentStr::new("int_arith_loop").unwrap(),
             IdentStr::new("i64_loop").unwrap(),
             |runner| {
-                group.bench_function("mono/i64", |b| {
+                group.bench_function("mono_i64", |b| {
                     // Same 8 bytes; reinterpret as i64.
                     b.iter(|| black_box(runner.call_words(&[ITERS]).unwrap() as i64));
                 });
@@ -78,7 +78,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
 
         let module = move_bytecode_int_arith_loop();
         testing::with_loaded_move_function(&module, "u64_loop", |env| {
-            group.bench_function("move_vm/u64", |b| {
+            group.bench_function("move_vm_u64", |b| {
                 b.iter(|| {
                     let result = env.run(vec![testing::arg_u64(ITERS)]);
                     black_box(testing::return_u64(&result))
@@ -86,7 +86,7 @@ fn bench_int_arith_loop(c: &mut Criterion) {
             });
         });
         testing::with_loaded_move_function(&module, "i64_loop", |env| {
-            group.bench_function("move_vm/i64", |b| {
+            group.bench_function("move_vm_i64", |b| {
                 b.iter(|| {
                     let result = env.run(vec![testing::arg_u64(ITERS)]);
                     black_box(testing::return_i64(&result))

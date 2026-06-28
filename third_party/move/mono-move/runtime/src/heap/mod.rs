@@ -4,13 +4,12 @@
 //! Bump-allocated heap with a copying garbage collector (Cheney's algorithm).
 //!
 //! Exposed as free functions taking explicit parameters (heap, descriptors,
-//! pinned roots, root-walk state). This keeps the borrow surface narrow —
-//! callers in the interpreter can hold auxiliary borrows (e.g. a `PinGuard`
-//! into [`PinnedRoots`]) while still invoking allocation paths that mutate
-//! only the heap.
+//! root pool, root-walk state). This keeps the borrow surface narrow —
+//! callers in the interpreter can hold auxiliary borrows (e.g. a handle into
+//! the [`RootPool`]) while still invoking allocation paths that mutate only the
+//! heap.
 
 mod deep_copy;
-pub(crate) mod pinned_roots;
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
@@ -26,11 +25,13 @@ use crate::{
     },
 };
 use mono_move_core::{
-    align_max, checked_align_max, DescriptorId, DescriptorProvider, FrameOffset, Function,
-    ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
-    CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    align_max, checked_align_max,
+    native::{NativeABI, NativeExtensions},
+    types::InternedType,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
+    RootPool, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
+    ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
-use pinned_roots::PinnedRoots;
 use std::ptr::NonNull;
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ use std::ptr::NonNull;
 ///
 /// Each macro forwards to an eponymous free function, unpacking the fields
 /// of an `InterpreterContext` binding (`heap`, `descriptors`,
-/// `pinned_roots`, `current_func`, `pc`, `frame_ptr`) as individual
+/// `root_pool`, `current_func`, `pc`, `frame_ptr`) as individual
 /// arguments.
 ///
 /// ```ignore
@@ -52,8 +53,8 @@ use std::ptr::NonNull;
 ///
 /// Rust lacks partial-borrow syntax: a method on `InterpreterContext` that
 /// mutates `heap` would borrow `self` as `&mut`, conflicting with any
-/// outstanding borrow of an unrelated field (e.g. a `PinGuard` that holds
-/// `&self.pinned_roots`). Spelling out the individual field borrows at the
+/// outstanding borrow of an unrelated field (e.g. a root handle that holds
+/// `&self.root_pool`). Spelling out the individual field borrows at the
 /// call site lets the compiler see that the borrows are disjoint. The
 /// macro hides that boilerplate while preserving the field-level borrow
 /// granularity.
@@ -70,10 +71,13 @@ pub(crate) mod macros {
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
-                $ctx.current_func,
-                $ctx.pc,
+                $crate::heap::TopFrame::Function {
+                    func: $ctx.current_func,
+                    pc: $ctx.pc,
+                },
                 $descriptor_id,
             )
         };
@@ -94,10 +98,13 @@ pub(crate) mod macros {
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
-                $ctx.current_func,
-                $ctx.pc,
+                $crate::heap::TopFrame::Function {
+                    func: $ctx.current_func,
+                    pc: $ctx.pc,
+                },
                 $descriptor_id,
                 $elem_size,
                 $capacity_in_elems,
@@ -114,10 +121,13 @@ pub(crate) mod macros {
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
-                $ctx.current_func,
-                $ctx.pc,
+                $crate::heap::TopFrame::Function {
+                    func: $ctx.current_func,
+                    pc: $ctx.pc,
+                },
                 $values_size,
                 $descriptor_id,
             )
@@ -139,9 +149,12 @@ pub(crate) mod macros {
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
-                $ctx.current_func,
-                $ctx.pc,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
+                $crate::heap::TopFrame::Function {
+                    func: $ctx.current_func,
+                    pc: $ctx.pc,
+                },
                 $fp,
                 $vec_ref_offset,
                 $elem_size,
@@ -158,10 +171,13 @@ pub(crate) mod macros {
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
                 &mut $ctx.read_write_set,
-                &$ctx.pinned_roots,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $ctx.frame_ptr,
-                $ctx.current_func,
-                $ctx.pc,
+                $crate::heap::TopFrame::Function {
+                    func: $ctx.current_func,
+                    pc: $ctx.pc,
+                },
             )
         };
     }
@@ -217,6 +233,29 @@ impl Heap {
             gc_count: 0,
         }
     }
+
+    /// Rewinds the bump pointer to the start of the buffer, discarding all allocations. The buffer
+    /// is retained (no reallocation), so it's the cheap way to reuse one heap across runs.
+    ///
+    /// The caller must ensure no live references into the heap remain (reset the interpreter's frame
+    /// and root set first, via [`InterpreterContext::reset`](crate::InterpreterContext::reset)).
+    pub fn reset(&mut self) {
+        self.bump_ptr = self.buffer.as_ptr();
+        self.gc_count = 0;
+    }
+
+    /// Bump-allocates one object of `total_size` bytes (header + payload), stamps the header with
+    /// `descriptor_id`, and returns the data pointer (payload start; the header occupies the
+    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Returns `None` if
+    /// the heap is full. Does not run GC.
+    pub fn alloc_object(
+        &mut self,
+        total_size: usize,
+        descriptor_id: DescriptorId,
+    ) -> Option<std::ptr::NonNull<u8>> {
+        let ptr = heap_alloc(self, total_size, descriptor_id).ok()?;
+        std::ptr::NonNull::new(ptr)
+    }
 }
 
 /// Outcome of a bump-allocation attempt.
@@ -257,19 +296,101 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
 ) -> RuntimeResult<*mut u8> {
     match try_alloc(heap) {
         Ok(ptr) => Ok(ptr),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
-            gc_collect(heap, provider, rws, pinned_roots, fp, current_func, pc)?;
+            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
             try_alloc(heap).map_err(AllocationError::into_runtime_error)
         },
         Err(e) => Err(e.into_runtime_error()),
+    }
+}
+
+/// Deep-copies the value tree at `root`.
+/// Automatically runs GC and retries when out of memory.
+///
+/// # Safety
+///
+/// `root` must point to the data region of a live object whose header is at
+/// `root - OBJECT_HEADER_SIZE`.
+pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    root: NonNull<u8>,
+) -> RuntimeResult<NonNull<u8>> {
+    // SAFETY: `root` is a live object (this function's contract).
+    let root_guard = unsafe { extra_roots.root_object(root.as_ptr()) };
+    // SAFETY: the rooted object is live, so its (possibly relocated) pointer is
+    // non-null.
+    match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr())) } {
+        Ok(ptr) => Ok(ptr),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+            // SAFETY: the handle kept the source live across GC; re-read its
+            // relocated, still-non-null pointer.
+            unsafe {
+                heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr()))
+                    .map_err(AllocationError::into_runtime_error)
+            }
+        },
+    }
+}
+
+/// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
+/// runs out of heap, collects garbage once (with the given roots) and retries.
+/// The deserialize counterpart to [`alloc_or_gc`] / [`deep_copy_or_gc`].
+///
+/// # Safety
+///
+/// `dst` must be writable for `ty`'s layout size, and `bytes` must not alias the
+/// heap, since a GC may relocate heap objects.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn deserialize_or_gc<
+    L: LayoutProvider + ?Sized,
+    P: DescriptorProvider + ?Sized,
+>(
+    layouts: &L,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    frame_ptr: *mut u8,
+    top_frame: TopFrame<'_>,
+) -> RuntimeResult<()> {
+    // SAFETY: forwarded from this function's contract.
+    match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
+        Ok(()) => Ok(()),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(
+                heap,
+                provider,
+                rws,
+                extra_roots,
+                extensions,
+                frame_ptr,
+                top_frame,
+            )?;
+            // SAFETY: as above.
+            unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
+                .map_err(AllocationError::into_runtime_error)
+        },
     }
 }
 
@@ -284,6 +405,13 @@ pub(crate) struct RootScanner<'a> {
 }
 
 impl<'a> RootScanner<'a> {
+    /// Test-only constructor. Production code only sees a
+    /// `RootScanner` handed in by [`gc_collect`].
+    #[cfg(test)]
+    pub(crate) fn for_test(heap: &'a Heap, free_ptr: *mut u8) -> RootScanner<'a> {
+        RootScanner { heap, free_ptr }
+    }
+
     /// Current to-space bump cursor.
     pub(crate) fn cursor(&self) -> usize {
         self.free_ptr as usize
@@ -301,13 +429,6 @@ impl<'a> RootScanner<'a> {
             return None;
         }
         Some(gc_copy_object(ptr, &mut self.free_ptr))
-    }
-
-    /// Test-only constructor. Production code only sees a
-    /// `RootScanner` handed in by [`gc_collect`].
-    #[cfg(test)]
-    pub(crate) fn for_test(heap: &'a Heap, free_ptr: *mut u8) -> RootScanner<'a> {
-        RootScanner { heap, free_ptr }
     }
 }
 
@@ -360,6 +481,17 @@ pub(crate) fn heap_alloc(
     unsafe {
         let header_start = heap.bump_ptr;
         heap.bump_ptr = header_start.add(aligned_size);
+        // TODO(perf): this O(size) memset is redundant for `EnumNew` /
+        // `PackVariant`, which immediately overwrite the tag and every field of
+        // the active variant. A pack-aware non-zeroing path could skip it (a
+        // material win for large/wide-variant enums). It is not a drop-in
+        // change: `gc_copy_object` / `deep_copy` copy the full object image
+        // including dead-variant tail and inter-field padding, which is
+        // deterministically zero today; leaving it uninitialized makes that
+        // image carry stale heap bytes. Prefer zeroing only the
+        // tail/padding the active variant does not write (still skipping the
+        // large active body), or audit that no byte-image consumer
+        // (state commit / hashing) depends on those bytes first.
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
@@ -374,10 +506,10 @@ fn alloc_sized<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     total_size: usize,
     descriptor_id: DescriptorId,
 ) -> RuntimeResult<*mut u8> {
@@ -385,10 +517,10 @@ fn alloc_sized<P: DescriptorProvider + ?Sized>(
         heap,
         provider,
         rws,
-        pinned_roots,
+        extra_roots,
+        extensions,
         fp,
-        current_func,
-        pc,
+        top_frame,
         |h| heap_alloc(h, total_size, descriptor_id),
     )
 }
@@ -403,10 +535,10 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
     elem_size: u32,
     capacity_in_elems: u64,
@@ -420,10 +552,10 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         heap,
         provider,
         rws,
-        pinned_roots,
+        extra_roots,
+        extensions,
         fp,
-        current_func,
-        pc,
+        top_frame,
         total_size,
         descriptor_id,
     )
@@ -435,10 +567,10 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
 ) -> RuntimeResult<*mut u8> {
     let desc = match provider.descriptor(descriptor_id) {
@@ -466,10 +598,10 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
         heap,
         provider,
         rws,
-        pinned_roots,
+        extra_roots,
+        extensions,
         fp,
-        current_func,
-        pc,
+        top_frame,
         total_size,
         descriptor_id,
     )
@@ -483,10 +615,10 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     values_size: u32,
     descriptor_id: DescriptorId,
 ) -> RuntimeResult<*mut u8> {
@@ -495,10 +627,10 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
         heap,
         provider,
         rws,
-        pinned_roots,
+        extra_roots,
+        extensions,
         fp,
-        current_func,
-        pc,
+        top_frame,
         total_size,
         descriptor_id,
     )
@@ -521,9 +653,9 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
-    current_func: NonNull<Function>,
-    pc: usize,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    top_frame: TopFrame<'_>,
     fp: *mut u8,
     vec_ref_offset: usize,
     elem_size: u32,
@@ -554,10 +686,10 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
             heap,
             provider,
             rws,
-            pinned_roots,
+            extra_roots,
+            extensions,
             fp,
-            current_func,
-            pc,
+            top_frame,
             descriptor_id,
             elem_size,
             new_cap_in_elems,
@@ -586,8 +718,19 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 // Garbage collection
 // ---------------------------------------------------------------------------
 
+/// Identifies the top stack frame for GC root scanning.
+//
+// TODO(cleanup): revisit whether this enum is the cleanest representation.
+#[derive(Clone, Copy)]
+pub(crate) enum TopFrame<'a> {
+    /// A regular Move function frame; `pc` selects the safe-point supplement.
+    Function { func: NonNull<Function>, pc: usize },
+    /// A native function frame; its arg slots hold the roots.
+    Native(&'a NativeABI),
+}
+
 /// Run Cheney's copying GC. Walks the call stack to find roots via
-/// per-function pointer slot lists, scans [`PinnedRoots`], then does a
+/// per-function pointer slot lists, scans the [`RootPool`], then does a
 /// breadth-first copy of all reachable objects.
 ///
 /// # Safety assumptions
@@ -608,18 +751,14 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 ///   in every heap object header are set by the allocator and never
 ///   overwritten by user code. Corrupted headers → wrong copy size or
 ///   wrong reference tracing (UB).
-///
-/// TODO: `current_func` assumes the top frame is always a regular function.
-/// This breaks down when the top frame is a native function. We must fix it
-/// before allowing heap allocations within native functions.
 pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
     rws: &mut ResourceReadWriteSet,
-    pinned_roots: &PinnedRoots,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     frame_ptr: *mut u8,
-    current_func: NonNull<Function>,
-    pc_top: usize,
+    top_frame: TopFrame<'_>,
 ) -> Result<(), RuntimeInvariantViolation> {
     heap.gc_count += 1;
 
@@ -636,34 +775,32 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
         free_ptr: to_space.as_ptr(),
     };
 
-    // Phase 1a: scan roots from the call stack.
-    //
-    // Two sets of pointer offsets are scanned per frame:
-    //   1. `frame_layout.heap_ptr_offsets` — always applies, to every
-    //      frame on the stack.
-    //   2. The matching `safe_point_layouts` entry for the *top*
-    //      frame's `pc_top`, if any — provides additional pointer
-    //      offsets that are only valid at that specific top-frame
-    //      safe point (an allocating op currently executing in the
-    //      top frame).
-    //
-    // Per `SafePointEntry`'s top-frame-only contract,
-    // `safe_point_layouts` is consulted only for the top frame;
-    // caller-below frames use `frame_layout` alone.
-    {
-        // Top frame: frame_layout + safe_point_layouts[pc_top].
-        // SAFETY: current_func is valid (caller's invariant).
-        let top_func = unsafe { current_func.as_ref() };
-        unsafe {
-            gc_scan_frame_roots(
-                &mut scanner,
-                frame_ptr,
-                &top_func.frame_layout.heap_ptr_offsets,
-            );
-            if let Some(sp_layout) = top_func.safe_point_layout_at(pc_top) {
-                gc_scan_frame_roots(&mut scanner, frame_ptr, &sp_layout.heap_ptr_offsets);
+    // Phase 1a: scan roots from the call stack. The top frame is either a
+    // regular function (scanned via `frame_layout` plus the `safe_point_layouts`
+    // entry for its current pc, per `SafePointEntry`'s top-frame-only contract)
+    // or a native (scanned via the arg pointer slots in its ABI). Caller-below
+    // frames are always regular functions and use `frame_layout` alone.
+    match top_frame {
+        TopFrame::Function { func, pc } => {
+            // SAFETY: func is valid (caller's invariant).
+            let top_func = unsafe { func.as_ref() };
+            unsafe {
+                gc_scan_frame_roots(
+                    &mut scanner,
+                    frame_ptr,
+                    &top_func.frame_layout.heap_ptr_offsets,
+                );
+                if let Some(sp_layout) = top_func.safe_point_layout_at(pc) {
+                    gc_scan_frame_roots(&mut scanner, frame_ptr, &sp_layout.heap_ptr_offsets);
+                }
             }
-        }
+        },
+        TopFrame::Native(abi) => {
+            // SAFETY: a native's arg slots hold the references passed to it.
+            unsafe {
+                gc_scan_frame_roots(&mut scanner, frame_ptr, abi.heap_ptr_offsets());
+            }
+        },
     }
 
     // Walk caller frames with frame_layout only.
@@ -687,13 +824,27 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
         }
     }
 
-    // Phase 1b: scan the auxiliary pinned-roots set.
-    pinned_roots.scan(&mut scanner);
+    // Phase 1b: scan the extra roots (the interpreter's pins or a native's
+    // rooted handles).
+    // SAFETY: GC is stop-the-world, so no handle read overlaps; the closure only
+    // relocates via the scanner and never re-enters the pool.
+    unsafe { extra_roots.relocate_each(|base| scanner.relocate(base)) };
 
     // Phase 1c: resource read-write set. Working-map and journal writes
     // point into the local heap and must be relocated alongside the call
     // stack and pinned roots.
     rws.scan(&mut scanner);
+
+    // Phase 1d: native extension roots.
+    //
+    // TODO(correctness): a native holding an extension borrow across an
+    // allocation makes this a hard error; revisit how to guarantee exclusive
+    // access here (e.g. relocating only the disjoint root set).
+    unsafe {
+        extensions
+            .relocate_all_roots(&mut |base| scanner.relocate(base))
+            .map_err(|_| RuntimeInvariantViolation::ExtensionBorrowedDuringGC)?;
+    }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
     // `scan_ptr` is a raw cursor — header start of the next object to
@@ -745,7 +896,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 /// `obj_ptr == end` is unreachable in practice. The bound is written
 /// to match the semantic invariant so it stays correct under future
 /// changes.
-fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
+pub(crate) fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
     let start = heap.buffer.as_ptr() as usize;
     let end = start + heap.buffer.len();
     let p = ptr as usize;
@@ -902,7 +1053,12 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         } => unsafe {
             let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET) as usize;
             if tag >= variant_pointer_offsets.len() {
-                return Ok(());
+                // A tag past the variant count means a corrupt object; surface
+                // it as an invariant violation.
+                return Err(RuntimeInvariantViolation::EnumTagOutOfRange {
+                    tag: tag as u64,
+                    variant_count: variant_pointer_offsets.len(),
+                });
             }
             let pointer_offsets = &variant_pointer_offsets[tag];
             if pointer_offsets.is_empty() {

@@ -16,7 +16,10 @@ use aptos_gas_schedule::{
 };
 use aptos_release_bundle::{ReleaseBundle, ReleasePackage};
 use aptos_types::{
-    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    account_config::{
+        self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS,
+        EXPERIMENTAL_CODE_ADDRESS,
+    },
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     executable::ModulePath,
@@ -92,6 +95,7 @@ const EPOCH_TIMEOUT_CONFIG_MODULE_NAME: &str = "epoch_timeout_config";
 const DECRYPTION_MODULE_NAME: &str = "decryption";
 const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
+const TRADING_NATIVE_CAPABILITY_MODULE_NAME: &str = "trading_native_capability";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -118,6 +122,14 @@ pub struct GenesisConfiguration {
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
+    /// Whether to create the `decryption` resources (including
+    /// `PerBlockDecryptionKeyV2`) during genesis. Production genesis always
+    /// does (`true`), so a fresh decryption-enabled chain emits
+    /// `BlockMetadataExt::V3` from the first epoch. Tests can set this to
+    /// `false` to boot in the pre-resource state, so the chain emits the
+    /// legacy `V2` until the first `reconfiguration_with_dkg` lazily creates
+    /// the resource and flips it to `V3` — exercising the V2->V3 cutover.
+    pub initialize_decryption_at_genesis: bool,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -187,6 +199,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
             .clone()
             .map(Features::into_flag_vec),
     );
+    initialize_trading_native_capability(&mut session, &module_storage, &mut traversal_context);
     initialize_aptos_coin(&mut session, &module_storage, &mut traversal_context);
     initialize_on_chain_governance(
         &mut session,
@@ -313,6 +326,7 @@ pub fn encode_genesis_change_set(
             .clone()
             .map(Features::into_flag_vec),
     );
+    initialize_trading_native_capability(&mut session, &module_storage, &mut traversal_context);
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(
             &mut session,
@@ -352,7 +366,9 @@ pub fn encode_genesis_change_set(
     );
     initialize_chunky_dkg(&mut session, &module_storage, &mut traversal_context);
     initialize_epoch_timeout_config(&mut session, &module_storage, &mut traversal_context);
-    initialize_decryption(&mut session, &module_storage, &mut traversal_context);
+    if genesis_config.initialize_decryption_at_genesis {
+        initialize_decryption(&mut session, &module_storage, &mut traversal_context);
+    }
     initialize_on_chain_governance(
         &mut session,
         &module_storage,
@@ -557,6 +573,25 @@ fn initialize(
             MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.voting_power_increase_limit),
         ]),
+    );
+}
+
+/// Call `init_module` for the aptos-experimental package: genesis
+/// publishes module bytes directly, bypassing the flow that auto-invokes it.
+fn initialize_trading_native_capability(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function_internal(
+        session,
+        module_storage,
+        traversal_context,
+        TRADING_NATIVE_CAPABILITY_MODULE_NAME,
+        "init_module",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
+        EXPERIMENTAL_CODE_ADDRESS,
     );
 }
 
@@ -1476,6 +1511,7 @@ pub fn generate_test_genesis(
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
+            initialize_decryption_at_genesis: true,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1529,6 +1565,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
         keyless_groth16_vk: None,
+        initialize_decryption_at_genesis: true,
     }
 }
 

@@ -1,0 +1,85 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::retained_ref_capture {
+    private inline fun apply(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of($t0, $t1, result0());
+    }
+
+    private fun caller(r: &u64,x: u64): u64 {
+        {
+          let (x: u64): (u64) = Tuple(x);
+          {
+            let (y: u64): (u64) = Tuple(x);
+            Add<u64>(y, Deref(r))
+          }
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), Add($t1, $t0));
+    }
+
+} // end 0x42::retained_ref_capture
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::retained_ref_capture {
+    inline fun apply(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+
+    spec apply(f: |u64|u64, x: u64): u64 {
+        pragma opaque = true;
+        ensures ensures_of<f>(x, result);
+    }
+
+    fun caller(r: &u64, x: u64): u64 {
+        let x = x;
+        let y = x;
+        y + *r
+    }
+
+    spec caller(r: &u64, x: u64): u64 {
+        ensures result == x + r;
+    }
+
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::retained_ref_capture {
+    private inline fun apply(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of($t0, $t1, result0());
+    }
+
+    private fun caller(r: &u64,x: u64): u64 {
+        {
+          let (x: u64): (u64) = Tuple(x);
+          {
+            let (y: u64): (u64) = Tuple(x);
+            Add<u64>(y, Deref(r))
+          }
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), Add($t1, $t0));
+    }
+
+} // end 0x42::retained_ref_capture
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::retained_ref_capture
+// Function definition at index 0
+fun caller(l0: &u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    read_ref
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

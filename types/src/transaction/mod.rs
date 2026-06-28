@@ -2194,6 +2194,12 @@ impl TransactionOutput {
             expected_events,
         );
 
+        // TODO(trading-native): this comparator ignores the checkpoint hashes
+        // (state/hot-state and `position_state_checkpoint_hash`), so replay-verify
+        // tooling (e.g. db-tool's `replay_on_archive`) can report a successful
+        // replay even when the authenticated position state root diverges from
+        // local execution. Validate the checkpoint hashes here before enabling
+        // COMPUTE_TRADING_NATIVE_STATE_ROOTS.
         Ok(())
     }
 
@@ -2229,8 +2235,10 @@ pub enum TransactionInfo {
     V1(TransactionInfoV1),
 }
 
+#[bon::bon]
 impl TransactionInfo {
-    pub fn new(
+    #[builder(finish_fn = build)]
+    pub fn builder_v0(
         transaction_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
@@ -2250,7 +2258,8 @@ impl TransactionInfo {
         ))
     }
 
-    pub fn new_v1(
+    #[builder(finish_fn = build)]
+    pub fn builder_v1(
         transaction_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
@@ -2259,6 +2268,7 @@ impl TransactionInfo {
         gas_used: u64,
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
+        position_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self::V1(TransactionInfoV1::new(
             transaction_hash,
@@ -2269,6 +2279,7 @@ impl TransactionInfo {
             gas_used,
             status,
             auxiliary_info_hash,
+            position_state_checkpoint_hash,
         ))
     }
 
@@ -2278,28 +2289,27 @@ impl TransactionInfo {
         state_checkpoint_hash: Option<HashValue>,
         status: ExecutionStatus,
     ) -> Self {
-        Self::new(
-            HashValue::default(),
-            HashValue::default(),
-            HashValue::default(),
-            state_checkpoint_hash,
-            gas_used,
-            status,
-            Some(HashValue::default()),
-        )
+        Self::builder_v0()
+            .transaction_hash(HashValue::default())
+            .state_change_hash(HashValue::default())
+            .event_root_hash(HashValue::default())
+            .maybe_state_checkpoint_hash(state_checkpoint_hash)
+            .gas_used(gas_used)
+            .status(status)
+            .auxiliary_info_hash(HashValue::default())
+            .build()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     fn dummy() -> Self {
-        Self::new(
-            HashValue::default(),
-            HashValue::default(),
-            HashValue::default(),
-            None,
-            0,
-            ExecutionStatus::Success,
-            Some(HashValue::default()),
-        )
+        Self::builder_v0()
+            .transaction_hash(HashValue::default())
+            .state_change_hash(HashValue::default())
+            .event_root_hash(HashValue::default())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .auxiliary_info_hash(HashValue::default())
+            .build()
     }
 
     pub fn transaction_hash(&self) -> HashValue {
@@ -2343,6 +2353,13 @@ impl TransactionInfo {
         match self {
             Self::V0(_) => None,
             Self::V1(v) => v.hot_state_checkpoint_hash,
+        }
+    }
+
+    pub fn position_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.position_state_checkpoint_hash,
         }
     }
 
@@ -2432,8 +2449,8 @@ pub struct TransactionInfoV1 {
     hot_state_checkpoint_hash: Option<HashValue>,
     auxiliary_info_hash: Option<HashValue>,
 
-    // Reserved for future changes.
-    placeholder0: Option<HashValue>,
+    /// Repurposed reserved field; `None` matches the prior BCS encoding.
+    position_state_checkpoint_hash: Option<HashValue>,
     placeholder1: Option<HashValue>,
     placeholder2: Option<HashValue>,
     placeholder3: Option<HashValue>,
@@ -2453,6 +2470,7 @@ impl TransactionInfoV1 {
         gas_used: u64,
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
+        position_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -2463,7 +2481,7 @@ impl TransactionInfoV1 {
             state_checkpoint_hash,
             hot_state_checkpoint_hash,
             auxiliary_info_hash,
-            placeholder0: None,
+            position_state_checkpoint_hash,
             placeholder1: None,
             placeholder2: None,
             placeholder3: None,
@@ -3756,4 +3774,16 @@ pub struct EphemeralAuxiliaryInfo {
     // TODO(grao): After execution pool is implemented we might want this information be persisted
     // onchain?
     pub proposer_index: u64,
+}
+
+/// A block of consecutive transactions.
+#[derive(Serialize, Deserialize)]
+pub struct TransactionBlock {
+    /// The version of the first transaction in the block.
+    pub begin_version: Version,
+    /// Non-empty list of transactions in a block.
+    pub transactions: Vec<Transaction>,
+    /// Persisted auxiliary info for each transaction, aligned with `transactions`.
+    #[serde(default = "Vec::new")]
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
 }

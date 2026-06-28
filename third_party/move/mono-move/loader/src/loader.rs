@@ -26,12 +26,11 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, LayoutId,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
     LayoutProvider, ModuleId, ModuleProvider, ValueLayout,
 };
-use mono_move_gas::GasMeter;
 use mono_move_global_context::{
-    ArenaRef, ExecutionGuard, FieldLayout, FunctionSlot, LoadedModule, LoadedModuleSlot,
+    ArenaRef, ExecutionGuard, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot,
 };
 use shared_dsa::UnorderedSet;
@@ -134,7 +133,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     pub fn load_module(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         match &self.policy {
@@ -149,7 +148,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
     }
 
-    // TODO: Revisit the handling of native functions here.
+    // TODO(cleanup): Revisit the handling of native functions here.
     //
     // Need to make sure:
     // 1. A registered native function impl does not shadow a Move-body function with the same name.
@@ -158,7 +157,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     pub fn load_function(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -222,6 +221,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // lock a second time to publish the result. Splitting the read and
         // the install keeps the lock window short for the common hit case
         // and avoids holding it across lowering work.
+        //
+        // TODO(perf): the cache key distinguishes instantiations that
+        // differ only in phantom type arguments even though their lowered
+        // code is identical. A per-callee mask of the type parameters that
+        // actually affect lowering would let the key ignore the rest;
+        // same-package callers could also stop forwarding unused ty_args,
+        // but upgradable code can't (the caller can't tell which params the
+        // callee currently needs).
         if let Some((function, function_ms)) =
             module.get_instantiated_function_ptr(func_name, ty_args)
         {
@@ -241,7 +248,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn lower_function_with_ty_args(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         module: &LoadedModule,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
@@ -258,6 +265,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 });
             },
         };
+        // TODO(metering): the lowering work needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
@@ -288,13 +296,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             func_ir,
             ty_args,
             self.guard,
+            self.guard,
             descriptors,
             self.natives,
         )
         .map_err(LoaderError::Specializer)?
         {
             LoweringOutcome::Built(f) => f,
-            // TODO: drop this arm — together with the `LoweringOutcome`
+            // TODO(cleanup): drop this arm — together with the `LoweringOutcome`
             // enum and the corresponding `BuildContextOutcome::Skipped`
             // paths in the specializer — once `try_build_context`
             // handles nominal types and partial concretization. At that
@@ -318,7 +327,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_lazy_with_lazy_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         read_set.record_pending_loading(id)?;
@@ -340,7 +349,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_package(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         let package = match self.guard.get_module(id) {
@@ -428,7 +437,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn load_lazy_with_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> LoaderResult<&'guard LoadedModule> {
         let module = match self.guard.get_module(id) {
@@ -468,7 +477,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn ensure_ready_for_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -502,7 +511,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn charge_mandatory_set_for_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -529,7 +538,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn compute_mandatory_set_for_eager_lowering(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> LoaderResult<()> {
@@ -578,7 +587,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 address: *id.address(),
                 name: id.name().to_string(),
             })?;
-        // TODO: placeholder cost model — byte length of the module. Replace
+        // TODO(metering): placeholder cost model — byte length of the module. Replace
         // with a proper cost function (bucketed by size, verifier cost, etc.).
         let cost = bytes.len() as u64;
         let compiled_module = self
@@ -588,7 +597,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         self.module_provider
             .verify_module(&compiled_module)
             .map_err(LoaderError::Verification)?;
-        // TODO:
+        // TODO(cleanup):
         //   This can run verification twice because destack runs it and we verified before.
         //   Destack should take a hook so we can add more things to verify.
         let module_ir =
@@ -621,7 +630,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn record_loaded_and_charge_slots<F>(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         slots: &[LoadedModuleSlot],
         mut on_read_set_miss: F,
     ) -> LoaderResult<()>
@@ -655,7 +664,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn charge_non_read_set_slots(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GasMeter,
         slots: &[LoadedModuleSlot],
     ) -> LoaderResult<()> {
         self.record_loaded_and_charge_slots(read_set, gas_meter, slots, |read_set, slot| {
@@ -701,6 +710,16 @@ impl<'a, 'guard, 'ctx> LoweringContext<'a, 'guard, 'ctx> {
     }
 }
 
+impl LayoutProvider for LoweringContext<'_, '_, '_> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard.layout_id(ty)
+    }
+}
+
 impl SpecializerContext for LoweringContext<'_, '_, '_> {
     fn get_fields(
         &mut self,
@@ -713,7 +732,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         let module = match self.read_set.get(id) {
             Some(ModuleRead::Loaded { module, .. }) => module,
             Some(ModuleRead::Pending) => {
-                // TODO: should be `invariant_violation!(ReadSetEntryNotLoaded)`.
+                // TODO(correctness): should be `invariant_violation!(ReadSetEntryNotLoaded)`.
                 // The specializer needs a typed error first, without creating
                 // a circular dependency with `LoaderError`.
                 anyhow::bail!("All modules have to be loaded or not present")
@@ -746,18 +765,6 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .cloned())
     }
 
-    fn set_nominal_layout(
-        &self,
-        ty: InternedType,
-        size: u32,
-        align: u32,
-        fields: Option<&[FieldLayout]>,
-    ) -> anyhow::Result<()> {
-        self.loader
-            .guard
-            .set_nominal_layout(ty, size, align, fields)
-    }
-
     fn subst_type(
         &self,
         ty: InternedType,
@@ -782,6 +789,18 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         self.loader.guard.vec_descriptor_for(elem_ty)
     }
 
+    fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets))
+    }
+
     fn publish_captured_data_descriptor(
         &self,
         values_size: u32,
@@ -793,15 +812,27 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .publish_captured_data_descriptor(values_size, pointer_offsets))
     }
 
-    fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
-        self.loader.guard.layout_id_for(ty)
-    }
-
-    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
-        self.loader.guard.layout(id)
-    }
-
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
         self.loader.guard.publish_layout(ty, layout)
+    }
+
+    fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]> {
+        self.loader.guard.publish_variant_layouts(enum_ty, variants)
+    }
+
+    fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
     }
 }

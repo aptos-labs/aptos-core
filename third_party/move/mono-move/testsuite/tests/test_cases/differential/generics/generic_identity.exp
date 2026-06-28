@@ -20,7 +20,7 @@ fun call_identity_u64(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call identity, [r0]
+    0: [x0] := call identity<u64>, [r0]
     1: ret [x0]
 }
 
@@ -44,4 +44,4 @@ fun call_identity_u64() {
     3: Return
 }
 
-fun identity(): skipped (not all types are concrete)
+fun identity(): skipped (generic function not instantiated)

@@ -59,13 +59,17 @@ pub fn view_function_ref(ptr: InternedFunctionRef) -> &'static FunctionRef {
     unsafe { ptr.as_ref_unchecked() }
 }
 
-/// Interns Move file format types into efficient pointer-based implementation
-/// where data is allocated in arena.
+/// Constructs interned values, turning each into its canonical,
+/// arena-allocated handle, and derives new types by substituting type
+/// parameters.
 ///
 /// # Invariant
 ///
 /// Implementations deduplicate allocations, so that pointer equality implies
 /// structural equality.
+///
+/// TODO(metering): enforce a type-size limit (potentially, when interning) so
+/// that very large types are not allowed to be created.
 pub trait Interner {
     /// Returns a type parameter with the specified index. Note that pointer
     /// equality of any two interned type parameters is structural only. Two

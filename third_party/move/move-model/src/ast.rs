@@ -1369,6 +1369,24 @@ impl ExpData {
         }
     }
 
+    /// Peels a selection chain (`Select`, `SelectVariants`, `Index`, and optionally
+    /// `Deref`) to its first non-projection operand. Used to find the root variable
+    /// of an l-value or borrow target.
+    pub fn selection_chain_root(&self, peel_deref: bool) -> &ExpData {
+        let mut target = self;
+        while let ExpData::Call(_, op, args) = target {
+            let peel = matches!(
+                op,
+                Operation::Select(..) | Operation::SelectVariants(..) | Operation::Index
+            ) || (peel_deref && matches!(op, Operation::Deref));
+            if !peel || args.is_empty() {
+                break;
+            }
+            target = args[0].as_ref();
+        }
+        target
+    }
+
     pub fn node_ids(&self) -> Vec<NodeId> {
         let mut ids = vec![];
         self.visit_post_order(&mut |e| {

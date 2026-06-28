@@ -8,7 +8,7 @@ use crate::stackless_exec_ir::FunctionIR;
 use anyhow::{bail, Result};
 use mono_move_core::{
     types::{view_type, InternedType, Type},
-    FrameOffset,
+    FrameOffset, LayoutId, LayoutKind, LayoutProvider,
 };
 
 /// GC-relevant frame metadata derived for a single function.
@@ -29,15 +29,15 @@ pub fn derive_frame_layout(
     home_slot_types: &[InternedType],
 ) -> Result<DerivedFrameLayout> {
     let mut heap_ptr_offsets = vec![];
-    // TODO: consider whether `LoweringContext::home_slots` should carry
+    // TODO(cleanup): consider whether `LoweringContext::home_slots` should carry
     // each slot's type directly, so we wouldn't need to zip with a
     // separate `home_slot_types` slice here.
     for (slot, &ty) in ctx.home_slots.iter().zip(home_slot_types.iter()) {
-        for rel in type_pointer_offsets(ty)? {
+        for rel in type_pointer_offsets(ctx.layouts, ty)? {
             heap_ptr_offsets.push(FrameOffset(slot.offset.0 + rel));
         }
     }
-    // TODO: revisit whether sort and dedup is necessary here or if invariants
+    // TODO(cleanup): revisit whether sort and dedup is necessary here or if invariants
     // established beforehand guarantee them already.
     heap_ptr_offsets.sort_by_key(|o| o.0);
     heap_ptr_offsets.dedup();
@@ -65,7 +65,7 @@ pub fn derive_frame_layout(
 /// Returns `true` iff `type_pointer_offsets` would accept `ty` without
 /// erroring. Keep in sync with `type_pointer_offsets`: every case that
 /// `bail!`s there must return `false` here.
-pub fn gc_layout_supports(ty: InternedType) -> bool {
+pub fn gc_layout_supports(layouts: &dyn LayoutProvider, ty: InternedType) -> bool {
     match view_type(ty) {
         Type::Bool
         | Type::U8
@@ -86,17 +86,8 @@ pub fn gc_layout_supports(ty: InternedType) -> bool {
         | Type::MutRef { .. }
         | Type::Vector { .. }
         | Type::Function { .. } => true,
-        Type::Nominal { .. } => {
-            // Mirrors the bails in `type_pointer_offsets`'s Nominal arm:
-            // unpopulated layout, enum (no field_layouts), or unsupported field.
-            let Some(layout) = view_type(ty).layout() else {
-                return false;
-            };
-            let Some(fields) = layout.field_layouts() else {
-                return false;
-            };
-            fields.iter().all(|f| gc_layout_supports(f.ty()))
-        },
+        // A nominal is walkable once its value layout is published.
+        Type::Nominal { .. } => layouts.layout_by_ty(ty).is_some(),
         Type::TypeParam { .. } => false,
     }
 }
@@ -108,7 +99,7 @@ pub fn gc_layout_supports(ty: InternedType) -> bool {
 /// contains non-instantiated type parameters. Callers that want to
 /// decide *whether* to lower a function should use `gc_layout_supports`
 /// for a graceful `Skipped` outcome rather than reaching this `Err`.
-pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
+pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> Result<Vec<u32>> {
     let offsets = match view_type(ty) {
         // Scalars: no pointer offsets.
         Type::Bool
@@ -134,26 +125,51 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
         // 8-byte heap pointers.
         Type::Vector { .. } | Type::Function { .. } => vec![0],
 
-        // Inline structs: walk each field's pointer offsets and shift
-        // by the field's byte offset within the struct.
-        // TODO: Enums.
+        // Structs/enums: walk the published value layout. A struct recurses
+        // through its fields' child layouts; an enum is an 8-byte heap pointer.
         //
-        // TODO: rewrite without recursion or add a depth/visited bound;
-        // a malformed or racing `NominalLayout` publisher could otherwise
-        // produce a cyclic layout that blows the stack here.
+        // TODO(metering): rewrite without recursion or add a depth/visited bound.
         Type::Nominal { .. } => {
-            let layout = view_type(ty)
-                .layout()
+            let id = layouts
+                .layout_id(ty)
                 .ok_or_else(|| anyhow::anyhow!("nominal type has no layout populated"))?;
-            let Some(fields) = layout.field_layouts() else {
-                bail!("enum type in frame slot not yet supported by gc_layout");
-            };
+            layout_pointer_offsets(layouts, id)?
+        },
+
+        Type::TypeParam { .. } => {
+            bail!("type parameter reached gc_layout — try_build_context should have skipped");
+        },
+    };
+    Ok(offsets)
+}
+
+/// Heap-pointer byte offsets within a value of the given published layout,
+/// relative to the value's start. Pointer positions are a property of the
+/// layout: a reference, vector, function, or (frozen) enum slot holds a pointer
+/// at relative offset 0; a struct recurses through its fields' child layouts;
+/// scalars hold none.
+///
+/// TODO(metering): rewrite without recursion or add a depth/visited bound.
+fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> Result<Vec<u32>> {
+    let layout = layouts
+        .layout(id)
+        .ok_or_else(|| anyhow::anyhow!("layout id does not resolve to a layout"))?;
+    let offsets = match &layout.kind {
+        LayoutKind::Bool
+        | LayoutKind::UnsignedInt
+        | LayoutKind::SignedInt
+        | LayoutKind::Address => vec![],
+        LayoutKind::Ref
+        | LayoutKind::Vector { .. }
+        | LayoutKind::FrozenEnum { .. }
+        | LayoutKind::Function => vec![0],
+        LayoutKind::Struct { fields } => {
             let mut out = vec![];
-            for field in fields {
-                for rel in type_pointer_offsets(field.ty())? {
+            for field in fields.iter() {
+                for rel in layout_pointer_offsets(layouts, field.id)? {
                     let abs = field.offset.checked_add(rel).ok_or_else(|| {
                         anyhow::anyhow!(
-                            "gc_layout: field.offset {} + inner offset {} overflows u32",
+                            "gc_layout: field offset {} + inner offset {} overflows u32",
                             field.offset,
                             rel,
                         )
@@ -163,10 +179,30 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
             }
             out
         },
-
-        Type::TypeParam { .. } => {
-            bail!("type parameter reached gc_layout — try_build_context should have skipped");
-        },
     };
     Ok(offsets)
+}
+
+/// Heap-pointer byte offsets for a sequence of `(field_offset, field_type)`
+/// pairs: each field's own pointer offsets shifted by the field's offset within
+/// the enclosing region.
+/// Errors on a non-GC-walkable field type or a `u32` offset overflow.
+pub fn shifted_field_pointer_offsets(
+    layouts: &dyn LayoutProvider,
+    fields: impl IntoIterator<Item = (u32, InternedType)>,
+) -> Result<Vec<u32>> {
+    let mut out = vec![];
+    for (field_offset, field_ty) in fields {
+        for rel in type_pointer_offsets(layouts, field_ty)? {
+            let abs = field_offset.checked_add(rel).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gc_layout: field offset {} + inner offset {} overflows u32",
+                    field_offset,
+                    rel,
+                )
+            })?;
+            out.push(abs);
+        }
+    }
+    Ok(out)
 }

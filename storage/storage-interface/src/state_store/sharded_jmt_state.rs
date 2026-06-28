@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::MapLayer;
-use aptos_scratchpad::ProofRead;
+use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
@@ -145,6 +145,7 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
         &self,
         new_version: Version,
         updates: Vec<(HashValue, Slot)>,
+        base_summary: &StateSummary,
         proof_reader: &impl ProofRead,
     ) -> Result<Self> {
         let smt_updates: Vec<(HashValue, Option<HashValue>)> =
@@ -154,7 +155,7 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
         } else {
             self.summary()
                 .global_state_summary
-                .freeze(&self.summary().global_state_summary)
+                .freeze(&base_summary.global_state_summary)
                 .batch_update(smt_updates.iter(), proof_reader)
                 .map_err(|e| {
                     AptosDbError::Other(format!("scratchpad SMT batch_update failed: {e:?}"))
@@ -169,6 +170,30 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
     pub fn make_delta(&self, base: &Self) -> Vec<(HashValue, Slot)> {
         self.state().make_delta(base.state())
     }
+}
+
+/// A native-position leaf: the SMT/JMT only needs the key + value hash
+/// (no value body), so the slot carries `()` as its value type.
+pub type PositionSlot = LeafSlot<()>;
+
+pub type PositionStateSummary = StateSummary;
+
+pub type PositionStateWithSummary = StateAndSummary<ShardedJmtState<PositionSlot>>;
+
+pub fn new_empty_position_state() -> PositionStateWithSummary {
+    PositionStateWithSummary::new_empty("position")
+}
+
+/// Restart-from-disk constructor: seeds the in-memory pipeline with
+/// the JMT root persisted at `version`.
+pub fn position_state_at_version(
+    version: Version,
+    root_hash: HashValue,
+) -> PositionStateWithSummary {
+    PositionStateWithSummary::new(
+        ShardedJmtState::new_at_version(Some(version), "position"),
+        StateSummary::new_global_only(version, SparseMerkleTree::new(root_hash)),
+    )
 }
 
 pub fn pre_shard_jmt_updates<I>(

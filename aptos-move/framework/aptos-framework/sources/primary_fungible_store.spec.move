@@ -125,8 +125,7 @@ spec aptos_framework::primary_fungible_store {
     /// </high-level-req>
     ///
     spec module {
-        // TODO: verification disabled until this module is specified.
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec fun spec_primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
@@ -137,4 +136,25 @@ spec aptos_framework::primary_fungible_store {
         let metadata_addr = object::object_address(metadata);
         object::spec_create_user_derived_object_address(owner, metadata_addr)
     }
+
+    spec primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_primary_store_address(owner, metadata);
+    }
+
+    spec primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_primary_store_exists(account, metadata);
+    }
+
+    spec primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
+        pragma opaque;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        aborts_if !exists<object::ObjectCore>(store_addr);
+        aborts_if !object::spec_exists_at<FungibleStore>(store_addr);
+        ensures object::object_address(result) == store_addr;
+    }
+
 }

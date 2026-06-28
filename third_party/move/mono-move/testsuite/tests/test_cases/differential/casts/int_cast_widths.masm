@@ -1,0 +1,239 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x1::cast_widths
+
+// --- Identity, small widths. ---
+
+fun u8_to_u8(a: u8): u8
+    copy_loc a
+    cast_u8
+    ret
+
+fun u16_to_u16(a: u16): u16
+    copy_loc a
+    cast_u16
+    ret
+
+fun i8_to_i8(a: i8): i8
+    copy_loc a
+    cast_i8
+    ret
+
+fun i32_to_i32(a: i32): i32
+    copy_loc a
+    cast_i32
+    ret
+
+// --- Widening, unsigned. ---
+
+fun u8_to_u256(a: u8): u256
+    copy_loc a
+    cast_u256
+    ret
+
+fun u16_to_u32(a: u16): u32
+    copy_loc a
+    cast_u32
+    ret
+
+fun u8_to_u64(a: u8): u64
+    copy_loc a
+    cast_u64
+    ret
+
+// --- Narrowing, unsigned. ---
+
+fun u32_to_u8(a: u32): u8
+    copy_loc a
+    cast_u8
+    ret
+
+fun u256_to_u8(a: u256): u8
+    copy_loc a
+    cast_u8
+    ret
+
+fun u64_to_u16(a: u64): u16
+    copy_loc a
+    cast_u16
+    ret
+
+// --- Signed widening, sign-extends negatives. ---
+
+fun i8_to_i64(a: i8): i64
+    copy_loc a
+    cast_i64
+    ret
+
+fun i16_to_i256(a: i16): i256
+    copy_loc a
+    cast_i256
+    ret
+
+// --- Signed narrowing. ---
+
+fun i64_to_i8(a: i64): i8
+    copy_loc a
+    cast_i8
+    ret
+
+fun i32_to_i16(a: i32): i16
+    copy_loc a
+    cast_i16
+    ret
+
+// --- Unsigned -> signed. ---
+
+fun u8_to_i8(a: u8): i8
+    copy_loc a
+    cast_i8
+    ret
+
+fun u16_to_i8(a: u16): i8
+    copy_loc a
+    cast_i8
+    ret
+
+// --- Signed -> unsigned. ---
+
+fun i8_to_u8(a: i8): u8
+    copy_loc a
+    cast_u8
+    ret
+
+fun i8_to_u64(a: i8): u64
+    copy_loc a
+    cast_u64
+    ret
+
+// --- 256-bit extremes. ---
+
+fun i256_to_i8(a: i256): i8
+    copy_loc a
+    cast_i8
+    ret
+
+fun u8_to_i256(a: u8): i256
+    copy_loc a
+    cast_i256
+    ret
+
+// --- Identity, small widths: never aborts, endpoints included. ---
+
+// RUN: execute 0x1::cast_widths::u8_to_u8 --args 0
+// CHECK: results: 0
+// RUN: execute 0x1::cast_widths::u8_to_u8 --args 255
+// CHECK: results: 255
+// RUN: execute 0x1::cast_widths::i8_to_i8 --args -128
+// CHECK: results: -128
+// RUN: execute 0x1::cast_widths::i8_to_i8 --args 127
+// CHECK: results: 127
+// RUN: execute 0x1::cast_widths::u16_to_u16 --args 65535
+// CHECK: results: 65535
+// RUN: execute 0x1::cast_widths::i32_to_i32 --args -2147483648
+// CHECK: results: -2147483648
+
+// --- Widening, unsigned: always fits. ---
+
+// RUN: execute 0x1::cast_widths::u8_to_u256 --args 255
+// CHECK: results: 255
+// RUN: execute 0x1::cast_widths::u16_to_u32 --args 65535
+// CHECK: results: 65535
+// RUN: execute 0x1::cast_widths::u8_to_u64 --args 255
+// CHECK: results: 255
+
+// --- Narrowing, unsigned: boundary at the target max. ---
+
+// 255 fits u8, 256 does not.
+// RUN: execute 0x1::cast_widths::u32_to_u8 --args 255
+// CHECK: results: 255
+// RUN: execute 0x1::cast_widths::u32_to_u8 --args 256
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// RUN: execute 0x1::cast_widths::u256_to_u8 --args 255
+// CHECK: results: 255
+// RUN: execute 0x1::cast_widths::u256_to_u8 --args 256
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+// u256::MAX is far above u8::MAX.
+// RUN: execute 0x1::cast_widths::u256_to_u8 --args 115792089237316195423570985008687907853269984665640564039457584007913129639935
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// 65535 fits u16, 65536 does not.
+// RUN: execute 0x1::cast_widths::u64_to_u16 --args 65535
+// CHECK: results: 65535
+// RUN: execute 0x1::cast_widths::u64_to_u16 --args 65536
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// --- Signed widening: sign-extends negatives. ---
+
+// RUN: execute 0x1::cast_widths::i8_to_i64 --args -128
+// CHECK: results: -128
+// RUN: execute 0x1::cast_widths::i8_to_i64 --args 127
+// CHECK: results: 127
+// RUN: execute 0x1::cast_widths::i8_to_i64 --args 0
+// CHECK: results: 0
+// RUN: execute 0x1::cast_widths::i16_to_i256 --args -32768
+// CHECK: results: -32768
+
+// --- Signed narrowing: boundary at both ends of [-128, 127] / [-32768, 32767]. ---
+
+// RUN: execute 0x1::cast_widths::i64_to_i8 --args 127
+// CHECK: results: 127
+// RUN: execute 0x1::cast_widths::i64_to_i8 --args -128
+// CHECK: results: -128
+// RUN: execute 0x1::cast_widths::i64_to_i8 --args 128
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+// RUN: execute 0x1::cast_widths::i64_to_i8 --args -129
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// RUN: execute 0x1::cast_widths::i32_to_i16 --args 32767
+// CHECK: results: 32767
+// RUN: execute 0x1::cast_widths::i32_to_i16 --args -32768
+// CHECK: results: -32768
+// RUN: execute 0x1::cast_widths::i32_to_i16 --args 32768
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+// RUN: execute 0x1::cast_widths::i32_to_i16 --args -32769
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// --- Unsigned -> signed: boundary at the signed max. ---
+
+// 127 fits i8; 128 exceeds i8::MAX.
+// RUN: execute 0x1::cast_widths::u8_to_i8 --args 127
+// CHECK: results: 127
+// RUN: execute 0x1::cast_widths::u8_to_i8 --args 128
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+// RUN: execute 0x1::cast_widths::u16_to_i8 --args 200
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// --- Signed -> unsigned: negatives abort, even when widening. ---
+
+// RUN: execute 0x1::cast_widths::i8_to_u8 --args 0
+// CHECK: results: 0
+// RUN: execute 0x1::cast_widths::i8_to_u8 --args 127
+// CHECK: results: 127
+// RUN: execute 0x1::cast_widths::i8_to_u8 --args -1
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+// RUN: execute 0x1::cast_widths::i8_to_u64 --args -1
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+
+// --- 256-bit extremes. ---
+
+// i256::MIN cannot narrow to i8.
+// RUN: execute 0x1::cast_widths::i256_to_i8 --args -57896044618658097711785492504343953926634992332820282019728792003956564819968
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-V2-SUBSTR: value out of range
+// RUN: execute 0x1::cast_widths::i256_to_i8 --args -128
+// CHECK: results: -128
+// RUN: execute 0x1::cast_widths::u8_to_i256 --args 255
+// CHECK: results: 255

@@ -96,6 +96,7 @@
 use crate::{
     data_invariant_instrumentation::INVARIANT_FAILS_MESSAGE as DATA_INVARIANT_FAILS_MESSAGE,
     global_invariant_instrumentation::GLOBAL_INVARIANT_FAILS_MESSAGE, options::ProverOptions,
+    verification_analysis,
 };
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::CodeOffset;
@@ -563,192 +564,9 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
             return data;
         }
 
-        // Run the spec inference analysis
-        let mut analyzer = SpecInferenceAnalyzer::new(fun_env, &data);
-        let (wp_map, has_skipped_blocks) = analyzer.analyze();
-
-        // If the backward analysis skipped blocks due to cycles (unprocessed loops),
-        // the WP is incomplete. Report this and skip spec inference.
-        if has_skipped_blocks {
-            fun_env.module_env.env.diag(
-                Severity::Bug,
-                &fun_env.get_loc(),
-                "unexpected loss of weakest precondition: \
-                 loops in backward CFG prevented complete analysis",
-            );
-        } else {
-            // Get WP at entry point and update spec
-            // By construction, for well-typed code the WP at entry should only reference parameters.
-            // If this invariant is violated, it indicates a bug in spec inference.
-            let entry_state = wp_map.get(&0).or_else(|| wp_map.get(&1));
-            if let Some(state) = entry_state {
-                let entry_post_label = state.post;
-                let mut state = state.clone();
-
-                // Resolve is_parent temporaries: substitute them with their path conditions
-                // computed via dominator tree analysis.
-                let bytecode = analyzer.target.get_bytecode();
-                let is_parent_subs = analyzer.compute_is_parent_substitutions(bytecode);
-                if !is_parent_subs.is_empty() {
-                    state = analyzer.resolve_is_parent_in_state(&state, &is_parent_subs);
-                }
-
-                // For &mut params that were never written on any path, add `ensures param == old(param)`.
-                // This captures the fact that unmodified reference parameters retain their original value.
-                let num_params = fun_env.get_parameter_count();
-                for idx in 0..num_params {
-                    let ty = analyzer.get_local_type(idx);
-                    if ty.is_mutable_reference() && !state.captured_mut_params.contains(&idx) {
-                        let param_exp = analyzer.mk_temporary(idx);
-                        let old_param = analyzer.mk_old(param_exp.clone());
-                        state.add_ensures(analyzer.mk_eq(param_exp, old_param));
-                    }
-                }
-
-                // Resolve borrow temps from captured globals.
-                // On exit paths, the BorrowGlobal handler may not have been reached
-                // (it only appears on the loop body path), leaving unresolved
-                // Temporary(idx) or Freeze(Temporary(idx)) references to borrow temps.
-                // Substitute them with the corresponding global<R>[@entry](addr),
-                // using the entry label so MemoryLabelInfo::normalize can later
-                // wrap it in old() for ensures context.
-                let captured_globals: Vec<TempIndex> =
-                    state.captured_globals.iter().copied().collect();
-                for &temp in &captured_globals {
-                    if let Some((mid, sid, targs, addr_temp)) =
-                        analyzer.borrow_global_info.get(&temp).cloned()
-                    {
-                        let struct_env = analyzer.get_struct(mid, sid);
-                        let addr_exp = analyzer.mk_temporary(addr_temp);
-                        let global_exp = analyzer.mk_global_with_label(
-                            &struct_env,
-                            &targs,
-                            addr_exp,
-                            Some(entry_post_label),
-                        );
-                        // Replace patterns referencing the borrow temp with global<R>(addr):
-                        // - Freeze(Temporary(temp)) → global<R>(addr)
-                        // - bare Temporary(temp) → global<R>(addr)
-                        // - Old(Temporary(temp)) → Old(global<R>(addr))
-                        let temp_exp = analyzer.mk_temporary(temp);
-                        let global_node_type = analyzer.global_env().get_node_type(
-                            if let ExpData::Call(id, ..) = global_exp.as_ref() {
-                                *id
-                            } else {
-                                unreachable!()
-                            },
-                        );
-                        let freeze_id = analyzer.new_node(global_node_type, None);
-                        let freeze_exp =
-                            ExpData::Call(freeze_id, AstOp::Freeze(false), vec![temp_exp.clone()])
-                                .into_exp();
-                        let old_temp_exp = analyzer.mk_old(temp_exp.clone());
-                        let old_global_exp = analyzer.mk_old(global_exp.clone());
-                        state = state.map(|e| {
-                            let e = analyzer.substitute_exp_with_exp(e, &freeze_exp, &global_exp);
-                            let e = analyzer.substitute_exp_with_exp(
-                                &e,
-                                &old_temp_exp,
-                                &old_global_exp,
-                            );
-                            // Use substitute_temp_with_exp for bare Temporary — substitute_exp_with_exp
-                            // only matches Call patterns and would miss Temporary nodes.
-                            analyzer.substitute_temp_with_exp(&e, temp, &global_exp)
-                        });
-                    }
-                }
-
-                // Strip memory labels inside old() wrappers.
-                // BorrowGlobal substitution inserts the state.post label everywhere,
-                // including inside old(). Labels inside old() are semantically wrong
-                // (old() already refers to function entry state).
-                state = analyzer.strip_labels_inside_old(&state);
-
-                // Collect modifies targets before normalization (labels still present).
-                for ensures in &state.ensures {
-                    collect_modifies_targets(ensures, &mut state.direct_modifies);
-                }
-
-                // Final label normalization: classify all labels and convert.
-                // - pre-labels in ensures → old(Global(None))
-                // - pre-labels in aborts → Global(None) (already pre-state context)
-                // - post-labels → stripped to None (implicit post-state)
-                // - intermediate labels preserved
-                {
-                    let all_conds: Vec<&Exp> =
-                        state.ensures.iter().chain(state.aborts.iter()).collect();
-                    let label_info =
-                        MemoryLabelInfo::from_conditions(&all_conds, Some(entry_post_label));
-                    let env = analyzer.global_env();
-                    state.ensures = state
-                        .ensures
-                        .iter()
-                        .map(|e| label_info.normalize(env, e, true))
-                        .collect();
-                    state.aborts = state
-                        .aborts
-                        .iter()
-                        .map(|e| label_info.normalize(env, e, false))
-                        .collect();
-                }
-
-                // Eliminate WP-internal `WriteOf` carriers before simplification
-                // so any tautologies it produces are folded away.
-                analyzer.eliminate_write_of(&mut state);
-
-                // Simplify conditions: constant folding, arithmetic/boolean
-                // identities, and assumption-based redundancy elimination.
-                // Multiple passes allow multi-step simplification chains to complete
-                // (e.g., normalize → pinch → one-point rule).
-                state = simplify_state(&mut analyzer, &state);
-                state = simplify_state(&mut analyzer, &state);
-                state = simplify_state(&mut analyzer, &state);
-
-                if !state.is_empty() {
-                    update_spec(fun_env, &state, &mut analyzer);
-                    // Extract repeated state-neutral sub-expressions into let bindings.
-                    cse_inferred_conditions(fun_env);
-                    // Emit modifies clauses only for opaque specs (they need
-                    // explicit modifies to declare which globals may change).
-                    if !ProverOptions::get(analyzer.global_env()).no_inference_opaque {
-                        emit_modifies(fun_env, &state);
-                    }
-                    // Check for inferred conditions referencing non-parameter temporaries
-                    check_bad_temps(fun_env);
-                } else {
-                    // Entry state is empty but there may be non-empty WP states at intermediate
-                    // offsets, indicating that weakest preconditions were lost during joins.
-                    let has_non_empty_wp = wp_map.values().any(|s| !s.is_empty());
-                    if has_non_empty_wp {
-                        fun_env.module_env.env.diag(
-                            Severity::Bug,
-                            &fun_env.get_loc(),
-                            "unexpected loss of weakest precondition: \
-                             intermediate WP states exist but did not propagate to entry",
-                        );
-                    }
-                }
-            } else {
-                // No entry state at all but there may be non-empty WP states at other offsets.
-                let has_non_empty_wp = wp_map.values().any(|s| !s.is_empty());
-                if has_non_empty_wp {
-                    fun_env.module_env.env.diag(
-                        Severity::Bug,
-                        &fun_env.get_loc(),
-                        "unexpected loss of weakest precondition: \
-                         intermediate WP states exist but did not propagate to entry",
-                    );
-                }
-            }
+        if let Some(annotation) = run_spec_inference_on_data(fun_env, &data, self.annotate, false) {
+            data.annotations.set::<WPAnnotation>(annotation, true);
         }
-
-        // Store the WP annotation if requested (for test/debug dump output)
-        drop(analyzer);
-        if self.annotate {
-            data.annotations
-                .set::<WPAnnotation>(WPAnnotation(wp_map), true);
-        }
-
         data
     }
 
@@ -796,6 +614,81 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
 }
 
 // =================================================================================================
+// LambdaSpecInferenceProcessor
+
+/// Auto-infers specs for lambda-lifted functions which have no user-written spec
+/// conditions, in verify mode. Without an inferred spec, behavioral predicates over
+/// such a lambda degrade to trivial values at call sites (`bp_ensures_of = true`,
+/// `bp_aborts_of = false`, `result_of` unconstrained). Inferring `ensures result == …`
+/// and `aborts_if …` from the body gives callers real information.
+///
+/// Operates on the Baseline variant (before `SpecInstrumentationProcessor` would
+/// clear it for opaque callees). Best-effort: if the analyzer cannot summarize the
+/// body, the spec is left empty and behavioral predicates degrade as before.
+pub struct LambdaSpecInferenceProcessor();
+
+impl LambdaSpecInferenceProcessor {
+    pub fn new() -> Box<Self> {
+        Box::new(Self())
+    }
+}
+
+impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
+    fn name(&self) -> String {
+        "lambda_spec_inference".to_string()
+    }
+
+    fn process(
+        &self,
+        _targets: &mut FunctionTargetsHolder,
+        fun_env: &FunctionEnv,
+        data: FunctionData,
+        _scc_opt: Option<&[FunctionEnv]>,
+    ) -> FunctionData {
+        if fun_env.is_native() || fun_env.is_intrinsic() {
+            return data;
+        }
+        if data.code.is_empty() {
+            return data;
+        }
+        if !is_lambda_lifted_name(fun_env) {
+            return data;
+        }
+        if fun_env.get_spec().has_conditions() {
+            return data;
+        }
+        if !fun_env.module_env.env.is_verify_mode() {
+            return data;
+        }
+        // Only infer for lambdas that are actually verified. The inferred spec is
+        // marked opaque and trusted at call sites through `ensures_of`/`aborts_of`,
+        // so the body must be checked against it; a lambda excluded from
+        // verification (narrow scope, `pragma verify = false`, `--verify-exclude`)
+        // must not contribute a trusted-but-unproven spec.
+        if !verification_analysis::get_info(&FunctionTarget::new(fun_env, &data)).verified {
+            return data;
+        }
+        if !needs_inference(fun_env) {
+            return data;
+        }
+        let _ = run_spec_inference_on_data(
+            fun_env, &data, /*annotate=*/ false, /*silent=*/ true,
+        );
+        data
+    }
+}
+
+/// Identifies lambda-lifted functions by name. Mirrors `LIFTED_FUN_MARKER` from
+/// `move-compiler-v2/src/env_pipeline/lambda_lifter.rs` (we can't import that const
+/// because `bytecode-pipeline` does not depend on `move-compiler-v2`).
+fn is_lambda_lifted_name(fun_env: &FunctionEnv) -> bool {
+    fun_env
+        .symbol_pool()
+        .string(fun_env.get_name())
+        .contains("__lambda__")
+}
+
+// =================================================================================================
 // Helper Functions
 
 /// Checks if a function needs spec inference
@@ -806,6 +699,198 @@ fn needs_inference(fun_env: &FunctionEnv) -> bool {
     } else {
         true
     }
+}
+
+/// Runs spec inference on a function's bytecode and writes inferred conditions into
+/// the function's spec via [`update_spec`]. The caller is responsible for the higher-
+/// level gates (e.g. native/intrinsic/empty-code checks, variant selection, and
+/// [`needs_inference`]). Returns the WP annotation when `annotate` is true so callers
+/// can install it on `FunctionData.annotations`.
+///
+/// When `silent_on_failure` is true, the WP-loss diagnostics (which indicate a bug in
+/// inference for the normal path) are suppressed; this is appropriate for best-effort
+/// uses where the function's spec is allowed to stay empty if the analyzer cannot
+/// summarize the body.
+fn run_spec_inference_on_data(
+    fun_env: &FunctionEnv,
+    data: &FunctionData,
+    annotate: bool,
+    silent_on_failure: bool,
+) -> Option<WPAnnotation> {
+    let mut analyzer = SpecInferenceAnalyzer::new(fun_env, data);
+    let (wp_map, has_skipped_blocks) = analyzer.analyze();
+
+    if has_skipped_blocks {
+        if !silent_on_failure {
+            fun_env.module_env.env.diag(
+                Severity::Bug,
+                &fun_env.get_loc(),
+                "unexpected loss of weakest precondition: \
+                 loops in backward CFG prevented complete analysis",
+            );
+        }
+        drop(analyzer);
+        return annotate.then_some(WPAnnotation(wp_map));
+    }
+
+    // By construction, for well-typed code the WP at entry should only reference
+    // parameters. If this invariant is violated, it indicates a bug in spec inference.
+    let entry_state = wp_map.get(&0).or_else(|| wp_map.get(&1));
+    if let Some(state) = entry_state {
+        let entry_post_label = state.post;
+        let mut state = state.clone();
+
+        // Resolve is_parent temporaries: substitute them with their path conditions
+        // computed via dominator tree analysis.
+        let bytecode = analyzer.target.get_bytecode();
+        let is_parent_subs = analyzer.compute_is_parent_substitutions(bytecode);
+        if !is_parent_subs.is_empty() {
+            state = analyzer.resolve_is_parent_in_state(&state, &is_parent_subs);
+        }
+
+        // For &mut params that were never written on any path, add `ensures param == old(param)`.
+        // This captures the fact that unmodified reference parameters retain their original value.
+        let num_params = fun_env.get_parameter_count();
+        for idx in 0..num_params {
+            let ty = analyzer.get_local_type(idx);
+            if ty.is_mutable_reference() && !state.captured_mut_params.contains(&idx) {
+                let param_exp = analyzer.mk_temporary(idx);
+                let old_param = analyzer.mk_old(param_exp.clone());
+                state.add_ensures(analyzer.mk_eq(param_exp, old_param));
+            }
+        }
+
+        // Resolve borrow temps from captured globals.
+        // On exit paths, the BorrowGlobal handler may not have been reached
+        // (it only appears on the loop body path), leaving unresolved
+        // Temporary(idx) or Freeze(Temporary(idx)) references to borrow temps.
+        // Substitute them with the corresponding global<R>[@entry](addr),
+        // using the entry label so MemoryLabelInfo::normalize can later
+        // wrap it in old() for ensures context.
+        let captured_globals: Vec<TempIndex> = state.captured_globals.iter().copied().collect();
+        for &temp in &captured_globals {
+            if let Some((mid, sid, targs, addr_temp)) =
+                analyzer.borrow_global_info.get(&temp).cloned()
+            {
+                let struct_env = analyzer.get_struct(mid, sid);
+                let addr_exp = analyzer.mk_temporary(addr_temp);
+                let global_exp = analyzer.mk_global_with_label(
+                    &struct_env,
+                    &targs,
+                    addr_exp,
+                    Some(entry_post_label),
+                );
+                // Replace patterns referencing the borrow temp with global<R>(addr):
+                // - Freeze(Temporary(temp)) → global<R>(addr)
+                // - bare Temporary(temp) → global<R>(addr)
+                // - Old(Temporary(temp)) → Old(global<R>(addr))
+                let temp_exp = analyzer.mk_temporary(temp);
+                let global_node_type = analyzer.global_env().get_node_type(
+                    if let ExpData::Call(id, ..) = global_exp.as_ref() {
+                        *id
+                    } else {
+                        unreachable!()
+                    },
+                );
+                let freeze_id = analyzer.new_node(global_node_type, None);
+                let freeze_exp =
+                    ExpData::Call(freeze_id, AstOp::Freeze(false), vec![temp_exp.clone()])
+                        .into_exp();
+                let old_temp_exp = analyzer.mk_old(temp_exp.clone());
+                let old_global_exp = analyzer.mk_old(global_exp.clone());
+                state = state.map(|e| {
+                    let e = analyzer.substitute_exp_with_exp(e, &freeze_exp, &global_exp);
+                    let e = analyzer.substitute_exp_with_exp(&e, &old_temp_exp, &old_global_exp);
+                    // Use substitute_temp_with_exp for bare Temporary — substitute_exp_with_exp
+                    // only matches Call patterns and would miss Temporary nodes.
+                    analyzer.substitute_temp_with_exp(&e, temp, &global_exp)
+                });
+            }
+        }
+
+        // Strip memory labels inside old() wrappers.
+        // BorrowGlobal substitution inserts the state.post label everywhere,
+        // including inside old(). Labels inside old() are semantically wrong
+        // (old() already refers to function entry state).
+        state = analyzer.strip_labels_inside_old(&state);
+
+        // Collect modifies targets before normalization (labels still present).
+        for ensures in &state.ensures {
+            collect_modifies_targets(ensures, &mut state.direct_modifies);
+        }
+
+        // Final label normalization: classify all labels and convert.
+        // - pre-labels in ensures → old(Global(None))
+        // - pre-labels in aborts → Global(None) (already pre-state context)
+        // - post-labels → stripped to None (implicit post-state)
+        // - intermediate labels preserved
+        {
+            let all_conds: Vec<&Exp> = state.ensures.iter().chain(state.aborts.iter()).collect();
+            let label_info = MemoryLabelInfo::from_conditions(&all_conds, Some(entry_post_label));
+            let env = analyzer.global_env();
+            state.ensures = state
+                .ensures
+                .iter()
+                .map(|e| label_info.normalize(env, e, true))
+                .collect();
+            state.aborts = state
+                .aborts
+                .iter()
+                .map(|e| label_info.normalize(env, e, false))
+                .collect();
+        }
+
+        // Eliminate WP-internal `WriteOf` carriers before simplification
+        // so any tautologies it produces are folded away.
+        analyzer.eliminate_write_of(&mut state);
+
+        // Simplify conditions: constant folding, arithmetic/boolean
+        // identities, and assumption-based redundancy elimination.
+        // Multiple passes allow multi-step simplification chains to complete
+        // (e.g., normalize → pinch → one-point rule).
+        state = simplify_state(&mut analyzer, &state);
+        state = simplify_state(&mut analyzer, &state);
+        state = simplify_state(&mut analyzer, &state);
+
+        if !state.is_empty() {
+            update_spec(fun_env, &state, &mut analyzer);
+            // Extract repeated state-neutral sub-expressions into let bindings.
+            cse_inferred_conditions(fun_env);
+            // Emit modifies clauses only for opaque specs (they need
+            // explicit modifies to declare which globals may change).
+            if !ProverOptions::get(analyzer.global_env()).no_inference_opaque {
+                emit_modifies(fun_env, &state);
+            }
+            // Check for inferred conditions referencing non-parameter temporaries
+            check_bad_temps(fun_env);
+        } else if !silent_on_failure {
+            // Entry state is empty but there may be non-empty WP states at intermediate
+            // offsets, indicating that weakest preconditions were lost during joins.
+            let has_non_empty_wp = wp_map.values().any(|s| !s.is_empty());
+            if has_non_empty_wp {
+                fun_env.module_env.env.diag(
+                    Severity::Bug,
+                    &fun_env.get_loc(),
+                    "unexpected loss of weakest precondition: \
+                     intermediate WP states exist but did not propagate to entry",
+                );
+            }
+        }
+    } else if !silent_on_failure {
+        // No entry state at all but there may be non-empty WP states at other offsets.
+        let has_non_empty_wp = wp_map.values().any(|s| !s.is_empty());
+        if has_non_empty_wp {
+            fun_env.module_env.env.diag(
+                Severity::Bug,
+                &fun_env.get_loc(),
+                "unexpected loss of weakest precondition: \
+                 intermediate WP states exist but did not propagate to entry",
+            );
+        }
+    }
+
+    drop(analyzer);
+    annotate.then_some(WPAnnotation(wp_map))
 }
 
 fn update_spec<'env>(

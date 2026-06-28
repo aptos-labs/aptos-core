@@ -137,7 +137,6 @@ spec aptos_framework::staking_config {
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
-        pragma verify_duration_estimate = 120;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.2]
@@ -149,7 +148,9 @@ spec aptos_framework::staking_config {
     }
 
     spec get(): StakingConfig {
+        pragma opaque;
         aborts_if !exists<StakingConfig>(@aptos_framework);
+        ensures result == global<StakingConfig>(@aptos_framework);
     }
 
     spec get_reward_rate(config: &StakingConfig): (u64, u64) {
@@ -163,7 +164,6 @@ spec aptos_framework::staking_config {
     }
 
     spec reward_rate(): (u64, u64) {
-        pragma verify_duration_estimate = 120;
         let config = global<StakingConfig>(@aptos_framework);
         aborts_if !exists<StakingConfig>(@aptos_framework);
         include StakingRewardsConfigRequirement;
@@ -173,14 +173,12 @@ spec aptos_framework::staking_config {
     }
 
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
-        pragma verify_duration_estimate = 120;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
         aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
     }
 
     spec calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
-        pragma verify_duration_estimate = 120;
         requires features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
@@ -195,6 +193,8 @@ spec aptos_framework::staking_config {
         maximum_stake: u64,
     ) {
         use std::signer;
+        pragma opaque;
+        modifies global<StakingConfig>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.3]
         aborts_if addr != @aptos_framework;
@@ -212,6 +212,8 @@ spec aptos_framework::staking_config {
         new_recurring_lockup_duration_secs: u64,
     ) {
         use std::signer;
+        pragma opaque;
+        modifies global<StakingConfig>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.4]
         aborts_if addr != @aptos_framework;
@@ -232,6 +234,8 @@ spec aptos_framework::staking_config {
         new_rewards_rate_denominator: u64,
     ) {
         use std::signer;
+        pragma opaque;
+        modifies global<StakingConfig>(@aptos_framework);
         aborts_if features::spec_periodical_reward_rate_decrease_enabled();
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.5]
@@ -255,7 +259,6 @@ spec aptos_framework::staking_config {
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
-        pragma verify_duration_estimate = 120; // verified but takes long
         include StakingRewardsConfigRequirement;
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.6]
@@ -278,6 +281,8 @@ spec aptos_framework::staking_config {
         new_voting_power_increase_limit: u64,
     ) {
         use std::signer;
+        pragma opaque;
+        modifies global<StakingConfig>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.7]
         aborts_if addr != @aptos_framework;
@@ -289,6 +294,7 @@ spec aptos_framework::staking_config {
 
     /// The maximum_stake must be greater than maximum_stake in the range of Specified stake and the maximum_stake greater than zero.
     spec validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
+        pragma opaque;
         aborts_if minimum_stake > maximum_stake || maximum_stake == 0;
     }
 
@@ -299,6 +305,7 @@ spec aptos_framework::staking_config {
         rewards_rate_period_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
+        pragma opaque;
         include StakingRewardsConfigValidationAbortsIf;
     }
 

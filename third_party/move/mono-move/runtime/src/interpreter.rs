@@ -11,16 +11,18 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
+        deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        pinned_roots::PinnedRoots,
-        AllocationError, Heap,
+        AllocationError, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
-        read_account_address, read_bool, read_descriptor, read_fat_ptr, read_obj_size, read_ptr,
-        read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr, write_bool, write_fat_ptr,
-        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
+        read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
+        read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
+        write_bool, write_enum_tag, write_fat_ptr, write_ptr, write_u32, write_u64, write_u8,
+        MemoryRegion,
     },
+    native_context::ProductionNativeContext,
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
@@ -30,19 +32,22 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    native::{NativeABI, NativeIdx, NativeStatus, ProductionNativeContext},
+    native::{
+        NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool,
+        VMInternalError,
+    },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
+    types::{view_type_list, InternedType, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
-use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
@@ -69,7 +74,7 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + Lay
     /// Auxiliary GC root set for temporarily-live heap pointers that are
     /// not yet stored in any frame slot (e.g. between two allocations in a
     /// fused micro-op, or in native functions).
-    pub(crate) pinned_roots: PinnedRoots,
+    pub(crate) root_pool: RootPool,
     /// Per-transaction global-storage state: working map of cached
     /// reads / pending writes, linear journal for rollback, and
     /// checkpoint stack.
@@ -112,7 +117,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
-            pinned_roots: PinnedRoots::new(),
+            root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
         }
@@ -126,27 +131,54 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.heap.gc_count
     }
 
-    /// TODO: move to execution context
-    pub fn checkpoint(&mut self) {
+    /// The VM heap. Exposed so callers can read heap-resident values.
+    pub fn heap(&self) -> &Heap {
+        &self.heap
+    }
+
+    pub fn extensions(&self) -> &NativeExtensions {
+        self.exec_ctx.extensions()
+    }
+
+    /// Takes a checkpoint (opening a new sub-session): checkpoints the
+    /// read-write set and signals every native extension. The two advance in
+    /// lockstep, so a single [`Self::rollback`] depth undoes a checkpoint's
+    /// effects across both.
+    //
+    // TODO(cleanup): move to execution context
+    pub fn checkpoint(&mut self) -> RuntimeResult<()> {
         self.read_write_set.checkpoint();
+        self.exec_ctx
+            .extensions()
+            .checkpoint()
+            .map_err(VMInternalError::into_runtime_error)
     }
 
-    /// TODO: move to execution context
+    /// Rolls back the `n` most recent checkpoints across the read-write set and
+    /// every native extension. `n == 0` is a no-op; `n` beyond the current
+    /// depth is an invariant violation. The read-write set rolls back first, so
+    /// an underflow is caught before any extension is touched.
+    //
+    // TODO(cleanup): move to execution context
     pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
-        self.read_write_set.rollback(n)
+        self.read_write_set.rollback(n)?;
+        self.exec_ctx
+            .extensions()
+            .rollback(n)
+            .map_err(VMInternalError::into_runtime_error)
     }
 
-    /// TODO: move to execution context
+    /// TODO(cleanup): move to execution context
     pub fn checkpoint_depth(&self) -> usize {
         self.read_write_set.checkpoint_depth()
     }
 
-    /// TODO: move to execution context
+    /// TODO(cleanup): move to execution context
     pub fn current_epoch(&self) -> u64 {
         self.read_write_set.current_epoch()
     }
 
-    /// TODO: move to execution context
+    /// TODO(cleanup): move to execution context
     pub fn journal_len(&self) -> usize {
         self.read_write_set.journal_len()
     }
@@ -155,7 +187,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
     ///
-    // TODO: invoke() is test-only for now. When used with real gas budgets,
+    // TODO(cleanup): invoke() is test-only for now. When used with real gas budgets,
     // decide whether to reset the gas meter here.
     pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
@@ -185,6 +217,17 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
     }
 
+    /// Resets the context to run `func` again from a clean state, reusing the already-allocated
+    /// stack and heap buffers instead of reallocating them. Place arguments with
+    /// [`set_root_arg`](Self::set_root_arg) before calling [`run`](Self::run).
+    pub fn reset(&mut self, func: &Function, gas_budget: u64) {
+        self.invoke(func);
+        self.heap.reset();
+        self.read_write_set = ResourceReadWriteSet::new();
+        self.root_pool = RootPool::new();
+        self.exec_ctx.gas_meter().reset(gas_budget);
+    }
+
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result(&self) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
@@ -195,14 +238,30 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
     }
 
-    /// Read `size` raw bytes from the root frame at the given byte offset.
-    pub fn root_result_bytes(&self, offset: u32, size: u32) -> &[u8] {
+    /// Read `size` raw bytes from the root frame at the given byte offset. For
+    /// tests inspecting an entry/native function's raw return slots.
+    pub fn root_result_bytes_for_test(&self, offset: u32, size: u32) -> &[u8] {
         unsafe {
             let base = self
                 .stack
                 .as_ptr()
                 .add(FRAME_METADATA_SIZE + offset as usize);
             std::slice::from_raw_parts(base, size as usize)
+        }
+    }
+
+    /// Reads a heap `vector<u8>` (or a `String`, same slot layout) from the root
+    /// result slot at `offset`; empty if the pointer is null. For tests.
+    pub fn root_result_byte_vector_for_test(&self, offset: u32) -> Vec<u8> {
+        // SAFETY: the slot holds a live pointer to a heap vector<u8>; the heap
+        // is still owned by this context, so the read stays in bounds.
+        unsafe {
+            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
+            if ptr.is_null() {
+                return vec![];
+            }
+            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
+            std::slice::from_raw_parts(ptr.add(VEC_DATA_OFFSET), len).to_vec()
         }
     }
 
@@ -220,6 +279,29 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     /// Read a raw heap pointer from the root frame at the given byte offset.
     pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
         unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
+    }
+
+    /// Deserialize a BCS-encoded argument of type `ty` into the root frame at `offset`, allocating
+    /// any nested heap data on this context's heap. Handles struct/vector arguments, unlike
+    /// [`set_root_arg`](Self::set_root_arg) (a raw copy for primitives only).
+    ///
+    /// # Safety
+    ///
+    /// `offset` and `ty` must correspond to a real parameter slot, and `ty` must not be a reference.
+    pub unsafe fn deserialize_root_arg(
+        &mut self,
+        offset: u32,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> RuntimeResult<()> {
+        let dst = unsafe {
+            self.stack
+                .as_ptr()
+                .add(FRAME_METADATA_SIZE + offset as usize)
+        };
+        // SAFETY: `dst` is a slot in the root frame (caller guarantees offset/ty match a
+        // parameter); `exec_ctx` is the LayoutProvider and `heap` is where nested data is boxed.
+        unsafe { value_utils::deserialize_into(&*self.exec_ctx, &mut self.heap, ty, bytes, dst) }
     }
 
     /// Allocate a vector of `u64` values on the heap and return its address
@@ -261,7 +343,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
 // compile to a handful of direct memory ops (e.g. AddU64 is 4 movs +
 // addq + jae + jmp).
 //
-// TODO: re-verify inlining after non-trivial changes to the helpers,
+// TODO(perf): re-verify inlining after non-trivial changes to the helpers,
 // the call sites, or the rustc/LLVM versions the workspace pins to.
 
 /// `dst <- op(lhs_slot, rhs_slot)` (infallible).
@@ -370,7 +452,7 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
 /// Read a `T`-sized value from `base + byte_offset`. Aligned access for
 /// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
 ///
-/// TODO: this reads with native endianness, but `StoreImm*` writes immediates
+/// TODO(correctness): this reads with native endianness, but `StoreImm*` writes immediates
 /// as little-endian bytes. Consistent on LE hosts (all current targets); force
 /// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
 ///
@@ -795,6 +877,9 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         // offsets are within the current frame (enforced by the bytecode
         // compiler). Heap pointers read from the frame are kept valid by GC.
         unsafe {
+            // TODO(perf): explore faster dispatch -- super-instructions (fuse
+            // common sequences like load+compare+branch), threaded/computed-goto
+            // dispatch, and copy-and-patch JIT.
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
                 MicroOp::CallIndirect {
@@ -802,7 +887,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     func_name,
                     ty_args,
                 } => {
-                    // TODO: full flow should be like this:
+                    // TODO(perf): full flow should be like this:
                     //
                     //   1. IC lookup:
                     //      - Hit:  return pointer,
@@ -825,10 +910,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
                 MicroOp::CallNative {
                     native_idx,
+                    ty_args,
                     ref abi,
-                    ..
                 } => {
-                    return self.exec_call_native(func, fp, native_idx, abi);
+                    return self.exec_call_native(func, fp, native_idx, ty_args, abi);
                 },
 
                 MicroOp::JumpNotZeroU64 {
@@ -1062,7 +1147,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let message = if len == 0 {
                         String::new()
                     } else {
-                        // TODO: charge gas for abort message bytes.
+                        // TODO(metering): charge gas for abort message bytes.
                         if len > ABORT_MESSAGE_SIZE_LIMIT {
                             return Err(RuntimeError::AbortMessageTooLong {
                                 len,
@@ -1243,6 +1328,9 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 },
 
                 MicroOp::Move { dst, src, size } => {
+                    // TODO(perf): consider adding a provably non-overlapping variant of this op.
+                    // Overlap-safe `copy`: `dst` and `src` may partially overlap.
+                    // E.g. the return-value shuffle may move results in the same home region.
                     std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
                 },
 
@@ -1357,6 +1445,46 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         vec_elem_ptr(vec_ptr, idx, elem_size) as *mut u8,
                         elem_size as usize,
                     );
+                },
+
+                MicroOp::VecPack(ref op) => {
+                    self.exec_vec_pack(fp, op)?;
+                },
+
+                MicroOp::VecUnpack(ref op) => {
+                    self.exec_vec_unpack(fp, op)?;
+                },
+
+                MicroOp::VecSwap {
+                    vec_ref,
+                    idx_a,
+                    idx_b,
+                    elem_size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                    let idx_a = read_u64(fp, idx_a);
+                    let idx_b = read_u64(fp, idx_b);
+                    let len = read_vec_len(vec_ptr);
+                    // Indices are checked before the equal-indices no-op.
+                    for idx in [idx_a, idx_b] {
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::Swap,
+                                idx,
+                                len,
+                            });
+                        }
+                    }
+                    // Equal pointers are UB for `swap_nonoverlapping`; distinct
+                    // in-bounds indices guarantee disjoint element ranges.
+                    if idx_a != idx_b {
+                        std::ptr::swap_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
+                            vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                    }
                 },
 
                 // ----- Reference (fat pointer) instructions -----
@@ -1638,6 +1766,150 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     let right = read_bool(fp, rhs);
                     write_bool(fp, dst, left || right)
                 },
+                MicroOp::EnumTestTag {
+                    dst,
+                    enum_ref,
+                    variant,
+                } => {
+                    // Deref the enum fat pointer to the heap object, then read the tag.
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    let tag = read_enum_tag(obj_ptr);
+                    write_bool(fp, dst, tag == variant);
+                },
+
+                MicroOp::EnumBorrowVariantField {
+                    dst,
+                    enum_ref,
+                    ref offsets,
+                } => {
+                    // Deref the enum fat pointer to the heap object, read the
+                    // tag, then borrow the field at that variant's offset.
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    let tag = read_enum_tag(obj_ptr);
+                    let Some(variant_offset) = offsets.get(tag as usize) else {
+                        // A tag past the variant table is heap corruption (a
+                        // well-formed enum's tag is always in range), not a
+                        // user-level mismatch. Surface it as an invariant
+                        // violation.
+                        invariant_violation!(EnumTagOutOfRange {
+                            tag,
+                            variant_count: offsets.len(),
+                        });
+                    };
+                    match variant_offset {
+                        Some(offset) => write_fat_ptr(fp, dst, obj_ptr, *offset as u64),
+                        // Tag in range but this variant does not declare the
+                        // field (move semantics for this is a runtime error).
+                        None => return Err(RuntimeError::EnumVariantMismatch { tag }),
+                    }
+                },
+
+                MicroOp::EnumCheckVariant { enum_ptr, variant } => {
+                    // `enum_ptr` is the heap-pointer value; runtime error if
+                    // its tag is not the expected variant.
+                    let obj_ptr = read_ptr(fp, enum_ptr);
+                    let tag = read_enum_tag(obj_ptr);
+                    if tag != variant {
+                        return Err(RuntimeError::EnumVariantMismatch { tag });
+                    }
+                },
+
+                MicroOp::EnumNew {
+                    dst,
+                    descriptor_id,
+                    variant,
+                } => {
+                    let obj_ptr = alloc_obj!(self, fp, descriptor_id)?;
+                    // No safe point between the allocation and these
+                    // non-allocating writes: stamp the tag through the fresh
+                    // pointer, then publish it to `dst`.
+                    write_enum_tag(obj_ptr, variant);
+                    write_ptr(fp, dst, obj_ptr);
+                },
+
+                MicroOp::EnumReadVariantField {
+                    dst,
+                    enum_ref,
+                    offset,
+                    size,
+                } => {
+                    // Double deref of the enum fat pointer to the heap object,
+                    // then copy the field bytes directly — no intermediate
+                    // scratch reference. The offset is a static uniform offset
+                    // (no tag dispatch).
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    // Non-overlapping: `dst` is a stack-region slot, the field
+                    // is heap-object bytes.
+                    std::ptr::copy_nonoverlapping(
+                        obj_ptr.add(offset as usize),
+                        fp.add(dst.into()),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::EnumWriteVariantField {
+                    enum_ref,
+                    offset,
+                    src,
+                    size,
+                } => {
+                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                    // Non-overlapping: `src` is a stack-region slot, the field
+                    // is heap-object bytes.
+                    std::ptr::copy_nonoverlapping(
+                        fp.add(src.into()),
+                        obj_ptr.add(offset as usize),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {
+                    // Pre-condition: each `base + off` holds a heap pointer
+                    // byte-copied from another value, so the pointee is still
+                    // shared with that value. Replace each non-null pointer
+                    // with a pointer to a fresh deep copy, making the value at
+                    // `base` independent (Move value semantics). Null (e.g. an
+                    // empty vector) stays null.
+                    //
+                    // TODO(metering): the IR-level cost of the materializing
+                    // instruction charges only the shallow byte move, not this
+                    // heap-graph copy. Change charging to reflect at least the
+                    // amount of work done.
+                    //
+                    // TODO(perf): the materializing op currently emits a byte
+                    // move into `base` followed by this in-place fixup that
+                    // re-reads from `base`. A fused `src -> dst` deep copy
+                    // would drop the separate move and the re-read. It would
+                    // need deep-copying variants of `ReadRef`, `Read*Field`,
+                    // etc.
+                    if let &[off] = offsets.as_ref() {
+                        // Fast path for copying whole-enum / whole-vector /
+                        // aggregate with one heap backed field: a single owned
+                        // pointer at one offset. Uses single-root `deep_copy`,
+                        // avoiding the batch's per-op `Vec`s.
+                        if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
+                            let new = self.deep_copy(src)?;
+                            write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                        }
+                    } else {
+                        let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
+                        let mut sources: Vec<NonNull<u8>> = Vec::with_capacity(offsets.len());
+                        for &off in offsets.iter() {
+                            if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
+                                live_offsets.push(off);
+                                sources.push(src);
+                            }
+                        }
+                        let copies = self.deep_copy_batch(&sources)?;
+                        for (off, new) in live_offsets.iter().zip(copies) {
+                            write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                        }
+                    }
+                },
             }
         }
 
@@ -1660,24 +1932,86 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         // and is writable (no aliasing to the heap).
         unsafe {
             let dst = self.frame_ptr.add(usize::from(dst));
-            if let Err(err) =
-                value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
-            {
-                match err {
-                    AllocationError::RuntimeError(err) => return Err(err),
-                    AllocationError::OutOfHeapMemory { .. } => {
-                        // TODO: add an ld_const test that fills the heap so
-                        // the first deserialize fails and this GC-then-retry
-                        // path runs. Needs a `ForceGC` native to drive it
-                        // deterministically in the differential suite.
-                        gc_collect!(self)?;
-                        value_utils::deserialize(self.exec_ctx, &mut self.heap, ty, bytes, dst)
-                            .map_err(AllocationError::into_runtime_error)?;
-                    },
-                }
-            }
-            Ok(())
+            deserialize_or_gc(
+                self.exec_ctx,
+                &mut self.heap,
+                ty,
+                bytes,
+                dst,
+                self.exec_ctx,
+                &mut self.read_write_set,
+                &self.root_pool,
+                self.exec_ctx.extensions(),
+                self.frame_ptr,
+                crate::heap::TopFrame::Function {
+                    func: self.current_func,
+                    pc: self.pc,
+                },
+            )
         }
+    }
+
+    /// Allocates the vector at exact capacity in a single allocation, writes
+    /// the length, copies each source element from the frame, and writes the
+    /// heap pointer to `op.dst`. Any GC runs inside the allocation, before the
+    /// fp-relative element reads, so those reads see post-GC pointers.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+        let count = op.srcs.len() as u64;
+        // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
+        // payload byte is overwritten below before the op returns and no GC can
+        // intervene afterwards. A fully-initialized-payload alloc variant would
+        // avoid the dead memset. Padding needs to be carefully considered for
+        // the optimization.
+        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        unsafe {
+            write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
+            for (elem_idx, src) in op.srcs.iter().enumerate() {
+                // Non-overlapping: the source is a frame slot, the destination
+                // is in the freshly-allocated heap vector — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    fp.add((*src).into()),
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size) as *mut u8,
+                    op.elem_size as usize,
+                );
+            }
+            write_ptr(fp, op.dst, vec_ptr);
+        }
+        Ok(())
+    }
+
+    /// Checks that the vector's length equals `op.dsts.len()` — erroring on a
+    /// mismatch; then copies each element into its destination slot. A null
+    /// `src` is the empty vector: it unpacks cleanly when `dsts` is empty and
+    /// fails the length check otherwise.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - `op.src` and each `op.dsts` slot are in-bounds for the current frame.
+    unsafe fn exec_vec_unpack(&mut self, fp: *mut u8, op: &VecUnpackOp) -> RuntimeResult<()> {
+        unsafe {
+            let vec_ptr = read_ptr(fp, op.src);
+            let expected = op.dsts.len() as u64;
+            let actual = read_vec_len(vec_ptr);
+            if actual != expected {
+                return Err(RuntimeError::VecUnpackLengthMismatch { expected, actual });
+            }
+            for (elem_idx, dst) in op.dsts.iter().enumerate() {
+                // Non-overlapping: the source is a heap vector element, the
+                // destination is a frame slot — disjoint regions.
+                std::ptr::copy_nonoverlapping(
+                    vec_elem_ptr(vec_ptr, elem_idx as u64, op.elem_size),
+                    fp.add((*dst).into()),
+                    op.elem_size as usize,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Deep-copy the value tree rooted at the specified source into the
@@ -1689,25 +2023,84 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
-        let root_guard = self.pinned_roots.pin(root);
-        // SAFETY: `root_guard.get()` returns the caller-supplied root, which
-        // by this function's contract points to a live object.
-        match unsafe { self.heap.try_deep_copy(self.exec_ctx, root_guard.get()) } {
-            Ok(ptr) => Ok(ptr),
-            Err(AllocationError::RuntimeError(err)) => Err(err),
-            Err(AllocationError::OutOfHeapMemory { .. }) => {
-                gc_collect!(self)?;
-                // Re-read the root pointer from the pin, as its address have
-                // been changed by the GC.
-                // SAFETY: the pin keeps the root live across GC; the relocated
-                // pointer still points to the same live object.
-                unsafe {
-                    self.heap
-                        .try_deep_copy(self.exec_ctx, root_guard.get())
-                        .map_err(AllocationError::into_runtime_error)
-                }
-            },
+        // SAFETY: by this function's contract `root` points to a live object.
+        unsafe {
+            deep_copy_or_gc(
+                &mut self.heap,
+                self.exec_ctx,
+                &mut self.read_write_set,
+                &self.root_pool,
+                self.exec_ctx.extensions(),
+                self.frame_ptr,
+                TopFrame::Function {
+                    func: self.current_func,
+                    pc: self.pc,
+                },
+                root,
+            )
         }
+    }
+
+    /// Deep-copy each of `sources` into the local heap, returning the new root
+    /// pointers in the same order.
+    ///
+    /// All sources are rooted for the whole batch, so a GC triggered partway
+    /// through preserves and relocates the not-yet-copied ones. Because
+    /// `try_deep_copy` never GCs mid-copy, a *successful* pass builds every
+    /// result without an intervening GC, so the already-built results need no
+    /// root of their own — only the sources are rooted. Mirrors
+    /// [`Self::deep_copy`]'s single GC-then-retry-once policy, batched over all
+    /// sources.
+    ///
+    /// # Safety
+    ///
+    /// Every `source` must point to the data region of a live object whose
+    /// header is at `source - OBJECT_HEADER_SIZE`.
+    unsafe fn deep_copy_batch(
+        &mut self,
+        sources: &[NonNull<u8>],
+    ) -> RuntimeResult<Vec<NonNull<u8>>> {
+        // SAFETY: each source is a live object (caller contract); the handle
+        // keeps it live and relocated across any GC during the batch.
+        let guards: Vec<ObjectHandle> = sources
+            .iter()
+            .map(|&src| unsafe { self.root_pool.root_object(src.as_ptr()) })
+            .collect();
+        // First attempt. On out-of-memory, the partial copies are unrooted
+        // garbage; drop them, GC (which relocates the rooted sources), and
+        // retry the whole batch once.
+        let mut out = Vec::with_capacity(guards.len());
+        let mut needs_gc = false;
+        for guard in &guards {
+            // SAFETY: each root holds a live object; GC keeps `guard.ptr()`
+            // valid and relocated.
+            match unsafe {
+                self.heap
+                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+            } {
+                Ok(ptr) => out.push(ptr),
+                Err(AllocationError::RuntimeError(err)) => return Err(err),
+                Err(AllocationError::OutOfHeapMemory { .. }) => {
+                    needs_gc = true;
+                    break;
+                },
+            }
+        }
+        if !needs_gc {
+            return Ok(out);
+        }
+        gc_collect!(self)?;
+        out.clear();
+        for guard in &guards {
+            // SAFETY: as above, after relocation.
+            let ptr = unsafe {
+                self.heap
+                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+            }
+            .map_err(AllocationError::into_runtime_error)?;
+            out.push(ptr);
+        }
+        Ok(out)
     }
 
     /// Implementation of `MicroOp::PackClosure`.
@@ -1721,17 +2114,17 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// and `captured_data_ptr` is left null.
     ///
     /// For capturing closures, two allocations happen. The closure object
-    /// is pinned via [`PinnedRoots`] immediately after its own allocation
-    /// and stays pinned across the captured-data allocation, so any GC
+    /// is rooted in the [`RootPool`] immediately after its own allocation
+    /// and stays rooted across the captured-data allocation, so any GC
     /// triggered by the second allocation preserves the closure (even
     /// before it's written to `op.dst`) and relocates our local pointer.
     ///
-    // TODO: swap the generic `PinnedRoots` machinery here for a
+    // TODO(perf): swap the generic [`RootPool`] machinery here for a
     // `Heap::reserve(n)` API that pre-secures headroom for both
     // allocations so the second `alloc_obj` can never trigger GC.
-    // `PinnedRoots` is still justified for native functions but is
-    // overkill for the 2-allocation case here and costs us a guard
-    // construction / pointer reload.
+    // The pool is still justified for native functions but is overkill for
+    // the 2-allocation case here and costs us a handle construction /
+    // pointer reload.
     ///
     /// # Safety
     ///
@@ -1754,18 +2147,19 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 return Ok(());
             }
 
-            // Capturing path: allocate the closure object, pin it, then
+            // Capturing path: allocate the closure object, root it, then
             // allocate and populate the captured-data object.
             //
             // The closure has a null `captured_data_ptr` between the two
             // allocations — safe for GC to see (null heap pointers are
-            // skipped). Pinning keeps the closure live across the second
-            // allocation and lets GC update the pinned slot in-place if
+            // skipped). Rooting keeps the closure live across the second
+            // allocation and lets GC update the rooted slot in-place if
             // the object is relocated.
             let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
-            let pin = self.pinned_roots.pin(NonNull::new_unchecked(closure_ptr));
+            // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
+            let closure_root = self.root_pool.root_object(closure_ptr);
 
-            self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
+            self.write_closure_func_ref_and_mask(closure_root.ptr(), op);
 
             // SAFETY: the verifier guarantees `captured_data_descriptor_id`
             // is `Some` whenever `captured` is non-empty. The values-region
@@ -1779,7 +2173,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // a lazily-resolved callee's captured layout against it; the header
             // records only the alignment-rounded allocation size.
             //
-            // TODO: persisting only the total lets `CallClosure` check totals but
+            // TODO(correctness): persisting only the total lets `CallClosure` check totals but
             // not the per-capture `(size, align)` breakdown. Persist that layout
             // here to enable element-wise validation of an `Unresolved` callee.
             write_u32(
@@ -1803,7 +2197,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 cursor = next;
             }
 
-            let closure = pin.get().as_ptr();
+            let closure = closure_root.ptr();
             write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, captured_data);
             write_ptr(fp, op.dst, closure);
 
@@ -1934,6 +2328,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     }
                     let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
                     if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
+                        // TODO(completeness): only the Materialized captured-data tag is supported.
                         todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported now)", cap_tag);
                     }
                     // The resolved callee's captured `values_size` must equal the
@@ -1941,7 +2336,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     // alignment-rounded header), rejecting signature skew before
                     // the copy loop reads the bytes at the callee's offsets.
                     //
-                    // TODO: this compares only the *total* values_size, so a
+                    // TODO(correctness): this compares only the *total* values_size, so a
                     // same-total but different per-capture `(size, align)` layout
                     // (a cross-module skew) still passes and is read at the wrong
                     // per-value offsets. The `Resolved` path is fully covered by
@@ -1979,7 +2374,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // parameter order) with provided arguments (from the caller's
             // frame).
             //
-            // TODO: replace this interleaving scheme with one where the
+            // TODO(perf): replace this interleaving scheme with one where the
             // specializer pre-writes provided arguments into the callee's
             // parameter region at the call site (densely packed, in
             // parameter order — exactly the same codegen as a regular
@@ -2173,6 +2568,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         caller: &Function,
         fp: *mut u8,
         native_idx: NativeIdx,
+        ty_args: InternedTypeList,
         abi: &NativeABI,
     ) -> RuntimeResult<StepResult> {
         // Check if we have enough space on the stack to allocate the native's frame.
@@ -2197,15 +2593,33 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = self.frame_ptr;
         self.frame_ptr = new_fp;
         let result = {
-            let (registry, gas_meter) = self.exec_ctx.natives_and_gas_meter();
+            let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
+                self.exec_ctx.native_call_borrows();
             let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
                     idx: native_idx.0,
                     registry_size: registry.len(),
                 })
             })?;
-            let mut ctx = ProductionNativeContext::new(new_fp, abi, gas_meter);
-            func(&mut ctx)
+            // TODO(cleanup): eventually pass the interpreter context itself rather than
+            // unpacking `gas_meter` / `heap` / `read_write_set` (and giving
+            // access to the loader + global context). Need to first work out
+            // whether that's sound under the context's interior-mutability model
+            // — clearer once everything (rws → table natives, gas → all) is
+            // wired up.
+            let ctx = ProductionNativeContext::new(
+                new_fp,
+                abi,
+                view_type_list(ty_args),
+                gas_meter,
+                provider,
+                layouts,
+                resource_provider,
+                &mut self.heap,
+                &mut self.read_write_set,
+                extensions,
+            );
+            func(&ctx)
         };
         self.frame_ptr = saved_fp;
 
@@ -2215,11 +2629,11 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 Ok(StepResult::Continue)
             },
             Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
-            Err(e) => Err(RuntimeError::VMInternal(e)),
+            Err(e) => Err(e.into_runtime_error()),
         }
     }
 
-    // TODO: Hoist pc, fp, and current_func into local variables in the run loop
+    // TODO(perf): Hoist pc, fp, and current_func into local variables in the run loop
     // instead of reading/writing self.pc, self.frame_ptr, self.current_func each
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.

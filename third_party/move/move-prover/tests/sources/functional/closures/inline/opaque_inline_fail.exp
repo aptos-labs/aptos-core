@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:18:9
+   │
+18 │         ensures result == x + 2; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:14: test_wrong_caller_post
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:15: test_wrong_caller_post
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:18: test_wrong_caller_post (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fail.move:23:32
+   │
+23 │         apply(|y| y + 1 spec { ensures result == y + 2; }, x) // error: post-condition does not hold (lifted lambda)
+   │                                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_fail.move:23: test_wrong_lambda_spec
+   =         y = <redacted>
+   =         result = <redacted>

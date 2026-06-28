@@ -3,7 +3,7 @@
 
 //! Single-pass recursive deep-copy of a heap-based value.
 //!
-//! TODO(security): reimplement this with non-recursive algorithm or add
+//! TODO(metering): reimplement this with non-recursive algorithm or add
 //!   depth checks.
 
 use crate::{

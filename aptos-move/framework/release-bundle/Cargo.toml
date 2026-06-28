@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[lib]
+doctest = false
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -22,6 +25,3 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 serde = { workspace = true }
-
-[lib]
-doctest = false

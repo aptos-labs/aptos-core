@@ -72,7 +72,7 @@ fun caller() {
     0: CallIndirect 0x66::vec_pushback_safe_point::fresh
     1: VecNew [8]
     2: SlotBorrow [16] <- &[8]
-    3: VecPushBack [16].push([0], size=8, desc=2)
+    3: VecPushBack [16].push([0], size=8, desc=0)
     4: CallIndirect 0x66::vec_pushback_safe_point::take
     5: SlotBorrow [16] <- &[8]
     6: VecPopBack [32] <- [16].pop(size=8)

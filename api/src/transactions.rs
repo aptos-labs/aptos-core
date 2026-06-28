@@ -1744,15 +1744,13 @@ impl TransactionsApi {
         // All state hashes are invalid, and will be filled with 0s
         let txn = aptos_types::transaction::Transaction::UserTransaction(txn);
         let zero_hash = aptos_crypto::HashValue::zero();
-        let info = aptos_types::transaction::TransactionInfo::new(
-            txn.committed_hash(),
-            zero_hash,
-            zero_hash,
-            None,
-            output.gas_used(),
-            exe_status,
-            None,
-        );
+        let info = aptos_types::transaction::TransactionInfo::builder_v0()
+            .transaction_hash(txn.committed_hash())
+            .state_change_hash(zero_hash)
+            .event_root_hash(zero_hash)
+            .gas_used(output.gas_used())
+            .status(exe_status)
+            .build();
         let mut events = output.events().to_vec();
         let _ = self
             .context

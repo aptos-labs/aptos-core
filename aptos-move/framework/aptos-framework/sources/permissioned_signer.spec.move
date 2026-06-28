@@ -15,6 +15,7 @@ spec aptos_framework::permissioned_signer {
 
     spec is_permissioned_signer_impl(s: &signer): bool {
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract] result == spec_is_permissioned_signer_impl(s);
     }
 
@@ -30,8 +31,8 @@ spec aptos_framework::permissioned_signer {
 
     spec is_permissioned_signer(s: &signer): bool {
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] result == spec_is_permissioned_signer(s);
+        aborts_if false;
+        ensures result == spec_is_permissioned_signer(s);
     }
 
     spec fun spec_permission_address(s: signer): address;
@@ -59,7 +60,8 @@ spec aptos_framework::permissioned_signer {
     spec create_permissioned_handle(master: &signer): PermissionedHandle {
         use aptos_framework::transaction_context;
         pragma opaque;
-        aborts_if [abstract] spec_is_permissioned_signer(master);
+        pragma aborts_if_is_partial;
+        aborts_if spec_is_permissioned_signer(master);
         let permissions_storage_addr = transaction_context::spec_generate_unique_address();
         modifies global<PermissionStorage>(permissions_storage_addr);
         let master_account_addr = signer::address_of(master);
@@ -70,7 +72,8 @@ spec aptos_framework::permissioned_signer {
     spec create_storable_permissioned_handle(master: &signer, expiration_time: u64): StorablePermissionedHandle {
         use aptos_framework::transaction_context;
         pragma opaque;
-        aborts_if [abstract] spec_is_permissioned_signer(master);
+        pragma aborts_if_is_partial;
+        aborts_if spec_is_permissioned_signer(master);
         let permissions_storage_addr = transaction_context::spec_generate_unique_address();
         modifies global<PermissionStorage>(permissions_storage_addr);
         let master_account_addr = signer::address_of(master);
@@ -113,30 +116,37 @@ spec aptos_framework::permissioned_signer {
     }
 
     spec check_permission_exists<PermKey: copy + drop + store>(s: &signer, perm: PermKey): bool {
+        use aptos_std::type_info;
+        use std::bcs;
+        use aptos_framework::big_ordered_map;
         pragma opaque;
         modifies global<PermissionStorage>(spec_permission_address(s));
+        aborts_if spec_is_permissioned_signer(s)
+            && !exists<PermissionStorage>(spec_permission_address(s));
+
+        let addr = spec_permission_address(s);
+        let pre_perms = global<PermissionStorage>(addr).perms;
+        let key = aptos_std::copyable_any::Any {
+            type_name: type_info::type_name<PermKey>(),
+            data: bcs::serialize(perm)
+        };
+        let pre_has = big_ordered_map::spec_contains_key(pre_perms, key);
+        let pre_stored = big_ordered_map::spec_get(pre_perms, key);
+
+        ensures [concrete] !spec_is_permissioned_signer(s) ==> result == true;
+        ensures [concrete] (spec_is_permissioned_signer(s) && !pre_has) ==> result == false;
+        ensures [concrete] (spec_is_permissioned_signer(s)
+                && pre_has
+                && (pre_stored is StoredPermission::Unlimited))
+            ==> result == true;
+        ensures [concrete] (spec_is_permissioned_signer(s)
+                && pre_has
+                && !(pre_stored is StoredPermission::Unlimited))
+            ==> (result == (pre_stored.0 >= 1));
         ensures [abstract] result == spec_check_permission_exists(s, perm);
     }
 
     spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool;
-
-    // TODO(teng): add this back later
-    // spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {
-    //     use aptos_std::type_info;
-    //     use std::bcs;
-    //     let addr = spec_permission_address(s);
-    //     let key = Any {
-    //         type_name: type_info::type_name<PermKey>(),
-    //         data: bcs::serialize(perm)
-    //     };
-    //     if (!spec_is_permissioned_signer(s)) { true }
-    //     else if (!exists<PermissionStorage>(addr)) { false }
-    //     else {
-    //         // ordered_map::spec_contains_key(global<PermissionStorage>(addr).perms, key)
-    //         // FIXME: ordered map spec doesn't exist yet.
-    //         true
-    //     }
-    // }
 
     spec check_permission_capacity_above<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
@@ -153,18 +163,68 @@ spec aptos_framework::permissioned_signer {
     spec check_permission_consume<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
     ): bool {
+        use aptos_std::type_info;
+        use std::bcs;
+        use aptos_framework::big_ordered_map;
         pragma opaque;
-        let permissioned_signer_addr = spec_permission_address(s);
         modifies global<PermissionStorage>(spec_permission_address(s));
+        aborts_if spec_is_permissioned_signer(s)
+            && !exists<PermissionStorage>(spec_permission_address(s));
+
+        let addr = spec_permission_address(s);
+        let pre_perms = global<PermissionStorage>(addr).perms;
+        let key = aptos_std::copyable_any::Any {
+            type_name: type_info::type_name<PermKey>(),
+            data: bcs::serialize(perm)
+        };
+        let pre_has = big_ordered_map::spec_contains_key(pre_perms, key);
+        let pre_stored = big_ordered_map::spec_get(pre_perms, key);
+
+        ensures [concrete] !spec_is_permissioned_signer(s) ==> result == true;
+        ensures [concrete] (spec_is_permissioned_signer(s) && !pre_has) ==> result == false;
+        ensures [concrete] (spec_is_permissioned_signer(s)
+                && pre_has
+                && (pre_stored is StoredPermission::Unlimited))
+            ==> result == true;
+        ensures [concrete] (spec_is_permissioned_signer(s)
+                && pre_has
+                && !(pre_stored is StoredPermission::Unlimited))
+            ==> (result == (pre_stored.0 >= threshold));
         ensures [abstract] result == spec_check_permission_consume(s, threshold, perm);
     }
 
     spec fun spec_check_permission_consume<PermKey: copy + drop + store>(s: signer, threshold: u256, perm: PermKey): bool;
 
     spec capacity<PermKey: copy + drop + store>(s: &signer, perm: PermKey): Option<u256> {
+        use aptos_std::type_info;
+        use std::bcs;
+        use aptos_framework::big_ordered_map;
         pragma opaque;
-        let permissioned_signer_addr = spec_permission_address(s);
         modifies global<PermissionStorage>(spec_permission_address(s));
+        aborts_if spec_is_permissioned_signer(s)
+            && !exists<PermissionStorage>(spec_permission_address(s));
+
+        let addr = spec_permission_address(s);
+        let pre_perms = global<PermissionStorage>(addr).perms;
+        let key = aptos_std::copyable_any::Any {
+            type_name: type_info::type_name<PermKey>(),
+            data: bcs::serialize(perm)
+        };
+        let pre_has = big_ordered_map::spec_contains_key(pre_perms, key);
+        let pre_stored = big_ordered_map::spec_get(pre_perms, key);
+
+        ensures [concrete] !spec_is_permissioned_signer(s) ==>
+            result == std::option::spec_some(MAX_U256);
+        ensures [concrete] (spec_is_permissioned_signer(s) && !pre_has) ==>
+            result == std::option::spec_none<u256>();
+        ensures [concrete] (spec_is_permissioned_signer(s)
+                && pre_has
+                && (pre_stored is StoredPermission::Unlimited))
+            ==> result == std::option::spec_some(MAX_U256);
+        ensures [concrete] (spec_is_permissioned_signer(s)
+                && pre_has
+                && !(pre_stored is StoredPermission::Unlimited))
+            ==> result == std::option::spec_some(pre_stored.0);
         ensures [abstract] result == spec_capacity(s, perm);
     }
 

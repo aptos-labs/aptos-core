@@ -24,6 +24,8 @@ pub struct RandDb {
 }
 
 pub const RAND_DB_NAME: &str = "rand_db";
+/// Upperbound for total live WAL size.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 impl RandDb {
     pub(crate) fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
@@ -38,6 +40,7 @@ impl RandDb {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+        opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
         let db = Arc::new(
             DB::open(path.clone(), RAND_DB_NAME, column_families, opts)
                 .expect("RandDB open failed; unable to continue"),

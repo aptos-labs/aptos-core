@@ -9,6 +9,9 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 abstract-domain-derive = { path = "./abstract_domain_derive" }
 anyhow = { workspace = true }
@@ -30,9 +33,6 @@ try_match = { workspace = true }
 anyhow = { workspace = true }
 datatest-stable = { workspace = true }
 move-stackless-bytecode-test-utils = { workspace = true }
-
-[features]
-default = []
 
 [[test]]
 name = "testsuite"
