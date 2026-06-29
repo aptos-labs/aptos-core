@@ -186,6 +186,12 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     fn output_approx_size(&self) -> u64;
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<Txn::Key, Txn::Tag>>;
+
+    /// State keys read by the VM during the execution that produced this output.
+    fn storage_keys_read(&self) -> impl Iterator<Item = &Txn::Key>;
+
+    /// Keys that receive a value write when this output commits.
+    fn storage_keys_written(&self) -> impl Iterator<Item = &Txn::Key>;
 }
 
 pub trait AfterMaterializationOutput<Txn: Transaction> {
