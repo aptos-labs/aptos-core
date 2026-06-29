@@ -1,0 +1,18 @@
+---
+# Config for the regular framework releases.
+#
+# Replace `vX.YY.Z` with the actual version number to prepare for an actual release.
+name: "aptos-framework-vX.YY.Z"
+metadata:
+  title: "Multi-step proposal to upgrade mainnet framework, version vX.YY.Z"
+  description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-vX.YY.Z"
+update_sequence:
+  - Gas:
+      # The previous release's published gas schedule, looked up in aptos-networks
+      # by version (e.g. v1.44.0). A full URL or local path also works.
+      old: vX.WW.Z
+      # The new schedule is the one from the current branch
+      new: current
+  - Framework:
+      bytecode_version: 10
+      git_hash: ~

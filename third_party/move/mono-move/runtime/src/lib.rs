@@ -34,6 +34,6 @@ pub use native_context::{
     ProductionNativeRegistry,
 };
 pub use transaction_context::TransactionContext;
-pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
+pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use value_utils::{deserialize_into, serialize};
 pub use verifier::{verify_function, verify_program, VerificationError};
