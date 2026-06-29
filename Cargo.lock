@@ -12901,6 +12901,7 @@ name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
  "blake2-rfc",
+ "libsecp256k1",
  "mono-move-core",
  "move-core-types",
  "ripemd",
