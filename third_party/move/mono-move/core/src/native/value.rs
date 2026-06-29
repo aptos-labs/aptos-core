@@ -184,6 +184,15 @@ impl Ref<'_, TableHandle> {
     }
 }
 
+impl Ref<'_, AccountAddress> {
+    /// Borrows the referenced address.
+    pub fn get(&self) -> &AccountAddress {
+        // SAFETY: `AccountAddress` is `[u8; N]` (align 1), so the bytes the
+        // reference points at reinterpret as `&AccountAddress`.
+        unsafe { &*(self.ptr() as *const AccountAddress) }
+    }
+}
+
 /// Marker for a type that is not statically known.
 ///
 /// This can be used to build composite types in generic native functions — e.g. the
