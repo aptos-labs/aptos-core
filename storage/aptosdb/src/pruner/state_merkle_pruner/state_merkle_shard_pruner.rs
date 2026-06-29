@@ -4,7 +4,7 @@
 use crate::{
     pruner::{
         pruner_utils::get_or_initialize_subpruner_progress,
-        state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+        state_merkle_pruner::{generics::MerklePrunerSchema, StateMerklePruner},
     },
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
@@ -18,15 +18,15 @@ use aptos_schemadb::{batch::SchemaBatch, schema::KeyCodec, DB};
 use aptos_types::transaction::Version;
 use std::{marker::PhantomData, sync::Arc};
 
-pub(in crate::pruner) struct StateMerkleShardPruner<S> {
+pub(in crate::pruner) struct StateMerkleShardPruner<M> {
     shard_id: usize,
     db_shard: Arc<DB>,
-    _phantom: PhantomData<S>,
+    _phantom: PhantomData<M>,
 }
 
-impl<S: StaleNodeIndexSchemaTrait> StateMerkleShardPruner<S>
+impl<M: MerklePrunerSchema> StateMerkleShardPruner<M>
 where
-    StaleNodeIndex: KeyCodec<S>,
+    StaleNodeIndex: KeyCodec<M::StaleIndexSchema>,
 {
     pub(in crate::pruner) fn new(
         shard_id: usize,
@@ -35,7 +35,7 @@ where
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
             &db_shard,
-            &S::progress_metadata_key(Some(shard_id)),
+            &M::shard_progress_key(shard_id),
             metadata_progress,
         )?;
         let myself = Self {
@@ -48,7 +48,7 @@ where
             progress = progress,
             metadata_progress = metadata_progress,
             "Catching up {} shard {shard_id}.",
-            S::name(),
+            M::name(),
         );
         myself.prune(progress, metadata_progress, usize::MAX)?;
 
@@ -63,7 +63,7 @@ where
     ) -> Result<()> {
         loop {
             let mut batch = SchemaBatch::new();
-            let (indices, next_version) = StateMerklePruner::get_stale_node_indices(
+            let (indices, next_version) = StateMerklePruner::<M>::get_stale_node_indices(
                 &self.db_shard,
                 current_progress,
                 target_version,
@@ -72,7 +72,7 @@ where
 
             indices.into_iter().try_for_each(|index| {
                 batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
-                batch.delete::<S>(&index)
+                batch.delete::<M::StaleIndexSchema>(&index)
             })?;
 
             let mut done = true;
@@ -84,7 +84,7 @@ where
 
             if done {
                 batch.put::<DbMetadataSchema>(
-                    &S::progress_metadata_key(Some(self.shard_id)),
+                    &M::shard_progress_key(self.shard_id),
                     &DbMetadataValue::Version(target_version),
                 )?;
             }

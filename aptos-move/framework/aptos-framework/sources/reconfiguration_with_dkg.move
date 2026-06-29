@@ -111,7 +111,7 @@ module aptos_framework::reconfiguration_with_dkg {
         chunky_dkg_config_seqnum::on_new_epoch(framework);
         chunky_dkg_config::on_new_epoch(framework);
         epoch_timeout_config::on_new_epoch(framework);
-        decryption::on_new_epoch(framework);
+        decryption::on_new_epoch(framework, reconfiguration::current_epoch() + 1);
         reconfiguration::reconfigure();
     }
 

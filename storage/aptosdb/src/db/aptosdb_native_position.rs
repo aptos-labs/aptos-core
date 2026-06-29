@@ -6,17 +6,20 @@ use crate::{
     native_state_committer::NativeStateCommitter,
     position_buffered_state::{
         new_empty_position_state, position_state_at_version, PositionLedgerStateWithSummary,
-        PositionProofReader, PositionSlot,
+        PositionPersistedState, PositionProofReader, PositionSlot,
     },
     position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_merkle_db::PositionMerkleDb,
+    position_pruner::PositionPruner,
     position_state_store::PositionStateStore,
     utils::truncation_helper::{
         get_position_commit_progress, get_position_merkle_commit_progress,
         truncate_position_db_shards, truncate_position_merkle_db,
     },
 };
-use aptos_config::config::{RocksdbConfig, StorageDirPaths};
+use aptos_config::config::{
+    LedgerPrunerConfig, RocksdbConfig, StateMerklePrunerConfig, StorageDirPaths,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
@@ -27,14 +30,20 @@ use std::{collections::HashMap, sync::Arc};
 pub struct PositionBundle {
     pub kv_db: Arc<PositionDb>,
     pub merkle_db: Arc<PositionMerkleDb>,
+    /// Pruner managers (value + merkle), the analog of main state's
+    /// `StatePruner`. `None` in readonly mode. Held as `Arc` so the
+    /// position merkle batch committer shares it; the value pruner is
+    /// driven from `commit_native_position`, the merkle pruners from the
+    /// committer, and all are re-activated on restart from `open_internal`.
+    pub(crate) position_pruner: Option<Arc<PositionPruner>>,
     /// `None` in readonly mode.
     pub(crate) state_store: Option<Arc<PositionStateStore>>,
-    /// JMT version the in-memory MapLayer chain is rooted at — the
-    /// version `PositionProofReader` queries. Stays at init time
-    /// because the chain doesn't rebase as new snapshots are taken
-    /// (the chain just grows). When chain-rebasing lands, update
-    /// this alongside the rebase.
-    pub(crate) snapshot_version: Option<Version>,
+    /// Latest persisted in-memory snapshot — the base the in-memory
+    /// chain rebases onto each chunk (SMT freeze base + proof
+    /// version). Advanced by the merkle batch committer as snapshots
+    /// persist, so the proof base tracks the JMT forward and the
+    /// in-memory tree sheds nodes below it. `None` in readonly mode.
+    pub(crate) persisted: Option<PositionPersistedState>,
 }
 
 impl AptosDB {
@@ -56,6 +65,9 @@ impl AptosDB {
         db_paths: &StorageDirPaths,
         kv_config: RocksdbConfig,
         merkle_config: RocksdbConfig,
+        value_pruner_config: LedgerPrunerConfig,
+        state_merkle_pruner_config: StateMerklePrunerConfig,
+        epoch_snapshot_pruner_config: StateMerklePrunerConfig,
         env: &Env,
         block_cache: &Cache,
         readonly: bool,
@@ -92,8 +104,22 @@ impl AptosDB {
         let kv_db = Arc::new(position_db);
         let merkle_db = Arc::new(merkle_db);
 
-        let state_store = if readonly {
+        // Pruner managers (value + merkle), grouped like main state's
+        // `StatePruner`. Shared with the merkle batch committer via `Arc`.
+        let position_pruner = if readonly {
             None
+        } else {
+            Some(Arc::new(PositionPruner::new(
+                Arc::clone(&kv_db),
+                Arc::clone(&merkle_db),
+                value_pruner_config,
+                state_merkle_pruner_config,
+                epoch_snapshot_pruner_config,
+            )))
+        };
+
+        let (state_store, persisted) = if readonly {
+            (None, None)
         } else {
             let last_snapshot = match merkle_progress {
                 Some(version) => {
@@ -102,11 +128,22 @@ impl AptosDB {
                 },
                 None => new_empty_position_state(),
             };
-            Some(Arc::new(PositionStateStore::new_at_snapshot(
+            // Seed the persisted base with the exact snapshot used for
+            // `current_state` so the first rebase freezes against an
+            // in-family ancestor (the chain descends from this seed).
+            let persisted = PositionPersistedState::new(last_snapshot.clone());
+            let store = Arc::new(PositionStateStore::new_at_snapshot(
                 Arc::clone(&merkle_db),
                 Arc::clone(&self.ledger_db),
                 last_snapshot,
-            )))
+                Arc::clone(
+                    position_pruner
+                        .as_ref()
+                        .expect("position_pruner present in non-readonly mode"),
+                ),
+                persisted.clone(),
+            ));
+            (Some(store), Some(persisted))
         };
 
         // Replay write sets between the JMT snapshot and the chain
@@ -129,8 +166,9 @@ impl AptosDB {
         self.position = Some(Arc::new(PositionBundle {
             kv_db,
             merkle_db,
+            position_pruner,
             state_store,
-            snapshot_version: merkle_progress,
+            persisted,
         }));
 
         info!(
@@ -168,17 +206,28 @@ impl AptosDB {
             truncate_position_db_shards(position_db, target)?;
         }
 
-        let progress = get_position_merkle_commit_progress(merkle_db)?;
-        if let Some(v_merkle) = progress {
-            if let Some(v) = v_overall {
-                assert!(
-                    v_merkle <= v,
-                    "position_merkle_db at version {v_merkle} is ahead of chain {v}"
-                );
-            }
-            truncate_position_merkle_db(merkle_db, v_merkle)?;
-        }
-        Ok(progress)
+        let Some(v_merkle) = get_position_merkle_commit_progress(merkle_db)? else {
+            return Ok(None);
+        };
+
+        // `pre_commit_ledger()` runs `commit_native_position()` — which can
+        // advance the position merkle snapshot — before `commit_ledger()`
+        // records `OverallCommitProgress`. A crash in that window leaves the
+        // merkle DB ahead of the chain, so truncate down to the latest snapshot
+        // at or before the chain tip rather than panicking (matches main
+        // state's restart handling).
+        let target = match v_overall {
+            Some(v) if v < v_merkle => merkle_db.latest_snapshot_version_at_or_before(v)?,
+            _ => Some(v_merkle),
+        };
+        let target = target.ok_or_else(|| {
+            AptosDbError::Other(format!(
+                "position_merkle_db has no snapshot at or before chain version {v_overall:?}; \
+                 only an uncommitted snapshot at {v_merkle} exists"
+            ))
+        })?;
+        truncate_position_merkle_db(merkle_db, target)?;
+        Ok(Some(target))
     }
 
     /// Replay `WriteSet`s in `[snapshot_next_version, num_transactions)`
@@ -230,7 +279,11 @@ impl AptosDB {
             merkle_db: Arc::clone(merkle_db),
             version: snapshot_version,
         };
-        let new_latest = pipeline_latest.extend(target_version, updates, &proof_reader)?;
+        // At replay start the persisted base equals the seed, which is
+        // `pipeline_latest` itself — freeze against it.
+        let base_summary = pipeline_latest.summary().clone();
+        let new_latest =
+            pipeline_latest.extend(target_version, updates, &base_summary, &proof_reader)?;
 
         // Treat the target as a checkpoint so the buffered_state
         // sync-commits the JMT snapshot before we return.

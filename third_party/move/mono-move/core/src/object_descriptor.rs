@@ -77,14 +77,13 @@ pub enum ObjectDescriptorInner {
 
     /// `ClosureCapturedData` (Materialized) object.
     ///
-    /// Data-region layout: `[tag(1) + padding(7)] [values...]`.
-    /// `size` and `pointer_offsets` are interpreted relative to the
-    /// values region (i.e., excluding the tag+padding prefix), so an
-    /// offset of `0` names the first byte of the first captured value.
-    /// The 8-byte tag prefix is added internally by the GC.
+    /// Data-region layout: `[tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [values @ 8]`.
+    /// `pointer_offsets` are relative to the values region (i.e., excluding
+    /// the 8-byte prefix), so an offset of `0` names the first byte of the
+    /// first captured value. The prefix is added internally by the GC.
+    /// Pointer-free captures carry no `CapturedData` descriptor: they share
+    /// `Trivial`.
     CapturedData {
-        /// Byte size of the values region (sum of captured value sizes).
-        size: u32,
         /// Byte offsets within the values region that hold heap pointers.
         pointer_offsets: Vec<u32>,
     },
@@ -105,11 +104,18 @@ impl ObjectDescriptor {
 
     /// Construct a [`Vector`](ObjectDescriptorInner::Vector) descriptor.
     ///
-    /// Returns `Err` if `elem_size == 0` or any offset in
-    /// `elem_pointer_offsets` is not 8-byte aligned, runs past
-    /// `elem_size`, or breaks strict ordering.
+    /// Returns `Err` if `elem_size == 0`, `elem_pointer_offsets` is empty,
+    /// or any offset in `elem_pointer_offsets` is not 8-byte aligned, runs
+    /// past `elem_size`, or breaks strict ordering. A vector with no
+    /// pointer offsets is pointer-free and uses the reserved `Trivial`
+    /// descriptor instead.
     pub fn new_vector(elem_size: u32, elem_pointer_offsets: Vec<u32>) -> anyhow::Result<Self> {
         anyhow::ensure!(elem_size > 0, "Vector: elem_size must be > 0");
+        anyhow::ensure!(
+            !elem_pointer_offsets.is_empty(),
+            "Vector: elem_pointer_offsets must be non-empty; pointer-free \
+             vectors use the Trivial descriptor"
+        );
         check_pointer_offsets(
             "Vector::elem_pointer_offsets",
             &elem_pointer_offsets,
@@ -164,16 +170,20 @@ impl ObjectDescriptor {
     }
 
     /// Construct a [`CapturedData`](ObjectDescriptorInner::CapturedData)
-    /// descriptor.
+    /// descriptor. `values_size` is the byte width of the values region the
+    /// `pointer_offsets` are validated against.
     ///
-    /// Returns `Err` if `size == 0` or any offset in `pointer_offsets`
-    /// is not 8-byte aligned, runs past `size`, or breaks strict
+    /// Returns `Err` if `values_size == 0` or any offset in `pointer_offsets`
+    /// is not 8-byte aligned, runs past `values_size`, or breaks strict
     /// ordering.
-    pub fn new_captured_data(size: u32, pointer_offsets: Vec<u32>) -> anyhow::Result<Self> {
-        anyhow::ensure!(size > 0, "CapturedData: size must be > 0");
-        check_pointer_offsets("CapturedData::pointer_offsets", &pointer_offsets, size)?;
+    pub fn new_captured_data(values_size: u32, pointer_offsets: Vec<u32>) -> anyhow::Result<Self> {
+        anyhow::ensure!(values_size > 0, "CapturedData: values_size must be > 0");
+        check_pointer_offsets(
+            "CapturedData::pointer_offsets",
+            &pointer_offsets,
+            values_size,
+        )?;
         Ok(Self(ObjectDescriptorInner::CapturedData {
-            size,
             pointer_offsets,
         }))
     }
@@ -214,6 +224,19 @@ pub trait DescriptorProvider {
     /// descriptor known to this provider.
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor>;
 }
+
+/// A [`DescriptorProvider`] with no descriptors; every lookup returns `None`.
+/// For execution contexts that never allocate heap objects.
+pub struct NoDescriptorProvider;
+
+impl DescriptorProvider for NoDescriptorProvider {
+    fn descriptor(&self, _id: DescriptorId) -> Option<&ObjectDescriptor> {
+        None
+    }
+}
+
+/// Shared [`NoDescriptorProvider`] instance.
+pub static NO_DESCRIPTOR_PROVIDER: NoDescriptorProvider = NoDescriptorProvider;
 
 // ---------------------------------------------------------------------------
 // ObjectDescriptorTable — a simple in-memory provider for tests/benches
@@ -357,7 +380,7 @@ mod tests {
     #[test]
     fn push_returns_increasing_ids() {
         let mut t = ObjectDescriptorTable::new();
-        let a = t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+        let a = t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
         let b = t.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
         assert_eq!(a, DescriptorId(2));
         assert_eq!(b, DescriptorId(3));
@@ -387,9 +410,8 @@ mod tests {
 
     #[test]
     fn captured_data_zero_size_errors() {
-        assert!(
-            err_msg(ObjectDescriptor::new_captured_data(0, vec![])).contains("CapturedData: size")
-        );
+        assert!(err_msg(ObjectDescriptor::new_captured_data(0, vec![]))
+            .contains("CapturedData: values_size"));
     }
 
     // ----- Pointer offsets -----
@@ -423,6 +445,13 @@ mod tests {
     fn vector_pointer_out_of_bounds_errors() {
         // 8 + 8 = 16 > 8
         assert!(err_msg(ObjectDescriptor::new_vector(8, vec![8])).contains("exceeds region size"));
+    }
+
+    #[test]
+    fn vector_empty_pointer_offsets_errors() {
+        // Pointer-free vectors are non-canonical as a Vector descriptor; they
+        // use the reserved Trivial descriptor instead.
+        assert!(err_msg(ObjectDescriptor::new_vector(8, vec![])).contains("non-empty"));
     }
 
     // ----- Enum tag accounting -----

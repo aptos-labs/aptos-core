@@ -281,7 +281,7 @@ impl PreparedModule {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        // TODO: intern the nominals first and pass a &[InternedType], indexed by struct handle
+        // TODO(perf): intern the nominals first and pass a &[InternedType], indexed by struct handle
         // index, to intern_sig_token. That way, we could avoid re-interning the nominal in the
         // Struct case, or the module_id + struct_name in the StructInstantiation case. It saves
         // a few hashmap lookups per struct reference, which may add up across the signature.
@@ -391,10 +391,10 @@ impl PreparedModule {
 /// Recursively interns `token` into the global type arena. Composite leaves
 /// go through `interner`; struct/enum tokens delegate to `resolver`.
 ///
-/// TODO: non-recursive implementation. Coordinate with the similar TODO on
+/// TODO(metering): non-recursive implementation. Coordinate with the similar TODO on
 /// `TypeInternerKey`'s `Hash` impl in `types.rs`.
 ///
-/// TODO (perf): probe-before-allocate for composite tokens.
+/// TODO(perf): probe-before-allocate for composite tokens.
 ///
 /// Right now, every composite variant (Vector, Reference, MutableReference,
 /// Function, and the StructInstantiation path through the resolver) allocates a
@@ -404,7 +404,7 @@ impl PreparedModule {
 /// `SignatureIndex`, and `vector<T>` / `&T` appear repeatedly), this means the
 /// fast path pays one arena allocation + a dedup probe per occurrence instead
 /// of a single probe.
-fn intern_sig_token(
+pub fn intern_sig_token(
     token: &SignatureToken,
     module: &CompiledModule,
     interner: &impl Interner,

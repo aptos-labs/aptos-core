@@ -27,7 +27,7 @@ pub(crate) struct SSAFunction {
 impl SSAFunction {
     /// Run all pre-allocation instruction fusion passes.
     pub(crate) fn with_fusion_passes(mut self) -> Self {
-        // [TODO]: right now, we have each different fusion operation to be a separate pass.
+        // TODO(perf): right now, we have each different fusion operation to be a separate pass.
         // This is easier to reason about, but we could make it more efficient by
         // combining the passes.
         for block in &mut self.blocks {
@@ -77,45 +77,25 @@ fn fuse_pairs(instrs: &mut Vec<Instr>, try_fuse: fn(&Instr, &Instr) -> Option<In
 /// Try to fuse a borrow+deref pair into a combined field access instruction.
 fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+        (Instr::ImmBorrowField(ref_r, owner, fld, src), Instr::ReadRef(dst, read_src))
             if *ref_r == *read_src =>
         {
-            Some(Instr::ReadField(*dst, *fld, *src))
+            Some(Instr::ReadField(*dst, *owner, *fld, *src))
         },
-        (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-            if *ref_r == *read_src =>
-        {
-            Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
-        },
-        (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+        (Instr::MutBorrowField(ref_r, owner, fld, dst_ref), Instr::WriteRef(write_ref, val))
             if *ref_r == *write_ref =>
         {
-            Some(Instr::WriteField(*fld, *dst_ref, *val))
+            Some(Instr::WriteField(*owner, *fld, *dst_ref, *val))
         },
-        (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-            if *ref_r == *write_ref =>
-        {
-            Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
-        },
-        (Instr::ImmBorrowVariantField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+        (Instr::ImmBorrowVariantField(ref_r, owner, fld, src), Instr::ReadRef(dst, read_src))
             if *ref_r == *read_src =>
         {
-            Some(Instr::ReadVariantField(*dst, *fld, *src))
-        },
-        (Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-            if *ref_r == *read_src =>
-        {
-            Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
-        },
-        (Instr::MutBorrowVariantField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-            if *ref_r == *write_ref =>
-        {
-            Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
+            Some(Instr::ReadVariantField(*dst, *owner, *fld, *src))
         },
         (
-            Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
+            Instr::MutBorrowVariantField(ref_r, owner, fld, dst_ref),
             Instr::WriteRef(write_ref, val),
-        ) if *ref_r == *write_ref => Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val)),
+        ) if *ref_r == *write_ref => Some(Instr::WriteVariantField(*owner, *fld, *dst_ref, *val)),
         _ => None,
     }
 }
@@ -124,23 +104,25 @@ fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
 /// single local-field op, eliding the intermediate fat pointer.
 fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        (Instr::ImmBorrowLoc(ref_r, local), Instr::ImmBorrowField(dst, fld, src))
+        (Instr::ImmBorrowLoc(ref_r, local), Instr::ImmBorrowField(dst, owner, fld, src))
             if *ref_r == *src =>
         {
-            Some(Instr::ImmBorrowLocField(*dst, *fld, *local))
+            Some(Instr::ImmBorrowLocField(*dst, *owner, *fld, *local))
         },
-        (Instr::MutBorrowLoc(ref_r, local), Instr::MutBorrowField(dst, fld, src))
+        (Instr::MutBorrowLoc(ref_r, local), Instr::MutBorrowField(dst, owner, fld, src))
             if *ref_r == *src =>
         {
-            Some(Instr::MutBorrowLocField(*dst, *fld, *local))
+            Some(Instr::MutBorrowLocField(*dst, *owner, *fld, *local))
         },
-        (Instr::ImmBorrowLoc(ref_r, local), Instr::ReadField(dst, fld, src)) if *ref_r == *src => {
-            Some(Instr::ReadLocalField(*dst, *fld, *local))
+        (Instr::ImmBorrowLoc(ref_r, local), Instr::ReadField(dst, owner, fld, src))
+            if *ref_r == *src =>
+        {
+            Some(Instr::ReadLocalField(*dst, *owner, *fld, *local))
         },
-        (Instr::MutBorrowLoc(ref_r, local), Instr::WriteField(fld, dst_ref, val))
+        (Instr::MutBorrowLoc(ref_r, local), Instr::WriteField(owner, fld, dst_ref, val))
             if *ref_r == *dst_ref =>
         {
-            Some(Instr::WriteLocalField(*fld, *local, *val))
+            Some(Instr::WriteLocalField(*owner, *fld, *local, *val))
         },
         _ => None,
     }

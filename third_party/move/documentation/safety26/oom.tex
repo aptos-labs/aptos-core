@@ -1,0 +1,16 @@
+\subsection{Liveness}
+\label{sec:bugs:oom}
+
+A fourth class of exploits targets liveness: an attacker submits a transaction that every validator processes the same way, and that processing crashes the node with out of memory.
+On Aptos, the most direct source of such a denial-of-service attack has historically been missing bounds on types, and here specifically, types which are created by \emph{type substitution}.
+The Move runtime needs to know instantiated types in order to implement type-indexed resource access; thus even though Move is statically typed, types cannot be erased.
+A generic type |Pair<T, T>| instantiated with |T = Pair<U, U>| describes a tree whose representation doubles at every level of nesting.
+Without a bound on instantiation depth, a script that constructs |Pair<Pair<...>>| at nesting depth $n$ forces the runtime to materialize type-information records --- needed for type tagging, dispatch, and serialization --- whose size grows as $O(2^n)$.
+At $n \approx 30$ the per-transaction allocator is at gigabytes; every validator OOMs in lockstep, and the chain halts.
+
+The corresponding safety check is a runtime bound on type depth and aggregate type size, evaluated before any value of the offending type is constructed --- a check the offline verifier cannot perform, because the type only comes into existence when the transaction is executed.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

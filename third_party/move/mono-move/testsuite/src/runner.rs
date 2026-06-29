@@ -5,32 +5,45 @@
 //! normalized output for comparison.
 
 use crate::{
-    compile::{compile, compile_move_stdlib, SourceKind},
+    compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
+    engine::RunResult,
+    extensions::{
+        seed_extensions, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
+        TEST_TXN_INDEX,
+    },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
-    parser::{PrintSection, Step},
+    parser::{Check, PrintSection, Step},
     print_sections,
 };
 use anyhow::{anyhow, bail};
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
-use aptos_vm::natives::aptos_natives;
-use mono_move_core::{
-    native::{NativeName, ProductionContextFamily, ProductionNativeRegistry},
-    types::EMPTY_TYPE_LIST,
-    Interner,
+use aptos_framework_natives::{
+    event::NativeEventContext, object::NativeObjectContext,
+    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
-use mono_move_gas::SimpleGasMeter;
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_types::{
+    contract_event::ContractEvent,
+    event::EventKey,
+    on_chain_config::{Features, TimedFeaturesBuilder},
+    state_store::{
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        StateViewId,
+    },
+    transaction::user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+};
+use aptos_vm::natives::aptos_natives;
+use aptos_vm_types::resolver::StateStorageView;
+use mono_move_core::{native::NativeExtensions, types::type_to_string};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_natives::{make_all_production_natives, make_all_test_natives};
-use mono_move_runtime::{ExecutionContext, InterpreterContext, RuntimeStatus, TransactionContext};
+use mono_move_natives::{EventKind, EventStore};
+use mono_move_runtime::serialize;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     int256::{I256, U256},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::StatusCode,
 };
@@ -41,7 +54,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
     AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
-    RuntimeEnvironment,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
@@ -50,6 +63,132 @@ use std::{path::Path, sync::OnceLock};
 /// Execution output from a VM as a normalized display string.
 struct Output {
     display: String,
+}
+
+/// A [`StateStorageView`] over empty storage that serves a fixed usage, for
+/// exercising the legacy `state_storage` native in the differential tests.
+//
+// TODO(testing): replace with a real state view if tests need natives that read actual
+// stored state.
+struct MockEmptyStateStorage {
+    usage: StateStorageUsage,
+}
+
+impl StateStorageView for MockEmptyStateStorage {
+    type Key = StateKey;
+
+    fn id(&self) -> StateViewId {
+        StateViewId::Miscellaneous
+    }
+
+    fn read_state_value(&self, _state_key: &StateKey) -> Result<(), StateViewError> {
+        Ok(())
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+        Ok(self.usage)
+    }
+}
+
+/// Normalized rendering of one emitted event, used to diff the two VMs' events.
+/// `creator`/`seq` are `Some` only for handle (V1) events.
+fn render_event(
+    creator: Option<AccountAddress>,
+    seq: Option<u64>,
+    type_str: &str,
+    blob: &[u8],
+) -> String {
+    match (creator, seq) {
+        (Some(creator), Some(seq)) => format!(
+            "handle creator={} seq={} {} {}",
+            creator.to_hex_literal(),
+            seq,
+            type_str,
+            render_bytes(blob),
+        ),
+        _ => format!("module {} {}", type_str, render_bytes(blob)),
+    }
+}
+
+/// Combines return values and rendered events into the normalized output string
+/// that `CHECK` directives match against: a `results:` segment when the call
+/// returns values and an `events:` segment when it emits events, joined by
+/// ` | `. A void, event-free call renders as `results:`.
+fn render_execution_output(vals: &[String], events: &[String]) -> String {
+    let mut segments = Vec::new();
+    if !vals.is_empty() {
+        segments.push(format!("results: {}", vals.join(", ")));
+    }
+    if !events.is_empty() {
+        segments.push(format!("events: {}", events.join("; ")));
+    }
+    if segments.is_empty() {
+        return "results:".to_string();
+    }
+    segments.join(" | ")
+}
+
+/// Renders the events emitted into the legacy VM's [`NativeEventContext`], in
+/// emission order, for cross-VM comparison.
+pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
+    extensions
+        .get::<NativeEventContext>()
+        .events_iter()
+        .map(|event| {
+            let type_str = event.type_tag().to_canonical_string();
+            match event {
+                ContractEvent::V1(e) => render_event(
+                    Some(e.key().get_creator_address()),
+                    Some(e.sequence_number()),
+                    &type_str,
+                    e.event_data(),
+                ),
+                ContractEvent::V2(_) => render_event(None, None, &type_str, event.event_data()),
+            }
+        })
+        .collect()
+}
+
+/// Serializes and renders the events recorded in mono-move's [`EventStore`], in
+/// emission order, for cross-VM comparison. `layouts` (the guard's published
+/// layouts) resolves the event types.
+///
+/// # Safety
+///
+/// The VM heap must be live: each entry's `msg_data` embeds heap pointers that
+/// [`serialize`] dereferences.
+pub unsafe fn finalize_events_v2(
+    extensions: &NativeExtensions,
+    layouts: &ExecutionGuard<'_>,
+) -> Vec<String> {
+    let store = extensions
+        .get_mut::<EventStore>()
+        .expect("event store installed");
+    store
+        .entries()
+        .iter()
+        .map(|entry| {
+            let type_str = type_to_string(entry.msg_ty);
+            // SAFETY: forwarded from this function's contract — the heap is live.
+            let blob = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }
+                .expect("event value serializes");
+            match &entry.kind {
+                EventKind::V2 => render_event(None, None, &type_str, &blob),
+                EventKind::V1 {
+                    guid,
+                    sequence_number,
+                } => {
+                    let key: EventKey = bcs::from_bytes(guid).expect("guid decodes to EventKey");
+                    render_event(
+                        Some(key.get_creator_address()),
+                        Some(*sequence_number),
+                        &type_str,
+                        &blob,
+                    )
+                },
+            }
+        })
+        .collect()
 }
 
 /// Run all steps in a differential test, checking both VMs produce matching
@@ -67,11 +206,9 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
 
     // Publish the Move stdlib into both VMs so tests can call real stdlib
     // natives.
-    for module in stdlib_modules() {
+    for module in stdlib_modules().iter().chain(test_utils_modules()) {
         let mut blob = vec![];
-        module
-            .serialize(&mut blob)
-            .expect("stdlib module serializes");
+        module.serialize(&mut blob).expect("module serializes");
         storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
         module_provider.add_module(module);
     }
@@ -111,21 +248,53 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 module_name,
                 function_name,
                 args,
+                heap_size,
                 checks,
             } => {
-                let v1_output =
-                    execute_function_v1(&storage, &address, &module_name, &function_name, &args);
-                let v2_output = execute_function_v2(
-                    &guard,
-                    &module_provider,
-                    &address,
-                    &module_name,
-                    &function_name,
-                    &args,
-                    &v1_output.param_kinds,
-                    &v1_output.return_kinds,
-                );
-                check_output(&checks, &v1_output.output.display, &v2_output.display)?;
+                // Run only the VM(s) a step actually checks (via `CHECK-V1` /
+                // `CHECK-V2`). This lets a step assert just one side — needed for
+                // natives one VM cannot run (e.g. `aggregator_v2`, which the
+                // legacy harness installs no extension for and would panic on).
+                // `CHECK-GC-COUNT` inspects the V2 collector, so it also needs V2.
+                let needs_v1 = checks.iter().any(|c| matches!(c, Check::V1(..)));
+                let needs_v2 = checks
+                    .iter()
+                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..)));
+
+                let v1 = needs_v1.then(|| {
+                    execute_function_v1(&storage, &address, &module_name, &function_name, &args)
+                });
+
+                let (v2_display, v2_gc_count) = if needs_v2 {
+                    // V2 needs the arg/return kinds. Reuse V1's if it ran,
+                    // otherwise load the function (without running it) to size them.
+                    let (param_kinds, return_kinds) = match &v1 {
+                        Some(v1) => (v1.param_kinds.clone(), v1.return_kinds.clone()),
+                        None => load_signature_v1(&storage, &address, &module_name, &function_name),
+                    };
+                    assert_eq!(
+                        param_kinds.len(),
+                        args.len(),
+                        "function requires a different number of arguments"
+                    );
+                    let (v2_output, v2_gc_count) = execute_function_v2(
+                        &guard,
+                        &module_provider,
+                        &address,
+                        &module_name,
+                        &function_name,
+                        &args,
+                        &param_kinds,
+                        &return_kinds,
+                        heap_size,
+                    );
+                    (v2_output.display, v2_gc_count)
+                } else {
+                    (String::new(), 0)
+                };
+
+                let v1_display = v1.map(|v| v.output.display).unwrap_or_default();
+                check_output(&checks, &v1_display, &v2_display, v2_gc_count)?;
             },
         }
     }
@@ -158,12 +327,74 @@ fn stdlib_modules() -> &'static [CompiledModule] {
     STDLIB.get_or_init(|| compile_move_stdlib().expect("Move stdlib compiles"))
 }
 
+fn test_utils_modules() -> &'static [CompiledModule] {
+    static TEST_UTILS: OnceLock<Vec<CompiledModule>> = OnceLock::new();
+    TEST_UTILS.get_or_init(|| {
+        compile_move_path(Path::new(crate::compile::TEST_UTILS_PATH))
+            .expect("test_utils library compiles")
+    })
+}
+
 /// Output of V1 execution, plus the parameter and return types so V2 can
 /// place args and read its result region with matching widths.
 struct V1Output {
     output: Output,
     param_kinds: Vec<PrimitiveKind>,
     return_kinds: Vec<PrimitiveKind>,
+}
+
+/// Maps a function's parameter and return types to [`PrimitiveKind`]s. Panics on
+/// any non-primitive type — the harness only supports primitive args/returns.
+fn primitive_kinds(
+    param_tys: &[Type],
+    return_tys: &[Type],
+    env: &RuntimeEnvironment,
+) -> (Vec<PrimitiveKind>, Vec<PrimitiveKind>) {
+    let param_kinds = param_tys
+        .iter()
+        .map(|ty| {
+            PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
+        })
+        .collect::<Vec<_>>();
+    let return_kinds = return_tys
+        .iter()
+        .map(|ty| PrimitiveKind::from_return_type(ty, env))
+        .collect::<Vec<_>>();
+    (param_kinds, return_kinds)
+}
+
+/// Loads a function via the legacy VM and returns its parameter and return
+/// kinds, without executing it. Used to size the V2 arg/return regions when the
+/// legacy VM is skipped for a step (no `CHECK-V1`/shared checks).
+fn load_signature_v1(
+    storage: &InMemoryStorage,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+) -> (Vec<PrimitiveKind>, Vec<PrimitiveKind>) {
+    let mut gas_meter = UnmeteredGasMeter;
+    let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
+    let module_storage = storage.as_unsync_module_storage();
+    let loader = LazyLoader::new(&module_storage);
+
+    let function = match loader.load_instantiated_function(
+        &LegacyLoaderConfig::unmetered(),
+        &mut gas_meter,
+        &mut traversal_context,
+        &ModuleId::new(*address, module_name.to_owned()),
+        function_name,
+        &[],
+    ) {
+        Ok(function) => function,
+        Err(err) => panic!("Failed to load function: {}", err),
+    };
+
+    primitive_kinds(
+        function.param_tys(),
+        function.return_tys(),
+        module_storage.runtime_environment(),
+    )
 }
 
 /// Execute a function via legacy MoveVM and returns normalized output.
@@ -188,7 +419,7 @@ fn execute_function_v1(
         &mut traversal_context,
         &ModuleId::new(*address, module_name.to_owned()),
         function_name,
-        // TODO: support type arguments.
+        // TODO(completeness): support type arguments.
         &[],
     ) {
         Ok(function) => function,
@@ -201,23 +432,47 @@ fn execute_function_v1(
     if function.param_tys().len() != args.len() {
         panic!("Function requires a different number of arguments");
     }
-    let param_kinds = function
-        .param_tys()
-        .iter()
-        .map(|ty| {
-            PrimitiveKind::from_type(ty).expect("Only primitive argument types are supported")
-        })
-        .collect::<Vec<_>>();
-    let return_kinds = function
-        .return_tys()
-        .iter()
-        .map(|ty| PrimitiveKind::from_type(ty).expect("Only primitive return types are supported"))
-        .collect::<Vec<_>>();
+    let (param_kinds, return_kinds) = primitive_kinds(
+        function.param_tys(),
+        function.return_tys(),
+        module_storage.runtime_environment(),
+    );
     let serialized_args = param_kinds
         .iter()
         .zip(args.iter())
         .map(|(kind, arg)| kind.to_move_value(arg).simple_serialize().unwrap())
         .collect::<Vec<_>>();
+
+    // Seed the native extensions with the same fixed inputs as the mono-move
+    // side, so extension-backed natives produce matching output.
+    let state_storage_view = MockEmptyStateStorage {
+        usage: StateStorageUsage::new(TEST_STATE_ITEMS as usize, TEST_STATE_BYTES as usize),
+    };
+    let mut extensions = NativeContextExtensions::default();
+    let user_transaction_context = UserTransactionContext::new(
+        AccountAddress::ZERO,
+        vec![],
+        AccountAddress::ZERO,
+        0,
+        0,
+        0,
+        None,
+        None,
+        TransactionIndexKind::BlockExecution {
+            transaction_index: TEST_TXN_INDEX,
+        },
+        false,
+    );
+    extensions.add(NativeTransactionContext::new(
+        TEST_TXN_HASH.to_vec(),
+        vec![],
+        0,
+        Some(user_transaction_context),
+        TEST_SESSION_COUNTER,
+    ));
+    extensions.add(NativeObjectContext::default());
+    extensions.add(NativeStateStorageContext::new(&state_storage_view));
+    extensions.add(NativeEventContext::default());
 
     let mut data_cache = TransactionDataCache::empty();
     let output = match MoveVM::execute_loaded_function(
@@ -226,7 +481,7 @@ fn execute_function_v1(
         &mut MoveVmDataCacheAdapter::new(&mut data_cache, storage, &loader),
         &mut gas_meter,
         &mut traversal_context,
-        &mut NativeContextExtensions::default(),
+        &mut extensions,
         &loader,
     ) {
         Ok(result) => {
@@ -234,10 +489,19 @@ fn execute_function_v1(
                 .return_values
                 .iter()
                 .zip(return_kinds.iter())
-                .map(|((bytes, _layout), kind)| kind.format_bytes(bytes))
+                .map(|((bytes, _layout), kind)| match kind {
+                    PrimitiveKind::Utf8String => {
+                        render_utf8(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+                    },
+                    PrimitiveKind::ByteVector => {
+                        render_bytes(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+                    },
+                    _ => kind.format_bytes(bytes),
+                })
                 .collect::<Vec<_>>();
+            let events = finalize_events_v1(&extensions);
             Output {
-                display: format!("results: {}", vals.join(", ")),
+                display: render_execution_output(&vals, &events),
             }
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
@@ -259,7 +523,8 @@ fn execute_function_v1(
     }
 }
 
-/// Executes a function via MonoMove VM, and returns normalized output.
+/// Executes a function via MonoMove VM. Returns the normalized output and the
+/// number of garbage collections that ran (for `CHECK-GC-COUNT`).
 fn execute_function_v2(
     guard: &ExecutionGuard<'_>,
     module_provider: &InMemoryModuleProvider,
@@ -269,94 +534,76 @@ fn execute_function_v2(
     args: &[String],
     arg_kinds: &[PrimitiveKind],
     return_kinds: &[PrimitiveKind],
-) -> Output {
-    // Construct a per-transaction context.
-    let mut natives = ProductionNativeRegistry::<SimpleGasMeter>::new();
-    natives
-        .register_all(
-            make_all_test_natives::<ProductionContextFamily<SimpleGasMeter>>()
-                .into_iter()
-                .chain(make_all_production_natives::<
-                    ProductionContextFamily<SimpleGasMeter>,
-                >())
-                .map(|(addr, module, function, func)| {
-                    let name = NativeName {
-                        module: guard.module_id_of(&addr, &module),
-                        function: guard.identifier_of(&function),
-                    };
-                    (name, func)
-                }),
-        )
-        .expect("natives have unique qualified names");
-    let loader = Loader::new_with_policy(
+    heap_size: Option<usize>,
+) -> (Output, usize) {
+    // Seed extensions with the same fixed inputs as the legacy side.
+    let extensions = seed_extensions();
+
+    // Run through the shared pipeline engine. Argument placement and result
+    // reading mirror mono-move's frame slot layout.
+    let mut gc_count = 0;
+    let outcome = crate::engine::with_mono_function(
         guard,
         module_provider,
-        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &natives,
-    );
-    let mut txn_ctx = TransactionContext::new(
-        loader,
-        SimpleGasMeter::new(u64::MAX),
-        &mono_move_core::NO_RESOURCE_PROVIDER,
-        &natives,
-    );
-
-    // Resolve the entry function via load_function so the entry module is
-    // lazily loaded into the read-set and gas is charged for the load.
-    let id = guard
-        .intern_address_name(address, module_name)
-        .into_global_arena_ptr();
-    let function_name = guard
-        .intern_identifier(function_name)
-        .into_global_arena_ptr();
-
-    // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard`
-    // is held, the global executable cache cannot enter the maintenance
-    // phase, so no arena reset can happen for the duration of this step.
-    let function = match txn_ctx.load_function(id, function_name, EMPTY_TYPE_LIST) {
-        Ok(p) => unsafe { p.as_ref_unchecked() },
-        Err(err) => {
-            return Output {
-                display: format!("error: {}", err),
-            };
+        *address,
+        module_name,
+        function_name,
+        extensions,
+        |runner| {
+            runner.set_heap_size(heap_size);
+            let result = runner.run(
+                |interpreter| {
+                    let mut offset: u32 = 0;
+                    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+                        offset = mono_move_core::align_up_u32(offset, kind.align());
+                        let bytes = kind.parse_to_bytes(arg);
+                        interpreter.set_root_arg(offset, &bytes);
+                        offset += kind.size();
+                    }
+                },
+                |interpreter| {
+                    let mut ret_off: u32 = 0;
+                    let mut vals = Vec::with_capacity(return_kinds.len());
+                    for kind in return_kinds {
+                        ret_off = mono_move_core::align_up_u32(ret_off, kind.align());
+                        match kind {
+                            PrimitiveKind::Utf8String => {
+                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
+                                vals.push(render_utf8(&content));
+                            },
+                            PrimitiveKind::ByteVector => {
+                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
+                                vals.push(render_bytes(&content));
+                            },
+                            _ => {
+                                let bytes =
+                                    interpreter.root_result_bytes_for_test(ret_off, kind.size());
+                                vals.push(kind.format_bytes(bytes));
+                            },
+                        }
+                        ret_off += kind.size();
+                    }
+                    // SAFETY: the heap (and every pointer the events embed) is
+                    // live while the interpreter is.
+                    let events = unsafe { finalize_events_v2(interpreter.extensions(), guard) };
+                    (vals, events)
+                },
+            );
+            gc_count = runner.gc_count();
+            result
         },
+    );
+
+    let display = match outcome {
+        Err(err) => format!("error: {}", err),
+        Ok(RunResult::Error(err)) => format!("error: {}", err),
+        Ok(RunResult::Aborted { code, message }) => match message {
+            Some(m) => format!("aborted: code {} ({})", code, m),
+            None => format!("aborted: code {}", code),
+        },
+        Ok(RunResult::Success((vals, events))) => render_execution_output(&vals, &events),
     };
-
-    let mut interpreter = InterpreterContext::new(&mut txn_ctx, function);
-
-    let mut offset: u32 = 0;
-    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-        offset = align_up(offset, kind.align());
-        let bytes = kind.parse_to_bytes(arg);
-        interpreter.set_root_arg(offset, &bytes);
-        offset += kind.size();
-    }
-
-    match interpreter.run() {
-        Err(err) => Output {
-            display: format!("error: {}", err),
-        },
-        Ok(RuntimeStatus::Aborted { code, message }) => {
-            let display = match message {
-                Some(m) => format!("aborted: code {} ({})", code, m),
-                None => format!("aborted: code {}", code),
-            };
-            Output { display }
-        },
-        Ok(RuntimeStatus::Success) => {
-            let mut ret_off: u32 = 0;
-            let mut vals = Vec::with_capacity(return_kinds.len());
-            for kind in return_kinds {
-                ret_off = align_up(ret_off, kind.align());
-                let bytes = interpreter.root_result_bytes(ret_off, kind.size());
-                vals.push(kind.format_bytes(bytes));
-                ret_off += kind.size();
-            }
-            Output {
-                display: format!("results: {}", vals.join(", ")),
-            }
-        },
-    }
+    (Output { display }, gc_count)
 }
 
 /// Kind supported as an argument or return value in differential tests
@@ -379,6 +626,13 @@ enum PrimitiveKind {
     I128,
     I256,
     Address,
+    Signer,
+    /// A `String` return value (return-only). Rendered as a UTF-8 string by
+    /// reading the heap `vector<u8>` (V2) or decoding the BCS bytes (V1).
+    Utf8String,
+    /// A `vector<u8>` return value (return-only). Rendered as a `0x…` hex dump
+    /// of its bytes, read from the heap (V2) or the BCS return (V1).
+    ByteVector,
 }
 
 impl PrimitiveKind {
@@ -398,8 +652,32 @@ impl PrimitiveKind {
             Type::I128 => PrimitiveKind::I128,
             Type::I256 => PrimitiveKind::I256,
             Type::Address => PrimitiveKind::Address,
+            Type::Signer => PrimitiveKind::Signer,
             _ => return None,
         })
+    }
+
+    /// Like [`Self::from_type`] but also recognizes a `0x1::string::String`
+    /// return as [`PrimitiveKind::Utf8String`]. Used for return values, which
+    /// (unlike arguments) may be a `String`.
+    fn from_return_type(ty: &Type, env: &RuntimeEnvironment) -> Self {
+        if let Some(kind) = Self::from_type(ty) {
+            return kind;
+        }
+        // `vector<u8>` renders as a hex byte dump (distinct from `String`).
+        if let Type::Vector(elem) = ty
+            && matches!(&**elem, Type::U8)
+        {
+            return PrimitiveKind::ByteVector;
+        }
+        if let Ok(TypeTag::Struct(s)) = env.ty_to_ty_tag(ty)
+            && s.address == AccountAddress::ONE
+            && s.module.as_str() == "string"
+            && s.name.as_str() == "String"
+        {
+            return PrimitiveKind::Utf8String;
+        }
+        panic!("Only primitive, vector<u8>, and String return types are supported");
     }
 
     fn size(self) -> u32 {
@@ -407,9 +685,15 @@ impl PrimitiveKind {
             PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64 | PrimitiveKind::I64 => 8,
+            PrimitiveKind::U64
+            | PrimitiveKind::I64
+            | PrimitiveKind::Utf8String
+            | PrimitiveKind::ByteVector => 8,
             PrimitiveKind::U128 | PrimitiveKind::I128 => 16,
-            PrimitiveKind::U256 | PrimitiveKind::I256 | PrimitiveKind::Address => 32,
+            PrimitiveKind::U256
+            | PrimitiveKind::I256
+            | PrimitiveKind::Address
+            | PrimitiveKind::Signer => 32,
         }
     }
 
@@ -418,14 +702,18 @@ impl PrimitiveKind {
             PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
             PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
             PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64 | PrimitiveKind::I64 => 8,
+            PrimitiveKind::U64
+            | PrimitiveKind::I64
+            | PrimitiveKind::Utf8String
+            | PrimitiveKind::ByteVector => 8,
             // Wide integers and addresses are 8-byte aligned in the
             // frame even though their size is larger.
             PrimitiveKind::U128
             | PrimitiveKind::I128
             | PrimitiveKind::U256
             | PrimitiveKind::I256
-            | PrimitiveKind::Address => 8,
+            | PrimitiveKind::Address
+            | PrimitiveKind::Signer => 8,
         }
     }
 
@@ -447,6 +735,13 @@ impl PrimitiveKind {
             PrimitiveKind::Address => {
                 let addr = AccountAddress::from_hex_literal(s).expect("invalid address literal");
                 MoveValue::Address(addr)
+            },
+            PrimitiveKind::Signer => {
+                let addr = AccountAddress::from_hex_literal(s).expect("invalid signer literal");
+                MoveValue::Signer(addr)
+            },
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!("String / vector<u8> are return-only kinds")
             },
         }
     }
@@ -510,10 +805,13 @@ impl PrimitiveKind {
                 .expect("invalid i256 literal")
                 .to_le_bytes()
                 .to_vec(),
-            PrimitiveKind::Address => AccountAddress::from_hex_literal(s)
+            PrimitiveKind::Address | PrimitiveKind::Signer => AccountAddress::from_hex_literal(s)
                 .expect("invalid address literal")
                 .into_bytes()
                 .to_vec(),
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!("String / vector<u8> are return-only kinds")
+            },
         }
     }
 
@@ -534,16 +832,33 @@ impl PrimitiveKind {
             PrimitiveKind::I64 => i64::from_le_bytes(bytes[..8].try_into().unwrap()).to_string(),
             PrimitiveKind::I128 => i128::from_le_bytes(bytes[..16].try_into().unwrap()).to_string(),
             PrimitiveKind::I256 => I256::from_le_bytes(bytes[..32].try_into().unwrap()).to_string(),
-            PrimitiveKind::Address => {
+            PrimitiveKind::Address | PrimitiveKind::Signer => {
                 let arr: [u8; AccountAddress::LENGTH] = bytes[..32].try_into().unwrap();
                 AccountAddress::new(arr).to_hex_literal()
+            },
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
+                unreachable!(
+                    "String / vector<u8> returns are rendered from the heap, not format_bytes"
+                )
             },
         }
     }
 }
 
-fn align_up(offset: u32, align: u32) -> u32 {
-    (offset + align - 1) & !(align - 1)
+/// Renders raw UTF-8 bytes as a quoted string for cross-VM comparison.
+fn render_utf8(bytes: &[u8]) -> String {
+    format!("{:?}", String::from_utf8_lossy(bytes))
+}
+
+/// Renders raw bytes as a `0x…` hex string for cross-VM comparison.
+fn render_bytes(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut s = String::with_capacity(2 + bytes.len() * 2);
+    s.push_str("0x");
+    for b in bytes {
+        write!(s, "{b:02x}").unwrap();
+    }
+    s
 }
 
 /// Parse a boolean argument literal. Only `true`/`false` are accepted; the

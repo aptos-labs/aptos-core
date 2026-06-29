@@ -12,9 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[[bin]]
+name = "aptos-release-builder"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true, features = [ "no-upload-proposal" ] }
+aptos = { workspace = true, features = ["no-upload-proposal"] }
 aptos-build-info = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -49,6 +53,7 @@ move-model = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
+regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -59,7 +64,3 @@ strum_macros = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 walkdir = { workspace = true }
-
-[[bin]]
-name = "aptos-release-builder"
-path = "src/main.rs"

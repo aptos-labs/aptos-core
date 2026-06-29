@@ -1,0 +1,20 @@
+\section{Related Work and Conclusion}
+\label{sec:concl}
+
+Static bytecode verification at load time is standard for typed managed VMs: the JVM~\cite{jvm} and CLR~\cite{clr} check well-formedness, typing, and stack discipline before execution, and sibling Move VMs share Move's verifier.
+None of these adds a \emph{second}, runtime layer of safety checks: once a module is admitted, its dynamic semantics is trusted.
+Dynamically typed languages such as JavaScript and Python sit at the opposite end, performing the runtime type checks of \S\ref{sec:type} but lacking the \emph{first} static layer.
+The EVM~\cite{ethereum,kevm} and Solana's SVM form a third regime: their untyped bytecode admits neither a static type verifier nor a runtime type discipline.
+Aptos's pairing of a static verifier with a complementary runtime layer is thus unique among production VMs.
+
+The runtime reference safety checks (RRSC) we describe are novel.
+The closest related work, Tree Borrows and Stacked Borrows~\cite{stackedborrows,treeborrows} (TB/SB), clarifies Rust's unsafe aliasing rules, but does not share RRSC's requirement of no false positives over the static verifier.
+TB/SB also tolerate two or more orders of magnitude of overhead, not being intended for production or large fuzzing workloads; unlike RRSC they maintain provenance genealogies among references and are not function-modular.
+Also, Move and Rust's reference semantics differ (\S\ref{sec:move}).
+As future work, the dynamic semantics of the reference checker is also interesting as a model for what reference safety means, since static borrow analysis over-approximates in a method-dependent way and no canonical operational semantics exists; we plan to fully formalize this.
+
+Deferring runtime checks off the execution path and replaying a recorded trace later is a well-known idea: decoupled dynamic analysis~\cite{aftersight,shadowreplica,straighttaint} and offline runtime verification~\cite{rvsurvey} move expensive monitoring onto spare cores.
+Our asynchronous checks differ in that the parallel blockchain execution model itself supplies the idle capacity (from workers waiting on read-write conflicts) and runs all checks online, so an offending transaction is detected automatically.
+
+To conclude, we argue the need for runtime safety checks, motivated by real-world bugs, as a second line of defense to the static verifier; they also serve as a semantic, precise oracle for fuzzing the verifier itself.
+We presented a novel runtime reference safety checker (yet to be launched in production) and two techniques for reducing the cost of runtime checks in a blockchain setting, with the type and ability checks (in production) introducing about 10\% overhead on Aptos workloads.

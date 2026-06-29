@@ -9,6 +9,12 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[lib]
+doctest = false
+
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 bcs = { workspace = true }
@@ -31,12 +37,6 @@ once_cell = { workspace = true }
 tempfile = { workspace = true }
 walkdir = { workspace = true }
 
-[features]
-default = []
-
 [[test]]
 name = "testsuite"
 harness = false
-
-[lib]
-doctest = false

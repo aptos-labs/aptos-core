@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:18:9
+   │
+18 │ ╭         ensures exists S in *:
+19 │ │             (S.. |~ requires_of<f>(x)) &&
+20 │ │             (S.. |~ !aborts_of<f>(x));
+   │ ╰──────────────────────────────────────^
+   │
+   =     at tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:13: apply_twice
+   =         f = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:14: apply_twice
+   =     at tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:15: apply_twice
+   =     at tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:13: apply_twice
+   =         x = <redacted>
+   =     at tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:18: apply_twice (spec)

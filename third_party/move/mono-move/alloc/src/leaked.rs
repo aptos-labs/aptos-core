@@ -81,7 +81,7 @@ impl<T> Clone for LeakedBoxPtr<T> {
 /// Versioned slot holding [`LeakedBoxPtr<T>`]s.
 pub struct VersionedLeakedBoxPtr<T> {
     base: AtomicPtr<T>,
-    // TODO:
+    // TODO(completeness):
     //   In the future, other versions will be place here.
     //   Right now, only one base (storage) version exists.
 }
@@ -96,7 +96,7 @@ impl<T> VersionedLeakedBoxPtr<T> {
 
     /// Returns the current pointer if set, or [`None`] otherwise.
     pub fn load(&self) -> Option<LeakedBoxPtr<T>> {
-        // TODO:
+        // TODO(completeness):
         //   In the future, the algorithm will be more involved: we need to
         //   find the right version to return based on the version specified
         //   by the user.
@@ -127,7 +127,7 @@ impl<T> VersionedLeakedBoxPtr<T> {
 
     /// Atomically swaps null in and returns the previous content if any.
     pub fn clear(&self) -> Option<LeakedBoxPtr<T>> {
-        // TODO: Revisit GC storey with Zaptos.
+        // TODO(completeness): Revisit GC story with Zaptos.
         let raw = self.base.swap(ptr::null_mut(), Ordering::AcqRel);
         NonNull::new(raw).map(LeakedBoxPtr)
     }

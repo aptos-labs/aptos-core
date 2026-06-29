@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+fuzzing = []
+
 [dependencies]
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
@@ -22,6 +25,3 @@ serde_yaml = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
-
-[features]
-fuzzing = []

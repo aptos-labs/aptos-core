@@ -32,7 +32,7 @@ fun entry(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call outer, [r0]
+    0: [x0] := call outer<u64>, [r0]
     1: ret [x0]
 }
 
@@ -49,7 +49,7 @@ fun middle(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call innermost, [r0]
+    0: [x0] := call innermost<_0>, [r0]
     1: ret [x0]
 }
 
@@ -58,7 +58,7 @@ fun outer(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call middle, [r0]
+    0: [x0] := call middle<_0>, [r0]
     1: ret [x0]
 }
 === micro-ops ===
@@ -66,16 +66,16 @@ fun outer(r0): _0 {
 
 fun entry() {
   frame_data_size: 8
+  entry_gas: 90
   code:
-    0: Charge #16
-    1: Move8 [32] <- [0]
-    2: CallIndirect 0x1::test::outer<u64>
-    3: Move8 [0] <- [32]
-    4: Return
+    0: Move8 [32] <- [0]
+    1: CallIndirect 0x1::test::outer<u64>
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
-fun innermost(): skipped (not all types are concrete)
+fun innermost(): skipped (generic function not instantiated)
 
-fun middle(): skipped (not all types are concrete)
+fun middle(): skipped (generic function not instantiated)
 
-fun outer(): skipped (not all types are concrete)
+fun outer(): skipped (generic function not instantiated)

@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    block_metadata::BlockMetadata, decryption::BlockTxnDecryptionKey, randomness::Randomness,
+    block_metadata::BlockMetadata,
+    decryption::{BlockTxnDecryptionKey, DecryptionPayload},
+    randomness::Randomness,
 };
 use aptos_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
@@ -21,6 +23,7 @@ pub enum BlockMetadataExt {
     V0(BlockMetadata),
     V1(BlockMetadataWithRandomness),
     V2(BlockMetadataWithRandAndDecKey),
+    V3(BlockMetadataWithRandAndDecPayload),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,6 +39,9 @@ pub struct BlockMetadataWithRandomness {
     pub randomness: Option<Randomness>,
 }
 
+/// Frozen wire format: testnet runs with decryption enabled and has committed
+/// V2 transactions in this exact layout. Do not change the fields or their
+/// encoding; additions go into a new variant (see `V3`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockMetadataWithRandAndDecKey {
     pub id: HashValue,
@@ -48,6 +54,23 @@ pub struct BlockMetadataWithRandAndDecKey {
     pub timestamp_usecs: u64,
     pub randomness: Option<Randomness>,
     pub decryption_key: Option<BlockTxnDecryptionKey>,
+}
+
+/// Replaces `V2` once the dense decryption-round tracking is active (the
+/// on-chain `PerBlockDecryptionKeyV2` resource exists): the decryption key is
+/// paired with the decryption round it consumed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockMetadataWithRandAndDecPayload {
+    pub id: HashValue,
+    pub epoch: u64,
+    pub round: u64,
+    pub proposer: AccountAddress,
+    #[serde(with = "serde_bytes")]
+    pub previous_block_votes_bitvec: Vec<u8>,
+    pub failed_proposer_indices: Vec<u32>,
+    pub timestamp_usecs: u64,
+    pub randomness: Option<Randomness>,
+    pub decryption_payload: Option<DecryptionPayload>,
 }
 
 impl BlockMetadataExt {
@@ -97,11 +120,36 @@ impl BlockMetadataExt {
         })
     }
 
+    pub fn new_v3(
+        id: HashValue,
+        epoch: u64,
+        round: u64,
+        proposer: AccountAddress,
+        previous_block_votes_bitvec: Vec<u8>,
+        failed_proposer_indices: Vec<u32>,
+        timestamp_usecs: u64,
+        randomness: Option<Randomness>,
+        decryption_payload: Option<DecryptionPayload>,
+    ) -> Self {
+        Self::V3(BlockMetadataWithRandAndDecPayload {
+            id,
+            epoch,
+            round,
+            proposer,
+            previous_block_votes_bitvec,
+            failed_proposer_indices,
+            timestamp_usecs,
+            randomness,
+            decryption_payload,
+        })
+    }
+
     pub fn id(&self) -> HashValue {
         match self {
             BlockMetadataExt::V0(obj) => obj.id(),
             BlockMetadataExt::V1(obj) => obj.id,
             BlockMetadataExt::V2(obj) => obj.id,
+            BlockMetadataExt::V3(obj) => obj.id,
         }
     }
 
@@ -110,6 +158,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.timestamp_usecs(),
             BlockMetadataExt::V1(obj) => obj.timestamp_usecs,
             BlockMetadataExt::V2(obj) => obj.timestamp_usecs,
+            BlockMetadataExt::V3(obj) => obj.timestamp_usecs,
         }
     }
 
@@ -118,6 +167,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.proposer(),
             BlockMetadataExt::V1(obj) => obj.proposer,
             BlockMetadataExt::V2(obj) => obj.proposer,
+            BlockMetadataExt::V3(obj) => obj.proposer,
         }
     }
 
@@ -126,6 +176,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.previous_block_votes_bitvec(),
             BlockMetadataExt::V1(obj) => &obj.previous_block_votes_bitvec,
             BlockMetadataExt::V2(obj) => &obj.previous_block_votes_bitvec,
+            BlockMetadataExt::V3(obj) => &obj.previous_block_votes_bitvec,
         }
     }
 
@@ -134,6 +185,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.failed_proposer_indices(),
             BlockMetadataExt::V1(obj) => &obj.failed_proposer_indices,
             BlockMetadataExt::V2(obj) => &obj.failed_proposer_indices,
+            BlockMetadataExt::V3(obj) => &obj.failed_proposer_indices,
         }
     }
 
@@ -142,6 +194,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.epoch(),
             BlockMetadataExt::V1(obj) => obj.epoch,
             BlockMetadataExt::V2(obj) => obj.epoch,
+            BlockMetadataExt::V3(obj) => obj.epoch,
         }
     }
 
@@ -150,6 +203,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.round(),
             BlockMetadataExt::V1(obj) => obj.round,
             BlockMetadataExt::V2(obj) => obj.round,
+            BlockMetadataExt::V3(obj) => obj.round,
         }
     }
 
@@ -158,6 +212,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(_) => "block_metadata_ext_transaction__v0",
             BlockMetadataExt::V1(_) => "block_metadata_ext_transaction__v1",
             BlockMetadataExt::V2(_) => "block_metadata_ext_transaction__v2",
+            BlockMetadataExt::V3(_) => "block_metadata_ext_transaction__v3",
         }
     }
 }

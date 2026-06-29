@@ -33,26 +33,26 @@ fun trigger(): u64 {
 
 fun helper() {
   frame_data_size: 8
+  entry_gas: 56
   code:
-    0: Charge #4
-    1: StoreImm8 [0] <- #7
-    2: Return
+    0: StoreImm8 [0] <- #7
+    1: Return
 }
 
 fun void_no_arg() {
   frame_data_size: 0
+  entry_gas: 2
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 102
   code:
-    0: Charge #26
-    1: CallIndirect 0x66::test::helper
-    2: StoreImm8 [0] <- #0
-    3: Move8 [0] <- [32]
-    4: CallIndirect 0x66::test::void_no_arg
-    5: Return
+    0: CallIndirect 0x66::test::helper
+    1: StoreImm8 [0] <- #0
+    2: Move8 [0] <- [32]
+    3: CallIndirect 0x66::test::void_no_arg
+    4: Return
 }

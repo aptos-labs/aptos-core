@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import argparse
+import datetime
 import os
+import re
 
 
 # Executor types still under active development. Their results are reported
@@ -24,6 +26,11 @@ NON_BLOCKING_EXECUTOR_TYPES = frozenset(
 ALLOWED_REGRESSION = 0.15
 ALLOWED_IMPROVEMENT = 0.15
 ABSOLUTE_BUFFER_US = 2.0
+
+# A drift backed by fewer than this many samples in the query window is too noisy to act
+# on (it may be a single run, e.g. a freshly deployed build), so it is ignored: the row
+# keeps its calibrated value until enough runs accumulate.
+MIN_RECALIBRATION_SAMPLES = 5
 
 
 def tps_band(expected_tps, count, min_ratio, max_ratio):
@@ -132,6 +139,99 @@ def _load_existing_tsv(path, key_columns_count):
             cells = line.split("\t")
             rows[tuple(cells[:key_columns_count])] = cells
     return rows
+
+
+def format_changelog_entry(date_str, is_move_e2e, triggers, unparseable):
+    """Render one recalibration event as a markdown table.
+
+    `triggers` is a list of (key, old, new, kind, runs) tuples, where `key` is the tuple of
+    key-column values, `kind` is "drift" (an out-of-band production row) or "new" (a row
+    with no prior calibration), and `runs` is the number of samples the new value was taken
+    over (the query's median is over this many runs in the window -- a low count means a
+    noisy, possibly single-run figure). For drift rows the table shows the signed percent
+    change of the calibrated metric -- tps for single-node (so a regression is negative),
+    wall-time microseconds for move-e2e (so a regression is positive); new rows show "new".
+    """
+    if is_move_e2e:
+        headers = ["transaction_type", "runs", "wall-time % change"]
+    else:
+        headers = [
+            "transaction_type",
+            "module_working_set",
+            "executor",
+            "runs",
+            "tps % change",
+        ]
+
+    lines = [f"## {date_str}", ""]
+    if not triggers:
+        # A write happened but no production row was out of band (only unparseable rows).
+        lines.append(f"_Refreshed; {unparseable} unparseable row(s) forced an update._")
+        lines.append("")
+        return "\n".join(lines) + "\n"
+
+    lines.append("| " + " | ".join(headers) + " |")
+    lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+    for key, old, new, kind, runs in triggers:
+        if kind == "new" or not old:
+            delta = "new"
+        else:
+            delta = f"{(new - old) / old * 100:+.1f}%"
+        lines.append("| " + " | ".join(list(key) + [runs, delta]) + " |")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def changelog_header(is_move_e2e):
+    """The fixed title/legend block at the top of a changelog (created on first write)."""
+    if is_move_e2e:
+        return (
+            "# Move e2e-benchmark calibration log\n\n"
+            "Recalibration history, newest first. Each entry lists the tests whose "
+            "calibrated value drifted out of band, as a signed `wall-time % change` "
+            "(positive means slower); new tests show `new`.\n"
+        )
+    return (
+        "# Single-node execution-performance calibration log\n\n"
+        "Recalibration history, newest first. Each entry lists the tests whose "
+        "calibrated value drifted out of band, as a signed `tps % change` "
+        "(negative means slower); new tests show `new`.\n"
+    )
+
+
+def update_changelog(tsv_path, is_move_e2e, triggers, unparseable):
+    """Insert a recalibration entry into the changelog beside `tsv_path`.
+
+    Only called when this run actually rewrote the `.tsv`, so the changelog only ever changes
+    alongside a real recalibration -- it is never created or touched on a run that recalibrates
+    nothing (otherwise the calibration workflow would open a PR that adds only an empty
+    changelog). The file is created on demand on the first recalibration (header + entry), and
+    subsequent entries are inserted directly below the header so the newest is first. Created
+    on demand (not shipped tracked) so the commit is a new-file *add*, which `create-pull-request`
+    cherry-picks onto the base branch cleanly even before the file exists there.
+    """
+    changelog_path = tsv_path[: -len(".tsv")] + ".changelog.md"
+    current = ""
+    if os.path.exists(changelog_path):
+        with open(changelog_path) as f:
+            current = f.read()
+    content = current if current.strip() else changelog_header(is_move_e2e)
+    entry = format_changelog_entry(
+        datetime.date.today().isoformat(),
+        is_move_e2e,
+        triggers,
+        unparseable,
+    )
+    match = re.search(r"^## ", content, re.MULTILINE)
+    if match:
+        # Insert above the most recent existing entry, keeping the header on top.
+        content = content[: match.start()] + entry + content[match.start() :]
+    else:
+        content = content.rstrip("\n") + "\n\n" + entry
+    if content != current:
+        with open(changelog_path, "w") as f:
+            f.write(content)
+        print(f"Updated {changelog_path}")
 
 
 def main():
@@ -260,8 +360,16 @@ def main():
     in_band = 0
     out_of_band = 0
     experimental_skipped = 0
+    low_sample_skipped = 0
     new_tests = 0
     unparseable = 0
+    # Rows that trigger the rewrite, for the recalibration changelog: each is
+    # (key, old_expected, new_median, kind, runs) with kind "drift" or "new" and runs the
+    # number of samples the new median was taken over.
+    triggers = []
+    # Existing rows whose drift was ignored as too-few-samples: keep their old values when
+    # the file is rewritten (a recalibration triggered by other rows must not bake these in).
+    keep_old = set()
 
     for new_row in parsed:
         try:
@@ -289,6 +397,7 @@ def main():
         if key not in existing:
             new_tests += 1
             needs_update = True
+            triggers.append((key, None, None, "new", new_row.get("count", "?")))
             continue
 
         old = existing[key]
@@ -298,6 +407,7 @@ def main():
             old_min_ratio = float(old[-3])
             old_max_ratio = float(old[-2])
             new_median = float(new_row["median"])
+            new_count = int(new_row["count"])
         except (ValueError, IndexError, KeyError) as e:
             print(f"Could not parse band inputs for {key}: {e}; "
                   f"treating as out-of-band.")
@@ -314,31 +424,46 @@ def main():
 
         if lo <= new_median <= hi:
             in_band += 1
+        elif new_count < MIN_RECALIBRATION_SAMPLES:
+            # Out of band, but too few samples to trust; keep the calibrated value.
+            low_sample_skipped += 1
+            keep_old.add(key)
         else:
             out_of_band += 1
             needs_update = True
+            triggers.append(
+                (key, old_expected, new_median, "drift", str(new_count))
+            )
 
     print(
         f"Calibration check for {output_file_name}: "
         f"out_of_band={out_of_band}, in_band={in_band}, "
         f"experimental_skipped={experimental_skipped}, "
+        f"low_sample_skipped={low_sample_skipped}, "
         f"new_tests={new_tests}, unparseable={unparseable}, "
         f"needs_update={needs_update}"
     )
 
-    if not needs_update:
+    if needs_update:
+        with open(output_file_name, "w") as f:
+            for line in parsed:
+                key = tuple(line[c] for c in columns[:key_columns_count])
+                if key in keep_old:
+                    # A too-few-samples drift keeps its previously calibrated row.
+                    row = existing[key]
+                else:
+                    row = [line[column] for column in columns]
+                f.write("\t".join(row))
+                f.write("\n")
+        print(f"Written to {output_file_name}")
+        # Record the recalibration in the changelog. Only done here -- never on a run that
+        # leaves the .tsv unchanged -- so the workflow never opens a PR for an empty changelog.
+        update_changelog(output_file_name, args.move_e2e, triggers, unparseable)
+    else:
         print(
             f"No production rows outside band; "
             f"leaving {output_file_name} unchanged."
         )
-        return
-
-    with open(output_file_name, "w") as f:
-        for line in parsed:
-            f.write("\t".join([line[column] for column in columns]))
-            f.write("\n")
-
-    print(f"Written to {output_file_name}")
 
 
 if __name__ == "__main__":

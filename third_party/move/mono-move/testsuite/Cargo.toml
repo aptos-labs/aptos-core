@@ -14,14 +14,17 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-framework-natives = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-move-stdlib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-types = { workspace = true }
+bcs = { workspace = true }
 bytes = { workspace = true }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
 mono-move-core = { workspace = true }
-mono-move-gas = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
 mono-move-natives = { workspace = true }
@@ -31,8 +34,9 @@ move-binary-format = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
+move-package = { workspace = true }
 move-prover-test-utils = { workspace = true }
-move-stdlib = { path = "../../move-stdlib" }
+move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
@@ -41,6 +45,7 @@ specializer = { workspace = true }
 tempfile = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
 walkdir = { workspace = true }
@@ -49,6 +54,26 @@ walkdir = { workspace = true }
 name = "differential"
 harness = false
 
-[[test]]
-name = "snapshot"
+[[bench]]
+name = "fib"
+harness = false
+
+[[bench]]
+name = "nested_loop"
+harness = false
+
+[[bench]]
+name = "merge_sort"
+harness = false
+
+[[bench]]
+name = "bst"
+harness = false
+
+[[bench]]
+name = "match_sum"
+harness = false
+
+[[bench]]
+name = "int_arith_loop"
 harness = false

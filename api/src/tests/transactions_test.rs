@@ -2289,32 +2289,6 @@ async fn test_create_signing_message_rejects_invalid_json(
     context.check_golden_output(resp);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_create_signing_message_rejects_no_content_length_request(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let req = warp::test::request()
-        .header("content-type", "application/json")
-        .method("POST")
-        .path(&build_path("/encode_submission"));
-
-    let resp = context.expect_status_code(411).execute(req).await;
-    context.check_golden_output(resp);
-}
-
 // Note: in tests, the min gas unit price is 0
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[rstest(

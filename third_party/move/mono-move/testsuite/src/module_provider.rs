@@ -47,6 +47,11 @@ impl InMemoryModuleProvider {
         }
     }
 
+    /// Adds a module from its already-serialized bytes (e.g. bytecode read from chain).
+    pub fn add_module_bytes(&mut self, address: AccountAddress, name: Identifier, bytes: Bytes) {
+        self.module_bytes.insert((address, name), bytes);
+    }
+
     /// Declares that `(address, name)` belongs to a package whose other
     /// members are the given `siblings`. The `siblings` list must NOT
     /// include `name` itself — each stored entry is built to include the

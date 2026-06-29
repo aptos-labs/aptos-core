@@ -7,7 +7,10 @@ use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_types::{
     dkg::{chunky_dkg::ChunkyDKGState, DKGState},
-    on_chain_config::{ChunkyDKGConfigMoveStruct, OnChainRandomnessConfig},
+    on_chain_config::{
+        ChunkyDKGConfigMoveStruct, FeatureFlag, Features, OnChainChunkyDKGConfig,
+        OnChainRandomnessConfig,
+    },
 };
 use std::{sync::Arc, time::Duration};
 
@@ -45,7 +48,12 @@ async fn chunky_dkg_enable_feature() {
             conf.allow_new_validators = true;
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
-            // Chunky DKG config defaults to Off. ENCRYPTED_TRANSACTIONS not set.
+            // Force chunky DKG off and ENCRYPTED_TRANSACTIONS off at genesis so the
+            // test can exercise the runtime enable path via governance.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
+            let mut features = Features::default();
+            features.disable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            conf.initial_features_override = Some(features);
         }))
         .build_with_cli(0)
         .await;

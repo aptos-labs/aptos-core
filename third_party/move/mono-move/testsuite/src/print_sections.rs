@@ -19,8 +19,8 @@ use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
-    types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Interner,
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    DescriptorId, FieldTypes, FrameOffset, Interner, LayoutId, LayoutProvider, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -100,7 +100,7 @@ fn push_module_banner(out: &mut String, module: &CompiledModule) {
 
 /// Lower each function in `module_ir`, returning `(name, result)` pairs.
 //
-// TODO: we render only at publish time, so there is no way to render
+// TODO(completeness): we render only at publish time, so there is no way to render
 // instantiated generics. Figure out what is the best way to print
 // their code.
 fn lower_functions(
@@ -116,12 +116,21 @@ fn lower_functions(
             let name = module_ir.module.identifier_at(func_ir.name_idx).to_string();
             let result = try_discover_types_for_lowering_in_function(
                 &mut loader_ctx,
+                guard,
                 module_ir,
                 func_ir,
                 EMPTY_TYPE_LIST,
             )
-            .and_then(|vd| {
-                try_lower_function(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vd, &NoNatives)
+            .and_then(|descriptors| {
+                try_lower_function(
+                    module_ir,
+                    func_ir,
+                    EMPTY_TYPE_LIST,
+                    guard,
+                    guard,
+                    descriptors,
+                    &NoNatives,
+                )
             });
             (name, result)
         })
@@ -189,6 +198,16 @@ struct SnapshotLoaderContext<'a, 'guard, 'ctx> {
     module_ir: &'a ModuleIR,
 }
 
+impl LayoutProvider for SnapshotLoaderContext<'_, '_, '_> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.guard.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.guard.layout_id(ty)
+    }
+}
+
 impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
     fn get_fields(
         &mut self,
@@ -203,16 +222,6 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .module
             .interned_field_types(*nominal_name)
             .cloned())
-    }
-
-    fn set_nominal_layout(
-        &self,
-        ty: InternedType,
-        size: u32,
-        align: u32,
-        fields: Option<&[FieldLayout]>,
-    ) -> Result<()> {
-        self.guard.set_nominal_layout(ty, size, align, fields)
     }
 
     fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType> {
@@ -232,5 +241,49 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
 
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
         self.guard.vec_descriptor_for(elem_ty)
+    }
+
+    fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> Result<DescriptorId> {
+        Ok(self
+            .guard
+            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets))
+    }
+
+    fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> Result<DescriptorId> {
+        Ok(self
+            .guard
+            .publish_captured_data_descriptor(values_size, pointer_offsets))
+    }
+
+    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        self.guard.publish_layout(ty, layout)
+    }
+
+    fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]> {
+        self.guard.publish_variant_layouts(enum_ty, variants)
+    }
+
+    fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
+        size: u32,
+        ptr_offsets: &[FrameOffset],
+    ) -> Result<DescriptorId> {
+        Ok(self
+            .guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
     }
 }

@@ -115,54 +115,52 @@ fun max(r0, r1): u64 {
 
 fun add() {
   frame_data_size: 24
+  entry_gas: 59
   code:
-    0: Charge #7
-    1: AddU64 [16] <- [0] + [8]
-    2: Move8 [0] <- [16]
-    3: Return
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
 }
 
 fun get_x() {
   frame_data_size: 24
+  entry_gas: 80
   code:
-    0: Charge #30
-    1: ReadRefOffset [16] <- *([0]+0) (size=8)
-    2: Move8 [0] <- [16]
-    3: Return
+    0: ReadRefOffset [16] <- *([0]+0) (size=8)
+    1: Move8 [0] <- [16]
+    2: Return
 }
 
 fun get_x_of() {
   frame_data_size: 32
+  entry_gas: 228
   code:
-    0: Charge #80
-    1: Move8 [64] <- [8]
-    2: Move8 [56] <- [0]
-    3: CallIndirect 0x42::basic::make_point
-    4: Move(16) [16] <- [56]
-    5: SlotBorrow [56] <- &[16]
-    6: CallIndirect 0x42::basic::get_x
-    7: Move8 [0] <- [56]
-    8: Return
+    0: Move8 [64] <- [8]
+    1: Move8 [56] <- [0]
+    2: CallIndirect 0x42::basic::make_point
+    3: Move(16) [16] <- [56]
+    4: SlotBorrow [56] <- &[16]
+    5: CallIndirect 0x42::basic::get_x
+    6: Move8 [0] <- [56]
+    7: Return
 }
 
 fun make_point() {
   frame_data_size: 32
+  entry_gas: 152
   code:
-    0: Charge #56
-    1: Move8 [24] <- [8]
-    2: Move8 [16] <- [0]
-    3: Move(16) [0] <- [16]
-    4: Return
+    0: Move8 [24] <- [8]
+    1: Move8 [16] <- [0]
+    2: Move(16) [0] <- [16]
+    3: Return
 }
 
 fun max() {
   frame_data_size: 16
+  entry_gas: 3
   code:
-    0: Charge #3
-    1: JumpGreaterEqualU64 @4 [8] >= [0]
-    2: Charge #2
+    0: JumpGreaterEqualU64 @2 [8] >= [0] gas_taken=54 gas_fallthrough=54
+    1: Return
+    2: Move8 [0] <- [8]
     3: Return
-    4: Charge #4
-    5: Move8 [0] <- [8]
-    6: Return
 }

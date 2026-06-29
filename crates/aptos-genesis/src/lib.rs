@@ -81,6 +81,8 @@ pub struct GenesisInfo {
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
+    /// See `aptos_vm_genesis::GenesisConfiguration::initialize_decryption_at_genesis`.
+    pub initialize_decryption_at_genesis: bool,
 }
 
 impl GenesisInfo {
@@ -123,6 +125,7 @@ impl GenesisInfo {
             jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
             initial_jwks: genesis_config.initial_jwks.clone(),
             keyless_groth16_vk: genesis_config.keyless_groth16_vk.clone(),
+            initialize_decryption_at_genesis: genesis_config.initialize_decryption_at_genesis,
         })
     }
 
@@ -161,6 +164,7 @@ impl GenesisInfo {
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
                 initial_jwks: self.initial_jwks.clone(),
                 keyless_groth16_vk: self.keyless_groth16_vk.clone(),
+                initialize_decryption_at_genesis: self.initialize_decryption_at_genesis,
             },
             &self.consensus_config,
             &self.execution_config,

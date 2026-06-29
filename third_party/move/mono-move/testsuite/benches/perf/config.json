@@ -1,0 +1,12 @@
+{
+  "threshold_percent": 3.0,
+  "mono_benches": [
+    { "id": "fib/mono" },
+    { "id": "nested_loop/mono" },
+    { "id": "merge_sort/mono" },
+    { "id": "bst/mono" },
+    { "id": "match_sum/mono" },
+    { "id": "int_arith_loop/mono_u64" },
+    { "id": "int_arith_loop/mono_i64" }
+  ]
+}

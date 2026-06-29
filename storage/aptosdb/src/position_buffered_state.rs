@@ -11,6 +11,7 @@ use crate::{
     ledger_db::LedgerDb,
     position_merkle_batch_committer::PositionMerkleBatchCommitter,
     position_merkle_db::PositionMerkleDb,
+    position_pruner::PositionPruner,
     position_snapshot_committer::{
         merklize_position, PositionSnapshotToCommit, POSITION_BATCH_CHANNEL_SIZE,
     },
@@ -21,36 +22,14 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::JellyfishMerkleTree;
-use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_storage_interface::state_store::{
-    sharded_jmt_state::{LeafSlot, ShardedJmtState},
-    state_summary::StateSummary,
-    state_with_summary::{LedgerWithSummary, StateAndSummary},
+use aptos_scratchpad::{ProofRead, SUBTREE_DROPPER};
+pub use aptos_storage_interface::state_store::sharded_jmt_state::{
+    new_empty_position_state, position_state_at_version, PositionSlot, PositionStateSummary,
+    PositionStateWithSummary,
 };
+use aptos_storage_interface::state_store::state_with_summary::LedgerWithSummary;
 use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use std::sync::Arc;
-
-pub type PositionSlot = LeafSlot<()>;
-
-pub type PositionStateSummary = StateSummary;
-
-pub type PositionStateWithSummary = StateAndSummary<ShardedJmtState<PositionSlot>>;
-
-pub fn new_empty_position_state() -> PositionStateWithSummary {
-    PositionStateWithSummary::new_empty("position")
-}
-
-/// Restart-from-disk constructor: seeds the in-memory pipeline with
-/// the JMT root persisted at `version`.
-pub fn position_state_at_version(
-    version: Version,
-    root_hash: HashValue,
-) -> PositionStateWithSummary {
-    PositionStateWithSummary::new(
-        ShardedJmtState::new_at_version(Some(version), "position"),
-        StateSummary::new_global_only(version, SparseMerkleTree::new(root_hash)),
-    )
-}
 
 pub type PositionLedgerStateWithSummary = LedgerWithSummary<PositionStateWithSummary>;
 
@@ -97,6 +76,37 @@ impl ProofRead for PositionProofReader {
     }
 }
 
+/// Shared handle to the latest persisted position snapshot. The merkle
+/// batch committer advances it (`set`) once a snapshot's JMT nodes are on
+/// disk; execution reads it (`get`) as the SMT freeze base and proof
+/// version for the next chunk. Holds the full summary so the version and
+/// the SMT stay consistent under one lock.
+#[derive(Clone)]
+pub(crate) struct PositionPersistedState {
+    inner: Arc<Mutex<PositionStateWithSummary>>,
+}
+
+impl PositionPersistedState {
+    const MAX_PENDING_DROPS: usize = 8;
+
+    pub(crate) fn new(seed: PositionStateWithSummary) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(seed)),
+        }
+    }
+
+    pub(crate) fn get(&self) -> PositionStateWithSummary {
+        // Backpressure on the reader (execution) side so we don't pile
+        // up a long chain of old base summaries pending subtree drop.
+        SUBTREE_DROPPER.wait_for_backlog_drop(Self::MAX_PENDING_DROPS);
+        self.inner.lock().clone()
+    }
+
+    pub(crate) fn set(&self, snapshot: PositionStateWithSummary) {
+        *self.inner.lock() = snapshot;
+    }
+}
+
 pub(crate) const POSITION_TARGET_ITEMS: usize = 200_000;
 
 pub(crate) type PositionBufferedState = crate::common::BufferedState<
@@ -125,6 +135,8 @@ impl PositionBufferedState {
         last_snapshot: PositionStateWithSummary,
         target_items: usize,
         out_current_state: Arc<Mutex<PositionLedgerStateWithSummary>>,
+        position_pruner: Arc<PositionPruner>,
+        persisted: PositionPersistedState,
     ) -> Self {
         *out_current_state.lock() =
             PositionLedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
@@ -139,7 +151,13 @@ impl PositionBufferedState {
             POSITION_BATCH_CHANNEL_SIZE,
             last_snapshot.clone(),
             move |batch_receiver| {
-                PositionMerkleBatchCommitter::new(batch_merkle_db, batch_receiver).run();
+                PositionMerkleBatchCommitter::new(
+                    batch_merkle_db,
+                    batch_receiver,
+                    position_pruner,
+                    persisted,
+                )
+                .run();
             },
             move |last_snapshot, input| {
                 merklize_position(

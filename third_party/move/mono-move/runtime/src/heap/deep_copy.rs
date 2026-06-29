@@ -3,14 +3,14 @@
 
 //! Single-pass recursive deep-copy of a heap-based value.
 //!
-//! TODO(security): reimplement this with non-recursive algorithm or add
+//! TODO(metering): reimplement this with non-recursive algorithm or add
 //!   depth checks.
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     heap::{heap_alloc, AllocationError, AllocationResult, Heap},
-    memory::{read_descriptor, read_obj_size, read_ptr, read_u64, write_ptr},
-    types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
+    memory::{read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_ptr},
+    types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
     DescriptorId, DescriptorProvider, ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET,
@@ -41,7 +41,8 @@ impl Heap {
         debug_assert!(src_size >= OBJECT_HEADER_SIZE);
 
         let new_raw = heap_alloc(self, src_size, src_desc_id)?;
-        // SAFETY: `heap_alloc` returns non-null on success.
+        // SAFETY: `heap_alloc` returns non-null on success and this is an
+        // object pointer that cannot be null.
         let new = unsafe { NonNull::new_unchecked(new_raw) };
 
         // SAFETY: regions don't overlap (different allocations).
@@ -70,10 +71,17 @@ impl Heap {
                     self.try_deep_copy_at_offset(descriptors, new, offset as usize)?;
                 }
             },
-            ObjectDescriptorInner::CapturedData {
-                pointer_offsets, ..
-            } => {
+            ObjectDescriptorInner::CapturedData { pointer_offsets } => {
                 for &offset in pointer_offsets {
+                    // Shared across objects of different `values_size`
+                    // (offset-shape dedup), so an offset isn't bounded by this
+                    // object's size; the layout guarantees `values_size >=
+                    // offset + 8`. Assert it for this object.
+                    debug_assert!(
+                        CAPTURED_DATA_VALUES_OFFSET + offset as usize + 8
+                            <= src_size - OBJECT_HEADER_SIZE,
+                        "captured-data pointer offset {offset} exceeds object payload"
+                    );
                     self.try_deep_copy_at_offset(
                         descriptors,
                         new,
@@ -110,7 +118,7 @@ impl Heap {
             } => {
                 // SAFETY: length lives at `VEC_LENGTH_OFFSET` of every
                 // vector payload.
-                let length = unsafe { read_u64(new.as_ptr(), VEC_LENGTH_OFFSET) } as usize;
+                let length = unsafe { read_vec_len(new.as_ptr()) as usize };
                 // Length comes from the GC-maintained object header, not from
                 // attacker-controlled bytes, so a debug assertion suffices
                 // (unlike the enum tag, which is validated unconditionally).

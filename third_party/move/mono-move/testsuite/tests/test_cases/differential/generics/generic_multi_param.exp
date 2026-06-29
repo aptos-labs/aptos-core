@@ -22,7 +22,7 @@ fun entry(r0): u64 {
   code:
   L0:
     0: x1 := ld_u64 99
-    1: [x0] := call pick_first, [r0, x1]
+    1: [x0] := call pick_first<u64, u64>, [r0, x1]
     2: ret [x0]
 }
 
@@ -39,13 +39,13 @@ fun pick_first(r0, r1): _0 {
 
 fun entry() {
   frame_data_size: 8
+  entry_gas: 118
   code:
-    0: Charge #18
-    1: StoreImm8 [40] <- #99
-    2: Move8 [32] <- [0]
-    3: CallIndirect 0x1::test::pick_first<u64, u64>
-    4: Move8 [0] <- [32]
-    5: Return
+    0: StoreImm8 [40] <- #99
+    1: Move8 [32] <- [0]
+    2: CallIndirect 0x1::test::pick_first<u64, u64>
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
-fun pick_first(): skipped (not all types are concrete)
+fun pick_first(): skipped (generic function not instantiated)

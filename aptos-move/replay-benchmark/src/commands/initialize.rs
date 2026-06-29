@@ -5,11 +5,10 @@ use crate::{
     commands::{build_debugger, init_logger_and_metrics, RestAPI},
     generator::InputOutputDiffGenerator,
     overrides::OverrideConfig,
-    workload::TransactionBlock,
 };
 use anyhow::anyhow;
 use aptos_logger::Level;
-use aptos_types::on_chain_config::FeatureFlag;
+use aptos_types::{on_chain_config::FeatureFlag, transaction::TransactionBlock};
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;

@@ -4,6 +4,7 @@
 pub mod stackless_exec_ir;
 
 pub mod destack;
+mod gas;
 pub mod lower;
 
 pub use destack::destack;

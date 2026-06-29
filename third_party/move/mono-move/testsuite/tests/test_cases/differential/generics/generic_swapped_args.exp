@@ -22,7 +22,7 @@ fun entry(r0): u64 {
   code:
   L0:
     0: x0 := ld_u64 99
-    1: [x0] := call pick_second, [x0, r0]
+    1: [x0] := call pick_second<u64, u64>, [x0, r0]
     2: ret [x0]
 }
 
@@ -39,13 +39,13 @@ fun pick_second(r0, r1): _1 {
 
 fun entry() {
   frame_data_size: 8
+  entry_gas: 118
   code:
-    0: Charge #18
-    1: StoreImm8 [32] <- #99
-    2: Move8 [40] <- [0]
-    3: CallIndirect 0x1::test::pick_second<u64, u64>
-    4: Move8 [0] <- [32]
-    5: Return
+    0: StoreImm8 [32] <- #99
+    1: Move8 [40] <- [0]
+    2: CallIndirect 0x1::test::pick_second<u64, u64>
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
-fun pick_second(): skipped (not all types are concrete)
+fun pick_second(): skipped (generic function not instantiated)

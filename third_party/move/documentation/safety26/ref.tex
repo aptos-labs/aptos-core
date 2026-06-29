@@ -1,0 +1,123 @@
+\subsection{Reference Safety}
+\label{sec:ref}
+
+The mutable-aliasing rule is critical in the presence of |enum| types: a reference into a variant payload is type-safe only while the enum still holds that variant.
+
+\paragraph{Example.}
+If two mutable references to the same enum can simultaneously be live, one can switch the variant under the other.
+Consider the following code:
+
+\noindent\hfil\begin{minipage}{0.78\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
+enum E { V1(Capability), V2(FakedCapability) }
+
+fun aliased_swap(a: &mut E, b: &mut E, faked: &mut E) {
+    // faked is V2(FakedCapability(victim))
+    match (a) {
+        E::V1(c) => {
+            mem::swap(b, faked); // *a is now V2(..)
+            admin_action(c); // c still &Capability
+        },
+        _ => {},
+    }
+}
+\end{lstlisting}
+\end{minipage}\hfil
+
+\noindent A call of the form |aliased_swap(p, q, ...)| where |p| and |q| alias should normally be rejected by the bytecode verifier.
+However, in hand-crafted bytecode, a borrow-analysis bug failed to recognize that |e.f1| and |e.f2|, fields of different variants, occupy the same physical offset, and so treated them as non-aliasing.
+This allowed creating mutable references to the same field offset in the enum, enabling a call to |aliased_swap| with aliased mutable references.
+This bug was discovered via the bug bounty program after the introduction of enum types.
+
+\paragraph{Performing the Checks.}
+Checking reference safety at runtime for Move-style borrow semantics is novel (\S\ref{sec:concl}).
+A challenge is that when constructing references, mutable reference aliasing \emph{is} allowed.
+Only once those references are used must aliasing be forbidden.
+For example, consider the valid code:
+
+\noindent\hfil\begin{minipage}{0.78\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
+struct S {a: u64, b: u64}
+let s: S;
+let r1 = &mut s.a; let r2 = &mut s.b;
+*r1 = 1; *r2 = 2; // r1 & r2 reference disjoint fields
+\end{lstlisting}
+\end{minipage}\hfil
+
+\noindent The corresponding stack-machine bytecode fragment is shown in Fig.~\ref{fig:aliastree}.
+\noindent While we have a mutable reference to $s.a$ on the stack, we temporarily create a new mutable reference to the whole of $s$, overlapping with the existing one~(Fig.~\ref{fig:aliastree}).
+The aliasing is eliminated only when this reference is consumed to create the reference to $s.b$.
+Thus, a naive approach to runtime reference safety checking, for example via reference counting, would be infeasibly strict.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  >=stealth,
+  op/.style={anchor=west, font=\small},
+  dot/.style={circle, fill=black, inner sep=1.6pt},
+  tedge/.style={black, line width=0.6pt},
+  conn/.style={densely dotted, gray, line width=0.8pt},
+]
+% left: the four reference-producing bytecode operations
+\node[op] (i1) at (0, 0.825)  {$\BORROWLOC\ s$};
+\node[op] (i2) at (0, 0.275)  {$\BORROWFIELD\ a$};
+\node[op] (i3) at (0,-0.275)  {$\BORROWLOC\ s$};
+\node[op] (i4) at (0,-0.825)  {$\BORROWFIELD\ b$};
+% left-side annotation: the second borrow_loc is the temporary aliasing
+\node[anchor=east, font=\scriptsize\itshape] (ta) at (-0.55,-0.275) {temporary aliasing};
+\draw[->, >=stealth, line width=0.5pt] (ta.east) -- (i3.west);
+% right: access path tree, root s with children via .a and .b
+\node[dot, label={[font=\small]above:$s$}] (root) at (5.6, 0.825) {};
+\node[dot] (na) at (4.8,-0.4) {};
+\node[dot] (nb) at (6.4,-0.85) {};
+\draw[tedge] (root) -- (na) node[midway, left=1pt, font=\scriptsize] {\texttt{.a}};
+\draw[tedge] (root) -- (nb) node[midway, right=1pt, font=\scriptsize] {\texttt{.b}};
+% dotted connectors: each op to the node its result denotes
+\draw[conn] (i1.east) -- (root);
+\draw[conn] (i2.east) to[bend right=8] (na);
+\draw[conn] (i3.east) to[bend left=8] (root);
+\draw[conn] (i4.east) -- (nb);
+\end{tikzpicture}
+\caption{A dotted line links each bytecode operation (left) to the access-path-tree node (right) for the place its pushed reference denotes.
+%Both $\BORROWLOC\ s$ operations denote the root $s$ (the temporary aliasing) while the two $\BORROWFIELD$ operations denote the disjoint child places reached by the field-offset edges \texttt{.a} and \texttt{.b}.
+}
+\label{fig:aliastree}
+\end{figure}
+
+Our checker instead executes an \emph{abstract shadow semantics} in lockstep with execution.
+The VM's operand stack, locals, and call frames are mirrored by a shadow state in which every non-reference value is opaque and every reference is a fresh identifier $\rho$ minted at its borrow site.
+The shadow state never inspects runtime values or memory addresses; conceptually, it is an abstract interpretation of the single path taken, embedded along with the concrete execution.
+
+\paragraph{State representation.} References point into trees of \emph{places}, not at each other.
+Each function lazily grows \emph{access path trees} rooted at its locals, at the global resource types it borrows, and at the values behind its reference parameters.
+Edges are field offsets: fields of different enum variants that share an offset share an edge.
+A reference $\rho$ is a pointer to a node (representing a place) in one of these trees, tagged with its mutability.
+Every aliasing question reduces to an ancestor/descendant relation between the places two references denote; no borrow genealogy among the references themselves is recorded.
+
+\paragraph{Poisoning, lazy fails.}
+A destructive operation, like a write through a mutable reference or the invalidation of a local by $\MOVELOC$, poisons every other reference whose places it invalidates.
+No error is raised at the operation itself.
+If a poisoned reference is later \emph{used} --- read, written, borrowed through, or passed to a callee --- a transaction-aborting error is raised.
+Poisoned references may be moved around or dropped without error.
+Overlapping references that never destructively interact are never flagged at all, admitting the temporary aliasing illustrated above.
+
+\paragraph{Compositional.} The checker is compositional across function boundaries.
+A call consumes its reference arguments, checks at the call site that the places reachable from each mutable argument are disjoint from those reachable from every other reference argument, and hands the callee fresh trees rooted at its own reference parameters.
+Passing a mutable reference into a call is a destructive operation, to keep the checker compositional (callee may mutate arbitrarily through it).
+On return, every returned reference must denote a place inside the tree of some reference parameter; its access path is replayed into the corresponding tree of the caller.
+Returned mutable references must also denote mutually disjoint places.
+Hence, the checker tracks precisely which parameter each returned reference derives from, along the executed path, while the static verifier conservatively assumes that a returned reference may borrow from every reference argument.
+
+Thus, we have a \emph{relaxed dynamic semantics} of the static borrow analysis: bytecode accepted by a correct static verifier is expected to pass the runtime checks on every execution, while the checker, observing only the executed path, does not have the join and call-summary over-approximations of the static verifier and thus admits strictly more behaviors.
+
+Revisiting the example (Fig.~\ref{fig:aliastree}), the bytecode fragment runs successfully: the second $\BORROWLOC\ s$ briefly creates a second mutable reference at the tree root for $s$, but that reference is consumed by $\BORROWFIELD\ b$ before any destructive write fires, so nothing is poisoned.
+The exploit that mints the overlapping references is caught by poisoning%
+%\footnote{This description assumes \texttt{aliased\_swap} is inlined at the call site. Otherwise, it is caught by the checker at the call site due to non-disjoint arguments.}
+instead: tree edges are field offsets, so the borrow paths |e.f1| and |e.f2| land on the same node by construction.
+The destructive |mem::swap| then poisons the still-live payload reference |c| sitting at a descendant place, and the |admin_action(c)| aborts as it is considered |c|'s use.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

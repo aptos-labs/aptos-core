@@ -353,7 +353,13 @@ mod test {
     }
 
     fn execution_fee(execution_gas: u64) -> FeeStatement {
-        FeeStatement::new(execution_gas, execution_gas, 0, 0, 0)
+        FeeStatement::builder()
+            .total_charge_gas_units(execution_gas)
+            .execution_gas_units(execution_gas)
+            .io_gas_units(0)
+            .storage_fee_octas(0)
+            .storage_fee_refund_octas(0)
+            .build()
     }
 
     #[test]

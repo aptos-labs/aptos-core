@@ -264,6 +264,10 @@ module aptos_framework::block {
 
     /// `block_prologue()` but also update the decryption key and trigger
     /// reconfiguration with DKG and Chunky DKG after epoch timed out.
+    ///
+    /// The signature is frozen: testnet runs with decryption enabled, so old
+    /// binaries call this entry with exactly these arguments. New fields go
+    /// into `block_prologue_ext_v3`.
     fun block_prologue_ext_v2(
         vm: signer,
         hash: address,
@@ -289,6 +293,42 @@ module aptos_framework::block {
             );
         randomness::on_new_block(&vm, epoch, round, randomness_seed);
         decryption::on_new_block(&vm, epoch, round, decryption_key);
+
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+            reconfiguration_with_dkg::try_start_with_chunky_dkg();
+            reconfiguration_with_dkg::try_advance_reconfig();
+        };
+    }
+
+    /// `block_prologue_ext_v2()` but the decryption key arrives paired with
+    /// the dense decryption round it consumed. Emitted by validators once the
+    /// `decryption::PerBlockDecryptionKeyV2` resource exists on chain.
+    fun block_prologue_ext_v3(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        randomness_seed: Option<vector<u8>>,
+        decryption_key: Option<vector<u8>>,
+        decryption_round: Option<u64>
+    ) acquires BlockResource, CommitHistory {
+        let epoch_interval =
+            block_prologue_common(
+                &vm,
+                hash,
+                epoch,
+                round,
+                proposer,
+                failed_proposer_indices,
+                previous_block_votes_bitvec,
+                timestamp
+            );
+        randomness::on_new_block(&vm, epoch, round, randomness_seed);
+        decryption::on_new_block_v2(&vm, epoch, round, decryption_key, decryption_round);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start_with_chunky_dkg();

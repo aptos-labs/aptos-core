@@ -577,6 +577,21 @@ impl TExecutionClient for ExecutionProxyClient {
         let decryption_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_chunky_dkg_config.chunky_dkg_enabled();
 
+        // TODO(decryption+windowing): the dense decryption-round chain is seeded
+        // in `build_root` from the commit-root state, but with execution
+        // windowing the synthetic root is the older `window_root`, and the
+        // committed window blocks get re-pipelined on recovery. Whether they
+        // re-increment the chain (overshooting the round) or pass through as
+        // no-key (self-consistent) depends on what feeds `secret_shared_key_rx`
+        // for re-inserted committed blocks — which is untested. Until that path
+        // is verified, refuse to run the two together rather than risk a
+        // mid-epoch round divergence across validators.
+        assert!(
+            !(decryption_enabled && onchain_consensus_config.window_size().is_some()),
+            "execution windowing (window_size) is not yet supported with decryption enabled; \
+             see TODO in execution_client::start_epoch"
+        );
+
         let aux_version = onchain_execution_config.persisted_auxiliary_info_version();
 
         self.execution_proxy.new_epoch(

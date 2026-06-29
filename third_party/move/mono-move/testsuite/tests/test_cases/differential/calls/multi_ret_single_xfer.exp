@@ -53,42 +53,42 @@ fun trigger(): u64 {
 
 fun three_rets() {
   frame_data_size: 32
+  entry_gas: 164
   code:
-    0: Charge #8
-    1: StoreImm8 [0] <- #1
-    2: StoreImm8 [8] <- #2
-    3: StoreImm8 [16] <- #3
-    4: Return
+    0: StoreImm8 [0] <- #1
+    1: StoreImm8 [8] <- #2
+    2: StoreImm8 [16] <- #3
+    3: Return
 }
 
 fun three_args() {
   frame_data_size: 32
+  entry_gas: 2
   code:
-    0: Charge #2
-    1: Return
+    0: Return
 }
 
 fun caller() {
   frame_data_size: 40
+  entry_gas: 204
   code:
-    0: Charge #82
-    1: CallIndirect 0x66::test::three_rets
-    2: Move8 [16] <- [64]
-    3: Move8 [32] <- [72]
-    4: Move8 [24] <- [80]
-    5: StoreImm8 [88] <- #0
-    6: Move8 [80] <- [16]
-    7: Move(16) [64] <- [0]
-    8: CallIndirect 0x66::test::three_args
-    9: Return
+    0: CallIndirect 0x66::test::three_rets
+    1: Move8 [16] <- [64]
+    2: Move8 [32] <- [72]
+    3: Move8 [24] <- [80]
+    4: StoreImm8 [88] <- #0
+    5: Move8 [80] <- [16]
+    6: Move(16) [64] <- [0]
+    7: CallIndirect 0x66::test::three_args
+    8: Return
 }
 
 fun trigger() {
   frame_data_size: 8
+  entry_gas: 118
   code:
-    0: Charge #16
-    1: StoreImm8 [0] <- #99
-    2: SlotBorrow [32] <- &[0]
-    3: CallIndirect 0x66::test::caller
-    4: Return
+    0: StoreImm8 [0] <- #99
+    1: SlotBorrow [32] <- &[0]
+    2: CallIndirect 0x66::test::caller
+    3: Return
 }

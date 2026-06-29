@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-15:  publish [module 0x77::test]
+task 1 lines 17-17:  run --verbose 0x77::test::entry
+Error: Function execution failed with VMError: {
+    message: Type depth is larger than maximum 20,
+    major_status: VM_MAX_TYPE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x77::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 0)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000077, name: Identifier("test") }), FunctionDefinitionIndex(2), 0)] }),
+}
