@@ -151,6 +151,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let mut interp = InterpreterContext::new(&mut txn_ctx, func);
 
     // Trial run: determine the outcome.
+    // TODO(cleanup): need to reset events / extensions?
     interp.reset(func, GAS_BUDGET);
     place_args(
         &mut interp,
@@ -172,6 +173,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
 
     // Timing: per-run reset is outside the timer; only argument placement + execution are timed.
     let samples = collect_samples(timing, || {
+        // TODO(cleanup): need to reset events / extensions?
         interp.reset(func, GAS_BUDGET);
         let start = Instant::now();
         let _ = place_args(
