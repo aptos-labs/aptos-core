@@ -23,6 +23,7 @@ pub mod function_info;
 pub mod hash;
 pub mod mem;
 pub mod object;
+pub mod secp256k1;
 pub mod signer;
 pub mod state_storage;
 pub mod string;
@@ -41,6 +42,7 @@ pub use function_info::make_all_function_info_natives;
 pub use hash::make_all_hash_natives;
 pub use mem::make_all_mem_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
+pub use secp256k1::make_all_secp256k1_natives;
 pub use signer::make_all_signer_natives;
 pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBoundary};
 pub use string::make_all_string_natives;
@@ -93,6 +95,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_cmp_natives::<F>());
     natives.extend(make_all_from_bytes_natives::<F>());
     natives.extend(make_all_table_natives::<F>());
+    natives.extend(make_all_secp256k1_natives::<F>());
     natives
 }
 
