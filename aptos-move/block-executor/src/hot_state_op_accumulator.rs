@@ -51,7 +51,7 @@ where
             if self.to_make_hot.remove(key) {
                 COUNTER.inc_with(&["promotion_removed_by_write"]);
             }
-            self.writes.get_or_insert_owned(key);
+            self.writes.get_or_insert_with(key, |k| k.clone());
         }
 
         for key in reads {
