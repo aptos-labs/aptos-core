@@ -1,0 +1,42 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+// Calling object::address_to_object<ClosureType> triggers an invariant
+// violation inside the native exists_at when it converts the function type
+// to a TypeTag and finds TypeTag::Function instead of TypeTag::Struct.
+//
+// We first create an object so ObjectCore exists at that address,
+// then call address_to_object<||u64 has key> which passes the ObjectCore
+// check but fails at exists_at<||u64 has key>.
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::poc
+
+use 0x1::signer as signer
+
+entry public fun trigger(sender: signer)
+    local addr: address
+    local obj_ref: 0x1::object::ConstructorRef
+
+    // Create an object so ObjectCore exists at some address.
+    borrow_loc sender
+    call signer::address_of
+    call 0x1::object::create_object
+    st_loc obj_ref
+
+    // Get the address of the created object.
+    borrow_loc obj_ref
+    call 0x1::object::address_from_constructor_ref
+    st_loc addr
+
+    // Call address_to_object<||u64 has copy+drop+store+key>(addr).
+    // Step 1: exists<ObjectCore>(addr) -> true (we just created it)
+    // Step 2: exists_at<||u64 has copy+drop+store+key>(addr) ->
+    //   ty_to_ty_tag produces TypeTag::Function, not TypeTag::Struct.
+    //   data_cache.rs:277-282 returns INTERNAL_TYPE_ERROR.
+    move_loc addr
+    call 0x1::object::address_to_object<||u64 has copy+drop+store+key>
+    pop
+    ret
+
+
+//# run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::poc::trigger

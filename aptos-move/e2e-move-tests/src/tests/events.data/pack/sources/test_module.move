@@ -1,5 +1,7 @@
 module 0x815::test_module {
     use std::signer;
+    use std::reflect;
+    use std::string;
     use aptos_framework::account;
     use aptos_framework::event;
 
@@ -54,5 +56,20 @@ module 0x815::test_module {
         // Same as in ok case, but with one extra nested vector.
         let event =  EventV2<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>{};
         event::emit(event);
+    }
+
+    #[event]
+    struct ReflectedEvent has copy, drop, store { value: u64 }
+
+    // `0x1::event::emit` is not reflectable: the verifier's `#[event]`/locality rules cannot be
+    // upheld for a dynamically-resolved function value, so resolution is rejected with
+    // `FunctionNotAccessible` (error code 2) even for this module's own `#[event]` struct.
+    public entry fun resolve_emit_is_rejected() {
+        let err = reflect::resolve<|ReflectedEvent|>(
+            @0x1,
+            &string::utf8(b"event"),
+            &string::utf8(b"emit"),
+        ).unwrap_err();
+        assert!(err.error_code() == 2, 0xBAD);
     }
 }

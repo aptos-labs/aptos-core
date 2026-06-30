@@ -1,0 +1,66 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+// PoC: the cross-module callback bypass is not possible. An attacker would resolve
+// emit<victim::SecretData> and pass it to a victim helper that calls the closure (so the victim's
+// frame is on the stack at emit time). But reflecting 0x1::event::emit is rejected
+// (FunctionNotAccessible), so the emit closure can never be constructed in the first place.
+
+// Victim module: has a struct (no #[event]!) and a callback helper.
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::victim
+
+struct SecretData has copy+store+drop
+    data: u64
+
+// A public function that calls a user-provided callback with a SecretData value.
+// This pattern is common in frameworks (e.g., iterators, visitors, hooks).
+public fun with_data(callback: |SecretData|)
+    ld_u64 9999
+    pack SecretData
+    move_loc callback
+    call_closure<|SecretData|>
+    ret
+
+// Attacker module.
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::attacker
+
+use 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::victim as victim
+
+// Attacker attempts to resolve emit<victim::SecretData> and pass it to victim::with_data. But
+// reflecting 0x1::event::emit is rejected (FunctionNotAccessible), so the unwrap below aborts and
+// the closure is never passed to the victim.
+
+entry public fun exploit()
+    local mod_name: 0x1::string::String
+    local func_name: 0x1::string::String
+    local emit_fn: |victim::SecretData|
+
+    // "event"
+    ld_const<vector<u8>> [101, 118, 101, 110, 116]
+    call 0x1::string::utf8
+    st_loc mod_name
+
+    // "emit"
+    ld_const<vector<u8>> [101, 109, 105, 116]
+    call 0x1::string::utf8
+    st_loc func_name
+
+    // resolve emit<victim::SecretData>
+    ld_const<address> 0x1
+    borrow_loc mod_name
+    borrow_loc func_name
+    call 0x1::reflect::resolve<|victim::SecretData|>
+    call 0x1::result::unwrap<|victim::SecretData|, 0x1::reflect::ReflectionError>
+    st_loc emit_fn
+
+    // Pass the emit closure to victim's callback.
+    // Victim calls emit_fn(SecretData{data:9999}) from its own frame.
+    move_loc emit_fn
+    call victim::with_data
+    ret
+
+
+//# run --signers Alice --show-events -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::attacker::exploit
