@@ -14,6 +14,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// When `Addition` operation overflows the `limit`.
@@ -49,6 +50,26 @@ pub enum AggregatorState {
     PositiveDelta,
     // If aggregator stores a negative delta.
     NegativeDelta,
+}
+
+/// Disposition of an aggregator V1 when the delayed field optimization is enabled. Its value is
+/// always represented by a delayed field id (so reads within a block observe a stable id), and the
+/// variant determines how the change is written out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AggregatorDelayedChange {
+    // New, or read and thus materialized: written as an id-bearing write op via the usual
+    // (metadata-aware) aggregator write conversion.
+    Materialized(DelayedFieldID),
+    // Only added/subtracted (never read): an in-place delta, written with legacy metadata.
+    Delta(DelayedFieldID),
+}
+
+impl AggregatorDelayedChange {
+    pub fn id(&self) -> DelayedFieldID {
+        match self {
+            AggregatorDelayedChange::Materialized(id) | AggregatorDelayedChange::Delta(id) => *id,
+        }
+    }
 }
 
 /// Internal aggregator data structure.
@@ -270,6 +291,16 @@ impl Aggregator {
         Ok(self.value)
     }
 
+    /// Returns the current state of the aggregator.
+    pub fn state(&self) -> AggregatorState {
+        self.state
+    }
+
+    /// Returns the current value (or delta magnitude) of the aggregator.
+    pub fn value(&self) -> u128 {
+        self.value
+    }
+
     /// Unpacks aggregator into its fields.
     pub fn into(self) -> (u128, AggregatorState, u128, Option<DeltaHistory>) {
         (self.value, self.state, self.max_value, self.history)
@@ -286,8 +317,14 @@ pub struct AggregatorData {
     new_aggregators: BTreeSet<AggregatorID>,
     // All aggregators that were destroyed in the current transaction, stored as ids.
     destroyed_aggregators: BTreeSet<AggregatorID>,
-    // All aggregator instances that exist in the current transaction.
-    aggregators: BTreeMap<AggregatorID, Aggregator>,
+
+    /// Legacy non-delayed (sequential) implementation for aggregators.
+    /// INVARIANT: Must be empty if there are any delayed changes.
+    non_delayed_changes: BTreeMap<AggregatorID, Aggregator>,
+    /// Implementation that uses delayed fields (parallel). Actual tracking is
+    /// done via delayed field extension.
+    /// INVARIANT: Must be empty if there are any non-delayed changes.
+    delayed_changes: BTreeMap<AggregatorID, AggregatorDelayedChange>,
 }
 
 impl AggregatorData {
@@ -300,7 +337,7 @@ impl AggregatorData {
         id: AggregatorID,
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
-        let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
+        let aggregator = self.non_delayed_changes.entry(id).or_insert(Aggregator {
             value: 0,
             state: AggregatorState::PositiveDelta,
             max_value,
@@ -309,9 +346,11 @@ impl AggregatorData {
         Ok(aggregator)
     }
 
-    /// Returns the number of aggregators that are used in the current transaction.
+    /// Returns the number of aggregators that are used in the current transaction. Used for
+    /// deterministic key derivation, so it counts both the legacy and delayed-field aggregators
+    /// (one of which is empty depending on whether the optimization is enabled).
     pub fn num_aggregators(&self) -> u128 {
-        self.aggregators.len() as u128
+        (self.non_delayed_changes.len() + self.delayed_changes.len()) as u128
     }
 
     /// Creates and a new Aggregator with a given `id` and a `max_value`. The value
@@ -324,15 +363,35 @@ impl AggregatorData {
             max_value,
             history: None,
         };
-        self.aggregators.insert(id.clone(), aggregator);
+        self.non_delayed_changes.insert(id.clone(), aggregator);
         self.new_aggregators.insert(id);
+    }
+
+    /// Records a change to an aggregator (when delayed field optimization is enabled).
+    pub fn record_change(&mut self, id: AggregatorID, change: AggregatorDelayedChange) {
+        self.delayed_changes.insert(id, change);
+    }
+
+    /// Returns the delayed-field change (an id-bearing write or a delta) recorded for the
+    /// aggregator, if any. Only used when the delayed field optimization is enabled.
+    pub fn delayed_change(&self, id: &AggregatorID) -> Option<AggregatorDelayedChange> {
+        self.delayed_changes.get(id).copied()
+    }
+
+    /// Records the aggregator as an in-place delta, unless it is already an id-bearing write
+    /// (a read-materialized aggregator stays a write even if further added to).
+    pub fn record_delayed_delta(&mut self, id: AggregatorID, df_id: DelayedFieldID) {
+        self.delayed_changes
+            .entry(id)
+            .or_insert(AggregatorDelayedChange::Delta(df_id));
     }
 
     /// If aggregator has been used in this transaction, it is removed. Otherwise,
     /// it is marked for deletion.
     pub fn remove_aggregator(&mut self, id: AggregatorID) {
         // Aggregator no longer in use during this transaction: remove it.
-        self.aggregators.remove(&id);
+        self.non_delayed_changes.remove(&id);
+        self.delayed_changes.remove(&id);
 
         if self.new_aggregators.contains(&id) {
             // Aggregator has been created in the same transaction. Therefore, no
@@ -351,20 +410,22 @@ impl AggregatorData {
         BTreeSet<AggregatorID>,
         BTreeSet<AggregatorID>,
         BTreeMap<AggregatorID, Aggregator>,
+        BTreeMap<AggregatorID, AggregatorDelayedChange>,
     ) {
         (
             self.new_aggregators,
             self.destroyed_aggregators,
-            self.aggregators,
+            self.non_delayed_changes,
+            self.delayed_changes,
         )
     }
 }
 
-pub(crate) fn addition_v1_error<T>(_err: T) -> PartialVMError {
+pub fn addition_v1_error<T>(_err: T) -> PartialVMError {
     abort_error("overflow", EADD_OVERFLOW)
 }
 
-pub(crate) fn subtraction_v1_error<T>(_err: T) -> PartialVMError {
+pub fn subtraction_v1_error<T>(_err: T) -> PartialVMError {
     abort_error("underflow", ESUB_UNDERFLOW)
 }
 

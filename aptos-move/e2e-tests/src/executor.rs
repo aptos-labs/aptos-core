@@ -1168,7 +1168,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         )?;
 
         Ok((
-            output.try_materialize_into_transaction_output(&resolver)?,
+            output.try_materialize_into_transaction_output()?,
             gas_profiler.finish(),
         ))
     }

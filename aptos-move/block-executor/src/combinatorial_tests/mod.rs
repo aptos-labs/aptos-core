@@ -8,8 +8,6 @@ pub mod bencher;
 #[cfg(test)]
 mod delayed_field_tests;
 #[cfg(test)]
-mod delta_tests;
-#[cfg(test)]
 mod group_tests;
 #[cfg(test)]
 pub(crate) mod mock_executor;

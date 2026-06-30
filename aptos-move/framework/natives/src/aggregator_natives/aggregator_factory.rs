@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext};
-use aptos_aggregator::aggregator_v1_extension::AggregatorID;
+use aptos_aggregator::aggregator_v1_extension::{AggregatorDelayedChange, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -54,7 +54,26 @@ fn native_new_aggregator(
 
     if let Ok(key) = AccountAddress::from_bytes(hash) {
         let id = AggregatorID::new(handle, key);
-        aggregator_data.create_new_aggregator(id, limit);
+        if aggregator_context.delayed_field_optimization_enabled {
+            // Aggregator V1 is always u128, so its size is 16.
+            const AGGREGATOR_V1_VALUE_SIZE: u32 = 16;
+
+            let delayed_field_id = aggregator_context
+                .delayed_field_resolver
+                .generate_delayed_field_id(AGGREGATOR_V1_VALUE_SIZE);
+
+            // We record a creation of an actual value, and a mapping from
+            // state key to ID (which points to value that needs to be written
+            // back).
+            aggregator_context
+                .delayed_field_data
+                .borrow_mut()
+                .create_new_aggregator(delayed_field_id);
+            aggregator_data
+                .record_change(id, AggregatorDelayedChange::Materialized(delayed_field_id));
+        } else {
+            aggregator_data.create_new_aggregator(id, limit);
+        }
 
         Ok(smallvec![Value::struct_(Struct::pack(vec![
             Value::address(handle.0),
