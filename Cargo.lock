@@ -10036,6 +10036,7 @@ dependencies = [
  "move-core-types",
  "move-transactional-test-runner",
  "move-vm-runtime",
+ "move-vm-test-utils",
  "move-vm-types",
  "once_cell",
  "primitive-types",
