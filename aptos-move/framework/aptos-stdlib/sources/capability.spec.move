@@ -15,13 +15,13 @@ spec aptos_std::capability {
     }
 
     spec create<Feature>(owner: &signer, _feature_witness: &Feature) {
-        let addr = signer::address_of(owner);
+        let addr = owner.address_of();
         aborts_if spec_has_cap<Feature>(addr);
         ensures spec_has_cap<Feature>(addr);
     }
 
     spec acquire<Feature>(requester: &signer, _feature_witness: &Feature): Cap<Feature> {
-        let addr = signer::address_of(requester);
+        let addr = requester.address_of();
         let root_addr = global<CapDelegateState<Feature>>(addr).root;
         include AcquireSchema<Feature>;
         ensures spec_has_delegate_cap<Feature>(addr) ==> result.root == root_addr;
@@ -29,7 +29,7 @@ spec aptos_std::capability {
     }
 
     spec acquire_linear<Feature>(requester: &signer, _feature_witness: &Feature): LinearCap<Feature> {
-        let addr = signer::address_of(requester);
+        let addr = requester.address_of();
         let root_addr = global<CapDelegateState<Feature>>(addr).root;
         include AcquireSchema<Feature>;
         ensures spec_has_delegate_cap<Feature>(addr) ==> result.root == root_addr;
@@ -45,7 +45,7 @@ spec aptos_std::capability {
     }
 
     spec delegate<Feature>(self: Cap<Feature>, _feature_witness: &Feature, to: &signer) {
-        let addr = signer::address_of(to);
+        let addr = to.address_of();
         aborts_if !spec_has_delegate_cap<Feature>(addr) && !spec_has_cap<Feature>(self.root);
         ensures spec_has_delegate_cap<Feature>(addr);
         ensures !old(spec_has_delegate_cap<Feature>(addr)) ==> global<CapDelegateState<Feature>>(addr).root == self.root;
