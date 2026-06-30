@@ -17,7 +17,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        hot_state::HotStateValue,
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -44,7 +44,10 @@ pub mod state_store;
 
 use crate::{
     chunk_to_commit::ChunkToCommit,
-    state_store::{state::State, state_summary::StateSummary},
+    state_store::{
+        sharded_jmt_state::PositionStateWithSummary, state::State, state_summary::StateSummary,
+        state_with_summary::LedgerWithSummary,
+    },
 };
 pub use aptos_types::block_info::BlockHeight;
 pub use errors::AptosDbError;
@@ -379,6 +382,31 @@ pub trait DbReader: Send + Sync {
 
         fn get_persisted_state_summary(&self) -> Result<StateSummary>;
 
+        /// Native-position analog of `get_persisted_state_summary`: the latest
+        /// merklized position summary, used by execution as the freeze base and
+        /// proof source for computing the position state root. Errors when the
+        /// feature is on but native-position storage is absent (i.e.
+        /// `ENABLE_TRADING_NATIVE` is off).
+        fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary>;
+
+        /// The pre-committed position tip (latest + last_checkpoint), including
+        /// committed writes the merklized snapshot in
+        /// `get_persisted_position_state_summary` may not yet reflect. Used by
+        /// execution to seed the parent position summary when no in-memory
+        /// block parent is available.
+        fn get_pre_committed_position_state_summary(
+            &self,
+        ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
+
+        /// Native-position analog of `get_state_proof_by_version_ext`: a
+        /// cold-key proof from the persisted position JMT at `version`.
+        fn get_position_state_proof_by_version_ext(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<SparseMerkleProofExt>;
+
         /// Get the ledger info of the epoch that `known_version` belongs to.
         fn get_epoch_ending_ledger_info(
             &self,
@@ -455,6 +483,30 @@ pub trait DbReader: Send + Sync {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> Result<StateValueChunkWithProof>;
+
+        /// Returns the total number of hot state items (leaves of the hot state Merkle tree) at
+        /// the given version.
+        fn get_hot_state_item_count(&self, version: Version) -> Result<usize>;
+
+        /// Returns an iterator over hot state leaves, walking the hot state Merkle tree at
+        /// `version` from `first_index` for up to `chunk_size` leaves. Each item pairs the full
+        /// state key with its `HotStateValue` (the value or vacancy plus `hot_since_version`) —
+        /// what a fast-syncing node needs to rebuild the hot state KV DB and Merkle tree.
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, HotStateValue)>> + '_>>;
+
+        /// Assembles a hot state value chunk with a range proof against the hot state Merkle root
+        /// at `version`.
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> Result<HotStateValueChunkWithProof>;
 
         /// Returns if the state store pruner is enabled.
         fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;

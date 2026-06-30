@@ -47,7 +47,7 @@ use aptos_types::{
         AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
         TransactionStatus, Version,
     },
-    write_set::{HotStateOp, TransactionWrite, WriteSet},
+    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
@@ -163,26 +163,31 @@ impl DoGetExecutionOutput {
                     payload
                         .try_get_keys_to_make_hot()
                         .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|key| (key, HotStateOp::make_hot()))
-                        .collect(),
+                        .unwrap_or_default(),
                 );
             }
         }
+        if onchain_config.hotness_in_epilogue() {
+            Self::convert_write_sets_to_v1(&mut transaction_outputs);
+        }
 
-        Parser::parse(
-            state_view.next_version(),
-            transactions,
-            transaction_outputs,
-            auxiliary_infos,
-            parent_state,
-            state_view,
-            false, // prime_state_cache
-            transaction_slice_metadata
-                .append_state_checkpoint_to_block()
-                .is_some(),
-        )
+        Parser::parse()
+            .first_version(state_view.next_version())
+            .transactions(transactions)
+            .transaction_outputs(transaction_outputs)
+            .auxiliary_infos(auxiliary_infos)
+            .parent_state(parent_state)
+            .base_state_view(state_view)
+            .prime_state_cache(false)
+            .is_block(
+                transaction_slice_metadata
+                    .append_state_checkpoint_to_block()
+                    .is_some(),
+            )
+            .transaction_info_v1(onchain_config.transaction_info_v1())
+            .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
+            .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
+            .build()
     }
 
     pub fn by_transaction_execution_sharded<V: VMBlockExecutor>(
@@ -194,11 +199,14 @@ impl DoGetExecutionOutput {
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         let state_view_arc = Arc::new(state_view);
-        let transaction_outputs = Self::execute_block_sharded::<V>(
+        let mut transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
             state_view_arc.clone(),
             onchain_config,
         )?;
+        if onchain_config.hotness_in_epilogue() {
+            Self::convert_write_sets_to_v1(&mut transaction_outputs);
+        }
 
         // TODO(Manu): Handle state checkpoint here.
 
@@ -207,19 +215,30 @@ impl DoGetExecutionOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-        Parser::parse(
-            state_view.next_version(),
-            PartitionedTransactions::flatten(transactions)
-                .into_iter()
-                .map(|t| t.into_txn().into_inner())
-                .collect(),
-            transaction_outputs,
-            auxiliary_infos,
-            parent_state,
-            state_view,
-            false, // prime_state_cache
-            append_state_checkpoint_to_block.is_some(),
-        )
+        Parser::parse()
+            .first_version(state_view.next_version())
+            .transactions(
+                PartitionedTransactions::flatten(transactions)
+                    .into_iter()
+                    .map(|t| t.into_txn().into_inner())
+                    .collect(),
+            )
+            .transaction_outputs(transaction_outputs)
+            .auxiliary_infos(auxiliary_infos)
+            .parent_state(parent_state)
+            .base_state_view(state_view)
+            .prime_state_cache(false)
+            .is_block(append_state_checkpoint_to_block.is_some())
+            .transaction_info_v1(onchain_config.transaction_info_v1())
+            .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
+            .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
+            .build()
+    }
+
+    fn convert_write_sets_to_v1(transaction_outputs: &mut [TransactionOutput]) {
+        transaction_outputs
+            .iter_mut()
+            .for_each(TransactionOutput::convert_write_set_to_v1);
     }
 
     pub fn by_transaction_output(
@@ -228,17 +247,21 @@ impl DoGetExecutionOutput {
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
         state_view: CachedStateView,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ExecutionOutput> {
-        let out = Parser::parse(
-            state_view.next_version(),
-            transactions,
-            transaction_outputs,
-            auxiliary_infos,
-            parent_state,
-            state_view,
-            true,  // prime state cache
-            false, // is_block
-        )?;
+        let out = Parser::parse()
+            .first_version(state_view.next_version())
+            .transactions(transactions)
+            .transaction_outputs(transaction_outputs)
+            .auxiliary_infos(auxiliary_infos)
+            .parent_state(parent_state)
+            .base_state_view(state_view)
+            .prime_state_cache(true)
+            .is_block(false)
+            .transaction_info_v1(onchain_config.transaction_info_v1())
+            .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
+            .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
+            .build()?;
 
         let ret = out.clone();
         THREAD_MANAGER.get_background_pool().spawn(move || {
@@ -341,7 +364,9 @@ impl DoGetExecutionOutput {
 
 struct Parser;
 
+#[bon::bon]
 impl Parser {
+    #[builder(finish_fn = build)]
     fn parse(
         first_version: Version,
         mut transactions: Vec<Transaction>,
@@ -351,6 +376,9 @@ impl Parser {
         base_state_view: CachedStateView,
         prime_state_cache: bool,
         is_block: bool,
+        transaction_info_v1: bool,
+        hot_state_root_in_txn_info: bool,
+        compute_trading_native_state_roots: bool,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
 
@@ -425,20 +453,23 @@ impl Parser {
         )?;
         let state_reads = base_state_view.into_memorized_reads();
 
-        let out = ExecutionOutput::new(
-            is_block,
-            first_version,
-            statuses_for_input_txns,
-            to_commit,
-            to_discard,
-            to_retry,
-            result_state,
-            state_reads,
-            hot_state_updates,
-            block_end_info,
-            next_epoch_state,
-            Planned::place_holder(),
-        );
+        let out = ExecutionOutput::builder()
+            .is_block(is_block)
+            .first_version(first_version)
+            .statuses_for_input_txns(statuses_for_input_txns)
+            .to_commit(to_commit)
+            .to_discard(to_discard)
+            .to_retry(to_retry)
+            .result_state(result_state)
+            .state_reads(state_reads)
+            .hot_state_updates(hot_state_updates)
+            .maybe_block_end_info(block_end_info)
+            .maybe_next_epoch_state(next_epoch_state)
+            .subscribable_events(Planned::place_holder())
+            .transaction_info_v1(transaction_info_v1)
+            .hot_state_root_in_txn_info(hot_state_root_in_txn_info)
+            .compute_trading_native_state_roots(compute_trading_native_state_roots)
+            .build();
         let ret = out.clone();
         ret.subscribable_events
             .plan(THREAD_MANAGER.get_non_exe_cpu_pool(), move || {
@@ -528,9 +559,9 @@ impl Parser {
             write_set: last_write_set,
         };
 
-        let validator_set = ValidatorSet::fetch_config(&write_set_view)
+        let validator_set = ValidatorSet::fetch_config(&write_set_view)?
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = ConfigurationResource::fetch_config(&write_set_view)
+        let configuration = ConfigurationResource::fetch_config(&write_set_view)?
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
         Ok(EpochState::new(
@@ -622,17 +653,20 @@ mod tests {
             ),
         ];
         let state = LedgerState::new_empty(HotStateConfig::default());
-        let execution_output = Parser::parse(
-            0,
-            txns,
-            txn_outs,
-            auxiliary_infos,
-            &state,
-            CachedStateView::new_dummy(&state),
-            false,
-            false,
-        )
-        .unwrap();
+        let execution_output = Parser::parse()
+            .first_version(0)
+            .transactions(txns)
+            .transaction_outputs(txn_outs)
+            .auxiliary_infos(auxiliary_infos)
+            .parent_state(&state)
+            .base_state_view(CachedStateView::new_dummy(&state))
+            .prime_state_cache(false)
+            .is_block(false)
+            .transaction_info_v1(false)
+            .hot_state_root_in_txn_info(false)
+            .compute_trading_native_state_roots(false)
+            .build()
+            .unwrap();
         assert_eq!(
             vec![event_0, event_2],
             *execution_output.subscribable_events

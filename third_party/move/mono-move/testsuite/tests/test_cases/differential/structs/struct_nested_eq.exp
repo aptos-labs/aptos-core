@@ -1,0 +1,437 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+struct Bag has copy + drop
+  id: u64
+  items: vector<u64>
+
+struct Point has copy + drop
+  x: u64
+  y: u64
+
+// Function definition at index 0
+fun bag_eq(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64, l5: u64): bool
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    call mk_bag
+    move_loc l3
+    // @5
+    move_loc l4
+    move_loc l5
+    call mk_bag
+    eq
+    ret
+
+// Function definition at index 1
+fun bag_eq_len(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64): bool
+    move_loc l0
+    move_loc l1
+    call mk_bag1
+    move_loc l2
+    move_loc l3
+    // @5
+    move_loc l4
+    call mk_bag
+    eq
+    ret
+
+// Function definition at index 2
+fun bag_neq(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64, l5: u64): bool
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    call mk_bag
+    move_loc l3
+    // @5
+    move_loc l4
+    move_loc l5
+    call mk_bag
+    neq
+    ret
+
+// Function definition at index 3
+fun mk_bag(l0: u64, l1: u64, l2: u64): Bag
+    local l3: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l3
+    mut_borrow_loc l3
+    move_loc l1
+    vec_push_back <u64>
+    // @5
+    mut_borrow_loc l3
+    move_loc l2
+    vec_push_back <u64>
+    move_loc l0
+    move_loc l3
+    // @10
+    pack Bag
+    ret
+
+// Function definition at index 4
+fun mk_bag1(l0: u64, l1: u64): Bag
+    local l2: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l2
+    mut_borrow_loc l2
+    move_loc l1
+    vec_push_back <u64>
+    // @5
+    move_loc l0
+    move_loc l2
+    pack Bag
+    ret
+
+// Function definition at index 5
+fun mk_points(l0: u64, l1: u64, l2: u64, l3: u64): vector<Point>
+    local l4: vector<Point>
+    vec_pack <Point>, 0
+    st_loc l4
+    mut_borrow_loc l4
+    move_loc l0
+    move_loc l1
+    // @5
+    pack Point
+    vec_push_back <Point>
+    mut_borrow_loc l4
+    move_loc l2
+    move_loc l3
+    // @10
+    pack Point
+    vec_push_back <Point>
+    move_loc l4
+    ret
+
+// Function definition at index 6
+fun pts_eq(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64, l5: u64, l6: u64, l7: u64): bool
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    move_loc l3
+    call mk_points
+    // @5
+    move_loc l4
+    move_loc l5
+    move_loc l6
+    move_loc l7
+    call mk_points
+    // @10
+    eq
+    ret
+
+// Function definition at index 7
+fun pts_neq(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64, l5: u64, l6: u64, l7: u64): bool
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    move_loc l3
+    call mk_points
+    // @5
+    move_loc l4
+    move_loc l5
+    move_loc l6
+    move_loc l7
+    call mk_points
+    // @10
+    neq
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun bag_eq(r0, r1, r2, r3, r4, r5): bool {
+  slots: params(6), locals(0), temps(2), xfer(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: u64
+    r6: 0x1::test::Bag
+    r7: bool
+  code:
+  L0:
+    0: [r6] := call mk_bag, [r0, r1, r2]
+    1: [x0] := call mk_bag, [r3, r4, r5]
+    2: r7 := eq r6, x0
+    3: ret [r7]
+}
+
+fun bag_eq_len(r0, r1, r2, r3, r4): bool {
+  slots: params(5), locals(0), temps(2), xfer(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: 0x1::test::Bag
+    r6: bool
+  code:
+  L0:
+    0: [r5] := call mk_bag1, [r0, r1]
+    1: [x0] := call mk_bag, [r2, r3, r4]
+    2: r6 := eq r5, x0
+    3: ret [r6]
+}
+
+fun bag_neq(r0, r1, r2, r3, r4, r5): bool {
+  slots: params(6), locals(0), temps(2), xfer(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: u64
+    r6: 0x1::test::Bag
+    r7: bool
+  code:
+  L0:
+    0: [r6] := call mk_bag, [r0, r1, r2]
+    1: [x0] := call mk_bag, [r3, r4, r5]
+    2: r7 := neq r6, x0
+    3: ret [r7]
+}
+
+fun mk_bag(r0, r1, r2): Bag {
+  slots: params(3), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: vector<u64>
+    r4: &mut vector<u64>
+    r5: 0x1::test::Bag
+  code:
+  L0:
+    0: r3 := vec_pack u64, 0, []
+    1: r4 := mut_borrow_loc r3
+    2: vec_push_back u64, r4, r1
+    3: r4 := mut_borrow_loc r3
+    4: vec_push_back u64, r4, r2
+    5: r5 := pack 0x1::test::Bag, [r0, r3]
+    6: ret [r5]
+}
+
+fun mk_bag1(r0, r1): Bag {
+  slots: params(2), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: vector<u64>
+    r3: &mut vector<u64>
+    r4: 0x1::test::Bag
+  code:
+  L0:
+    0: r2 := vec_pack u64, 0, []
+    1: r3 := mut_borrow_loc r2
+    2: vec_push_back u64, r3, r1
+    3: r4 := pack 0x1::test::Bag, [r0, r2]
+    4: ret [r4]
+}
+
+fun mk_points(r0, r1, r2, r3): vector<Point> {
+  slots: params(4), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: vector<0x1::test::Point>
+    r5: &mut vector<0x1::test::Point>
+    r6: 0x1::test::Point
+  code:
+  L0:
+    0: r4 := vec_pack 0x1::test::Point, 0, []
+    1: r5 := mut_borrow_loc r4
+    2: r6 := pack 0x1::test::Point, [r0, r1]
+    3: vec_push_back 0x1::test::Point, r5, r6
+    4: r5 := mut_borrow_loc r4
+    5: r6 := pack 0x1::test::Point, [r2, r3]
+    6: vec_push_back 0x1::test::Point, r5, r6
+    7: ret [r4]
+}
+
+fun pts_eq(r0, r1, r2, r3, r4, r5, r6, r7): bool {
+  slots: params(8), locals(0), temps(2), xfer(4)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: u64
+    r6: u64
+    r7: u64
+    r8: vector<0x1::test::Point>
+    r9: bool
+  code:
+  L0:
+    0: [r8] := call mk_points, [r0, r1, r2, r3]
+    1: [x0] := call mk_points, [r4, r5, r6, r7]
+    2: r9 := eq r8, x0
+    3: ret [r9]
+}
+
+fun pts_neq(r0, r1, r2, r3, r4, r5, r6, r7): bool {
+  slots: params(8), locals(0), temps(2), xfer(4)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: u64
+    r6: u64
+    r7: u64
+    r8: vector<0x1::test::Point>
+    r9: bool
+  code:
+  L0:
+    0: [r8] := call mk_points, [r0, r1, r2, r3]
+    1: [x0] := call mk_points, [r4, r5, r6, r7]
+    2: r9 := neq r8, x0
+    3: ret [r9]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun bag_eq() {
+  frame_data_size: 72
+  entry_gas: 243
+  code:
+    0: Move8 [112] <- [16]
+    1: Move8 [104] <- [8]
+    2: Move8 [96] <- [0]
+    3: CallIndirect 0x1::test::mk_bag
+    4: Move(16) [48] <- [96]
+    5: Move8 [112] <- [40]
+    6: Move8 [104] <- [32]
+    7: Move8 [96] <- [24]
+    8: CallIndirect 0x1::test::mk_bag
+    9: ValueCmp [64] <- [48] == [96] : 0x1::test::Bag
+    10: Move(1) [0] <- [64]
+    11: Return
+}
+
+fun bag_eq_len() {
+  frame_data_size: 64
+  entry_gas: 217
+  code:
+    0: Move8 [96] <- [8]
+    1: Move8 [88] <- [0]
+    2: CallIndirect 0x1::test::mk_bag1
+    3: Move(16) [40] <- [88]
+    4: Move8 [104] <- [32]
+    5: Move8 [96] <- [24]
+    6: Move8 [88] <- [16]
+    7: CallIndirect 0x1::test::mk_bag
+    8: ValueCmp [56] <- [40] == [88] : 0x1::test::Bag
+    9: Move(1) [0] <- [56]
+    10: Return
+}
+
+fun bag_neq() {
+  frame_data_size: 72
+  entry_gas: 243
+  code:
+    0: Move8 [112] <- [16]
+    1: Move8 [104] <- [8]
+    2: Move8 [96] <- [0]
+    3: CallIndirect 0x1::test::mk_bag
+    4: Move(16) [48] <- [96]
+    5: Move8 [112] <- [40]
+    6: Move8 [104] <- [32]
+    7: Move8 [96] <- [24]
+    8: CallIndirect 0x1::test::mk_bag
+    9: ValueCmp [64] <- [48] != [96] : 0x1::test::Bag
+    10: Move(1) [0] <- [64]
+    11: Return
+}
+
+fun mk_bag() {
+  frame_data_size: 64
+  entry_gas: 222
+  code:
+    0: VecNew [24]
+    1: SlotBorrow [32] <- &[24]
+    2: VecPushBack [32].push([8], size=8, desc=0)
+    3: SlotBorrow [32] <- &[24]
+    4: VecPushBack [32].push([16], size=8, desc=0)
+    5: Move8 [56] <- [24]
+    6: Move8 [48] <- [0]
+    7: Move(16) [0] <- [48]
+    8: Return
+  safe_point_layouts:
+    2: []
+    4: []
+}
+
+fun mk_bag1() {
+  frame_data_size: 56
+  entry_gas: 192
+  code:
+    0: VecNew [16]
+    1: SlotBorrow [24] <- &[16]
+    2: VecPushBack [24].push([8], size=8, desc=0)
+    3: Move8 [48] <- [16]
+    4: Move8 [40] <- [0]
+    5: Move(16) [0] <- [40]
+    6: Return
+  safe_point_layouts:
+    2: []
+}
+
+fun mk_points() {
+  frame_data_size: 72
+  entry_gas: 272
+  code:
+    0: VecNew [32]
+    1: SlotBorrow [40] <- &[32]
+    2: Move8 [64] <- [8]
+    3: Move8 [56] <- [0]
+    4: VecPushBack [40].push([56], size=16, desc=0)
+    5: SlotBorrow [40] <- &[32]
+    6: Move8 [64] <- [24]
+    7: Move8 [56] <- [16]
+    8: VecPushBack [40].push([56], size=16, desc=0)
+    9: Move8 [0] <- [32]
+    10: Return
+  safe_point_layouts:
+    4: []
+    8: []
+}
+
+fun pts_eq() {
+  frame_data_size: 80
+  entry_gas: 271
+  code:
+    0: Move8 [128] <- [24]
+    1: Move8 [120] <- [16]
+    2: Move8 [112] <- [8]
+    3: Move8 [104] <- [0]
+    4: CallIndirect 0x1::test::mk_points
+    5: Move8 [64] <- [104]
+    6: Move8 [128] <- [56]
+    7: Move8 [120] <- [48]
+    8: Move8 [112] <- [40]
+    9: Move8 [104] <- [32]
+    10: CallIndirect 0x1::test::mk_points
+    11: ValueCmp [72] <- [64] == [104] : vector<0x1::test::Point>
+    12: Move(1) [0] <- [72]
+    13: Return
+}
+
+fun pts_neq() {
+  frame_data_size: 80
+  entry_gas: 271
+  code:
+    0: Move8 [128] <- [24]
+    1: Move8 [120] <- [16]
+    2: Move8 [112] <- [8]
+    3: Move8 [104] <- [0]
+    4: CallIndirect 0x1::test::mk_points
+    5: Move8 [64] <- [104]
+    6: Move8 [128] <- [56]
+    7: Move8 [120] <- [48]
+    8: Move8 [112] <- [40]
+    9: Move8 [104] <- [32]
+    10: CallIndirect 0x1::test::mk_points
+    11: ValueCmp [72] <- [64] != [104] : vector<0x1::test::Point>
+    12: Move(1) [0] <- [72]
+    13: Return
+}

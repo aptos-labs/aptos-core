@@ -14,7 +14,7 @@ use std::{
 };
 
 #[test]
-fn test_same_executable_id() {
+fn test_same_module_id() {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
@@ -29,7 +29,7 @@ fn test_same_executable_id() {
 }
 
 #[test]
-fn test_different_executable_ids() {
+fn test_different_module_ids() {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
@@ -49,7 +49,7 @@ fn test_different_executable_ids() {
 }
 
 #[test]
-fn test_concurrent_same_executable_ids() {
+fn test_concurrent_same_module_ids() {
     let num_threads = 4;
 
     let ctx = Arc::new(GlobalContext::with_num_execution_workers(num_threads));
@@ -87,7 +87,7 @@ fn test_concurrent_same_executable_ids() {
 }
 
 #[test]
-fn test_concurrent_different_executable_ids() {
+fn test_concurrent_different_module_ids() {
     let num_threads = 4;
 
     let ctx = Arc::new(GlobalContext::with_num_execution_workers(num_threads));

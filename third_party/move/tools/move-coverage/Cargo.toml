@@ -9,6 +9,9 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 bcs = { workspace = true }
@@ -22,6 +25,3 @@ move-core-types = { workspace = true }
 move-ir-types = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true }
-
-[features]
-default = []

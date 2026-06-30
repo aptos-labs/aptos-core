@@ -177,7 +177,7 @@ fn check_baseline(test_file: &str, output: &str) {
 
 #[test]
 fn move_framework_prover_tests() {
-    run_prover_for_pkg("aptos-framework", 1, None);
+    run_prover_for_pkg("aptos-framework", 5, None);
 }
 
 #[test]

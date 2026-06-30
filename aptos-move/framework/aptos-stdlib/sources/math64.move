@@ -87,6 +87,9 @@ module aptos_std::math64 {
                 res += n;
             };
             n >>= 1;
+        } spec {
+            invariant (res as u64) + 2 * (n as u64) <= 64;
+            invariant n == 0 ==> (res as u64) <= 63;
         };
         res
     }

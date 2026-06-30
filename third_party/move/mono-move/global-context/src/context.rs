@@ -3,7 +3,23 @@
 
 //! Core types and implementation for the global execution context.
 //!
-//! # Safety Contract & Design Principles
+//! # Rationale
+//!
+//! The block executor runs many transactions in parallel within a block and
+//! sequentially across blocks. Code-derived data (interned identifiers,
+//! interned types, loaded modules) is long-lived: it survives across
+//! transactions and is shared between worker threads. Ideally, the following
+//! requirements are satisfied:
+//!   - allocations are cheap and lock-free on the hot path,
+//!   - references to data can be handed to workers and stay valid for the
+//!     duration of their work without per-reference counting.
+//!
+//! Concurrent deallocation against many readers is the hard problem. To avoid
+//! it, memory is only reclaimed at certain epochs (e.g., between blocks). The
+//! two-phase state machine below turns this observation safety contract
+//! enforced at compile-time.
+//!
+//! # Safety Contract
 //!
 //! ## Two-Phase State Machine
 //!
@@ -17,10 +33,11 @@
 //!    Pointers returned from the guard are valid for the guard's lifetime.
 //!
 //! 2. **Maintenance Phase**
-//!    A single exclusive [`MaintenanceGuard`] guard exists with write access
-//!    via [`RwLockWriteGuard`]. During this phase caches can be reset. Because
-//!    no execution contexts can co-exist, there can be no dangling pointers,
-//!    making deallocation safe.
+//!    A single exclusive [`MaintenanceGuard`] guard exists. It is obtained
+//!    through `&mut GlobalContext`, so the borrow checker guarantees no
+//!    [`ExecutionGuard`] can co-exist. During this phase caches can be reset.
+//!    Because no execution contexts can co-exist, there can be no dangling
+//!    pointers, making deallocation safe.
 //!
 //! ## Global Allocation Race Window
 //!
@@ -33,36 +50,38 @@
 //!   - Trade-off: minor memory waste for lower lock contention.
 
 use crate::maintenance_config::MaintenanceConfig;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::NominalLayout, ExecutableId, Interner};
+use mono_move_core::{
+    reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
+    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor, ValueLayout,
+    TRIVIAL_DESCRIPTOR_ID,
+};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::OnceLock,
 };
 
 // Submodules: to split implementation into smaller pieces.
 mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod module_ids;
-use module_ids::ExecutableIdInternerKey;
+use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
     FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
 };
 mod module_cache;
 use module_cache::ModuleCache;
-use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
+use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 mod types;
 pub use types::{
-    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
-    InternedType, InternedTypeList, Type,
+    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, InternedType,
+    InternedTypeList, Type,
 };
 use types::{TypeInternerKey, TypeListInternerKey};
 
@@ -88,40 +107,186 @@ pub struct GlobalContext {
     global_arena: GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     maintenance_config: MaintenanceConfig,
-    /// Lock to switch between execution and maintenance modes:
-    ///   - Read lock: execution phase.
-    ///   - Write lock: maintenance phase.
-    phase: RwLock<()>,
 }
 
 /// Shared context containing interned data structures. Global arena where the
 /// data is allocated is kept separately.
 struct Context {
     identifiers: DashMap<IdentifierInternerKey, InternedIdentifier, ahash::RandomState>,
-    module_ids: DashMap<ExecutableIdInternerKey, InternedModuleId, ahash::RandomState>,
+    module_ids: DashMap<ModuleIdInternerKey, InternedModuleId, ahash::RandomState>,
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
+    // TODO(perf): reconsider whether this indirection earns its keep. The
+    // alternative is to widen the closure's `Unresolved` func_ref payload to
+    // store the 24-byte triple inline, dropping both this map and the
+    // `InternedFunctionRef` arena allocation at the cost of a larger closure
+    // object.
+    function_refs: DashMap<
+        (InternedModuleId, InternedIdentifier, InternedTypeList),
+        InternedFunctionRef,
+        ahash::RandomState,
+    >,
     module_cache: ModuleCache,
+    /// Published object descriptors.
+    descriptors: Descriptors,
+    /// Published type layouts (the type-driven walk shape, separate from the
+    /// GC object descriptors above).
+    layouts: Layouts,
+}
+
+/// Storage for the published object-descriptor set.
+///
+/// # Invariants
+///
+/// - `table[id.as_usize()]` is the descriptor for [`DescriptorId`] `id`.
+/// - Slot 0 is [`ObjectDescriptor::trivial`] and slot 1 is
+///   [`ObjectDescriptor::closure`]; user descriptors start at slot 2.
+/// - For every `(elem_ty, id)` in `vector_by_elem`, `table[id]` is a
+///   `Vector` descriptor with that element type.
+/// - Entries are appended but never removed or reordered during the
+///   execution phase; only [`MaintenanceGuard::reset_arena_pool`] clears
+///   the table. Reset drops every descriptor, freeing their heap-owning
+///   payloads (e.g. `Vec<u32>` offset lists).
+struct Descriptors {
+    /// Vector-descriptor idempotency cache: `elem_ty -> id`. Lock-free reads
+    /// via DashMap; the first publisher for a given `elem_ty` takes a shard
+    /// write-lock once.
+    //
+    // TODO(cleanup): unify the per-kind type-keyed caches (`vector_by_elem`,
+    // `enum_by_type`, `struct_by_ty`) into one map keyed on the full
+    // `InternedType` (`vector<T>` instead of `T`).
+    // `captured_data_by_pointer_offsets` is keyed by shape, not type, and
+    // stays separate.
+    vector_by_elem: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// Enum-descriptor idempotency cache: `enum_ty -> id`. Mirrors
+    /// `vector_by_elem` but keyed on the concrete enum type.
+    enum_by_type: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// Captured-data idempotency cache: pointer-offset shape -> id. Captures
+    /// sharing a pointer shape share one descriptor. Pointer-free captures
+    /// bypass this cache for `TRIVIAL_DESCRIPTOR_ID`.
+    captured_data_by_pointer_offsets: DashMap<Vec<u32>, DescriptorId, ahash::RandomState>,
+    /// Struct-object idempotency cache: `struct_ty -> id`. Inline resources
+    /// laid out as heap objects share one descriptor per type.
+    struct_by_ty: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// All descriptors (reserved + user) in id order. `boxcar::Vec` is an
+    /// append-only concurrent vector: entries are pushed through a shared `&`
+    /// reference and are never moved, so [`DescriptorId`] indices stay stable
+    /// and concurrent reads need no lock.
+    table: boxcar::Vec<ObjectDescriptor>,
+}
+
+impl Default for Descriptors {
+    fn default() -> Self {
+        Self {
+            vector_by_elem: DashMap::default(),
+            enum_by_type: DashMap::default(),
+            captured_data_by_pointer_offsets: DashMap::default(),
+            struct_by_ty: DashMap::default(),
+            table: initial_descriptors(),
+        }
+    }
+}
+
+impl Descriptors {
+    /// Drop user descriptors and idempotency caches; reinstall the
+    /// reserved-slot table.
+    fn reset(&mut self) {
+        // Exhaustive destructuring so that adding a new field forces a
+        // compile-time error here.
+        let Self {
+            vector_by_elem,
+            enum_by_type,
+            captured_data_by_pointer_offsets,
+            struct_by_ty,
+            table,
+        } = self;
+        vector_by_elem.clear();
+        enum_by_type.clear();
+        captured_data_by_pointer_offsets.clear();
+        struct_by_ty.clear();
+        *table = initial_descriptors();
+    }
+}
+
+/// Initial descriptor table: the two reserved entries.
+fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
+    let table = boxcar::Vec::new();
+    table.push(ObjectDescriptor::trivial());
+    table.push(ObjectDescriptor::closure());
+    table
+}
+
+/// Table of type layouts.
+///
+/// # Invariants
+///
+/// - Layouts can be obtained by indexing the table with [`LayoutId`] index.
+///   By construction, these indices always have to be in bounds.
+/// - First few slots are reserved for primitives, references, etc. These IDs
+///   do not have the mapping from type to ID. For all other types, the mapping
+///   from type to ID exists where ID can be used to index type's layout.
+struct Layouts {
+    /// Type to layout ID mapping. Types are concrete.
+    by_ty: DashMap<InternedType, LayoutId, ahash::RandomState>,
+    /// Enum type to the layout IDs of its per-variant bodies. Variant bodies
+    /// may not have a Move type of their own, so they are keyed in this map.
+    enum_variants_by_type: DashMap<InternedType, Box<[LayoutId]>, ahash::RandomState>,
+    /// All existing layouts in ID order. `boxcar::Vec` is an append-only
+    /// concurrent vector: entries are pushed through a shared `&` reference and
+    /// are never moved, so [`LayoutId`] indices stay stable and concurrent
+    /// reads need no lock.
+    table: boxcar::Vec<ValueLayout>,
+}
+
+impl Default for Layouts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Layouts {
+    /// Creates a fresh table seeded with the reserved layouts and an empty
+    /// type-to-ID map.
+    fn new() -> Self {
+        Self {
+            by_ty: DashMap::default(),
+            enum_variants_by_type: DashMap::default(),
+            table: initial_layouts(),
+        }
+    }
+
+    /// Resets layout table and type to layout ID mappings. Reserved layouts
+    /// are added back to the layout table.
+    fn reset(&mut self) {
+        let Self {
+            by_ty,
+            enum_variants_by_type,
+            table,
+        } = self;
+        by_ty.clear();
+        enum_variants_by_type.clear();
+        *table = initial_layouts();
+    }
+}
+
+fn initial_layouts() -> boxcar::Vec<ValueLayout> {
+    let mut table = boxcar::Vec::new();
+    table.extend(reserved_layouts());
+    table
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
 ///
 /// Only one maintenance context can exist at a time, ensuring exclusive
-/// access to the internal state for maintenance operations. The write lock
-/// is held for the lifetime of this guard and automatically released when
-/// dropped.
+/// access to the internal state for maintenance operations.
 pub struct MaintenanceGuard<'ctx> {
-    /// Reference to the caches stored in context.
-    ctx: &'ctx Context,
+    /// Exclusive reference to the caches stored in context.
+    ctx: &'ctx mut Context,
     /// Pool of all arenas managing global allocations.
-    global_arena: &'ctx GlobalArenaPool,
+    global_arena: &'ctx mut GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     #[allow(dead_code)]
     maintenance_config: &'ctx MaintenanceConfig,
-
-    /// Write guard that disallows obtaining concurrent execution
-    /// guard. **Must** be dropped last.
-    _guard: RwLockWriteGuard<'ctx, ()>,
 }
 
 /// RAII guard for the execution phase providing concurrent read access
@@ -133,10 +298,6 @@ pub struct ExecutionGuard<'ctx> {
     /// Arena dedicated for this execution guard with exclusive access.
     /// During execution, data can be allocated here without contention.
     global_arena: GlobalArenaShard<'ctx>,
-
-    /// Read guard preventing maintenance phase, but allowing concurrent
-    /// execution phases. **Must** be dropped last.
-    _guard: RwLockReadGuard<'ctx, ()>,
 }
 
 /// A scoped reference to data obtained from [`ExecutionGuard`] and is guaranteed
@@ -193,40 +354,34 @@ impl GlobalContext {
                 module_ids: DashMap::default(),
                 types: DashMap::default(),
                 type_lists: DashMap::default(),
+                function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
+                descriptors: Descriptors::default(),
+                layouts: Layouts::default(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
-            phase: RwLock::new(()),
         }
     }
 
     /// Transitions to maintenance mode by obtaining a [`MaintenanceGuard`]
-    /// guard. Only one maintenance context can be held at a time, providing
-    /// exclusive access to the internal state for maintenance operations. No
-    /// execution context can be held concurrently.
-    ///
-    /// Returns [`None`] if [`ExecutionGuard`] is currently held or there is
-    /// an ongoing maintenance.
+    /// guard, providing exclusive access to the internal state for maintenance
+    /// operations. The `&mut self` receiver guarantees no [`ExecutionGuard`]
+    /// can be held concurrently.
     #[must_use]
-    pub fn try_maintenance_context(&self) -> Option<MaintenanceGuard<'_>> {
-        let _guard = self.phase.try_write()?;
-
-        Some(MaintenanceGuard {
-            ctx: &self.ctx,
-            global_arena: &self.global_arena,
+    pub fn maintenance_context(&mut self) -> MaintenanceGuard<'_> {
+        MaintenanceGuard {
+            ctx: &mut self.ctx,
+            global_arena: &mut self.global_arena,
             maintenance_config: &self.maintenance_config,
-            _guard,
-        })
+        }
     }
 
     /// Transitions to execution mode by obtaining an [`ExecutionGuard`] guard
     /// and locking the arena for the given worker. Multiple execution contexts
     /// can be held concurrently across threads for different workers.
     ///
-    /// Returns [`None`] if
-    ///   - there is an ongoing maintenance phase,
-    ///   - the arena for this worker has already been locked.
+    /// Returns [`None`] if the arena for this worker has already been locked.
     ///
     /// # Panics
     ///
@@ -234,12 +389,9 @@ impl GlobalContext {
     /// from the pool.
     #[must_use]
     pub fn try_execution_context(&self, worker_id: usize) -> Option<ExecutionGuard<'_>> {
-        let _guard = self.phase.try_read()?;
-
         Some(ExecutionGuard {
             ctx: &self.ctx,
             global_arena: self.global_arena.try_lock_arena(worker_id)?,
-            _guard,
         })
     }
 }
@@ -312,7 +464,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// reference tied to the guard's lifetime, if found.
     pub fn get_module<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
+        key: ArenaRef<'guard, ModuleId>,
     ) -> Option<&'guard LoadedModule> {
         let ptr = self.ctx.module_cache.get(key.into_global_arena_ptr())?;
 
@@ -327,7 +479,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// shard write lock on the create path.
     pub fn get_or_create_module_slot<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
+        key: ArenaRef<'guard, ModuleId>,
     ) -> LoadedModuleSlot {
         self.ctx
             .module_cache
@@ -339,7 +491,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     pub fn arena_ref_for_module_id<'guard>(
         &'guard self,
         ptr: InternedModuleId,
-    ) -> ArenaRef<'guard, ExecutableId>
+    ) -> ArenaRef<'guard, ModuleId>
     where
         'ctx: 'guard,
     {
@@ -362,12 +514,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
         unsafe { ptr.as_ref_unchecked() }
     }
 
-    /// Interns a nominal (struct or enum) identity without populating its
-    /// layout. The returned pointer can be used immediately in IR, but
-    /// [`Type::size_and_align`] and [`Type::layout`] will return [`None`]
-    /// until [`Self::set_nominal_layout`] is called for this type. Callers
-    /// using this in cross-module contexts must tolerate the missing layout
-    /// until a layout-population pass runs.
+    /// Interns a nominal (struct or enum) identity. The returned pointer can be
+    /// used immediately in IR.
     pub fn intern_nominal(
         &self,
         module_id: InternedModuleId,
@@ -378,105 +526,234 @@ impl<'ctx> ExecutionGuard<'ctx> {
             module_id,
             name,
             ty_args,
-            layout: OnceLock::new(),
         });
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    /// Allocates the field-layout slice in the arena (when `fields` is
-    /// `Some`), builds a [`NominalLayout`] and installs it into the type's
-    /// layout slot. Pass `Some(&fields)` for structs and `None` for enums.
-    /// Returns an error if `ty` is not a nominal type.
-    ///
-    /// Setting layouts concurrently is safe: the layout stores canonical
-    /// field type pointers and so is structurally identical across threads.
-    pub fn set_nominal_layout(
+    /// Returns the already-published vector-descriptor id for `elem_ty`,
+    /// or `None` if no descriptor has been published yet. Lock-free.
+    pub fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .vector_by_elem
+            .get(&elem_ty)
+            .map(|r| *r)
+    }
+
+    /// Materializes a vector-object descriptor for `elem_ty` into the
+    /// shared arena and returns its assigned [`DescriptorId`]. Idempotent:
+    /// subsequent calls with the same `elem_ty` return the same id without
+    /// re-allocating.
+    //
+    // TODO(perf): the slow path takes a DashMap shard write-lock (`entry`) on
+    // the idempotency cache. The `boxcar::Vec` append itself is lock-free and
+    // O(1). Profile before optimizing the shard lock further.
+    pub fn publish_vec_descriptor(
         &self,
-        ty: InternedType,
+        elem_ty: InternedType,
+        elem_size: u32,
+        elem_ptr_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        if elem_ptr_offsets.is_empty() {
+            return TRIVIAL_DESCRIPTOR_ID;
+        }
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(id) = self.ctx.descriptors.vector_by_elem.get(&elem_ty) {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .vector_by_elem
+            .entry(elem_ty)
+            .or_insert_with(|| {
+                let offsets: Vec<u32> = elem_ptr_offsets.iter().map(|o| o.0).collect();
+                let desc = ObjectDescriptor::new_vector(elem_size, offsets)
+                    .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}"));
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Materializes a struct-object descriptor for `struct_ty` (the inline
+    /// resource laid out as a heap object) into the shared arena and returns
+    /// its assigned [`DescriptorId`]. Idempotent: subsequent calls with the
+    /// same `struct_ty` return the same id without re-allocating.
+    pub fn publish_struct_descriptor(
+        &self,
+        struct_ty: InternedType,
         size: u32,
-        align: u32,
-        fields: Option<&[FieldLayout]>,
-    ) -> Result<()> {
-        let slot = match view_type(ty) {
-            Type::Nominal { layout: slot, .. } => slot,
-            Type::Bool
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256
-            | Type::I8
-            | Type::I16
-            | Type::I32
-            | Type::I64
-            | Type::I128
-            | Type::I256
-            | Type::Address
-            | Type::Signer
-            | Type::ImmutRef { .. }
-            | Type::MutRef { .. }
-            | Type::Vector { .. }
-            | Type::Function { .. }
-            | Type::TypeParam { .. } => {
-                bail!("set_nominal_layout called on a non-nominal type")
-            },
-        };
+        ptr_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(id) = self.ctx.descriptors.struct_by_ty.get(&struct_ty) {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .struct_by_ty
+            .entry(struct_ty)
+            .or_insert_with(|| {
+                let offsets: Vec<u32> = ptr_offsets.iter().map(|o| o.0).collect();
+                let desc = ObjectDescriptor::new_struct(size, offsets)
+                    .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}"));
+                self.append_descriptor(desc)
+            })
+    }
 
-        // Fast path: if the layout is already installed, skip the field-slice
-        // allocation entirely. A race can still leak one allocation between
-        // this check and `slot.set` below, but that is bounded and consistent
-        // with the documented arena race trade-off.
-        if slot.get().is_some() {
-            return Ok(());
+    /// Materializes an enum-object descriptor for `enum_ty` into the shared
+    /// arena and returns its assigned [`DescriptorId`]. Idempotent on
+    /// `enum_ty`. `variant_pointer_offsets[v]` are the heap-pointer byte
+    /// offsets (relative to the data region after the tag) for variant `v`.
+    ///
+    /// TODO(correctness): `enum_by_type` (and the sibling `vector_by_elem` /
+    /// captured-data caches) key on a version-agnostic `InternedType`. This is
+    /// sound only while the interner, descriptor table, and module cache are
+    /// reset together (`reset_all_caches`) and no in-place module-version
+    /// replacement exists. When multi-version module upgrade lands, make these
+    /// caches version-aware or clear them on every version switch — otherwise a
+    /// changed enum layout could reuse a stale descriptor.
+    pub fn publish_enum_descriptor(
+        &self,
+        enum_ty: InternedType,
+        size: u32,
+        variant_pointer_offsets: Vec<Vec<u32>>,
+    ) -> DescriptorId {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(id) = self.ctx.descriptors.enum_by_type.get(&enum_ty) {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .enum_by_type
+            .entry(enum_ty)
+            .or_insert_with(|| {
+                let desc = ObjectDescriptor::new_enum(size, variant_pointer_offsets)
+                    .unwrap_or_else(|e| panic!("publish_enum_descriptor: {e}"));
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Appends `desc` to the shared descriptor table and returns its assigned
+    /// [`DescriptorId`].
+    fn append_descriptor(&self, desc: ObjectDescriptor) -> DescriptorId {
+        let idx = self.ctx.descriptors.table.push(desc);
+        DescriptorId(u32::try_from(idx).expect("published descriptor count exceeds u32::MAX"))
+    }
+
+    /// Returns the GC trace descriptor for a closure's captured-data object.
+    /// `values_size` is the byte width of the packed values region;
+    /// `pointer_offsets` are intra-values heap-pointer offsets.
+    ///
+    /// A pointer-free capture (no offsets) returns the reserved
+    /// [`TRIVIAL_DESCRIPTOR_ID`]. A pointer-bearing capture materializes (or
+    /// reuses) a `CapturedData` descriptor, idempotent on the pointer-offset
+    /// shape.
+    pub fn publish_captured_data_descriptor(
+        &self,
+        values_size: u32,
+        pointer_offsets: &[FrameOffset],
+    ) -> DescriptorId {
+        if pointer_offsets.is_empty() {
+            return TRIVIAL_DESCRIPTOR_ID;
+        }
+        let offsets: Vec<u32> = pointer_offsets.iter().map(|o| o.0).collect();
+        if let Some(id) = self
+            .ctx
+            .descriptors
+            .captured_data_by_pointer_offsets
+            .get(&offsets)
+        {
+            return *id;
+        }
+        *self
+            .ctx
+            .descriptors
+            .captured_data_by_pointer_offsets
+            .entry(offsets.clone())
+            .or_insert_with(move || {
+                let desc = ObjectDescriptor::new_captured_data(values_size, offsets)
+                    .unwrap_or_else(|e| panic!("publish_captured_data_descriptor: {e}"));
+                self.append_descriptor(desc)
+            })
+    }
+
+    /// Returns the layout ID for the given type, or [`None`] if no layout has
+    /// been published yet.
+    pub fn layout_id_for(&self, ty: InternedType) -> Option<LayoutId> {
+        if let Some(id) = reserved_layout_id(view_type(ty)) {
+            return Some(id);
+        }
+        self.ctx.layouts.by_ty.get(&ty).map(|r| *r)
+    }
+
+    /// Publishes the layout for the given type and returns its assigned
+    /// [`LayoutId`].
+    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+        if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
+            return *id;
         }
 
-        let layout = match fields {
-            Some(fields) => {
-                let fields_ptr = self.global_arena.alloc_slice_copy(fields);
-                NominalLayout::new_struct(size, align, fields_ptr)
-            },
-            None => NominalLayout::new_enum(size, align),
-        };
-        if let Err(other_layout) = slot.set(layout) {
-            let installed_layout = slot.get().expect("Layout was just installed");
-            debug_assert_eq!(installed_layout.size, other_layout.size);
-            debug_assert_eq!(installed_layout.align, other_layout.align);
-            debug_assert_eq!(
-                installed_layout.field_layouts().is_some(),
-                other_layout.field_layouts().is_some()
-            );
-            // Layout computation is deterministic given the type identity,
-            // so per-field offsets must match too.
-            if let (Some(installed), Some(other)) = (
-                installed_layout.field_layouts(),
-                other_layout.field_layouts(),
-            ) {
-                debug_assert_eq!(installed.len(), other.len());
-                for (installed, other) in installed.iter().zip(other.iter()) {
-                    debug_assert_eq!(installed.offset, other.offset);
-                }
-            }
+        // TODO(perf): consider if we should append to the table without holding the shard lock.
+        *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
+            let idx = self.ctx.layouts.table.push(layout);
+            LayoutId::from_usize(idx)
+        })
+    }
+
+    /// Publishes the variant-body layouts of enum and returns their [`LayoutId`]s.
+    pub fn publish_variant_layouts(
+        &self,
+        enum_ty: InternedType,
+        variants: Vec<ValueLayout>,
+    ) -> Box<[LayoutId]> {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock.
+        if let Some(ids) = self.ctx.layouts.enum_variants_by_type.get(&enum_ty) {
+            return ids.clone();
         }
-        Ok(())
+        self.ctx
+            .layouts
+            .enum_variants_by_type
+            .entry(enum_ty)
+            .or_insert_with(|| {
+                variants
+                    .into_iter()
+                    .map(|layout| LayoutId::from_usize(self.ctx.layouts.table.push(layout)))
+                    .collect()
+            })
+            .clone()
     }
 
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
-    ///
-    /// For nominal types, the returned pointer carries identity but its
-    /// layout slot may still be empty — `set_nominal_layout` runs in a
-    /// separate pass after all field types are interned. Callers consuming
-    /// this in cross-module contexts must tolerate `None` from
-    /// [`Type::size_and_align`] and [`Type::layout`] until the layout-
-    /// population pass completes.
     pub fn try_intern_for_module(
         &self,
         token: &SignatureToken,
         module: &CompiledModule,
     ) -> Option<InternedType> {
         self.get_interned_type_pointer_internal(token, module)
+    }
+}
+
+impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.ctx.descriptors.table.get(id.as_usize())
+    }
+}
+
+impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.ctx.layouts.table.get(id.as_usize())
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.layout_id_for(ty)
     }
 }
 
@@ -533,7 +810,6 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
             module_id,
             name,
             ty_args,
-            layout: OnceLock::new(),
         });
         self.insert_allocated_type_pointer_internal(ty)
     }
@@ -542,11 +818,32 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         self.intern_address_name_internal(*address, name)
     }
 
+    fn function_ref_of(
+        &self,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> InternedFunctionRef {
+        // SAFETY: all three components are canonical (already-interned)
+        // pointers, so the tuple's pointer-based hash/eq is structural. The
+        // map is cleared on arena reset, so stored pointers stay valid.
+        let key = (module_id, func_name, ty_args);
+        if let Some(entry) = self.ctx.function_refs.get(&key) {
+            return *entry.value();
+        }
+        let ptr = self.global_arena.alloc(FunctionRef {
+            module_id,
+            func_name,
+            ty_args,
+        });
+        *self.ctx.function_refs.entry(key).or_insert(ptr)
+    }
+
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
         self.intern_identifier_internal(identifier)
     }
 
-    // TODO:
+    // TODO(perf, metering):
     //   1. Non-recursive implementation.
     //   2. Current implementation is O(N^2) because hashes of inner types are
     //      not cached, and have to be recomputed on insertion.
@@ -604,13 +901,11 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
                 module_id,
                 name,
                 ty_args: inner_args,
-                layout,
             } => {
                 let new_inner_args = self.subst_type_list(*inner_args, ty_args)?;
                 if new_inner_args == *inner_args {
                     ty
                 } else {
-                    debug_assert!(layout.get().is_none(), "Layout cannot be set for generics");
                     self.nominal_of(*module_id, *name, new_inner_args)
                 }
             },
@@ -689,13 +984,19 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             module_ids,
             types,
             type_lists,
+            function_refs,
             module_cache,
+            descriptors,
+            layouts,
         } = self.ctx;
 
         identifiers.clear();
         module_ids.clear();
         types.clear();
         type_lists.clear();
+        function_refs.clear();
+        descriptors.reset();
+        layouts.reset();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules

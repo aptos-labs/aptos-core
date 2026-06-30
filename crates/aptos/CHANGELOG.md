@@ -4,7 +4,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- _No changes yet._
+- Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.
+
+## [9.4.0]
+- Set language version 2.4 and bytecode version v10 as default.
+
+## [9.3.0]
+- Replaced `aptos node verify-digest-key` with two commands: `aptos node validate-digest-key` and `aptos node validate-public-parameters`. Both compute and report a blake3 checksum (instead of SHA-256) along with the file size, and verify that the blob deserializes to the corresponding type. The JSON output field is renamed from `sha256` to `blake3`.
 
 ## [9.2.0]
 - Update boogie from 3.5.1 to 3.5.6.
@@ -13,6 +19,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [9.1.0]
 - Added support for confidential transactions locally
 - Updated default formatter version to 1.5.1.
+- `aptos move simulate` now supports `--show-details` to include both `events` and `changes` in simulation output.
 
 ## [9.0.0]
 - Add linter rules `unused_function`, `unused_struct`, and `unused_constant` to detect unused items.

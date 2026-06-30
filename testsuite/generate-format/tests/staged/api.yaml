@@ -229,6 +229,10 @@ BlockMetadataExt:
       V2:
         NEWTYPE:
           TYPENAME: BlockMetadataWithRandAndDecKey
+    3:
+      V3:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandAndDecPayload
 BlockMetadataWithRandAndDecKey:
   STRUCT:
     - id:
@@ -247,6 +251,24 @@ BlockMetadataWithRandAndDecKey:
     - decryption_key:
         OPTION:
           TYPENAME: BlockTxnDecryptionKey
+BlockMetadataWithRandAndDecPayload:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
+    - decryption_payload:
+        OPTION:
+          TYPENAME: DecryptionPayload
 BlockMetadataWithRandomness:
   STRUCT:
     - id:
@@ -380,6 +402,11 @@ DecryptionFailureReason:
       TrustedSetupExhausted: UNIT
     9:
       ExecuteBlockLimitReached: UNIT
+DecryptionPayload:
+  STRUCT:
+    - key:
+        TYPENAME: BlockTxnDecryptionKey
+    - decryption_round: U64
 DepositEvent:
   STRUCT:
     - amount: U64
@@ -505,6 +532,16 @@ ExecutionStatus:
       MiscellaneousError:
         NEWTYPE:
           OPTION: U64
+Extension:
+  ENUM:
+    0:
+      NativePosition:
+        NEWTYPE:
+          MAP:
+            KEY:
+              TYPENAME: StateKey
+            VALUE:
+              TYPENAME: WriteOp
 FederatedKeylessPublicKey:
   STRUCT:
     - jwk_addr:
@@ -725,8 +762,8 @@ RequestedMultipliers:
     0:
       V1:
         STRUCT:
-          - execution_bps: U64
-          - io_bps: U64
+          - execution_multiplier_percent: U64
+          - io_multiplier_percent: U64
 Script:
   STRUCT:
     - code: BYTES
@@ -783,6 +820,10 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+    3:
+      TradingNative:
+        NEWTYPE:
+          TYPENAME: TradingNativeKey
 StateValueMetadata:
   ENUM:
     0:
@@ -817,6 +858,17 @@ SymmetricCiphertext:
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
+TradingNativeKey:
+  ENUM:
+    0:
+      Position:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:
@@ -1002,6 +1054,10 @@ TransactionInfo:
       V0:
         NEWTYPE:
           TYPENAME: TransactionInfoV0
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: TransactionInfoV1
 TransactionInfoV0:
   STRUCT:
     - gas_used: U64
@@ -1017,6 +1073,50 @@ TransactionInfoV0:
         OPTION:
           TYPENAME: HashValue
     - auxiliary_info_hash:
+        OPTION:
+          TYPENAME: HashValue
+TransactionInfoV1:
+  STRUCT:
+    - gas_used: U64
+    - status:
+        TYPENAME: ExecutionStatus
+    - transaction_hash:
+        TYPENAME: HashValue
+    - event_root_hash:
+        TYPENAME: HashValue
+    - state_change_hash:
+        TYPENAME: HashValue
+    - state_checkpoint_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - hot_state_checkpoint_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - auxiliary_info_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - position_state_checkpoint_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder1:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder2:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder3:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder4:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder5:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder6:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder7:
         OPTION:
           TYPENAME: HashValue
 TransactionOnChainData:
@@ -1183,6 +1283,10 @@ WriteSet:
       V0:
         NEWTYPE:
           TYPENAME: WriteSetV0
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: WriteSetV1
 WriteSetMut:
   STRUCT:
     - write_set:
@@ -1205,8 +1309,19 @@ WriteSetPayload:
           - script:
               TYPENAME: Script
 WriteSetV0:
-  NEWTYPESTRUCT:
-    TYPENAME: WriteSetMut
+  STRUCT:
+    - value_writes:
+        TYPENAME: WriteSetMut
+WriteSetV1:
+  STRUCT:
+    - value_writes:
+        TYPENAME: WriteSetMut
+    - hotness:
+        SEQ:
+          TYPENAME: StateKey
+    - extensions:
+        SEQ:
+          TYPENAME: Extension
 ZKP:
   ENUM:
     0:

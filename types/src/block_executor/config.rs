@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::on_chain_config::BlockGasLimitType;
+use crate::on_chain_config::{BlockGasLimitType, Features};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_GAS_PRICE_TO_BURN: u64 = 90;
@@ -62,9 +62,6 @@ pub struct BlockExecutorLocalConfig {
     pub discard_failed_blocks: bool,
     pub module_cache_config: BlockExecutorModuleCacheLocalConfig,
     pub enable_pre_write: bool,
-    /// If true, the per-block hot-state promotion set is embedded into the block epilogue
-    /// transaction (BlockEpiloguePayload::V2).
-    pub persist_hotness_in_epilogue: bool,
 }
 
 impl BlockExecutorLocalConfig {
@@ -74,25 +71,28 @@ impl BlockExecutorLocalConfig {
     ///   - Default module cache configs.
     pub fn default_with_concurrency_level(concurrency_level: usize) -> Self {
         Self {
-            blockstm_v2: false,
+            blockstm_v2: true,
             concurrency_level,
             allow_fallback: true,
             discard_failed_blocks: false,
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             enable_pre_write: true,
-            persist_hotness_in_epilogue: false,
         }
     }
 }
 
 /// Configuration from on-chain configuration, that is
 /// required to be the same across all nodes.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
     enable_per_block_gas_limit: bool,
     per_block_gas_limit: Option<u64>,
     gas_price_to_burn: Option<u64>,
+    hotness_in_epilogue: bool,
+    transaction_info_v1: bool,
+    hot_state_root_in_txn_info: bool,
+    compute_trading_native_state_roots: bool,
 }
 
 impl BlockExecutorConfigFromOnchain {
@@ -106,6 +106,10 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit,
             per_block_gas_limit: None,
             gas_price_to_burn,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -115,6 +119,10 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -125,6 +133,10 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
@@ -146,16 +158,50 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
+            compute_trading_native_state_roots: false,
         }
     }
 
-    pub fn with_block_gas_limit_override(self, block_gas_limit_override: Option<u64>) -> Self {
-        Self {
-            block_gas_limit_type: self.block_gas_limit_type,
-            enable_per_block_gas_limit: self.enable_per_block_gas_limit,
-            per_block_gas_limit: block_gas_limit_override,
-            gas_price_to_burn: self.gas_price_to_burn,
-        }
+    pub fn with_block_gas_limit_override(mut self, block_gas_limit_override: Option<u64>) -> Self {
+        self.per_block_gas_limit = block_gas_limit_override;
+        self
+    }
+
+    pub fn with_features(mut self, features: &Features) -> Self {
+        self.hotness_in_epilogue = features.is_hotness_in_epilogue_enabled();
+        self.transaction_info_v1 = features.is_transaction_info_v1_enabled();
+        // Requires transaction_info_v1: the hot state root rides in
+        // TransactionInfoV1's hot_state_checkpoint_hash field, which V0 lacks.
+        self.hot_state_root_in_txn_info = features.is_hot_state_root_in_txn_info_enabled()
+            && features.is_transaction_info_v1_enabled();
+        // Requires transaction_info_v1 (the root rides in TransactionInfoV1) and
+        // hotness_in_epilogue (only the V1 write-set format it enables serializes
+        // the native-position extensions; V0 drops them, so output-replay would
+        // diverge). Degrades to off if either is missing.
+        self.compute_trading_native_state_roots = features
+            .is_compute_trading_native_state_roots_enabled()
+            && features.is_transaction_info_v1_enabled()
+            && features.is_hotness_in_epilogue_enabled();
+        self
+    }
+
+    pub fn hotness_in_epilogue(&self) -> bool {
+        self.hotness_in_epilogue
+    }
+
+    pub fn transaction_info_v1(&self) -> bool {
+        self.transaction_info_v1
+    }
+
+    pub fn hot_state_root_in_txn_info(&self) -> bool {
+        self.hot_state_root_in_txn_info
+    }
+
+    pub fn compute_trading_native_state_roots(&self) -> bool {
+        self.compute_trading_native_state_roots
     }
 
     pub fn block_gas_limit_override(&self) -> Option<u64> {

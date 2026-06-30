@@ -1,0 +1,18 @@
+---
+# Config used by the crate's end-to-end test. It is deliberately minimal:
+# - the framework release is limited to move-stdlib to keep compilation fast;
+# - the gas change points at the synthetic snapshots in this directory so the
+#   generated summary is fully deterministic.
+name: "aptos-framework-test"
+metadata:
+  title: "Test framework release"
+  description: "Synthetic bundle used by aptos-release-tool's tests."
+update_sequence:
+  - Gas:
+      old: tests/data/gas_old.json
+      new: tests/data/gas_new.json
+  - Framework:
+      bytecode_version: 10
+      git_hash: ~
+      packages:
+        - move-stdlib

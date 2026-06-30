@@ -45,7 +45,9 @@ use std::{
     time::Instant,
 };
 
+/// MaxBcsSize: 818 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 pub type ChunkyTranscript = SignedWeightedTranscript<Pairing>;
+/// ArkSize: 120 + 16·n + 104·W + 8·max_w + 48·(W + max_w)·c.
 pub type ChunkySubtranscript = WeightedSubtranscript<Pairing>;
 pub type DealerPrivateKey = bls12381::PrivateKey;
 pub type DealerPublicKey = bls12381::PublicKey;
@@ -61,12 +63,14 @@ pub static TEST_DIGEST_KEY: Lazy<Arc<DigestKey>> = Lazy::new(|| {
     Arc::new(DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail"))
 });
 /// Shared test PublicParameters for chunky DKG (unit tests only).
+/// Sized for n=20 (forge): `max_num_shares=72` (rounding upper bound),
+/// `max_aggregation=20` (per-chunk dealer-sum ceiling).
 pub static TEST_PUBLIC_PARAMETERS: Lazy<Arc<ChunkyDKGPublicParameters>> = Lazy::new(|| {
     let mut rng = StdRng::seed_from_u64(200u64);
     Arc::new(PublicParameters::new_for_testing(
-        24,
+        72,
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
-        4,
+        20,
         G2Affine::generator(),
         &mut rng,
     ))
@@ -152,7 +156,7 @@ pub fn set_public_parameters(pp: Arc<ChunkyDKGPublicParameters>) {
 #[derive(Debug)]
 pub enum PublicParametersSource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Will fall back to the built-in test parameters on first access.
     TestKeyFallback,
     /// No PublicParameters available (no path configured, not a test chain).
@@ -167,6 +171,7 @@ pub fn initialize_public_parameters(chain_id: ChainId) -> PublicParametersSource
     if let Some(path) = PUBLIC_PARAMETERS_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => PublicParametersSource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => PublicParametersSource::NotAvailable,
@@ -243,7 +248,7 @@ pub fn set_digest_key(key: Arc<DigestKey>) {
 #[derive(Debug)]
 pub enum DigestKeySource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Fell back to the built-in test key.
     TestKeyFallback,
     /// No DigestKey is available (no path configured, not a test chain).
@@ -258,6 +263,7 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
     if let Some(path) = DIGEST_KEY_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => DigestKeySource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => DigestKeySource::NotAvailable,
@@ -397,6 +403,23 @@ impl ChunkyDKGSession {
             eks,
         })
     }
+
+    /// BCS wire-size upper bound for an inbound `ChunkyTranscript`. Used as a structural
+    /// validation gate before deserialization.
+    ///
+    /// Formula taken from `aptos_dkg::pvss::signed::generic_signing::GenericSigning`'s
+    /// `MaxBcsSize(T=UnsignedWeightedTranscript<Bls12_381>)` annotation.
+    pub fn expected_max_transcript_size(&self) -> usize {
+        const FR_BITS: usize = 255;
+        let n = self.eks.len();
+        let w = self.threshold_config.get_total_weight();
+        let max_w = self.threshold_config.get_max_weight();
+        let ell = self.public_parameters.ell.max(1);
+        let c = FR_BITS.div_ceil(ell);
+        let max_bcs_size = 818 + 32 * n + 120 * w + 24 * max_w + 128 * (w + max_w) * c + 80 * ell;
+        const FIXED_SLACK: usize = 4 * 1024;
+        max_bcs_size + FIXED_SLACK
+    }
 }
 
 /// Reflection of `0x1::chunky_dkg::DKGSessionMetadata` in rust.
@@ -508,4 +531,93 @@ impl ChunkyDKGState {
 impl OnChainConfig for ChunkyDKGState {
     const MODULE_IDENTIFIER: &'static str = "chunky_dkg";
     const TYPE_IDENTIFIER: &'static str = "ChunkyDKGState";
+}
+
+#[cfg(test)]
+mod transcript_size_bound_tests {
+    use super::*;
+    use aptos_crypto::{SigningKey, Uniform};
+    use aptos_dkg::pvss::{
+        chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
+        traits::{transcript::Transcript, Convert, HasEncryptionPublicParams},
+        Player,
+    };
+    use rand::thread_rng;
+
+    fn deal_and_check(weights: Vec<usize>, max_num_shares: usize) {
+        let mut rng_pp = StdRng::seed_from_u64(0xC0FFEE);
+        let pp = Arc::new(ChunkyDKGPublicParameters::new_for_testing(
+            max_num_shares,
+            DEFAULT_ELL_FOR_DEPLOYMENT,
+            4,
+            G2Affine::generator(),
+            &mut rng_pp,
+        ));
+        let total_w: usize = weights.iter().sum();
+        let threshold_config =
+            ChunkyDKGThresholdConfig::new(total_w.div_ceil(2).max(1), weights.clone()).unwrap();
+        let n = weights.len();
+        let dks: Vec<ChunkyDecryptPrivKey> = (0..n)
+            .map(|_| Uniform::generate(&mut thread_rng()))
+            .collect();
+        let eks: Vec<ChunkyEncryptPubKey> = dks
+            .iter()
+            .map(|dk| dk.to(pp.get_encryption_public_params()))
+            .collect();
+        let ssk: DealerPrivateKey = Uniform::generate(&mut thread_rng());
+        let spk: DealerPublicKey = ssk.verifying_key();
+        let session = ChunkyDKGSession {
+            threshold_config,
+            public_parameters: pp,
+            session_metadata: ChunkyDKGSessionMetadata {
+                dealer_epoch: 0,
+                chunky_dkg_config: OnChainChunkyDKGConfig::default_enabled().into(),
+                dealer_validator_set: vec![],
+                target_validator_set: vec![],
+            },
+            eks,
+        };
+        let bound = session.expected_max_transcript_size();
+        let mut rng = thread_rng();
+        let secret = ChunkyInputSecret::generate(&mut rng);
+        let trx = ChunkyTranscript::deal(
+            &session.threshold_config,
+            &session.public_parameters,
+            &ssk,
+            &spk,
+            &session.eks,
+            &secret,
+            &session.session_metadata,
+            &Player { id: 0 },
+            &mut rng,
+        );
+        let actual = bcs::to_bytes(&trx).unwrap().len();
+        let w = session.threshold_config.get_total_weight();
+        let max_w = session.threshold_config.get_max_weight();
+        println!(
+            "[size-bound] W={w} max_w={max_w} n={n} actual={actual} bound={bound} headroom={}",
+            bound as isize - actual as isize
+        );
+        assert!(actual <= bound, "actual {actual} > bound {bound}");
+    }
+
+    #[test]
+    fn within_bound_w16() {
+        deal_and_check(vec![4, 4, 4, 4], 24);
+    }
+
+    #[test]
+    fn within_bound_w100() {
+        deal_and_check(vec![20; 5], 128);
+    }
+
+    #[test]
+    fn within_bound_w200() {
+        deal_and_check(vec![40; 5], 256);
+    }
+
+    #[test]
+    fn within_bound_w400() {
+        deal_and_check(vec![40; 10], 512);
+    }
 }

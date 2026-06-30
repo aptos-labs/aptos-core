@@ -24,23 +24,6 @@
 //!   be reset and that it is called from single-threaded context (exclusive
 //!   access required).
 //!
-//! # Executable arena
-//!
-//! [`ExecutableArena`] is used for bump-allocating data that is tied to a
-//! particular executable version (e.g., function bytecode). Returns
-//! [`ExecutableArenaPtr<T>`] which is a raw pointer to arena's allocation.
-//!
-//! ## Safety model
-//!
-//! When executable is dropped, the arena is also invalidated. The following
-//! **unsafe** contracts must be enforced.
-//!
-//! - [`ExecutableArenaPtr::as_ref_unchecked`] - caller must ensure the owning
-//!   executable (and therefore its arena) is still alive.
-//! - **Drop contract**: the [`ExecutableArena`] is owned by the executable, so
-//!   the pointers to arena and the arena itself are dropped together in the
-//!   right order.
-//!
 //! # Explicit memory management
 //!
 //! [`LeakedBoxPtr<T>`] is used for data that cannot be bulk-allocated and
@@ -61,17 +44,14 @@
 //! execution phase, it is guaranteed that:
 //!
 //!   1. Global arena is not reset.
-//!   2. Executables and their arenas are not dropped.
-//!   3. Leaked pointers are not freed.
-//!   4. No pointers outlive execution phase.
+//!   2. Leaked pointers are not freed.
+//!   3. No pointers outlive execution phase.
 //!
 //! During maintenance phase there is exclusive access to all arenas and data.
 //! Maintenance phase can reset or drop arenas, and free leaked pointers.
 
-mod executable_arena;
 mod global_arena;
 mod leaked;
 
-pub use executable_arena::{ExecutableArena, ExecutableArenaPtr};
 pub use global_arena::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 pub use leaked::{LeakedBoxPtr, VersionedLeakedBoxPtr};

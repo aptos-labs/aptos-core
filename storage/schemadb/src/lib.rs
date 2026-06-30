@@ -39,7 +39,13 @@ pub use rocksdb::{
     DBCompressionType, Env, Options, ReadOptions, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use rocksdb::{ErrorKind, WriteOptions};
-use std::{collections::HashSet, fmt, iter::Iterator, path::Path};
+use std::{
+    collections::HashSet,
+    fmt,
+    iter::Iterator,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -151,6 +157,7 @@ impl DB {
         cfds: Vec<ColumnFamilyDescriptor>,
         open_mode: OpenMode,
     ) -> DbResult<DB> {
+        let start = Instant::now();
         // ignore error, since it'll fail to list cfs on the first open
         let existing_cfs: HashSet<String> = rocksdb::DB::list_cf(&db_opts, path.de_unc())
             .unwrap_or_default()
@@ -195,7 +202,13 @@ impl DB {
         }
         .into_db_res()?;
 
-        Ok(Self::log_construct(name, open_mode, inner, db_opts))
+        Ok(Self::log_construct(
+            name,
+            open_mode,
+            inner,
+            db_opts,
+            start.elapsed(),
+        ))
     }
 
     fn cfd_for_unrecognized_cf(cf: &String) -> ColumnFamilyDescriptor {
@@ -206,10 +219,17 @@ impl DB {
         ColumnFamilyDescriptor::new(cf.to_string(), cf_opts)
     }
 
-    fn log_construct(name: &str, open_mode: OpenMode, inner: rocksdb::DB, opts: Options) -> DB {
+    fn log_construct(
+        name: &str,
+        open_mode: OpenMode,
+        inner: rocksdb::DB,
+        opts: Options,
+        open_duration: Duration,
+    ) -> DB {
         info!(
             rocksdb_name = name,
             open_mode = ?open_mode,
+            time_ms = open_duration.as_millis() as u64,
             "Opened RocksDB."
         );
         DB {

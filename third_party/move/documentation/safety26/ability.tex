@@ -1,0 +1,53 @@
+\subsection{Ability Safety}
+\label{sec:ability}
+
+Bugs not enforcing |copy| ability are very damaging.
+A value whose type lacks |copy| is meant to be unique: this is what makes the |Capability| of \S\ref{sec:type} a single-issue permission, and what makes a |Coin| balance impossible to counterfeit.
+A runtime that produces a fresh value of a no-|copy| type silently duplicates that resource.
+
+\paragraph{Example.}
+Move's ability system permits an assignment to downgrade a value's abilities (i.e., width subtyping over the ability set, which is sound).
+But due to the classic invariance of mutable references~\cite{pierce2002tapl}, applying this rule through a mutable reference is unsound.
+When Move was extended with closures, a corner case (see example below) did not enforce invariance.
+An exploit could capture a no-|copy| resource |r| inside a no-|copy| closure |h|, store that closure into a variable |f| of |copy|-able closure type, and then copy |f| freely, calling it multiple times, duplicating the no-|copy| resource |r|.
+
+\noindent
+\begin{minipage}[t]{0.46\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
+struct NoCopy(u64) has drop;
+
+public fun assign<T: drop>(
+    ref: &mut T, x: T
+) {
+ // old ref value dropped
+ *ref = x;
+}
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.50\linewidth}
+\begin{lstlisting}[language=Move,style=MoveStyle,basicstyle=\relsize{-2}\ttfamily,keywordstyle=\color{blue},frame=single,frameround=tttt,framesep=4pt,rulecolor=\color{gray!60},backgroundcolor=\color{gray!4}]
+let r = NoCopy(42);
+let h: || has drop = || {
+    // capture and use `r`
+};
+let f: || has drop + copy = || {};
+assign<|| has drop>(&mut f, h);
+// ^ bug if not rejected: covariant
+let g = copy f; f(); g();
+\end{lstlisting}
+\end{minipage}
+
+\noindent This bug was found as part of pre-production security auditing.
+
+\paragraph{Performing the Checks.}
+
+The VM performs runtime checks for violations of each of the abilities |copy|, |drop|, |key|, and |store|.
+These checks are performed when the corresponding instruction is executed.
+For |drop|, the VM tracks which values have not been consumed on function exit.
+The runtime checks for |drop| are more precise than the static checks, as the latter conservatively rejects if a no-|drop| local may not be consumed on some control-flow path (including infeasible paths), while the former only checks the real executed path.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

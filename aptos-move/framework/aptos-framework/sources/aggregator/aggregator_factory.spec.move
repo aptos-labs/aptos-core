@@ -47,6 +47,8 @@ spec aptos_framework::aggregator_factory {
     /// AggregatorFactory is not under the caller before creating the resource.
     spec initialize_aggregator_factory(aptos_framework: &signer) {
         use std::signer;
+        pragma opaque;
+        modifies global<AggregatorFactory>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<AggregatorFactory>(addr);
@@ -55,6 +57,8 @@ spec aptos_framework::aggregator_factory {
     }
 
     spec create_aggregator_internal(): Aggregator {
+        pragma opaque;
+        modifies global<AggregatorFactory>(@aptos_framework);
         /// [high-level-req-2]
         include CreateAggregatorInternalAbortsIf;
         ensures aggregator::spec_get_limit(result) == MAX_U128;
@@ -68,11 +72,15 @@ spec aptos_framework::aggregator_factory {
     /// AggregatorFactory existed under the @aptos_framework when Creating a new aggregator.
     spec create_aggregator(account: &signer, limit: u128): Aggregator {
         use std::signer;
+        pragma opaque;
+        modifies global<AggregatorFactory>(@aptos_framework);
         let addr = signer::address_of(account);
         /// [high-level-req-3]
         aborts_if addr != @aptos_framework;
         aborts_if limit != MAX_U128;
         aborts_if !exists<AggregatorFactory>(@aptos_framework);
+        ensures aggregator::spec_get_limit(result) == limit;
+        ensures aggregator::spec_aggregator_get_val(result) == 0;
     }
 
     spec native fun spec_new_aggregator(limit: u128): Aggregator;

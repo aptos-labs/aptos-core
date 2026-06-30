@@ -181,6 +181,30 @@ pub enum FeatureFlag {
     /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
     /// modifier itself still cannot be removed. See issue #19650.
     ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    HOTNESS_IN_EPILOGUE = 116,
+    /// When enabled, execution assembles `TransactionInfoV1` instead of `TransactionInfoV0`.
+    TRANSACTION_INFO_V1 = 117,
+    /// Umbrella auth flag for the native-trading subsystem; the per-store
+    /// flags below gate the actual writes. Both must be on to write.
+    TRADING_NATIVE = 118,
+    /// Gates native-position writes.
+    NATIVE_POSITION = 119,
+    /// Gates native-orderbook writes.
+    NATIVE_ORDERBOOK = 120,
+    /// Gates native-collateral writes.
+    NATIVE_COLLATERAL = 121,
+    /// When enabled, execution computes the native-position state root at the
+    /// checkpoint stage and commits it to `TransactionInfoV1`, so it is
+    /// consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    COMPUTE_TRADING_NATIVE_STATE_ROOTS = 122,
+    /// When enabled, execution populates `TransactionInfoV1`'s hot state root hash, so it
+    /// is committed to the ledger accumulator. Requires `TRANSACTION_INFO_V1`.
+    HOT_STATE_ROOT_IN_TXN_INFO = 123,
 }
 
 impl FeatureFlag {
@@ -295,6 +319,8 @@ impl FeatureFlag {
             Self::VERSIONED_TRANSACTION_VALIDATION,
             Self::STORAGE_SLOT_NATIVES,
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
+            Self::HOTNESS_IN_EPILOGUE,
+            Self::ENCRYPTED_TRANSACTIONS,
         ]
     }
 }
@@ -360,7 +386,14 @@ impl Features {
             .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
             .enumerate()
             .filter(|(_feature_idx, enabled)| *enabled)
-            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .map(|(feature_idx, _)| {
+                FeatureFlag::from_repr(feature_idx).unwrap_or_else(|| {
+                    panic!(
+                        "unknown FeatureFlag index {feature_idx} in features bitmap; \
+                         a newer-binary override likely set a flag this binary does not know"
+                    )
+                })
+            })
             .collect()
     }
 
@@ -513,6 +546,22 @@ impl Features {
 
     pub fn is_versioned_transaction_validation_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
+    }
+
+    pub fn is_hotness_in_epilogue_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HOTNESS_IN_EPILOGUE)
+    }
+
+    pub fn is_transaction_info_v1_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
+    }
+
+    pub fn is_compute_trading_native_state_roots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS)
+    }
+
+    pub fn is_hot_state_root_in_txn_info_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

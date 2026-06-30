@@ -4,6 +4,7 @@
 use crate::stored_package::CachedPackageRegistry;
 use aptos_cli_common::load_account_arg;
 use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
+use aptos_rest_client::Client;
 use futures::executor::block_on;
 use move_package::{
     compilation::package_layout::CompiledPackageLayout, package_hooks::PackageHooks,
@@ -43,7 +44,7 @@ async fn maybe_download_package(info: &CustomDepInfo) -> anyhow::Result<()> {
         .exists()
     {
         let registry = CachedPackageRegistry::create(
-            Url::parse(info.node_url.as_str())?,
+            Client::new(Url::parse(info.node_url.as_str())?),
             load_account_arg(info.package_address.as_str())?,
             false,
         )

@@ -17446,6 +17446,9 @@
           },
           {
             "$ref": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey"
+          },
+          {
+            "$ref": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecPayload"
           }
         ],
         "discriminator": {
@@ -17453,7 +17456,8 @@
           "mapping": {
             "v0": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty",
             "v1": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness",
-            "v2": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey"
+            "v2": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey",
+            "v3": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecPayload"
           }
         }
       },
@@ -17476,6 +17480,20 @@
           },
           "decryption_key": {
             "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "BlockMetadataExtensionRandomnessAndDecPayload": {
+        "type": "object",
+        "properties": {
+          "randomness": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          },
+          "decryption_key": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          },
+          "decryption_round": {
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -17542,6 +17560,28 @@
           },
           {
             "$ref": "#/components/schemas/BlockMetadataExtensionRandomnessAndDecKey"
+          }
+        ]
+      },
+      "BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "v3"
+                ],
+                "example": "v3"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/BlockMetadataExtensionRandomnessAndDecPayload"
           }
         ]
       },
@@ -17869,6 +17909,38 @@
           },
           "decryption_nonce": {
             "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "DelegatedVoterLimitsRequest": {
+        "type": "object",
+        "description": "A higher-limits request backed by a stake pool the fee payer is the\ndelegated voter of.",
+        "required": [
+          "pool_address",
+          "multipliers"
+        ],
+        "properties": {
+          "pool_address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "multipliers": {
+            "$ref": "#/components/schemas/RequestedMultipliers"
+          }
+        }
+      },
+      "DelegationPoolDelegatorLimitsRequest": {
+        "type": "object",
+        "description": "A higher-limits request backed by a delegation pool the fee payer delegates\nto.",
+        "required": [
+          "pool_address",
+          "multipliers"
+        ],
+        "properties": {
+          "pool_address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "multipliers": {
+            "$ref": "#/components/schemas/RequestedMultipliers"
           }
         }
       },
@@ -19430,6 +19502,9 @@
           },
           "replay_protection_nonce": {
             "$ref": "#/components/schemas/U64"
+          },
+          "txn_limits_request": {
+            "$ref": "#/components/schemas/UserTxnLimitsRequest"
           }
         }
       },
@@ -19690,6 +19765,22 @@
           }
         ]
       },
+      "RequestedMultipliers": {
+        "type": "object",
+        "description": "Multipliers for higher transaction limits, expressed as percent of the base\nlimit (100 = 1x, 200 = 2x, 250 = 2.5x).",
+        "required": [
+          "execution_multiplier_percent",
+          "io_multiplier_percent"
+        ],
+        "properties": {
+          "execution_multiplier_percent": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "io_multiplier_percent": {
+            "$ref": "#/components/schemas/U64"
+          }
+        }
+      },
       "RoleType": {
         "type": "string",
         "enum": [
@@ -19924,6 +20015,18 @@
         "properties": {
           "value": {
             "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "StakePoolOwnerLimitsRequest": {
+        "type": "object",
+        "description": "A higher-limits request whose backing is a stake pool the fee payer owns.",
+        "required": [
+          "multipliers"
+        ],
+        "properties": {
+          "multipliers": {
+            "$ref": "#/components/schemas/RequestedMultipliers"
           }
         }
       },
@@ -20731,6 +20834,9 @@
           "replay_protection_nonce": {
             "$ref": "#/components/schemas/U64"
           },
+          "txn_limits_request": {
+            "$ref": "#/components/schemas/UserTxnLimitsRequest"
+          },
           "events": {
             "type": "array",
             "description": "Events generated by the transaction",
@@ -20742,6 +20848,95 @@
             "$ref": "#/components/schemas/U64"
           }
         }
+      },
+      "UserTxnLimitsRequest": {
+        "type": "object",
+        "description": "A request for higher transaction execution limits, backed by a staking proof.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/UserTxnLimitsRequest_StakePoolOwnerLimitsRequest"
+          },
+          {
+            "$ref": "#/components/schemas/UserTxnLimitsRequest_DelegatedVoterLimitsRequest"
+          },
+          {
+            "$ref": "#/components/schemas/UserTxnLimitsRequest_DelegationPoolDelegatorLimitsRequest"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "stake_pool_owner": "#/components/schemas/UserTxnLimitsRequest_StakePoolOwnerLimitsRequest",
+            "delegated_voter": "#/components/schemas/UserTxnLimitsRequest_DelegatedVoterLimitsRequest",
+            "delegation_pool_delegator": "#/components/schemas/UserTxnLimitsRequest_DelegationPoolDelegatorLimitsRequest"
+          }
+        }
+      },
+      "UserTxnLimitsRequest_DelegatedVoterLimitsRequest": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "delegated_voter"
+                ],
+                "example": "delegated_voter"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/DelegatedVoterLimitsRequest"
+          }
+        ]
+      },
+      "UserTxnLimitsRequest_DelegationPoolDelegatorLimitsRequest": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "delegation_pool_delegator"
+                ],
+                "example": "delegation_pool_delegator"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/DelegationPoolDelegatorLimitsRequest"
+          }
+        ]
+      },
+      "UserTxnLimitsRequest_StakePoolOwnerLimitsRequest": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stake_pool_owner"
+                ],
+                "example": "stake_pool_owner"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/StakePoolOwnerLimitsRequest"
+          }
+        ]
       },
       "ValidatorTransaction": {
         "type": "object",

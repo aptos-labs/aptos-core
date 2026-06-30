@@ -51,8 +51,6 @@ spec aptos_framework::consensus_config {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
 
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 600;
         include staking_config::StakingRewardsConfigRequirement;
         let addr = signer::address_of(account);
         /// [high-level-req-2]
@@ -68,13 +66,18 @@ spec aptos_framework::consensus_config {
     }
 
     spec set_for_next_epoch(account: &signer, config: vector<u8>) {
+        pragma opaque;
+        modifies global<config_buffer::PendingConfigs>(@aptos_framework);
         include config_buffer::SetForNextEpochAbortsIf;
+        let key = std::type_info::type_name<ConsensusConfig>();
+        let post configs_post = global<config_buffer::PendingConfigs>(@aptos_framework).configs;
+        ensures std::simple_map::spec_contains_key(configs_post, key);
+        ensures std::simple_map::spec_get(configs_post, key) == std::any::pack(ConsensusConfig { config });
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
-        include config_buffer::OnNewEpochRequirement<ConsensusConfig>;
-        aborts_if false;
+        pragma opaque;
+        include config_buffer::OnNewEpochApply<ConsensusConfig>;
     }
 
     spec validator_txn_enabled(): bool {

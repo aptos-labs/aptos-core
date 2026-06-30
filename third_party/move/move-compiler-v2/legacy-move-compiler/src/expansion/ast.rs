@@ -312,6 +312,8 @@ pub enum SpecBlockMember_ {
         signature: FunctionSignature,
         modifies: Vec<Exp>,
         reads: Vec<Type>,
+        /// Optional `:weight N` on the spec function's defining axiom.
+        weight: Option<u32>,
         body: FunctionBody,
     },
     ModifiesOf {
@@ -388,12 +390,14 @@ pub enum Proof_ {
     Assume(Vec<PragmaProperty>, Exp),
     /// `apply lemma(args);`
     Apply(ModuleAccess, Vec<Exp>),
-    /// `forall bindings [triggers] apply lemma(args);`
+    /// `forall bindings [triggers] [weight = N] apply lemma(args);`
     ForallApply {
         bindings: LValueWithRangeList,
         patterns: Vec<Vec<Exp>>,
         lemma: ModuleAccess,
         args: Vec<Exp>,
+        /// Optional `:weight N` annotation on the emitted SMT quantifier.
+        weight: Option<u32>,
     },
     /// `calc(e1 relop e2 relop ... en);`
     Calc(Vec<(Exp, Option<BinOp>)>),
@@ -606,6 +610,7 @@ pub enum Exp_ {
         QuantKind,
         LValueWithRangeList,
         Vec<Vec<Exp>>,
+        Option<u32>,
         Option<Box<Exp>>,
         Box<Exp>,
     ), // spec only
@@ -1358,6 +1363,7 @@ impl AstDebug for SpecBlockMember_ {
                 name,
                 modifies,
                 reads,
+                weight,
                 body,
             } => {
                 if *uninterpreted {
@@ -1367,6 +1373,9 @@ impl AstDebug for SpecBlockMember_ {
                 }
                 w.write(format!("define {}", name));
                 signature.ast_debug(w);
+                if let Some(n) = weight {
+                    w.write(format!(" [weight = {}]", n));
+                }
                 if !modifies.is_empty() {
                     w.write(" modifies ");
                     w.list(modifies, ", ", |w, e| {
@@ -1591,6 +1600,7 @@ impl AstDebug for Proof_ {
                 patterns,
                 lemma,
                 args,
+                weight,
             } => {
                 w.write("forall ");
                 w.list(&bindings.value, ", ", |w, sp!(_, (lv, range))| {
@@ -1606,6 +1616,9 @@ impl AstDebug for Proof_ {
                         true
                     });
                     w.write("}");
+                }
+                if let Some(w_val) = weight {
+                    w.write(format!(" [weight = {}]", w_val));
                 }
                 w.write(" apply ");
                 lemma.ast_debug(w);
@@ -2022,11 +2035,14 @@ impl AstDebug for Exp_ {
                     spec.ast_debug(w);
                 }
             },
-            E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
+            E::Quant(kind, sp!(_, rs), trs, weight, c_opt, e) => {
                 kind.ast_debug(w);
                 w.write(" ");
                 rs.ast_debug(w);
                 trs.ast_debug(w);
+                if let Some(n) = weight {
+                    w.write(format!(" [weight = {}]", n));
+                }
                 if let Some(c) = c_opt {
                     w.write(" where ");
                     c.ast_debug(w);

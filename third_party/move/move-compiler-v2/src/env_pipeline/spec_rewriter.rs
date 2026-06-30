@@ -1077,10 +1077,9 @@ struct SpecConverter<'a> {
     contains_imperative_expression: bool,
     /// Set to true when rewriting spec during inlining phase
     for_inline: bool,
-    /// Depth tracker for behavioral-predicate argument context. When > 0,
-    /// the rewriter is descending into args of an `ensures_of` / `result_of`
-    /// (etc.) call; in this context, `Borrow(Mut, ...)` selector borrows
-    /// must be preserved so the model spec rewriter can normalize them.
+    /// > 0 while descending into args of a behavioral-predicate call;
+    /// preserves `Borrow(Mut, ...)` selectors so the model rewriter can
+    /// detect them and route pre-state through `save_param`.
     bp_arg_depth: usize,
 }
 
@@ -1187,10 +1186,8 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 _ => exp,
             };
 
-            // Track behavioral-predicate argument depth across descent so
-            // `Borrow(Mut, ...)` selectors inside `ensures_of(&mut x.foo, ...)`
-            // are preserved (their stripping is done later by the model spec
-            // rewriter only after augmenting the call to its canonical form).
+            // Track BP-arg depth so `Borrow(Mut, ...)` selectors survive
+            // for the model rewriter.
             let is_behavior = matches!(exp.as_ref(), Call(_, Behavior(_, _), _));
             if is_behavior {
                 self.bp_arg_depth += 1;
@@ -1216,10 +1213,8 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                     Call(*id, Global(None), args.clone()).into_exp()
                 },
                 Call(_, Borrow(ReferenceKind::Mutable), _) if self.bp_arg_depth > 0 => {
-                    // Inside a behavioral-predicate argument: preserve the
-                    // `Borrow(Mut, ...)` so the model spec rewriter can
-                    // augment the call (extracting pre-state via
-                    // `old(...)` and appending post-state clones).
+                    // Preserve in BP args so the model rewriter sees the
+                    // stateful mut-ref shape.
                     exp.clone()
                 },
                 Call(_, Borrow(_), args) | Call(_, Deref, args) => {
@@ -1370,6 +1365,9 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
             }) {
                 self.env.set_node_instantiation(new_id, new_inst);
             }
+            if let Some(weight) = self.env.get_quant_weight(id) {
+                self.env.set_quant_weight(new_id, weight);
+            }
             Some(new_id)
         } else {
             None
@@ -1430,5 +1428,73 @@ fn check_data_invariants(struct_env: &StructEnv) {
                 )
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_core_types::account_address::AccountAddress;
+    use move_model::{
+        ast::{Address, ModuleName, Spec},
+        exp_rewriter::ExpRewriterFunctions,
+        ty::BOOL_TYPE,
+    };
+    use std::collections::BTreeMap;
+
+    fn fresh_env() -> GlobalEnv {
+        let mut env = GlobalEnv::new();
+        let loc = Loc::default();
+        let addr = Address::Numerical(AccountAddress::ZERO);
+        let module_name = ModuleName::new(addr, env.symbol_pool().make("test_mod"));
+        env.add(
+            loc,
+            module_name,
+            vec![],
+            vec![],
+            vec![],
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            vec![],
+            vec![],
+            vec![],
+            Spec::default(),
+            vec![],
+        );
+        env
+    }
+
+    #[test]
+    fn spec_converter_rewrite_node_id_preserves_quant_weight() {
+        let mut env = fresh_env();
+
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        env.set_quant_weight(id, 17);
+
+        let function_mapping: BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>> =
+            BTreeMap::new();
+        let mut converter = SpecConverter::new(&mut env, &function_mapping, true);
+        let new_id = converter
+            .rewrite_node_id(id)
+            .expect("rewrite produced a new node id");
+
+        assert_ne!(new_id, id);
+        assert_eq!(env.get_quant_weight(new_id), Some(17));
+    }
+
+    #[test]
+    fn spec_converter_rewrite_node_id_skips_outside_spec() {
+        let mut env = fresh_env();
+
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        env.set_quant_weight(id, 9);
+
+        let function_mapping: BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>> =
+            BTreeMap::new();
+        let mut converter = SpecConverter::new(&mut env, &function_mapping, false);
+        assert!(converter.rewrite_node_id(id).is_none());
+
+        assert_eq!(env.get_quant_weight(id), Some(9));
     }
 }

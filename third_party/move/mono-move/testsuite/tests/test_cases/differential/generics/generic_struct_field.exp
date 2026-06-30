@@ -1,0 +1,161 @@
+=== stackless ===
+// module 0x42::generic_struct_field
+
+fun local_field_ops(r0, r1): u64 {
+  slots: params(2), locals(1), temps(3)
+    r0: u8
+    r1: u64
+    r2: 0x42::generic_struct_field::Pair<u8, u64>
+    r3: u64
+    r4: u8
+    r5: u64
+  code:
+  L0:
+    0: r2 := pack 0x42::generic_struct_field::Pair<u8, u64>, [r0, r1]
+    1: r3 := read_local_field Pair::second, r2
+    2: r3 := add r3, #1
+    3: write_local_field Pair::second, r2, r3
+    4: r4 := read_local_field Pair::first, r2
+    5: r4 := add r4, #1u8
+    6: write_local_field Pair::first, r2, r4
+    7: r4 := read_local_field Pair::first, r2
+    8: r3 := cast_u64 r4
+    9: r5 := read_local_field Pair::second, r2
+    10: r5 := add r3, r5
+    11: ret [r5]
+}
+
+fun read_via_ref(r0, r1): u64 {
+  slots: params(2), locals(2), temps(3)
+    r0: u8
+    r1: u64
+    r2: 0x42::generic_struct_field::Pair<u8, u64>
+    r3: &0x42::generic_struct_field::Pair<u8, u64>
+    r4: u8
+    r5: u64
+    r6: u64
+  code:
+  L0:
+    0: r2 := pack 0x42::generic_struct_field::Pair<u8, u64>, [r0, r1]
+    1: r3 := imm_borrow_loc r2
+    2: r4 := read_field Pair::first, r3
+    3: r5 := cast_u64 r4
+    4: r6 := read_field Pair::second, r3
+    5: r6 := add r5, r6
+    6: ret [r6]
+}
+
+fun read_wide(r0, r1): u64 {
+  slots: params(2), locals(2), temps(3)
+    r0: u64
+    r1: u64
+    r2: 0x42::generic_struct_field::Pair<u128, u64>
+    r3: &0x42::generic_struct_field::Pair<u128, u64>
+    r4: u128
+    r5: u64
+    r6: u64
+  code:
+  L0:
+    0: r4 := cast_u128 r0
+    1: r2 := pack 0x42::generic_struct_field::Pair<u128, u64>, [r4, r1]
+    2: r3 := imm_borrow_loc r2
+    3: r4 := read_field Pair::first, r3
+    4: r5 := cast_u64 r4
+    5: r6 := read_field Pair::second, r3
+    6: r6 := add r5, r6
+    7: ret [r6]
+}
+
+fun write_via_mut_ref(r0, r1): u64 {
+  slots: params(2), locals(2), temps(3)
+    r0: u8
+    r1: u64
+    r2: 0x42::generic_struct_field::Pair<u8, u64>
+    r3: &mut 0x42::generic_struct_field::Pair<u8, u64>
+    r4: u64
+    r5: u8
+    r6: u64
+  code:
+  L0:
+    0: r2 := pack 0x42::generic_struct_field::Pair<u8, u64>, [r0, r1]
+    1: r3 := mut_borrow_loc r2
+    2: r4 := read_field Pair::second, r3
+    3: r4 := add r4, #10
+    4: write_field Pair::second, r3, r4
+    5: r5 := read_local_field Pair::first, r2
+    6: r4 := cast_u64 r5
+    7: r6 := read_local_field Pair::second, r2
+    8: r6 := add r4, r6
+    9: ret [r6]
+}
+=== micro-ops ===
+// module 0x42::generic_struct_field
+
+fun local_field_ops() {
+  frame_data_size: 56
+  entry_gas: 217
+  code:
+    0: Move8 [24] <- [8]
+    1: Move(1) [16] <- [0]
+    2: Move8 [32] <- [24]
+    3: AddU64Imm [32] <- [32] + #1
+    4: Move8 [24] <- [32]
+    5: Move(1) [40] <- [16]
+    6: IntAdd [40] <- [40] + u8 #1
+    7: Move(1) [16] <- [40]
+    8: Move(1) [40] <- [16]
+    9: IntCast.u8->u64 [32] <- [40]
+    10: Move8 [48] <- [24]
+    11: AddU64 [48] <- [32] + [48]
+    12: Move8 [0] <- [48]
+    13: Return
+}
+
+fun read_via_ref() {
+  frame_data_size: 72
+  entry_gas: 147
+  code:
+    0: Move8 [24] <- [8]
+    1: Move(1) [16] <- [0]
+    2: SlotBorrow [32] <- &[16]
+    3: ReadRefOffset [48] <- *([32]+0) (size=1)
+    4: IntCast.u8->u64 [56] <- [48]
+    5: ReadRefOffset [64] <- *([32]+8) (size=8)
+    6: AddU64 [64] <- [56] + [64]
+    7: Move8 [0] <- [64]
+    8: Return
+}
+
+fun read_wide() {
+  frame_data_size: 88
+  entry_gas: 221
+  code:
+    0: IntCast.u64->u128 [56] <- [0]
+    1: Move8 [32] <- [8]
+    2: Move(16) [16] <- [56]
+    3: SlotBorrow [40] <- &[16]
+    4: ReadRefOffset [56] <- *([40]+0) (size=16)
+    5: IntCast.u128->u64 [72] <- [56]
+    6: ReadRefOffset [80] <- *([40]+16) (size=8)
+    7: AddU64 [80] <- [72] + [80]
+    8: Move8 [0] <- [80]
+    9: Return
+}
+
+fun write_via_mut_ref() {
+  frame_data_size: 72
+  entry_gas: 204
+  code:
+    0: Move8 [24] <- [8]
+    1: Move(1) [16] <- [0]
+    2: SlotBorrow [32] <- &[16]
+    3: ReadRefOffset [48] <- *([32]+8) (size=8)
+    4: AddU64Imm [48] <- [48] + #10
+    5: WriteRefOffset *([32]+8) <- [48] (size=8)
+    6: Move(1) [56] <- [16]
+    7: IntCast.u8->u64 [48] <- [56]
+    8: Move8 [64] <- [24]
+    9: AddU64 [64] <- [48] + [64]
+    10: Move8 [0] <- [64]
+    11: Return
+}

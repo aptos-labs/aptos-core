@@ -122,6 +122,14 @@ impl<K: Hash + Eq, V> UnorderedMap<K, V> {
         self.inner.retain(f);
     }
 
+    /// Applies the function to every value in the map.
+    /// The predicate is applied in an arbitrary order — callers must ensure
+    /// that `f` does not depend on the order in which key-value pairs are visited.
+    #[inline]
+    pub fn for_each_value(&mut self, mut f: impl FnMut(&mut V)) {
+        self.inner.iter_mut().for_each(|(_, v)| f(v));
+    }
+
     /// Reserves space for at least `additional` more elements. Pass the number
     /// of elements you expect to add, not an inflated value — the load factor
     /// is handled internally.

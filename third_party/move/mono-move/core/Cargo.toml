@@ -13,9 +13,12 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-arc-swap = { workspace = true }
+bitflags = { workspace = true }
+bytes = { workspace = true }
+fxhash = { workspace = true }
 mono-move-alloc = { workspace = true }
-mono-move-gas = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }

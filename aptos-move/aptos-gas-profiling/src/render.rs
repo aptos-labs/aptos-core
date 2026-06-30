@@ -118,6 +118,7 @@ impl Display for Render<'_, StateKey> {
                 },)
             },
             Raw(..) => panic!("not supported"),
+            TradingNative(..) => panic!("not supported"),
         }
     }
 }

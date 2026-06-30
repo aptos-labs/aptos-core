@@ -24,7 +24,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state::State, state_summary::ProvableStateSummary,
+        state::State,
+        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
@@ -36,6 +37,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{Features, OnChainConfig},
     state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
@@ -65,6 +67,31 @@ use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
 pub mod chunk_commit_queue;
 pub mod chunk_result_verifier;
 pub mod transaction_chunk;
+
+/// `BlockExecutorConfigFromOnchain` for executing a chunk against the given
+/// parent state.
+///
+/// Chunks don't cross epoch boundaries, so the parent state's features
+/// determine the write-set and `TransactionInfo` formats that match the
+/// committed proofs.
+///
+/// When the `Features` resource is absent in the parent state — pre-genesis
+/// replay, or test setups whose genesis doesn't write it — fall back to
+/// `new_no_block_limit()`'s defaults, matching `db_bootstrapper`.
+fn chunk_onchain_config(state_view: &CachedStateView) -> Result<BlockExecutorConfigFromOnchain> {
+    // State sync executor shouldn't have block gas limit.
+    let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
+    Ok(match Features::fetch_config(state_view)? {
+        Some(features) => base.with_features(&features),
+        None => {
+            info!(
+                next_version = state_view.next_version(),
+                "No `Features` resource in parent state; chunk executes with no on-chain features applied."
+            );
+            base
+        },
+    })
+}
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -336,25 +363,54 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     pub fn update_ledger(&self) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger_total"]);
 
-        let (parent_state_summary, parent_accumulator, chunk) =
+        let (parent_state_summary, parent_position_state_summary, parent_accumulator, chunk) =
             self.commit_queue.lock().next_chunk_to_update_ledger()?;
         let ChunkToUpdateLedger {
             output,
             chunk_verifier,
         } = chunk;
 
-        let state_checkpoint_output = DoStateCheckpoint::run(
-            &output.execution_output,
-            &parent_state_summary,
-            &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
-            Some(
-                chunk_verifier
-                    .transaction_infos()
+        let txn_infos = chunk_verifier.transaction_infos();
+        let known_state_checkpoints = Some(
+            txn_infos
+                .iter()
+                .map(|t| t.state_checkpoint_hash())
+                .collect_vec(),
+        );
+        let known_hot_state_checkpoints =
+            output.execution_output.hot_state_root_in_txn_info.then(|| {
+                txn_infos
                     .iter()
-                    .map(|t| t.state_checkpoint_hash())
-                    .collect_vec(),
-            ),
-        )?;
+                    .map(|t| t.hot_state_checkpoint_hash())
+                    .collect_vec()
+            });
+        let compute_trading_native_state_roots =
+            output.execution_output.compute_trading_native_state_roots;
+        let known_position_state_checkpoints = compute_trading_native_state_roots.then(|| {
+            txn_infos
+                .iter()
+                .map(|t| t.position_state_checkpoint_hash())
+                .collect_vec()
+        });
+        let position_persisted = compute_trading_native_state_roots
+            .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+            .transpose()?;
+        let state_checkpoint_output = DoStateCheckpoint::run()
+            .execution_output(&output.execution_output)
+            .parent_state_summary(&parent_state_summary)
+            .persisted_state_summary(&ProvableStateSummary::new_persisted(
+                self.db.reader.as_ref(),
+            )?)
+            .maybe_known_state_checkpoints(known_state_checkpoints)
+            .maybe_known_hot_state_checkpoints(known_hot_state_checkpoints)
+            // Parent position summary is chained across chunks by the commit
+            // queue (seeded from the pre-committed position tip); the persisted
+            // base supplies cold-key proofs. The known-hash check validates the
+            // computed root against the committed TransactionInfos.
+            .maybe_parent_position_state_summary(parent_position_state_summary.as_ref())
+            .maybe_persisted_position_state_summary(position_persisted.as_ref())
+            .maybe_known_position_state_checkpoints(known_position_state_checkpoints)
+            .build()?;
 
         let ledger_update_output = DoLedgerUpdate::run(
             &output.execution_output,
@@ -615,14 +671,14 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .take((end_version - begin_version) as usize)
             .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
             .collect::<Vec<_>>();
-        // State sync executor shouldn't have block gas limit.
+        let onchain_config = chunk_onchain_config(&state_view)?;
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),
             auxiliary_info,
             &parent_state,
             state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            onchain_config,
             TransactionSliceMetadata::chunk(begin_version, end_version),
         )?;
         // not `zip_eq`, deliberately

@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: unsupported language construct
+   ┌─ tests/checking-lang-v2.2/specs/weight_version_err.move:10:34
+   │
+10 │     spec fun id_num(n: num): num [weight = 20] {
+   │                                  ^^^^^^^ `[weight = N]` annotation on spec functions not enabled before version 2.4
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v2.2/specs/weight_version_err.move:16:9
+   │
+16 │         lemma trivial(n: num) {
+   │         ^^^^^ lemma declarations are not enabled before version 2.4
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v2.2/specs/weight_version_err.move:26:31
+   │
+26 │         ensures forall y: u64 [weight = 7]: y == y;
+   │                               ^^^^^^^ `[weight = N]` annotation on quantifier expressions not enabled before version 2.4
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v2.2/specs/weight_version_err.move:28:7
+   │
+28 │     } proof {
+   │       ^^^^^ proof blocks are not enabled before version 2.4
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v2.2/specs/weight_version_err.move:29:35
+   │
+29 │         forall x: num {id_num(x)} [weight = 5]
+   │                                   ^^^^^^^ `[weight = N]` annotation on `forall ... apply` not enabled before version 2.4

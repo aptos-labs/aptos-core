@@ -1,8 +1,8 @@
 processed 2 tasks
-task 0 lines 3-8:  publish --print-bytecode [// Bytecode version v9]
+task 0 lines 3-8:  publish --print-bytecode [// Bytecode version v10]
 
 == BEGIN Bytecode ==
-// Bytecode version v9
+// Bytecode version v10
 module 0x66::test1
 struct S has copy + drop
   _1: u64
@@ -10,10 +10,10 @@ struct S has copy + drop
 
 
 == END Bytecode ==
-task 1 lines 12-24:  publish --print-bytecode [// Bytecode version v9]
+task 1 lines 12-24:  publish --print-bytecode [// Bytecode version v10]
 
 == BEGIN Bytecode ==
-// Bytecode version v9
+// Bytecode version v10
 module 0x66::test2
 use 0x66::test1
 struct T has drop

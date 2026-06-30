@@ -1,0 +1,123 @@
+=== stackless ===
+// module 0x77::narrow
+
+fun add_u8(r0, r1): u8 {
+  slots: params(2), locals(0), temps(1)
+    r0: u8
+    r1: u8
+    r2: u8
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun sub_u8(r0, r1): u8 {
+  slots: params(2), locals(0), temps(1)
+    r0: u8
+    r1: u8
+    r2: u8
+  code:
+  L0:
+    0: r2 := sub r0, r1
+    1: ret [r2]
+}
+
+fun mul_u8(r0, r1): u8 {
+  slots: params(2), locals(0), temps(1)
+    r0: u8
+    r1: u8
+    r2: u8
+  code:
+  L0:
+    0: r2 := mul r0, r1
+    1: ret [r2]
+}
+
+fun add_i8(r0, r1): i8 {
+  slots: params(2), locals(0), temps(1)
+    r0: i8
+    r1: i8
+    r2: i8
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun sub_i8(r0, r1): i8 {
+  slots: params(2), locals(0), temps(1)
+    r0: i8
+    r1: i8
+    r2: i8
+  code:
+  L0:
+    0: r2 := sub r0, r1
+    1: ret [r2]
+}
+
+fun negate_i8(r0): i8 {
+  slots: params(1), locals(0), temps(1)
+    r0: i8
+    r1: i8
+  code:
+  L0:
+    0: r1 := negate r0
+    1: ret [r1]
+}
+=== micro-ops ===
+// module 0x77::narrow
+
+fun add_u8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntAdd [2] <- [0] + u8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun sub_u8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntSub [2] <- [0] - u8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun mul_u8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntMul [2] <- [0] * u8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun add_i8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntAdd [2] <- [0] + i8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun sub_i8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntSub [2] <- [0] - i8 [1]
+    1: Move(1) [0] <- [2]
+    2: Return
+}
+
+fun negate_i8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntNegate.i8 [1] <- -[0]
+    1: Move(1) [0] <- [1]
+    2: Return
+}

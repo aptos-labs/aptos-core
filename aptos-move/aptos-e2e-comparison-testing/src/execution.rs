@@ -409,7 +409,7 @@ impl Execution {
         }
 
         // Update features if needed to the correct binary format used by V2 compiler.
-        let mut features = Features::fetch_config(&state).unwrap_or_default();
+        let mut features = Features::fetch_config(&state).unwrap().unwrap_or_default();
         self.enable_features(&mut features, &self.enable_features);
         self.disable_features(&mut features, &self.disable_features);
 

@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Per-transaction set of executables recorded by the loader, pinning one
+//! Per-transaction set of modules recorded by the loader, pinning one
 //! version per module for the duration of the transaction.
 
-use anyhow::{bail, Result};
-use mono_move_core::ExecutableId;
+use crate::{error::LoaderResult, invariant_violation};
+use mono_move_core::ModuleId;
 use mono_move_global_context::{ArenaRef, LoadedModule};
 use shared_dsa::UnorderedMap;
 
@@ -62,11 +62,11 @@ impl<'guard> ModuleRead<'guard> {
     }
 }
 
-/// Maps from executable ID to the version the transaction is using for the
+/// Maps from module ID to the version the transaction is using for the
 /// duration of this transaction.
 #[derive(Default)]
 pub struct ModuleReadSet<'guard> {
-    inner: UnorderedMap<ArenaRef<'guard, ExecutableId>, ModuleRead<'guard>>,
+    inner: UnorderedMap<ArenaRef<'guard, ModuleId>, ModuleRead<'guard>>,
 }
 
 impl<'guard> ModuleReadSet<'guard> {
@@ -78,15 +78,26 @@ impl<'guard> ModuleReadSet<'guard> {
     }
 
     /// Returns the recorded read, or [`None`] if absent.
-    pub fn get(&self, id: ArenaRef<'guard, ExecutableId>) -> Option<ModuleRead<'guard>> {
+    pub fn get(&self, id: ArenaRef<'guard, ModuleId>) -> Option<ModuleRead<'guard>> {
         self.inner.get(&id).copied()
+    }
+
+    /// Returns the loaded module for `id`. Callers that resolve a module they
+    /// are already executing from rely on it being present and loaded, so a
+    /// missing or still-pending entry is an invariant violation.
+    pub fn get_loaded(&self, id: ArenaRef<'guard, ModuleId>) -> LoaderResult<&'guard LoadedModule> {
+        match self.get(id) {
+            Some(ModuleRead::Loaded { module, .. }) => Ok(module),
+            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
+            None => invariant_violation!(UnexpectedReadSetMiss),
+        }
     }
 
     /// Records a module that is about to be loaded. Used so a load that fails
     /// due to deserialization / verification still leaves the read in the set.
-    pub fn record_pending_loading(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
+    pub fn record_pending_loading(&mut self, id: ArenaRef<'guard, ModuleId>) -> LoaderResult<()> {
         if self.inner.insert(id, ModuleRead::Pending).is_some() {
-            bail!("Invariant violated: there should be no entry when marked as pending")
+            invariant_violation!(EntryAlreadyExists);
         }
         Ok(())
     }
@@ -94,9 +105,9 @@ impl<'guard> ModuleReadSet<'guard> {
     /// Records loaded module in the read-set as unmetered.
     pub fn record_unmetered(
         &mut self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
-    ) -> Result<()> {
+    ) -> LoaderResult<()> {
         let read = ModuleRead::Loaded {
             module,
             state: ModuleState::Unmetered,
@@ -104,16 +115,16 @@ impl<'guard> ModuleReadSet<'guard> {
         let prev = self.inner.insert(id, read);
         match prev {
             Some(ModuleRead::Pending) => Ok(()),
-            Some(ModuleRead::Loaded { .. }) | None => bail!("Module must be recorded as pending"),
+            Some(ModuleRead::Loaded { .. }) | None => invariant_violation!(ModuleExpectedPending),
         }
     }
 
     /// Records loaded module in the read-set as metered.
     pub fn record_metered(
         &mut self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
-    ) -> Result<()> {
+    ) -> LoaderResult<()> {
         let read = ModuleRead::Loaded {
             module,
             state: ModuleState::Metered,
@@ -121,7 +132,7 @@ impl<'guard> ModuleReadSet<'guard> {
         let prev = self.inner.insert(id, read);
         match prev {
             Some(ModuleRead::Pending) => Ok(()),
-            Some(ModuleRead::Loaded { .. }) | None => bail!("Module must be recorded as pending"),
+            Some(ModuleRead::Loaded { .. }) | None => invariant_violation!(ModuleExpectedPending),
         }
     }
 
@@ -129,9 +140,9 @@ impl<'guard> ModuleReadSet<'guard> {
     /// are ready for lowering (i.e., its mandatory dependency is known).
     pub fn record_ready_for_lowering(
         &mut self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
-    ) -> Result<()> {
+    ) -> LoaderResult<()> {
         match self.inner.get(&id) {
             Some(ModuleRead::Pending) => {
                 self.inner.insert(id, ModuleRead::Loaded {
@@ -140,13 +151,13 @@ impl<'guard> ModuleReadSet<'guard> {
                 });
                 Ok(())
             },
-            None => bail!("Module must be recorded as pending"),
-            Some(ModuleRead::Loaded { .. }) => bail!("Module is already loaded"),
+            None => invariant_violation!(ModuleExpectedPending),
+            Some(ModuleRead::Loaded { .. }) => invariant_violation!(ModuleAlreadyLoaded),
         }
     }
 
     /// Transitions an existing loaded module from unmetered to metered state.
-    pub fn mark_metered(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
+    pub fn mark_metered(&mut self, id: ArenaRef<'guard, ModuleId>) -> LoaderResult<()> {
         match self.inner.get_mut(&id) {
             Some(ModuleRead::Loaded { state, .. }) => match state {
                 ModuleState::Unmetered => {
@@ -154,26 +165,26 @@ impl<'guard> ModuleReadSet<'guard> {
                     Ok(())
                 },
                 ModuleState::Metered | ModuleState::ReadyForLowering => {
-                    bail!("Module is already metered")
+                    invariant_violation!(ModuleAlreadyMetered);
                 },
             },
-            Some(ModuleRead::Pending) | None => bail!("Module must be loaded"),
+            Some(ModuleRead::Pending) | None => invariant_violation!(ModuleExpectedLoaded),
         }
     }
 
     /// Records that existing loaded module has satisfied the lowering
     /// requirements (i.e., its mandatory dependency set has been computed).
-    pub fn mark_ready_for_lowering(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
+    pub fn mark_ready_for_lowering(&mut self, id: ArenaRef<'guard, ModuleId>) -> LoaderResult<()> {
         match self.inner.get_mut(&id) {
             Some(ModuleRead::Loaded { state, .. }) => match state {
-                ModuleState::Unmetered => bail!("Module must be metered"),
-                ModuleState::ReadyForLowering => bail!("Module is already ready for lowering"),
+                ModuleState::Unmetered => invariant_violation!(ModuleExpectedMetered),
+                ModuleState::ReadyForLowering => invariant_violation!(ModuleAlreadyReady),
                 ModuleState::Metered => {
                     *state = ModuleState::ReadyForLowering;
                     Ok(())
                 },
             },
-            Some(ModuleRead::Pending) | None => bail!("Module must be at least loaded"),
+            Some(ModuleRead::Pending) | None => invariant_violation!(ModuleExpectedAtLeastLoaded),
         }
     }
 

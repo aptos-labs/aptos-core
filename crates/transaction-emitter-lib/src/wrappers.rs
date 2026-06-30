@@ -195,6 +195,11 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.encrypt_transactions(true);
     }
 
+    if let Some(encrypted_gas_price_multiplier) = args.encrypted_gas_price_multiplier {
+        emit_job_request =
+            emit_job_request.encrypted_gas_price_multiplier(encrypted_gas_price_multiplier);
+    }
+
     let coin_source_account = std::sync::Arc::new(coin_source_account);
     let stats = emitter
         .emit_txn_for_with_stats(

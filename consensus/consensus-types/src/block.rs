@@ -17,7 +17,7 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
-    decryption::BlockTxnDecryptionKey,
+    decryption::{BlockTxnDecryptionKey, DecryptionPayload},
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     randomness::Randomness,
@@ -612,6 +612,30 @@ impl Block {
             self.timestamp_usecs(),
             randomness,
             decryption_key,
+        )
+    }
+
+    pub fn new_metadata_with_rand_and_dec_payload(
+        &self,
+        validators: &[AccountAddress],
+        randomness: Option<Randomness>,
+        decryption_payload: Option<DecryptionPayload>,
+    ) -> BlockMetadataExt {
+        BlockMetadataExt::new_v3(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.previous_bitvec().into(),
+            // For nil block, we use 0x0 which is convention for nil address in move.
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
+            self.timestamp_usecs(),
+            randomness,
+            decryption_payload,
         )
     }
 

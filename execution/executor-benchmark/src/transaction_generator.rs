@@ -15,12 +15,15 @@ use aptos_sdk::{
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
 };
+use aptos_transaction_generator_lib::TransactionFeedback;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_test_root_address, AccountResource, BlockResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     on_chain_config::ConfigurationResource,
+    randomness::{RandMetadata, Randomness},
     state_store::MoveResourceExt,
     timestamp::TimestampResource,
     transaction::{
@@ -31,7 +34,7 @@ use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, RngCore, SeedableRng};
 use rayon::{
     iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -52,6 +55,16 @@ use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
+
+/// Optional lower bound on the timestamp used in `epoch_change_block`.
+/// When non-zero, the epoch-change block's timestamp is clamped to at least
+/// this value, causing `BenchmarkTimestamp::from_db` to reflect the same
+/// floor in every subsequent block.  Set before calling `epoch_change_block`.
+static MIN_BLOCK_TIMESTAMP_USECS: AtomicU64 = AtomicU64::new(0);
+
+pub fn set_min_block_timestamp_usecs(min: u64) {
+    MIN_BLOCK_TIMESTAMP_USECS.store(min, Ordering::SeqCst);
+}
 
 fn validator_address() -> AccountAddress {
     // Replicate the exact same logic as genesis creation in test_config_with_custom_onchain
@@ -87,17 +100,12 @@ fn get_genesis_validator_address(db: &DbReaderWriter) -> AccountAddress {
         if let Ok(validator_set) = bcs::from_bytes::<ValidatorSet>(validator_set_bytes.bytes()) {
             if !validator_set.active_validators.is_empty() {
                 let validator_addr = validator_set.active_validators[0].account_address;
-                eprintln!(
-                    "DEBUG: Using genesis validator address: {:x}",
-                    validator_addr
-                );
                 return validator_addr;
             }
         }
     }
 
     // Fallback to generated address if we can't read the validator set
-    eprintln!("DEBUG: Could not read genesis validator set, falling back to generated address");
     validator_address()
 }
 
@@ -168,7 +176,7 @@ impl BenchmarkTimestamp {
         self.base_usecs / 1_000_000 + 60
     }
 
-    /// Creates a `BlockMetadata` transaction for the next block, using a
+    /// Creates a `BlockMetadataExt` transaction for the next block, using a
     /// strictly increasing timestamp derived from this `BenchmarkTimestamp`.
     pub fn next_block_metadata_txn(&self, db: &DbReaderWriter) -> Transaction {
         let (round, timestamp_usecs) = self.next_round_and_timestamp();
@@ -180,7 +188,17 @@ impl BenchmarkTimestamp {
             timestamp_usecs
         );
 
-        Transaction::BlockMetadata(BlockMetadata::new(
+        let mut seed = vec![0u8; 32];
+        thread_rng().fill_bytes(&mut seed);
+        let randomness = Randomness::new(
+            RandMetadata {
+                epoch: self.epoch(),
+                round,
+            },
+            seed,
+        );
+
+        Transaction::BlockMetadataExt(BlockMetadataExt::new_v1(
             HashValue::random(),
             self.epoch(),
             round,
@@ -188,6 +206,7 @@ impl BenchmarkTimestamp {
             vec![],
             vec![],
             timestamp_usecs,
+            Some(randomness),
         ))
     }
 
@@ -197,6 +216,13 @@ impl BenchmarkTimestamp {
     /// computes a timestamp that triggers reconfiguration
     /// (`last_reconfig_time + epoch_interval + 1`), and returns the
     /// block (a `Vec<Transaction>` with one `BlockMetadata` entry).
+    ///
+    /// Uses `BlockMetadata` (not `BlockMetadataExt`) so that `block_prologue`
+    /// calls `reconfiguration::reconfigure()` directly and the epoch advances
+    /// immediately.  `BlockMetadataExt` would initiate a DKG session via
+    /// `reconfiguration_with_dkg::try_start()`, which can never complete in the
+    /// benchmark environment (no real DKG infrastructure), causing the epoch
+    /// change to stall.
     ///
     /// After committing this block, callers should use
     /// `BenchmarkTimestamp::from_db()` to get a fresh timestamp state
@@ -214,7 +240,8 @@ impl BenchmarkTimestamp {
 
         let epoch_interval = block_resource.epoch_interval();
         let last_reconfig_time = config.last_reconfiguration_time_micros();
-        let epoch_change_timestamp = last_reconfig_time + epoch_interval + 1;
+        let epoch_change_timestamp = (last_reconfig_time + epoch_interval + 1)
+            .max(MIN_BLOCK_TIMESTAMP_USECS.load(Ordering::SeqCst));
 
         info!(
             "epoch_change_block: last_reconfig_time={}, epoch_interval={}, \
@@ -520,6 +547,7 @@ impl TransactionGenerator {
         transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
         phase: Arc<AtomicUsize>,
         transactions_per_sender: usize,
+        feedback: Option<Arc<dyn TransactionFeedback>>,
     ) -> usize {
         let last_non_empty_phase = Arc::new(AtomicUsize::new(0));
         let transaction_generators = Mutex::new(transaction_generators);
@@ -528,6 +556,13 @@ impl TransactionGenerator {
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for i in 0..num_blocks {
+            // Wait in the main thread (outside rayon) until there is work to
+            // generate. This prevents flooding the pipeline with empty blocks
+            // while accounts are waiting for on-chain events (e.g. UIDs).
+            if let Some(fb) = feedback.as_ref() {
+                fb.wait_until_ready();
+            }
+
             let sender_indices = rand::seq::index::sample(
                 &mut thread_rng(),
                 account_pool_size,
@@ -932,11 +967,12 @@ impl TransactionGenerator {
                     val, last_generated_at
                 );
                 return true;
+            } else {
+                info!(
+                    "Block generation: no transactions generated in phase {}, moving to next phase",
+                    val
+                );
             }
-            info!(
-                "Block generation: no transactions generated in phase {}, moving to next phase",
-                val
-            );
         } else {
             let val = phase.load(Ordering::Relaxed);
             last_non_empty_phase.fetch_max(val, Ordering::Relaxed);

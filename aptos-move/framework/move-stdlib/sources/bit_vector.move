@@ -60,7 +60,9 @@ module std::bit_vector {
     }
     spec set {
         include SetAbortsIf;
-        ensures self.bit_field[bit_index];
+        ensures  self.bit_field[bit_index];
+        ensures  self.length == old(self).length;
+        ensures  forall k in 0..self.length: k != bit_index ==> self.bit_field[k] == old(self).bit_field[k];
     }
     spec schema SetAbortsIf {
         self: BitVector;
@@ -76,6 +78,8 @@ module std::bit_vector {
     spec unset {
         include UnsetAbortsIf;
         ensures !self.bit_field[bit_index];
+        ensures  self.length == old(self).length;
+        ensures  forall k in 0..self.length: k != bit_index ==> self.bit_field[k] == old(self).bit_field[k];
     }
     spec schema UnsetAbortsIf {
         self: BitVector;
@@ -215,6 +219,7 @@ module std::bit_vector {
 
             while ({
                 spec {
+                    invariant self.length == old(self).length;
                     invariant forall j in self.length - amount..i: !self.bit_field[j];
                     invariant forall k in 0..self.length - amount: self.bit_field[k] == old(self).bit_field[k + amount];
                     invariant i >= self.length - amount;

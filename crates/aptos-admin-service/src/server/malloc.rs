@@ -3,6 +3,8 @@
 
 use aptos_logger::info;
 use aptos_system_utils::utils::{reply_with, reply_with_status};
+#[cfg(target_os = "linux")]
+use hyper::header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE};
 use hyper::{Body, Request, Response, StatusCode};
 use std::{
     collections::HashMap,
@@ -88,9 +90,17 @@ fn validate_output_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn handle_dump_profile_request(req: Request<Body>) -> hyper::Result<Response<Body>> {
+pub async fn handle_dump_profile_request(req: Request<Body>) -> hyper::Result<Response<Body>> {
     let query = req.uri().query().unwrap_or("");
     let query_pairs: HashMap<_, _> = url::form_urlencoded::parse(query.as_bytes()).collect();
+
+    // ?format=path keeps the legacy behavior: write the raw .heap file to disk and
+    // return its path as text. Default returns a symbolized, gzipped pprof body.
+    let want_path_only = query_pairs
+        .get("format")
+        .map(|f| f.as_ref() == "path")
+        .unwrap_or(false);
+
     let output_path = query_pairs
         .get("output")
         .map(|p| p.to_string())
@@ -102,20 +112,73 @@ pub fn handle_dump_profile_request(req: Request<Body>) -> hyper::Result<Response
         return Ok(reply_with_status(StatusCode::BAD_REQUEST, msg));
     }
 
+    if want_path_only || output_path.is_some() {
+        return Ok(legacy_dump_to_path(output_path));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        match dump_pprof_symbolized().await {
+            Ok(pprof) => {
+                info!("Returning symbolized pprof ({} bytes).", pprof.len());
+                let mut resp = Response::new(Body::from(pprof));
+                resp.headers_mut().insert(
+                    CONTENT_TYPE,
+                    HeaderValue::from_static("application/octet-stream"),
+                );
+                resp.headers_mut()
+                    .insert(CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+                Ok(resp)
+            },
+            Err(e) => {
+                info!("Failed to produce pprof: {e:?}");
+                Ok(reply_with_status(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to produce pprof: {e}"),
+                ))
+            },
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Ok(legacy_dump_to_path(output_path))
+    }
+}
+
+fn legacy_dump_to_path(output_path: Option<String>) -> Response<Body> {
     match dump_heap_profile(output_path) {
         Ok(path) => {
             info!("Finished dumping heap profile to {path}.");
-            Ok(reply_with(
+            reply_with(
                 Vec::new(),
                 Body::from(format!("Successfully dumped heap profile to {path}")),
-            ))
+            )
         },
         Err(e) => {
             info!("Failed to dump heap profile: {e:?}");
-            Ok(reply_with_status(
+            reply_with_status(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to dump heap profile: {e}"),
-            ))
+            )
         },
     }
+}
+
+#[cfg(target_os = "linux")]
+async fn dump_pprof_symbolized() -> anyhow::Result<Vec<u8>> {
+    let prof_ctl_lock = jemalloc_pprof::PROF_CTL
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("jemalloc profiling controller unavailable"))?;
+    // Take an owned guard so it can move into the blocking task below.
+    let mut prof_ctl = prof_ctl_lock.clone().lock_owned().await;
+    if !prof_ctl.activated() {
+        anyhow::bail!(
+            "jemalloc profiling is not activated; start aptos-node with MALLOC_CONF=prof:true"
+        );
+    }
+    // Symbolization reads /proc/self/maps and parses ELF; it can take seconds.
+    // Offload to the blocking pool so other admin-service requests aren't stalled.
+    tokio::task::spawn_blocking(move || prof_ctl.dump_pprof())
+        .await
+        .map_err(|e| anyhow::anyhow!("dump_pprof task join error: {e}"))?
 }

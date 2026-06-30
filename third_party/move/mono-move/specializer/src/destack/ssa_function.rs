@@ -8,8 +8,10 @@
 //! block boundaries, no phi nodes are needed — each value ID is defined exactly
 //! once within its block and never crosses a block boundary.
 
-use super::instr_utils::{extract_imm_value, is_commutative};
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, Instr};
+use crate::stackless_exec_ir::{
+    instr_utils::{extract_imm_value, is_commutative},
+    BasicBlock, BinaryOp, Instr,
+};
 use mono_move_core::types::InternedType;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
@@ -25,11 +27,14 @@ pub(crate) struct SSAFunction {
 impl SSAFunction {
     /// Run all pre-allocation instruction fusion passes.
     pub(crate) fn with_fusion_passes(mut self) -> Self {
-        // [TODO]: right now, we have each different fusion operation to be a separate pass.
+        // TODO(perf): right now, we have each different fusion operation to be a separate pass.
         // This is easier to reason about, but we could make it more efficient by
         // combining the passes.
         for block in &mut self.blocks {
             fuse_pairs(&mut block.instrs, try_fuse_field_access);
+            // Consumes ReadField/WriteField produced above, maintain this
+            // ordering between fusion passes.
+            fuse_pairs(&mut block.instrs, try_fuse_local_field_access);
             fuse_pairs(&mut block.instrs, try_fuse_immediate_binop);
             // Must run after try_fuse_immediate_binop so that BinaryOpImm is
             // available for the BrCmpImm variant.
@@ -72,45 +77,53 @@ fn fuse_pairs(instrs: &mut Vec<Instr>, try_fuse: fn(&Instr, &Instr) -> Option<In
 /// Try to fuse a borrow+deref pair into a combined field access instruction.
 fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+        (Instr::ImmBorrowField(ref_r, owner, fld, src), Instr::ReadRef(dst, read_src))
             if *ref_r == *read_src =>
         {
-            Some(Instr::ReadField(*dst, *fld, *src))
+            Some(Instr::ReadField(*dst, *owner, *fld, *src))
         },
-        (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-            if *ref_r == *read_src =>
-        {
-            Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
-        },
-        (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+        (Instr::MutBorrowField(ref_r, owner, fld, dst_ref), Instr::WriteRef(write_ref, val))
             if *ref_r == *write_ref =>
         {
-            Some(Instr::WriteField(*fld, *dst_ref, *val))
+            Some(Instr::WriteField(*owner, *fld, *dst_ref, *val))
         },
-        (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-            if *ref_r == *write_ref =>
-        {
-            Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
-        },
-        (Instr::ImmBorrowVariantField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+        (Instr::ImmBorrowVariantField(ref_r, owner, fld, src), Instr::ReadRef(dst, read_src))
             if *ref_r == *read_src =>
         {
-            Some(Instr::ReadVariantField(*dst, *fld, *src))
-        },
-        (Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-            if *ref_r == *read_src =>
-        {
-            Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
-        },
-        (Instr::MutBorrowVariantField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-            if *ref_r == *write_ref =>
-        {
-            Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
+            Some(Instr::ReadVariantField(*dst, *owner, *fld, *src))
         },
         (
-            Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
+            Instr::MutBorrowVariantField(ref_r, owner, fld, dst_ref),
             Instr::WriteRef(write_ref, val),
-        ) if *ref_r == *write_ref => Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val)),
+        ) if *ref_r == *write_ref => Some(Instr::WriteVariantField(*owner, *fld, *dst_ref, *val)),
+        _ => None,
+    }
+}
+
+/// Try to fuse a `borrow_loc` followed by a field op on its result into a
+/// single local-field op, eliding the intermediate fat pointer.
+fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
+    match (first, second) {
+        (Instr::ImmBorrowLoc(ref_r, local), Instr::ImmBorrowField(dst, owner, fld, src))
+            if *ref_r == *src =>
+        {
+            Some(Instr::ImmBorrowLocField(*dst, *owner, *fld, *local))
+        },
+        (Instr::MutBorrowLoc(ref_r, local), Instr::MutBorrowField(dst, owner, fld, src))
+            if *ref_r == *src =>
+        {
+            Some(Instr::MutBorrowLocField(*dst, *owner, *fld, *local))
+        },
+        (Instr::ImmBorrowLoc(ref_r, local), Instr::ReadField(dst, owner, fld, src))
+            if *ref_r == *src =>
+        {
+            Some(Instr::ReadLocalField(*dst, *owner, *fld, *local))
+        },
+        (Instr::MutBorrowLoc(ref_r, local), Instr::WriteField(owner, fld, dst_ref, val))
+            if *ref_r == *dst_ref =>
+        {
+            Some(Instr::WriteLocalField(*owner, *fld, *local, *val))
+        },
         _ => None,
     }
 }
@@ -136,13 +149,13 @@ fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
         (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrTrue(label, cond))
             if *dst == *cond =>
         {
-            Some(Instr::BrCmpImm(*label, *cmp, *src, *imm))
+            Some(Instr::BrCmpImm(*label, *cmp, *src, imm.clone()))
         },
         // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrFalse(label, dst)
         (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrFalse(label, cond))
             if *dst == *cond =>
         {
-            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, *imm))
+            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, imm.clone()))
         },
         _ => None,
     }

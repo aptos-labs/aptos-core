@@ -16,6 +16,11 @@ name = "move"
 path = "src/main.rs"
 required-features = ["binary"]
 
+[features]
+default = []
+binary = ["testing"]
+testing = ["aptos-vm/testing"]
+
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
@@ -26,6 +31,7 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-resource-viewer = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
@@ -78,8 +84,3 @@ mockall = { workspace = true }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 termcolor = { workspace = true }
-
-[features]
-default = []
-binary = ["testing"]
-testing = ["aptos-vm/testing"]

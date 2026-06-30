@@ -8,6 +8,8 @@ use ark_serialize::{
     Write,
 };
 
+/// ArkSize(F=Bls12_381::Fr, H=two_term_msm::Homomorphism<G1>): 113.
+/// ArkSize(F=Bls12_381::Fr, H=hkzg_chunked_elgamal::Homomorphism): 113 + 16·(n + W + max_w) + 80·(W + max_w)·c.
 #[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
 pub struct Proof<F: Field, H: homomorphism::Trait>
 where
@@ -17,8 +19,14 @@ where
     /// The “first item” recorded in the proof, which can be either:
     /// - the prover's commitment (H::Codomain)
     /// - the verifier's challenge (E::ScalarField)
+    ///
+    /// ArkSize(H=two_term_msm::Homomorphism<G1>): 49.
+    /// ArkSize(H=hkzg_chunked_elgamal::Homomorphism): 65 + 8·(n + W + max_w) + 48·(W + max_w)·c.
     pub first_proof_item: FirstProofItem<F, H>,
-    /// Prover's second message (response)
+    /// Prover's second message (response).
+    ///
+    /// ArkSize(F=Bls12_381::Fr, H=two_term_msm::Homomorphism<G1>): 64.
+    /// ArkSize(F=Bls12_381::Fr, H=hkzg_chunked_elgamal::Homomorphism): 48 + 8·(n + W + max_w) + 32·(W + max_w)·c.
     pub z: H::Domain,
 }
 
@@ -80,11 +88,16 @@ where
 /// - The first message of the protocol, which is the commitment from the prover. This leads to a more compact proof.
 /// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
 /// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
+///
+/// ArkSize(H=two_term_msm::Homomorphism<G1>): 49.
+/// ArkSize(H=hkzg_chunked_elgamal::Homomorphism): 65 + 8·(n + W + max_w) + 48·(W + max_w)·c.
 #[derive(Clone, Debug, Eq)]
 pub enum FirstProofItem<F: Field, H: homomorphism::Trait>
 where
     H::CodomainNormalized: Statement,
 {
+    /// ArkSize(H=two_term_msm::Homomorphism<G1>): 48.
+    /// ArkSize(H=hkzg_chunked_elgamal::Homomorphism): 64 + 8·(n + W + max_w) + 48·(W + max_w)·c.
     Commitment(H::CodomainNormalized),
     Challenge(F), // In more generality, this should be H::Domain::Scalar
 }

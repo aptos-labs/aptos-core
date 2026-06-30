@@ -1,0 +1,17 @@
+//# publish
+module 0x77::test
+
+#[persistent] public fun h<T>(): vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<T>>>>>>>>>>>>>>>>>>
+    ld_u64 0
+    abort
+
+fun make<T>(): ||vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<T>>>>>>>>>>>>>>>>>> has drop
+    pack_closure h<T>, 0
+    ret
+
+public fun entry()
+    call make<vector<u8>>
+    pop
+    ret
+
+//# run --verbose 0x77::test::entry

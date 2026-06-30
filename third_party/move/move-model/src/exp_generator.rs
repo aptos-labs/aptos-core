@@ -1133,6 +1133,28 @@ pub trait ExpGenerator<'env> {
             all_args,
         )
     }
+
+    /// Build `write_of<f, j>(args)` with pre/post state labels.
+    /// `mut_ref_idx` indexes the targeted `&mut` parameter among the
+    /// callee's `&mut` parameters only.
+    fn mk_write_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        mut_ref_value_type: &Type,
+        mut_ref_idx: usize,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange { pre, post };
+        self.mk_call(
+            mut_ref_value_type,
+            Operation::Behavior(BehaviorKind::WriteOf(mut_ref_idx), range),
+            all_args,
+        )
+    }
 }
 
 // =================================================================================================

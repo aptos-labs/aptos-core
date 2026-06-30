@@ -353,6 +353,10 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
             signature: Some(txn.authenticator().into()),
             payload,
             replay_protection_nonce: txn.replay_protector().get_nonce().map(|nonce| nonce.into()),
+            txn_limits_request: txn
+                .extra_config()
+                .txn_limits_request()
+                .map(UserTxnLimitsRequest::from),
         }
     }
 }
@@ -510,6 +514,8 @@ pub struct UserTransactionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
     pub replay_protection_nonce: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txn_limits_request: Option<UserTxnLimitsRequest>,
 }
 
 impl UserTransactionRequest {
@@ -518,6 +524,87 @@ impl UserTransactionRequest {
             aptos_types::transaction::ReplayProtector::Nonce(nonce.0)
         } else {
             aptos_types::transaction::ReplayProtector::SequenceNumber(self.sequence_number.0)
+        }
+    }
+}
+
+/// Multipliers for higher transaction limits, expressed as percent of the base
+/// limit (100 = 1x, 200 = 2x, 250 = 2.5x).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct RequestedMultipliers {
+    pub execution_multiplier_percent: U64,
+    pub io_multiplier_percent: U64,
+}
+
+/// A higher-limits request whose backing is a stake pool the fee payer owns.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct StakePoolOwnerLimitsRequest {
+    pub multipliers: RequestedMultipliers,
+}
+
+/// A higher-limits request backed by a stake pool the fee payer is the
+/// delegated voter of.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct DelegatedVoterLimitsRequest {
+    pub pool_address: Address,
+    pub multipliers: RequestedMultipliers,
+}
+
+/// A higher-limits request backed by a delegation pool the fee payer delegates
+/// to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct DelegationPoolDelegatorLimitsRequest {
+    pub pool_address: Address,
+    pub multipliers: RequestedMultipliers,
+}
+
+/// A request for higher transaction execution limits, backed by a staking proof.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum UserTxnLimitsRequest {
+    StakePoolOwner(StakePoolOwnerLimitsRequest),
+    DelegatedVoter(DelegatedVoterLimitsRequest),
+    DelegationPoolDelegator(DelegationPoolDelegatorLimitsRequest),
+}
+
+impl From<&aptos_types::transaction::RequestedMultipliers> for RequestedMultipliers {
+    fn from(multipliers: &aptos_types::transaction::RequestedMultipliers) -> Self {
+        match multipliers {
+            aptos_types::transaction::RequestedMultipliers::V1 {
+                execution_multiplier_percent,
+                io_multiplier_percent,
+            } => Self {
+                execution_multiplier_percent: (*execution_multiplier_percent).into(),
+                io_multiplier_percent: (*io_multiplier_percent).into(),
+            },
+        }
+    }
+}
+
+impl From<&aptos_types::transaction::UserTxnLimitsRequest> for UserTxnLimitsRequest {
+    fn from(request: &aptos_types::transaction::UserTxnLimitsRequest) -> Self {
+        use aptos_types::transaction::UserTxnLimitsRequest as Protocol;
+        match request {
+            Protocol::StakePoolOwner { multipliers } => {
+                Self::StakePoolOwner(StakePoolOwnerLimitsRequest {
+                    multipliers: multipliers.into(),
+                })
+            },
+            Protocol::DelegatedVoter {
+                pool_address,
+                multipliers,
+            } => Self::DelegatedVoter(DelegatedVoterLimitsRequest {
+                pool_address: (*pool_address).into(),
+                multipliers: multipliers.into(),
+            }),
+            Protocol::DelegationPoolDelegator {
+                pool_address,
+                multipliers,
+            } => Self::DelegationPoolDelegator(DelegationPoolDelegatorLimitsRequest {
+                pool_address: (*pool_address).into(),
+                multipliers: multipliers.into(),
+            }),
         }
     }
 }
@@ -610,6 +697,13 @@ pub struct BlockMetadataExtensionRandomnessAndDecKey {
     decryption_key: Option<HexEncodedBytes>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionRandomnessAndDecPayload {
+    randomness: Option<HexEncodedBytes>,
+    decryption_key: Option<HexEncodedBytes>,
+    decryption_round: Option<U64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
@@ -617,6 +711,7 @@ pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
     V2(BlockMetadataExtensionRandomnessAndDecKey),
+    V3(BlockMetadataExtensionRandomnessAndDecPayload),
 }
 
 impl BlockMetadataExtension {
@@ -639,6 +734,22 @@ impl BlockMetadataExtension {
                     .as_ref()
                     .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
+            BlockMetadataExt::V3(payload) => {
+                Self::V3(BlockMetadataExtensionRandomnessAndDecPayload {
+                    randomness: payload
+                        .randomness
+                        .as_ref()
+                        .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+                    decryption_key: payload
+                        .decryption_payload
+                        .as_ref()
+                        .map(|p| HexEncodedBytes::from(p.key.decryption_key_cloned())),
+                    decryption_round: payload
+                        .decryption_payload
+                        .as_ref()
+                        .map(|p| U64::from(p.decryption_round)),
+                })
+            },
         }
     }
 }
@@ -688,6 +799,7 @@ impl BlockMetadataTransaction {
             Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
             Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
             Some(BlockMetadataExtension::V2(_)) => "block_metadata_ext_transaction__v2",
+            Some(BlockMetadataExtension::V3(_)) => "block_metadata_ext_transaction__v3",
         }
     }
 }
@@ -2691,5 +2803,108 @@ impl From<aptos_types::transaction::PersistedAuxiliaryInfo> for PersistedAuxilia
                 transaction_index: Some(transaction_index),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::{
+        account_address::AccountAddress,
+        transaction::{
+            RequestedMultipliers as ProtocolMultipliers,
+            UserTxnLimitsRequest as ProtocolLimitsRequest,
+        },
+    };
+    use std::str::FromStr;
+
+    fn multipliers() -> ProtocolMultipliers {
+        ProtocolMultipliers::V1 {
+            execution_multiplier_percent: 200,
+            io_multiplier_percent: 150,
+        }
+    }
+
+    #[test]
+    fn stake_pool_owner_limits_request_to_json() {
+        let request = ProtocolLimitsRequest::StakePoolOwner {
+            multipliers: multipliers(),
+        };
+        let json = serde_json::to_value(UserTxnLimitsRequest::from(&request)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "stake_pool_owner",
+                "multipliers": {
+                    "execution_multiplier_percent": "200",
+                    "io_multiplier_percent": "150",
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn delegated_voter_limits_request_to_json() {
+        let pool = AccountAddress::from_hex_literal("0x1234").unwrap();
+        let request = ProtocolLimitsRequest::DelegatedVoter {
+            pool_address: pool,
+            multipliers: multipliers(),
+        };
+        let json = serde_json::to_value(UserTxnLimitsRequest::from(&request)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "delegated_voter",
+                "pool_address": pool.to_hex_literal(),
+                "multipliers": {
+                    "execution_multiplier_percent": "200",
+                    "io_multiplier_percent": "150",
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn delegation_pool_delegator_limits_request_to_json() {
+        let pool = AccountAddress::from_hex_literal("0xabcd").unwrap();
+        let request = ProtocolLimitsRequest::DelegationPoolDelegator {
+            pool_address: pool,
+            multipliers: multipliers(),
+        };
+        let json = serde_json::to_value(UserTxnLimitsRequest::from(&request)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "delegation_pool_delegator",
+                "pool_address": pool.to_hex_literal(),
+                "multipliers": {
+                    "execution_multiplier_percent": "200",
+                    "io_multiplier_percent": "150",
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn omitted_when_absent() {
+        // A request without a limits request must not emit the key, so existing
+        // transaction JSON stays byte-for-byte unchanged.
+        let request = UserTransactionRequest {
+            sender: AccountAddress::ONE.into(),
+            sequence_number: 0.into(),
+            max_gas_amount: 0.into(),
+            gas_unit_price: 0.into(),
+            expiration_timestamp_secs: 0.into(),
+            payload: TransactionPayload::EntryFunctionPayload(EntryFunctionPayload {
+                function: EntryFunctionId::from_str("0x1::foo::bar").unwrap(),
+                type_arguments: vec![],
+                arguments: vec![],
+            }),
+            signature: None,
+            replay_protection_nonce: None,
+            txn_limits_request: None,
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert!(json.get("txn_limits_request").is_none());
     }
 }

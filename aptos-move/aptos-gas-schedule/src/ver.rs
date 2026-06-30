@@ -8,6 +8,12 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V49:
+///   - Count the closure function-type node towards type size and depth limits
+/// - V48:
+///   - TBA
+/// - V47:
+///   - TBA
 /// - V46:
 ///    - Correct value for gas param `algebra.ark_bn254_fr_one`.
 ///    - Fix BN254 `Fr::one()` native to charge `algebra.ark_bn254_fr_one`.
@@ -80,7 +86,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_46;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_50;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -121,4 +127,8 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_44: u64 = 48;
     pub const RELEASE_V1_45: u64 = 49;
     pub const RELEASE_V1_46: u64 = 50;
+    pub const RELEASE_V1_47: u64 = 51;
+    pub const RELEASE_V1_48: u64 = 52;
+    pub const RELEASE_V1_49: u64 = 53;
+    pub const RELEASE_V1_50: u64 = 54;
 }

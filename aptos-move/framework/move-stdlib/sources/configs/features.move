@@ -865,6 +865,88 @@ module std::features {
         is_enabled(STORAGE_SLOT_NATIVES)
     }
 
+    /// Whether the multisig timelock feature is enabled.
+    const MULTISIG_TIMELOCK: u64 = 115;
+
+    public fun get_multisig_timelock_feature(): u64 {
+        MULTISIG_TIMELOCK
+    }
+
+    public fun is_multisig_timelock_enabled(): bool {
+        is_enabled(MULTISIG_TIMELOCK)
+    }
+
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    /// Lifetime: permanent
+    const HOTNESS_IN_EPILOGUE: u64 = 116;
+
+    /// When enabled, execution assembles `TransactionInfoV1` instead of `TransactionInfoV0`.
+    /// Lifetime: permanent
+    const TRANSACTION_INFO_V1: u64 = 117;
+
+    /// Umbrella auth flag for the native-trading subsystem; the per-store
+    /// flags below gate the actual writes. Both must be on to write.
+    const TRADING_NATIVE: u64 = 118;
+
+    public fun get_trading_native_feature(): u64 {
+        TRADING_NATIVE
+    }
+
+    public fun is_trading_native_enabled(): bool {
+        is_enabled(TRADING_NATIVE)
+    }
+
+    /// Gates native-position writes.
+    const NATIVE_POSITION: u64 = 119;
+
+    public fun get_native_position_feature(): u64 {
+        NATIVE_POSITION
+    }
+
+    public fun is_native_position_enabled(): bool {
+        is_enabled(NATIVE_POSITION)
+    }
+
+    /// Gates native-orderbook writes.
+    const NATIVE_ORDERBOOK: u64 = 120;
+
+    public fun get_native_orderbook_feature(): u64 {
+        NATIVE_ORDERBOOK
+    }
+
+    public fun is_native_orderbook_enabled(): bool {
+        is_enabled(NATIVE_ORDERBOOK)
+    }
+
+    /// Gates native-collateral writes.
+    const NATIVE_COLLATERAL: u64 = 121;
+
+    public fun get_native_collateral_feature(): u64 {
+        NATIVE_COLLATERAL
+    }
+
+    public fun is_native_collateral_enabled(): bool {
+        is_enabled(NATIVE_COLLATERAL)
+    }
+
+    /// When enabled, execution computes the trading-native state roots and commits them to
+    /// `TransactionInfoV1`, so they are consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    /// Covers the native-position tree today and is intended to cover the other trading-native
+    /// trees as they are added. Enabling it first commits the (empty-tree) roots to transaction
+    /// info; the actual Move-side writes to those trees are gated by separate flags.
+    /// Lifetime: permanent
+    const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 122;
+
+    /// When enabled together with `TRANSACTION_INFO_V1`, execution populates
+    /// `TransactionInfoV1`'s hot state root hash, so it is committed to the ledger
+    /// accumulator. Requires `TRANSACTION_INFO_V1`.
+    /// Lifetime: permanent
+    const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
+
     // ============================================================================================
     // Feature Flag Implementation
 

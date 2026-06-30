@@ -10,7 +10,7 @@ use crate::{
         },
         AptosDB,
     },
-    pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
+    pruner::{LedgerPrunerManager, PrunerManager, StateMerkle, StateMerklePrunerManager},
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
@@ -106,7 +106,7 @@ fn test_pruner_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
-        let state_merkle_pruner = StateMerklePrunerManager::<StaleNodeIndexSchema>::new(
+        let state_merkle_pruner = StateMerklePrunerManager::<StateMerkle>::new(
             Arc::clone(&aptos_db.state_merkle_db()),
             StateMerklePrunerConfig {
                 enable,
@@ -157,6 +157,56 @@ fn test_error_if_version_pruned() {
         "AptosDB Other Error: Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
+
+    // Hot state guards consult the hot pruners, independent of the cold ones set above.
+    db.state_store
+        .state_db
+        .state_pruner
+        .hot_state_merkle_pruner
+        .save_min_readable_version(5)
+        .unwrap();
+    db.state_store
+        .state_db
+        .state_pruner
+        .hot_state_kv_pruner
+        .save_min_readable_version(10)
+        .unwrap();
+    assert_eq!(
+        db.error_if_hot_state_merkle_pruned("Hot state", 4)
+            .unwrap_err()
+            .to_string(),
+        "AptosDB Other Error: Version 4 is not epoch ending."
+    );
+    assert!(db.error_if_hot_state_merkle_pruned("Hot state", 5).is_ok());
+    assert_eq!(
+        db.error_if_hot_state_kv_pruned("HotStateValue", 9)
+            .unwrap_err()
+            .to_string(),
+        "AptosDB Other Error: HotStateValue at version 9 is pruned, min available version is 10."
+    );
+    assert!(db.error_if_hot_state_kv_pruned("HotStateValue", 10).is_ok());
+}
+
+#[test]
+fn test_state_proof_ext_guards_with_hot_pruner() {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    // Prune the hot merkle above the queried version; leave the cold merkle unpruned.
+    db.state_store
+        .state_db
+        .state_pruner
+        .hot_state_merkle_pruner
+        .save_min_readable_version(10)
+        .unwrap();
+    let key_hash = StateKey::raw(b"key").hash();
+    // With use_hot_state the hot pruner must be consulted: version 5 < hot min 10 is rejected at
+    // the guard. Were the cold pruner (min 0) used instead, the guard would let version 5 through.
+    assert_eq!(
+        db.get_state_proof_by_version_ext(&key_hash, 5, 0, true)
+            .unwrap_err()
+            .to_string(),
+        "AptosDB Other Error: Version 5 is not epoch ending."
+    );
 }
 
 #[test]
@@ -208,15 +258,15 @@ fn test_get_latest_ledger_summary() {
     let auxiliary_info = PersistedAuxiliaryInfo::V1 {
         transaction_index: 0,
     };
-    let txn_info = TransactionInfo::new(
-        HashValue::random(),
-        HashValue::random(),
-        HashValue::random(),
-        Some(state_hash),
-        0,
-        ExecutionStatus::MiscellaneousError(None),
-        Some(auxiliary_info.hash()),
-    );
+    let txn_info = TransactionInfo::builder_v0()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .state_checkpoint_hash(state_hash)
+        .gas_used(0)
+        .status(ExecutionStatus::MiscellaneousError(None))
+        .auxiliary_info_hash(auxiliary_info.hash())
+        .build();
     let root_hash = txn_info.hash();
     let mut txn_to_commit = TransactionToCommit::dummy();
     txn_to_commit.transaction_info = txn_info;
@@ -356,6 +406,7 @@ proptest! {
         2,   /* max_user_txns_per_block */
         80,  /* min_blocks */
         120, /* max_blocks */
+        false, /* make_hot_in_epilogue */
     )) {
         aptos_logger::Logger::new().init();
         let tmp_dir = TempPath::new();

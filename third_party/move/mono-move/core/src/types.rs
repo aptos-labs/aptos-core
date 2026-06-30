@@ -19,7 +19,6 @@
 //! Type parameters are interned and allocated in arena as [`GlobalArenaPtr`].
 //! During type substitution, pointers are replaced, and the whole type is re-
 //! canonicalized.
-//! TODO: This is currently not supported.
 //!
 //! ## Vectors
 //!
@@ -38,17 +37,10 @@
 //!
 //! ## Fully-instantiated structs and enums
 //!
-//! Struct and enum types are arena-allocated, and store module ID, name
-//! and type arguments that uniquely identify the type. Both can carry an
-//! optional layout slot. The slot stores size and alignment of this type. For
-//! structs, per-field offsets in flat memory are also recorded. Note that enum
-//! field offsets are not cached in the type graph because enum definitions
-//! can change on module upgrade (new variants added); per-variant field
-//! layouts are stored per-module and resolved at runtime.
+//! Struct and enum types are arena-allocated, and store module ID, name and
+//! type arguments that uniquely identify the type.
 //!
 //! ## Generic structs
-//!
-//! TODO: support substitution
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId},
@@ -56,7 +48,7 @@ use crate::{
 };
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::ability::AbilitySet;
-use std::{cmp::PartialEq, fmt, sync::OnceLock};
+use std::{cmp::PartialEq, fmt};
 
 // ================================================================================================
 // Layout types
@@ -71,6 +63,9 @@ pub type Alignment = u32;
 
 /// Offset in bytes of struct fields in flat memory.
 pub type FieldOffset = u32;
+
+/// An enum variant's discriminant (the tag stored at `ENUM_TAG_OFFSET`).
+pub type VariantTag = u64;
 
 /// Pointer to an arena-interned [`Type`]. Pointer equality implies structural
 /// equality because the global interner deduplicates types. The alias hides
@@ -120,7 +115,7 @@ impl InternedTypeList {
 // Rust has no way to spell that. Callers must not store these references
 // beyond the scope where the above invariants hold.
 //
-// TODO (design follow-up): the `&'static` widening makes these references
+// TODO(cleanup): the `&'static` widening makes these references
 // effectively raw pointers at the type level — the "arena is alive" proof is
 // carried only in docs, not in the types. Consider tying the returned
 // reference to a witness value instead:
@@ -156,7 +151,7 @@ pub fn view_name(ptr: InternedIdentifier) -> &'static str {
 /// Converts `&mut T` to `&T` by interning the immutable counterpart. Errors
 /// if `mut_ref` is not a [`Type::MutRef`].
 ///
-/// Reads through `view_type` and therefore inherits its safety contract.
+/// Inherits safety contract of [`view_type`].
 pub fn convert_mut_to_immut_ref(
     interner: &impl Interner,
     mut_ref: InternedType,
@@ -170,7 +165,7 @@ pub fn convert_mut_to_immut_ref(
 /// Strips the reference from `&T` or `&mut T`, returning `T`. Errors if
 /// `ref_ty` is not a reference type.
 ///
-/// Reads through `view_type` and therefore inherits its safety contract.
+/// Inherits safety contract of [`view_type`].
 pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
     let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
         anyhow::bail!("strip_ref: expected reference type");
@@ -178,72 +173,39 @@ pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
     Ok(*inner)
 }
 
-/// Layout for struct fields:
-///   - Offset of the field in flat memory representation.
-///   - Pointer to the field's type for traversals (e.g., serialization).
-#[derive(Copy, Clone)]
-pub struct FieldLayout {
-    pub offset: FieldOffset,
-    #[allow(dead_code)]
-    ty: InternedType,
-}
-
-impl FieldLayout {
-    /// Creates a new field layout entry.
-    pub fn new(offset: FieldOffset, ty: InternedType) -> Self {
-        Self { offset, ty }
-    }
-}
-
-/// Layout information for a [`Type::Nominal`]: total size, alignment, and an
-/// optional pointer to per-field offsets.
+/// Whether `ty` contains no [`Type::TypeParam`] node.
 ///
-/// `fields` is `Some(_)` when per-field offsets are cached (today: structs)
-/// and `None` when they are not (today: enums, whose layout can change on
-/// module upgrade). `Some(_)` is therefore not a "this is a struct" marker —
-/// once `#[frozen]` enums land, frozen enums will also carry `Some(_)` since
-/// their variants cannot change. TODO: replace this side-channel with a
-/// more explicit shape (e.g., a dedicated enum) once frozen enums are wired
-/// in.
-pub struct NominalLayout {
-    /// Total size of the type. Includes necessary padding based on the
-    /// alignment requirements.
-    pub size: Size,
-    pub align: Alignment,
-    fields: Option<GlobalArenaPtr<[FieldLayout]>>,
-}
-
-impl NominalLayout {
-    /// Creates a struct layout entry with per-field offsets.
-    pub fn new_struct(size: Size, align: Alignment, fields: GlobalArenaPtr<[FieldLayout]>) -> Self {
-        Self {
-            size,
-            align,
-            fields: Some(fields),
-        }
-    }
-
-    /// Creates an enum layout entry. Enums do not store per-field offsets
-    /// at the type level.
-    pub fn new_enum(size: Size, align: Alignment) -> Self {
-        Self {
-            size,
-            align,
-            fields: None,
-        }
-    }
-
-    // TODO: This API is test-only for now, will change, so ignore safety.
-    pub fn field_layouts(&self) -> Option<&[FieldLayout]> {
-        self.fields.map(|p| unsafe { p.as_ref_unchecked() })
+/// Inherits safety contract of [`view_type`].
+/// TODO(metering): convert to non-recursive.
+pub fn is_closed_type(ty: InternedType) -> bool {
+    match view_type(ty) {
+        Type::TypeParam { .. } => false,
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer => true,
+        Type::Vector { elem } => is_closed_type(*elem),
+        Type::ImmutRef { inner } | Type::MutRef { inner } => is_closed_type(*inner),
+        Type::Nominal { ty_args, .. } => {
+            view_type_list(*ty_args).iter().copied().all(is_closed_type)
+        },
+        Type::Function { args, results, .. } => {
+            view_type_list(*args).iter().copied().all(is_closed_type)
+                && view_type_list(*results).iter().copied().all(is_closed_type)
+        },
     }
 }
-
-// Arena reset bulk-rewinds without running `Drop`. Layout is allowed to skip
-// drop only as long as it owns no non-arena memory. If a future field
-// introduces a heap owner (`Vec`, `String`, `Box`, etc.), this assertion turns
-// the silent leak / double-free into a compile error.
-const _: () = assert!(!std::mem::needs_drop::<NominalLayout>());
 
 // ================================================================================================
 // Type enum
@@ -282,29 +244,13 @@ pub enum Type {
     Vector {
         elem: InternedType,
     },
-    /// Nominal type — a struct or enum identified by name. The layout slot is
-    /// empty for generic instances and for cross-module references whose
-    /// layout has not yet been populated by the loader; it is filled once via
-    /// [`OnceLock::set`] when all constituent layouts become available. For
-    /// structs, layout stores field offsets as well. This is not the case for
-    /// enums. Enums are always pointer-sized today, because new variants may
-    /// be added on module upgrade.
-    ///
-    /// TODO: `#[frozen]` enums (e.g., `Option`) cannot gain new variants on
-    /// upgrade, so they should cache per-variant field offsets in the layout
-    /// slot rather than indirecting through a pointer. This will need to be
-    /// wired in once the frozen-enum attribute is supported end-to-end.
-    ///
-    /// The slot is `OnceLock`-gated so layout can be filled after interning.
-    /// Drop on arena reset is skipped (bumpalo bulk-rewinds without calling
-    /// `Drop`), which is harmless only as long as layout owns no non-arena
-    /// memory - keep it that way.
+    /// Nominal type — a struct or enum identified by module, name, and type
+    /// arguments.
     Nominal {
-        // TODO: Make this a pointer to a named-type struct holding these pointers.
+        // TODO(cleanup): Make this a pointer to a named-type struct holding these pointers.
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-        layout: OnceLock<NominalLayout>,
     },
     /// Function type with argument types, result types and abilities.
     Function {
@@ -329,76 +275,69 @@ pub enum Type {
     },
 }
 
+/// In-memory slot width and alignment for the shapes whose size is intrinsic:
+/// primitives, references (16-byte fat pointers), and vectors and function
+/// values (8-byte heap-pointer slots). Returns [`None`] for nominal types and
+/// for type parameters.
+pub fn intrinsic_slot_size_and_align(ty: &Type) -> Option<(Size, Alignment)> {
+    Some(match ty {
+        // Primitives.
+        Type::Bool | Type::U8 | Type::I8 => (1, 1),
+        Type::U16 | Type::I16 => (2, 2),
+        Type::U32 | Type::I32 => (4, 4),
+        Type::U64 | Type::I64 => (8, 8),
+        Type::U128 | Type::I128 => (16, 8),
+        Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 8),
+
+        // Vectors: pointer to the heap which stores vector metadata such as
+        // length, capacity.
+        Type::Vector { .. } => (8, 8),
+
+        // References are 16-byte fat pointers, 8-byte aligned.
+        Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
+
+        // Function values - TODO(completeness): for now use heap pointer values.
+        Type::Function { .. } => (8, 8),
+
+        // Nominal size is the sum of its fields (resolved through the layout
+        // table); type parameters need substitution first.
+        Type::Nominal { .. } | Type::TypeParam { .. } => return None,
+    })
+}
+
 impl Type {
-    /// Returns the size and alignment of this type. Returns [`None`] if the
-    /// size or alignment cannot be computed:
-    ///   - If the type is a generic struct.
-    ///   - If the type is a struct or enum whose layout has not yet been
-    ///     populated (e.g., a cross-module reference awaiting its loader
-    ///     pass).
-    ///   - If the type is an unresolved type parameter.
-    pub fn size_and_align(&self) -> Option<(Size, Alignment)> {
-        Some(match self {
-            // Primitives.
-            Type::Bool | Type::U8 | Type::I8 => (1, 1),
-            Type::U16 | Type::I16 => (2, 2),
-            Type::U32 | Type::I32 => (4, 4),
-            Type::U64 | Type::I64 => (8, 8),
-            Type::U128 | Type::I128 => (16, 8),
-            Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 8),
-
-            // Vectors: pointer to the heap which stores vector metadata such
-            // as length, capacity.
-            Type::Vector { .. } => (8, 8),
-
-            // References are 16-byte fat pointers, 8-byte aligned.
-            Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
-
-            // Function values - TODO: for now use heap pointer values.
-            Type::Function { .. } => (8, 8),
-
-            // Nominal types (struct/enum): the layout slot may be empty for
-            // generic instances or for cross-module references awaiting
-            // layout population.
-            Type::Nominal { layout, .. } => match layout.get() {
-                Some(layout) => (layout.size, layout.align),
-                None => return None,
-            },
-
-            // Need type substitution to calculate the size and alignment.
-            Type::TypeParam { .. } => {
-                return None;
-            },
-        })
+    /// The short kind word for this type (`"u64"`, `"vector"`, `"struct"`, ...).
+    /// Mirrors the legacy VM's `TypeTag::to_short_string`.
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            Type::Bool => "bool",
+            Type::U8 => "u8",
+            Type::U16 => "u16",
+            Type::U32 => "u32",
+            Type::U64 => "u64",
+            Type::U128 => "u128",
+            Type::U256 => "u256",
+            Type::I8 => "i8",
+            Type::I16 => "i16",
+            Type::I32 => "i32",
+            Type::I64 => "i64",
+            Type::I128 => "i128",
+            Type::I256 => "i256",
+            Type::Address => "address",
+            Type::Signer => "signer",
+            Type::Vector { .. } => "vector",
+            Type::Nominal { .. } => "struct",
+            Type::Function { .. } => "function",
+            Type::ImmutRef { .. } | Type::MutRef { .. } => "reference",
+            Type::TypeParam { .. } => "type parameter",
+        }
     }
 
-    /// Returns layout for a nominal (struct or enum) type, or [`None`] for
-    /// other types or for nominal types whose layout slot has not yet been
-    /// populated.
-    pub fn layout(&self) -> Option<&NominalLayout> {
-        match self {
-            Type::Nominal { layout, .. } => layout.get(),
-            Type::Bool
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256
-            | Type::I8
-            | Type::I16
-            | Type::I32
-            | Type::I64
-            | Type::I128
-            | Type::I256
-            | Type::Address
-            | Type::Signer
-            | Type::ImmutRef { .. }
-            | Type::MutRef { .. }
-            | Type::Vector { .. }
-            | Type::Function { .. }
-            | Type::TypeParam { .. } => None,
-        }
+    /// True iff this is `Type::U64`. Used by the specializer to gate the
+    /// u64-specialized micro-op fast paths.
+    #[inline(always)]
+    pub fn is_u64(&self) -> bool {
+        matches!(self, Type::U64)
     }
 }
 
@@ -509,6 +448,20 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
             Ok(())
         },
     }
+}
+
+/// Renders an interned type to its textual representation (see [`display_type`]).
+//
+// TODO(metering): this traversal is unbounded; replace with a metered, depth-bounded
+// version.
+pub fn type_to_string(ty: InternedType) -> String {
+    struct Disp(InternedType);
+    impl fmt::Display for Disp {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            display_type(f, self.0)
+        }
+    }
+    Disp(ty).to_string()
 }
 
 /// Writes an interned type list as `T0, T1, ...`.

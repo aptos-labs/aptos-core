@@ -3,27 +3,73 @@
 
 //! Interning APIs.
 
-use crate::{
-    types::{InternedType, InternedTypeList},
-    ExecutableId,
-};
+use crate::types::{InternedType, InternedTypeList};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
 
 /// Pointer to interned Move identifier allocated in global arena.
 pub type InternedIdentifier = GlobalArenaPtr<str>;
 
-/// Pointer to interned module ID allocated in global arena.
-// TODO: rename ExecutableId to ModuleID
-pub type InternedModuleId = GlobalArenaPtr<ExecutableId>;
+/// Identifies a module or script by its address and name.
+pub struct ModuleId {
+    address: AccountAddress,
+    name: InternedIdentifier,
+}
 
-/// Interns Move file format types into efficient pointer-based implementation
-/// where data is allocated in arena.
+impl ModuleId {
+    /// Creates a new module ID.
+    pub const fn new(address: AccountAddress, name: InternedIdentifier) -> Self {
+        Self { address, name }
+    }
+
+    /// Returns the account address of this module.
+    pub fn address(&self) -> &AccountAddress {
+        &self.address
+    }
+
+    /// Returns the arena pointer to the name.
+    pub fn name(&self) -> InternedIdentifier {
+        self.name
+    }
+}
+
+/// Pointer to interned module ID allocated in global arena.
+pub type InternedModuleId = GlobalArenaPtr<ModuleId>;
+
+/// Symbolic identity of a function: the same `(module, name, type arguments)`
+/// triple the loader keys function code on, bundled so a single thin arena
+/// pointer can name a function for lazy resolution (e.g. a closure's target).
+pub struct FunctionRef {
+    pub module_id: InternedModuleId,
+    pub func_name: InternedIdentifier,
+    pub ty_args: InternedTypeList,
+}
+
+/// Pointer to an interned [`FunctionRef`] allocated in the global arena.
+pub type InternedFunctionRef = GlobalArenaPtr<FunctionRef>;
+
+/// Dereferences an interned function reference.
+///
+/// # Safety contract
+///
+/// Same as the other `view_*` helpers: the arena must be alive for as long as
+/// the returned reference is used (holds during the execution phase).
+pub fn view_function_ref(ptr: InternedFunctionRef) -> &'static FunctionRef {
+    // SAFETY: see the safety contract above.
+    unsafe { ptr.as_ref_unchecked() }
+}
+
+/// Constructs interned values, turning each into its canonical,
+/// arena-allocated handle, and derives new types by substituting type
+/// parameters.
 ///
 /// # Invariant
 ///
 /// Implementations deduplicate allocations, so that pointer equality implies
 /// structural equality.
+///
+/// TODO(metering): enforce a type-size limit (potentially, when interning) so
+/// that very large types are not allowed to be created.
 pub trait Interner {
     /// Returns a type parameter with the specified index. Note that pointer
     /// equality of any two interned type parameters is structural only. Two
@@ -59,6 +105,16 @@ pub trait Interner {
         name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> InternedType;
+
+    /// Returns the interned function reference identity `(module, name, type
+    /// arguments)`. This is the loader's function-code key bundled behind one
+    /// thin arena pointer.
+    fn function_ref_of(
+        &self,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> InternedFunctionRef;
 
     /// Returns the interned IR corresponding to (address, module name) pair
     /// that identifies a module.

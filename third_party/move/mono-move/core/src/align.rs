@@ -82,3 +82,17 @@ pub fn align_up_u32(offset: u32, align: u32) -> u32 {
     debug_assert!(align > 0 && align.is_power_of_two());
     (offset + align - 1) & !(align - 1)
 }
+
+/// Checked variant of [`align_up_u32`]: returns `None` if rounding `offset` up
+/// to `align` overflows `u32`. Use when `offset` may be untrusted or otherwise
+/// unbounded.
+///
+/// **Pre-condition:** `align` is non-zero and is a power of two.
+#[inline(always)]
+pub fn checked_align_up_u32(offset: u32, align: u32) -> Option<u32> {
+    debug_assert!(align > 0 && align.is_power_of_two());
+    // TODO(cleanup): establish a systematic rule for choosing the checked vs unchecked
+    // alignment helpers. Prefer checked by default; switch a call site to the
+    // unchecked `align_up_u32` only where its bound is documented and proven.
+    u32::try_from(checked_align_up(offset as usize, align as usize)?).ok()
+}

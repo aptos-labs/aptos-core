@@ -68,6 +68,9 @@ const LOG_MESSAGES_AT_INFO_LEVEL: bool = false;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
+    // The consensus observer config
+    consensus_observer_config: ConsensusObserverConfig,
+
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
 
@@ -143,6 +146,7 @@ impl ConsensusObserver {
 
         // Create the consensus observer
         Self {
+            consensus_observer_config,
             execution_client,
             observer_block_data,
             observer_epoch_state,
@@ -394,7 +398,9 @@ impl ConsensusObserver {
         update_metrics_for_block_payload_message(peer_network_id, &block_payload);
 
         // Verify the block payload digests
-        if let Err(error) = block_payload.verify_payload_digests() {
+        if let Err(error) = block_payload
+            .verify_payload_digests(self.consensus_observer_config.max_num_payload_proofs)
+        {
             // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -523,6 +529,7 @@ impl ConsensusObserver {
                         commit_decision.proof_block_info()
                     ))
                 );
+                increment_ignored_message_counter(&peer_network_id, metrics::COMMIT_DECISION_LABEL);
                 return;
             }
 
@@ -773,6 +780,7 @@ impl ConsensusObserver {
                     ordered_block.proof_block_info()
                 ))
             );
+            increment_ignored_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
             return;
         };
 
@@ -822,6 +830,7 @@ impl ConsensusObserver {
                     ordered_block.proof_block_info()
                 ))
             );
+            increment_ignored_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
         }
     }
 
@@ -1096,6 +1105,7 @@ impl ConsensusObserver {
             execution_config,
             randomness_config,
             chunky_dkg_config,
+            features,
         ) = self
             .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
@@ -1124,6 +1134,7 @@ impl ConsensusObserver {
                 &execution_config,
                 &randomness_config,
                 &chunky_dkg_config,
+                &features,
                 None,
                 None,
                 rand_msg_rx,
@@ -1372,6 +1383,15 @@ fn update_metrics_for_ordered_block_with_window_message(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
         ordered_block.proof_block_info().round(),
+    );
+}
+
+/// Increments the ignored message counter for the given peer and message
+fn increment_ignored_message_counter(peer_network_id: &PeerNetworkId, message_label: &str) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_IGNORED_MESSAGES,
+        message_label,
+        peer_network_id,
     );
 }
 

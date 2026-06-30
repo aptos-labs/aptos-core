@@ -72,9 +72,10 @@ use aptos_types::{
     randomness::{PerBlockRandomness, Randomness},
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
+        authenticator::{
+            AbstractAuthenticationData, AnySignature, AuthenticationProof, TransactionAuthenticator,
+        },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
-        encrypted_payload::DecryptionFailureReason,
         signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
@@ -162,7 +163,6 @@ static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static ENABLE_PRE_WRITE: OnceCell<bool> = OnceCell::new();
-static PERSIST_HOTNESS_IN_EPILOGUE: OnceCell<bool> = OnceCell::new();
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -421,6 +421,44 @@ impl AptosVM {
             }
     }
 
+    /// Rejects authenticator/signature variants whose feature flag is not yet
+    /// enabled. Called from both mempool validation and the execution paths.
+    fn check_authenticator_features(
+        &self,
+        authenticator: &TransactionAuthenticator,
+    ) -> Result<(), VMStatus> {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
+        {
+            if let TransactionAuthenticator::SingleSender { .. } = authenticator {
+                return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+            }
+        }
+
+        let webauthn_enabled = self.features().is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE);
+        let slh_dsa_enabled = self
+            .features()
+            .is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE);
+        if !webauthn_enabled || !slh_dsa_enabled {
+            let sk_authenticators = authenticator
+                .to_single_key_authenticators()
+                .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
+            for auth in &sk_authenticators {
+                if !webauthn_enabled && matches!(auth.signature(), AnySignature::WebAuthn { .. }) {
+                    return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                }
+                if !slh_dsa_enabled
+                    && matches!(auth.signature(), AnySignature::SlhDsa_Sha2_128s { .. })
+                {
+                    return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Sets execution concurrency level when invoked the first time.
     pub fn set_concurrency_level_once(mut concurrency_level: usize) {
         concurrency_level = min(concurrency_level, num_cpus::get());
@@ -471,19 +509,6 @@ impl AptosVM {
         match ENABLE_PRE_WRITE.get() {
             Some(enable_pre_write) => *enable_pre_write,
             None => true,
-        }
-    }
-
-    /// Sets persist_hotness_in_epilogue flag when invoked the first time.
-    pub fn set_persist_hotness_in_epilogue_once(persist: bool) {
-        let _ = PERSIST_HOTNESS_IN_EPILOGUE.set(persist);
-    }
-
-    /// Get the persist_hotness_in_epilogue flag if already set, otherwise return default (false)
-    pub fn get_persist_hotness_in_epilogue() -> bool {
-        match PERSIST_HOTNESS_IN_EPILOGUE.get() {
-            Some(persist) => *persist,
-            None => false,
         }
     }
 
@@ -582,13 +607,13 @@ impl AptosVM {
         storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
-        FeeStatement::new(
-            gas_used,
-            u64::from(gas_meter.execution_gas_used()),
-            u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_fee_used()),
-            storage_fee_refund,
-        )
+        FeeStatement::builder()
+            .total_charge_gas_units(gas_used)
+            .execution_gas_units(u64::from(gas_meter.execution_gas_used()))
+            .io_gas_units(u64::from(gas_meter.io_gas_used()))
+            .storage_fee_octas(u64::from(gas_meter.storage_fee_used()))
+            .storage_fee_refund_octas(storage_fee_refund)
+            .build()
     }
 
     pub(crate) fn failed_transaction_cleanup(
@@ -2159,47 +2184,21 @@ impl AptosVM {
             Err(_) => return unwrap_or_discard!(Err(deprecated_module_bundle!())),
         };
 
-        // Re-queue without charging gas or bumping the sequence number when the
-        // decryption pipeline marked this txn for retry: either the per-block
-        // batch limit was reached, or the block carried an epoch-ending vtxn so
-        // decryption was skipped to avoid leaking sender intent.
-        if let Some(reason) = txn.payload().decryption_failure_reason() {
-            let message = match reason {
-                DecryptionFailureReason::BatchLimitReached => {
-                    Some("Encrypted transaction exceeded batch limit; retrying")
-                },
-                DecryptionFailureReason::ExecuteBlockLimitReached => {
-                    Some("Encrypted transaction exceeded execute-block limit; retrying")
-                },
-                DecryptionFailureReason::EpochEndRetry => {
-                    Some("Block contained an epoch-ending vtxn; retrying encrypted txn next epoch")
-                },
-                // TODO(ibalajiarun): TrustedSetupExhausted is an operational
-                // condition (the epoch outlived the trusted setup's num_rounds);
-                // falling through here charges the user gas + bumps their seq#
-                // for a system issue. Alert on the
-                // `aptos_consensus_decryption_pipeline_txns_count{category="trusted_setup_exhausted"}`
-                // counter so ops can extend the setup before users are affected.
-                // Revisit to use a Discard path that does not charge.
-                DecryptionFailureReason::CryptoFailure
-                | DecryptionFailureReason::ConfigUnavailable
-                | DecryptionFailureReason::DecryptionKeyUnavailable
-                | DecryptionFailureReason::ClaimedEntryFunctionMismatch
-                | DecryptionFailureReason::PayloadHashMismatch
-                | DecryptionFailureReason::EpochMismatch
-                | DecryptionFailureReason::TrustedSetupExhausted => None,
-            };
-            if let Some(message) = message {
-                return (
-                    VMStatus::Error {
-                        status_code: StatusCode::UNKNOWN_STATUS,
-                        sub_status: None,
-                        message: Some(message.to_string()),
-                    },
-                    VMOutput::empty_with_status(TransactionStatus::Retry),
-                );
-            }
-        }
+        // Retryable decryption failures (BatchLimitReached / ExecuteBlockLimitReached
+        // / EpochEndRetry) are kept out of the executed block by the consensus
+        // decryption pipeline (see `DecryptionResult::retry_txns`): they stay
+        // uncommitted and are re-proposed via the quorum store. They must never
+        // reach execution — emitting a `TransactionStatus::Retry` output here would
+        // be committed/materialized by Block-STM and violate its materialization
+        // invariant (`check_materialization`). Non-retryable failures (e.g.
+        // CryptoFailure, TrustedSetupExhausted) still execute and discard as usual.
+        debug_assert!(
+            !txn.payload()
+                .decryption_failure_reason()
+                .is_some_and(|reason| reason.is_retryable()),
+            "retryable decryption failure reached the VM; consensus must exclude it \
+             from the executed set"
+        );
 
         let multisig_address = txn.multisig_address();
         let result = if let Some(multisig_address) = multisig_address {
@@ -2305,6 +2304,7 @@ impl AptosVM {
             &'a C,
         ) -> G,
     {
+        self.check_authenticator_features(txn.authenticator_ref())?;
         let txn_metadata = TransactionMetadata::new(self, resolver, txn, auxiliary_info)?;
 
         let vm_params = self.gas_params(log_context)?.vm.clone();
@@ -2696,6 +2696,35 @@ impl AptosVM {
                         .as_move_value(),
                 ];
                 (BLOCK_PROLOGUE_EXT_V2, args)
+            },
+            BlockMetadataExt::V3(v3) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
+                    MoveValue::U64(v3.epoch),
+                    MoveValue::U64(v3.round),
+                    MoveValue::Address(v3.proposer),
+                    v3.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v3.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v3.timestamp_usecs),
+                    v3.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                    v3.decryption_payload
+                        .as_ref()
+                        .map(|p| p.key.decryption_key_cloned())
+                        .as_move_value(),
+                    v3.decryption_payload
+                        .as_ref()
+                        .map(|p| p.decryption_round)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT_V3, args)
             },
         };
 
@@ -3384,7 +3413,6 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
                 discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
                 enable_pre_write: AptosVM::get_enable_pre_write(),
-                persist_hotness_in_epilogue: AptosVM::get_persist_hotness_in_epilogue(),
             },
             onchain: onchain_config,
         };
@@ -3440,46 +3468,8 @@ impl VMValidator for AptosVM {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        if !self
-            .features()
-            .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
-        {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
-                return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-            }
-        }
-
-        if !self.features().is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
-            if let Ok(sk_authenticators) = transaction
-                .authenticator_ref()
-                .to_single_key_authenticators()
-            {
-                for authenticator in sk_authenticators {
-                    if let AnySignature::WebAuthn { .. } = authenticator.signature() {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                }
-            } else {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            }
-        }
-
-        if !self
-            .features()
-            .is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE)
-        {
-            if let Ok(sk_authenticators) = transaction
-                .authenticator_ref()
-                .to_single_key_authenticators()
-            {
-                for authenticator in sk_authenticators {
-                    if let AnySignature::SlhDsa_Sha2_128s { .. } = authenticator.signature() {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                }
-            } else {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            }
+        if let Err(err) = self.check_authenticator_features(transaction.authenticator_ref()) {
+            return VMValidatorResult::error(err.status_code());
         }
 
         if !self
@@ -3503,11 +3493,8 @@ impl VMValidator for AptosVM {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
 
-        let txn = match transaction.check_signature() {
-            Ok(t) => t,
-            _ => {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            },
+        let Ok(txn) = transaction.check_signature() else {
+            return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
         };
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
         let resolver = self.as_move_resolver(&state_view);

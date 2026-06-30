@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: [boogie translator] labeled calls bound to the same state variable use functions with inconsistent `&mut` parameter shapes; combine them into a single labeled call, or split the state variable into distinct labels
+   ┌─ tests/sources/functional/state_labels/labeled_state_shape_mismatch.move:27:21
+   │
+27 │             (S.. |~ pair_progressed(a, b));
+   │                     ^^^^^^^^^^^^^^^^^^^^^

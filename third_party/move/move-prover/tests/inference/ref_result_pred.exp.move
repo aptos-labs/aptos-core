@@ -31,14 +31,8 @@ module 0x42::ref_result_pred {
     }
     spec caller(self: &mut Data): u64 {
         pragma opaque = true;
-        ensures [inferred] result == {
-            let (_t0,_t1) = result_of<peek>(old(self));
-            _t0
-        };
-        ensures [inferred] self == {
-            let (_t0,_t1) = result_of<peek>(old(self));
-            _t1
-        };
+        ensures [inferred] result == result_of<peek>(old(self));
+        ensures [inferred] ensures_of<peek>(self, result, self);
         aborts_if [inferred] aborts_of<peek>(self);
     }
 

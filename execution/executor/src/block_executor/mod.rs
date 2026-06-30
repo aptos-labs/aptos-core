@@ -27,7 +27,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+        state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
@@ -264,7 +265,7 @@ where
                     auxiliary_info,
                     parent_output.result_state(),
                     state_view,
-                    onchain_config.clone(),
+                    onchain_config,
                     TransactionSliceMetadata::block(parent_block_id, block_id),
                 )?
             };
@@ -351,12 +352,25 @@ where
                 fail_point!("executor::block_state_checkpoint", |_| {
                     Err(anyhow::anyhow!("Injected error in block state checkpoint."))
                 });
-                output.set_state_checkpoint_output(DoStateCheckpoint::run(
-                    &output.execution_output,
-                    parent_block.output.ensure_result_state_summary()?,
-                    &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
-                    None,
-                )?);
+                let parent_state_summary = parent_block.output.ensure_result_state_summary()?;
+                let position_persisted = output
+                    .execution_output
+                    .compute_trading_native_state_roots
+                    .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+                    .transpose()?;
+                let parent_position_summary =
+                    parent_block.output.ensure_result_position_state_summary()?;
+                output.set_state_checkpoint_output(
+                    DoStateCheckpoint::run()
+                        .execution_output(&output.execution_output)
+                        .parent_state_summary(parent_state_summary)
+                        .persisted_state_summary(&ProvableStateSummary::new_persisted(
+                            self.db.reader.as_ref(),
+                        )?)
+                        .maybe_parent_position_state_summary(parent_position_summary)
+                        .maybe_persisted_position_state_summary(position_persisted.as_ref())
+                        .build()?,
+                );
                 output.set_ledger_update_output(DoLedgerUpdate::run(
                     &output.execution_output,
                     output.ensure_state_checkpoint_output()?,

@@ -90,11 +90,15 @@ async fn test_transaction_tracing() {
     // Wait for tracing logs to be flushed
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-    // Check validator logs for TxnTrace entries
-    let mut total_trace_count = 0;
+    // Collect every TxnTrace log line from every validator and parse the
+    // structured-JSON payload appended by aptos_logger.
+    let mut parsed_traces: Vec<serde_json::Value> = Vec::new();
     for validator in swarm.validators() {
         let logs = validator.get_log_contents().unwrap_or_default();
-        let trace_lines: Vec<&str> = logs.lines().filter(|l| l.contains("TxnTrace")).collect();
+        let trace_lines: Vec<&str> = logs
+            .lines()
+            .filter(|l| l.contains("\"event\":\"TxnTrace\""))
+            .collect();
         println!(
             "Validator {} has {} TxnTrace log entries",
             validator.peer_id(),
@@ -102,36 +106,155 @@ async fn test_transaction_tracing() {
         );
         for line in &trace_lines {
             println!("  {}", line);
+            // aptos_logger appends ` {...json...}` at the end of the line in
+            // text mode; locate the trailing JSON object and parse it.
+            let json_start = line
+                .find("{\"event\"")
+                .or_else(|| line.find('{'))
+                .expect("TxnTrace log line should contain a JSON payload");
+            let json_str = &line[json_start..];
+            let value: serde_json::Value = serde_json::from_str(json_str)
+                .unwrap_or_else(|e| panic!("failed to parse TxnTrace JSON: {} in {}", e, json_str));
+            parsed_traces.push(value);
         }
-        total_trace_count += trace_lines.len();
     }
 
     assert!(
-        total_trace_count > 0,
+        !parsed_traces.is_empty(),
         "Expected TxnTrace log entries in validator logs, found none."
     );
-    println!(
-        "Found {} total TxnTrace log entries across all validators",
-        total_trace_count
-    );
+    println!("Found {} total TxnTrace log entries", parsed_traces.len());
 
-    // Verify at least one tracked address appears in the trace logs
-    let all_logs: String = swarm
-        .validators()
-        .filter_map(|v| v.get_log_contents().ok())
-        .collect::<Vec<_>>()
-        .join("\n");
+    // Per-stage scalar fields expected on a committed trace's first pipeline
+    // pass. Each is `data.<field>` as a JSON number — no array indexing.
+    let required_scalar_fields = [
+        "mempool_insert_ms",
+        "qs_batch_pull_ms",
+        "block_proposed_ms",
+        "executed_ms",
+        "committed_ms",
+        "mempool_commit_ms",
+    ];
 
+    // Match the bare-hex form produced by serde for AccountAddress.
     let tracked_hex: Vec<String> = addresses.iter().map(|a| a.to_hex()).collect();
-    let mut found_addresses = 0;
-    for addr in &tracked_hex {
-        if all_logs.contains(addr) {
-            found_addresses += 1;
-            println!("Found traced address {} in validator logs", addr);
+    let mut committed_with_tracked_sender = 0;
+
+    for trace in &parsed_traces {
+        // Basic identity fields. HashValue and AccountAddress both serialize
+        // via serde as bare hex (no `0x` prefix) — their Display impls print
+        // `0x...` but the on-wire JSON does not. Humio queries against
+        // `data.hash` / `data.sender` therefore use bare hex.
+        assert_eq!(trace["event"], "TxnTrace");
+        let hash = trace["hash"].as_str().expect("hash must be string");
+        assert!(
+            !hash.starts_with("0x") && hash.len() == 64,
+            "hash should be bare 64-char hex: {}",
+            hash
+        );
+        let sender = trace["sender"].as_str().expect("sender must be string");
+        assert!(
+            !sender.starts_with("0x") && sender.len() == 64,
+            "sender should be bare 64-char hex: {}",
+            sender
+        );
+
+        let outcome = trace["outcome"].as_str().expect("outcome must be string");
+        let attempts = trace["attempts"]
+            .as_u64()
+            .expect("attempts must be unsigned int");
+        assert!(attempts >= 1, "attempts must be >= 1, got {}", attempts);
+
+        let total_latency_ms = trace["total_latency_ms"]
+            .as_i64()
+            .expect("total_latency_ms must be int");
+
+        // `stages` is the human-readable timeline string.
+        let stages = trace["stages"].as_str().expect("stages must be string");
+        assert!(
+            stages.contains("MempoolInsert="),
+            "stages should contain MempoolInsert= marker: {}",
+            stages
+        );
+
+        // Every populated `*_ms` per-stage field must be a plain JSON number
+        // (not an array — the schema emits scalars for the first pipeline
+        // pass only). Most stages use the local clock and are non-negative;
+        // `block_proposed_ms` can be negative due to cross-validator clock
+        // skew. We also assert no value exceeds `total_latency_ms` (the
+        // structured scalars only cover attempt 1; for a retried trace,
+        // total_latency reflects later attempts and stays >= scalar max).
+        for (key, val) in trace.as_object().expect("trace must be object").iter() {
+            if !key.ends_with("_ms") || key == "total_latency_ms" || key == "age_ms" {
+                continue;
+            }
+            let d = match val.as_i64() {
+                Some(n) => n,
+                None => panic!("{} must be i64, got {}", key, val),
+            };
+            // Most stages use local clocks and are non-negative;
+            // `block_proposed_ms` and `parent_block_proposed_ms` record
+            // foreign-block timestamps (proposer's clock for the child and
+            // parent blocks) and can be negative due to cross-validator
+            // clock skew.
+            if key != "block_proposed_ms" && key != "parent_block_proposed_ms" {
+                assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
+            }
+            assert!(
+                d <= total_latency_ms,
+                "{} = {} exceeds total_latency_ms = {} (hash={})",
+                key,
+                d,
+                total_latency_ms,
+                hash
+            );
+        }
+
+        if outcome == "committed" {
+            // First-attempt scalars for the terminal pipeline stages must be
+            // present. For a single-attempt commit, `mempool_commit_ms` equals
+            // `total_latency_ms`; for a retried-then-committed trace, the
+            // structured fields only cover attempt 1 (no MempoolCommit there),
+            // so this required check is gated to single-attempt traces.
+            if attempts == 1 {
+                for f in &required_scalar_fields {
+                    assert!(
+                        trace.get(f).is_some(),
+                        "committed single-attempt trace {} missing scalar field {}",
+                        hash,
+                        f
+                    );
+                }
+                let mempool_commit_ms = trace["mempool_commit_ms"]
+                    .as_i64()
+                    .expect("mempool_commit_ms must be int on single-attempt commit");
+                let diff = (mempool_commit_ms - total_latency_ms).abs();
+                assert!(
+                    diff <= 1,
+                    "mempool_commit_ms {} != total_latency_ms {} (diff={}) for {}",
+                    mempool_commit_ms,
+                    total_latency_ms,
+                    diff,
+                    hash
+                );
+            }
+            assert!(
+                stages.contains("Committed="),
+                "committed trace stages should mention Committed=: {}",
+                stages
+            );
+            if tracked_hex.iter().any(|h| h == sender) {
+                committed_with_tracked_sender += 1;
+            }
         }
     }
+
     assert!(
-        found_addresses > 0,
-        "Expected at least one tracked sender address in TxnTrace logs, found none"
+        committed_with_tracked_sender > 0,
+        "Expected at least one committed TxnTrace from a tracked sender, found none."
+    );
+    println!(
+        "Verified {} committed TxnTrace entries from tracked senders",
+        committed_with_tracked_sender
     );
 }

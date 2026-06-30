@@ -24,9 +24,9 @@ use mono_move_core::interner::InternedModuleId;
 
 /// Concurrent long-living loaded module cache.
 ///
-// TODO:
-//   1. Support speculative writes for Zaptos optimistic pipeline.
-//   2. Support lock-free hot tier?
+// TODO(completeness):
+//   1. Revisit upgrade story per block and with Zaptos.
+//   2. Remove any versioning?
 pub(super) struct ModuleCache {
     // Uses fxhash because the keys are already well-distributed arena
     // pointers, so a simple, fast hash is sufficient.

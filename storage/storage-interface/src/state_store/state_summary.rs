@@ -4,8 +4,10 @@
 use crate::{
     metrics::TIMER,
     state_store::{
+        sharded_jmt_state::PositionStateWithSummary,
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
+        state_with_summary::LedgerWithSummary,
         HotStateShardUpdates, HotStateUpdates,
     },
     DbReader,
@@ -13,7 +15,7 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
-    hash::{CryptoHash, CORRUPTION_SENTINEL},
+    hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_logger::warn;
@@ -32,7 +34,8 @@ use rayon::prelude::*;
 pub struct StateSummary {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
-    pub hot_state_summary: SparseMerkleTree,
+    /// `None` for pipelines without a hot-state companion.
+    pub hot_state_summary: Option<SparseMerkleTree>,
     pub global_state_summary: SparseMerkleTree,
     hot_state_config: HotStateConfig,
 }
@@ -46,7 +49,7 @@ impl StateSummary {
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
-            hot_state_summary,
+            hot_state_summary: Some(hot_state_summary),
             global_state_summary,
             hot_state_config,
         }
@@ -55,18 +58,44 @@ impl StateSummary {
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self {
             next_version: 0,
-            hot_state_summary: SparseMerkleTree::new_empty(),
+            hot_state_summary: Some(SparseMerkleTree::new_empty()),
             global_state_summary: SparseMerkleTree::new_empty(),
             hot_state_config,
         }
     }
 
-    pub fn hot_root_hash(&self) -> HashValue {
-        self.hot_state_summary.root_hash()
+    pub fn new_global_only(version: Version, global_state_summary: SparseMerkleTree) -> Self {
+        Self {
+            next_version: version + 1,
+            hot_state_summary: None,
+            global_state_summary,
+            hot_state_config: HotStateConfig::default(),
+        }
+    }
+
+    pub fn new_empty_global_only() -> Self {
+        Self {
+            next_version: 0,
+            hot_state_summary: None,
+            global_state_summary: SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            hot_state_config: HotStateConfig::default(),
+        }
+    }
+
+    /// Errors if this pipeline has no hot-state companion.
+    pub fn hot_root_hash(&self) -> Result<HashValue> {
+        self.hot_state_summary
+            .as_ref()
+            .map(SparseMerkleTree::root_hash)
+            .ok_or_else(|| anyhow::anyhow!("hot_root_hash on a StateSummary with no hot half"))
     }
 
     pub fn root_hash(&self) -> HashValue {
         self.global_state_summary.root_hash()
+    }
+
+    pub fn hot_state_config(&self) -> HotStateConfig {
+        self.hot_state_config
     }
 
     pub fn next_version(&self) -> Version {
@@ -90,7 +119,9 @@ impl StateSummary {
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state_summary__update"]);
 
-        assert_ne!(self.hot_state_summary.root_hash(), *CORRUPTION_SENTINEL);
+        if let Some(hot) = &self.hot_state_summary {
+            assert_ne!(hot.root_hash(), *CORRUPTION_SENTINEL);
+        }
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
@@ -119,7 +150,7 @@ impl StateSummary {
 
         Ok(Self {
             next_version: updates.next_version(),
-            hot_state_summary: hot_smt_result?,
+            hot_state_summary: Some(hot_smt_result?),
             global_state_summary: smt_result?,
             hot_state_config: self.hot_state_config,
         })
@@ -130,9 +161,16 @@ impl StateSummary {
         persisted: &ProvableStateSummary,
         hot_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
     ) -> Result<SparseMerkleTree> {
+        let current_hot = self.hot_state_summary.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("update_hot_state_summary on a StateSummary with no hot half")
+        })?;
         if !self.hot_state_config.compute_root_hash {
             return Ok(SparseMerkleTree::new_empty());
         }
+        let persisted_hot_smt = persisted
+            .hot_state_summary
+            .as_ref()
+            .expect("hot half present on self implies same on persisted");
 
         let hot_smt_updates = hot_updates
             .par_iter()
@@ -147,9 +185,8 @@ impl StateSummary {
             })
             .collect::<Vec<_>>();
 
-        Ok(self
-            .hot_state_summary
-            .freeze(&persisted.hot_state_summary)
+        Ok(current_hot
+            .freeze(persisted_hot_smt)
             .batch_update_sorted_uniq(&hot_smt_updates, &HotProvableStateSummary::new(persisted))?
             .unfreeze())
     }
@@ -320,7 +357,7 @@ impl<'db> ProvableStateSummary<'db> {
                         *key, version, /* root_depth = */ 0,
                     )?;
                 proof.verify(
-                    self.state_summary.hot_state_summary.root_hash(),
+                    self.state_summary.hot_root_hash()?,
                     *key,
                     hot_value_opt.as_ref(),
                 )?;
@@ -366,6 +403,53 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
             inner
                 .get_proof(key, ver, root_depth, /* use_hot_state = */ false)
                 .expect("Failed to get account state with proof by version.")
+        })
+    }
+}
+
+/// The merklized position snapshot (freeze base + `ProofRead` for
+/// `ShardedJmtState::extend`, read at `version()`), paired with the
+/// pre-committed position tip used to seed the in-memory parent when no
+/// block parent is available. The async merkle committer can lag the tip,
+/// so the two differ and must not be conflated.
+pub struct ProvablePositionStateSummary<'db> {
+    persisted: PositionStateWithSummary,
+    pre_committed: LedgerWithSummary<PositionStateWithSummary>,
+    db: &'db (dyn DbReader + Sync),
+}
+
+impl<'db> ProvablePositionStateSummary<'db> {
+    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_position_state_summary()?,
+            pre_committed: db.get_pre_committed_position_state_summary()?,
+            db,
+        })
+    }
+
+    pub fn summary(&self) -> &StateSummary {
+        self.persisted.summary()
+    }
+
+    /// The pre-committed position tip — seeds the in-memory parent at genesis
+    /// or the first block after the feature is enabled. It includes committed
+    /// writes the merklized snapshot may not yet reflect, so the computed root
+    /// covers all prior position writes.
+    pub fn base(&self) -> &LedgerWithSummary<PositionStateWithSummary> {
+        &self.pre_committed
+    }
+
+    pub fn version(&self) -> Option<Version> {
+        self.persisted.version()
+    }
+}
+
+impl ProofRead for ProvablePositionStateSummary<'_> {
+    fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
+        self.version().map(|version| {
+            self.db
+                .get_position_state_proof_by_version_ext(key, version, root_depth)
+                .expect("Failed to get position state proof by version.")
         })
     }
 }

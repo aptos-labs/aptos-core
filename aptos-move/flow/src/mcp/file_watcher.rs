@@ -6,8 +6,9 @@
 //! Monitors directories containing Move source files and detects changes
 //! (modifications, additions, deletions) that should trigger recompilation.
 //!
-//! Only `.move` files and `Move.toml` changes trigger invalidation — other
-//! files (coverage maps, lock files, build artifacts) are filtered out.
+//! Only `.move`, `Move.toml`, and `Prover.toml` changes trigger invalidation
+//! — other files (coverage maps, lock files, build artifacts) are filtered
+//! out.
 //!
 //! The watcher callback resolves affected cache keys immediately and invokes
 //! a caller-provided invalidation callback (typically removing the entry from
@@ -66,7 +67,7 @@ impl FileWatcher {
                     // This filters out coverage maps, lock files, build artifacts, etc.
                     let dominated_by_ignored = event.paths.iter().all(|p| {
                         let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                        !name.ends_with(".move") && name != "Move.toml"
+                        !name.ends_with(".move") && name != "Move.toml" && name != "Prover.toml"
                     });
                     if dominated_by_ignored {
                         return;

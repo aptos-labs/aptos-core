@@ -115,7 +115,7 @@ impl ProverTaskRunner {
                         return (task_id, result);
                     }
                     debug!("previous instance failed, waiting for another worker to report...");
-                    num_working_instances = usize::saturating_add(num_working_instances, 1);
+                    num_working_instances = usize::saturating_sub(num_working_instances, 1);
                 },
                 Err(RecvTimeoutError::Timeout) => {
                     // recv timeout, i.e. boogie/underlying solver is hanging

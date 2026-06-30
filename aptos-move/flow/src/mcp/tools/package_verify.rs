@@ -3,7 +3,7 @@
 
 use super::{
     super::{package_data::DiagnosticSource, session::FlowSession},
-    resolve_excludes, resolve_filter,
+    load_sanitized_prover_options, module_part_of, resolve_excludes, resolve_filter,
 };
 use codespan_reporting::term::termcolor::NoColor;
 use rmcp::{
@@ -95,6 +95,54 @@ impl FlowSession {
                 let verify_exclude = resolve_excludes(exclude.as_deref());
                 let has_excludes = !verify_exclude.is_empty();
 
+                // Reject `exclude` entries that don't match any target module
+                // (or function, for `module::function` entries). Both
+                // `build_filtered_env` and the anti-vacuity check below silently
+                // no-op on unmatched names, which would otherwise hide typos.
+                for entry in exclude.as_deref().unwrap_or(&[]) {
+                    let module_name = module_part_of(entry);
+                    let func_name = entry.rfind("::").map(|pos| &entry[pos + 2..]);
+                    let exists = data.env().get_modules().any(|m| {
+                        m.is_target()
+                            && m.matches_name(module_name)
+                            && func_name
+                                .is_none_or(|f| m.get_functions().any(|fn_env| fn_env.matches_name(f)))
+                    });
+                    if !exists {
+                        let kind = if func_name.is_some() { "function" } else { "module" };
+                        return Err(rmcp::ErrorData::invalid_params(
+                            format!("exclude entry `{}` does not match any target {}", entry, kind),
+                            None,
+                        ));
+                    }
+                }
+
+                let exclude_entries: Vec<&str> = exclude
+                    .as_deref()
+                    .unwrap_or(&[])
+                    .iter()
+                    .map(String::as_str)
+                    .collect();
+                let func_excluded = |m: &move_model::model::ModuleEnv,
+                                     func: &move_model::model::FunctionEnv|
+                 -> bool {
+                    exclude_entries.iter().any(|e| match e.rfind("::") {
+                        Some(pos) => m.matches_name(&e[..pos]) && func.matches_name(&e[pos + 2..]),
+                        None => m.matches_name(e),
+                    })
+                };
+                let any_verifiable = data.env().get_modules().any(|m| {
+                    m.is_target()
+                        && m.get_functions().any(|func| {
+                            func.should_verify(&verification_scope) && !func_excluded(&m, &func)
+                        })
+                });
+                if !any_verifiable {
+                    return Ok(CallToolResult::success(vec![Content::text(
+                        "nothing to verify: filter and exclude leave no verifiable functions in scope",
+                    )]));
+                }
+
                 // 4. Check cache (skip when exclusions are active — cached results
                 //    don't account for the exclusion set).
                 //    - Success propagates via entailment (wider success ⇒ narrower success).
@@ -123,16 +171,65 @@ impl FlowSession {
                     }
                 }
 
-                // 5. Build prover options.
+                // 5. Build the env to run on (filtered or cached) up front so
+                //    verify_exclude can be aligned with the actual target set.
+                let excluded_modules: Vec<String> = exclude
+                    .as_deref()
+                    .map(|v| v.iter().filter(|e| !e.contains("::")).cloned().collect())
+                    .unwrap_or_default();
+                let needs_filtered_env = filter.is_some() || !excluded_modules.is_empty();
+                let mut maybe_filtered_env = if needs_filtered_env {
+                    match data.build_filtered_env(filter.as_deref(), &excluded_modules) {
+                        Ok(env) => Some(env),
+                        Err(e) => {
+                            return Ok(CallToolResult::error(vec![Content::text(format!(
+                                "failed to rebuild env for filter `{:?}` exclude `{:?}`: {}",
+                                filter, excluded_modules, e
+                            ))]))
+                        },
+                    }
+                } else {
+                    data.env().clear_diag();
+                    None
+                };
+
+                // Keep verify_exclude entries whose module is still a target in
+                // the env that will actually run. Modules demoted out of targets
+                // are silently dropped (prover would otherwise reject them);
+                // modules that survived (e.g. via soft fallback on file-share)
+                // remain so the prover still applies them.
+                let env_for_check = maybe_filtered_env.as_ref().unwrap_or_else(|| data.env());
+                let prover_verify_exclude: Vec<_> = verify_exclude
+                    .iter()
+                    .filter(|s| {
+                        use move_model::model::VerificationScope::*;
+                        let module_name = match s {
+                            OnlyModule(name) => name.as_str(),
+                            Only(qname) => module_part_of(qname),
+                            _ => return true,
+                        };
+                        env_for_check
+                            .get_modules()
+                            .any(|m| m.is_target() && m.matches_name(module_name))
+                    })
+                    .cloned()
+                    .collect();
+
+                // 6. Build prover options.
                 let temp_dir = tempfile::tempdir().map_err(|e| {
                     rmcp::ErrorData::internal_error(
                         format!("failed to create temp dir: {}", e),
                         None,
                     )
                 })?;
-                let mut options = move_prover::cli::Options::default();
+                let mut options = match load_sanitized_prover_options(data.path()) {
+                    Ok(o) => o,
+                    Err(msg) => {
+                        return Ok(CallToolResult::error(vec![Content::text(msg)]));
+                    },
+                };
                 options.prover.verify_scope = verification_scope;
-                options.prover.verify_exclude = verify_exclude;
+                options.prover.verify_exclude = prover_verify_exclude;
                 options.backend.vc_timeout = vc_timeout;
                 options.backend.split_vcs_by_assert = split_vcs_by_assert;
                 if let Some(n) = error_limit {
@@ -150,15 +247,36 @@ impl FlowSession {
                     .to_string_lossy()
                     .into_owned();
 
-                // 6. Clear leftover diagnostics from previous runs, then run the prover.
-                data.env().clear_diag();
+                // 7. Run the prover.
                 let mut error_writer = NoColor::new(Vec::new());
-                let prover_result = move_prover::run_move_prover_with_model_v2(
-                    data.env_mut(),
-                    &mut error_writer,
-                    options,
-                    Instant::now(),
-                );
+                let (prover_result, fallback_env_diags) =
+                    if let Some(env) = maybe_filtered_env.as_mut() {
+                        let result = move_prover::run_move_prover_with_model_v2(
+                            env,
+                            &mut error_writer,
+                            options,
+                            Instant::now(),
+                        );
+                        let fallback = if result.is_err() {
+                            super::super::package_data::render_diagnostics(env)
+                        } else {
+                            Vec::new()
+                        };
+                        (result, fallback)
+                    } else {
+                        let result = move_prover::run_move_prover_with_model_v2(
+                            data.env_mut(),
+                            &mut error_writer,
+                            options,
+                            Instant::now(),
+                        );
+                        let fallback = if result.is_err() {
+                            super::super::package_data::render_diagnostics(data.env())
+                        } else {
+                            Vec::new()
+                        };
+                        (result, fallback)
+                    };
 
                 match prover_result {
                     Ok(()) => {
@@ -183,24 +301,18 @@ impl FlowSession {
                                 diag_text.clone()
                             ]);
                             format!("verification failed:\n{}", diag_text)
-                        } else {
+                        } else if !fallback_env_diags.is_empty() {
                             // The prover may return errors (e.g. tool version
                             // mismatch, boogie crash) that bypass the diagnostic
-                            // writer. Try unreported env diagnostics first, then
-                            // fall back to the anyhow error.
-                            let env_diags =
-                                super::super::package_data::render_diagnostics(data.env());
-                            if !env_diags.is_empty() {
-                                let joined = env_diags.join("\n");
-                                data.set_diagnostics(DiagnosticSource::Verifier, env_diags);
-                                format!("verification failed:\n{}", joined)
-                            } else {
-                                let err_msg = format!("{:#}", e);
-                                data.set_diagnostics(DiagnosticSource::Verifier, vec![
-                                    err_msg.clone()
-                                ]);
-                                format!("verification failed: {}", err_msg)
-                            }
+                            // writer. Use the env diags captured above from
+                            // whichever env actually ran.
+                            let joined = fallback_env_diags.join("\n");
+                            data.set_diagnostics(DiagnosticSource::Verifier, fallback_env_diags);
+                            format!("verification failed:\n{}", joined)
+                        } else {
+                            let err_msg = format!("{:#}", e);
+                            data.set_diagnostics(DiagnosticSource::Verifier, vec![err_msg.clone()]);
+                            format!("verification failed: {}", err_msg)
                         };
                         log::info!("move_package_verify: failed\n{}", msg);
                         Ok(CallToolResult::error(vec![Content::text(msg)]))

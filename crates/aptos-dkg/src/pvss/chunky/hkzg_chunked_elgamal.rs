@@ -45,12 +45,17 @@ use std::{iter::repeat_with, marker::PhantomData};
 /// - the HKZG randomness,
 /// - the chunked plaintexts, and
 /// - the ElGamal randomness.
+///
+/// ArkSize(F=Bls12_381::Fr): 48 + 8·(n + W + max_w) + 32·(W + max_w)·c.
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
 pub struct HkzgElgamalWitness<F: PrimeField> {
+    /// ArkSize(F=Bls12_381::Fr): 32.
     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
+    /// ArkSize(F=Bls12_381::Fr): 8 + 8·n + 8·W + 32·W·c.
     pub chunked_plaintexts: Vec<Vec<Vec<Scalar<F>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
+    /// ArkSize(F=Bls12_381::Fr): 8 + 8·max_w + 32·max_w·c.
     pub elgamal_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, for each chunk, a blinding factor
 }
 

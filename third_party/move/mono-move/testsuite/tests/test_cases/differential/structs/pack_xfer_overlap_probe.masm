@@ -1,0 +1,32 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::pack_xfer_overlap_probe
+
+struct Pair has drop+copy
+  _1: u64
+  _2: u64
+
+fun pair_returns(): (u64, u64)
+    ld_u64 10
+    ld_u64 20
+    ret
+
+fun consume_two(a: u64, p: Pair): u64
+    move_loc a
+    move_loc p
+    unpack Pair
+    add
+    add
+    ret
+
+public fun trigger(other: u64): u64
+    move_loc other
+    call pair_returns
+    pack Pair
+    call consume_two
+    ret
+
+// RUN: execute 0x66::pack_xfer_overlap_probe::trigger --args 0
+// CHECK: results: 30
+
+// RUN: execute 0x66::pack_xfer_overlap_probe::trigger --args 100
+// CHECK: results: 130

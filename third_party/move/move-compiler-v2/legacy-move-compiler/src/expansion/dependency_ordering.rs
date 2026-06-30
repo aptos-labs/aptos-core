@@ -584,7 +584,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             }
             exp(context, e)
         },
-        E::Quant(_, binds, es_vec, eopt, e) => {
+        E::Quant(_, binds, es_vec, _, eopt, e) => {
             lvalues_with_range(context, binds);
             es_vec
                 .iter()
@@ -717,6 +717,7 @@ fn proof_exps(context: &mut Context, sp!(_, proof_): &E::Proof) {
             patterns,
             lemma,
             args,
+            weight: _,
         } => {
             lvalues_with_range(context, bindings);
             module_access(context, lemma);

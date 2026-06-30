@@ -4,33 +4,34 @@
 //! Bump-allocated heap with a copying garbage collector (Cheney's algorithm).
 //!
 //! Exposed as free functions taking explicit parameters (heap, descriptors,
-//! pinned roots, root-walk state). This keeps the borrow surface narrow —
-//! callers in the interpreter can hold auxiliary borrows (e.g. a `PinGuard`
-//! into [`PinnedRoots`]) while still invoking allocation paths that mutate
-//! only the heap.
+//! root pool, root-walk state). This keeps the borrow surface narrow —
+//! callers in the interpreter can hold auxiliary borrows (e.g. a handle into
+//! the [`RootPool`]) while still invoking allocation paths that mutate only the
+//! heap.
 
-pub(crate) mod object_descriptor;
-pub(crate) mod pinned_roots;
+mod deep_copy;
 
 use crate::{
-    bail,
-    error::ExecutionResult,
-    heap::object_descriptor::{ObjectDescriptor, ObjectDescriptorInner},
+    error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
+    global_storage::ResourceReadWriteSet,
+    invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
-        write_forwarding, write_obj_size, write_ptr, write_u64, MemoryRegion,
+        write_forwarding, write_object_header, write_ptr, write_u64, MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
-        META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
-    align_max, checked_align_max, DescriptorId, FrameOffset, Function, CAPTURED_DATA_VALUES_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    align_max, checked_align_max,
+    native::{NativeABI, NativeExtensions},
+    types::InternedType,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
+    RootPool, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
+    ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
-use pinned_roots::PinnedRoots;
 use std::ptr::NonNull;
 
 // ---------------------------------------------------------------------------
@@ -39,24 +40,18 @@ use std::ptr::NonNull;
 
 /// Call-site sugar for the allocation and GC free functions in this module.
 ///
-/// Each macro forwards to an eponymous free function, unpacking the fields
-/// of an `InterpreterContext` binding (`heap`, `descriptors`,
-/// `pinned_roots`, `current_func`, `pc`, `frame_ptr`) as individual
-/// arguments.
+/// Each macro forwards to an eponymous free function, unpacking the fields of an
+/// `InterpreterContext`.
 ///
 /// ```ignore
-/// let ptr = heap::macros::alloc_obj!(self, fp, desc_id)?;
+/// let ptr = heap::macros::alloc_obj!(self, fp, pc, func, desc_id)?;
 /// ```
 ///
 /// # Why macros and not methods
 ///
 /// Rust lacks partial-borrow syntax: a method on `InterpreterContext` that
-/// mutates `heap` would borrow `self` as `&mut`, conflicting with any
-/// outstanding borrow of an unrelated field (e.g. a `PinGuard` that holds
-/// `&self.pinned_roots`). Spelling out the individual field borrows at the
-/// call site lets the compiler see that the borrows are disjoint. The
-/// macro hides that boilerplate while preserving the field-level borrow
-/// granularity.
+/// mutates a field would borrow `self` as `&mut`, conflicting with any
+/// outstanding borrow of an unrelated field.
 ///
 /// The macros live in a submodule so their `macro_rules!` names don't
 /// collide with the free functions in the value namespace of this module
@@ -65,14 +60,18 @@ pub(crate) mod macros {
     /// Forwards to [`super::alloc_obj`]. Arguments: (`$ctx`, `$fp`,
     /// `$descriptor_id`).
     macro_rules! alloc_obj {
-        ($ctx:ident, $fp:expr, $descriptor_id:expr $(,)?) => {
+        ($ctx:ident, $fp:expr, $pc:expr, $func:expr, $descriptor_id:expr $(,)?) => {
             $crate::heap::alloc_obj(
                 &mut $ctx.heap,
-                $ctx.descriptors,
-                &$ctx.pinned_roots,
+                $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
-                $ctx.current_func,
-                $ctx.pc,
+                $crate::heap::TopFrame::Function {
+                    func: $func,
+                    pc: $pc,
+                },
                 $descriptor_id,
             )
         };
@@ -85,17 +84,23 @@ pub(crate) mod macros {
         (
             $ctx:ident,
             $fp:expr,
+            $pc:expr,
+            $func:expr,
             $descriptor_id:expr,
             $elem_size:expr,
             $capacity_in_elems:expr $(,)?
         ) => {
             $crate::heap::alloc_vec(
                 &mut $ctx.heap,
-                $ctx.descriptors,
-                &$ctx.pinned_roots,
+                $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
                 $fp,
-                $ctx.current_func,
-                $ctx.pc,
+                $crate::heap::TopFrame::Function {
+                    func: $func,
+                    pc: $pc,
+                },
                 $descriptor_id,
                 $elem_size,
                 $capacity_in_elems,
@@ -104,22 +109,57 @@ pub(crate) mod macros {
     }
     pub(crate) use alloc_vec;
 
+    /// Forwards to [`super::alloc_captured_data`]. Arguments: (`$ctx`, `$fp`,
+    /// `$values_size`, `$descriptor_id`).
+    macro_rules! alloc_captured_data {
+        (
+            $ctx:ident,
+            $fp:expr,
+            $pc:expr,
+            $func:expr,
+            $values_size:expr,
+            $descriptor_id:expr $(,)?
+        ) => {
+            $crate::heap::alloc_captured_data(
+                &mut $ctx.heap,
+                $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
+                $fp,
+                $crate::heap::TopFrame::Function {
+                    func: $func,
+                    pc: $pc,
+                },
+                $values_size,
+                $descriptor_id,
+            )
+        };
+    }
+    pub(crate) use alloc_captured_data;
+
     /// Forwards to [`super::grow_vec_ref`]. Arguments: (`$ctx`, `$fp`,
     /// `$vec_ref_offset`, `$elem_size`, `$required_cap_in_elems`).
     macro_rules! grow_vec_ref {
         (
             $ctx:ident,
             $fp:expr,
+            $pc:expr,
+            $func:expr,
             $vec_ref_offset:expr,
             $elem_size:expr,
             $required_cap_in_elems:expr $(,)?
         ) => {
             $crate::heap::grow_vec_ref(
                 &mut $ctx.heap,
-                $ctx.descriptors,
-                &$ctx.pinned_roots,
-                $ctx.current_func,
-                $ctx.pc,
+                $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
+                $crate::heap::TopFrame::Function {
+                    func: $func,
+                    pc: $pc,
+                },
                 $fp,
                 $vec_ref_offset,
                 $elem_size,
@@ -131,14 +171,18 @@ pub(crate) mod macros {
 
     /// Forwards to [`super::gc_collect`]. Arguments: (`$ctx`,).
     macro_rules! gc_collect {
-        ($ctx:ident $(,)?) => {
+        ($ctx:ident, $fp:expr, $pc:expr, $func:expr $(,)?) => {
             $crate::heap::gc_collect(
                 &mut $ctx.heap,
-                $ctx.descriptors,
-                &$ctx.pinned_roots,
-                $ctx.frame_ptr,
-                $ctx.current_func,
-                $ctx.pc,
+                $ctx.exec_ctx,
+                &mut $ctx.read_write_set,
+                &$ctx.root_pool,
+                $ctx.exec_ctx.extensions(),
+                $fp,
+                $crate::heap::TopFrame::Function {
+                    func: $func,
+                    pc: $pc,
+                },
             )
         };
     }
@@ -194,6 +238,203 @@ impl Heap {
             gc_count: 0,
         }
     }
+
+    /// Rewinds the bump pointer to the start of the buffer, discarding all allocations. The buffer
+    /// is retained (no reallocation), so it's the cheap way to reuse one heap across runs.
+    ///
+    /// The caller must ensure no live references into the heap remain (reset the interpreter's frame
+    /// and root set first, via [`InterpreterContext::reset`](crate::InterpreterContext::reset)).
+    pub fn reset(&mut self) {
+        self.bump_ptr = self.buffer.as_ptr();
+        self.gc_count = 0;
+    }
+
+    /// Bump-allocates one object of `total_size` bytes (header + payload), stamps the header with
+    /// `descriptor_id`, and returns the data pointer (payload start; the header occupies the
+    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Returns `None` if
+    /// the heap is full. Does not run GC.
+    pub fn alloc_object(
+        &mut self,
+        total_size: usize,
+        descriptor_id: DescriptorId,
+    ) -> Option<std::ptr::NonNull<u8>> {
+        let ptr = heap_alloc(self, total_size, descriptor_id).ok()?;
+        std::ptr::NonNull::new(ptr)
+    }
+}
+
+/// Outcome of a bump-allocation attempt.
+#[derive(Debug)]
+pub(crate) enum AllocationError {
+    /// Heap is full and the requested size did not fit. GC can be triggered to
+    /// free up space and continue. If after GC there is still no space for the
+    /// allocation, converted to [`RuntimeError::OutOfHeapMemory`].
+    OutOfHeapMemory { requested: usize },
+    /// Runtime error, not recoverable.
+    RuntimeError(RuntimeError),
+}
+
+pub(crate) type AllocationResult<T> = Result<T, AllocationError>;
+
+impl From<RuntimeError> for AllocationError {
+    fn from(err: RuntimeError) -> Self {
+        Self::RuntimeError(err)
+    }
+}
+
+impl AllocationError {
+    /// Converts allocation error into non-recoverable [`RuntimeError`].
+    pub(crate) fn into_runtime_error(self) -> RuntimeError {
+        match self {
+            AllocationError::OutOfHeapMemory { requested } => {
+                RuntimeError::OutOfHeapMemory { requested }
+            },
+            AllocationError::RuntimeError(err) => err,
+        }
+    }
+}
+
+/// Runs allocation function; on [`AllocationError::OutOfHeapMemory`] runs GC
+/// once and retries again. If allocation fails on retry, returns a runtime
+/// error.
+pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
+) -> RuntimeResult<*mut u8> {
+    match try_alloc(heap) {
+        Ok(ptr) => Ok(ptr),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+            try_alloc(heap).map_err(AllocationError::into_runtime_error)
+        },
+        Err(e) => Err(e.into_runtime_error()),
+    }
+}
+
+/// Deep-copies the value tree at `root`.
+/// Automatically runs GC and retries when out of memory.
+///
+/// # Safety
+///
+/// `root` must point to the data region of a live object whose header is at
+/// `root - OBJECT_HEADER_SIZE`.
+pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    root: NonNull<u8>,
+) -> RuntimeResult<NonNull<u8>> {
+    // SAFETY: `root` is a live object (this function's contract).
+    let root_guard = unsafe { extra_roots.root_object(root.as_ptr()) };
+    // SAFETY: the rooted object is live, so its (possibly relocated) pointer is
+    // non-null.
+    match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr())) } {
+        Ok(ptr) => Ok(ptr),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+            // SAFETY: the handle kept the source live across GC; re-read its
+            // relocated, still-non-null pointer.
+            unsafe {
+                heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr()))
+                    .map_err(AllocationError::into_runtime_error)
+            }
+        },
+    }
+}
+
+/// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
+/// runs out of heap, collects garbage once (with the given roots) and retries.
+/// The deserialize counterpart to [`alloc_or_gc`] / [`deep_copy_or_gc`].
+///
+/// # Safety
+///
+/// `dst` must be writable for `ty`'s layout size, and `bytes` must not alias the
+/// heap, since a GC may relocate heap objects.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn deserialize_or_gc<
+    L: LayoutProvider + ?Sized,
+    P: DescriptorProvider + ?Sized,
+>(
+    layouts: &L,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    frame_ptr: *mut u8,
+    top_frame: TopFrame<'_>,
+) -> RuntimeResult<()> {
+    // SAFETY: forwarded from this function's contract.
+    match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
+        Ok(()) => Ok(()),
+        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(
+                heap,
+                provider,
+                rws,
+                extra_roots,
+                extensions,
+                frame_ptr,
+                top_frame,
+            )?;
+            // SAFETY: as above.
+            unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
+                .map_err(AllocationError::into_runtime_error)
+        },
+    }
+}
+
+/// Root-walking interface for the GC. Passed to each root source that iterates
+/// its allocations and calls [`Self::relocate`] per pointer, writing the
+/// returned value back into the slot.
+pub(crate) struct RootScanner<'a> {
+    /// From-space heap.
+    heap: &'a Heap,
+    /// Bump cursor in to-space. Advances during relocation.
+    free_ptr: *mut u8,
+}
+
+impl<'a> RootScanner<'a> {
+    /// Test-only constructor. Production code only sees a
+    /// `RootScanner` handed in by [`gc_collect`].
+    #[cfg(test)]
+    pub(crate) fn for_test(heap: &'a Heap, free_ptr: *mut u8) -> RootScanner<'a> {
+        RootScanner { heap, free_ptr }
+    }
+
+    /// Current to-space bump cursor.
+    pub(crate) fn cursor(&self) -> usize {
+        self.free_ptr as usize
+    }
+
+    /// Relocates a possibly-from-space pointer to its to-space address.
+    /// address. Returns [`None`] when pointer is null or does not belong to
+    /// the heap. Otherwise, returns the copy.
+    ///
+    /// Callers must uphold the object-header-integrity invariant
+    /// documented on [`gc_collect`]: if `ptr` is in-heap, its
+    /// header at `ptr - OBJECT_HEADER_SIZE` must be valid.
+    pub(crate) fn relocate(&mut self, ptr: *mut u8) -> Option<*mut u8> {
+        if ptr.is_null() || !is_heap_ptr(self.heap, ptr) {
+            return None;
+        }
+        Some(gc_copy_object(ptr, &mut self.free_ptr))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,34 +449,27 @@ impl Heap {
 /// only need to populate the data region (e.g. vector length, captured
 /// values).
 ///
-/// Triggers GC if the bump allocator is full; fails on OOM after GC.
-///
-/// `fp`, `current_func`, `pc` describe the top of the call stack so that GC
-/// (if triggered) can walk frames to find roots. `pinned_roots` is the
-/// auxiliary root set.
-fn heap_alloc(
+/// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
+/// so the caller can trigger GC and retry.
+pub(crate) fn heap_alloc(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> ExecutionResult<*mut u8> {
+) -> AllocationResult<*mut u8> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
     // past the bound.
     let aligned_size = checked_align_max(total_size).ok_or_else(|| {
-        anyhow::anyhow!("heap_alloc: size {} overflows after alignment", total_size)
+        AllocationError::from(RuntimeError::AllocationTooLarge {
+            requested: total_size,
+        })
     })?;
     debug_assert!(aligned_size >= OBJECT_HEADER_SIZE);
     if aligned_size > MAX_SINGLE_ALLOCATION_SIZE {
-        bail!(
-            "heap_alloc: size {} exceeds maximum single allocation size",
-            aligned_size
-        );
+        return Err(AllocationError::from(RuntimeError::AllocationTooLarge {
+            requested: aligned_size,
+        }));
     }
 
     // Bound check uses integer arithmetic on addresses rather than
@@ -244,24 +478,56 @@ fn heap_alloc(
     // the end of the buffer is UB, so we cannot legally form the
     // out-of-bounds pointer just to compare it.
     if !fits_in_buffer(heap, aligned_size) {
-        gc_collect(heap, descriptors, pinned_roots, fp, current_func, pc)?;
-        if !fits_in_buffer(heap, aligned_size) {
-            bail!(
-                "out of heap memory after GC (requested {} bytes)",
-                aligned_size
-            );
-        }
+        return Err(AllocationError::OutOfHeapMemory {
+            requested: aligned_size,
+        });
     }
 
     unsafe {
         let header_start = heap.bump_ptr;
         heap.bump_ptr = header_start.add(aligned_size);
+        // TODO(perf): this O(size) memset is redundant for `EnumNew` /
+        // `PackVariant`, which immediately overwrite the tag and every field of
+        // the active variant. A pack-aware non-zeroing path could skip it (a
+        // material win for large/wide-variant enums). It is not a drop-in
+        // change: `gc_copy_object` / `deep_copy` copy the full object image
+        // including dead-variant tail and inter-field padding, which is
+        // deterministically zero today; leaving it uninitialized makes that
+        // image carry stale heap bytes. Prefer zeroing only the
+        // tail/padding the active variant does not write (still skipping the
+        // large active body), or audit that no byte-image consumer
+        // (state commit / hashing) depends on those bytes first.
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
-        write_descriptor(obj_ptr, descriptor_id.as_u32());
-        write_obj_size(obj_ptr, aligned_size as u32);
+        write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
         Ok(obj_ptr)
     }
+}
+
+/// Reserve `total_size` bytes (object header + payload) on the heap, running a
+/// GC and retrying once on out-of-memory. Shared tail of the `alloc_*` entry
+/// points below, which differ only in how `total_size` is computed.
+fn alloc_sized<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    total_size: usize,
+    descriptor_id: DescriptorId,
+) -> RuntimeResult<*mut u8> {
+    alloc_or_gc(
+        heap,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
+        fp,
+        top_frame,
+        |h| heap_alloc(h, total_size, descriptor_id),
+    )
 }
 
 /// Allocate a new vector object on the heap.
@@ -270,66 +536,107 @@ fn heap_alloc(
 /// before needing to grow — *not* a byte size. Total bytes allocated
 /// are roughly `capacity_in_elems * elem_size + OBJECT_HEADER_SIZE +
 /// VEC_DATA_OFFSET`, rounded up to `MAX_ALIGN`.
-pub(crate) fn alloc_vec(
+pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
     elem_size: u32,
     capacity_in_elems: u64,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     let total_size = (capacity_in_elems as usize)
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or_else(|| anyhow::anyhow!("alloc_vec: size overflow"))?;
-    heap_alloc(
+        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
+    // `length` defaults to 0 via heap_alloc's zero-init.
+    alloc_sized(
         heap,
-        descriptors,
-        pinned_roots,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
         fp,
-        current_func,
-        pc,
+        top_frame,
         total_size,
         descriptor_id,
     )
-    // `length` defaults to 0 via heap_alloc's zero-init.
 }
 
 /// Allocate a new zeroed heap object (struct or enum). Size comes from the
 /// descriptor at `descriptor_id`.
-pub(crate) fn alloc_obj(
+pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
+    top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
-) -> ExecutionResult<*mut u8> {
-    let payload_size = match descriptors[descriptor_id.as_usize()].inner() {
+) -> RuntimeResult<*mut u8> {
+    let desc = match provider.descriptor(descriptor_id) {
+        Some(desc) => desc,
+        None => invariant_violation!(DescriptorNotFound {
+            descriptor_id: descriptor_id.as_u32(),
+        }),
+    };
+    let payload_size = match desc.inner() {
         ObjectDescriptorInner::Struct { size, .. } => *size as usize,
         ObjectDescriptorInner::Enum { size, .. } => *size as usize,
         ObjectDescriptorInner::Closure => CLOSURE_DATA_SIZE,
-        ObjectDescriptorInner::CapturedData { size, .. } => {
-            // Add the 8-byte tag+padding prefix to the values-region size.
-            CAPTURED_DATA_VALUES_OFFSET + *size as usize
+        // These descriptors carry no intrinsic size, so their objects are
+        // allocated through explicit-size entry points, not this path.
+        ObjectDescriptorInner::Trivial
+        | ObjectDescriptorInner::Vector { .. }
+        | ObjectDescriptorInner::CapturedData { .. } => {
+            invariant_violation!(NonAllocatableDescriptor {
+                descriptor_id: descriptor_id.as_u32(),
+            });
         },
-        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => bail!(
-            "alloc_obj called with non-allocatable descriptor {}",
-            descriptor_id
-        ),
     };
-    heap_alloc(
+    let total_size = OBJECT_HEADER_SIZE + payload_size;
+    alloc_sized(
         heap,
-        descriptors,
-        pinned_roots,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
         fp,
-        current_func,
-        pc,
-        OBJECT_HEADER_SIZE + payload_size,
+        top_frame,
+        total_size,
+        descriptor_id,
+    )
+}
+
+/// Allocate a closure's captured-data object. The values-region `values_size`
+/// is a parameter, not read from the descriptor, so layouts sharing a trace
+/// shape share one `descriptor_id`: `Trivial` when pointer-free, else a
+/// `CapturedData` descriptor.
+pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    values_size: u32,
+    descriptor_id: DescriptorId,
+) -> RuntimeResult<*mut u8> {
+    let total_size = OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + values_size as usize;
+    alloc_sized(
+        heap,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
+        fp,
+        top_frame,
+        total_size,
         descriptor_id,
     )
 }
@@ -347,17 +654,18 @@ pub(crate) fn alloc_obj(
 /// relocates objects; the fat pointer's base in `heap_ptr_offsets` and the
 /// vector pointer in the struct's `pointer_offsets` are updated by the GC.
 /// We re-read through the fat pointer after allocation.
-pub(crate) fn grow_vec_ref(
+pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    current_func: NonNull<Function>,
-    pc: usize,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    top_frame: TopFrame<'_>,
     fp: *mut u8,
     vec_ref_offset: usize,
     elem_size: u32,
     required_cap_in_elems: u64,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     unsafe {
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
@@ -381,11 +689,12 @@ pub(crate) fn grow_vec_ref(
         // alloc_vec may trigger GC. Re-read through the fat pointer afterward.
         let new_ptr = alloc_vec(
             heap,
-            descriptors,
-            pinned_roots,
+            provider,
+            rws,
+            extra_roots,
+            extensions,
             fp,
-            current_func,
-            pc,
+            top_frame,
             descriptor_id,
             elem_size,
             new_cap_in_elems,
@@ -414,8 +723,19 @@ pub(crate) fn grow_vec_ref(
 // Garbage collection
 // ---------------------------------------------------------------------------
 
+/// Identifies the top stack frame for GC root scanning.
+//
+// TODO(cleanup): revisit whether this enum is the cleanest representation.
+#[derive(Clone, Copy)]
+pub(crate) enum TopFrame<'a> {
+    /// A regular Move function frame; `pc` selects the safe-point supplement.
+    Function { func: NonNull<Function>, pc: usize },
+    /// A native function frame; its arg slots hold the roots.
+    Native(&'a NativeABI),
+}
+
 /// Run Cheney's copying GC. Walks the call stack to find roots via
-/// per-function pointer slot lists, scans [`PinnedRoots`], then does a
+/// per-function pointer slot lists, scans the [`RootPool`], then does a
 /// breadth-first copy of all reachable objects.
 ///
 /// # Safety assumptions
@@ -436,14 +756,15 @@ pub(crate) fn grow_vec_ref(
 ///   in every heap object header are set by the allocator and never
 ///   overwritten by user code. Corrupted headers → wrong copy size or
 ///   wrong reference tracing (UB).
-pub(crate) fn gc_collect(
+pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
     frame_ptr: *mut u8,
-    current_func: NonNull<Function>,
-    pc_top: usize,
-) -> ExecutionResult<()> {
+    top_frame: TopFrame<'_>,
+) -> Result<(), RuntimeInvariantViolation> {
     heap.gc_count += 1;
 
     let to_space = MemoryRegion::new(heap.buffer.len());
@@ -454,74 +775,87 @@ pub(crate) fn gc_collect(
     // `to_space.end()`, which is the one-past-end address that pointer
     // arithmetic permits. A `+ H` bias would let it overshoot when all
     // of from-space survives, producing UB on `.add` / `.sub`.
-    let mut free_ptr = to_space.as_ptr();
+    let mut scanner = RootScanner {
+        heap,
+        free_ptr: to_space.as_ptr(),
+    };
 
-    // Phase 1: scan roots from the call stack.
-    //
-    // For each frame we scan two sets of pointer offsets:
-    //   1. `frame_layout.heap_ptr_offsets` — always applies.
-    //   2. The matching `safe_point_layouts` entry for the frame's
-    //      current PC, if any — provides additional pointer offsets
-    //      that are only valid at that specific safe point.
-    //
-    // PC tracking: the topmost frame uses `pc_top`. For caller frames,
-    // the saved PC is read from the callee's frame metadata (the return
-    // address stored when returning from a call).
+    // Phase 1a: scan roots from the call stack. The top frame is either a
+    // regular function (scanned via `frame_layout` plus the `safe_point_layouts`
+    // entry for its current pc, per `SafePointEntry`'s top-frame-only contract)
+    // or a native (scanned via the arg pointer slots in its ABI). Caller-below
+    // frames are always regular functions and use `frame_layout` alone.
+    match top_frame {
+        TopFrame::Function { func, pc } => {
+            // SAFETY: func is valid (caller's invariant).
+            let top_func = unsafe { func.as_ref() };
+            unsafe {
+                gc_scan_frame_roots(
+                    &mut scanner,
+                    frame_ptr,
+                    &top_func.frame_layout.heap_ptr_offsets,
+                );
+                if let Some(sp_layout) = top_func.safe_point_layout_at(pc) {
+                    gc_scan_frame_roots(&mut scanner, frame_ptr, &sp_layout.heap_ptr_offsets);
+                }
+            }
+        },
+        TopFrame::Native(abi) => {
+            // SAFETY: a native's arg slots hold the references passed to it.
+            unsafe {
+                gc_scan_frame_roots(&mut scanner, frame_ptr, abi.heap_ptr_offsets());
+            }
+        },
+    }
+
+    // Walk caller frames with frame_layout only.
     let mut fp = frame_ptr;
-    let mut func_ptr = current_func;
-    let mut pc = pc_top;
-
     loop {
-        // SAFETY: func_ptr is a valid, non-null pointer — set by the call
-        // instruction and saved/restored via frame metadata. These pointers
-        // are valid for the lifetime of the module and not freed during
-        // execution. `fp.sub` retrieves saved metadata written by the call
-        // protocol.
-        let func = unsafe { func_ptr.as_ref() };
+        // SAFETY: `fp.sub(FRAME_METADATA_SIZE)` reads metadata written
+        // by the call protocol when this frame's callee was created.
+        // Arena pointers are valid for the executable's lifetime.
+        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
+        let saved_func_ptr =
+            unsafe { read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) } as *const Function;
+        if saved_func_ptr.is_null() {
+            break;
+        }
+        fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
+        // SAFETY: non-null checked above.
+        let caller_func_ptr = unsafe { NonNull::new_unchecked(saved_func_ptr as *mut Function) };
+        let caller_func = unsafe { caller_func_ptr.as_ref() };
         unsafe {
-            // Scan base pointer offsets (always active).
-            let base_offsets = &func.frame_layout.heap_ptr_offsets;
-            gc_scan_frame_roots(heap, fp, base_offsets, &mut free_ptr);
-
-            // Scan safe-point-specific pointer offsets, if any.
-            if let Some(sp_layout) = func.safe_point_layout_at(pc) {
-                gc_scan_frame_roots(heap, fp, &sp_layout.heap_ptr_offsets, &mut free_ptr);
-            }
-
-            let meta = fp.sub(FRAME_METADATA_SIZE);
-            let saved_func_ptr = read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
-            if saved_func_ptr.is_null() {
-                break;
-            }
-            pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
-            fp = read_ptr(meta, META_SAVED_FP_OFFSET);
-            // SAFETY: saved_func_ptr is non-null — we checked for the
-            // null sentinel above and would have broken out of the loop.
-            func_ptr = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+            gc_scan_frame_roots(&mut scanner, fp, &caller_func.frame_layout.heap_ptr_offsets);
         }
     }
 
-    // Phase 1b: scan the auxiliary pinned-roots set.
+    // Phase 1b: scan the extra roots (the interpreter's pins or a native's
+    // rooted handles).
+    // SAFETY: GC is stop-the-world, so no handle read overlaps; the closure only
+    // relocates via the scanner and never re-enters the pool.
+    unsafe { extra_roots.relocate_each(|base| scanner.relocate(base)) };
+
+    // Phase 1c: resource read-write set. Working-map and journal writes
+    // point into the local heap and must be relocated alongside the call
+    // stack and pinned roots.
+    rws.scan(&mut scanner);
+
+    // Phase 1d: native extension roots.
     //
-    // SAFETY: `update_in_place` requires that its callback neither pin
-    // new objects nor drop `PinGuard`s tied to this `PinnedRoots`. Our
-    // callback only calls `gc_copy_object` and `is_heap_ptr`, which don't
-    // touch the pinned-roots set.
+    // TODO(correctness): a native holding an extension borrow across an
+    // allocation makes this a hard error; revisit how to guarantee exclusive
+    // access here (e.g. relocating only the disjoint root set).
     unsafe {
-        pinned_roots.update_in_place(|old_ptr| {
-            if is_heap_ptr(heap, old_ptr) {
-                gc_copy_object(old_ptr, &mut free_ptr)
-            } else {
-                old_ptr
-            }
-        });
+        extensions
+            .relocate_all_roots(&mut |base| scanner.relocate(base))
+            .map_err(|_| RuntimeInvariantViolation::ExtensionBorrowedDuringGC)?;
     }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
     // `scan_ptr` is a raw cursor — header start of the next object to
     // scan. Object pointers (data starts) are `scan_ptr + H`.
     let mut scan_ptr = to_space.as_ptr();
-    while (scan_ptr as usize) < (free_ptr as usize) {
+    while (scan_ptr as usize) < scanner.cursor() {
         // SAFETY: scan_ptr advances through to-space by each object's
         // aligned size. Object headers were copied verbatim by
         // gc_copy_object, so descriptor_id and size are valid as long
@@ -532,16 +866,13 @@ pub(crate) fn gc_collect(
             let obj_size = read_obj_size(obj_ptr) as usize;
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
-                bail!(
-                    "GC scan: invalid object size {} (expected non-zero, MAX_ALIGN-byte aligned)",
-                    obj_size
-                );
+                return Err(RuntimeInvariantViolation::GcInvalidObjectSize { size: obj_size });
             }
 
             if descriptor_id == FORWARDED_MARKER {
-                bail!("GC found forwarding marker in to-space (invariant violation)");
+                return Err(RuntimeInvariantViolation::GcForwardingMarkerInToSpace);
             }
-            gc_scan_object(descriptors, heap, obj_ptr, descriptor_id, &mut free_ptr);
+            gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
@@ -550,6 +881,7 @@ pub(crate) fn gc_collect(
     // Phase 3: swap — drop old heap, adopt new one. The bump cursor
     // semantics match `free_ptr` directly (both are raw header-start
     // cursors).
+    let RootScanner { free_ptr, .. } = scanner;
     heap.buffer = to_space;
     heap.bump_ptr = free_ptr;
     Ok(())
@@ -569,7 +901,7 @@ pub(crate) fn gc_collect(
 /// `obj_ptr == end` is unreachable in practice. The bound is written
 /// to match the semantic invariant so it stays correct under future
 /// changes.
-fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
+pub(crate) fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
     let start = heap.buffer.as_ptr() as usize;
     let end = start + heap.buffer.len();
     let p = ptr as usize;
@@ -577,25 +909,19 @@ fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
 }
 
 /// Scan a set of pointer offsets in a frame, copying any heap objects
-/// they reference into to-space and updating the frame slots.
+/// they reference into to-space (via `scanner`) and updating the frame
+/// slots.
 ///
 /// # Safety
 ///
 /// - `fp` must point to a valid frame.
 /// - Each entry in `offsets` must be a valid 8-byte-aligned offset within
 ///   the frame's extended size.
-/// - `free_ptr` must point into to-space with sufficient room.
-unsafe fn gc_scan_frame_roots(
-    heap: &Heap,
-    fp: *mut u8,
-    offsets: &[FrameOffset],
-    free_ptr: &mut *mut u8,
-) {
+unsafe fn gc_scan_frame_roots(scanner: &mut RootScanner<'_>, fp: *mut u8, offsets: &[FrameOffset]) {
     unsafe {
         for &offset in offsets {
             let old_ptr = read_ptr(fp, offset);
-            if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                let new_ptr = gc_copy_object(old_ptr, free_ptr);
+            if let Some(new_ptr) = scanner.relocate(old_ptr) {
                 write_ptr(fp, offset, new_ptr);
             }
         }
@@ -666,23 +992,19 @@ fn gc_copy_object(old_ptr: *mut u8, free_ptr: &mut *mut u8) -> *mut u8 {
 ///   the reference layout of the object.
 /// - `free_ptr` must point to the next free byte in to-space with enough
 ///   room for any objects that will be copied.
-fn gc_scan_object(
-    descriptors: &[ObjectDescriptor],
-    heap: &Heap,
+fn gc_scan_object<P: DescriptorProvider + ?Sized>(
+    provider: &P,
+    scanner: &mut RootScanner<'_>,
     obj_ptr: *mut u8,
-    descriptor_id: u32,
-    free_ptr: &mut *mut u8,
-) {
-    debug_assert!(
-        (descriptor_id as usize) < descriptors.len(),
-        "gc_scan_object: descriptor_id {} out of bounds (have {} descriptors)",
-        descriptor_id,
-        descriptors.len()
-    );
-    let desc = if (descriptor_id as usize) < descriptors.len() {
-        &descriptors[descriptor_id as usize]
-    } else {
-        return;
+    descriptor_id: DescriptorId,
+) -> Result<(), RuntimeInvariantViolation> {
+    let desc = match provider.descriptor(descriptor_id) {
+        Some(d) => d,
+        None => {
+            return Err(RuntimeInvariantViolation::DescriptorNotFound {
+                descriptor_id: descriptor_id.as_u32(),
+            })
+        },
     };
 
     // All offsets below are relative to `obj_ptr` (the data-region
@@ -698,7 +1020,7 @@ fn gc_scan_object(
         } => {
             debug_assert!(*elem_size > 0, "elem_size must not be zero");
             if elem_pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             unsafe {
                 let length = read_u64(obj_ptr, VEC_LENGTH_OFFSET) as usize;
@@ -708,8 +1030,7 @@ fn gc_scan_object(
                     let elem_base = data_start.add(i * (*elem_size as usize));
                     for &ptr_off in elem_pointer_offsets {
                         let old_ptr = read_ptr(elem_base, ptr_off as usize);
-                        if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                            let new_ptr = gc_copy_object(old_ptr, free_ptr);
+                        if let Some(new_ptr) = scanner.relocate(old_ptr) {
                             write_ptr(elem_base, ptr_off as usize, new_ptr);
                         }
                     }
@@ -720,13 +1041,12 @@ fn gc_scan_object(
             pointer_offsets, ..
         } => {
             if pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             unsafe {
                 for &off in pointer_offsets {
                     let old_ptr = read_ptr(obj_ptr, off as usize);
-                    if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                        let new_ptr = gc_copy_object(old_ptr, free_ptr);
+                    if let Some(new_ptr) = scanner.relocate(old_ptr) {
                         write_ptr(obj_ptr, off as usize, new_ptr);
                     }
                 }
@@ -738,17 +1058,22 @@ fn gc_scan_object(
         } => unsafe {
             let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET) as usize;
             if tag >= variant_pointer_offsets.len() {
-                return;
+                // A tag past the variant count means a corrupt object; surface
+                // it as an invariant violation.
+                return Err(RuntimeInvariantViolation::EnumTagOutOfRange {
+                    tag: tag as u64,
+                    variant_count: variant_pointer_offsets.len(),
+                });
             }
             let pointer_offsets = &variant_pointer_offsets[tag];
             if pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             for &off in pointer_offsets {
-                let old_ptr = read_ptr(obj_ptr, ENUM_DATA_OFFSET + off as usize);
-                if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                    let new_ptr = gc_copy_object(old_ptr, free_ptr);
-                    write_ptr(obj_ptr, ENUM_DATA_OFFSET + off as usize, new_ptr);
+                let abs_off = ENUM_DATA_OFFSET + off as usize;
+                let old_ptr = read_ptr(obj_ptr, abs_off);
+                if let Some(new_ptr) = scanner.relocate(old_ptr) {
+                    write_ptr(obj_ptr, abs_off, new_ptr);
                 }
             }
         },
@@ -757,27 +1082,32 @@ fn gc_scan_object(
             // fixed data-region offset.
             let off = CLOSURE_CAPTURED_DATA_PTR_OFFSET;
             let old_ptr = read_ptr(obj_ptr, off);
-            if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                let new_ptr = gc_copy_object(old_ptr, free_ptr);
+            if let Some(new_ptr) = scanner.relocate(old_ptr) {
                 write_ptr(obj_ptr, off, new_ptr);
             }
         },
-        ObjectDescriptorInner::CapturedData {
-            pointer_offsets, ..
-        } => {
+        ObjectDescriptorInner::CapturedData { pointer_offsets } => {
             if pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             unsafe {
                 for &off in pointer_offsets {
                     let abs_off = CAPTURED_DATA_VALUES_OFFSET + off as usize;
+                    // Shared across objects of different `values_size`
+                    // (offset-shape dedup), so `off` isn't bounded by this
+                    // object's size; the layout guarantees `values_size >=
+                    // off + 8`. Assert it for this object.
+                    debug_assert!(
+                        abs_off + 8 <= read_obj_size(obj_ptr) as usize - OBJECT_HEADER_SIZE,
+                        "captured-data pointer offset {off} exceeds object payload"
+                    );
                     let old_ptr = read_ptr(obj_ptr, abs_off);
-                    if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                        let new_ptr = gc_copy_object(old_ptr, free_ptr);
+                    if let Some(new_ptr) = scanner.relocate(old_ptr) {
                         write_ptr(obj_ptr, abs_off, new_ptr);
                     }
                 }
             }
         },
     }
+    Ok(())
 }

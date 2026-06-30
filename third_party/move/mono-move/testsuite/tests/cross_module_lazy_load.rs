@@ -9,11 +9,12 @@
 //! `CallIndirect` at runtime lazily loads it through the transaction
 //! context.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
-use mono_move_gas::SimpleGasMeter;
+use mono_move_core::{types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
-use mono_move_runtime::InterpreterContext;
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_runtime::{
+    ExecutionContext, InterpreterContext, ProductionNativeRegistry, TransactionContext,
+};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -36,14 +37,21 @@ fn call_indirect_triggers_lazy_module_load() {
     // -- Build the global context and lazy loader ------------------------
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
+    let natives = ProductionNativeRegistry::new();
     let loader = Loader::new_with_policy(
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
     );
 
     // -- Wrap into a TransactionContext ---------------------------
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(u64::MAX));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        GasMeter::with_max_budget(),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+        &natives,
+    );
 
     // -- Resolve bar::main through the txn_ctx ---------------------------
     // This lazily loads `bar` (via the loader) and returns a pointer to
@@ -64,7 +72,7 @@ fn call_indirect_triggers_lazy_module_load() {
     // SAFETY: `main_ptr` came from the executable cache, which is kept
     // alive by `guard` for the duration of this test.
     let main_fn = unsafe { main_ptr.as_ref_unchecked() };
-    let mut interp = InterpreterContext::new(&mut txn_ctx, &[], main_fn);
+    let mut interp = InterpreterContext::new(&mut txn_ctx, main_fn);
     interp.set_root_arg(0, &41u64.to_le_bytes());
     interp.run().expect("execution should succeed");
 

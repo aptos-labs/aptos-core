@@ -209,36 +209,36 @@ they will be of `bv` types in all instances of the function or the struct when t
 ## Built-in functions
 
 MSL supports a number of built-in constants and functions. Most of them are not available in the Move
-language:
+language. The two-state mutation predicates (`publish`, `remove`, `update`) are only meaningful in
+contexts that compare pre- and post-state, such as `ensures` clauses.
 
-- `MAX_U8: num`, `MAX_U64: num`, `MAX_U128: num` return the maximum value of the corresponding
-  type.
-- `exists<T>(address): bool` returns true if the resource `T` exists at the address.
-- `global<T>(address): T` returns the resource value at the address.
-- `len<T>(vector<T>): num` returns the length of the vector.
-- `update<T>(vector<T>, num, T): vector<T>` returns a new vector with the element replaced at the
-  given index.
-- `vec<T>(): vector<T>` returns an empty vector.
-- `vec<T>(x): vector<T>` returns a singleton vector.
-- `concat<T>(vector<T>, vector<T>): vector<T>` returns the concatenation of the parameters.
-- `contains<T>(vector<T>, T): bool` returns true if the element is in the vector.
-- `index_of<T>(vector<T>, T): num` returns the index of the element in the vector, or the length of
-  the vector if it does not contain it.
-- `range<T>(vector<T>): range` returns the index range of the vector.
-- `in_range<T>(vector<T>, num): bool` returns true if the number is in the index range of the
-  vector.
-- `in_range<T>(range, num): bool` returns true if the number is in the range.
-- `update_field(S, F, T): S` updates a field in a struct, preserving the values of other fields,
-  where `S` is some struct, `F` the name of a field in `S`, and `T` a value for this field.
-- `old(T): T` delivers the value of the passed argument at point of entry into a Move function. This
-  is allowed in
-  `ensures` post-conditions,
-  inline spec blocks (with additional restrictions), and
-  certain forms of invariants, as discussed later.
-- `TRACE(T): T` is semantically the identity function and causes visualization of the argument's
-  value in error messages created by the prover.
-- `int2bv(v)` explicitly converts an integer `v` into its `bv` representation.
-- `bv2int(b)` explicitly converts a `bv` integer `b` into the `num` representation. However, its use is not encouraged due to efficiency issues.
+<div class="signature-table">
+
+| Signature | Description |
+| --- | --- |
+| `bv2int(b)` | Explicitly converts a `bv` integer `b` into the `num` representation. Use is discouraged due to efficiency. |
+| `concat<T>(vector<T>, vector<T>): vector<T>` | Concatenation of the two vectors. |
+| `contains<T>(vector<T>, T): bool` | True if the element is in the vector. |
+| `exists<T>(address): bool` | True if the resource `T` exists at the address. |
+| `global<T>(address): T` | The resource value at the address. |
+| `index_of<T>(vector<T>, T): num` | Index of the element in the vector, or the length of the vector if absent. |
+| `in_range<T>(range, num): bool` | True if the number is in the range. |
+| `in_range<T>(vector<T>, num): bool` | True if the number is a valid index of the vector. |
+| `int2bv(v)` | Explicitly converts an integer `v` into its `bv` representation. |
+| `len<T>(vector<T>): num` | Length of the vector. |
+| `MAX_U8`, `MAX_U16`, `MAX_U32`, `MAX_U64`, `MAX_U128`, `MAX_U256: num` | Maximum value of the corresponding integer type. |
+| `old(T): T` | Value of the argument at the point of entry into the Move function. Allowed in `ensures` post-conditions, inline spec blocks (with restrictions), and certain forms of invariants. |
+| `publish<T: key>(address, T): bool` | Two-state: true iff resource `T` did not exist at the address in the pre-state and exists with the given value in the post-state. |
+| `range<T>(vector<T>): range` | Index range of the vector. |
+| `remove<T: key>(address): bool` | Two-state: true iff resource `T` existed at the address in the pre-state and does not exist in the post-state. |
+| `TRACE(T): T` | Identity function that causes visualization of the argument's value in prover error messages. |
+| `update<T: key>(address, T): bool` | Two-state: true iff resource `T` existed at the address in the pre-state and has the given value in the post-state. |
+| `update<T>(vector<T>, num, T): vector<T>` | New vector with the element replaced at the given index. |
+| `update_field(S, F, T): S` | Updates a field in a struct, preserving the values of other fields. `S` is some struct, `F` the name of a field in `S`, and `T` a value for the field. |
+| `vec<T>(): vector<T>` | Empty vector. |
+| `vec<T>(x): vector<T>` | Singleton vector containing `x`. |
+
+</div>
 
 Built-in functions live in an unnamed outer scope of a module. If the module defines a function `len`,
 then this definition will shadow that of the according built-in function. To access the built-in

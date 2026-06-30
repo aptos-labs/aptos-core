@@ -3,11 +3,13 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext, LocalExecutionContext};
-use mono_move_gas::SimpleGasMeter;
+use mono_move_core::{types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
-use mono_move_runtime::{ExecutionError, InterpreterContext};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_runtime::{
+    ExecutionContext, InterpreterContext, LocalRuntimeContext, ProductionNativeRegistry,
+    RuntimeError, TransactionContext,
+};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -28,15 +30,20 @@ module 0x1::test {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader =
-        Loader::new_with_policy(&guard, &provider, LoadingPolicy::Lazy(LoweringPolicy::Lazy));
+    let natives = ProductionNativeRegistry::new();
+    let loader = Loader::new_with_policy(
+        &guard,
+        &provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
+    );
 
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("test"));
     let fib_name = guard
         .intern_identifier(ident_str!("fib"))
         .into_global_arena_ptr();
     let mut read_set = ModuleReadSet::new();
-    let mut load_gas = SimpleGasMeter::new(u64::MAX);
+    let mut load_gas = GasMeter::with_max_budget();
     let fib = loader
         .load_function(
             &mut read_set,
@@ -50,11 +57,11 @@ module 0x1::test {
     // SAFETY: `fib` is held alive by the executable cache via `guard`.
     let fib = unsafe { fib.as_ref_unchecked() };
 
-    let mut exec_ctx = LocalExecutionContext::with_budget(10);
-    let mut interpreter = InterpreterContext::new(&mut exec_ctx, &[], fib);
+    let mut exec_ctx = LocalRuntimeContext::with_budget(10);
+    let mut interpreter = InterpreterContext::new(&mut exec_ctx, fib);
     interpreter.set_root_arg(0, &10u64.to_le_bytes());
     let err = interpreter.run().unwrap_err();
-    assert!(matches!(err, ExecutionError::GasExhausted(_)));
+    assert!(matches!(err, RuntimeError::GasExhausted(_)));
 }
 
 /// `load_function` errors when the gas budget is too small to cover the
@@ -70,13 +77,21 @@ fn test_out_of_gas_during_load() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
+    // 1 gas unit — far below the byte-length cost of any real module.
+    let natives = ProductionNativeRegistry::new();
     let loader = Loader::new_with_policy(
         &guard,
         &module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &natives,
     );
     // 1 gas unit — far below the byte-length cost of any real module.
-    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(1));
+    let mut txn_ctx = TransactionContext::new(
+        loader,
+        GasMeter::new(1),
+        &mono_move_core::NO_RESOURCE_PROVIDER,
+        &natives,
+    );
 
     let id = guard
         .intern_address_name(&AccountAddress::ONE, ident_str!("test"))

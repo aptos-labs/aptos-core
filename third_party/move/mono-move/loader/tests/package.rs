@@ -3,10 +3,9 @@
 
 //! Integration tests for the Package loading policy.
 
-use mono_move_core::types::EMPTY_TYPE_LIST;
-use mono_move_gas::{GasMeter, SimpleGasMeter};
+use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, ModuleRead, ModuleReadSet, ModuleState};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -31,13 +30,14 @@ fn load_package_cache_miss_loads_all_members() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
+    let loader =
+        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
     let exec = loader.load_module(&mut read_set, &mut gas, id_a).unwrap();
 
     // Both package members must be in the read-set.
@@ -75,20 +75,15 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
+    let loader =
+        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
-    let id_a = guard
-        .intern_module_id(&ModuleId::new(
-            AccountAddress::ONE,
-            ident_str!("a").to_owned(),
-        ))
-        .into_global_arena_ptr();
-    let id_b = guard
-        .intern_module_id(&ModuleId::new(
-            AccountAddress::ONE,
-            ident_str!("b").to_owned(),
-        ))
-        .into_global_arena_ptr();
+    let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
+    let id_b_module = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());
+    let id_a_key = guard.intern_module_id(&id_a_module);
+    let id_b_key = guard.intern_module_id(&id_b_module);
+    let id_a = id_a_key.into_global_arena_ptr();
+    let id_b = id_b_key.into_global_arena_ptr();
     let name_f = guard
         .intern_identifier(ident_str!("f"))
         .into_global_arena_ptr();
@@ -97,17 +92,49 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
         .into_global_arena_ptr();
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
 
-    // 1. Lowering `a::f` side-loads `b` for layout of `b::S`.
+    // 1. `a::f` takes `b::S` by value, so lowering it walks `S` and side-loads
+    //    `b` as a metered read. `S` is a concrete inline struct, so the
+    //    specializer derives its GC layout and `a::f` lowers successfully. That
+    //    layout-only side-load leaves `b` recorded as a metered read: only its
+    //    layout was needed, so its mandatory-dependency set isn't computed yet.
     loader
         .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
-        .expect("load_function(a::f) must succeed");
+        .expect("load_function(a::f) must lower now that inline structs are supported");
+    assert!(
+        matches!(
+            read_set.get(id_b_key),
+            Some(ModuleRead::Loaded {
+                state: ModuleState::Metered,
+                ..
+            })
+        ),
+        "expected `b` to be recorded as a metered side-load after lowering `a::f`"
+    );
 
-    // 2. Dispatch to `b::g`. Must promote `b` to ready and return the function successfully.
+    // 2. `b::g` is nominal-free, so dispatching to it succeeds. The package
+    //    policy must promote the already-metered `b` to ReadyForLowering
+    //    rather than re-loading or bailing.
     loader
         .load_function(&mut read_set, &mut gas, id_b, name_g, EMPTY_TYPE_LIST)
         .expect("load_function(b::g) must promote b, not bail");
+    assert!(matches!(
+        read_set.get(id_b_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::ReadyForLowering,
+            ..
+        })
+    ));
+    // `a` is loaded via the package policy at the very start of step 1, so it
+    // should also be ready by now — confirms step 2 didn't regress its state.
+    assert!(matches!(
+        read_set.get(id_a_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::ReadyForLowering,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -122,20 +149,21 @@ fn load_package_cache_hit_walks_dependencies() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
+    let loader =
+        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);
 
     // Prime the cache with a full package load.
     let mut rs1 = ModuleReadSet::new();
-    let mut g1 = SimpleGasMeter::new(u64::MAX);
+    let mut g1 = GasMeter::with_max_budget();
     loader.load_module(&mut rs1, &mut g1, id_a).unwrap();
 
     // Second call with a fresh read-set must hit the cache and charge both
     // members without fetching.
     let mut rs2 = ModuleReadSet::new();
-    let mut g2 = SimpleGasMeter::new(u64::MAX);
+    let mut g2 = GasMeter::with_max_budget();
     let before = g2.balance();
     loader.load_module(&mut rs2, &mut g2, id_a).unwrap();
     let charged = before - g2.balance();

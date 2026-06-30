@@ -7,10 +7,10 @@ description = "Move examples"
 license = "Apache-2.0"
 publish = false
 
+[features]
+
 [dependencies]
 
 [dev-dependencies]
 move-prover = { workspace = true }
 move-stdlib = { path = "../move-stdlib" }
-
-[features]

@@ -1,0 +1,10 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/spec_fun_old_param.move:31:9
+   │
+31 │         ensures counter_increased(_c); // should fail: counter did not change
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/spec_fun_old_param.move:29: noop
+   =         _c = <redacted>
+   =     at tests/sources/functional/state_labels/spec_fun_old_param.move:31: noop (spec)

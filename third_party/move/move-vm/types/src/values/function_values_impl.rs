@@ -1,14 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, Value};
+use crate::values::{
+    DepthDisplay, DeserializationSeed, SerializationReadyValue, VMValueCast, Value,
+};
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
+    value::{check_layout_within_bounds, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use serde::{
@@ -96,13 +98,20 @@ impl Debug for Closure {
     }
 }
 
+pub(crate) fn fmt_closure(c: &Closure, f: &mut Formatter<'_>, depth: usize) -> fmt::Result {
+    let Closure(fun, captured) = c;
+    let captured = fun.closure_mask().format_arguments(
+        captured
+            .iter()
+            .map(|v| DepthDisplay(v, depth + 1).to_string())
+            .collect(),
+    );
+    write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
+}
+
 impl Display for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(fun, captured) = self;
-        let captured = fun
-            .closure_mask()
-            .format_arguments(captured.iter().map(|v| v.to_string()).collect());
-        write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
+        fmt_closure(self, f, 0)
     }
 }
 
@@ -133,6 +142,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
         seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
         for (layout, value) in data.captured_layouts.into_iter().zip(captured.iter()) {
+            // Reject captured layouts whose DAG would unfold past the node-count cap.
+            check_layout_within_bounds::<S::Error>(&layout)?;
             seq.serialize_element(&layout)?;
             seq.serialize_element(&SerializationReadyValue {
                 ctx: self.ctx,

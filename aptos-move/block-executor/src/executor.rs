@@ -1939,6 +1939,26 @@ where
         ))
     }
 
+    /// Testing-only public wrapper (behind the `testing` feature) so PoCs in other crates can
+    /// drive parallel block execution with a custom `ExecutorTask`. Mirrors the internal
+    /// `execute_transactions_parallel` signature, including its `Result<_, ()>`.
+    #[cfg(any(test, feature = "testing"))]
+    #[allow(clippy::result_unit_err)]
+    pub fn execute_transactions_parallel_for_testing(
+        &self,
+        signature_verified_block: &TP,
+        base_view: &S,
+        transaction_slice_metadata: &TransactionSliceMetadata,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<T, E::Output>, ()> {
+        self.execute_transactions_parallel(
+            signature_verified_block,
+            base_view,
+            transaction_slice_metadata,
+            module_cache_manager_guard,
+        )
+    }
+
     pub(crate) fn execute_transactions_parallel(
         &self,
         signature_verified_block: &TP,
@@ -2178,7 +2198,7 @@ where
             }
         }
         let fee_distribution = FeeDistribution::new(amount);
-        if self.config.local.persist_hotness_in_epilogue {
+        if self.config.onchain.hotness_in_epilogue() {
             let (inner, to_make_hot) = block_end_info.into_parts();
             Ok(T::block_epilogue_v2(
                 block_id,
@@ -2319,6 +2339,11 @@ where
         );
 
         let mut block_epilogue_txn = None;
+        // Counts user-txn `accumulate_fee_statement` calls. Incremented alongside each
+        // accumulate so any loop-exit path (including the bcs-fallback `continue`) keeps
+        // this in sync. Passed as `num_committed` to `finish_*` so block-level counters
+        // (`BLOCK_COMMITTED_TXNS`, `BLOCK_TXNS_CUT_BY_LIMIT`) report user-txn counts only.
+        let mut num_committed_user_txns: u32 = 0;
         let mut idx = 0;
         while idx <= num_txns {
             let txn = if idx != num_txns {
@@ -2412,6 +2437,12 @@ where
                         read_write_summary,
                         approx_output_size,
                     );
+                    if idx < num_txns {
+                        // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns
+                        // tracks only user txns. Includes bcs-fallback discards (which accumulate
+                        // a fee statement before being discarded), consistent with the accumulator.
+                        num_committed_user_txns += 1;
+                    }
 
                     // Drop to acquire a write lock, then re-assign the output_before_guard.
                     drop(output_before_guard);
@@ -2639,8 +2670,8 @@ where
         }
 
         block_limit_processor.finish_sequential_update_counters_and_log_info(
-            ret.len() as u32,
-            num_txns as u32 + block_epilogue_txn.as_ref().map_or(0, |_| 1),
+            num_committed_user_txns,
+            num_txns as u32,
         );
 
         counters::update_state_counters(unsync_map.stats(), false);

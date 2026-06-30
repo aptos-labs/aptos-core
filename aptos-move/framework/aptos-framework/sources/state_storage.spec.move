@@ -49,10 +49,10 @@ spec aptos_framework::state_storage {
         invariant [suspendable] chain_status::is_operating() ==> exists<GasParameter>(@aptos_framework);
     }
 
-    /// ensure caller is admin.
-    /// aborts if StateStorageUsage already exists.
     spec initialize(aptos_framework: &signer) {
         use std::signer;
+        pragma opaque;
+        modifies global<StateStorageUsage>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-4]
         aborts_if !system_addresses::is_aptos_framework_address(addr);
@@ -66,15 +66,24 @@ spec aptos_framework::state_storage {
 
     spec on_new_block(epoch: u64) {
         use aptos_framework::chain_status;
+        pragma opaque;
         /// [high-level-req-5.2]
         requires chain_status::is_operating();
+        modifies global<StateStorageUsage>(@aptos_framework);
         aborts_if false;
-        ensures epoch == global<StateStorageUsage>(@aptos_framework).epoch;
+        let post state_usage = global<StateStorageUsage>(@aptos_framework);
+        ensures epoch == state_usage.epoch;
+        ensures epoch == old(global<StateStorageUsage>(@aptos_framework).epoch) ==>
+            state_usage == old(global<StateStorageUsage>(@aptos_framework));
     }
 
     spec current_items_and_bytes(): (u64, u64) {
+        pragma opaque;
         /// [high-level-req-5.1]
         aborts_if !exists<StateStorageUsage>(@aptos_framework);
+        let usage = global<StateStorageUsage>(@aptos_framework).usage;
+        ensures result_1 == usage.items;
+        ensures result_2 == usage.bytes;
     }
 
     spec get_state_storage_usage_only_at_epoch_beginning(): Usage {
@@ -83,6 +92,7 @@ spec aptos_framework::state_storage {
     }
 
     spec on_reconfig {
+        pragma opaque;
         aborts_if true;
     }
 }

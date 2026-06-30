@@ -1,0 +1,24 @@
+\section{Trusted Code}
+\label{sec:trusted}
+
+Because runtime checks impose a performance overhead, the VM supports \emph{trusted code}: modules for which these checks are waived.
+Trusted deployment is currently under Aptos Foundation governance and limited to the Aptos framework; each deployment is approved by the Aptos operators.
+While this does not rule out VM bugs, it reduces the chance of maliciously engineered trusted code, raising confidence in its integrity.
+We are also investigating staking-based models.
+
+Executing trusted code disables the checks of \S\ref{sec:type} and \S\ref{sec:ability}.
+Because checks like type safety accumulate state during execution, the transitions between untrusted and trusted code must be modeled carefully.
+For example, trusted code does not maintain the type stack, so when returning from a trusted function the return value's type must be synthesized for the untrusted caller from the type signature.
+
+%\begin{itemize}
+%\item $\CALL trusted$ from untrusted code:
+%the types of the arguments need to be removed from $\theta$ since the callee will not use them.
+%\item $\RET$ from trusted to untrusted code: the types of the return values need to be pushed on the stack, since %the trusted code does not do this but the untrusted expects it.
+%\item $\CALL untrusted$ from trusted code: argument types need to be pushed onto the type stack.
+%\item $\RET$ from untrusted code to trusted code: the return types need to be popped.
+%\end{itemize}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

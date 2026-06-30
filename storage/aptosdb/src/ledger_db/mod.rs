@@ -19,7 +19,6 @@ use crate::{
     },
 };
 use aptos_config::config::RocksdbConfig;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{batch::SchemaBatch, Cache, ColumnFamilyDescriptor, Env, DB};
@@ -115,7 +114,6 @@ impl LedgerDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
-        persist_write_set_hotness: bool,
     ) -> Result<Self> {
         let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref());
         let ledger_metadata_db = Arc::new(Self::open_rocksdb(
@@ -141,8 +139,8 @@ impl LedgerDb {
         let mut transaction_db = None;
         let mut transaction_info_db = None;
         let mut write_set_db = None;
-        THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
-            s.spawn(|_| {
+        std::thread::scope(|s| {
+            s.spawn(|| {
                 let event_db_raw = Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(EVENT_DB_NAME),
@@ -159,7 +157,7 @@ impl LedgerDb {
                     EventStore::new(event_db_raw),
                 ));
             });
-            s.spawn(|_| {
+            s.spawn(|| {
                 persisted_auxiliary_info_db = Some(PersistedAuxiliaryInfoDb::new(Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME),
@@ -172,7 +170,7 @@ impl LedgerDb {
                     .unwrap(),
                 )));
             });
-            s.spawn(|_| {
+            s.spawn(|| {
                 transaction_accumulator_db = Some(TransactionAccumulatorDb::new(Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
@@ -185,7 +183,7 @@ impl LedgerDb {
                     .unwrap(),
                 )));
             });
-            s.spawn(|_| {
+            s.spawn(|| {
                 transaction_auxiliary_data_db = Some(TransactionAuxiliaryDataDb::new(Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
@@ -198,7 +196,7 @@ impl LedgerDb {
                     .unwrap(),
                 )))
             });
-            s.spawn(|_| {
+            s.spawn(|| {
                 transaction_db = Some(TransactionDb::new(Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_DB_NAME),
@@ -211,7 +209,7 @@ impl LedgerDb {
                     .unwrap(),
                 )));
             });
-            s.spawn(|_| {
+            s.spawn(|| {
                 transaction_info_db = Some(TransactionInfoDb::new(Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
@@ -224,21 +222,18 @@ impl LedgerDb {
                     .unwrap(),
                 )));
             });
-            s.spawn(|_| {
-                write_set_db = Some(WriteSetDb::new(
-                    Arc::new(
-                        Self::open_rocksdb(
-                            ledger_db_folder.join(WRITE_SET_DB_NAME),
-                            WRITE_SET_DB_NAME,
-                            &ledger_db_config,
-                            env,
-                            block_cache,
-                            readonly,
-                        )
-                        .unwrap(),
-                    ),
-                    persist_write_set_hotness,
-                ));
+            s.spawn(|| {
+                write_set_db = Some(WriteSetDb::new(Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(WRITE_SET_DB_NAME),
+                        WRITE_SET_DB_NAME,
+                        &ledger_db_config,
+                        env,
+                        block_cache,
+                        readonly,
+                    )
+                    .unwrap(),
+                )));
             });
         });
 
@@ -266,7 +261,6 @@ impl LedgerDb {
             None,
             None,
             /*readonly=*/ false,
-            /*persist_write_set_hotness=*/ false,
         )?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 

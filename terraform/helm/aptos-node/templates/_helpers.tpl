@@ -36,14 +36,14 @@ Common labels
 */}}
 {{- define "aptos-validator.labels" -}}
 {{- range $k, $v := .Values.labels }}
-{{ $k }}: {{ $v }}
+{{ $k }}: {{ $v | quote }}
 {{- end }}
 helm.sh/chart: {{ include "aptos-validator.chart" . }}
 {{ include "aptos-validator.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 {{- end -}}
 
 {{/*
@@ -60,7 +60,7 @@ The logic below assigns a target cluster to each statefulset replica in a round-
 {{- $numClusters := len $ctx.Values.multicluster.targetClusters }}
 {{- $clusterIndex := mod $index $numClusters }}
 {{- $cluster := index $ctx.Values.multicluster.targetClusters $clusterIndex }}
-multicluster/targetcluster: {{ $cluster }}
+multicluster/targetcluster: {{ $cluster | quote }}
 {{- end }}
 {{- end -}}
 
@@ -69,18 +69,26 @@ Selector labels
 */}}
 {{- define "aptos-validator.selectorLabels" -}}
 {{- range $k, $v := .Values.labels }}
-{{ $k }}: {{ $v }}
+{{ $k }}: {{ $v | quote }}
 {{- end }}
-app.kubernetes.io/part-of: {{ include "aptos-validator.name" . }}
+app.kubernetes.io/part-of: {{ include "aptos-validator.name" . | quote }}
 app.kubernetes.io/managed-by: helm
 {{- end -}}
 
 {{/*
-Create the name of the service account to use
+Create the name of the service accounts to use
 */}}
-{{- define "aptos-validator.serviceAccountName" -}}
+{{- define "aptos-validator.validatorServiceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-    {{ default (include "aptos-validator.fullname" .) .Values.serviceAccount.name }}
+    {{ include "aptos-validator.fullname" $ }}-validator
+{{- else -}}
+    {{ default "default" .Values.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
+{{- define "aptos-validator.fullnodeServiceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+    {{ include "aptos-validator.fullname" $ }}-fullnode
 {{- else -}}
     {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}

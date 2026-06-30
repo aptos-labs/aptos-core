@@ -1,28 +1,39 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Execution error types for the interpreter runtime.
+//! Interpreter-internal error types.
 
-use mono_move_gas::GasExhaustedError;
-use thiserror::Error;
+pub use mono_move_core::{
+    ArithOp, GlobalStorageOp, RuntimeError, RuntimeInvariantViolation, RuntimeResult, Signedness,
+    VecOp,
+};
 
-#[derive(Debug, Error)]
-pub enum ExecutionError {
-    /// Gas exhausted.
-    #[error(transparent)]
-    GasExhausted(#[from] GasExhaustedError),
-    /// Placeholder for all other runtime errors (to be refined).
-    #[error(transparent)]
-    Placeholder(#[from] anyhow::Error),
+/// Successful terminal outcomes from `Interpreter::run`. Runtime
+/// failures flow through the `Err` channel as [`RuntimeError`] — abort
+/// and failure are structurally separate.
+#[derive(Debug)]
+pub enum RuntimeStatus {
+    Success,
+    // TODO(completeness): carry the abort's `Location` (which module raised it) once
+    // we have a `Location` type defined.
+    Aborted { code: u64, message: Option<String> },
 }
 
-/// Result type for interpreter operations.
-pub type ExecutionResult<T> = Result<T, ExecutionError>;
-
-/// Like `anyhow::bail!` but returns `ExecutionError::Placeholder`.
+/// Returns from the enclosing function with an [`RuntimeError::InvariantViolation`]
+/// wrapping the named [`RuntimeInvariantViolation`] variant. Works for both
+/// unit and struct variants:
+///
+/// ```ignore
+/// invariant_violation!(NullFuncRefInClosure);
+/// invariant_violation!(PcOutOfBounds { pc, func_name, code_len });
+/// ```
 #[macro_export]
-macro_rules! bail {
-    ($($arg:tt)*) => {
-        return Err($crate::error::ExecutionError::Placeholder(anyhow::anyhow!($($arg)*)))
+macro_rules! invariant_violation {
+    ($($body:tt)+) => {
+        return ::core::result::Result::Err(
+            $crate::error::RuntimeError::InvariantViolation(
+                $crate::error::RuntimeInvariantViolation::$($body)+,
+            ),
+        )
     };
 }

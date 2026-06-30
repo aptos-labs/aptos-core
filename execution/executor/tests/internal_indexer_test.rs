@@ -134,7 +134,6 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
 
 #[test]
 fn test_db_indexer_data() {
-    use std::{thread, time::Duration};
     // create test db
     let (aptos_db, core_account) = create_test_db();
     let total_version = aptos_db.expect_synced_version();
@@ -157,7 +156,7 @@ fn test_db_indexer_data() {
         .process_a_batch(start_version, total_version)
         .unwrap();
     // wait for the commit to finish
-    thread::sleep(Duration::from_millis(100));
+    db_indexer.flush().unwrap();
     // indexer has process all the transactions
     assert_eq!(
         internal_indexer_db.get_persisted_version().unwrap(),
@@ -318,6 +317,7 @@ fn test_db_indexer_data() {
         ident_str!("permissioned_signer"),
         ident_str!("transaction_context"),
         ident_str!("confidential_balance"),
+        ident_str!("epoch_timeout_config"),
         ident_str!("jwk_consensus_config"),
         ident_str!("ristretto255_elgamal"),
         ident_str!("sigma_protocol_proof"),
@@ -404,12 +404,14 @@ fn test_db_indexer_data() {
         (false, "0x1::aptos_governance::GovernanceConfig"),
         (false, "0x1::aptos_governance::GovernanceEvents"),
         (false, "0x1::chunky_dkg_config::ChunkyDKGConfig"),
+        (false, "0x1::decryption::PerBlockDecryptionKeyV2"),
         (false, "0x1::randomness_config::RandomnessConfig"),
         (false, "0x1::transaction_limits::TxnLimitsConfig"),
         (false, "0x1::staking_config::StakingRewardsConfig"),
         (false, "0x1::aggregator_factory::AggregatorFactory"),
         (false, "0x1::transaction_fee::AptosCoinMintCapability"),
         (false, "0x1::transaction_fee::AptosFABurnCapabilities"),
+        (false, "0x1::epoch_timeout_config::EpochTimeoutConfig"),
         (false, "0x1::aptos_governance::ApprovedExecutionHashes"),
         (false, "0x1::aptos_governance::GovernanceResponsbility"),
         (false, "0x1::randomness_api_v0_config::RequiredGasDeposit"),

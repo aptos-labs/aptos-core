@@ -1,0 +1,1 @@
+../../shared/move-init.js

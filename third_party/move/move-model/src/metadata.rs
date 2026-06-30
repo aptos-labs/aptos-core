@@ -3,9 +3,7 @@
 
 use anyhow::bail;
 use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
-use move_binary_format::file_format_common::{
-    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4, VERSION_DEFAULT_LANG_V2_5,
-};
+use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_5};
 use move_command_line_common::env;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -19,7 +17,7 @@ const UNSTABLE_MARKER: &str = "-unstable";
 pub const LATEST_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_5;
 
 /// Only stable versions are allowed on production networks
-pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_3;
+pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_4;
 pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
 
 pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
@@ -199,7 +197,7 @@ pub enum LanguageVersion {
     /// The 2.3 version of Move, which adds support for
     /// - signed integer types
     V2_3,
-    /// The currently unstable 2.4 version of Move
+    /// The 2.4 version of Move
     V2_4,
     /// The currently unstable 2.5 version of Move
     V2_5,
@@ -274,8 +272,8 @@ impl LanguageVersion {
     pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
-            V2_0 | V2_1 | V2_2 | V2_3 => false,
-            V2_4 | V2_5 => true,
+            V2_0 | V2_1 | V2_2 | V2_3 | V2_4 => false,
+            V2_5 => true,
         }
     }
 
@@ -309,8 +307,8 @@ impl LanguageVersion {
             LanguageVersion::V2_0
             | LanguageVersion::V2_1
             | LanguageVersion::V2_2
-            | LanguageVersion::V2_3 => VERSION_DEFAULT,
-            LanguageVersion::V2_4 => VERSION_DEFAULT_LANG_V2_4,
+            | LanguageVersion::V2_3
+            | LanguageVersion::V2_4 => VERSION_DEFAULT,
             LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_5,
         })
     }

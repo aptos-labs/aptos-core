@@ -22,15 +22,14 @@ pub(crate) fn execute_workload(
 ) -> Vec<TransactionOutput> {
     let config = BlockExecutorConfig {
         local: BlockExecutorLocalConfig {
-            blockstm_v2: false,
+            blockstm_v2: true,
             concurrency_level,
             allow_fallback: true,
             discard_failed_blocks: false,
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             enable_pre_write: true,
-            persist_hotness_in_epilogue: false,
         },
-        // For replay, there is no block limit.
+        // For replay, there is no block limit. TODO(HotState): may need to update this.
         onchain: BlockExecutorConfigFromOnchain::on_but_large_for_test(),
     };
 

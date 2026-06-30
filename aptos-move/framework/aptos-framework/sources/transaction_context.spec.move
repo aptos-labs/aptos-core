@@ -70,9 +70,17 @@ spec aptos_framework::transaction_context {
         ensures [abstract] result == spec_generate_unique_address();
     }
     spec auid_address(auid: &AUID): address {
+        pragma opaque;
         // property 2: Fetching the unique address should never abort.
         /// [high-level-req-2]
         aborts_if false;
+        ensures result == auid.unique_address;
+    }
+
+    spec generate_auid(): AUID {
+        pragma opaque;
+        aborts_if false;
+        ensures result.unique_address == spec_generate_unique_address();
     }
 
     spec sender_internal(): address {
@@ -116,10 +124,18 @@ spec aptos_framework::transaction_context {
     spec monotonically_increasing_counter_internal(timestamp_us: u64): u128 {
         //TODO: temporary mockup
         pragma opaque;
+        aborts_if [abstract] false;
     }
 
     spec monotonically_increasing_counter_internal_for_test_only(): u128 {
         //TODO: temporary mockup
         pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec monotonically_increasing_counter(): u128 {
+        pragma opaque;
+        // Assume that the monotonically increasing counter is always increasing.
+        aborts_if [abstract] false;
     }
 }

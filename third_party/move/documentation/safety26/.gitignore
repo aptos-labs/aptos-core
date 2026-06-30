@@ -1,0 +1,13 @@
+# LaTeX intermediates; latexmk routes these to build/ (ignored by the repo-root
+# .gitignore), but direct pdflatex/IDE runs drop them next to main.tex.
+# main.pdf is intentionally tracked.
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.synctex.gz(busy)
+*.toc

@@ -1,36 +1,34 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
-use arc_swap::ArcSwap;
+use crate::{
+    instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE},
+    interner::InternedModuleId,
+};
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
-use std::{ptr::NonNull, sync::Arc};
+use std::{fmt, ptr::NonNull};
 
 /// Function's micro-ops.
+// TODO(completeness): when demand-driven re-optimization swaps in new code at
+// runtime, the swap must not be observed by the transaction that triggered it.
+// Only future re-executions may see the new code; the running transaction keeps
+// executing against the code it started with.
 pub struct Code {
-    inner: ArcSwap<Vec<MicroOp>>,
+    inner: Box<[MicroOp]>,
 }
 
 impl Code {
     /// Builds code from a vector of micro-ops.
     pub fn from_vec(ops: Vec<MicroOp>) -> Self {
         Self {
-            inner: ArcSwap::from_pointee(ops),
+            inner: ops.into_boxed_slice(),
         }
     }
 
-    /// Snapshot of the current micro-ops.
-    ///
-    /// TODO: decide on if using ArcSwap is good enough for perf and
-    ///   what is the best way to update code and any other relevant
-    ///   information in the function.
-    pub fn load(&self) -> arc_swap::Guard<Arc<Vec<MicroOp>>> {
-        self.inner.load()
-    }
-
-    /// Replaces the micro-ops atomically.
-    pub fn store(&self, ops: Vec<MicroOp>) {
-        self.inner.store(Arc::new(ops));
+    /// The function's micro-ops.
+    #[inline(always)]
+    pub fn get(&self) -> &[MicroOp] {
+        &self.inner
     }
 }
 
@@ -75,17 +73,15 @@ impl FrameLayoutInfo {
     }
 }
 
-/// Additional frame layout that applies at a specific safe point.
+/// At specific safepoints, this entry supplements the base `frame_layout` with
+/// additional pointer offsets that are only valid at that PC.
 ///
-/// Safe points are instructions where GC may run:
+/// Top-frame-only contract: this entry is consulted by the GC only when (a)
+/// this function is the top stack frame and (b) its current PC equals
+/// `code_offset`.
 ///
-/// - **Allocating instructions** (`HeapNew`, `VecPushBack`, `ForceGC`):
-///   GC runs during the instruction, so the safe point is at that
-///   instruction's own PC.
-/// - **Call return sites**: when a callee triggers GC, the caller's
-///   saved PC is `call_pc + 1`. The safe point for a caller frame is
-///   the instruction *after* the call — at that point, the shared
-///   arg/return region holds return values, not arguments.
+/// `code_offset` must point at an op for which [`MicroOp::is_allocating`]
+/// returns `true`.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -134,36 +130,24 @@ impl SortedSafePointEntries {
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
-///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
+///   [0 .. param_region_size)                                  parameters (written by caller as arguments)
+///   [param_region_size .. param_and_local_sizes_sum)          locals
 ///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots
 /// ```
 ///
 /// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
+    pub module_id: InternedModuleId,
     pub code: Code,
-    /// Byte size of each parameter, in declaration order.
-    ///
-    /// Used by `CallClosure` (together with the closure's `ClosureMask`) to
-    /// compute each parameter's offset in the callee's parameter region and
-    /// to advance through the packed captured values. The sum of these sizes
-    /// must equal `param_sizes_sum`.
-    //
-    // TODO: this only captures sizes, not alignment. Once the layout admits
-    // non-8-byte fields, the closure-call interleaver will need per-param
-    // alignment (either encoded alongside `size` here, or as a sibling
-    // `param_alignments` slice).
-    pub param_sizes: Vec<u32>,
-    /// Size of the parameter region at the start of the frame.
-    /// The caller writes the corresponding arguments into this region
-    /// before the call instruction; when `zero_frame` is true, the runtime
-    /// zeroes everything beyond the parameter region
-    /// (`param_sizes_sum..extended_frame_size`) at frame creation to
-    /// ensure pointer slots start as null.
-    pub param_sizes_sum: usize,
+    /// Gas cost of the entry basic block.
+    pub entry_gas: u64,
+    /// Per-parameter (aligned) frame slot, in declaration order.
+    pub param_slots: Vec<SizedSlot>,
+    /// Byte size of the parameter region (includes padding in between parameters).
+    pub param_region_size: usize,
     /// Size of the parameters + locals region. Frame metadata is stored
     /// immediately after this region at offset `param_and_local_sizes_sum`.
     pub param_and_local_sizes_sum: usize,
@@ -174,7 +158,7 @@ pub struct Function {
     /// (sized to fit the largest callee's arguments or return values).
     pub extended_frame_size: usize,
     /// Whether the runtime must zero-initialize the region beyond
-    /// parameters (`param_sizes_sum..extended_frame_size`) when a new
+    /// parameters (`param_region_size..extended_frame_size`) when a new
     /// frame is created. This is required when `frame_layout` has
     /// pointer slots so the GC sees null instead of garbage. Functions
     /// with no heap pointer slots in `frame_layout` (beyond parameters)
@@ -182,7 +166,7 @@ pub struct Function {
     /// function uses only per-PC layouts and the specializer ensures
     /// slots are written before becoming visible as pointers.
     //
-    // TODO: derive from `frame_layout` instead of taking as input.
+    // TODO(completeness): derive from `frame_layout` instead of taking as input.
     // `safe_point_layouts` doesn't need zeroing — each entry already
     // pins which slots hold valid pointers at that PC.
     pub zero_frame: bool,
@@ -196,36 +180,41 @@ pub struct Function {
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a frame
-    ///   is created, so all non-parameter pointer slots (including the
-    ///   callee arg/return region) start as null.
+    ///   runtime zeroes `param_region_size..extended_frame_size` when a
+    ///   frame is created, so all non-parameter pointer slots
+    ///   (including the callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be
     ///   overwritten with another valid heap pointer (or null). The
     ///   specializer must guarantee this.
     ///
-    /// The callee arg region (`frame_size()..extended_frame_size`)
-    /// overlaps with the callee's frame during GC traversal — both
-    /// frames may scan the same memory. The forwarding markers in
-    /// `gc_copy_object` handle double-scans correctly.
+    /// Callee-region offsets (≥ `frame_size()`) should go in
+    /// `safe_point_layouts` (top-frame-only), not here, unless the
+    /// value is pointer-shaped at every PC.
     pub frame_layout: FrameLayoutInfo,
     /// Per-safe-point frame layouts.
     ///
-    /// During GC, for each frame on the call stack, the GC scans the
-    /// union of `frame_layout.heap_ptr_offsets` (always) and the
-    /// matching safe-point entry's `heap_ptr_offsets` (if the frame's
-    /// current PC has a corresponding entry).
+    /// **Top-frame-only.** During GC, an entry at `code_offset = pc` is
+    /// consulted only when this function is the *top* stack frame and
+    /// its current PC equals `pc`. Caller frames below the top use
+    /// `frame_layout` (always-on) alone — `gc_collect` does not query
+    /// `safe_point_layouts` for any below-frame.
+    ///
+    /// Each entry's `code_offset` must point at an op for which
+    /// [`MicroOp::is_allocating`] returns `true` — the only PCs at
+    /// which a top-frame consultation can occur.
     ///
     /// The offsets in each safe-point entry must be disjoint from
-    /// `frame_layout.heap_ptr_offsets` — a slot that is always a pointer
-    /// belongs in `frame_layout`, not in individual safe-point entries.
+    /// `frame_layout.heap_ptr_offsets` — a slot that is always a
+    /// pointer belongs in `frame_layout`, not in individual safe-point
+    /// entries.
     ///
     /// This supplements `frame_layout` for slots whose pointer status
-    /// changes across the function — e.g., shared arg/return regions
-    /// that hold a pointer argument before a call but a scalar return
-    /// value after, or callee arg slots used by different callees.
+    /// changes across the function — typically shared callee arg/ret
+    /// region offsets that hold pointers only at specific allocating
+    /// ops in this function's body.
     ///
-    /// Empty when the function needs no per-PC distinction (all pointer
-    /// slots are stable across the entire function body).
+    /// Empty when the function needs no per-PC distinction (all
+    /// pointer slots are stable across the entire function body).
     pub safe_point_layouts: SortedSafePointEntries,
 }
 
@@ -241,6 +230,40 @@ impl Function {
     /// Returns `None` if there is no entry for this exact code offset.
     pub fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
         self.safe_point_layouts.layout_at(pc)
+    }
+
+    /// The function's interned name.
+    pub fn name(&self) -> &str {
+        // SAFETY: any safe `&Function` borrow carries an upstream guarantee
+        // that `name`'s pointee remains valid for the borrow's lifetime.
+        unsafe { self.name.as_ref_unchecked() }
+    }
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "fun {}() {{", self.name())?;
+        writeln!(f, "  frame_data_size: {}", self.param_and_local_sizes_sum)?;
+        writeln!(f, "  entry_gas: {}", self.entry_gas)?;
+        writeln!(f, "  code:")?;
+        let code = self.code.get();
+        for (i, op) in code.iter().enumerate() {
+            writeln!(f, "    {}: {}", i, op)?;
+        }
+        let entries = self.safe_point_layouts.entries();
+        if !entries.is_empty() {
+            writeln!(f, "  safe_point_layouts:")?;
+            for entry in entries {
+                let offsets: Vec<String> = entry
+                    .layout
+                    .heap_ptr_offsets
+                    .iter()
+                    .map(|o| o.0.to_string())
+                    .collect();
+                writeln!(f, "    {}: [{}]", entry.code_offset.0, offsets.join(", "))?;
+            }
+        }
+        writeln!(f, "}}")
     }
 }
 

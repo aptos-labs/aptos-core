@@ -167,6 +167,7 @@ impl StateComputeResult {
             state_update_refs: self.execution_output.to_commit.state_update_refs(),
             state_reads: &self.execution_output.state_reads,
             hot_state_updates: &self.execution_output.hot_state_updates,
+            position_state_summary: self.state_checkpoint_output.position_state_summary.as_ref(),
             is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
     }

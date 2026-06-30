@@ -10,8 +10,6 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 #[cfg(test)]
 mod digest_key_bench;
 pub mod smoke;
-#[cfg(test)]
-pub mod typescript;
 
 pub fn prepare_all<T: BatchThresholdEncryption, P: Plaintext>(
     cts: &[T::Ciphertext],

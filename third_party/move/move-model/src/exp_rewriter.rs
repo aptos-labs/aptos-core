@@ -850,7 +850,7 @@ pub trait ExpRewriterFunctions {
                     .collect();
                 (changed, Proof::Apply(loc.clone(), *lemma_id, new_args))
             },
-            Proof::ForallApply(loc, bindings, patterns, lemma_id, args) => {
+            Proof::ForallApply(loc, bindings, patterns, lemma_id, args, weight) => {
                 let mut changed = false;
                 let new_patterns: Vec<Vec<_>> = patterns
                     .iter()
@@ -881,6 +881,7 @@ pub trait ExpRewriterFunctions {
                         new_patterns,
                         *lemma_id,
                         new_args,
+                        *weight,
                     ),
                 )
             },
@@ -993,4 +994,20 @@ impl ExpRewriterFunctions for MemoryLabelFreshener {
         };
         new_oper.map(|op| ExpData::Call(id, op, args.to_vec()).into_exp())
     }
+}
+
+/// Strip every `Operation::Old` wrapper at any nesting level: `old(p).x`
+/// becomes `p.x`, `old(old(x))` becomes `x`, etc.
+pub fn strip_all_olds(exp: &Exp) -> Exp {
+    struct OldStripper;
+    impl ExpRewriterFunctions for OldStripper {
+        fn rewrite_call(&mut self, _id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+            if matches!(oper, Operation::Old) && args.len() == 1 {
+                Some(self.rewrite_exp(args[0].clone()))
+            } else {
+                None
+            }
+        }
+    }
+    OldStripper.rewrite_exp(exp.clone())
 }

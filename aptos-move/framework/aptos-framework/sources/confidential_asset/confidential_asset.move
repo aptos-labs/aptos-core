@@ -522,6 +522,9 @@ module aptos_framework::confidential_asset {
         assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
 
+        // WARNING: We do not assert `is_confidentiality_enabled_for_asset_type` because we want to give users a way to
+        // withdraw from the confidential into their public balance after an asset type is disabled.
+
         let sender_addr = signer::address_of(sender);
 
         // Read values before mutable borrow to avoid conflicting borrows of ConfidentialStore

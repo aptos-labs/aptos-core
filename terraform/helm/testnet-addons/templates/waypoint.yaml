@@ -13,6 +13,9 @@ metadata:
     cloud.google.com/backend-config: '{"default":"{{ include "testnet-addons.fullname" . }}-waypoint"}'
     cloud.google.com/neg: '{"ingress": true}'
     {{- end }}
+    {{- if and (eq .Values.cloud "AKS") .Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.service.domain }}
+    {{- end }}
 spec:
   selector:
     {{- include "testnet-addons.selectorLabels" . | nindent 4 }}
@@ -20,7 +23,11 @@ spec:
   ports:
   - port: 80
     targetPort: 8080
+  {{- if and (eq .Values.cloud "AKS") .Values.service.domain }}
+  type: LoadBalancer
+  {{- else }}
   type: NodePort
+  {{- end }}
 ---
 {{- if eq .Values.cloud "GKE" }}
 apiVersion: cloud.google.com/v1
@@ -60,7 +67,73 @@ spec:
       labels:
         {{- include "testnet-addons.selectorLabels" . | nindent 8 }}
         app: {{ include "testnet-addons.fullname" . }}-waypoint
+        {{- if and (eq .Values.cloud "AKS") .Values.azure_genesis_storage.workloadIdentityClientId }}
+        azure.workload.identity/use: "true"
+        {{- end }}
     spec:
+      initContainers:
+        {{- if and (eq .Values.cloud "AKS") .Values.azure_genesis_storage.enabled }}
+        - name: fetch-genesis-azure
+          image: mcr.microsoft.com/azure-cli:latest
+          command:
+            - bash
+            - -c
+            - |
+              set -ex
+              # Copy waypoint from genesis secret
+              cp /opt/aptos/genesis_readonly/waypoint.txt /srv/http/waypoint.txt || true
+              # Azure AD Workload Identity - auto-authenticated via injected token
+              az login --service-principal \
+                --username "$AZURE_CLIENT_ID" \
+                --tenant "$AZURE_TENANT_ID" \
+                --federated-token "$(cat $AZURE_FEDERATED_TOKEN_FILE)" \
+                --allow-no-subscriptions
+              # Fetch genesis.blob from Azure Blob Storage
+              az storage blob download \
+                --account-name {{ $.Values.azure_genesis_storage.storageAccount }} \
+                --container-name {{ $.Values.azure_genesis_storage.container }} \
+                --name "{{ $.Values.azure_genesis_storage.blobPath }}/genesis.blob" \
+                --file /srv/http/genesis.blob \
+                --auth-mode login
+              ls -l /srv/http
+          workingDir: /tmp
+          env:
+          - name: HOME
+            value: /tmp
+          - name: ARBITRARY_VALUE
+            value: {{ .Values.arbitraryValue | toString | quote }}
+          volumeMounts:
+            - name: genesis-secret
+              mountPath: /opt/aptos/genesis_readonly
+            - name: httpdata
+              mountPath: /srv/http
+        {{- else }}
+        - name: fetch-genesis
+          image: {{ $.Values.tools.image.repo }}:{{ $.Values.tools.image.tag | default $.Values.imageTag }}
+          command:
+            - bash
+            - -c
+            - |
+              set -x
+              cp /opt/aptos/genesis_readonly/* /srv/http
+              if [[ ! -f /srv/http/genesis.blob ]]; then
+                gcloud storage cp "{{ $.Values.genesis_bucket_path }}/genesis.blob" /srv/http/genesis.blob
+              else
+                echo "genesis.blob found locally"
+              fi
+              ls -l /srv/http
+          workingDir: /tmp
+          env:
+          - name: HOME
+            value: /tmp
+          - name: ARBITRARY_VALUE
+            value: {{ .Values.arbitraryValue | toString | quote }}
+          volumeMounts:
+            - name: genesis-secret
+              mountPath: /opt/aptos/genesis_readonly
+            - name: httpdata
+              mountPath: /srv/http
+        {{- end }}
       containers:
       - name: http
         resources:
@@ -71,7 +144,9 @@ spec:
         ports:
         - containerPort: 8080
         volumeMounts:
-        - name: genesis
+        - name: genesis-secret
+          mountPath: /opt/aptos/genesis_readonly
+        - name: httpdata
           mountPath: /srv/http
         securityContext:
           readOnlyRootFilesystem: true
@@ -98,7 +173,9 @@ spec:
         runAsUser: 65534
         runAsGroup: 65534
       volumes:
-      - name: genesis
+      - name: httpdata
+        emptyDir: {}
+      - name: genesis-secret
         secret:
           # all validator genesis secrets will have waypoint.txt and genesis.blob
           secretName: {{ .Values.genesis.username_prefix }}-0-genesis-e{{ .Values.genesis.era }}

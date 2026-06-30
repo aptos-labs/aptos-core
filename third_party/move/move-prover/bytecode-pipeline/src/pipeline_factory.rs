@@ -9,11 +9,16 @@ use crate::{
     eliminate_imm_refs::EliminateImmRefsProcessor,
     global_invariant_analysis::GlobalInvariantAnalysisProcessor,
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
-    inconsistency_check::InconsistencyCheckInstrumenter, loop_analysis::LoopAnalysisProcessor,
-    memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter, normalize_exits::NormalizeExitsProcessor,
-    number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
-    spec_inference::SpecInferenceProcessor, spec_instrumentation::SpecInstrumentationProcessor,
+    inconsistency_check::InconsistencyCheckInstrumenter,
+    loop_analysis::LoopAnalysisProcessor,
+    memory_instrumentation::MemoryInstrumentationProcessor,
+    mono_analysis::MonoAnalysisProcessor,
+    mut_ref_instrumentation::MutRefInstrumenter,
+    normalize_exits::NormalizeExitsProcessor,
+    number_operation_analysis::NumberOperationProcessor,
+    options::ProverOptions,
+    spec_inference::{LambdaSpecInferenceProcessor, SpecInferenceProcessor},
+    spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
@@ -49,6 +54,13 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
 
     if !options.skip_loop_analysis {
         processors.push(LoopAnalysisProcessor::new());
+    }
+
+    // Auto-infer specs for lifted lambdas before spec instrumentation reads them
+    // (only in standard verify mode; inference mode runs SpecInferenceProcessor at
+    // the end of the pipeline and would otherwise double-process).
+    if !options.no_infer_lambda_specs && !options.inference {
+        processors.push(LambdaSpecInferenceProcessor::new());
     }
 
     processors.append(&mut vec![

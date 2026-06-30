@@ -12,13 +12,16 @@ use aptos_forge::{EmitJobMode, Node, NodeExt, Swarm, SwarmExt, TransactionType};
 use aptos_logger::info;
 use aptos_types::{
     dkg::{chunky_dkg::ChunkyDKGState, DKGState},
-    on_chain_config::{ChunkyDKGConfigMoveStruct, OnChainRandomnessConfig},
+    on_chain_config::{
+        ChunkyDKGConfigMoveStruct, FeatureFlag, Features, OnChainChunkyDKGConfig,
+        OnChainRandomnessConfig,
+    },
 };
 use std::{sync::Arc, time::Duration};
 
 /// Create a swarm with randomness/DKG enabled but chunky DKG OFF.
 /// Returns (swarm, cli, root_idx) for governance script execution.
-async fn create_swarm_with_dkg_only(
+pub(super) async fn create_swarm_with_dkg_only(
     num_validators: usize,
     epoch_duration_secs: u64,
 ) -> (
@@ -49,7 +52,12 @@ async fn create_swarm_with_dkg_only(
             conf.allow_new_validators = true;
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
-            // Chunky DKG config defaults to Off. ENCRYPTED_TRANSACTIONS not set.
+            // Force chunky DKG off and ENCRYPTED_TRANSACTIONS off at genesis so
+            // tests built on this helper can exercise the off→on transition.
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
+            let mut features = Features::default();
+            features.disable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            conf.initial_features_override = Some(features);
         }))
         .build_with_cli(0)
         .await;
