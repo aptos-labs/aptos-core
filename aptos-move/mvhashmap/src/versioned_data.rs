@@ -8,7 +8,6 @@ use crate::{
     types::{Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout},
 };
 use anyhow::Result;
-use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_infallible::Mutex;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
@@ -32,7 +31,6 @@ pub(crate) const FLAG_ESTIMATE: bool = true;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-/// TODO: can remove pub(crate) once aggregator V1 is deprecated.
 pub(crate) struct Entry<V> {
     /// Actual contents.
     pub(crate) value: V,
@@ -43,21 +41,14 @@ pub(crate) struct Entry<V> {
 }
 
 /// Represents the content of a single entry in multi-version data-structure.
-enum EntryCell<V> {
-    /// Recorded in the shared multi-version data-structure for each write. It
-    /// has: 1) Incarnation number of the transaction that wrote the entry (note
-    /// that TxnIndex is part of the key and not recorded here), 2) actual data
-    /// stored in a shared pointer (to ensure ownership and avoid clones).
-    ResourceWrite {
-        incarnation: Incarnation,
-        value_with_layout: ValueWithLayout<V>,
-        dependencies: Mutex<RegisteredReadDependencies>,
-    },
-
-    /// Recorded in the shared multi-version data-structure for each delta.
-    /// Option<u128> is a shortcut to aggregated value (to avoid traversing down
-    /// beyond this index), which is created after the corresponding txn is committed.
-    Delta(DeltaOp, Option<u128>),
+/// Recorded in the shared multi-version data-structure for each write. It has:
+/// 1) Incarnation number of the transaction that wrote the entry (note that
+/// TxnIndex is part of the key and not recorded here), 2) actual data stored in
+/// a shared pointer (to ensure ownership and avoid clones).
+struct EntryCell<V> {
+    incarnation: Incarnation,
+    value_with_layout: ValueWithLayout<V>,
+    dependencies: Mutex<RegisteredReadDependencies>,
 }
 
 /// A versioned value internally is represented as a BTreeMap from indices of
@@ -77,15 +68,11 @@ fn new_write_entry<V>(
     value: ValueWithLayout<V>,
     dependencies: BTreeMap<TxnIndex, Incarnation>,
 ) -> Entry<EntryCell<V>> {
-    Entry::new(EntryCell::ResourceWrite {
+    Entry::new(EntryCell {
         incarnation,
         value_with_layout: value,
         dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
     })
-}
-
-fn new_delta_entry<V>(data: DeltaOp) -> Entry<EntryCell<V>> {
-    Entry::new(EntryCell::Delta(data, None))
 }
 
 impl<V> Entry<V> {
@@ -102,25 +89,6 @@ impl<V> Entry<V> {
 
     pub(crate) fn mark_estimate(&self) {
         self.flag.store(FLAG_ESTIMATE, Ordering::Relaxed);
-    }
-}
-
-impl<V> Entry<EntryCell<V>> {
-    // The entry must be a delta, will record the provided value as a base value
-    // shortcut (the value in storage before block execution). If a value was already
-    // recorded, the new value is asserted for equality.
-    fn record_delta_shortcut(&mut self, value: u128) {
-        use crate::versioned_data::EntryCell::Delta;
-
-        self.value = match self.value {
-            Delta(delta_op, maybe_shortcut) => {
-                if let Some(prev_value) = maybe_shortcut {
-                    assert_eq!(value, prev_value, "Recording different shortcuts");
-                }
-                Delta(delta_op, Some(value))
-            },
-            _ => unreachable!("Must contain a delta"),
-        }
     }
 }
 
@@ -160,28 +128,27 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             .range(..=ShiftedTxnIndex::new(txn_idx))
             .next_back()
         {
-            // Non-exchanged format is default validation failure.
-            if let EntryCell::ResourceWrite {
+            let EntryCell {
                 incarnation: _,
                 value_with_layout,
                 dependencies,
-            } = &entry.value
-            {
-                // Take dependencies above txn_idx
-                affected_deps = dependencies.lock().split_off(txn_idx + 1);
-                if !affected_deps.is_empty() {
-                    if let ValueWithLayout::Exchanged(
+            } = &entry.value;
+
+            // Take dependencies above txn_idx
+            affected_deps = dependencies.lock().split_off(txn_idx + 1);
+            if !affected_deps.is_empty() {
+                // Non-exchanged format is default validation failure.
+                if let ValueWithLayout::Exchanged(
+                    previous_entry_value,
+                    previous_entry_maybe_layout,
+                ) = value_with_layout
+                {
+                    still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
                         previous_entry_value,
-                        previous_entry_maybe_layout,
-                    ) = value_with_layout
-                    {
-                        still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
-                            previous_entry_value,
-                            new_data,
-                            previous_entry_maybe_layout.as_ref(),
-                            new_maybe_layout.as_ref(),
-                        );
-                    }
+                        new_data,
+                        previous_entry_maybe_layout.as_ref(),
+                        new_maybe_layout.as_ref(),
+                    );
                 }
             }
         }
@@ -214,7 +181,7 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                 );
 
                 // Non-exchanged format is default validation failure.
-                if let EntryCell::ResourceWrite {
+                if let EntryCell {
                     incarnation: _,
                     value_with_layout: ValueWithLayout::Exchanged(entry_value, entry_maybe_layout),
                     dependencies: next_lower_deps,
@@ -251,11 +218,7 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             .versioned_map
             .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(reader_txn_idx));
 
-        // If read encounters a delta, it must traverse the block of transactions
-        // (top-down) until it encounters a write or reaches the end of the block.
-        // During traversal, all aggregator deltas have to be accumulated together.
-        let mut accumulator: Option<Result<DeltaOp, ()>> = None;
-        while let Some((idx, entry)) = iter.next_back() {
+        if let Some((idx, entry)) = iter.next_back() {
             if entry.is_estimate() {
                 debug_assert!(
                     maybe_reader_incarnation.is_none(),
@@ -267,112 +230,27 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                 ));
             }
 
-            match (&entry.value, accumulator.as_mut()) {
-                (
-                    EntryCell::ResourceWrite {
-                        incarnation,
-                        value_with_layout,
-                        dependencies,
-                    },
-                    None,
-                ) => {
-                    // Record the read dependency (only in V2 case, not to add contention to V1).
-                    if let Some(reader_incarnation) = maybe_reader_incarnation {
-                        // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
-                        assert_ok!(dependencies
-                            .lock()
-                            .insert(reader_txn_idx, reader_incarnation));
-                    }
+            let EntryCell {
+                incarnation,
+                value_with_layout,
+                dependencies,
+            } = &entry.value;
 
-                    // Resolve to the write if no deltas were applied in between.
-                    return Ok(Versioned(
-                        idx.idx().map(|idx| (idx, *incarnation)),
-                        value_with_layout.clone(),
-                    ));
-                },
-                (
-                    EntryCell::ResourceWrite {
-                        incarnation,
-                        value_with_layout,
-                        // We ignore dependencies here because accumulator is set, i.e.
-                        // we are dealing with AggregatorV1 flow w.o. push validation.
-                        dependencies: _,
-                    },
-                    Some(accumulator),
-                ) => {
-                    // Deltas were applied. We must deserialize the value
-                    // of the write and apply the aggregated delta accumulator.
-                    let value = value_with_layout.extract_value_no_layout();
-                    return match value
-                        .as_u128()
-                        .expect("Aggregator value must deserialize to u128")
-                    {
-                        None => {
-                            // Resolve to the write if the WriteOp was deletion
-                            // (MoveVM will observe 'deletion'). This takes precedence
-                            // over any speculative delta accumulation errors on top.
-                            Ok(Versioned(
-                                idx.idx().map(|idx| (idx, *incarnation)),
-                                value_with_layout.clone(),
-                            ))
-                        },
-                        Some(value) => {
-                            // Panics if the data can't be resolved to an aggregator value.
-                            accumulator
-                                .map_err(|_| DeltaApplicationFailure)
-                                .and_then(|a| {
-                                    // Apply accumulated delta to resolve the aggregator value.
-                                    a.apply_to(value)
-                                        .map(Resolved)
-                                        .map_err(|_| DeltaApplicationFailure)
-                                })
-                        },
-                    };
-                },
-                (EntryCell::Delta(delta, maybe_shortcut), Some(accumulator)) => {
-                    if let Some(shortcut_value) = maybe_shortcut {
-                        return accumulator
-                            .map_err(|_| DeltaApplicationFailure)
-                            .and_then(|a| {
-                                // Apply accumulated delta to resolve the aggregator value.
-                                a.apply_to(*shortcut_value)
-                                    .map(Resolved)
-                                    .map_err(|_| DeltaApplicationFailure)
-                            });
-                    }
-
-                    *accumulator = accumulator.and_then(|mut a| {
-                        // Read hit a delta during traversing the block and aggregating
-                        // other deltas. Merge two deltas together. If Delta application
-                        // fails, we record an error, but continue processing (to e.g.
-                        // account for the case when the aggregator was deleted).
-                        if a.merge_with_previous_delta(*delta).is_err() {
-                            Err(())
-                        } else {
-                            Ok(a)
-                        }
-                    });
-                },
-                (EntryCell::Delta(delta, maybe_shortcut), None) => {
-                    if let Some(shortcut_value) = maybe_shortcut {
-                        return Ok(Resolved(*shortcut_value));
-                    }
-
-                    // Read hit a delta and must start accumulating.
-                    // Initialize the accumulator and continue traversal.
-                    accumulator = Some(Ok(*delta))
-                },
+            // Record the read dependency (only in V2 case, not to add contention to V1).
+            if let Some(reader_incarnation) = maybe_reader_incarnation {
+                // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
+                assert_ok!(dependencies
+                    .lock()
+                    .insert(reader_txn_idx, reader_incarnation));
             }
+
+            return Ok(Versioned(
+                idx.idx().map(|idx| (idx, *incarnation)),
+                value_with_layout.clone(),
+            ));
         }
 
-        // It can happen that while traversing the block and resolving
-        // deltas the actual written value has not been seen yet (i.e.
-        // it is not added as an entry to the data-structure).
-        match accumulator {
-            Some(Ok(accumulator)) => Err(Unresolved(accumulator)),
-            Some(Err(_)) => Err(DeltaApplicationFailure),
-            None => Err(Uninitialized),
-        }
+        Err(Uninitialized)
     }
 }
 
@@ -417,14 +295,6 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 
     pub(crate) fn total_base_value_size(&self) -> u64 {
         self.total_base_value_size.load(Ordering::Relaxed)
-    }
-
-    pub fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
-        let mut v = self.values.entry(key).or_default();
-        v.versioned_map.insert(
-            ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(new_delta_entry(delta)),
-        );
     }
 
     /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
@@ -484,30 +354,24 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 ))
             })?;
 
-        if let EntryCell::ResourceWrite {
+        let EntryCell {
             incarnation: _,
             value_with_layout,
             dependencies,
-        } = &removed_entry.value
-        {
-            match value_with_layout {
-                ValueWithLayout::RawFromStorage(_) => {
-                    unreachable!(
-                        "Removed value written by txn {txn_idx} may not be RawFromStorage"
-                    );
-                },
-                ValueWithLayout::Exchanged(data, layout) => {
-                    let removed_deps = take_dependencies(dependencies);
-                    v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
-                        txn_idx,
-                        removed_deps,
-                        data,
-                        layout,
-                    )
-                },
-            }
-        } else {
-            Ok(BTreeMap::new())
+        } = &removed_entry.value;
+        match value_with_layout {
+            ValueWithLayout::RawFromStorage(_) => {
+                unreachable!("Removed value written by txn {txn_idx} may not be RawFromStorage");
+            },
+            ValueWithLayout::Exchanged(data, layout) => {
+                let removed_deps = take_dependencies(dependencies);
+                v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
+                    txn_idx,
+                    removed_deps,
+                    data,
+                    layout,
+                )
+            },
         }
     }
 
@@ -567,56 +431,54 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 )));
             },
             Occupied(mut o) => {
-                if let EntryCell::ResourceWrite {
+                let EntryCell {
                     incarnation,
                     value_with_layout: existing_value_with_layout,
                     dependencies,
-                } = &o.get().value
-                {
-                    assert!(*incarnation == 0);
-                    match (existing_value_with_layout, &base_value_with_layout) {
-                        (RawFromStorage(existing_value), RawFromStorage(base_value)) => {
-                            // Base value from storage needs to be identical
-                            // Assert the length of bytes for efficiency (instead of full equality)
-                            assert!(
+                } = &o.get().value;
+                assert_eq!(*incarnation, 0);
+                match (existing_value_with_layout, &base_value_with_layout) {
+                    (RawFromStorage(existing_value), RawFromStorage(base_value)) => {
+                        // Base value from storage needs to be identical
+                        // Assert the length of bytes for efficiency (instead of full equality)
+                        assert_eq!(
+                            base_value.bytes().map(|b| b.len()),
+                            existing_value.bytes().map(|b| b.len())
+                        );
+                    },
+                    (Exchanged(_, _), RawFromStorage(_)) => {
+                        // Stored value contains more info, nothing to do.
+                    },
+                    (RawFromStorage(_), Exchanged(_, _)) => {
+                        // Received more info, update, but keep the same dependencies.
+                        // TODO(BlockSTMv2): Once we support dependency kind, here we could check
+                        // that carried over dependencies can be only size & metadata.
+                        o.insert(CachePadded::new(new_write_entry(
+                            0,
+                            base_value_with_layout,
+                            take_dependencies(dependencies),
+                        )));
+                    },
+                    (
+                        Exchanged(existing_value, existing_layout),
+                        Exchanged(base_value, base_layout),
+                    ) => {
+                        // base value may have already been provided by another transaction
+                        // executed simultaneously and asking for the same resource.
+                        // Value from storage must be identical, but then delayed field
+                        // identifier exchange could've modified it.
+                        //
+                        // If maybe_layout is None, they are required to be identical
+                        // If maybe_layout is Some, there might have been an exchange
+                        // Assert the length of bytes for efficiency (instead of full equality)
+                        assert_eq!(existing_layout.is_some(), base_layout.is_some());
+                        if existing_layout.is_none() {
+                            assert_eq!(
+                                existing_value.bytes().map(|b| b.len()),
                                 base_value.bytes().map(|b| b.len())
-                                    == existing_value.bytes().map(|b| b.len())
                             );
-                        },
-                        (Exchanged(_, _), RawFromStorage(_)) => {
-                            // Stored value contains more info, nothing to do.
-                        },
-                        (RawFromStorage(_), Exchanged(_, _)) => {
-                            // Received more info, update, but keep the same dependencies.
-                            // TODO(BlockSTMv2): Once we support dependency kind, here we could check
-                            // that carried over dependencies can be only size & metadata.
-                            o.insert(CachePadded::new(new_write_entry(
-                                0,
-                                base_value_with_layout,
-                                take_dependencies(dependencies),
-                            )));
-                        },
-                        (
-                            Exchanged(existing_value, existing_layout),
-                            Exchanged(base_value, base_layout),
-                        ) => {
-                            // base value may have already been provided by another transaction
-                            // executed simultaneously and asking for the same resource.
-                            // Value from storage must be identical, but then delayed field
-                            // identifier exchange could've modified it.
-                            //
-                            // If maybe_layout is None, they are required to be identical
-                            // If maybe_layout is Some, there might have been an exchange
-                            // Assert the length of bytes for efficiency (instead of full equality)
-                            assert_eq!(existing_layout.is_some(), base_layout.is_some());
-                            if existing_layout.is_none() {
-                                assert_eq!(
-                                    existing_value.bytes().map(|b| b.len()),
-                                    base_value.bytes().map(|b| b.len())
-                                );
-                            }
-                        },
-                    }
+                        }
+                    },
                 }
             },
         };
@@ -646,11 +508,11 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         // a layout. Values with layouts (delayed fields) require special handling and cannot
         // be safely compared this way.
         if let Some(entry) = prev_entry {
-            if let EntryCell::ResourceWrite {
+            let EntryCell {
                 incarnation: prev_incarnation,
                 value_with_layout: prev_value,
                 ..
-            } = &entry.value
+            } = &entry.value;
             {
                 // For BlockSTMv1, the dependencies are always empty.
                 // TODO(BlockSTMv2): when AggregatorV1 is deprecated, we can assert that
@@ -771,47 +633,15 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 
         // Changes versioned metadata that was stored.
         prev_entry.is_none_or(|entry| -> bool {
-            if let EntryCell::ResourceWrite {
+            let EntryCell {
                 value_with_layout: existing_value_with_layout,
                 ..
-            } = &entry.value
-            {
-                arc_data.as_state_value_metadata()
-                    != existing_value_with_layout
-                        .extract_value_no_layout()
-                        .as_state_value_metadata()
-            } else {
-                unreachable!("Group metadata can't be written at AggregatorV1 key");
-            }
+            } = &entry.value;
+            arc_data.as_state_value_metadata()
+                != existing_value_with_layout
+                    .extract_value_no_layout()
+                    .as_state_value_metadata()
         })
-    }
-
-    /// When a transaction is committed, this method can be called for its delta outputs to add
-    /// a 'shortcut' to the corresponding materialized aggregator value, so any subsequent reads
-    /// do not have to traverse below the index. It must be guaranteed by the caller that the
-    /// data recorded below this index will not change after the call, and that the corresponding
-    /// transaction has indeed produced a delta recorded at the given key.
-    ///
-    /// If the result is Err(op), it means the base value to apply DeltaOp op hadn't been set.
-    pub fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
-        let mut v = self.values.get_mut(key).expect("Path must exist");
-
-        // +1 makes sure we include the delta from txn_idx.
-        match v.read(txn_idx + 1, None) {
-            Ok(MVDataOutput::Resolved(value)) => {
-                v.versioned_map
-                    .get_mut(&ShiftedTxnIndex::new(txn_idx))
-                    .expect("Entry by the txn must exist to commit delta")
-                    .record_delta_shortcut(value);
-
-                Ok(value)
-            },
-            Err(MVDataError::Unresolved(op)) => Err(op),
-            _ => unreachable!(
-                "Must resolve delta at key = {:?}, txn_idx = {}",
-                key, txn_idx
-            ),
-        }
     }
 
     #[cfg(test)]
@@ -820,20 +650,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         key: &K,
         shifted_txn_idx: ShiftedTxnIndex,
     ) -> BTreeMap<TxnIndex, Incarnation> {
-        match &self
+        let versioned_value = self
             .values
             .get(key)
-            .expect("Entry must exist for the given key")
+            .expect("Entry must exist for the given key");
+        let EntryCell { dependencies, .. } = &versioned_value
             .versioned_map
             .get(&shifted_txn_idx)
             .expect("Entry must exist for the given txn_idx")
-            .value
-        {
-            EntryCell::ResourceWrite { dependencies, .. } => {
-                dependencies.lock().clone_dependencies_for_test()
-            },
-            _ => unreachable!("Dependencies can only be recorded for resource writes"),
-        }
+            .value;
+        dependencies.lock().clone_dependencies_for_test()
     }
 }
 
@@ -841,7 +667,6 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 mod tests {
     use super::*;
     use crate::types::StorageVersion;
-    use aptos_aggregator::{bounded_math::SignedU128, delta_math::DeltaHistory};
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds,
         state_store::state_value::{StateValue, StateValueMetadata},
@@ -898,11 +723,8 @@ mod tests {
     fn get_deps_from_entry(
         entry: &Entry<EntryCell<TestValueWithMetadata>>,
     ) -> BTreeMap<TxnIndex, Incarnation> {
-        if let EntryCell::ResourceWrite { dependencies, .. } = &entry.value {
-            dependencies.lock().clone_dependencies_for_test()
-        } else {
-            unreachable!()
-        }
+        let EntryCell { dependencies, .. } = &entry.value;
+        dependencies.lock().clone_dependencies_for_test()
     }
 
     #[test_case(1, BTreeMap::from([(2, 0), (3, 1), (7, 1)]), true; "deps > 1 from idx 0 write, pass validation")]
@@ -1012,43 +834,6 @@ mod tests {
         );
 
         let _ = v.read(5, Some(outdated_incarnation));
-    }
-
-    #[test]
-    fn test_split_off_affected_read_dependencies_delta_only() {
-        let mut v = VersionedValue::<TestValueWithMetadata>::default();
-        v.versioned_map.insert(
-            ShiftedTxnIndex::new(0),
-            CachePadded::new(new_delta_entry(DeltaOp::new(
-                SignedU128::Positive(10),
-                1000,
-                DeltaHistory {
-                    max_achieved_positive_delta: 10,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },
-            ))),
-        );
-        v.versioned_map.insert(
-            ShiftedTxnIndex::new(5),
-            CachePadded::new(new_delta_entry(DeltaOp::new(
-                SignedU128::Positive(20),
-                1000,
-                DeltaHistory {
-                    max_achieved_positive_delta: 20,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },
-            ))),
-        );
-        let (deps, _) = v.split_off_affected_read_dependencies::<false>(
-            3,
-            &Arc::new(TestValueWithMetadata::new(10, 100)),
-            &None,
-        );
-        assert_eq!(deps, BTreeMap::new());
     }
 
     #[test]

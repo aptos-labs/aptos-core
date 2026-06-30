@@ -21,11 +21,6 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
 };
-use aptos_aggregator::{
-    bounded_math::SignedU128,
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
-    delta_math::DeltaHistory,
-};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{
@@ -555,104 +550,6 @@ fn empty_block() {
     // This test checks that we do not trigger asserts due to an empty block, e.g. in the
     // scheduler. Instead, parallel execution should gracefully early return empty output.
     run_and_assert::<KeyType<[u8; 32]>, MockEvent>(vec![], false);
-}
-
-#[test]
-fn delta_counters() {
-    // TODO(BlockSTMv2): Adjust these tests to also use V2.
-    let key = KeyType(random::<[u8; 32]>());
-    let mut transactions = vec![MockTransaction::from_behavior(MockIncarnation::<
-        KeyType<[u8; 32]>,
-        MockEvent,
-    >::new(
-        vec![],
-        vec![(key, random_value(false), false)], // writes
-        vec![],
-        vec![],
-        1, // gas
-    ))];
-
-    for _ in 0..50 {
-        transactions.push(
-            MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
-                vec![(key, false)], // reads
-                vec![],
-                vec![(key, delta_add(5, u128::MAX), None)], // deltas
-                vec![],
-                1, // gas
-            ))
-            .with_aggregator_v1_testing(),
-        );
-    }
-
-    transactions.push(
-        MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
-            vec![],
-            vec![(key, random_value(false), false)], // writes
-            vec![],
-            vec![],
-            1, // gas
-        ))
-        .with_aggregator_v1_testing(),
-    );
-
-    for _ in 0..50 {
-        transactions.push(
-            MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
-                vec![(key, false)], // reads
-                vec![],
-                vec![(key, delta_sub(2, u128::MAX), None)], // deltas
-                vec![],
-                1, // gas
-            ))
-            .with_aggregator_v1_testing(),
-        );
-    }
-
-    run_and_assert(transactions, true)
-}
-
-#[test]
-fn delta_chains() {
-    let mut transactions = vec![];
-    // Generate a series of transactions add and subtract from an aggregator.
-
-    let keys: Vec<KeyType<[u8; 32]>> = (0..10).map(|_| KeyType(random::<[u8; 32]>())).collect();
-
-    for i in 0..500 {
-        transactions.push(
-            MockTransaction::<KeyType<[u8; 32]>, MockEvent>::from_behavior(MockIncarnation::new(
-                keys.clone().into_iter().map(|k| (k, true)).collect(), // reads
-                vec![],
-                keys.iter()
-                    .enumerate()
-                    .filter_map(|(j, k)| match (i + j) % 2 == 0 {
-                        true => Some((
-                            *k,
-                            // Deterministic pattern for adds/subtracts.
-                            DeltaOp::new(
-                                if (i % 2 == 0) == (j < 5) {
-                                    SignedU128::Positive(10)
-                                } else {
-                                    SignedU128::Negative(1)
-                                },
-                                // below params irrelevant for this test.
-                                u128::MAX,
-                                DeltaHistory::new(),
-                            ),
-                            None,
-                        )),
-                        false => None,
-                    })
-                    .collect(), // deltas
-                vec![],
-                1, // gas
-            ))
-            .with_aggregator_v1_testing(),
-        );
-    }
-
-    run_and_assert(transactions, true)
 }
 
 const TOTAL_KEY_NUM: u64 = 50;

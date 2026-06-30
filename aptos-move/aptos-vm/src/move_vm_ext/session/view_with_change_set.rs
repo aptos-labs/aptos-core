@@ -65,14 +65,14 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn try_get_resource_write_op_from_change_set<'s>(
-        &'s self,
+    fn try_get_resource_write_op_from_change_set(
+        &self,
         state_key: &StateKey,
-        calling_fn_name: &'static str,
-    ) -> PartialVMResult<Option<&'s WriteOp>> {
+        calling_fn_name: &str,
+    ) -> PartialVMResult<Option<&WriteOp>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
-                AbstractResourceWriteOp::Write(write_op)
+                AbstractResourceWriteOp::Write(write_op, _)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
                     write_op,
                     ..
@@ -95,11 +95,11 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn try_get_group_write_from_change_set<'s>(
-        &'s self,
+    fn try_get_group_write_from_change_set(
+        &self,
         group_key: &StateKey,
-        calling_fn_name: &'static str,
-    ) -> Result<Option<&'s GroupWrite>, PanicError> {
+        calling_fn_name: &str,
+    ) -> Result<Option<&GroupWrite>, PanicError> {
         use AbstractResourceWriteOp::*;
 
         self.change_set
@@ -108,7 +108,7 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
             .and_then(|abstract_write_op| match abstract_write_op {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None, // Will become Ok(None) after transpose
-                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                Write(..) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
                     Some(Err(code_invariant_error(format!(
                         "Non-ResourceGroup write found in {} call for key {:?}",
                         calling_fn_name, group_key
@@ -126,16 +126,21 @@ impl TAggregatorV1View for ExecutorViewWithChangeSet<'_> {
         &self,
         id: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
-        match self.change_set.aggregator_v1_delta_set().get(id) {
-            Some(delta_op) => Ok(self
-                .base_executor_view
-                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op)?
-                .as_state_value()),
-            None => match self.change_set.aggregator_v1_write_set().get(id) {
-                Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base_executor_view.get_aggregator_v1_state_value(id),
-            },
+        // Aggregator V1 changes are folded into the resource write set. A concrete write (a normal
+        // write or an in-place materialized delta) resolves directly; anything else (a delayed
+        // delta, whose value lives behind an id, or an absent key) reads from the base view.
+        match self.try_get_resource_write_op_from_change_set(id, "get_aggregator_v1_state_value")? {
+            Some(write_op) => Ok(write_op.as_state_value()),
+            None => self.base_executor_view.get_aggregator_v1_state_value(id),
         }
+    }
+
+    fn get_aggregator_v1_delayed_field_id(
+        &self,
+        id: &Self::Identifier,
+    ) -> PartialVMResult<Option<DelayedFieldID>> {
+        self.base_executor_view
+            .get_aggregator_v1_delayed_field_id(id)
     }
 }
 
@@ -263,7 +268,7 @@ impl TResourceView for ExecutorViewWithChangeSet<'_> {
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
-                AbstractResourceWriteOp::Write(write_op)
+                AbstractResourceWriteOp::Write(write_op, _)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
                     write_op,
                     ..
@@ -413,7 +418,7 @@ mod test {
         data_cache::AsMoveResolver,
         move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
     };
-    use aptos_aggregator::delta_change_set::{delta_add, serialize};
+    use aptos_aggregator::delta_change_set::serialize;
     use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
     use aptos_vm_types::abstract_write_op::GroupWrite;
@@ -537,13 +542,23 @@ mod test {
             (key("resource_write_set"), (write(90), None)),
         ]);
 
-        let aggregator_v1_write_set = BTreeMap::from([
-            (key("aggregator_both"), write(120)),
-            (key("aggregator_write_set"), write(130)),
+        // Aggregator V1 writes are folded into the resource write set. A read-materialized
+        // aggregator is a normal Write; an in-place materialized delta (base 70 + 1 = 71) is a
+        // legacy Write carrying the committed value.
+        let aggregator_v1_resource_write_set = BTreeMap::from([
+            (
+                key("aggregator_both"),
+                AbstractResourceWriteOp::Write(write(120), false),
+            ),
+            (
+                key("aggregator_write_set"),
+                AbstractResourceWriteOp::Write(write(130), false),
+            ),
+            (
+                key("aggregator_delta_set"),
+                AbstractResourceWriteOp::Write(write(71), true),
+            ),
         ]);
-
-        let aggregator_v1_delta_set =
-            BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = BTreeMap::from([
@@ -582,8 +597,7 @@ mod test {
         let change_set = VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set,
+            aggregator_v1_resource_write_set,
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),

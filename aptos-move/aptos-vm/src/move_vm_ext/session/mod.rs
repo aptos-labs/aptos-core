@@ -7,6 +7,7 @@ use crate::{
         resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
     },
 };
+use aptos_aggregator::aggregator_v1_extension::{AGGREGATOR_V1_LAYOUT, AGGREGATOR_V1_SIZE};
 use aptos_framework_natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
@@ -19,13 +20,21 @@ use aptos_framework_natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
-    state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
+    chain_id::ChainId,
+    contract_event::ContractEvent,
+    on_chain_config::Features,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    transaction::user_transaction_context::UserTransactionContext,
+    write_set::WriteOp,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
-    module_write_set::ModuleWrite, storage::change_set_configs::ChangeSetConfigs,
+    abstract_write_op::{
+        AbstractResourceWriteOp, InPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
+    },
+    change_set::VMChangeSet,
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWrite,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
@@ -442,9 +451,7 @@ where
     ) -> PartialVMResult<VMChangeSet> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
-
         let mut aggregator_v1_write_set = BTreeMap::new();
-        let mut aggregator_v1_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let resources = account_changeset.into_resources();
@@ -484,27 +491,54 @@ where
         }
 
         for (state_key, change) in aggregator_change_set.aggregator_v1_changes {
-            match change {
-                AggregatorChangeV1::Write(value) => {
+            let abstract_op = match change {
+                AggregatorChangeV1::Write(value) => AbstractResourceWriteOp::Write(
+                    woc.convert_aggregator_modification(&state_key, value)?,
+                    false,
+                ),
+                AggregatorChangeV1::MaterializedDelta(value) => {
+                    let bytes = bcs::to_bytes(&value)
+                        .expect("Serialization of u128 aggregator value cannot fail")
+                        .into();
+                    AbstractResourceWriteOp::Write(WriteOp::legacy_modification(bytes), true)
+                },
+                AggregatorChangeV1::WriteWithDelayedFields(id) => {
+                    let value = id.as_u64() as u128;
                     let write_op = woc.convert_aggregator_modification(&state_key, value)?;
-                    aggregator_v1_write_set.insert(state_key, write_op);
+                    AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                        write_op,
+                        layout: AGGREGATOR_V1_LAYOUT.clone(),
+                        materialized_size: Some(AGGREGATOR_V1_SIZE as u64),
+                    })
                 },
-                AggregatorChangeV1::Merge(delta_op) => {
-                    aggregator_v1_delta_set.insert(state_key, delta_op);
+                AggregatorChangeV1::DelayedDelta => {
+                    AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                        InPlaceDelayedFieldChangeOp {
+                            layout: AGGREGATOR_V1_LAYOUT.clone(),
+                            materialized_size: AGGREGATOR_V1_SIZE as u64,
+                            metadata: StateValueMetadata::none(),
+                            is_aggregator_v1_delta: true,
+                        },
+                    )
                 },
-                AggregatorChangeV1::Delete => {
-                    let write_op =
-                        woc.convert_aggregator(&state_key, MoveStorageOp::Delete, false)?;
-                    aggregator_v1_write_set.insert(state_key, write_op);
-                },
-            }
+                // A deletion has no delayed field to exchange, so it is a
+                // concrete write, just like a normal resource deletion.
+                AggregatorChangeV1::Delete => AbstractResourceWriteOp::Write(
+                    woc.convert_aggregator_deletion(&state_key)?,
+                    false,
+                ),
+            };
+            aggregator_v1_write_set.insert(state_key, abstract_op);
         }
 
         // We need to remove values that are already in the writes.
         let reads_needing_exchange = aggregator_change_set
             .reads_needing_exchange
             .into_iter()
-            .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
+            .filter(|(state_key, _)| {
+                !resource_write_set.contains_key(state_key)
+                    && !aggregator_v1_write_set.contains_key(state_key)
+            })
             .collect();
 
         let group_reads_needing_change = aggregator_change_set
@@ -517,7 +551,6 @@ where
             resource_write_set,
             resource_group_write_set,
             aggregator_v1_write_set,
-            aggregator_v1_delta_set,
             aggregator_change_set.delayed_field_changes,
             reads_needing_exchange,
             group_reads_needing_change,

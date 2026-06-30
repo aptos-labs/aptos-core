@@ -291,15 +291,13 @@ proptest! {
     }
 
     #[test]
-    #[should_panic]
     fn test_aggregator_underflow(block_split in BlockSplit::arbitrary(3)) {
         let (mut h, acc) = setup();
 
         let txns = vec![
             (SUCCESS, new(&mut h, &acc, 0)),
             (SUCCESS, add(&mut h, &acc, 0, 400)),
-            // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
-            // We cannot catch it, because we don't materialize it.
+            // Value would drop below zero.
             (EAGGREGATOR_UNDERFLOW, sub(&mut h, &acc, 0, 500)),
         ];
 
@@ -322,7 +320,6 @@ proptest! {
     }
 
     #[test]
-    #[should_panic]
     fn test_aggregator_overflow(block_split in BlockSplit::arbitrary(4)) {
         let (mut h, acc) = setup();
 
@@ -330,8 +327,7 @@ proptest! {
             (SUCCESS, new(&mut h, &acc, 0)),
             (SUCCESS, add(&mut h, &acc, 0, u128::MAX - 600)),
             (SUCCESS, add(&mut h, &acc, 0, 400)),
-            // Currently, this one will panic, instead of throwing this code.
-            // We cannot catch it, because we don't materialize it.
+            // Value would exceed the limit.
             (EAGGREGATOR_OVERFLOW, add(&mut h, &acc, 0, 201)),
         ];
 

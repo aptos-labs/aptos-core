@@ -15,7 +15,7 @@ use crate::{
         serialize_from_delayed_field_u128,
     },
 };
-use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::TransactionEvent, executable::ModulePath,
@@ -65,7 +65,6 @@ use std::{
 #[derive(Clone)]
 enum BaselineValue {
     GenericWrite(ValueType),
-    Aggregator(u128),
     // Expected value and expected version of the delayed field.
     DelayedField(u128, u32),
     // If true, then baseline value (when non-empty), includes txn_idx
@@ -257,9 +256,6 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
                         BaselineValue::GenericWrite(_) => {
                             unreachable!("Delayed field testing should not have generic writes")
                         },
-                        BaselineValue::Aggregator(_) => {
-                            unreachable!("Delayed field testing should not have aggregators")
-                        },
                     }
                 } else {
                     baseline_value.clone()
@@ -290,12 +286,6 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
                                     .expect("Must be set by delta pre-processing"),
                             ),
                         );
-                    },
-                    DeltaTestKind::AggregatorV1 => {
-                        // In this case transaction did not fail due to delta application
-                        // errors, and thus we should update written_ and resolved_ worlds.
-                        self.current_world
-                            .insert(k.clone(), BaselineValue::Aggregator(v));
                     },
                     DeltaTestKind::None => {
                         unreachable!("None delta test kind should not be used for resource deltas");
@@ -368,9 +358,6 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
                             Some(BaselineValue::GenericWrite(_)) => {
                                 unreachable!("Delayed field testing should not have generic writes")
                             },
-                            Some(BaselineValue::Aggregator(_)) => {
-                                unreachable!("Delayed field testing should not have aggregators")
-                            },
                             None | Some(BaselineValue::Empty(_)) => {
                                 self.txn_read_write_resolved_deltas
                                     .insert(k.clone(), STORAGE_AGGREGATOR_VALUE);
@@ -426,8 +413,6 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
                         )
                     }
                 },
-                // Get base value from latest resolved aggregator value.
-                BaselineValue::Aggregator(value) => (*value, None),
                 // Storage always gets resolved to a default constant.
                 BaselineValue::Empty(delta_test_kind) => (
                     STORAGE_AGGREGATOR_VALUE,
@@ -719,20 +704,9 @@ where
         }
 
         // Check that remaining transactions are properly marked as skipped.
-        let mut write_summary_flag = true;
         for txn_output in txn_outputs.iter().skip(valid_txn_count) {
             // Ensure the transaction is skipped based on the output
             assert!(txn_output.skipped);
-
-            // materialized delta writes is only set by a callback for
-            // committed transactions, which requires getting write summary.
-            // However, the very first transaction that is not committed might
-            // be an exception, which is why we use a boolean flag.
-            if txn_output.materialized_delta_writes.get().is_some() {
-                let called_write_summary = txn_output.called_write_summary.get().is_some();
-                assert!(write_summary_flag || called_write_summary);
-                write_summary_flag &= called_write_summary;
-            }
         }
     }
 
@@ -767,23 +741,12 @@ where
                 (BaselineValue::GenericWrite(v), None) => {
                     assert_none!(v.extract_raw_bytes());
                 },
-                (BaselineValue::Aggregator(aggr_value), Some(bytes)) => {
-                    assert_eq!(serialize(aggr_value), *bytes);
-                },
-                (BaselineValue::Aggregator(_), None) => {
-                    unreachable!(
-                        "Deleted or non-existent value from storage can't match aggregator value"
-                    );
-                },
                 (BaselineValue::Empty(delta_test_kind), maybe_bytes) => match delta_test_kind {
                     DeltaTestKind::DelayedFields => {
                         assert_eq!(
                             maybe_bytes.as_ref().unwrap(),
                             &serialize_from_delayed_field_u128(STORAGE_AGGREGATOR_VALUE, u32::MAX)
                         );
-                    },
-                    DeltaTestKind::AggregatorV1 => {
-                        assert_eq!(*maybe_bytes, Some(serialize(&STORAGE_AGGREGATOR_VALUE)));
                     },
                     DeltaTestKind::None => {
                         assert_none!(maybe_bytes);
@@ -1008,21 +971,6 @@ where
         let baseline_deltas = resolved_deltas
             .as_ref()
             .expect("Aggregator failures not yet tested");
-
-        output
-            .materialized_delta_writes
-            .get()
-            .expect("Delta writes must be set")
-            .iter()
-            .for_each(|(k, result_delta_write)| {
-                assert_eq!(
-                    *baseline_deltas.get(k).expect("Baseline must contain delta"),
-                    result_delta_write
-                        .as_u128()
-                        .expect("Baseline must contain delta")
-                        .expect("Must deserialize aggregator write value")
-                );
-            });
 
         for (k, (_, _)) in output.reads_needing_exchange.iter() {
             let patched_resource = output

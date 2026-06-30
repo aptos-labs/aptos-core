@@ -2,9 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::types::InputOutputKey;
-use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
-};
+use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::PanicError,
@@ -14,7 +12,6 @@ use aptos_types::{
         AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction,
         TransactionOutput as TypesTransactionOutput,
     },
-    write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
@@ -109,18 +106,13 @@ pub trait ExecutorTask {
 
 /// Traits for execution result of a single transaction.
 pub trait BeforeMaterializationOutput<Txn: Transaction> {
-    /// Get the writes of a transaction from its output, separately for resources,
-    /// modules and aggregator_v1.
+    /// Get the writes of a transaction from its output, separately for resources
+    /// and modules. Aggregator V1 writes are ordinary entries of the resource write set.
     fn resource_write_set(
         &self,
     ) -> HashMap<Txn::Key, (TriompheArc<Txn::Value>, Option<TriompheArc<MoveTypeLayout>>)>;
 
     fn module_write_set(&self) -> &BTreeMap<Txn::Key, ModuleWrite<Txn::Value>>;
-
-    fn aggregator_v1_write_set(&self) -> BTreeMap<Txn::Key, Txn::Value>;
-
-    /// Get the aggregator V1 deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<Txn::Key, DeltaOp>;
 
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
@@ -145,7 +137,7 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
         ),
     >;
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         callback: &mut dyn FnMut(&Txn::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
@@ -251,13 +243,12 @@ pub trait TransactionOutput: Send + Debug {
     // to avoid data races with the accessor methods.
 
     /// Will be called once per transaction when the output is ready to be committed.
-    /// Ensures that any writes corresponding to materialized deltas and group updates
-    /// (recorded in output separately) are incorporated into the transaction output.
+    /// Ensures that any writes corresponding to materialized delayed fields and group
+    /// updates (recorded in output separately) are incorporated into the transaction output.
     /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
     /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
         &mut self,
-        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
         patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
@@ -266,10 +257,4 @@ pub trait TransactionOutput: Send + Debug {
     ) -> Result<Trace, PanicError>;
 
     fn set_txn_output_for_non_dynamic_change_set(&mut self);
-
-    // !!![CAUTION]!!! These methods should never be used in parallel execution.
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
-    );
 }

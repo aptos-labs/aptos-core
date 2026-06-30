@@ -9,8 +9,7 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TDelayedFieldView,
-    types::DelayedFieldValue,
+    delayed_change::DelayedChange, resolver::TDelayedFieldView, types::DelayedFieldValue,
 };
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
@@ -201,7 +200,6 @@ impl TransactionOutput for TestOutput {
 
     fn incorporate_materialized_txn_output(
         &mut self,
-        _aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         _patched_events: Vec<ContractEvent>,
     ) -> Result<Trace, PanicError> {
@@ -209,12 +207,6 @@ impl TransactionOutput for TestOutput {
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&mut self) {}
-
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        _view: &impl aptos_aggregator::resolver::TAggregatorV1View<Identifier = StateKey>,
-    ) {
-    }
 }
 
 impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
@@ -227,14 +219,6 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
         static EMPTY: OnceCell<BTreeMap<StateKey, ModuleWrite<WriteOp>>> = OnceCell::new();
         EMPTY.get_or_init(BTreeMap::new)
-    }
-
-    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
-        BTreeMap::new()
-    }
-
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
-        BTreeMap::new()
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
@@ -268,7 +252,7 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
         HashMap::new()
     }
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         _callback: &mut dyn FnMut(&StateKey) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
