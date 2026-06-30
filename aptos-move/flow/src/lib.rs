@@ -4,8 +4,9 @@
 pub mod hooks;
 pub mod mcp;
 pub mod plugin;
+pub mod update;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use mcp::supervisor::{run_supervised, RESTART_ENV_VAR};
 use std::path::PathBuf;
@@ -48,6 +49,8 @@ pub enum FlowCommand {
     /// Hook subcommands (called from AI platform hooks).
     #[command(subcommand)]
     Hook(hooks::HookCommand),
+    /// Update move-flow to the latest release.
+    Update(update::UpdateArgs),
 }
 
 /// Supported AI platform targets.
@@ -76,6 +79,12 @@ impl FlowCli {
                 Some(v) => mcp::run(args, &self.global, v == "1").await,
             },
             FlowCommand::Hook(cmd) => hooks::run(cmd),
+            FlowCommand::Update(args) => {
+                let args = args.clone();
+                tokio::task::spawn_blocking(move || update::run(&args))
+                    .await
+                    .context("update task panicked")?
+            },
         }
     }
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-30
+
+### Added
+- `move-flow update [--check]` subcommand for self-updating from
+  `aptos-labs/aptos-ai` GitHub releases.
+
 ## [1.0.4] - 2026-06-10
 
 ### Added
@@ -16,5 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `x86_64-apple-darwin`, `aarch64-apple-darwin`, and
   `x86_64-pc-windows-msvc`.
 
-[Unreleased]: https://github.com/aptos-labs/aptos-core/compare/move-flow-v1.0.4...HEAD
+[Unreleased]: https://github.com/aptos-labs/aptos-core/compare/move-flow-v1.1.0...HEAD
+[1.1.0]: https://github.com/aptos-labs/aptos-core/compare/move-flow-v1.0.4...move-flow-v1.1.0
 [1.0.4]: https://github.com/aptos-labs/aptos-core/releases/tag/move-flow-v1.0.4
