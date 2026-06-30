@@ -6,6 +6,9 @@ name: Checks the proto changes and release
       - main
     paths:
       - protos/proto/aptos/transaction/v1/transaction.proto
+permissions:
+  contents: read
+
 
 jobs:
   check-protos:

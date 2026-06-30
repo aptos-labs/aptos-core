@@ -41,6 +41,10 @@ env:
   # It is also used to pull the docker images for the CI.
   IMAGE_TAG: ${{ inputs.GIT_SHA }}
   GIT_SHA: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }} # default to PR branch sha when not running on workflow_call
+permissions:
+  contents: read
+  id-token: write
+
 
 jobs:
   # These tests ensure that the faucet works with a node built from main. If we only

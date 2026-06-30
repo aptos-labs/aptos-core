@@ -38,6 +38,9 @@ env:
 
 # TODO: should we migrate this to a composite action, so that we can skip it
 # at the call site, and don't need to wrap each step in an if statement?
+permissions:
+  contents: read
+
 jobs:
   # Confirm that the generated client within the TS SDK has been re-generated
   # if there are any changes that would affect it within the PR / commit. If

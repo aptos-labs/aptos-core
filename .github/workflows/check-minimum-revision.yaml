@@ -15,6 +15,9 @@ on:
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
   MINIMUM_REVISION: ${{ secrets.MINIMUM_REVISION }}
+permissions:
+  contents: read
+
 
 jobs:
   check-minimum-revision:

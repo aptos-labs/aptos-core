@@ -2,6 +2,10 @@ name: Trigger Validation Tests on Release Branch Cut
 
 on:
   create:
+permissions:
+  contents: read
+  actions: write
+
 
 jobs:
   check-branch-prefix:
