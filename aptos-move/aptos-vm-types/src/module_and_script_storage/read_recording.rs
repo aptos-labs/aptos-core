@@ -16,7 +16,9 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
 };
 use move_vm_runtime::{
     ambassador_impl_LayoutCache, ambassador_impl_WithRuntimeEnvironment, LayoutCache,
@@ -24,35 +26,56 @@ use move_vm_runtime::{
     WithRuntimeEnvironment,
 };
 use move_vm_types::code::{ambassador_impl_ScriptCache, Code, ScriptCache};
-use std::{cell::RefCell, collections::HashSet, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
-/// Wraps a code storage and records the state key of every module the VM fetches through it,
-/// so that module accesses become part of the transaction's observed read set (the basis for
-/// hot state promotion).
+/// Wraps a code storage and records every module the VM fetches through it, so that module
+/// accesses become part of the transaction's observed read set (the basis for hot state
+/// promotion).
+///
+/// The VM fetches the same module repeatedly within a transaction, and interning a module
+/// `StateKey` goes through a global, lock-guarded registry. To keep that off the per-access
+/// hot path, reads are accumulated as deduplicated module ids and interned into `StateKey`s
+/// once, when the set is extracted.
 ///
 /// Scripts are not state items, so script cache accesses are not recorded.
 pub struct ReadRecordingCodeStorage<'a, C> {
     code_storage: &'a C,
-    module_reads: RefCell<HashSet<StateKey>>,
+    module_reads: RefCell<HashMap<AccountAddress, HashSet<Identifier>>>,
 }
 
 impl<'a, C> ReadRecordingCodeStorage<'a, C> {
     pub fn new(code_storage: &'a C) -> Self {
         Self {
             code_storage,
-            module_reads: RefCell::new(HashSet::new()),
+            module_reads: RefCell::new(HashMap::new()),
         }
     }
 
-    /// Returns the state keys of modules fetched so far.
+    /// Interns the recorded module reads into state keys, once per distinct module.
     pub fn into_recorded_reads(self) -> HashSet<StateKey> {
-        self.module_reads.take()
+        self.module_reads
+            .into_inner()
+            .into_iter()
+            .flat_map(|(address, names)| {
+                names
+                    .into_iter()
+                    .map(move |name| StateKey::module(&address, &name))
+            })
+            .collect()
     }
 
     fn record(&self, address: &AccountAddress, module_name: &IdentStr) {
-        self.module_reads
-            .borrow_mut()
-            .insert(StateKey::module(address, module_name));
+        let mut module_reads = self.module_reads.borrow_mut();
+        let names = module_reads.entry(*address).or_default();
+        // `contains` borrows the name, so repeated fetches of an already-seen module touch
+        // no allocation and never reach the StateKey registry; clone only on first sighting.
+        if !names.contains(module_name) {
+            names.insert(module_name.to_owned());
+        }
     }
 }
 
