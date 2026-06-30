@@ -8,7 +8,6 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_aggregator::{
-    delta_change_set::serialize,
     delta_math::DeltaHistory,
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
@@ -94,21 +93,18 @@ pub(crate) enum DataRead<V> {
     ResourceSize(Option<u64>),
     // Exists is a lower tier, can be determined both from Metadata and ResourceSize.
     Exists(bool),
-    /// Read resolved an aggregatorV1 delta to a value.
-    /// TODO[agg_v1](cleanup): deprecate.
-    Resolved(u128),
     // CAUTION: when adding a new variant here, it must be ensured that compare
     // data reads implements a comparison (o.w. unreachable arm will be hit).
 }
 
 impl<V> DataRead<V> {
-    // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
+    // Assigns highest rank to Versioned, then Metadata, then Exists.
     // (e.g. versioned read implies metadata and existence information, and
     // metadata information implies existence information).
     fn get_kind(&self) -> ReadKind {
         use DataRead::*;
         match self {
-            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
+            Versioned(_, _, _) => ReadKind::Value,
             MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
             Metadata(_) => ReadKind::Metadata,
             ResourceSize(_) => ReadKind::ResourceSize,
@@ -150,7 +146,6 @@ impl<V: TransactionWrite> DataRead<V> {
             DataRead::Versioned(version, v, layout) => {
                 Self::versioned_convert_to(version, v, layout, kind)
             },
-            DataRead::Resolved(v) => Self::resolved_convert_to(*v, kind),
             DataRead::MetadataAndResourceSize(metadata, size) => {
                 Self::metadata_and_size_convert_to(metadata, *size, kind)
             },
@@ -179,21 +174,6 @@ impl<V: TransactionWrite> DataRead<V> {
             ReadKind::Metadata => Some(DataRead::Metadata(v.as_state_value_metadata())),
             ReadKind::ResourceSize => Some(DataRead::ResourceSize(Self::value_size(v))),
             ReadKind::Exists => Some(DataRead::Exists(!v.is_deletion())),
-        }
-    }
-
-    fn resolved_convert_to(v: u128, kind: &ReadKind) -> Option<DataRead<V>> {
-        match kind {
-            ReadKind::Value => Some(DataRead::Resolved(v)),
-            ReadKind::MetadataAndResourceSize => Some(DataRead::MetadataAndResourceSize(
-                Some(StateValueMetadata::none()),
-                Some(serialize(&v).len() as u64),
-            )),
-            ReadKind::Metadata => Some(DataRead::Metadata(Some(StateValueMetadata::none()))),
-            ReadKind::ResourceSize => {
-                Some(DataRead::ResourceSize(Some(serialize(&v).len() as u64)))
-            },
-            ReadKind::Exists => Some(DataRead::Exists(true)),
         }
     }
 
@@ -306,9 +286,6 @@ impl DataReadComparator {
                 v1_metadata == v2_metadata
             },
             (DataRead::Exists(v1_exists), DataRead::Exists(v2_exists)) => v1_exists == v2_exists,
-            (DataRead::Resolved(v1_resolved), DataRead::Resolved(v2_resolved)) => {
-                v1_resolved == v2_resolved
-            },
             (
                 DataRead::MetadataAndResourceSize(v1_metadata, v1_size),
                 DataRead::MetadataAndResourceSize(v2_metadata, v2_size),
@@ -318,16 +295,7 @@ impl DataReadComparator {
             },
             (
                 DataRead::Versioned(_, _, _),
-                DataRead::Resolved(_)
-                | DataRead::MetadataAndResourceSize(_, _)
-                | DataRead::Metadata(_)
-                | DataRead::ResourceSize(_)
-                | DataRead::Exists(_),
-            )
-            | (
-                DataRead::Resolved(_),
-                DataRead::Versioned(_, _, _)
-                | DataRead::MetadataAndResourceSize(_, _)
+                DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
                 | DataRead::ResourceSize(_)
                 | DataRead::Exists(_),
@@ -335,7 +303,6 @@ impl DataReadComparator {
             | (
                 DataRead::MetadataAndResourceSize(_, _),
                 DataRead::Versioned(_, _, _)
-                | DataRead::Resolved(_)
                 | DataRead::Metadata(_)
                 | DataRead::ResourceSize(_)
                 | DataRead::Exists(_),
@@ -343,7 +310,6 @@ impl DataReadComparator {
             | (
                 DataRead::Metadata(_),
                 DataRead::Versioned(_, _, _)
-                | DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::ResourceSize(_)
                 | DataRead::Exists(_),
@@ -351,7 +317,6 @@ impl DataReadComparator {
             | (
                 DataRead::ResourceSize(_),
                 DataRead::Versioned(_, _, _)
-                | DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
                 | DataRead::Exists(_),
@@ -359,7 +324,6 @@ impl DataReadComparator {
             | (
                 DataRead::Exists(_),
                 DataRead::Versioned(_, _, _)
-                | DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
                 | DataRead::ResourceSize(_),
@@ -559,8 +523,6 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
-    // Captured always, but used for aggregator v1 validation in BlockSTMv2 flow.
-    aggregator_v1_reads: HashSet<T::Key>,
 
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
@@ -590,7 +552,6 @@ impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
             data_reads: HashMap::new(),
             group_reads: HashMap::new(),
             delayed_field_reads: HashMap::new(),
-            aggregator_v1_reads: HashSet::new(),
             module_reads: hashbrown::HashMap::new(),
             delayed_field_speculative_failure: false,
             non_delayed_field_speculative_failure: false,
@@ -758,10 +719,6 @@ where
                 "Inconsistency in group data reads (must be due to speculation)".to_string(),
             )),
         }
-    }
-
-    pub(crate) fn capture_aggregator_v1_read(&mut self, key: T::Key) {
-        self.aggregator_v1_reads.insert(key);
     }
 
     pub(crate) fn capture_data_read(
@@ -941,18 +898,8 @@ where
                         DataReadComparison::Contains
                     )
                 },
-                Ok(Resolved(value)) => matches!(
-                    self.data_read_comparator
-                        .compare_data_reads(&DataRead::Resolved(value), read),
-                    DataReadComparison::Contains
-                ),
-                // Dependency implies a validation failure, and if the original read were to
-                // observe an unresolved delta, it would set the aggregator base value in the
-                // multi-versioned data-structure, resolve, and record the resolved value.
-                Err(Dependency(_))
-                | Err(Unresolved(_))
-                | Err(DeltaApplicationFailure)
-                | Err(Uninitialized) => false,
+                // Dependency implies a validation failure.
+                Err(Dependency(_)) | Err(Uninitialized) => false,
             } {
                 return false;
             }
@@ -969,56 +916,7 @@ where
             return false;
         }
 
-        // This includes AggregatorV1 reads and keeps BlockSTMv1 behavior intact.
         self.validate_data_reads_impl(self.data_reads.iter(), data_map, idx_to_validate)
-    }
-
-    // This method is only used in the BlockSTMv2 flow. BlockSTMv1 validates
-    // aggregator v1 reads as a part of data reads.
-    pub(crate) fn validate_aggregator_v1_reads(
-        &self,
-        data_map: &VersionedData<T::Key, T::Value>,
-        aggregator_write_keys: impl Iterator<Item = T::Key>,
-        idx_to_validate: TxnIndex,
-    ) -> Result<bool, PanicError> {
-        // Few aggregator v1 instances exist in the system (and legacy now, deprecated
-        // by DelayedFields), hence the efficiency of construction below is not a concern.
-        let mut aggregator_v1_iterable = Vec::with_capacity(self.aggregator_v1_reads.len());
-        for k in &self.aggregator_v1_reads {
-            match self.data_reads.get(k) {
-                Some(data_read) => aggregator_v1_iterable.push((k, data_read)),
-                None => {
-                    return Err(code_invariant_error(format!(
-                        "Aggregator v1 read {:?} not found among captured data reads",
-                        k
-                    )));
-                },
-            }
-        }
-
-        let ret = self.validate_data_reads_impl(
-            aggregator_v1_iterable.into_iter(),
-            data_map,
-            idx_to_validate,
-        );
-
-        if ret {
-            // Additional invariant check (that AggregatorV1 reads are captured for
-            // aggregator write keys). This protects against the case where aggregator v1
-            // state value read was read by a wrong interface (e.g. via resource API).
-            for key in aggregator_write_keys {
-                if self.data_reads.contains_key(&key) && !self.aggregator_v1_reads.contains(&key) {
-                    // Not assuming read-before-write here: if there was a read, it must also be
-                    // captured as an aggregator_v1 read.
-                    return Err(code_invariant_error(format!(
-                        "Captured read at aggregator key {:?} not found among AggregatorV1 reads",
-                        key
-                    )));
-                }
-            }
-        }
-
-        Ok(ret)
     }
 
     /// Records the read to global cache that spans across multiple blocks.
@@ -1618,10 +1516,6 @@ mod test {
             ReadKind::Value
         );
         assert_eq!(
-            DataRead::Resolved::<ValueType>(200).get_kind(),
-            ReadKind::Value
-        );
-        assert_eq!(
             DataRead::Metadata::<ValueType>(Some(StateValueMetadata::none())).get_kind(),
             ReadKind::Metadata
         );
@@ -1717,7 +1611,6 @@ mod test {
             TriompheArc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
             None,
         );
-        let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(StateValueMetadata::none()));
         let metadata = DataRead::Metadata(Some(raw_metadata(1)));
@@ -1726,11 +1619,9 @@ mod test {
 
         // Test contains & downcast.
         assert_contains!(versioned_legacy, legacy_metadata);
-        assert_contains!(resolved, legacy_metadata);
         assert_contains!(versioned_legacy, exists);
-        assert_contains!(resolved, exists);
         assert_contains!(legacy_metadata, exists);
-        // Same checks for deletion (Resolved cannot be a deletion).
+        // Same checks for deletion.
         assert_contains!(versioned_deletion, deletion_metadata);
         assert_contains!(versioned_deletion, not_exists);
         assert_contains!(deletion_metadata, not_exists);
@@ -1754,17 +1645,11 @@ mod test {
         assert_inconsistent_same_kind!(legacy_metadata, metadata);
         assert_inconsistent_same_kind!(versioned_legacy, versioned_with_metadata);
         assert_inconsistent_same_kind!(versioned_legacy, versioned_deletion);
-        assert_inconsistent_same_kind!(versioned_legacy, resolved);
         assert_inconsistent_same_kind!(versioned_with_metadata, versioned_deletion);
-        assert_inconsistent_same_kind!(versioned_with_metadata, resolved);
-        assert_inconsistent_same_kind!(versioned_deletion, resolved);
         // Test inconsistency with downcast.
         assert_inconsistent_downcast!(versioned_legacy, metadata);
         assert_inconsistent_downcast!(versioned_legacy, deletion_metadata);
         assert_inconsistent_downcast!(versioned_legacy, not_exists);
-        assert_inconsistent_downcast!(resolved, deletion_metadata);
-        assert_inconsistent_downcast!(resolved, metadata);
-        assert_inconsistent_downcast!(resolved, not_exists);
         assert_inconsistent_downcast!(versioned_with_metadata, legacy_metadata);
         assert_inconsistent_downcast!(versioned_with_metadata, deletion_metadata);
         assert_inconsistent_downcast!(versioned_with_metadata, not_exists);
@@ -1941,7 +1826,6 @@ mod test {
             TriompheArc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
             None,
         );
-        let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(StateValueMetadata::none()));
         let metadata = DataRead::Metadata(Some(raw_metadata(1)));
@@ -1968,8 +1852,6 @@ mod test {
         assert_update_incorrect!(map, 0, deletion_metadata);
 
         assert_update_insufficient!(map, 0, exists);
-        assert_update_inconsistent!(map, 0, resolved);
-        assert_update_insufficient!(map, 0, exists);
         assert_update_inconsistent!(map, 0, versioned_with_metadata);
         // Updated key 0 for the last time.
         assert_update!(map, 0, versioned_deletion);
@@ -1987,28 +1869,12 @@ mod test {
         assert_update_inconsistent!(map, 1, versioned_deletion);
         assert_update_insufficient!(map, 1, not_exists);
         assert_update_incorrect!(map, 1, metadata);
-        assert_update_inconsistent!(map, 1, resolved);
         assert_update!(map, 1, versioned_with_metadata);
         assert_update_insufficient!(map, 1, metadata);
         assert_update_insufficient!(map, 1, not_exists);
         assert_update_insufficient!(map, 1, exists);
         assert_update_insufficient!(map, 1, legacy_metadata);
         assert_update_incorrect!(map, 1, versioned_deletion);
-
-        assert_none!(map.get(&2));
-        assert_insert!(map, 2, legacy_metadata);
-        assert_update!(map, 2, resolved);
-        // Resolved also has Value ReadKind, and it is incorrect to call
-        // with the same ReadKind,
-        assert_update_incorrect!(map, 2, versioned_legacy);
-        assert_update_insufficient!(map, 2, legacy_metadata);
-        assert_update_incorrect!(map, 2, versioned_deletion);
-        assert_update_insufficient!(map, 2, not_exists);
-        assert_update_insufficient!(map, 2, metadata);
-        assert_update_insufficient!(map, 2, exists);
-        assert_update_incorrect!(map, 2, versioned_with_metadata);
-        assert_update_insufficient!(map, 2, deletion_metadata);
-        assert_update_incorrect!(map, 2, resolved);
     }
 
     fn legacy_reads_by_kind() -> Vec<DataRead<ValueType>> {
@@ -2134,12 +2000,7 @@ mod test {
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
 
-        let resolved = DataRead::Resolved::<ValueType>(200);
-        let mixed_reads = [
-            deletion_reads[0].clone(),
-            with_metadata_reads[1].clone(),
-            resolved,
-        ];
+        let mixed_reads = [deletion_reads[0].clone(), with_metadata_reads[1].clone()];
 
         assert_incorrect_use!(
             captured_reads,
@@ -2163,7 +2024,7 @@ mod test {
         // Test incorrect with with incompatible types.
         assert!(!captured_reads.incorrect_use);
 
-        for i in 0..3 {
+        for i in 0..2 {
             let key = KeyType::<u32>(20 + i);
             assert_ok!(captured_reads.capture_read(
                 key,
@@ -2194,7 +2055,6 @@ mod test {
             )),
             None,
         );
-        let resolved = DataRead::Resolved::<ValueType>(200);
         let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let deletion_metadata = DataRead::Metadata(None);
         let exists = DataRead::Exists(true);
@@ -2218,7 +2078,11 @@ mod test {
         captured_reads.delayed_field_speculative_failure = false;
         let key = KeyType::<u32>(21);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), deletion_metadata));
-        assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), resolved));
+        assert_err!(captured_reads.capture_read(
+            key,
+            use_tag.then_some(30),
+            versioned_legacy.clone()
+        ));
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.validate_data_reads(mvhashmap.data(), 0));
         assert!(!captured_reads.validate_group_reads(mvhashmap.group_data(), 0));

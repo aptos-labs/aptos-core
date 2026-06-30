@@ -320,7 +320,7 @@ pub(crate) fn update_transaction_on_abort<T, E>(
 
     // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
     if let Some(keys) = last_input_output.modified_resource_keys(txn_idx) {
-        for (k, _) in keys {
+        for k in keys {
             versioned_cache.data().mark_estimate(&k, txn_idx);
         }
     }

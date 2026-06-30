@@ -2,11 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_aggregator::{
-    aggregator_v1_extension::{AggregatorData, AggregatorState},
-    bounded_math::SignedU128,
+    aggregator_v1_extension::{extension_error, AggregatorData, AggregatorID},
     delayed_change::DelayedChange,
     delayed_field_extension::DelayedFieldData,
-    delta_change_set::DeltaOp,
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
@@ -22,13 +20,32 @@ use std::{
 use triomphe::Arc as TriompheArc;
 
 /// Represents a single aggregator change.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AggregatorChangeV1 {
-    // A value should be written to storage.
+    /// Used **ONLY** when delayed field optimization disabled.
+    ///
+    /// A concrete write of a known value (e.g., a new or read-materialized
+    /// aggregator). Creation vs modification is decided at conversion from the
+    /// existing storage slot.
     Write(u128),
-    // A delta should be merged with the value from storage.
-    Merge(DeltaOp),
-    // A value should be deleted from the storage.
+    /// Used **ONLY** when delayed field optimization disabled.
+    ///
+    /// A delta resolved in place; the value is already materialized, and it
+    /// will be written with legacy (no) metadata. Never charged gas.
+    MaterializedDelta(u128),
+    /// Used **ONLY** when delayed field optimization enabled.
+    ///
+    /// A write carrying the delayed field ID. The value behind the ID is stored
+    /// separately and flows through the delayed field extension.
+    WriteWithDelayedFields(DelayedFieldID),
+    /// Used **ONLY** when delayed field optimization enabled.
+    ///
+    /// A delta to be resolved later; materialized by block executor.
+    DelayedDelta,
+    /// A deletion of the aggregator from storage. Independent of the delayed
+    /// field optimization: a deletion carries no delayed field to exchange, so
+    /// it is always a plain concrete write, just like a normal resource
+    /// deletion.
     Delete,
 }
 
@@ -41,6 +58,13 @@ pub struct AggregatorChangeSet {
     pub reads_needing_exchange:
         BTreeMap<StateKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
     pub group_reads_needing_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
+}
+
+/// Result of an aggregator read: either a delayed value (not yet known), or
+/// a concrete u128 integer.
+pub(crate) enum AggregatorValue {
+    Delayed(DelayedFieldID),
+    Concrete(u128),
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -99,6 +123,49 @@ impl<'a> NativeAggregatorContext<'a> {
         self.session_hash
     }
 
+    pub(crate) fn resolve_aggregator_value(
+        &self,
+        id: &AggregatorID,
+    ) -> PartialVMResult<AggregatorValue> {
+        Ok(if self.delayed_field_optimization_enabled {
+            let existing = self.aggregator_v1_data.borrow().get_id(id);
+            let delayed_field_id = match existing {
+                Some(delayed_field_id) => delayed_field_id,
+                None => {
+                    let delayed_field_id = self
+                        .aggregator_v1_resolver
+                        .get_aggregator_v1_delayed_field_id(id.as_state_key())?
+                        .ok_or_else(|| {
+                            extension_error(format!(
+                                "Aggregator V1 value not found in storage at {:?}",
+                                id
+                            ))
+                        })?;
+                    self.aggregator_v1_data
+                        .borrow_mut()
+                        .set_id(id.clone(), delayed_field_id);
+                    delayed_field_id
+                },
+            };
+            AggregatorValue::Delayed(delayed_field_id)
+        } else {
+            let existing = self.aggregator_v1_data.borrow().get_value(id);
+            let value = match existing {
+                Some(value) => value,
+                None => self
+                    .aggregator_v1_resolver
+                    .get_aggregator_v1_value(id.as_state_key())?
+                    .ok_or_else(|| {
+                        extension_error(format!(
+                            "Aggregator V1 value not found in storage at {:?}",
+                            id
+                        ))
+                    })?,
+            };
+            AggregatorValue::Concrete(value)
+        })
+    }
+
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
     pub fn into_change_set(self) -> PartialVMResult<AggregatorChangeSet> {
@@ -107,33 +174,40 @@ impl<'a> NativeAggregatorContext<'a> {
             delayed_field_data,
             ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
+        let (new_aggregators, destroyed_aggregators, read_aggregators, values, ids) =
+            aggregator_v1_data.into_inner().into();
 
         let mut aggregator_v1_changes = BTreeMap::new();
 
-        // First, process all writes and deltas.
-        for (id, aggregator) in aggregators {
-            let (value, state, limit, history) = aggregator.into();
+        // An aggregator whose value is known when created in this transaction
+        // or read in this transaction. In this case, it is treated as a write.
+        // Non-writes are written with legacy (no) metadata and never charged,
+        // so it is important to differentiate here.
+        let is_write = |id: &AggregatorID| -> bool {
+            new_aggregators.contains(id) || read_aggregators.contains(id)
+        };
 
-            let change = match state {
-                AggregatorState::Data => AggregatorChangeV1::Write(value),
-                AggregatorState::PositiveDelta => {
-                    let history = history.unwrap();
-                    let plus = SignedU128::Positive(value);
-                    let delta_op = DeltaOp::new(plus, limit, history);
-                    AggregatorChangeV1::Merge(delta_op)
-                },
-                AggregatorState::NegativeDelta => {
-                    let history = history.unwrap();
-                    let minus = SignedU128::Negative(value);
-                    let delta_op = DeltaOp::new(minus, limit, history);
-                    AggregatorChangeV1::Merge(delta_op)
-                },
+        // Optimization disabled: the value is a concrete u128 tracked in place.
+        for (id, value) in values {
+            let change = if is_write(&id) {
+                AggregatorChangeV1::Write(value)
+            } else {
+                AggregatorChangeV1::MaterializedDelta(value)
             };
             aggregator_v1_changes.insert(id.0, change);
         }
 
-        // Additionally, do not forget to delete destroyed values from storage.
+        // Optimization enabled: the value is represented by a delayed field id, whose value flows
+        // through delayed field extension.
+        for (id, delayed_field_id) in ids {
+            let change = if is_write(&id) {
+                AggregatorChangeV1::WriteWithDelayedFields(delayed_field_id)
+            } else {
+                AggregatorChangeV1::DelayedDelta
+            };
+            aggregator_v1_changes.insert(id.0, change);
+        }
+
         for id in destroyed_aggregators {
             aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
         }
@@ -179,8 +253,8 @@ mod test {
     use aptos_aggregator::{
         aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, bounded_math::SignedU128,
         delayed_change::DelayedApplyChange, delta_change_set::DeltaWithMax,
-        delta_math::DeltaHistory, tests::types::FAKE_AGGREGATOR_VIEW_GEN_ID_START,
-        types::DelayedFieldValue, FakeAggregatorView,
+        tests::types::FAKE_AGGREGATOR_VIEW_GEN_ID_START, types::DelayedFieldValue,
+        FakeAggregatorView,
     };
     use aptos_types::delayed_fields::{
         calculate_width_for_integer_embedded_string, SnapshotToStringFormula,
@@ -215,26 +289,18 @@ mod test {
     fn test_set_up_v1(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_v1_data.borrow_mut();
 
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(100), 100);
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(300), 300);
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(400), 400);
+        // Created this transaction (value known, zero-initialized).
+        for key in [100, 200, 300, 400] {
+            aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(key));
+            aggregator_data.set_value(aggregator_v1_id_for_test(key), 0);
+        }
 
-        assert_ok!(aggregator_data.get_aggregator(aggregator_v1_id_for_test(100), 100));
-        assert_ok!(aggregator_data.get_aggregator(aggregator_v1_id_for_test(200), 200));
-        assert_ok!(aggregator_data
-            .get_aggregator(aggregator_v1_id_for_test(500), 500)
-            .unwrap()
-            .add(150));
-        assert_ok!(aggregator_data
-            .get_aggregator(aggregator_v1_id_for_test(600), 600)
-            .unwrap()
-            .add(100));
-        assert_ok!(aggregator_data
-            .get_aggregator(aggregator_v1_id_for_test(700), 700)
-            .unwrap()
-            .add(200));
+        // Existing aggregators reached through add/sub: the running value is tracked in place
+        // (600: 100 + 100, 700: 200 + 200).
+        aggregator_data.set_value(aggregator_v1_id_for_test(600), 200);
+        aggregator_data.set_value(aggregator_v1_id_for_test(700), 400);
 
+        // 100 and 300 were created this transaction (elided); 500 and 800 existed before (deleted).
         aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100));
         aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300));
         aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500));
@@ -244,7 +310,8 @@ mod test {
     #[test]
     fn test_v1_into_change_set() {
         let resolver = get_test_resolver_v1();
-        let context = NativeAggregatorContext::new([0; 32], &resolver, true, &resolver);
+        // The test drives `aggregator_v1_data` directly, i.e. the optimization-disabled path.
+        let context = NativeAggregatorContext::new([0; 32], &resolver, false, &resolver);
         test_set_up_v1(&context);
 
         let AggregatorChangeSet {
@@ -272,29 +339,20 @@ mod test {
                 .unwrap(),
             AggregatorChangeV1::Delete
         );
-        let delta_100 = DeltaOp::new(SignedU128::Positive(100), 600, DeltaHistory {
-            max_achieved_positive_delta: 100,
-            min_achieved_negative_delta: 0,
-            min_overflow_positive_delta: None,
-            max_underflow_negative_delta: None,
-        });
-        assert_eq!(
-            *aggregator_v1_changes
+        // Aggregators touched directly via `aggregator_v1_data` end the transaction in a delta
+        // state, so `into_change_set` materializes them against the resolver (600: 100 + 100,
+        // 700: 200 + 200).
+        assert_matches!(
+            aggregator_v1_changes
                 .get(&aggregator_v1_state_key_for_test(600))
                 .unwrap(),
-            AggregatorChangeV1::Merge(delta_100)
+            AggregatorChangeV1::MaterializedDelta(200)
         );
-        let delta_200 = DeltaOp::new(SignedU128::Positive(200), 700, DeltaHistory {
-            max_achieved_positive_delta: 200,
-            min_achieved_negative_delta: 0,
-            min_overflow_positive_delta: None,
-            max_underflow_negative_delta: None,
-        });
-        assert_eq!(
-            *aggregator_v1_changes
+        assert_matches!(
+            aggregator_v1_changes
                 .get(&aggregator_v1_state_key_for_test(700))
                 .unwrap(),
-            AggregatorChangeV1::Merge(delta_200)
+            AggregatorChangeV1::MaterializedDelta(400)
         );
         assert_matches!(
             aggregator_v1_changes

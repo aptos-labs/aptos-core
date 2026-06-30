@@ -686,11 +686,6 @@ impl<
                 MVGroupError::Uninitialized
             }),
             Err(MVDataError::Dependency(dep_idx)) => Err(MVGroupError::Dependency(dep_idx)),
-            Ok(MVDataOutput::Resolved(_))
-            | Err(MVDataError::Unresolved(_))
-            | Err(MVDataError::DeltaApplicationFailure) => {
-                unreachable!("Not using aggregatorV1")
-            },
         }
     }
 }

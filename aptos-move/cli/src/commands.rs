@@ -56,7 +56,6 @@ use aptos_types::{
         ReplayProtector, Transaction, TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use aptos_vm_types::resolver::TResourceView;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
@@ -2796,17 +2795,12 @@ impl CliCommand<TransactionSummary> for Replay {
         };
 
         // Materialize into transaction output and check if the outputs match.
-        let state_view = debugger.state_view_at_version(self.txn_id);
-        let resolver = state_view.as_move_resolver();
-
-        let txn_output = vm_output
-            .try_materialize_into_transaction_output(&resolver)
-            .map_err(|err| {
-                CliError::UnexpectedError(format!(
-                    "Failed to materialize into transaction output: {}",
-                    err
-                ))
-            })?;
+        let txn_output = vm_output.into_transaction_output().map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to materialize into transaction output: {}",
+                err
+            ))
+        })?;
 
         // When local package overrides are in use the replayed code diverges from
         // what was originally executed on-chain (different instructions, gas, etc.),

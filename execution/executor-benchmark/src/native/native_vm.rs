@@ -345,13 +345,7 @@ impl NativeVMExecutorTask {
         ));
 
         Ok((
-            VMChangeSet::new(
-                resource_write_set,
-                events,
-                delayed_field_change_set,
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
+            VMChangeSet::new(resource_write_set, events, delayed_field_change_set),
             gas_units,
         ))
     }
@@ -407,10 +401,13 @@ impl NativeVMExecutorTask {
                     account.sequence_number += 1;
                     resource_write_set.insert(
                         sender_account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::modification(
-                            Bytes::from(bcs::to_bytes(&account).map_err(hide_error)?),
-                            metadata,
-                        )),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::modification(
+                                Bytes::from(bcs::to_bytes(&account).map_err(hide_error)?),
+                                metadata,
+                            ),
+                            false,
+                        ),
                     );
                     Ok(())
                 } else {
@@ -427,9 +424,12 @@ impl NativeVMExecutorTask {
                     account.sequence_number = 1;
                     resource_write_set.insert(
                         sender_account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
-                            bcs::to_bytes(&account).map_err(hide_error)?,
-                        ))),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::legacy_creation(Bytes::from(
+                                bcs::to_bytes(&account).map_err(hide_error)?,
+                            )),
+                            false,
+                        ),
                     );
                     Ok(())
                 } else {
@@ -469,9 +469,12 @@ impl NativeVMExecutorTask {
 
                     resource_write_set.insert(
                         account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
-                            bcs::to_bytes(&account).map_err(hide_error)?,
-                        ))),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::legacy_creation(Bytes::from(
+                                bcs::to_bytes(&account).map_err(hide_error)?,
+                            )),
+                            false,
+                        ),
                     );
                 }
             },

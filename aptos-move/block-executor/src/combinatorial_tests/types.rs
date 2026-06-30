@@ -397,7 +397,6 @@ impl<K, E> MockIncarnation<K, E> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DeltaTestKind {
     DelayedFields,
-    AggregatorV1,
     None,
 }
 
@@ -455,16 +454,6 @@ impl<K, E> MockTransaction<K, E> {
         } = &mut self
         {
             *delta_test_kind = DeltaTestKind::DelayedFields;
-        }
-        self
-    }
-
-    pub(crate) fn with_aggregator_v1_testing(mut self) -> Self {
-        if let Self::Write {
-            delta_test_kind, ..
-        } = &mut self
-        {
-            *delta_test_kind = DeltaTestKind::AggregatorV1;
         }
         self
     }
@@ -948,20 +937,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         } else {
             MockTransaction::from_behaviors(behaviors)
         }
-    }
-
-    pub(crate) fn materialize_with_deltas<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-        delta_threshold: usize,
-        allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, E> {
-        // Enable delta generation for this specific method
-        self.new_mock_write_txn(universe, allow_deletes, Some(delta_threshold))
-            .with_aggregator_v1_testing()
     }
 }
 

@@ -4,9 +4,7 @@
 pub(crate) mod vm_wrapper;
 
 use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS};
-use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
-};
+use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager,
     errors::BlockExecutionError,
@@ -144,7 +142,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
 
         for (state_key, write) in self.guard.resource_write_set() {
             match write {
-                AbstractResourceWriteOp::Write(_)
+                AbstractResourceWriteOp::Write(..)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(_) => {
                     writes.insert(InputOutputKey::Resource(state_key.clone()));
                 },
@@ -177,14 +175,12 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         // Every key receiving a value write becomes hot via the write itself, so the hot
         // state accumulator must treat it as written and not promote it separately. Unlike
         // get_write_summary (conflict detection), this includes in-place delayed field
-        // rewrites, aggregator v1 writes/deltas and module writes. The accumulator dedups,
-        // so the chained keys need not be unique.
+        // rewrites and module writes. The accumulator dedups, so the chained keys need not
+        // be unique.
         self.guard
             .resource_write_set()
             .keys()
             .chain(self.guard.module_write_set().keys())
-            .chain(self.guard.aggregator_v1_write_set().keys())
-            .chain(self.guard.aggregator_v1_delta_set().keys())
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
@@ -226,7 +222,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         callback: &mut dyn FnMut(&StateKey) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
@@ -235,7 +231,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
-                AbstractResourceWriteOp::Write(_)
+                AbstractResourceWriteOp::Write(..)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(_) => Some(key),
                 _ => None,
             })
@@ -289,7 +285,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
-                AbstractResourceWriteOp::Write(write_op) => {
+                AbstractResourceWriteOp::Write(write_op, _) => {
                     Some((key.clone(), (TriompheArc::new(write_op.clone()), None)))
                 },
                 AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
@@ -307,16 +303,6 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
         self.guard.module_write_set()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
-        self.guard.aggregator_v1_write_set().clone()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
-        self.guard.aggregator_v1_delta_set().clone()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -459,7 +445,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     fn incorporate_materialized_txn_output(
         &mut self,
-        aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
     ) -> Result<Trace, PanicError> {
@@ -473,7 +458,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.committed_output
             .set(
                 vm_output.into_transaction_output_with_materialized_write_set(
-                    aggregator_v1_writes,
                     materialized_resource_write_set,
                     materialized_events,
                 )?,
@@ -499,18 +483,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                 .is_ok(),
             "Could not combine VMOutput with the materialized resource and event data"
         );
-    }
-
-    // Used only by the sequential execution, does not set committed_output.
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        view: &impl TAggregatorV1View<Identifier = StateKey>,
-    ) {
-        self.vm_output
-            .as_mut()
-            .expect("Output must be set to incorporate materialized data")
-            .try_materialize(view)
-            .expect("Delta materialization failed");
     }
 }
 

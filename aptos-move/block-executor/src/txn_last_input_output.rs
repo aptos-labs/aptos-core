@@ -20,7 +20,6 @@ use aptos_types::{
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
-    write_set::WriteOp,
 };
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
@@ -447,7 +446,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         if let Some(output) = output_wrapper.output.as_ref() {
             output
                 .before_materialization()?
-                .for_each_resource_key_no_aggregator_v1(&mut callback)?;
+                .for_each_resource_key(&mut callback)?;
         }
 
         Ok(())
@@ -478,43 +477,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     }
 
     // Extracts a set of resource paths (keys) written or updated during execution from
-    // transaction output. The group keys are not included, and the boolean indicates
-    // whether the resource is used as an AggregatorV1.
-    // Used only in BlockSTMv1. BlockSTMv2 uses modified_resource_keys_no_aggregator_v1
-    // and modified_aggregator_v1_keys methods below.
+    // transaction output. The group keys are not included.
     pub(crate) fn modified_resource_keys(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| {
-                let inner = t.before_materialization().expect("Output must be set");
-                Some(
-                    inner
-                        .resource_write_set()
-                        .into_iter()
-                        .map(|(k, (_, _))| (k, false))
-                        .chain(
-                            inner
-                                .aggregator_v1_write_set()
-                                .into_keys()
-                                .map(|k| (k, true)),
-                        )
-                        .chain(
-                            inner
-                                .aggregator_v1_delta_set()
-                                .into_keys()
-                                .map(|k| (k, true)),
-                        ),
-                )
-            },
-            None
-        )
-    }
-
-    pub(crate) fn modified_aggregator_v1_keys(
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = T::Key>> {
@@ -523,12 +487,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             txn_idx,
             |t| {
                 let inner = t.before_materialization().expect("Output must be set");
-                Some(
-                    inner
-                        .aggregator_v1_write_set()
-                        .into_keys()
-                        .chain(inner.aggregator_v1_delta_set().into_keys()),
-                )
+                Some(inner.resource_write_set().into_keys())
             },
             None
         )
@@ -613,23 +572,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         .expect("Output must be set")
     }
 
-    pub(crate) fn aggregator_v1_delta_keys(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = T::Key>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| Some(
-                t.before_materialization()
-                    .expect("Output must be set")
-                    .aggregator_v1_delta_set()
-                    .into_keys()
-            ),
-            None
-        )
-    }
-
     pub(crate) fn resource_group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {
         with_success_or_skip_rest!(self, txn_idx, resource_group_metadata_ops, vec![])
             .expect("Output must be set")
@@ -668,18 +610,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub(crate) fn record_materialized_txn_output(
         &self,
         txn_idx: TxnIndex,
-        delta_writes: Vec<(T::Key, WriteOp)>,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
     ) -> Result<Trace, PanicError> {
         with_success_or_skip_rest!(
             self,
             txn_idx,
-            |mut t| t.incorporate_materialized_txn_output(
-                delta_writes,
-                patched_resource_write_set,
-                patched_events
-            ),
+            |mut t| t
+                .incorporate_materialized_txn_output(patched_resource_write_set, patched_events),
             Ok(Trace::empty())
         )
     }

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext};
-use aptos_aggregator::aggregator_v1_extension::AggregatorID;
+use aptos_aggregator::aggregator_v1_extension::{AggregatorID, AGGREGATOR_V1_SIZE};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -54,7 +54,21 @@ fn native_new_aggregator(
 
     if let Ok(key) = AccountAddress::from_bytes(hash) {
         let id = AggregatorID::new(handle, key);
-        aggregator_data.create_new_aggregator(id, limit);
+        aggregator_data.create_new_aggregator(id.clone());
+        if aggregator_context.delayed_field_optimization_enabled {
+            let delayed_field_id = aggregator_context
+                .delayed_field_resolver
+                .generate_delayed_field_id(AGGREGATOR_V1_SIZE);
+
+            // Register the new value with the delayed field extension.
+            aggregator_context
+                .delayed_field_data
+                .borrow_mut()
+                .create_new_aggregator(delayed_field_id);
+            aggregator_data.set_id(id, delayed_field_id);
+        } else {
+            aggregator_data.set_value(id, 0);
+        }
 
         Ok(smallvec![Value::struct_(Struct::pack(vec![
             Value::address(handle.0),
