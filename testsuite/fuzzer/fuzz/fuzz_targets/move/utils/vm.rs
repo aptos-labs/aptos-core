@@ -16,16 +16,21 @@ use aptos_types::{
     },
 };
 use arbitrary::Arbitrary;
-use fuzzer::UserAccount;
+use fuzzer::{BlockExecVariantV2, RunnableBlockTransactionV2, UserAccount};
 use libfuzzer_sys::Corpus;
 use move_binary_format::{
     access::ModuleAccess,
     deserializer::DeserializerConfig,
     errors::VMError,
-    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
+    file_format::{
+        CompiledModule, CompiledScript, FunctionDefinitionIndex, Signature, SignatureToken,
+        Visibility,
+    },
     file_format_common::{VERSION_MAX, VERSION_MIN},
+    internals::ModuleIndex,
 };
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::Identifier,
     language_storage::ModuleId,
     vm_status::{StatusCode, StatusType, VMStatus},
@@ -36,6 +41,7 @@ use std::{
 };
 
 pub const BYTECODE_VERSION: u32 = 8;
+const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16;
 
 fn supported_bytecode_version(version: u32) -> u32 {
     if (VERSION_MIN..=VERSION_MAX).contains(&version) {
@@ -51,6 +57,167 @@ pub(crate) fn module_bytecode_version(module: &CompiledModule) -> u32 {
 
 pub(crate) fn script_bytecode_version(script: &CompiledScript) -> u32 {
     supported_bytecode_version(script.version)
+}
+
+pub(crate) fn module_self_id(module: &CompiledModule) -> Option<ModuleId> {
+    let handle = module
+        .module_handles
+        .get(module.self_module_handle_idx.into_index())?;
+    let address = module
+        .address_identifiers
+        .get(handle.address.into_index())?;
+    let name = module.identifiers.get(handle.name.into_index())?.to_owned();
+    Some(ModuleId::new(*address, name))
+}
+
+pub(crate) fn module_self_id_or_keep(module: &CompiledModule) -> Result<ModuleId, Corpus> {
+    module_self_id(module).ok_or(Corpus::Keep)
+}
+
+pub(crate) fn checked_module_self_id(module: &CompiledModule) -> ModuleId {
+    module_self_id(module).expect("module self id checked at fuzz case boundary")
+}
+
+pub(crate) fn resolve_module_ref(
+    modules: &[CompiledModule],
+    module_idx: u8,
+) -> Result<&CompiledModule, Corpus> {
+    if modules.is_empty() {
+        return Err(Corpus::Keep);
+    }
+    Ok(&modules[module_idx as usize % modules.len()])
+}
+
+pub(crate) fn resolve_module_refs(
+    modules: &[CompiledModule],
+    module_idxs: &[u8],
+) -> Result<Vec<CompiledModule>, Corpus> {
+    const MAX_MODULE_REFS: usize = 32;
+
+    if module_idxs.len() > MAX_MODULE_REFS {
+        return Err(Corpus::Keep);
+    }
+    if module_idxs.is_empty() {
+        return Ok(vec![]);
+    }
+    if modules.is_empty() {
+        return Err(Corpus::Keep);
+    }
+
+    let mut seen = BTreeSet::new();
+    Ok(module_idxs
+        .iter()
+        .map(|module_idx| *module_idx as usize % modules.len())
+        .filter(|idx| seen.insert(*idx))
+        .map(|idx| modules[idx].clone())
+        .collect())
+}
+
+pub(crate) fn normalize_module_for_fuzz(
+    mut module: CompiledModule,
+) -> Result<CompiledModule, Corpus> {
+    module.version = VERSION_MAX;
+    let is_entry_by_handle = module
+        .function_handles
+        .iter()
+        .map(|handle| {
+            module
+                .signatures
+                .get(handle.return_.into_index())
+                .is_some_and(|signature| signature.0.is_empty())
+        })
+        .collect::<Vec<_>>();
+
+    for definition in &mut module.function_defs {
+        if definition.code.is_none() {
+            return Err(Corpus::Keep);
+        }
+        definition.visibility = Visibility::Public;
+        definition.is_entry = is_entry_by_handle
+            .get(definition.function.into_index())
+            .copied()
+            .unwrap_or(false);
+    }
+
+    Ok(module)
+}
+
+pub(crate) fn serialize_module_for_version(
+    module: &CompiledModule,
+    bytecode_version: u32,
+) -> Result<Vec<u8>, Corpus> {
+    let mut bytes = vec![];
+    module
+        .serialize_for_version(Some(bytecode_version), &mut bytes)
+        .map_err(|e| {
+            tdbg!("module serialization failed", &e);
+            Corpus::Keep
+        })?;
+    Ok(bytes)
+}
+
+fn signature_token_is_too_large(token: &SignatureToken) -> bool {
+    match token {
+        SignatureToken::TypeParameter(idx) => *idx > MAX_TYPE_PARAMETER_VALUE,
+        SignatureToken::Vector(inner)
+        | SignatureToken::Reference(inner)
+        | SignatureToken::MutableReference(inner) => signature_token_is_too_large(inner),
+        SignatureToken::StructInstantiation(_, tys) => tys.iter().any(signature_token_is_too_large),
+        SignatureToken::Function(args, results, _) => {
+            args.iter().any(signature_token_is_too_large)
+                || results.iter().any(signature_token_is_too_large)
+        },
+        _ => false,
+    }
+}
+
+fn has_oversized_signatures(signatures: &[Signature]) -> bool {
+    signatures
+        .iter()
+        .any(|signature| signature.0.iter().any(signature_token_is_too_large))
+}
+
+pub(crate) fn filter_bad_modules(modules: &mut [CompiledModule]) -> Result<(), Corpus> {
+    for module in modules {
+        if module_self_id(module).is_none_or(|id| *id.address() == AccountAddress::ONE) {
+            return Err(Corpus::Keep);
+        }
+        for definition in &mut module.function_defs {
+            definition.is_entry = true;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn filter_bad_tx(exec_variant: &BlockExecVariantV2) -> Result<(), Corpus> {
+    match exec_variant {
+        BlockExecVariantV2::Script { _script, .. } => {
+            if has_oversized_signatures(&_script.signatures) {
+                return Err(Corpus::Keep);
+            }
+            Ok(())
+        },
+        BlockExecVariantV2::Publish { _module_idxs } => {
+            if _module_idxs.is_empty() {
+                return Err(Corpus::Keep);
+            }
+            Ok(())
+        },
+        BlockExecVariantV2::CallFunction { .. } => Ok(()),
+        BlockExecVariantV2::SplitBlock => Ok(()),
+    }
+}
+
+pub(crate) fn is_split_block(transaction: &RunnableBlockTransactionV2) -> bool {
+    matches!(&transaction.exec_variant, BlockExecVariantV2::SplitBlock)
+}
+
+pub(crate) fn has_invalid_split_blocks(transactions: &[RunnableBlockTransactionV2]) -> bool {
+    transactions.first().is_some_and(is_split_block)
+        || transactions.last().is_some_and(is_split_block)
+        || transactions
+            .windows(2)
+            .any(|window| window.iter().all(is_split_block))
 }
 
 // Used to fuzz the MoveVM
@@ -237,8 +404,8 @@ pub(crate) fn group_modules_by_address_topo(
     let all_modules = dep_modules;
     let map = all_modules
         .into_iter()
-        .map(|m| (m.self_id(), m))
-        .collect::<BTreeMap<_, _>>();
+        .map(|m| module_self_id_or_keep(&m).map(|id| (id, m)))
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
     let mut order = vec![];
     for id in map.keys() {
         let mut visited = HashSet::new();

@@ -47,16 +47,13 @@ use blockv2_fuzz_config::{
 use fuzzer::{BlockExecVariantV2, RunnableBlockStateV2, RunnableBlockTransactionV2, UserAccount};
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
-    access::ModuleAccess,
-    deserializer::DeserializerConfig,
-    file_format::{CompiledModule, ModuleHandle, Signature, SignatureToken},
+    access::ModuleAccess, deserializer::DeserializerConfig, file_format::CompiledModule,
     file_format_common::VERSION_MAX,
-    internals::ModuleIndex,
 };
 use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap},
+    collections::{btree_map::Entry, BTreeMap, HashMap},
     env,
     hash::Hash,
     sync::atomic::{AtomicU64, Ordering},
@@ -66,8 +63,10 @@ mod blockstm_executor;
 mod blockv2_fuzz_config;
 mod utils;
 use utils::vm::{
-    group_modules_by_address_topo, publish_transaction_payload_with_package_names,
-    resolve_function_name, script_bytecode_version, verify_module_fast, verify_script_fast,
+    checked_module_self_id, filter_bad_modules, filter_bad_tx, group_modules_by_address_topo,
+    has_invalid_split_blocks, is_split_block, publish_transaction_payload_with_package_names,
+    resolve_function_name, resolve_module_ref, resolve_module_refs, script_bytecode_version,
+    verify_module_fast, verify_script_fast,
 };
 
 #[cfg(fuzzing)]
@@ -95,10 +94,8 @@ const MIN_CONCURRENCY_LEVEL: usize = 2;
 const MAX_CONCURRENCY_LEVEL: usize = 8;
 const MAX_BLOCK_ACCOUNTS: usize = 256;
 const MAX_BLOCK_MODULES: usize = 32;
-const MAX_BLOCK_MODULE_REFS: usize = 32;
 const MAX_BLOCK_TXNS: usize = 24;
 const MAX_SECONDARY_SIGNERS: usize = 10;
-const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16;
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
 const DEFAULT_MAX_GAS_AMOUNT: u64 = 2_000_000;
 
@@ -184,66 +181,6 @@ fn require_fuzzing_cfg() {
 fn next_metadata(counter: &AtomicU64) -> TransactionSliceMetadata {
     let end = counter.fetch_add(1, Ordering::Relaxed);
     TransactionSliceMetadata::chunk(end - 1, end)
-}
-
-fn module_self_handle(module: &CompiledModule) -> Option<&ModuleHandle> {
-    module
-        .module_handles
-        .get(module.self_module_handle_idx.into_index())
-}
-
-fn module_self_id(module: &CompiledModule) -> Option<ModuleId> {
-    let handle = module_self_handle(module)?;
-    let address = module
-        .address_identifiers
-        .get(handle.address.into_index())
-        .copied()?;
-    let name = module.identifiers.get(handle.name.into_index())?.to_owned();
-    Some(ModuleId::new(address, name))
-}
-
-fn checked_module_self_id(module: &CompiledModule) -> ModuleId {
-    module_self_id(module).expect("module self id checked at fuzz case boundary")
-}
-
-fn signature_token_is_too_large(token: &SignatureToken) -> bool {
-    match token {
-        SignatureToken::TypeParameter(idx) => *idx > MAX_TYPE_PARAMETER_VALUE,
-        SignatureToken::Vector(inner)
-        | SignatureToken::Reference(inner)
-        | SignatureToken::MutableReference(inner) => signature_token_is_too_large(inner),
-        SignatureToken::StructInstantiation(_, tys) => tys.iter().any(signature_token_is_too_large),
-        SignatureToken::Function(args, results, _) => {
-            args.iter().any(signature_token_is_too_large)
-                || results.iter().any(signature_token_is_too_large)
-        },
-        _ => false,
-    }
-}
-
-fn has_oversized_signatures(signatures: &[Signature]) -> bool {
-    signatures
-        .iter()
-        .any(|signature| signature.0.iter().any(signature_token_is_too_large))
-}
-
-fn filter_bad_tx(exec_variant: &BlockExecVariantV2) -> Result<(), Corpus> {
-    match exec_variant {
-        BlockExecVariantV2::Script { _script, .. } => {
-            if has_oversized_signatures(&_script.signatures) {
-                return Err(Corpus::Keep);
-            }
-            Ok(())
-        },
-        BlockExecVariantV2::Publish { _module_idxs } => {
-            if _module_idxs.is_empty() {
-                return Err(Corpus::Keep);
-            }
-            Ok(())
-        },
-        BlockExecVariantV2::CallFunction { .. } => Ok(()),
-        BlockExecVariantV2::SplitBlock => Ok(()),
-    }
 }
 
 fn create_user_account(vm: &mut BlockFuzzExecutor, account: UserAccount) -> Account {
@@ -799,39 +736,6 @@ fn check_output_status(output: &TransactionOutput) -> Result<(), Corpus> {
     }
 }
 
-fn resolve_module_ref(
-    modules: &[CompiledModule],
-    module_idx: u8,
-) -> Result<&CompiledModule, Corpus> {
-    if modules.is_empty() {
-        return Err(Corpus::Keep);
-    }
-    Ok(&modules[module_idx as usize % modules.len()])
-}
-
-fn resolve_module_refs(
-    modules: &[CompiledModule],
-    module_idxs: &[u8],
-) -> Result<Vec<CompiledModule>, Corpus> {
-    if module_idxs.len() > MAX_BLOCK_MODULE_REFS {
-        return Err(Corpus::Keep);
-    }
-    if module_idxs.is_empty() {
-        return Ok(vec![]);
-    }
-    if modules.is_empty() {
-        return Err(Corpus::Keep);
-    }
-
-    let mut seen = BTreeSet::new();
-    Ok(module_idxs
-        .iter()
-        .map(|module_idx| *module_idx as usize % modules.len())
-        .filter(|idx| seen.insert(*idx))
-        .map(|idx| modules[idx].clone())
-        .collect())
-}
-
 /// Records a dependency module under its id, rejecting ambiguous preloads. Different versions of
 /// the same module id are allowed in the block itself as publish transactions, but genesis preload
 /// can contain only one version for a given id.
@@ -885,18 +789,6 @@ fn build_package_names_by_module(packages: &[Vec<CompiledModule>]) -> BTreeMap<M
     }
 
     package_names_by_module
-}
-
-fn is_split_block(transaction: &RunnableBlockTransactionV2) -> bool {
-    matches!(&transaction.exec_variant, BlockExecVariantV2::SplitBlock)
-}
-
-fn has_invalid_split_blocks(transactions: &[RunnableBlockTransactionV2]) -> bool {
-    transactions.first().is_some_and(is_split_block)
-        || transactions.last().is_some_and(is_split_block)
-        || transactions
-            .windows(2)
-            .any(|window| window.iter().all(is_split_block))
 }
 
 fn build_signed_transaction_blocks(
@@ -983,14 +875,7 @@ fn run_case(mut input: RunnableBlockStateV2) -> Result<(), Corpus> {
 
     // fail fast
     tdbg!("checking module ids and transaction shape");
-    for module in &mut input.modules {
-        if module_self_id(module).is_none_or(|id| *id.address() == AccountAddress::ONE) {
-            return Err(Corpus::Keep);
-        }
-        for ele in &mut module.function_defs {
-            ele.is_entry = true;
-        }
-    }
+    filter_bad_modules(&mut input.modules)?;
     for tx in &input.transactions {
         filter_bad_tx(&tx.exec_variant)?;
     }
