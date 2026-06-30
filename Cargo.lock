@@ -5288,6 +5288,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
+ "rustc-hash 2.1.1",
  "serde",
  "test-case",
  "triomphe",

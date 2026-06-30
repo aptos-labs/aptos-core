@@ -3,7 +3,7 @@
 //! Scratchpad for on chain values during the execution.
 
 use crate::move_vm_ext::{
-    resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+    resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView, ReadRecorder,
     ResourceGroupResolver,
 };
 use aptos_aggregator::{
@@ -26,6 +26,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::gas::get_gas_feature_version;
 use aptos_vm_types::{
+    output::ReadSet,
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
     },
@@ -44,6 +45,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
+    rc::Rc,
 };
 use triomphe::Arc as TriompheArc;
 
@@ -68,6 +70,11 @@ pub struct StorageAdapter<'e, E> {
     executor_view: &'e E,
     resource_group_view: ResourceGroupAdapter<'e>,
     accessed_groups: RefCell<HashSet<StateKey>>,
+    /// State keys of all data reads (resources, resource groups, table items, aggregator v1)
+    /// that the VM performed through this resolver, used for hot state promotion. Shared with
+    /// the resolvers of the respawned sessions spawned on top of this resolver, so that the
+    /// reads of all of a transaction's sessions land in one set.
+    recorded_reads: ReadRecorder,
 }
 
 impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
@@ -92,7 +99,24 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             executor_view,
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
+            recorded_reads: ReadRecorder::default(),
         }
+    }
+
+    pub(crate) fn with_read_recorder(mut self, recorded_reads: ReadRecorder) -> Self {
+        self.recorded_reads = recorded_reads;
+        self
+    }
+
+    /// Returns the state keys read through this resolver.
+    pub fn recorded_reads(&self) -> ReadSet {
+        (*self.recorded_reads.borrow()).clone()
+    }
+
+    /// Moves the recorded reads out, leaving the recorder empty. Extracted once per
+    /// transaction after all its sessions have finished, so this avoids cloning the set.
+    pub(crate) fn take_recorded_reads(&self) -> ReadSet {
+        std::mem::take(&mut *self.recorded_reads.borrow_mut())
     }
 
     fn get_any_resource_with_layout(
@@ -105,6 +129,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
+            self.recorded_reads.borrow_mut().insert(key.clone());
             let buf =
                 self.resource_group_view
                     .get_resource_from_group(&key, struct_tag, maybe_layout)?;
@@ -120,6 +145,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size + group_size as usize))
         } else {
             let state_key = resource_state_key(address, struct_tag)?;
+            self.recorded_reads.borrow_mut().insert(state_key.clone());
             let buf = self
                 .executor_view
                 .get_resource_bytes(&state_key, maybe_layout)?;
@@ -159,7 +185,11 @@ impl<E: ExecutorView> ResourceGroupResolver for StorageAdapter<'_, E> {
     }
 }
 
-impl<E: ExecutorView> AptosMoveResolver for StorageAdapter<'_, E> {}
+impl<E: ExecutorView> AptosMoveResolver for StorageAdapter<'_, E> {
+    fn read_recorder(&self) -> ReadRecorder {
+        Rc::clone(&self.recorded_reads)
+    }
+}
 
 impl<E: ExecutorView> ResourceResolver for StorageAdapter<'_, E> {
     fn get_resource_bytes_with_metadata_and_layout(
@@ -181,6 +211,7 @@ impl<E: ExecutorView> TableResolver for StorageAdapter<'_, E> {
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, PartialVMError> {
         let state_key = StateKey::table_item(&(*handle).into(), key);
+        self.recorded_reads.borrow_mut().insert(state_key.clone());
         self.executor_view
             .get_resource_bytes(&state_key, maybe_layout)
     }
@@ -193,6 +224,7 @@ impl<E: ExecutorView> TAggregatorV1View for StorageAdapter<'_, E> {
         &self,
         id: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        self.recorded_reads.borrow_mut().insert(id.clone());
         self.executor_view.get_aggregator_v1_state_value(id)
     }
 }
@@ -252,6 +284,7 @@ impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
 
 impl<E: ExecutorView> ConfigStorage for StorageAdapter<'_, E> {
     fn fetch_config_bytes(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
+        self.recorded_reads.borrow_mut().insert(state_key.clone());
         Ok(self.executor_view.get_resource_bytes(state_key, None)?)
     }
 }
@@ -336,5 +369,94 @@ pub(crate) mod tests {
         );
 
         StorageAdapter::new(state_view, group_adapter)
+    }
+
+    #[test]
+    fn test_recorded_reads() {
+        use aptos_types::state_store::MockStateView;
+        use move_core_types::identifier::Identifier;
+
+        let state_view = MockStateView::<StateKey>::empty();
+        let resolver = state_view.as_move_resolver();
+
+        let addr = AccountAddress::ONE;
+        let struct_tag = StructTag {
+            address: addr,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new("R").unwrap(),
+            type_args: vec![],
+        };
+        let resource_key = resource_state_key(&addr, &struct_tag).unwrap();
+        let table_handle = TableHandle(addr);
+        let table_key = StateKey::table_item(&table_handle.into(), &[7]);
+        let aggregator_key = StateKey::raw(b"aggregator");
+        let config_key = StateKey::raw(b"config");
+
+        // Reads of non-existent values still count: the slot was consulted.
+        assert!(resolver
+            .get_resource_bytes_with_metadata_and_layout(&addr, &struct_tag, &[], None)
+            .unwrap()
+            .0
+            .is_none());
+        assert!(resolver
+            .resolve_table_entry_bytes_with_layout(&table_handle, &[7], None)
+            .unwrap()
+            .is_none());
+        assert!(resolver
+            .get_aggregator_v1_state_value(&aggregator_key)
+            .unwrap()
+            .is_none());
+        assert!(resolver.fetch_config_bytes(&config_key).unwrap().is_none());
+
+        let expected = [resource_key, table_key, aggregator_key, config_key]
+            .into_iter()
+            .collect::<ReadSet>();
+        assert_eq!(resolver.recorded_reads(), expected);
+    }
+
+    /// A respawned session builds a fresh resolver over a change-set-wrapped view but must inherit
+    /// its parent's recorder, so a transaction's sessions accumulate reads into one set.
+    /// `RespawnedSession::spawn` wires this via `read_recorder()` + `with_read_recorder`; this pins
+    /// the contract those two methods must satisfy.
+    #[test]
+    fn test_read_recorder_shared_across_resolvers() {
+        use aptos_types::state_store::MockStateView;
+        use move_core_types::identifier::Identifier;
+
+        let state_view = MockStateView::<StateKey>::empty();
+        let addr = AccountAddress::ONE;
+        let tag = |name: &str| StructTag {
+            address: addr,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new(name).unwrap(),
+            type_args: vec![],
+        };
+
+        let parent = state_view.as_move_resolver();
+        let parent_tag = tag("Parent");
+        let parent_key = resource_state_key(&addr, &parent_tag).unwrap();
+        assert!(parent
+            .get_resource_bytes_with_metadata_and_layout(&addr, &parent_tag, &[], None)
+            .unwrap()
+            .0
+            .is_none());
+
+        // Spawn a second resolver inheriting the parent's recorder, exactly as the respawned
+        // session does.
+        let child = state_view
+            .as_move_resolver()
+            .with_read_recorder(parent.read_recorder());
+        let child_tag = tag("Child");
+        let child_key = resource_state_key(&addr, &child_tag).unwrap();
+        assert!(child
+            .get_resource_bytes_with_metadata_and_layout(&addr, &child_tag, &[], None)
+            .unwrap()
+            .0
+            .is_none());
+
+        // Both reads land in the single shared set, observable through either resolver.
+        let expected = [parent_key, child_key].into_iter().collect::<ReadSet>();
+        assert_eq!(parent.recorded_reads(), expected);
+        assert_eq!(child.recorded_reads(), expected);
     }
 }

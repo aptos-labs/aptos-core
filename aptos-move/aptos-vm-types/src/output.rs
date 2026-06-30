@@ -24,7 +24,11 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, mem};
+use rustc_hash::FxBuildHasher;
+use std::{
+    collections::{BTreeMap, HashSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -259,5 +263,27 @@ impl VMOutput {
         self.change_set.set_events(patched_events.into_iter());
 
         self.into_transaction_output()
+    }
+}
+
+/// The set a transaction's data reads accumulate into. `StateKey` already carries a
+/// precomputed 32-byte cryptographic hash, so the set's own hasher needs no collision
+/// resistance — a fast non-cryptographic hasher over that hash avoids SipHash's per-read cost.
+pub type ReadSet = HashSet<StateKey, FxBuildHasher>;
+
+/// A transaction's read set, used for hot-state promotion. Unordered at the
+/// per-transaction level; ordering is imposed later when aggregating per-block.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct UnorderedReadSet {
+    keys: ReadSet,
+}
+
+impl UnorderedReadSet {
+    pub fn new(keys: ReadSet) -> Self {
+        Self { keys }
+    }
+
+    pub fn as_inner(&self) -> &ReadSet {
+        &self.keys
     }
 }
