@@ -759,7 +759,7 @@ impl<'a> GraphBuilder<'a> {
                     for edge in graph.graph.edges_directed(node_idx, Direction::Incoming) {
                         match edge.weight() {
                             FlowGraphEdge::Use(param) => {
-                                if provided_complex_params.insert(*param) == false {
+                                if !provided_complex_params.insert(*param) {
                                     return false;
                                 }
                             },
@@ -1267,7 +1267,7 @@ mod tests {
         }));
 
         let builder = GraphBuilder::new(&model, 4, 1, None);
-        assert_eq!(builder.is_feasible(&graph), false);
+        assert!(!builder.is_feasible(&graph));
     }
 
     #[test]
@@ -1288,6 +1288,6 @@ mod tests {
         }));
 
         let builder = GraphBuilder::new(&model, 4, 1, None);
-        assert_eq!(builder.is_feasible(&graph), true);
+        assert!(builder.is_feasible(&graph));
     }
 }

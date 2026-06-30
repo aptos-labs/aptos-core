@@ -145,6 +145,9 @@ impl Simulator {
             let lines = stderr.read().expect("stderr read lock");
             let count = lines.len();
             if count == next_line {
+                // no new output yet; back off briefly instead of busy-spinning
+                drop(lines);
+                std::thread::sleep(std::time::Duration::from_millis(50));
                 continue;
             }
 

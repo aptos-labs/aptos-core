@@ -11,7 +11,6 @@ pub mod account;
 pub mod deps;
 pub mod package;
 
-// pub mod executor;
 pub mod simulator;
 pub mod testnet;
 

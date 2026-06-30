@@ -148,6 +148,11 @@ impl<'a, S: TStateView<Key = StateKey> + ?Sized> RecordingStateView<'a, S> {
                     address: AccountAddress::ONE,
                     is_resource_group: false,
                 },
+                StateKeyInner::TradingNative(..) => ResourceRead {
+                    struct_tag: synthetic_struct_tag("trading_native_", key),
+                    address: AccountAddress::ONE,
+                    is_resource_group: false,
+                },
             };
             result.push(read);
         }
@@ -191,7 +196,8 @@ impl TracingExecutor {
 
         // acquire gas config
         let mut gas_schedule = GasScheduleV2::fetch_config(executor.get_state_view())
-            .expect("expect genesis to have a gas schedule");
+            .expect("failed to read gas schedule from genesis state")
+            .expect("genesis is missing a gas schedule");
         let mut gas_params = AptosGasParameters::from_on_chain_gas_schedule(
             &gas_schedule.entries.into_iter().collect(),
             gas_schedule.feature_version,
@@ -354,6 +360,11 @@ impl TracingExecutor {
                 },
                 StateKeyInner::Raw(..) => ResourceWrite {
                     struct_tag: synthetic_struct_tag("raw_", state_key),
+                    address: AccountAddress::ONE,
+                    is_resource_group: true,
+                },
+                StateKeyInner::TradingNative(..) => ResourceWrite {
+                    struct_tag: synthetic_struct_tag("trading_native_", state_key),
                     address: AccountAddress::ONE,
                     is_resource_group: true,
                 },
@@ -602,6 +613,13 @@ impl TracingExecutor {
                     result.push(ResourceWrite {
                         address: AccountAddress::ONE,
                         struct_tag: synthetic_struct_tag("raw_", state_key),
+                        is_resource_group: true,
+                    });
+                },
+                StateKeyInner::TradingNative(..) => {
+                    result.push(ResourceWrite {
+                        address: AccountAddress::ONE,
+                        struct_tag: synthetic_struct_tag("trading_native_", state_key),
                         is_resource_group: true,
                     });
                 },

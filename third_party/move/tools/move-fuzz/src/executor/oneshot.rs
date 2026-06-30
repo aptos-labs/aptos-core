@@ -61,9 +61,9 @@ pub enum ExecStatus {
     OutOfGas,
 }
 
-impl Into<ExecStatus> for (VMStatus, TransactionStatus) {
-    fn into(self) -> ExecStatus {
-        match self {
+impl From<(VMStatus, TransactionStatus)> for ExecStatus {
+    fn from(val: (VMStatus, TransactionStatus)) -> Self {
+        match val {
             (VMStatus::Executed, TransactionStatus::Keep(ExecutionStatus::Success)) => {
                 ExecStatus::Success
             },
@@ -551,8 +551,10 @@ impl OneshotFuzzer {
             .map(|_| self.pick_seed_index());
         let sender = match seed_choice {
             None => self.mutator.random_signer(),
-            Some(_) => {
-                let index = self.pick_seed_index();
+            Some(index) => {
+                // reuse the seed index picked above so the sender and the
+                // mutation base come from the same seed (a second
+                // `pick_seed_index()` here would select an unrelated seed)
                 if self.mutator.random_percent() < 70 {
                     self.seedpool[index].input.sender
                 } else {

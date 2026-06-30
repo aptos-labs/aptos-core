@@ -8,5 +8,5 @@ authors = []
 test = '_'
 
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "main" }
+AptosFramework = { local = "../../../../../../aptos-move/framework/aptos-framework" }
 

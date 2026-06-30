@@ -89,6 +89,12 @@ pub struct AddressRegistry {
     user_addresses: BTreeMap<UserId, AccountAddress>,
 }
 
+impl Default for AddressRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AddressRegistry {
     /// Create an empty registry
     pub fn new() -> Self {
@@ -303,8 +309,8 @@ mod tests {
         assert_ne!(user_a.address(), user_b.address());
         let mapping = registry.all_addresses_by_kind();
         let users = mapping.get(&AddressKind::User).unwrap();
-        assert!(users.contains(&user_a.address()));
-        assert!(users.contains(&user_b.address()));
+        assert!(users.contains(user_a.address()));
+        assert!(users.contains(user_b.address()));
         assert_eq!(users.len(), 2);
     }
 

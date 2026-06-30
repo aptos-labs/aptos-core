@@ -46,11 +46,15 @@ use std::{
 
 const CHAIN_REBUILD_INTERVAL_SECS: u64 = 60;
 const SEQUENCE_MUTATION_INTERVAL_SECS: u64 = 30;
-const SEED_SCORE_COVERAGE: u32 = 32;
-const SEED_SCORE_DUG: u32 = 20;
-const SEED_SCORE_STATE_PROGRESS: u32 = 10;
-const SEED_SCORE_SUCCESS: u32 = 4;
-const SEED_SCORE_MISSING_DATA: u32 = 6;
+// Reward weights summed by `execution_seed_score` to prioritize seeds: a seed's
+// score is the sum of the rewards for the signals its execution triggered, and
+// higher-scoring seeds are favored for mutation. The relative magnitudes encode
+// how valuable each signal is for guiding the campaign.
+const SEED_SCORE_COVERAGE: u32 = 32; // hit previously-uncovered code
+const SEED_SCORE_DUG: u32 = 20; // advanced the def-use graph
+const SEED_SCORE_STATE_PROGRESS: u32 = 10; // produced new global-state writes
+const SEED_SCORE_SUCCESS: u32 = 4; // executed without aborting
+const SEED_SCORE_MISSING_DATA: u32 = 6; // surfaced a missing-data signal to resolve
 
 #[derive(Default)]
 struct MissingDataSignal {
@@ -70,7 +74,7 @@ fn render_resource_write(write: &ResourceWrite) -> String {
             .struct_tag
             .type_args
             .iter()
-            .map(|arg| format!("{arg:?}"))
+            .map(|arg| arg.to_canonical_string())
             .collect::<Vec<_>>()
             .join(","),
         write.is_resource_group
@@ -79,11 +83,15 @@ fn render_resource_write(write: &ResourceWrite) -> String {
 
 fn entrypoint_identity(sig: &ScriptSignature, code: &[u8]) -> String {
     let mut hasher = Sha3_256::new();
-    hasher.update(b"move-fuzz-entrypoint-v1");
+    // bump the domain tag (v1 -> v2): the generics are now hashed via their
+    // stable raw ability bits instead of the unstable `Debug` rendering
+    hasher.update(b"move-fuzz-entrypoint-v2");
     hasher.update(sig.name.as_bytes());
     hasher.update(sig.ident.to_string().as_bytes());
     for generic in &sig.generics {
-        hasher.update(format!("{generic:?}").as_bytes());
+        // hash the stable raw ability bits rather than the `Debug` rendering,
+        // which is not a stable format across move-core-types versions
+        hasher.update([generic.into_u8()]);
     }
     for parameter in &sig.parameters {
         hasher.update(parameter.to_string().as_bytes());
@@ -103,16 +111,36 @@ fn render_build_fingerprint(pkg_defs: &[PkgDefinition]) -> Vec<String> {
     let mut entries = Vec::with_capacity(pkg_defs.len());
     for pkg in pkg_defs {
         let info = pkg.package.compiled_package_info();
+        // Use stable `Display` renderings for the externally-defined
+        // compiler/language version types instead of `Debug`, which is not a
+        // stable format across dependency versions and would silently
+        // invalidate persisted caches. (`pkg.kind` is a local enum, so its
+        // `Debug` is controlled by this crate and is stable here.)
         entries.push(format!(
-            "{:?}|{}|{}|{:?}|{:?}|{:?}",
+            "{:?}|{}|{}|{}|{}|{}",
             pkg.kind,
             info.package_name,
             info.source_digest
                 .map(|digest| digest.to_string())
                 .unwrap_or_default(),
-            info.build_flags.compiler_config.bytecode_version,
-            info.build_flags.compiler_config.compiler_version,
-            info.build_flags.compiler_config.language_version,
+            info.build_flags
+                .compiler_config
+                .bytecode_version
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+            info.build_flags
+                .compiler_config
+                .compiler_version
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+            info.build_flags
+                .compiler_config
+                .language_version
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
         ));
     }
     entries
@@ -521,7 +549,7 @@ fn build_chain_fuzzer(
     executor: &TracingExecutor,
     entrypoints: &[(ScriptSignature, Vec<u8>)],
     type_pool: &TypePool,
-    cov_trace_path: &PathBuf,
+    cov_trace_path: &Path,
     dict_string: &[String],
     initial_resource_writes: &[ResourceWrite],
     chain: Chain,
@@ -537,7 +565,7 @@ fn build_chain_fuzzer(
         chain,
         entrypoints,
         type_pool.clone(),
-        cov_trace_path.clone(),
+        cov_trace_path.to_path_buf(),
         dict_string.to_vec(),
     );
     fuzzer.absorb_shared_object_writes(initial_resource_writes);
@@ -579,7 +607,7 @@ fn push_chain_fuzzer(
     executor: &TracingExecutor,
     entrypoints: &[(ScriptSignature, Vec<u8>)],
     type_pool: &TypePool,
-    cov_trace_path: &PathBuf,
+    cov_trace_path: &Path,
     dict_string: &[String],
     initial_resource_writes: &[ResourceWrite],
     chain: Chain,
@@ -620,7 +648,7 @@ fn spawn_targeted_missing_data_chains(
     executor: &TracingExecutor,
     entrypoints: &[(ScriptSignature, Vec<u8>)],
     type_pool: &TypePool,
-    cov_trace_path: &PathBuf,
+    cov_trace_path: &Path,
     dict_string: &[String],
     initial_resource_writes: &[ResourceWrite],
     seq_db: &SequenceDb,
@@ -1007,6 +1035,7 @@ fn restore_auto_state(
 }
 
 /// Entrypoint for the fuzzer
+#[allow(clippy::too_many_arguments)]
 pub fn entrypoint(
     pkg_defs: Vec<PkgDefinition>,
     named_accounts: BTreeMap<String, Account>,
@@ -1248,7 +1277,7 @@ pub fn entrypoint(
 
         // energy-based scheduling: prioritize recently-productive fuzzers while
         // still periodically giving full rounds to avoid starvation.
-        let run_all_oneshots = !phase2_entered || iteration % 20 == 0;
+        let run_all_oneshots = !phase2_entered || iteration.is_multiple_of(20);
         let mut oneshot_order: Vec<usize> = (0..oneshot_fuzzers.len()).collect();
         oneshot_order.sort_by_key(|&i| {
             (
@@ -1347,7 +1376,7 @@ pub fn entrypoint(
 
         // run chain fuzzers (Phase 2 only)
         if phase2_entered {
-            let run_all_chains = iteration % 10 == 0;
+            let run_all_chains = iteration.is_multiple_of(10);
             let mut chain_order: Vec<usize> = (0..chain_fuzzers.len()).collect();
             let (target_module_counts, module_signature_counts) =
                 chain_diversity_counts(&entrypoints, &chain_fuzzers);
@@ -1715,7 +1744,9 @@ pub fn entrypoint(
                 "unique_chain_target_modules": unique_chain_target_modules,
                 "unique_chain_module_signatures": unique_chain_module_signatures,
             });
-            let tmp_path = path_fuzz_stats.with_added_extension("tmp");
+            let mut tmp_name = path_fuzz_stats.as_os_str().to_owned();
+            tmp_name.push(".tmp");
+            let tmp_path = PathBuf::from(tmp_name);
             if let Ok(data) = serde_json::to_string_pretty(&stats_json) {
                 let _ = fs::write(&tmp_path, data);
                 let _ = fs::rename(&tmp_path, &path_fuzz_stats);
@@ -2545,7 +2576,7 @@ mod tests {
             is_resource_group: false,
         };
 
-        let without_state = campaign_fingerprint(&[entry.clone()], &[], 5, 2, 4);
+        let without_state = campaign_fingerprint(std::slice::from_ref(&entry), &[], 5, 2, 4);
         let with_state = campaign_fingerprint(&[entry], &[write], 5, 2, 4);
         assert_ne!(without_state, with_state);
     }

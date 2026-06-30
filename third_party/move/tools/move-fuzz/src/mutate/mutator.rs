@@ -200,6 +200,12 @@ pub struct TypePool {
     entries: Vec<(VmTypeTag, AbilitySet)>,
 }
 
+impl Default for TypePool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypePool {
     /// Create a new empty type pool
     pub fn new() -> Self {
@@ -665,7 +671,12 @@ impl Mutator {
     }
 
     fn random_account_address(&mut self) -> AccountAddress {
-        loop {
+        // A weighted-random address kind may map to a missing or empty bucket,
+        // so cap the number of weighted attempts and then fall back to any
+        // available address. This guarantees termination even if some buckets
+        // are empty (the original unbounded loop could spin forever).
+        const MAX_WEIGHTED_ATTEMPTS: usize = 16;
+        for _ in 0..MAX_WEIGHTED_ATTEMPTS {
             let x = self.rng.gen_range(0, GEN_ADDR_PROB_TOTAL);
             let kind = if x < GEN_ADDR_PROB_NAME_PRIMARY {
                 AddressKind::Named(NamedAddressKind::Primary)
@@ -680,17 +691,26 @@ impl Mutator {
                 AddressKind::User
             };
 
-            let addrs = match self.dict_address.get(&kind) {
-                None => continue,
-                Some(v) => v,
-            };
-            if addrs.is_empty() {
-                continue;
+            if let Some(addrs) = self.dict_address.get(&kind) {
+                if !addrs.is_empty() {
+                    let index = self.rng.gen_range(0, addrs.len());
+                    return *addrs.iter().nth(index).unwrap();
+                }
             }
-
-            let index = self.rng.gen_range(0, addrs.len());
-            return *addrs.iter().nth(index).unwrap();
         }
+
+        // Fallback: pick from any non-empty bucket so we always make progress.
+        let all: Vec<&AccountAddress> = self
+            .dict_address
+            .values()
+            .flat_map(|addrs| addrs.iter())
+            .collect();
+        assert!(
+            !all.is_empty(),
+            "address dictionary is empty; cannot generate a random account address"
+        );
+        let index = self.rng.gen_range(0, all.len());
+        *all[index]
     }
 
     /// Get a random address.

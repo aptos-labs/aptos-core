@@ -54,11 +54,13 @@ impl SubExec {
             .map_err(|e| anyhow!("failed to wait for process: {e}"))?;
 
         if status.is_some() {
+            // the child has exited; yield instead of busy-spinning while the
+            // reader threads drain the remaining buffered output
             while !self.thread_stdout.is_finished() {
-                // wait for stdout thread to finish
+                thread::yield_now();
             }
             while !self.thread_stderr.is_finished() {
-                // wait for stderr thread to finish
+                thread::yield_now();
             }
         }
         Ok(status)
@@ -75,31 +77,25 @@ impl SubExec {
         let mut has_error = false;
 
         // terminate the child process group first
-        match signal {
-            None => {
-                if let Err(e) = child.wait() {
-                    error!("failed to wait for process: {e}");
-                    has_error = true;
-                }
-            },
-            Some(signal) => {
-                if let Err(e) = child.signal(signal) {
-                    error!("failed to send signal {signal} to process: {e}");
-                    has_error = true;
-                }
-            },
-        }
-
-        // force kill the process group if runs into errors
-        if has_error {
-            match child.kill() {
-                Ok(()) => (),
-                Err(e) => panic!("unable to kill command: {e}"),
+        if let Some(signal) = signal {
+            if let Err(e) = child.signal(signal) {
+                error!("failed to send signal {signal} to process: {e}");
+                has_error = true;
             }
         }
 
-        // we must have obtained a status here
-        let status = child.wait().expect("command terminated");
+        // force kill the process group if signaling ran into errors
+        if has_error {
+            if let Err(e) = child.kill() {
+                bail!("unable to kill command: {e}");
+            }
+        }
+
+        // reap the child and obtain its exit status with a single `wait` call
+        // (calling `wait` a second time would error on the already-reaped child)
+        let status = child
+            .wait()
+            .map_err(|e| anyhow!("failed to wait for process: {e}"))?;
 
         // terminate both threads as well
         match thread_stdout.join() {
@@ -108,7 +104,7 @@ impl SubExec {
                 error!("stdout thread runs into error: {e}");
                 has_error = true;
             },
-            Err(e) => panic!("stdout thread panics: {e:?}"),
+            Err(e) => bail!("stdout thread panics: {e:?}"),
         }
         match thread_stderr.join() {
             Ok(Ok(())) => (),
@@ -116,7 +112,7 @@ impl SubExec {
                 error!("stderr thread runs into error: {e}");
                 has_error = true;
             },
-            Err(e) => panic!("stderr thread panics: {e:?}"),
+            Err(e) => bail!("stderr thread panics: {e:?}"),
         }
 
         // finish with the result

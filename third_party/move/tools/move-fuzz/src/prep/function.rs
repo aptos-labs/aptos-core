@@ -26,6 +26,12 @@ pub struct FunctionRegistry {
     decls: BTreeMap<FunctionIdent, FunctionDecl>,
 }
 
+impl Default for FunctionRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FunctionRegistry {
     /// Create an empty registry
     pub fn new() -> Self {

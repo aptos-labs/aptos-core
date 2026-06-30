@@ -56,7 +56,8 @@ pub(crate) fn merge_coverage(coverage: &mut ExecCoverageMap, new_map: CoverageMa
                         found_new = true;
                     }
                     let entry = func_map.entry(pos).or_insert(0);
-                    *entry += count;
+                    // saturate to avoid overflow during long-running campaigns
+                    *entry = entry.saturating_add(count);
                 }
             }
         }

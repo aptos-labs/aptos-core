@@ -293,7 +293,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         Self {
             state_store,
             event_store: self.event_store.clone(),
-            executor_thread_pool: Arc::clone(&self.executor_thread_pool),
+            concurrency_level: self.concurrency_level,
             block_time: self.block_time,
             executed_output: None,
             trace_dir: None,
