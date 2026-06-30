@@ -68,6 +68,9 @@ module aptos_framework::resource_account {
     use aptos_framework::coin;
     use aptos_std::simple_map::{Self, SimpleMap};
 
+    #[test_only]
+    use std::vector;
+
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
     /// The resource account was not created by the specified source account
@@ -109,7 +112,7 @@ module aptos_framework::resource_account {
         let (resource, resource_signer_cap) =
             account::create_resource_account(origin, seed);
         coin::register<AptosCoin>(&resource);
-        coin::transfer<AptosCoin>(origin, signer::address_of(&resource), fund_amount);
+        coin::transfer<AptosCoin>(origin, resource.address_of(), fund_amount);
         rotate_account_authentication_key_and_store_capability(
             origin,
             resource,
@@ -143,13 +146,13 @@ module aptos_framework::resource_account {
         resource_signer_cap: account::SignerCapability,
         optional_auth_key: vector<u8>
     ) acquires Container {
-        let origin_addr = signer::address_of(origin);
+        let origin_addr = origin.address_of();
         if (!exists<Container>(origin_addr)) {
             move_to(origin, Container { store: simple_map::create() })
         };
 
         let container = borrow_global_mut<Container>(origin_addr);
-        let resource_addr = signer::address_of(&resource);
+        let resource_addr = resource.address_of();
         container.store.add(resource_addr, resource_signer_cap);
 
         let auth_key =
@@ -172,7 +175,7 @@ module aptos_framework::resource_account {
             error::not_found(ECONTAINER_NOT_PUBLISHED)
         );
 
-        let resource_addr = signer::address_of(resource);
+        let resource_addr = resource.address_of();
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
             assert!(
@@ -196,7 +199,7 @@ module aptos_framework::resource_account {
 
     #[test(user = @0x1111)]
     public entry fun test_create_account_and_retrieve_cap(user: signer) acquires Container {
-        let user_addr = signer::address_of(&user);
+        let user_addr = user.address_of();
         account::create_account(user_addr);
 
         let seed = x"01";
@@ -217,7 +220,7 @@ module aptos_framework::resource_account {
     public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(
         user: signer
     ) acquires Container {
-        let user_addr = signer::address_of(&user);
+        let user_addr = user.address_of();
         account::create_account(user_addr);
 
         let seed = x"01";
@@ -235,7 +238,7 @@ module aptos_framework::resource_account {
 
     #[test(framework = @0x1, user = @0x1234)]
     public entry fun with_coin(framework: signer, user: signer) acquires Container {
-        let user_addr = signer::address_of(&user);
+        let user_addr = user.address_of();
         let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
         aptos_framework::aptos_account::create_account(copy user_addr);
 
