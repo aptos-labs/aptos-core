@@ -6,7 +6,6 @@ spec aptos_framework::reconfiguration_state {
     }
 
     spec initialize(fx: &signer) {
-        use std::signer;
         use aptos_std::from_bcs;
         aborts_if fx.address_of() != @aptos_framework;
         let post post_state = global<State>(@aptos_framework);
@@ -15,7 +14,6 @@ spec aptos_framework::reconfiguration_state {
     }
 
     spec initialize_for_testing(fx: &signer) {
-        use std::signer;
         aborts_if fx.address_of() != @aptos_framework;
     }
 

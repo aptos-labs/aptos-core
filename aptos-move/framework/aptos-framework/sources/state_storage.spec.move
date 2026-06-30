@@ -50,7 +50,6 @@ spec aptos_framework::state_storage {
     }
 
     spec initialize(aptos_framework: &signer) {
-        use std::signer;
         pragma opaque;
         modifies global<StateStorageUsage>(@aptos_framework);
         let addr = aptos_framework.address_of();

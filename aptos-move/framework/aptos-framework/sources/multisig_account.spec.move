@@ -288,7 +288,6 @@ spec aptos_framework::multisig_account {
     ////////////////////////// Timelock entry function specs ///////////////////////////////
 
     spec upsert_timelock(multisig_account: &signer, timelock_period: u64, override_threshold: Option<u64>) {
-        use std::signer;
         use std::features;
         pragma aborts_if_is_partial;
         let multisig_address = multisig_account.address_of();
@@ -350,7 +349,6 @@ spec aptos_framework::multisig_account {
     }
 
     spec remove_timelock(multisig_account: &signer) {
-        use std::signer;
         let multisig_address = multisig_account.address_of();
         aborts_if !exists<MultisigAccount>(multisig_address);
         // Aborts if no timelock exists — removal is no longer silent.
@@ -364,7 +362,6 @@ spec aptos_framework::multisig_account {
     ////////////////////////// Core entry function specs ///////////////////////////////
 
     spec create_transaction(owner: &signer, multisig_account: address, payload: vector<u8>) {
-        use std::signer;
         pragma aborts_if_is_partial;
         // Payload cannot be empty.
         aborts_if len(payload) == 0;
@@ -375,7 +372,6 @@ spec aptos_framework::multisig_account {
     }
 
     spec create_transaction_with_hash(owner: &signer, multisig_account: address, payload_hash: vector<u8>) {
-        use std::signer;
         pragma aborts_if_is_partial;
         // Hash must be exactly 32 bytes.
         aborts_if len(payload_hash) != 32;
@@ -386,21 +382,18 @@ spec aptos_framework::multisig_account {
     }
 
     spec approve_transaction(owner: &signer, multisig_account: address, sequence_number: u64) {
-        use std::signer;
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, owner.address_of());
     }
 
     spec reject_transaction(owner: &signer, multisig_account: address, sequence_number: u64) {
-        use std::signer;
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, owner.address_of());
     }
 
     spec vote_transanction(owner: &signer, multisig_account: address, sequence_number: u64, approved: bool) {
-        use std::signer;
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         // Caller must be an owner.
@@ -410,7 +403,6 @@ spec aptos_framework::multisig_account {
     }
 
     spec vote_transaction(owner: &signer, multisig_account: address, sequence_number: u64, approved: bool) {
-        use std::signer;
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, owner.address_of());
@@ -418,7 +410,6 @@ spec aptos_framework::multisig_account {
     }
 
     spec execute_rejected_transaction(owner: &signer, multisig_account: address) {
-        use std::signer;
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, owner.address_of());
@@ -433,7 +424,6 @@ spec aptos_framework::multisig_account {
     /// level state (and, for timelock, an inline helper plus the optional
     /// `MultisigAccountTimeLock` resource) and are left to `pragma aborts_if_is_partial`.
     spec validate_multisig_transaction(owner: &signer, multisig_account: address, payload: vector<u8>) {
-        use std::signer;
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
@@ -460,7 +450,6 @@ spec aptos_framework::multisig_account {
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
     ) {
-        use std::signer;
         pragma aborts_if_is_partial;
         // num_signatures_required must be in [1, len(owners)].
         aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);

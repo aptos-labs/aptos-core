@@ -105,7 +105,6 @@ spec aptos_framework::staking_config {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
     ) {
-        use std::signer;
         let addr = aptos_framework.address_of();
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         /// [high-level-req-1.1]
@@ -136,7 +135,6 @@ spec aptos_framework::staking_config {
         last_rewards_rate_period_start_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
-        use std::signer;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let addr = aptos_framework.address_of();
         /// [high-level-req-1.2]
@@ -192,7 +190,6 @@ spec aptos_framework::staking_config {
         minimum_stake: u64,
         maximum_stake: u64,
     ) {
-        use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
         let addr = aptos_framework.address_of();
@@ -211,7 +208,6 @@ spec aptos_framework::staking_config {
         aptos_framework: &signer,
         new_recurring_lockup_duration_secs: u64,
     ) {
-        use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
         let addr = aptos_framework.address_of();
@@ -233,7 +229,6 @@ spec aptos_framework::staking_config {
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) {
-        use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
         aborts_if features::spec_periodical_reward_rate_decrease_enabled();
@@ -258,7 +253,6 @@ spec aptos_framework::staking_config {
         rewards_rate_period_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
-        use std::signer;
         include StakingRewardsConfigRequirement;
         let addr = aptos_framework.address_of();
         /// [high-level-req-1.6]
@@ -280,7 +274,6 @@ spec aptos_framework::staking_config {
         aptos_framework: &signer,
         new_voting_power_increase_limit: u64,
     ) {
-        use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
         let addr = aptos_framework.address_of();

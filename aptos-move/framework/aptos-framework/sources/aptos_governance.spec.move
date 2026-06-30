@@ -840,7 +840,6 @@ spec aptos_framework::aptos_governance {
 
     spec force_end_epoch(aptos_framework: &signer) {
         use aptos_framework::reconfiguration_with_dkg;
-        use std::signer;
         pragma verify = false; // TODO: set because of timeout (property proved).
         let address = aptos_framework.address_of();
         include reconfiguration_with_dkg::FinishRequirement {

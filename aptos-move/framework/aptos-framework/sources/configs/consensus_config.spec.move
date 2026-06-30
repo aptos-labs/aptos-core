@@ -31,7 +31,6 @@ spec aptos_framework::consensus_config {
     /// Ensure caller is admin.
     /// Aborts if StateStorageUsage already exists.
     spec initialize(aptos_framework: &signer, config: vector<u8>) {
-        use std::signer;
         let addr = aptos_framework.address_of();
         /// [high-level-req-1]
         aborts_if !system_addresses::is_aptos_framework_address(addr);
@@ -46,7 +45,6 @@ spec aptos_framework::consensus_config {
     spec set(account: &signer, config: vector<u8>) {
         use aptos_framework::chain_status;
         use aptos_framework::timestamp;
-        use std::signer;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;

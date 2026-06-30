@@ -46,7 +46,6 @@ spec aptos_framework::aggregator_factory {
     /// Make sure the caller is @aptos_framework.
     /// AggregatorFactory is not under the caller before creating the resource.
     spec initialize_aggregator_factory(aptos_framework: &signer) {
-        use std::signer;
         pragma opaque;
         modifies global<AggregatorFactory>(@aptos_framework);
         let addr = aptos_framework.address_of();
@@ -71,7 +70,6 @@ spec aptos_framework::aggregator_factory {
     /// Make sure the caller is @aptos_framework.
     /// AggregatorFactory existed under the @aptos_framework when Creating a new aggregator.
     spec create_aggregator(account: &signer, limit: u128): Aggregator {
-        use std::signer;
         pragma opaque;
         modifies global<AggregatorFactory>(@aptos_framework);
         let addr = account.address_of();

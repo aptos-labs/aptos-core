@@ -53,7 +53,6 @@ spec aptos_framework::reconfiguration_with_dkg {
 
     spec schema FinishRequirement {
         use aptos_framework::chain_status;
-        use std::signer;
         use std::features;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;

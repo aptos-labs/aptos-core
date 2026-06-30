@@ -23,7 +23,6 @@ spec aptos_framework::version {
     }
 
     spec set_version(account: &signer, major: u64) {
-        use std::signer;
         use aptos_framework::chain_status;
         use aptos_framework::timestamp;
         use aptos_framework::coin::CoinInfo;
@@ -48,8 +47,6 @@ spec aptos_framework::version {
 
     /// Abort if resource already exists in `@aptos_framwork` when initializing.
     spec initialize(aptos_framework: &signer, initial_version: u64) {
-        use std::signer;
-
         /// [high-level-req-1]
         aborts_if aptos_framework.address_of() != @aptos_framework;
         aborts_if exists<Version>(@aptos_framework);

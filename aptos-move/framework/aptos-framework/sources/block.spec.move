@@ -130,7 +130,6 @@ spec aptos_framework::block {
     /// Make sure The BlockResource under the caller existed after initializing.
     /// The number of new events created does not exceed MAX_U64.
     spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
-        use std::signer;
         /// [high-level-req-1]
         include Initialize;
         include NewEventHandle;

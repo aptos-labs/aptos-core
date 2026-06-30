@@ -65,7 +65,6 @@ spec aptos_framework::reconfiguration {
     /// Already exists in framework account.
     /// Guid_creation_num should be 2 according to logic.
     spec initialize(aptos_framework: &signer) {
-        use std::signer;
         use aptos_framework::account::{Account};
         use aptos_framework::guid;
 

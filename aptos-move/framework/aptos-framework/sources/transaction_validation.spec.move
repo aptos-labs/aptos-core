@@ -49,7 +49,6 @@ spec aptos_framework::transaction_validation {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
     ) {
-        use std::signer;
         let addr = aptos_framework.address_of();
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if exists<TransactionValidation>(addr);
@@ -449,7 +448,6 @@ spec aptos_framework::transaction_validation {
     }
 
     spec schema EpilogueGasPayerAbortsIf {
-        use std::option;
         use aptos_std::type_info;
         use aptos_framework::account::{Account};
         use aptos_framework::aptos_coin::{AptosCoin};

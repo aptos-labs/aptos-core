@@ -1,6 +1,4 @@
 spec aptos_framework::create_signer {
-    use std::signer;
-
     /// <high-level-req>
     /// No.: 1
     /// Requirement: Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.

@@ -1,7 +1,6 @@
 spec aptos_framework::chunky_dkg {
 
     spec initialize(aptos_framework: &signer) {
-        use std::signer;
         let aptos_framework_addr = aptos_framework.address_of();
         aborts_if aptos_framework_addr != @aptos_framework;
     }
@@ -51,14 +50,12 @@ spec aptos_framework::chunky_dkg {
     }
 
     spec finish(aggregated_subtranscript: vector<u8>) {
-        use std::option;
         requires exists<ChunkyDKGState>(@aptos_framework);
         requires global<ChunkyDKGState>(@aptos_framework).in_progress.is_some();
         aborts_if false;
     }
 
     spec try_clear_incomplete_session(fx: &signer) {
-        use std::signer;
         let addr = fx.address_of();
         aborts_if addr != @aptos_framework;
     }

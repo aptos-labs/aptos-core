@@ -8,7 +8,6 @@ spec aptos_framework::execution_config {
     /// When setting now time must be later than last_reconfiguration_time.
     spec set(account: &signer, config: vector<u8>) {
         use aptos_framework::timestamp;
-        use std::signer;
         use std::features;
         use aptos_framework::chain_status;
         use aptos_framework::staking_config;
