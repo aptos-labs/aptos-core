@@ -82,6 +82,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "move_aptosvm_blockstm_v2_compare"
+path = "fuzz_targets/move/aptosvm_blockstm_v2_compare.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "u256_diff_fuzz"
 path = "fuzz_targets/u256_diff_fuzz.rs"
 test = false
@@ -96,6 +102,7 @@ aptos-cached-packages = { workspace = true }
 aptos-consensus = { workspace = true, features = ["fuzzing"], optional = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true, features = ["fuzzing"] }
 aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }

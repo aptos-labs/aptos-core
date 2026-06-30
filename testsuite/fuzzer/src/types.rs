@@ -62,6 +62,41 @@ pub enum ExecVariant {
     },
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Arbitrary, Dearbitrary)]
+pub enum BlockExecVariantV2 {
+    Script {
+        _script: CompiledScript,
+        _type_args: Vec<TypeTag>,
+        _args: Vec<MoveValue>,
+    },
+    CallFunction {
+        _module_idx: u8,
+        _function: FunctionDefinitionIndex,
+        _type_args: Vec<TypeTag>,
+        _args: Vec<Vec<u8>>,
+    },
+    Publish {
+        _module_idxs: Vec<u8>,
+    },
+    SplitBlock,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Arbitrary, Dearbitrary)]
+pub struct RunnableBlockTransactionV2 {
+    pub exec_variant: BlockExecVariantV2,
+    pub sender_slot: u8,
+    pub orderless: bool,
+    pub secondary_slots: Vec<u8>,
+    pub fee_payer_slot: Option<u8>,
+}
+
+#[derive(Debug, Default, Eq, PartialEq, Clone, Arbitrary, Dearbitrary)]
+pub struct RunnableBlockStateV2 {
+    pub accounts: Vec<UserAccount>,
+    pub modules: Vec<CompiledModule>,
+    pub transactions: Vec<RunnableBlockTransactionV2>,
+}
+
 // Originally from testsuite/fuzzer/src/utils.rs
 #[derive(Debug, Arbitrary, Dearbitrary, Eq, PartialEq, Clone)]
 pub enum Authenticator {

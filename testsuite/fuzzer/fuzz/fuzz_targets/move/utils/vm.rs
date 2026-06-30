@@ -23,6 +23,7 @@ use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::VMError,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
+    file_format_common::{VERSION_MAX, VERSION_MIN},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -35,6 +36,22 @@ use std::{
 };
 
 pub const BYTECODE_VERSION: u32 = 8;
+
+fn supported_bytecode_version(version: u32) -> u32 {
+    if (VERSION_MIN..=VERSION_MAX).contains(&version) {
+        version
+    } else {
+        VERSION_MAX
+    }
+}
+
+pub(crate) fn module_bytecode_version(module: &CompiledModule) -> u32 {
+    supported_bytecode_version(module.version)
+}
+
+pub(crate) fn script_bytecode_version(script: &CompiledScript) -> u32 {
+    supported_bytecode_version(script.version)
+}
 
 // Used to fuzz the MoveVM
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
@@ -77,13 +94,13 @@ pub(crate) fn sort_by_deps(
     id: ModuleId,
     visited: &mut HashSet<ModuleId>,
 ) -> Result<(), Corpus> {
+    if order.contains(&id) {
+        return Ok(());
+    }
     if visited.contains(&id) {
         return Err(Corpus::Keep);
     }
     visited.insert(id.clone());
-    if order.contains(&id) {
-        return Ok(());
-    }
     let compiled = &map.get(&id).unwrap();
     for dep in compiled.immediate_dependencies() {
         // Only consider deps which are actually in this package. Deps for outside
@@ -171,11 +188,19 @@ pub(crate) fn verify_module_fast(
 ) -> Result<(), Corpus> {
     let mut module_code = vec![];
     module
-        .serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
-        .map_err(|_| Corpus::Reject)?;
-    let m_de = CompiledModule::deserialize_with_config(&module_code, deserializer_config)
-        .map_err(|_| Corpus::Reject)?;
+        .serialize_for_version(Some(module_bytecode_version(module)), &mut module_code)
+        .map_err(|e| {
+            tdbg!("module serialization failed", &e);
+            Corpus::Reject
+        })?;
+    let m_de = CompiledModule::deserialize_with_config(&module_code, deserializer_config).map_err(
+        |e| {
+            tdbg!("module deserialization failed", &e);
+            Corpus::Reject
+        },
+    )?;
     move_bytecode_verifier::verify_module_with_config(verifier_config, &m_de).map_err(|e| {
+        tdbg!("module verification failed", &e);
         check_for_invariant_violation_vmerror(e);
         Corpus::Reject
     })
@@ -188,11 +213,19 @@ pub(crate) fn verify_script_fast(
 ) -> Result<(), Corpus> {
     let mut script_code = vec![];
     script
-        .serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
-        .map_err(|_| Corpus::Reject)?;
-    let s_de = CompiledScript::deserialize_with_config(&script_code, deserializer_config)
-        .map_err(|_| Corpus::Reject)?;
+        .serialize_for_version(Some(script_bytecode_version(script)), &mut script_code)
+        .map_err(|e| {
+            tdbg!("script serialization failed", &e);
+            Corpus::Reject
+        })?;
+    let s_de = CompiledScript::deserialize_with_config(&script_code, deserializer_config).map_err(
+        |e| {
+            tdbg!("script deserialization failed", &e);
+            Corpus::Reject
+        },
+    )?;
     move_bytecode_verifier::verify_script_with_config(verifier_config, &s_de).map_err(|e| {
+        tdbg!("script verification failed", &e);
         check_for_invariant_violation_vmerror(e);
         Corpus::Reject
     })
@@ -222,10 +255,10 @@ pub(crate) fn group_modules_by_address_topo(
         let package_address = module_id_to_start_package.address();
         let mut current_package_for_address: Vec<CompiledModule> = Vec::new();
         for module_id_in_global_order in &order {
-            if module_id_in_global_order.address() == package_address {
-                if let Some(module) = remaining_modules_map.remove(module_id_in_global_order) {
-                    current_package_for_address.push(module);
-                }
+            if module_id_in_global_order.address() == package_address
+                && let Some(module) = remaining_modules_map.remove(module_id_in_global_order)
+            {
+                current_package_for_address.push(module);
             }
         }
         if !current_package_for_address.is_empty() {
@@ -273,11 +306,65 @@ fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload
     for module in modules {
         let mut module_code: Vec<u8> = vec![];
         module
-            .serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
+            .serialize_for_version(Some(module_bytecode_version(module)), &mut module_code)
             .expect("Module must serialize");
         pkg_code.push(module_code);
     }
     code_publish_package_txn(pkg_metadata, pkg_code)
+}
+
+pub(crate) fn publish_transaction_payload_with_package_names(
+    modules: &[CompiledModule],
+    package_name: &str,
+    package_names_by_module: &BTreeMap<ModuleId, String>,
+) -> TransactionPayload {
+    let modules_metadata = modules
+        .iter()
+        .map(|module| ModuleMetadata {
+            name: module.name().to_string(),
+            source: vec![],
+            source_map: vec![],
+            extension: None,
+        })
+        .collect();
+
+    let deps = modules
+        .iter()
+        .flat_map(|module| module.immediate_dependencies())
+        .map(|id| PackageDep {
+            account: id.address,
+            package_name: package_names_by_module
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| id.name.to_string()),
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter(|dep| &dep.account != modules[0].address())
+        .collect();
+
+    let metadata = PackageMetadata {
+        name: package_name.to_string(),
+        upgrade_policy: UpgradePolicy::compat(),
+        upgrade_number: 1,
+        source_digest: "".to_string(),
+        manifest: vec![],
+        modules: modules_metadata,
+        deps,
+        extension: None,
+    };
+    let metadata = bcs::to_bytes(&metadata).expect("PackageMetadata must serialize");
+    let code = modules
+        .iter()
+        .map(|module| {
+            let mut code = vec![];
+            module
+                .serialize_for_version(Some(module_bytecode_version(module)), &mut code)
+                .expect("Module must serialize");
+            code
+        })
+        .collect();
+    code_publish_package_txn(metadata, code)
 }
 
 // List of known false positive messages for invariant violations
@@ -427,16 +514,15 @@ pub(crate) fn publish_group(
     match tdbg!(status) {
         ExecutionStatus::Success => Ok(()),
         ExecutionStatus::MiscellaneousError(e) => {
-            if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation
-                    && *e != StatusCode::VERIFICATION_ERROR
-                {
-                    panic!(
-                        "invariant violation via ExecutionStatus: {:?}, {:?}",
-                        e,
-                        res.auxiliary_data()
-                    );
-                }
+            if let Some(e) = e
+                && e.status_type() == StatusType::InvariantViolation
+                && *e != StatusCode::VERIFICATION_ERROR
+            {
+                panic!(
+                    "invariant violation via ExecutionStatus: {:?}, {:?}",
+                    e,
+                    res.auxiliary_data()
+                );
             }
             Err(Corpus::Keep)
         },
