@@ -31,7 +31,7 @@ spec aptos_framework::system_addresses {
 
     spec assert_core_resource(account: &signer) {
         pragma opaque;
-        include AbortsIfNotCoreResource { addr: account.address_of() };
+        include AbortsIfNotCoreResource { addr: signer::address_of(account) };
     }
 
     spec assert_core_resource_address(addr: address) {

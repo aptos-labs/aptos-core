@@ -299,7 +299,7 @@ spec aptos_framework::transaction_validation {
     ) {
         // TODO(fa_migration)
         pragma verify = false;
-        include EpilogueGasPayerAbortsIf { gas_payer: account.address_of() };
+        include EpilogueGasPayerAbortsIf { gas_payer: signer::address_of(account) };
     }
 
     spec epilogue(
