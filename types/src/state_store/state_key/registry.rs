@@ -238,8 +238,8 @@ impl StateKeyRegistry {
         struct_tag: &StructTag,
         address: &AccountAddress,
     ) -> &TwoKeyRegistry<StructTag, AccountAddress> {
-        &self.resource_shards
-            [Self::hash_address_and_name(address, struct_tag.name.as_bytes()) % NUM_RESOURCE_SHARDS]
+        &self.resource_shards[Self::hash_address_and_name(address, struct_tag.name.as_bytes())
+            % self.resource_shards.len()]
     }
 
     pub(crate) fn resource_group(
@@ -250,7 +250,7 @@ impl StateKeyRegistry {
         &self.resource_group_shards[Self::hash_address_and_name(
             address,
             struct_tag.name.as_bytes(),
-        ) % NUM_RESOURCE_GROUP_SHARDS]
+        ) % self.resource_group_shards.len()]
     }
 
     pub(crate) fn module(
@@ -259,7 +259,7 @@ impl StateKeyRegistry {
         name: &IdentStr,
     ) -> &TwoKeyRegistry<AccountAddress, Identifier> {
         &self.module_shards
-            [Self::hash_address_and_name(address, name.as_bytes()) % NUM_MODULE_SHARDS]
+            [Self::hash_address_and_name(address, name.as_bytes()) % self.module_shards.len()]
     }
 
     pub(crate) fn table_item(
@@ -267,11 +267,13 @@ impl StateKeyRegistry {
         handle: &TableHandle,
         key: &[u8],
     ) -> &TwoKeyRegistry<TableHandle, Vec<u8>> {
-        &self.table_item_shards[Self::hash_address_and_name(&handle.0, key) % NUM_MODULE_SHARDS]
+        &self.table_item_shards
+            [Self::hash_address_and_name(&handle.0, key) % self.table_item_shards.len()]
     }
 
     pub(crate) fn raw(&self, bytes: &[u8]) -> &TwoKeyRegistry<Vec<u8>, ()> {
-        &self.raw_shards[Self::hash_address_and_name(&AccountAddress::ONE, bytes) % NUM_RAW_SHARDS]
+        &self.raw_shards
+            [Self::hash_address_and_name(&AccountAddress::ONE, bytes) % self.raw_shards.len()]
     }
 
     pub(crate) fn position(
@@ -284,6 +286,6 @@ impl StateKeyRegistry {
         hasher.write_u8(exchange.as_ref()[AccountAddress::LENGTH - 1]);
         hasher.write_u8(account.as_ref()[AccountAddress::LENGTH - 1]);
         hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
-        &self.position_shards[hasher.finish() as usize % NUM_POSITION_SHARDS]
+        &self.position_shards[hasher.finish() as usize % self.position_shards.len()]
     }
 }
