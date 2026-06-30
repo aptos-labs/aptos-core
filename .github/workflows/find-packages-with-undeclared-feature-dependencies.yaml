@@ -1,6 +1,9 @@
 name: "Find Packages with undeclared feature dependencies"
 on:
   workflow_dispatch:
+permissions:
+  contents: read
+
 
 jobs:
   find-packages-with-undeclared-feature-dependencies:

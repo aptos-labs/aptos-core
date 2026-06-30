@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "terraform/**"
+permissions:
+  contents: read
+
 
 jobs:
   check-terraform-modifications:

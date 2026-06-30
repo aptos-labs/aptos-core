@@ -14,6 +14,10 @@ on:
         description: The network to provision storage for.
         type: string
         required: true
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   provision:
     runs-on: 2cpu-gh-ubuntu24-x64

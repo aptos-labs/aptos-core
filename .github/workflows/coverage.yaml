@@ -18,6 +18,9 @@ concurrency:
   # cancel redundant builds on PRs (only on PR, not on branches)
   group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
   cancel-in-progress: true
+permissions:
+  contents: read
+
 
 jobs:
   rust-unit-coverage:
