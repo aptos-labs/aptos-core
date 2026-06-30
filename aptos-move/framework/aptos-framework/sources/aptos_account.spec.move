@@ -88,7 +88,7 @@ spec aptos_framework::aptos_account {
     spec transfer(source: &signer, to: address, amount: u64) {
         // TODO(fa_migration)
         pragma verify = false;
-        let account_addr_source = signer::address_of(source);
+        let account_addr_source = source.address_of();
 
         include CreateAccountTransferAbortsIf;
         include GuidAbortsIf<AptosCoin>;
@@ -113,7 +113,7 @@ spec aptos_framework::aptos_account {
     }
 
     spec set_allow_direct_coin_transfers(account: &signer, allow: bool) {
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         include !exists<DirectTransferConfig>(addr) ==>
             account::NewEventHandleAbortsIf { account };
         modifies global<DirectTransferConfig>(addr);
@@ -125,7 +125,7 @@ spec aptos_framework::aptos_account {
     spec batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
         //TODO: Can't verify the loop invariant in enumerate
         pragma verify = false;
-        let account_addr_source = signer::address_of(source);
+        let account_addr_source = source.address_of();
         let coin_store_source = global<coin::CoinStore<AptosCoin>>(account_addr_source);
         let balance_source = coin_store_source.coin.value;
 
@@ -176,7 +176,7 @@ spec aptos_framework::aptos_account {
         //TODO: Can't verify the loop invariant in enumerate
         //use aptos_std::type_info;
         pragma verify = false;
-        let account_addr_source = signer::address_of(from);
+        let account_addr_source = from.address_of();
         let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
         let balance_source = coin_store_source.coin.value;
 
@@ -251,7 +251,7 @@ spec aptos_framework::aptos_account {
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
         // TODO(fa_migration)
         pragma verify = false;
-        let account_addr_source = signer::address_of(from);
+        let account_addr_source = from.address_of();
 
 
         include CreateAccountTransferAbortsIf;

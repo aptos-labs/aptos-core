@@ -31,7 +31,7 @@ spec aptos_framework::system_addresses {
 
     spec assert_core_resource(account: &signer) {
         pragma opaque;
-        include AbortsIfNotCoreResource { addr: signer::address_of(account) };
+        include AbortsIfNotCoreResource { addr: account.address_of() };
     }
 
     spec assert_core_resource_address(addr: address) {
@@ -65,7 +65,7 @@ spec aptos_framework::system_addresses {
 
     spec assert_framework_reserved_address(account: &signer) {
         pragma opaque;
-        aborts_if !is_framework_reserved_address(signer::address_of(account));
+        aborts_if !is_framework_reserved_address(account.address_of());
     }
 
     spec assert_framework_reserved(addr: address) {
@@ -86,7 +86,7 @@ spec aptos_framework::system_addresses {
     spec schema AbortsIfNotAptosFramework {
         account: signer;
         /// [high-level-req-2]
-        aborts_if signer::address_of(account) != @aptos_framework with error::PERMISSION_DENIED;
+        aborts_if account.address_of() != @aptos_framework with error::PERMISSION_DENIED;
     }
 
     spec assert_vm(account: &signer) {
@@ -97,7 +97,7 @@ spec aptos_framework::system_addresses {
     spec is_vm(account: &signer): bool {
         pragma opaque;
         aborts_if false;
-        ensures result == (signer::address_of(account) == @vm_reserved);
+        ensures result == (account.address_of() == @vm_reserved);
     }
 
     spec is_vm_address(addr: address): bool {
@@ -116,6 +116,6 @@ spec aptos_framework::system_addresses {
     spec schema AbortsIfNotVM {
         account: signer;
         /// [high-level-req-3]
-        aborts_if signer::address_of(account) != @vm_reserved with error::PERMISSION_DENIED;
+        aborts_if account.address_of() != @vm_reserved with error::PERMISSION_DENIED;
     }
 }

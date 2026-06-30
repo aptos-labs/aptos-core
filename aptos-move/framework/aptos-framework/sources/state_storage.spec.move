@@ -53,7 +53,7 @@ spec aptos_framework::state_storage {
         use std::signer;
         pragma opaque;
         modifies global<StateStorageUsage>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-4]
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         /// [high-level-req-3]

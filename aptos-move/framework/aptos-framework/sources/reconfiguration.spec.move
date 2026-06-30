@@ -70,7 +70,7 @@ spec aptos_framework::reconfiguration {
         use aptos_framework::guid;
 
         include AbortsIfNotAptosFramework;
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         let post config = global<Configuration>(@aptos_framework);
         requires exists<Account>(addr);
         aborts_if !(global<Account>(addr).guid_creation_num == 2);

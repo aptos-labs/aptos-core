@@ -69,7 +69,7 @@ spec aptos_framework::resource_account {
         optional_auth_key: vector<u8>,
     ) {
         use aptos_framework::create_signer;
-        let source_addr = signer::address_of(origin);
+        let source_addr = origin.address_of();
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
         let resource = create_signer::spec_create_signer(resource_addr);
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
@@ -84,7 +84,7 @@ spec aptos_framework::resource_account {
         use aptos_framework::aptos_account;
         // TODO(fa_migration)
         pragma verify = false;
-        let source_addr = signer::address_of(origin);
+        let source_addr = origin.address_of();
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
         let coin_store_resource = global<coin::CoinStore<AptosCoin>>(resource_addr);
 
@@ -106,7 +106,7 @@ spec aptos_framework::resource_account {
     ) {
         pragma verify = false;
         //TODO: Loop in code.spec
-        let source_addr = signer::address_of(origin);
+        let source_addr = origin.address_of();
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
         let optional_auth_key = ZERO_AUTH_KEY;
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
@@ -120,13 +120,13 @@ spec aptos_framework::resource_account {
     ) {
         pragma aborts_if_is_partial;
 
-        let resource_addr = signer::address_of(resource);
+        let resource_addr = resource.address_of();
         /// [high-level-req-1]
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf;
         /// [high-level-req-2]
-        ensures exists<Container>(signer::address_of(origin));
+        ensures exists<Container>(origin.address_of());
         /// [high-level-req-5]
-        ensures vector::length(optional_auth_key) != 0 ==>
+        ensures optional_auth_key.length() != 0 ==>
             global<aptos_framework::account::Account>(resource_addr).authentication_key == optional_auth_key;
     }
 
@@ -180,7 +180,7 @@ spec aptos_framework::resource_account {
 
         /// [high-level-req-6]
         aborts_if !exists<Container>(source_addr);
-        let resource_addr = signer::address_of(resource);
+        let resource_addr = resource.address_of();
 
         let container = global<Container>(source_addr);
         /// [high-level-req-7]

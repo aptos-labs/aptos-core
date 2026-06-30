@@ -97,20 +97,20 @@ spec aptos_framework::transaction_fee {
         aborts_if coin_store.coin.value < amount;
 
         let maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let supply_aggr = option::borrow(maybe_supply);
+        let supply_aggr = maybe_supply.borrow();
         let value = optional_aggregator::optional_aggregator_value(supply_aggr);
 
         let post post_maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let post post_supply = option::borrow(post_maybe_supply);
+        let post post_supply = post_maybe_supply.borrow();
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
-        aborts_if option::is_some(maybe_supply) && value < amount;
+        aborts_if maybe_supply.is_some() && value < amount;
 
         ensures post_coin_store.coin.value == coin_store.coin.value - amount;
-        ensures if (option::is_some(maybe_supply)) {
+        ensures if (maybe_supply.is_some()) {
             post_value == value - amount
         } else {
-            option::is_none(post_maybe_supply)
+            post_maybe_supply.is_none()
         };
         ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
     }
@@ -148,7 +148,7 @@ spec aptos_framework::transaction_fee {
         // TODO(fa_migration)
         pragma verify = false;
 
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if !system_addresses::is_aptos_framework_address(addr);
 
         aborts_if exists<AptosFABurnCapabilities>(addr);
@@ -161,7 +161,7 @@ spec aptos_framework::transaction_fee {
     /// Aborts if `AptosCoinMintCapability` already exists.
     spec store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
         use std::signer;
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if exists<AptosCoinMintCapability>(addr);
         ensures exists<AptosCoinMintCapability>(addr);

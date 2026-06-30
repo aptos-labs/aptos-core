@@ -39,7 +39,7 @@ spec aptos_framework::timestamp {
     spec set_time_has_started(aptos_framework: &signer) {
         pragma opaque;
         modifies global<CurrentTimeMicroseconds>(@aptos_framework);
-        aborts_if std::signer::address_of(aptos_framework) != @aptos_framework;
+        aborts_if aptos_framework.address_of() != @aptos_framework;
         aborts_if exists<CurrentTimeMicroseconds>(@aptos_framework);
         ensures exists<CurrentTimeMicroseconds>(@aptos_framework);
         ensures spec_now_microseconds() == 0;

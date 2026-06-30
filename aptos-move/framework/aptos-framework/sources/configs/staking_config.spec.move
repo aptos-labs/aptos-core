@@ -106,7 +106,7 @@ spec aptos_framework::staking_config {
         voting_power_increase_limit: u64,
     ) {
         use std::signer;
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         /// [high-level-req-1.1]
         aborts_if addr != @aptos_framework;
@@ -138,7 +138,7 @@ spec aptos_framework::staking_config {
     ) {
         use std::signer;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1.2]
         aborts_if addr != @aptos_framework;
         aborts_if last_rewards_rate_period_start_in_secs > timestamp::spec_now_seconds();
@@ -195,7 +195,7 @@ spec aptos_framework::staking_config {
         use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1.3]
         aborts_if addr != @aptos_framework;
         aborts_if minimum_stake > maximum_stake || maximum_stake == 0;
@@ -214,7 +214,7 @@ spec aptos_framework::staking_config {
         use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1.4]
         aborts_if addr != @aptos_framework;
         /// [high-level-req-3.2]
@@ -237,7 +237,7 @@ spec aptos_framework::staking_config {
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
         aborts_if features::spec_periodical_reward_rate_decrease_enabled();
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1.5]
         aborts_if addr != @aptos_framework;
         aborts_if new_rewards_rate_denominator == 0;
@@ -260,7 +260,7 @@ spec aptos_framework::staking_config {
     ) {
         use std::signer;
         include StakingRewardsConfigRequirement;
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1.6]
         aborts_if addr != @aptos_framework;
         aborts_if global<StakingRewardsConfig>(@aptos_framework).rewards_rate_period_in_secs != rewards_rate_period_in_secs;
@@ -283,7 +283,7 @@ spec aptos_framework::staking_config {
         use std::signer;
         pragma opaque;
         modifies global<StakingConfig>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1.7]
         aborts_if addr != @aptos_framework;
         /// [high-level-req-2.2]

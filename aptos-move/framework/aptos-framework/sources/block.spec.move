@@ -135,7 +135,7 @@ spec aptos_framework::block {
         include Initialize;
         include NewEventHandle;
 
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         let account = global<account::Account>(addr);
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
     }

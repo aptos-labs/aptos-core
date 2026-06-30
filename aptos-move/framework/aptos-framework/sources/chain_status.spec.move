@@ -33,7 +33,7 @@ spec aptos_framework::chain_status {
         pragma verify = true;
         pragma delegate_invariants_to_caller;
         modifies global<GenesisEndMarker>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if addr != @aptos_framework;
         /// [high-level-req-3]
         aborts_if exists<GenesisEndMarker>(@aptos_framework);

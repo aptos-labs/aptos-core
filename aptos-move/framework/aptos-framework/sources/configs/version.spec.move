@@ -36,7 +36,7 @@ spec aptos_framework::version {
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
-        aborts_if !exists<SetVersionCapability>(signer::address_of(account));
+        aborts_if !exists<SetVersionCapability>(account.address_of());
         aborts_if !exists<Version>(@aptos_framework);
 
         let old_major = global<Version>(@aptos_framework).major;
@@ -51,7 +51,7 @@ spec aptos_framework::version {
         use std::signer;
 
         /// [high-level-req-1]
-        aborts_if signer::address_of(aptos_framework) != @aptos_framework;
+        aborts_if aptos_framework.address_of() != @aptos_framework;
         aborts_if exists<Version>(@aptos_framework);
         aborts_if exists<SetVersionCapability>(@aptos_framework);
         ensures exists<Version>(@aptos_framework);
@@ -63,7 +63,7 @@ spec aptos_framework::version {
     spec set_for_next_epoch(account: &signer, major: u64) {
         pragma opaque;
         modifies global<config_buffer::PendingConfigs>(@aptos_framework);
-        aborts_if !exists<SetVersionCapability>(signer::address_of(account));
+        aborts_if !exists<SetVersionCapability>(account.address_of());
         aborts_if !exists<Version>(@aptos_framework);
         aborts_if global<Version>(@aptos_framework).major >= major;
         aborts_if aborts_of<config_buffer::upsert<Version>>(Version { major });

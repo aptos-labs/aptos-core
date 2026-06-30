@@ -53,7 +53,7 @@ spec aptos_framework::object {
         pragma aborts_if_is_partial;
         aborts_if !permissioned_signer::spec_is_permissioned_signer(permissioned_signer);
         aborts_if permissioned_signer::spec_is_permissioned_signer(master);
-        aborts_if signer::address_of(master) != signer::address_of(permissioned_signer);
+        aborts_if master.address_of() != permissioned_signer.address_of();
     }
 
     spec fun spec_exists_at<T: key>(object: address): bool;
@@ -157,7 +157,7 @@ spec aptos_framework::object {
     }
 
     spec create_named_object(creator: &signer, seed: vector<u8>): ConstructorRef {
-        let creator_address = signer::address_of(creator);
+        let creator_address = creator.address_of();
         let obj_addr = spec_create_object_address(creator_address, seed);
         aborts_if exists<ObjectCore>(obj_addr);
 
@@ -204,7 +204,7 @@ spec aptos_framework::object {
     spec create_object_from_account(creator: &signer): ConstructorRef {
         use std::features;
         use std::features::DEFAULT_ACCOUNT_RESOURCE;
-        let addr = signer::address_of(creator);
+        let addr = creator.address_of();
         let account_exists_pre = exists<account::Account>(addr);
         let feature_on = features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
 
@@ -255,12 +255,12 @@ spec aptos_framework::object {
     }
 
     spec create_object_from_object(creator: &signer): ConstructorRef {
-        aborts_if !exists<ObjectCore>(signer::address_of(creator));
+        aborts_if !exists<ObjectCore>(creator.address_of());
         //Guid properties
-        let object_data = global<ObjectCore>(signer::address_of(creator));
+        let object_data = global<ObjectCore>(creator.address_of());
         aborts_if object_data.guid_creation_num + 1 > MAX_U64;
         let creation_num = object_data.guid_creation_num;
-        let addr = signer::address_of(creator);
+        let addr = creator.address_of();
 
         let guid = guid::GUID {
             id: guid::ID {
@@ -360,15 +360,15 @@ spec aptos_framework::object {
     }
 
     spec create_guid(object: &signer): guid::GUID {
-        aborts_if !exists<ObjectCore>(signer::address_of(object));
+        aborts_if !exists<ObjectCore>(object.address_of());
         //Guid properties
-        let object_data = global<ObjectCore>(signer::address_of(object));
+        let object_data = global<ObjectCore>(object.address_of());
         aborts_if object_data.guid_creation_num + 1 > MAX_U64;
 
         ensures result == guid::GUID {
             id: guid::ID {
                 creation_num: object_data.guid_creation_num,
-                addr: signer::address_of(object)
+                addr: object.address_of()
             }
         };
     }
@@ -376,15 +376,15 @@ spec aptos_framework::object {
     spec new_event_handle<T: drop + store>(
         object: &signer,
     ): event::EventHandle<T> {
-        aborts_if !exists<ObjectCore>(signer::address_of(object));
+        aborts_if !exists<ObjectCore>(object.address_of());
         //Guid properties
-        let object_data = global<ObjectCore>(signer::address_of(object));
+        let object_data = global<ObjectCore>(object.address_of());
         aborts_if object_data.guid_creation_num + 1 > MAX_U64;
 
         let guid = guid::GUID {
             id: guid::ID {
                 creation_num: object_data.guid_creation_num,
-                addr: signer::address_of(object)
+                addr: object.address_of()
             }
         };
         ensures result == event::EventHandle<T> {
@@ -455,7 +455,7 @@ spec aptos_framework::object {
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
-        let owner_address = signer::address_of(owner);
+        let owner_address = owner.address_of();
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
     }
@@ -467,7 +467,7 @@ spec aptos_framework::object {
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
-        let owner_address = signer::address_of(owner);
+        let owner_address = owner.address_of();
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
@@ -480,7 +480,7 @@ spec aptos_framework::object {
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
-        let owner_address = signer::address_of(owner);
+        let owner_address = owner.address_of();
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
     }
@@ -492,7 +492,7 @@ spec aptos_framework::object {
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
-        let owner_address = signer::address_of(owner);
+        let owner_address = owner.address_of();
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
@@ -502,26 +502,26 @@ spec aptos_framework::object {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
-        aborts_if owner(object) != signer::address_of(owner);
+        aborts_if object.owner() != owner.address_of();
         ensures exists<TombStone>(object_address);
-        ensures is_owner(object, signer::address_of(owner));
+        ensures is_owner(object, owner.address_of());
     }
 
     spec burn_object_with_transfer<T: key>(owner: &signer, object: Object<T>) {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
-        aborts_if owner(object) != signer::address_of(owner);
-        aborts_if is_burnt(object);
+        aborts_if object.owner() != owner.address_of();
+        aborts_if object.is_burnt();
     }
 
     spec unburn<T: key>(original_owner: &signer, object: Object<T>) {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
-        aborts_if !is_burnt(object);
+        aborts_if !object.is_burnt();
         let tomb_stone = borrow_global<TombStone>(object_address);
-        let original_owner_address = signer::address_of(original_owner);
+        let original_owner_address = original_owner.address_of();
         let object_current_owner = borrow_global<ObjectCore>(object_address).owner;
         aborts_if object_current_owner != original_owner_address && tomb_stone.original_owner != original_owner_address;
     }

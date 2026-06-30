@@ -36,7 +36,7 @@ spec aptos_framework::aptos_coin {
 
     spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
 
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if addr != @aptos_framework;
         aborts_if !string::spec_internal_check_utf8(b"Aptos Coin");
         aborts_if !string::spec_internal_check_utf8(b"APT");
@@ -53,7 +53,7 @@ spec aptos_framework::aptos_coin {
     }
 
     spec destroy_mint_cap {
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if addr != @aptos_framework;
         aborts_if !exists<MintCapStore>(@aptos_framework);
     }

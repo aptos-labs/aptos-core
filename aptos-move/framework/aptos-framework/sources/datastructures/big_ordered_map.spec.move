@@ -103,14 +103,14 @@ spec aptos_framework::big_ordered_map {
         aborts_if false;
         // Hit: key was present
         ensures spec_contains_key(old(self), key) ==> (
-            option::is_some(result)
+            result.is_some()
             && option::spec_borrow(result) == spec_get(old(self), key)
             && !spec_contains_key(self, key)
             && spec_len(self) == spec_len(old(self)) - 1
         );
         // Miss: key was absent — map unchanged
         ensures !spec_contains_key(old(self), key) ==> (
-            option::is_none(result)
+            result.is_none()
             && spec_len(self) == spec_len(old(self))
         );
         ensures spec_unchanged_except_at(self, key);
@@ -130,7 +130,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_borrow {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_end(self, map);
+        aborts_if self.iter_is_end(map);
         ensures result == spec_get(map, self.key);
     }
 
@@ -139,7 +139,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_borrow_mut {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_end(self, map);
+        aborts_if self.iter_is_end(map);
         ensures result == spec_get(map, self.key);
     }
 
@@ -163,14 +163,14 @@ spec aptos_framework::big_ordered_map {
         pragma verify = false;
         aborts_if false;
         // End iff no key >= input exists (all keys are Less than input).
-        ensures iter_is_end(result, self) <==>
+        ensures result.iter_is_end(self) <==>
             (forall k: K where spec_contains_key(self, k):
                 std::cmp::compare(k, key) == std::cmp::Ordering::Less);
         // Otherwise, result.key is in the map, >= input, and the smallest such.
-        ensures !iter_is_end(result, self) ==> spec_contains_key(self, result.key);
-        ensures !iter_is_end(result, self) ==>
+        ensures !result.iter_is_end(self) ==> spec_contains_key(self, result.key);
+        ensures !result.iter_is_end(self) ==>
             std::cmp::compare(result.key, key) != std::cmp::Ordering::Less;
-        ensures !iter_is_end(result, self) ==>
+        ensures !result.iter_is_end(self) ==>
             (forall k: K where spec_contains_key(self, k) && std::cmp::compare(k, key) != std::cmp::Ordering::Less:
                 std::cmp::compare(result.key, k) != std::cmp::Ordering::Greater);
     }
@@ -221,10 +221,10 @@ spec aptos_framework::big_ordered_map {
     spec upsert {
         pragma opaque;
         pragma verify = false;
-        ensures !spec_contains_key(old(self), key) ==> option::is_none(result);
+        ensures !spec_contains_key(old(self), key) ==> result.is_none();
         ensures spec_contains_key(self, key);
         ensures spec_get(self, key) == value;
-        ensures spec_contains_key(old(self), key) ==> ((option::is_some(result)) && (option::spec_borrow(result) == spec_get(old(
+        ensures spec_contains_key(old(self), key) ==> ((result.is_some()) && (option::spec_borrow(result) == spec_get(old(
             self), key)));
         ensures !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
         ensures spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
@@ -330,18 +330,18 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
-        ensures iter_is_end(result, self) <==> !spec_contains_key(self, key);
-        ensures !iter_is_end(result, self) ==> result.key == key;
+        ensures result.iter_is_end(self) <==> !spec_contains_key(self, key);
+        ensures !result.iter_is_end(self) ==> result.key == key;
     }
 
     spec internal_new_begin_iter {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
-        ensures iter_is_end(result, self) <==> spec_len(self) == 0;
-        ensures !iter_is_end(result, self) ==> spec_contains_key(self, result.key);
+        ensures result.iter_is_end(self) <==> spec_len(self) == 0;
+        ensures !result.iter_is_end(self) ==> spec_contains_key(self, result.key);
         // result.key is the smallest key in the map.
-        ensures !iter_is_end(result, self) ==>
+        ensures !result.iter_is_end(self) ==>
             (forall k: K where spec_contains_key(self, k) && k != result.key:
                 std::cmp::compare(result.key, k) == std::cmp::Ordering::Less);
     }
@@ -356,13 +356,13 @@ spec aptos_framework::big_ordered_map {
     spec iter_next {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_end(self, map);
+        aborts_if self.iter_is_end(map);
     }
 
     spec iter_prev {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_begin(self, map);
+        aborts_if self.iter_is_begin(map);
     }
 
     spec compute_length {
@@ -374,7 +374,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_modify {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_end(self, map);
+        aborts_if self.iter_is_end(map);
         // iter_modify mutates the value at self.key via the closure. Containment is
         // unchanged for every key; values for keys other than self.key are preserved.
         ensures spec_contains_key(map, self.key);
@@ -386,8 +386,8 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
-        ensures iter_is_end(result.iterator, self) <==> !spec_contains_key(self, key);
-        ensures !iter_is_end(result.iterator, self) ==> result.iterator.key == key;
+        ensures result.iterator.iter_is_end(self) <==> !spec_contains_key(self, key);
+        ensures !result.iterator.iter_is_end(self) ==> result.iterator.key == key;
     }
 
     spec iter_with_path_get_iter {
@@ -400,7 +400,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_remove {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_end(self.iterator, map);
+        aborts_if self.iterator.iter_is_end(map);
         ensures result == spec_get(old(map), self.iterator.key);
         ensures !spec_contains_key(map, self.iterator.key);
         ensures spec_len(map) == spec_len(old(map)) - 1;
@@ -429,6 +429,6 @@ spec aptos_framework::big_ordered_map {
     spec internal_leaf_iter_borrow_entries_and_next_leaf_index {
         pragma opaque;
         pragma verify = false;
-        aborts_if internal_leaf_iter_is_end(self);
+        aborts_if self.internal_leaf_iter_is_end();
     }
 }

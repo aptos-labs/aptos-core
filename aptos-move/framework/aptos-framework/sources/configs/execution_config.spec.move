@@ -14,7 +14,7 @@ spec aptos_framework::execution_config {
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
 
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         requires chain_status::is_genesis();
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         requires len(config) > 0;

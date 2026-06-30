@@ -49,7 +49,7 @@ spec aptos_framework::aggregator_factory {
         use std::signer;
         pragma opaque;
         modifies global<AggregatorFactory>(@aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if addr != @aptos_framework;
         aborts_if exists<AggregatorFactory>(addr);
         /// [high-level-req-1]
@@ -74,7 +74,7 @@ spec aptos_framework::aggregator_factory {
         use std::signer;
         pragma opaque;
         modifies global<AggregatorFactory>(@aptos_framework);
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         /// [high-level-req-3]
         aborts_if addr != @aptos_framework;
         aborts_if limit != MAX_U128;

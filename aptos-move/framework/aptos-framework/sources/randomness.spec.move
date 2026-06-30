@@ -26,7 +26,7 @@ spec aptos_framework::randomness {
 
     spec initialize(framework: &signer) {
         use std::signer;
-        let framework_addr = signer::address_of(framework);
+        let framework_addr = framework.address_of();
         aborts_if framework_addr != @aptos_framework;
     }
 
@@ -39,7 +39,7 @@ spec aptos_framework::randomness {
         use std::signer;
         pragma opaque;
         modifies global<PerBlockRandomness>(@aptos_framework);
-        aborts_if signer::address_of(vm) != @vm;
+        aborts_if vm.address_of() != @vm;
         ensures exists<PerBlockRandomness>(@aptos_framework) ==>
             global<PerBlockRandomness>(@aptos_framework).seed == seed_for_new_block;
         ensures exists<PerBlockRandomness>(@aptos_framework) ==>
@@ -55,7 +55,7 @@ spec aptos_framework::randomness {
         include NextBlobAbortsIf;
         let input = b"APTOS_RANDOMNESS";
         let randomness = global<PerBlockRandomness>(@aptos_framework);
-        let seed = option::borrow(randomness.seed);
+        let seed = randomness.seed.borrow();
         let txn_hash = transaction_context::spec_get_txn_hash();
         let txn_counter = spec_fetch_and_increment_txn_counter();
         ensures len(result) == 32;
@@ -70,7 +70,7 @@ spec aptos_framework::randomness {
 
     spec schema NextBlobAbortsIf {
         let randomness = global<PerBlockRandomness>(@aptos_framework);
-        aborts_if option::is_none(randomness.seed);
+        aborts_if randomness.seed.is_none();
         aborts_if !spec_is_unbiasable();
         aborts_if !exists<PerBlockRandomness>(@aptos_framework);
     }
@@ -145,7 +145,7 @@ spec aptos_framework::randomness {
     spec permutation(n: u64): vector<u64> {
         pragma unroll = 1;
         aborts_if n > 1 && !exists<PerBlockRandomness>(@aptos_framework);
-        aborts_if n > 1 && option::is_none(global<PerBlockRandomness>(@aptos_framework).seed);
+        aborts_if n > 1 && global<PerBlockRandomness>(@aptos_framework).seed.is_none();
         aborts_if n > 1 && !spec_is_unbiasable();
         ensures len(result) == n;
     }

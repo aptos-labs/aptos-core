@@ -64,7 +64,7 @@ spec aptos_framework::permissioned_signer {
         aborts_if spec_is_permissioned_signer(master);
         let permissions_storage_addr = transaction_context::spec_generate_unique_address();
         modifies global<PermissionStorage>(permissions_storage_addr);
-        let master_account_addr = signer::address_of(master);
+        let master_account_addr = master.address_of();
         ensures result.master_account_addr == master_account_addr;
         ensures result.permissions_storage_addr == permissions_storage_addr;
     }
@@ -76,7 +76,7 @@ spec aptos_framework::permissioned_signer {
         aborts_if spec_is_permissioned_signer(master);
         let permissions_storage_addr = transaction_context::spec_generate_unique_address();
         modifies global<PermissionStorage>(permissions_storage_addr);
-        let master_account_addr = signer::address_of(master);
+        let master_account_addr = master.address_of();
         modifies global<GrantedPermissionHandles>(master_account_addr);
         ensures result.master_account_addr == master_account_addr;
         ensures result.permissions_storage_addr == permissions_storage_addr;
@@ -109,7 +109,7 @@ spec aptos_framework::permissioned_signer {
         pragma aborts_if_is_partial;
         aborts_if !spec_is_permissioned_signer(permissioned);
         aborts_if spec_is_permissioned_signer(master);
-        aborts_if signer::address_of(permissioned) != signer::address_of(master);
+        aborts_if permissioned.address_of() != master.address_of();
         ensures exists<PermissionStorage>(
             spec_permission_address(permissioned)
         );

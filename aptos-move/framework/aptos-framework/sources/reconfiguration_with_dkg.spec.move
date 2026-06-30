@@ -67,7 +67,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::randomness_config;
         use aptos_framework::jwk_consensus_config;
         framework: signer;
-        requires signer::address_of(framework) == @aptos_framework;
+        requires framework.address_of() == @aptos_framework;
         requires chain_status::is_operating();
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;

@@ -27,10 +27,10 @@ spec aptos_framework::function_info {
         module_name: String,
         function_name: String,
     ): FunctionInfo {
-        aborts_if !spec_is_identifier(string::bytes(module_name));
-        aborts_if !spec_is_identifier(string::bytes(function_name));
+        aborts_if !spec_is_identifier(module_name.bytes());
+        aborts_if !spec_is_identifier(function_name.bytes());
         ensures result == FunctionInfo {
-            module_address: signer::address_of(module_signer),
+            module_address: module_signer.address_of(),
             module_name,
             function_name,
         };
@@ -41,8 +41,8 @@ spec aptos_framework::function_info {
         module_name: String,
         function_name: String,
     ): FunctionInfo {
-        aborts_if !spec_is_identifier(string::bytes(module_name));
-        aborts_if !spec_is_identifier(string::bytes(function_name));
+        aborts_if !spec_is_identifier(module_name.bytes());
+        aborts_if !spec_is_identifier(function_name.bytes());
         ensures result == FunctionInfo {
             module_address,
             module_name,
