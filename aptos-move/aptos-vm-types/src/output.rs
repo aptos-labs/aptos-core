@@ -24,7 +24,10 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, HashSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -259,5 +262,22 @@ impl VMOutput {
         self.change_set.set_events(patched_events.into_iter());
 
         self.into_transaction_output()
+    }
+}
+
+/// A transaction's read set, used for hot-state promotion. Unordered at the
+/// per-transaction level; ordering is imposed later when aggregating per-block.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct UnorderedReadSet {
+    keys: HashSet<StateKey>,
+}
+
+impl UnorderedReadSet {
+    pub fn new(keys: HashSet<StateKey>) -> Self {
+        Self { keys }
+    }
+
+    pub fn as_inner(&self) -> &HashSet<StateKey> {
+        &self.keys
     }
 }

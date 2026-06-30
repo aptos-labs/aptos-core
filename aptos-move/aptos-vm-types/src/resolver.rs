@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use ambassador::delegatable_trait;
 use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
     serde_helper::bcs_utils::size_u32_as_uleb128,
@@ -22,6 +23,7 @@ use std::collections::{BTreeMap, HashMap};
 /// Allows requesting an immediate interrupt to ongoing transaction execution. For example, this
 /// allows an early return from a useless speculative execution when block execution has already
 /// halted (e.g. due to gas limit, committing only a block prefix).
+#[delegatable_trait]
 pub trait BlockSynchronizationKillSwitch {
     fn interrupt_requested(&self) -> bool;
 }
