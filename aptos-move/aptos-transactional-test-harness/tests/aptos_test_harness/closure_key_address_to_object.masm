@@ -1,6 +1,6 @@
 //# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 
-// PoC: Calling object::address_to_object<ClosureType> triggers an invariant
+// Calling object::address_to_object<ClosureType> triggers an invariant
 // violation inside the native exists_at when it converts the function type
 // to a TypeTag and finds TypeTag::Function instead of TypeTag::Struct.
 //

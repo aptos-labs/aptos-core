@@ -95,12 +95,7 @@ fn native_exists_at(
     // Only structs can be resources in global storage. A non-struct type (e.g., a function type
     // that declared the `key` ability) would reach the data cache and trip a VM invariant
     // violation, so reject it here with a deterministic, kept abort instead.
-    if context.gas_feature_version() >= RELEASE_V1_50
-        && !matches!(
-            type_,
-            Type::Struct { .. } | Type::StructInstantiation { .. }
-        )
-    {
+    if context.gas_feature_version() >= RELEASE_V1_50 && !type_.is_struct_or_enum() {
         return Err(SafeNativeError::abort_with_message(
             ENOT_A_RESOURCE_TYPE,
             "object type argument must be a resource (struct) type",

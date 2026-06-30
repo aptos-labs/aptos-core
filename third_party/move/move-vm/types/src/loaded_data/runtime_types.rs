@@ -503,6 +503,36 @@ impl Type {
         }
     }
 
+    /// Returns true if the type is a nominal datatype, i.e. a struct or an enum (instantiated or
+    /// not). At the runtime-type level enums share the `Struct`/`StructInstantiation`
+    /// representation, so both source-level structs and enums are covered.
+    pub fn is_struct_or_enum(&self) -> bool {
+        use Type::*;
+        match self {
+            Struct { .. } | StructInstantiation { .. } => true,
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
+            | Address
+            | Signer
+            | Vector(_)
+            | Function { .. }
+            | Reference(_)
+            | MutableReference(_)
+            | TyParam(_) => false,
+        }
+    }
+
     pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
         if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
             let msg = format!("{} `{}` cannot be a reference", msg, self);
