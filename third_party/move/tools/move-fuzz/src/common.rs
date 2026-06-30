@@ -30,7 +30,12 @@ impl Account {
     }
 }
 
-/// Supported transaction argument types
+/// Supported transaction argument types.
+///
+/// TODO: signed integer types (i8, i16, i32, i64, i128, i256) are not yet
+/// supported here.
+/// TODO: public structs/enums (other than `std::string::String`) are not yet
+/// supported; support is planned.
 #[derive(Clone)]
 pub enum TxnArgType {
     Bool,
@@ -67,6 +72,7 @@ impl TxnArgType {
                 {
                     Self::String
                 } else {
+                    // TODO: support public structs/enums (planned)
                     bail!("unexpected struct in function signature");
                 }
             },
@@ -78,6 +84,7 @@ impl TxnArgType {
                 }
             },
             SignatureToken::Vector(sub) => Self::Vector(Self::convert(binary, sub)?.into()),
+            // TODO: support signed integer types (i8, i16, i32, i64, i128, i256)
             _ => bail!("unexpected type in function signature"),
         };
         Ok(converted)

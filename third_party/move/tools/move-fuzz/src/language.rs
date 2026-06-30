@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
 use aptos_framework::extended_checks;
 use move_binary_format::file_format_common;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
@@ -39,11 +38,6 @@ impl FromStr for LanguageSetting {
         };
         let version = LanguageVersion::from_str(rest)?;
 
-        // sanity check
-        if matches!(version, LanguageVersion::V1) && !matches!(optimization, OptLevel::Default) {
-            bail!("V1 of the language does not support optimization");
-        }
-
         // done
         Ok(LanguageSetting {
             version,
@@ -55,7 +49,6 @@ impl FromStr for LanguageSetting {
 impl LanguageSetting {
     fn compiler_version(version: LanguageVersion) -> CompilerVersion {
         match version {
-            LanguageVersion::V1 => CompilerVersion::V1,
             LanguageVersion::V2_0 | LanguageVersion::V2_1 => CompilerVersion::V2_0,
             LanguageVersion::V2_2
             | LanguageVersion::V2_3
@@ -72,19 +65,17 @@ impl LanguageSetting {
         } = self;
 
         let mut experiments = vec![];
-        if !matches!(version, LanguageVersion::V1) {
-            match optimization {
-                OptLevel::Default => {
-                    experiments.push("optimize=on".to_string());
-                },
-                OptLevel::None => {
-                    experiments.push("optimize=off".to_string());
-                },
-                OptLevel::Extra => {
-                    experiments.push("optimize=on".to_string());
-                    experiments.push("optimize-extra=on".to_string());
-                },
-            }
+        match optimization {
+            OptLevel::Default => {
+                experiments.push("optimize=on".to_string());
+            },
+            OptLevel::None => {
+                experiments.push("optimize=off".to_string());
+            },
+            OptLevel::Extra => {
+                experiments.push("optimize=on".to_string());
+                experiments.push("optimize-extra=on".to_string());
+            },
         }
 
         // FIXME(mengxu): keep in sync with `aptos_framework::build_package::BuildOptions::move_2()`
@@ -95,7 +86,6 @@ impl LanguageSetting {
             language_version: Some(*version),
             compiler_version: Some(Self::compiler_version(*version)),
             bytecode_version: Some(match version {
-                LanguageVersion::V1 => file_format_common::VERSION_6,
                 LanguageVersion::V2_0 => file_format_common::VERSION_7,
                 LanguageVersion::V2_1 => file_format_common::VERSION_7,
                 LanguageVersion::V2_2 => file_format_common::VERSION_8,
@@ -115,14 +105,6 @@ impl LanguageSetting {
 
         // FIXME(mengxu): keep in sync with `aptos_framework::build_package::BuildOptions::move_2()`
         match version {
-            LanguageVersion::V1 => command.args([
-                "--language-version",
-                "1",
-                "--compiler-version",
-                "1",
-                "--bytecode-version",
-                "6",
-            ]),
             LanguageVersion::V2_0 => command.args([
                 "--language-version",
                 "2.0",
@@ -216,7 +198,8 @@ mod tests {
     }
 
     #[test]
-    fn test_language_setting_rejects_v1_non_default_optimization() {
+    fn test_language_setting_rejects_v1() {
+        assert!(LanguageSetting::from_str("1").is_err());
         assert!(LanguageSetting::from_str("1-").is_err());
         assert!(LanguageSetting::from_str("1+").is_err());
     }
@@ -224,7 +207,6 @@ mod tests {
     #[test]
     fn test_language_setting_cli_and_config_use_same_compiler_version() {
         for version in [
-            LanguageVersion::V1,
             LanguageVersion::V2_0,
             LanguageVersion::V2_1,
             LanguageVersion::V2_2,

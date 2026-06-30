@@ -39,6 +39,12 @@ pub struct DatatypeRegistry {
     contents: BTreeMap<DatatypeIdent, DatatypeContent>,
 }
 
+impl Default for DatatypeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DatatypeRegistry {
     /// Create an empty registry
     pub fn new() -> Self {

@@ -22,7 +22,7 @@ move-fuzz is no longer just a script generator. The current `auto` pipeline does
 Phase 1 is single-transaction fuzzing with online profiling.
 Phase 2 is multi-transaction fuzzing driven by the DUG and chain seed pools.
 
-The design inspiration is in `docs/idea.pdf`, but the implementation intentionally goes beyond the slides. When changing DUG-related logic, compare against `docs/idea.pdf` and call out any semantic gap you introduce or close.
+The implementation intentionally goes beyond its original design sketch. When changing DUG-related logic, call out any semantic gap you introduce or close.
 
 ## Primary entrypoints and files
 

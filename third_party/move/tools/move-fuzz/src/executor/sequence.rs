@@ -1799,7 +1799,7 @@ fn collect_target_seed_nodes(
         })
         .collect();
     targets.shuffle(rng);
-    targets.sort_by(|a, b| seed_target_priority(dug, *b).cmp(&seed_target_priority(dug, *a)));
+    targets.sort_by_key(|target| std::cmp::Reverse(seed_target_priority(dug, *target)));
     targets
 }
 

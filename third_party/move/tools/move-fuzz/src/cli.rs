@@ -453,6 +453,7 @@ fn cmd_test(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_auto(
     project_root: &Path,
     workdir: &Path,
@@ -840,10 +841,10 @@ fn configure_extended_checks_for_unit_test() {
 mod tests {
     use super::{
         build_address_aliases, prepare_autogen_dir, prepare_state_dir, resolve_state_dir,
-        split_on_char, stable_project_path,
+        split_on_char,
     };
     use anyhow::Result;
-    use std::{collections::BTreeSet, fs, path::PathBuf};
+    use std::{collections::BTreeSet, fs};
     use tempfile::TempDir;
 
     fn aliases_to_sorted_vec(input: Vec<BTreeSet<String>>) -> Vec<Vec<String>> {

@@ -18,11 +18,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Schema version of the persisted auto-state (`auto_state.json`). Bump this
+/// whenever the serialized layout of [`PersistedAutoState`] changes, so that
+/// state written by an older build is detected and ignored on load instead of
+/// being misinterpreted. The current value reflects the number of such layout
+/// changes made so far.
 pub const AUTO_STATE_VERSION: u32 = 6;
 pub const AUTO_STATE_FILENAME: &str = "auto_state.json";
+/// Schema version of the persisted entrypoint cache (`entrypoints_cache.json`).
+/// Bump this whenever its serialized layout changes (see `AUTO_STATE_VERSION`).
 pub const ENTRYPOINT_CACHE_VERSION: u32 = 2;
 pub const ENTRYPOINT_CACHE_FILENAME: &str = "entrypoints_cache.json";
 pub const PACKAGE_BUILD_CACHE_DIR: &str = "package-cache";
+/// Schema version of the persisted package-build cache metadata
+/// (`build_cache_info.json`). Bump this whenever its layout changes.
 pub const PACKAGE_BUILD_CACHE_INFO_VERSION: u32 = 2;
 pub const PACKAGE_BUILD_CACHE_INFO_FILENAME: &str = "build_cache_info.json";
 
