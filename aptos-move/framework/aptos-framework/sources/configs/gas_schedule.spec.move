@@ -35,9 +35,7 @@ spec aptos_framework::gas_schedule {
     }
 
     spec initialize(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
-        use std::signer;
-
-        let addr = signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         /// [high-level-req-1]
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         /// [high-level-req-3.3]
@@ -47,7 +45,6 @@ spec aptos_framework::gas_schedule {
     }
 
     spec set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
-        use std::signer;
         use aptos_framework::util;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
@@ -66,7 +63,7 @@ spec aptos_framework::gas_schedule {
         let gas_schedule = global<GasScheduleV2>(@aptos_framework);
         /// [high-level-req-4]
         aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < gas_schedule.feature_version;
-        ensures exists<GasScheduleV2>(signer::address_of(aptos_framework));
+        ensures exists<GasScheduleV2>(aptos_framework.address_of());
         ensures global<GasScheduleV2>(@aptos_framework) == new_gas_schedule;
     }
 

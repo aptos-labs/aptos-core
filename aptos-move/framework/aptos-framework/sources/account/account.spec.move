@@ -111,7 +111,7 @@ spec aptos_framework::account {
     /// Only the address `@aptos_framework` can call.
     /// OriginatingAddress does not exist under `@aptos_framework` before the call.
     spec initialize(aptos_framework: &signer) {
-        let aptos_addr = signer::address_of(aptos_framework);
+        let aptos_addr = aptos_framework.address_of();
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<OriginatingAddress>(aptos_addr);
         ensures exists<OriginatingAddress>(aptos_addr);
@@ -137,7 +137,7 @@ spec aptos_framework::account {
     spec create_account(new_address: address): signer {
         include CreateAccountAbortsIf {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
-        ensures signer::address_of(result) == new_address;
+        ensures result.address_of() == new_address;
         /// [high-level-req-2]
         ensures exists<Account>(new_address);
     }
@@ -148,7 +148,7 @@ spec aptos_framework::account {
         pragma opaque;
         include CreateAccountAbortsIf {addr: new_address};
         modifies global<Account>(new_address);
-        ensures signer::address_of(result) == new_address;
+        ensures result.address_of() == new_address;
         ensures exists<Account>(new_address);
         ensures global<Account>(new_address).guid_creation_num == 2;
         ensures global<Account>(new_address).sequence_number == 0;
@@ -210,21 +210,21 @@ spec aptos_framework::account {
     /// The Account existed under the signer before the call.
     /// The length of new_auth_key is 32.
     spec rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) {
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if vector::length(new_auth_key) != 32;
+        aborts_if new_auth_key.length() != 32;
         modifies global<Account>(addr);
         ensures account_resource.authentication_key == new_auth_key;
     }
 
     spec rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if vector::length(new_auth_key) != 32;
+        aborts_if new_auth_key.length() != 32;
         modifies global<Account>(addr);
         ensures account_resource.authentication_key == new_auth_key;
     }
@@ -275,7 +275,7 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
 
@@ -352,7 +352,7 @@ spec aptos_framework::account {
         cap_update_table: vector<u8>
     ) {
         aborts_if !exists<Account>(rotation_cap_offerer_address);
-        let delegate_address = signer::address_of(delegate_signer);
+        let delegate_address = delegate_signer.address_of();
         let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
         aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
         let curr_auth_key = from_bcs::deserialize<address>(offerer_account_resource.authentication_key);
@@ -402,7 +402,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) {
-        let source_address = signer::address_of(account);
+        let source_address = account.address_of();
         let account_resource = global<Account>(source_address);
         let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: global<chain_id::ChainId>(@aptos_framework).id,
@@ -444,7 +444,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.1]
         modifies global<Account>(source_address);
         let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
-        ensures option::borrow(offer_for) == recipient_address;
+        ensures offer_for.borrow() == recipient_address;
     }
 
     /// The Account existed under the signer.
@@ -456,7 +456,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
-        let source_address = signer::address_of(account);
+        let source_address = account.address_of();
         let account_resource = global<Account>(source_address);
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
             sequence_number: account_resource.sequence_number,
@@ -497,7 +497,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.2]
         modifies global<Account>(source_address);
         let post offer_for = global<Account>(source_address).signer_capability_offer.for;
-        ensures option::borrow(offer_for) == recipient_address;
+        ensures offer_for.borrow() == recipient_address;
     }
 
     spec is_signer_capability_offered(account_addr: address): bool {
@@ -507,7 +507,7 @@ spec aptos_framework::account {
     spec get_signer_capability_offer_for(account_addr: address): address {
         aborts_if !exists<Account>(account_addr);
         let account_resource = global<Account>(account_addr);
-        aborts_if option::is_none(account_resource.signer_capability_offer.for);
+        aborts_if account_resource.signer_capability_offer.for.is_none();
     }
 
     spec is_rotation_capability_offered(account_addr: address): bool {
@@ -517,14 +517,14 @@ spec aptos_framework::account {
     spec get_rotation_capability_offer_for(account_addr: address): address {
         aborts_if !exists<Account>(account_addr);
         let account_resource = global<Account>(account_addr);
-        aborts_if option::is_none(account_resource.rotation_capability_offer.for);
+        aborts_if account_resource.rotation_capability_offer.for.is_none();
     }
 
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
     spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
         aborts_if !exists<Account>(to_be_revoked_address);
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,to_be_revoked_address);
@@ -533,34 +533,34 @@ spec aptos_framework::account {
     }
 
     spec revoke_any_signer_capability(account: &signer) {
-        modifies global<Account>(signer::address_of(account));
+        modifies global<Account>(account.address_of());
         /// [high-level-req-7.4]
-        aborts_if !exists<Account>(signer::address_of(account));
-        let account_resource = global<Account>(signer::address_of(account));
-        aborts_if !option::is_some(account_resource.signer_capability_offer.for);
+        aborts_if !exists<Account>(account.address_of());
+        let account_resource = global<Account>(account.address_of());
+        aborts_if !account_resource.signer_capability_offer.for.is_some();
     }
 
     spec revoke_rotation_capability(account: &signer, to_be_revoked_address: address) {
         aborts_if !exists<Account>(to_be_revoked_address);
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if !option::spec_contains(account_resource.rotation_capability_offer.for,to_be_revoked_address);
         modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
-        ensures !option::is_some(offer_for);
+        ensures !offer_for.is_some();
     }
 
     spec revoke_any_rotation_capability(account: &signer) {
-        let addr = signer::address_of(account);
+        let addr = account.address_of();
         modifies global<Account>(addr);
         aborts_if !exists<Account>(addr);
         let account_resource = global<Account>(addr);
         /// [high-level-req-7.3]
-        aborts_if !option::is_some(account_resource.rotation_capability_offer.for);
+        aborts_if !account_resource.rotation_capability_offer.for.is_some();
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
-        ensures !option::is_some(offer_for);
+        ensures !offer_for.is_some();
     }
 
     /// The Account existed under the signer.
@@ -573,7 +573,7 @@ spec aptos_framework::account {
         };
         modifies global<Account>(offerer_address);
         ensures exists<Account>(offerer_address);
-        ensures signer::address_of(result) == offerer_address;
+        ensures result.address_of() == offerer_address;
     }
 
     spec schema AccountContainsAddr {
@@ -600,16 +600,16 @@ spec aptos_framework::account {
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
 
     spec create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
-        let source_addr = signer::address_of(source);
+        let source_addr = source.address_of();
         let resource_addr = spec_create_resource_address(source_addr, seed);
 
         aborts_if len(ZERO_AUTH_KEY) != 32;
         include spec_exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
         include !spec_exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
 
-        ensures signer::address_of(result_1) == resource_addr;
+        ensures result_1.address_of() == resource_addr;
         let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
-        ensures option::borrow(offer_for) == resource_addr;
+        ensures offer_for.borrow() == resource_addr;
         ensures result_2 == SignerCapability { account: resource_addr };
     }
 
@@ -619,7 +619,7 @@ spec aptos_framework::account {
     spec create_framework_reserved_account(addr: address): (signer, SignerCapability) {
         aborts_if spec_is_framework_address(addr);
         include CreateAccountAbortsIf {addr};
-        ensures signer::address_of(result_1) == addr;
+        ensures result_1.address_of() == addr;
         ensures result_2 == SignerCapability { account: addr };
     }
 
@@ -639,7 +639,7 @@ spec aptos_framework::account {
     /// The Account existed under the signer.
     spec create_guid(account_signer: &signer): guid::GUID {
         pragma verify = true;
-        let addr = signer::address_of(account_signer);
+        let addr = account_signer.address_of();
         include NewEventHandleAbortsIf { account: account_signer };
         modifies global<Account>(addr);
         ensures exists<Account>(addr);
@@ -653,7 +653,7 @@ spec aptos_framework::account {
     spec new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
         pragma verify = true;
         include NewEventHandleAbortsIf;
-        modifies global<Account>(signer::address_of(account));
+        modifies global<Account>(account.address_of());
     }
 
     spec schema NewEventHandleAbortsIf {
@@ -689,7 +689,7 @@ spec aptos_framework::account {
 
     spec create_signer_with_capability(capability: &SignerCapability): signer {
         let addr = capability.account;
-        ensures signer::address_of(result) == addr;
+        ensures result.address_of() == addr;
     }
 
     spec schema CreateResourceAccountAbortsIf {

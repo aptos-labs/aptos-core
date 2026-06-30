@@ -58,7 +58,7 @@ spec aptos_framework::managed_coin {
         // TODO(fa_migration)
         pragma verify = false;
 
-        let account_addr = signer::address_of(account);
+        let account_addr = account.address_of();
 
         // Resource Capabilities<CoinType> should exists in the signer address.
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
@@ -100,10 +100,10 @@ spec aptos_framework::managed_coin {
         include coin::InitializeInternalSchema<CoinType>;
         aborts_if !string::spec_internal_check_utf8(name);
         aborts_if !string::spec_internal_check_utf8(symbol);
-        aborts_if exists<Capabilities<CoinType>>(signer::address_of(account));
+        aborts_if exists<Capabilities<CoinType>>(account.address_of());
         /// [high-level-req-1]
         /// [high-level-req-3.1]
-        ensures exists<Capabilities<CoinType>>(signer::address_of(account));
+        ensures exists<Capabilities<CoinType>>(account.address_of());
     }
 
     /// The Capabilities<CoinType> should not exist in the signer address.
@@ -116,7 +116,7 @@ spec aptos_framework::managed_coin {
         use aptos_std::type_info;
         // TODO(fa_migration)
         pragma verify = false;
-        let account_addr = signer::address_of(account);
+        let account_addr = account.address_of();
         /// [high-level-req-3.3]
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         let addr = type_info::type_of<CoinType>().account_address;
@@ -138,7 +138,7 @@ spec aptos_framework::managed_coin {
         // TODO(fa_migration)
         pragma verify = false;
 
-        let account_addr = signer::address_of(account);
+        let account_addr = account.address_of();
         let acc = global<account::Account>(account_addr);
 
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
@@ -149,13 +149,13 @@ spec aptos_framework::managed_coin {
     }
 
     spec remove_caps<CoinType>(account: &signer): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
-        let account_addr = signer::address_of(account);
+        let account_addr = account.address_of();
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         ensures !exists<Capabilities<CoinType>>(account_addr);
     }
 
     spec destroy_caps <CoinType>(account: &signer) {
-        let account_addr = signer::address_of(account);
+        let account_addr = account.address_of();
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         ensures !exists<Capabilities<CoinType>>(account_addr);
     }

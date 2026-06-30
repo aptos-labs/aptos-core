@@ -139,7 +139,7 @@ module aptos_framework::sigma_protocol_fiat_shamir {
     #[test_only]
     use aptos_framework::sigma_protocol_statement::new_statement;
     #[test_only]
-    use aptos_std::ristretto255::{point_identity_compressed, new_scalar_from_u64, scalar_equals, basepoint_H,
+    use aptos_std::ristretto255::{point_identity_compressed, new_scalar_from_u64, basepoint_H,
         basepoint_H_compressed, basepoint, basepoint_compressed
     };
 

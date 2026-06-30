@@ -1,13 +1,13 @@
 spec aptos_framework::jwks {
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
+        requires @aptos_framework == framework.address_of();
         include config_buffer::OnNewEpochRequirement<SupportedOIDCProviders>;
         aborts_if false;
     }
 
     spec initialize(fx: &signer) {
         pragma opaque;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        aborts_if fx.address_of() != @aptos_framework;
         aborts_if exists<SupportedOIDCProviders>(@aptos_framework);
         aborts_if exists<ObservedJWKs>(@aptos_framework);
         aborts_if exists<Patches>(@aptos_framework);
@@ -30,7 +30,7 @@ spec aptos_framework::jwks {
         use aptos_framework::chain_status;
         pragma opaque;
         pragma aborts_if_is_partial;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        aborts_if fx.address_of() != @aptos_framework;
         aborts_if !chain_status::is_genesis();
         aborts_if !exists<SupportedOIDCProviders>(@aptos_framework);
         modifies global<SupportedOIDCProviders>(@aptos_framework);
@@ -40,7 +40,7 @@ spec aptos_framework::jwks {
         use aptos_framework::chain_status;
         pragma opaque;
         pragma aborts_if_is_partial;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        aborts_if fx.address_of() != @aptos_framework;
         aborts_if !chain_status::is_genesis();
         aborts_if !exists<SupportedOIDCProviders>(@aptos_framework);
         modifies global<SupportedOIDCProviders>(@aptos_framework);
@@ -50,7 +50,7 @@ spec aptos_framework::jwks {
         pragma opaque;
         pragma seed = 2;
         pragma aborts_if_is_partial;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        aborts_if fx.address_of() != @aptos_framework;
         modifies global<config_buffer::PendingConfigs>(@aptos_framework);
     }
 
@@ -59,7 +59,7 @@ spec aptos_framework::jwks {
         pragma verify_duration_estimate = 80;
         pragma opaque;
         pragma aborts_if_is_partial;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        aborts_if fx.address_of() != @aptos_framework;
         modifies global<config_buffer::PendingConfigs>(@aptos_framework);
     }
 
@@ -113,12 +113,11 @@ spec aptos_framework::jwks {
     }
 
     spec remove_issuer(jwks: &mut AllProvidersJWKs, issuer: vector<u8>): Option<ProviderJWKs> {
-        use std::option;
         use std::vector;
         pragma opaque;
-        ensures option::is_none(result) <==> (forall jwk: ProviderJWKs where vector::spec_contains(old(jwks).entries, jwk): jwk.issuer != issuer);
-        ensures option::is_none(result) ==> old(jwks) == jwks;
-        ensures option::is_some(result) ==> vector::spec_contains(old(jwks).entries, option::borrow(result));
+        ensures result.is_none() <==> (forall jwk: ProviderJWKs where vector::spec_contains(old(jwks).entries, jwk): jwk.issuer != issuer);
+        ensures result.is_none() ==> old(jwks) == jwks;
+        ensures result.is_some() ==> vector::spec_contains(old(jwks).entries, result.borrow());
     }
 
 }

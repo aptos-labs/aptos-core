@@ -254,11 +254,11 @@ spec aptos_framework::fungible_asset {
     ): Object<Metadata> {
         pragma aborts_if_is_partial;
         /// [high-level-req-1]
-        aborts_if std::string::length(name) > MAX_NAME_LENGTH;
-        aborts_if std::string::length(symbol) > MAX_SYMBOL_LENGTH;
+        aborts_if name.length() > MAX_NAME_LENGTH;
+        aborts_if symbol.length() > MAX_SYMBOL_LENGTH;
         aborts_if decimals > MAX_DECIMALS;
-        aborts_if std::string::length(icon_uri) > MAX_URI_LENGTH;
-        aborts_if std::string::length(project_uri) > MAX_URI_LENGTH;
+        aborts_if icon_uri.length() > MAX_URI_LENGTH;
+        aborts_if project_uri.length() > MAX_URI_LENGTH;
     }
 
     spec amount(self: &FungibleAsset): u64 {
@@ -309,8 +309,8 @@ spec aptos_framework::fungible_asset {
     }
 
     spec deposit {
-        modifies global<FungibleStore>(object::object_address(store));
-        modifies global<ConcurrentFungibleBalance>(object::object_address(store));
+        modifies global<FungibleStore>(store.object_address());
+        modifies global<ConcurrentFungibleBalance>(store.object_address());
     }
 
     spec unchecked_deposit {

@@ -6,8 +6,7 @@ spec aptos_framework::dkg {
     }
 
     spec initialize(aptos_framework: &signer) {
-        use std::signer;
-        let aptos_framework_addr = signer::address_of(aptos_framework);
+        let aptos_framework_addr = aptos_framework.address_of();
         aborts_if aptos_framework_addr != @aptos_framework;
     }
 
@@ -48,33 +47,31 @@ spec aptos_framework::dkg {
     /// the last-completed session on chain has `dealer_epoch == epoch`.
     spec fun spec_is_session_started(epoch: u64): bool {
         exists<DKGState>(@aptos_framework) && (
-            (option::is_some(global<DKGState>(@aptos_framework).in_progress)
-             && option::borrow(global<DKGState>(@aptos_framework).in_progress)
+            (global<DKGState>(@aptos_framework).in_progress.is_some()
+             && global<DKGState>(@aptos_framework).in_progress.borrow()
                     .metadata.dealer_epoch == epoch)
-            || (option::is_some(global<DKGState>(@aptos_framework).last_completed)
-                && option::borrow(global<DKGState>(@aptos_framework).last_completed)
+            || (global<DKGState>(@aptos_framework).last_completed.is_some()
+                && global<DKGState>(@aptos_framework).last_completed.borrow()
                        .metadata.dealer_epoch == epoch)
         )
     }
 
     spec finish(transcript: vector<u8>) {
-        use std::option;
         requires exists<DKGState>(@aptos_framework);
-        requires option::is_some(global<DKGState>(@aptos_framework).in_progress);
+        requires global<DKGState>(@aptos_framework).in_progress.is_some();
         aborts_if false;
     }
 
     spec fun has_incomplete_session(): bool {
         if (exists<DKGState>(@aptos_framework)) {
-            option::is_some(global<DKGState>(@aptos_framework).in_progress)
+            global<DKGState>(@aptos_framework).in_progress.is_some()
         } else {
             false
         }
     }
 
     spec try_clear_incomplete_session(fx: &signer) {
-        use std::signer;
-        let addr = signer::address_of(fx);
+        let addr = fx.address_of();
         aborts_if addr != @aptos_framework;
     }
 

@@ -79,7 +79,7 @@ spec aptos_framework::config_buffer {
         use aptos_std::type_info;
         framework: &signer;
 
-        requires @aptos_framework == std::signer::address_of(framework);
+        requires @aptos_framework == framework.address_of();
         include OnNewEpochRequirement<T>;
         aborts_if false;
         modifies global<PendingConfigs>(@aptos_framework);

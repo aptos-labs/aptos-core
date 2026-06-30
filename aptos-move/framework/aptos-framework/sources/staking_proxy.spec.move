@@ -48,7 +48,7 @@ spec aptos_framework::staking_proxy {
         pragma aborts_if_is_partial;
         aborts_if !permissioned_signer::spec_is_permissioned_signer(permissioned_signer);
         aborts_if permissioned_signer::spec_is_permissioned_signer(master);
-        aborts_if signer::address_of(master) != signer::address_of(permissioned_signer);
+        aborts_if master.address_of() != permissioned_signer.address_of();
     }
 
     /// Aborts if conditions of SetStakePoolOperator are not met

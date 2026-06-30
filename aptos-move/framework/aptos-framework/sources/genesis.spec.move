@@ -146,7 +146,7 @@ spec aptos_framework::genesis {
         requires len(global<stake::ValidatorSet>(@aptos_framework).active_validators) >= 1;
         // property 5: The end of genesis should be marked on chain.
         /// [high-level-req-5]
-        let addr = std::signer::address_of(aptos_framework);
+        let addr = aptos_framework.address_of();
         aborts_if addr != @aptos_framework;
         aborts_if exists<chain_status::GenesisEndMarker>(@aptos_framework);
         ensures global<chain_status::GenesisEndMarker>(@aptos_framework) == chain_status::GenesisEndMarker {};

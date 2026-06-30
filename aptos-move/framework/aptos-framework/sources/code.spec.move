@@ -81,8 +81,8 @@ spec aptos_framework::code {
 
     spec initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata) {
         pragma opaque;
-        let aptos_addr = signer::address_of(aptos_framework);
-        let owner_addr = signer::address_of(package_owner);
+        let aptos_addr = aptos_framework.address_of();
+        let owner_addr = package_owner.address_of();
         modifies global<PackageRegistry>(owner_addr);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         ensures exists<PackageRegistry>(owner_addr);
@@ -90,7 +90,7 @@ spec aptos_framework::code {
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
         pragma aborts_if_is_partial;
-        let addr = signer::address_of(owner);
+        let addr = owner.address_of();
         modifies global<PackageRegistry>(addr);
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
         include AbortsIfPermissionedSigner { s: owner };
@@ -118,7 +118,7 @@ spec aptos_framework::code {
         let code_object_addr = code_object.inner;
         aborts_if !exists<object::ObjectCore>(code_object_addr);
         aborts_if !exists<PackageRegistry>(code_object_addr);
-        aborts_if !object::is_owner(code_object, signer::address_of(publisher));
+        aborts_if !object::is_owner(code_object, publisher.address_of());
         include AbortsIfPermissionedSigner { s: publisher };
 
         modifies global<PackageRegistry>(code_object_addr);
