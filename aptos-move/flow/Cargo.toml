@@ -56,12 +56,12 @@ move-vm-runtime = { workspace = true }
 notify = { workspace = true }
 pathsearch = { workspace = true }
 rmcp = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
 self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = [
     "archive-zip",
     "compression-zip-deflate",
 ] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 tempfile = { workspace = true }
 tera = { workspace = true }
 tokio = { workspace = true }
