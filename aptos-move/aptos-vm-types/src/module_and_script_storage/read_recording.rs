@@ -48,8 +48,16 @@ impl<'a, C> ReadRecordingCodeStorage<'a, C> {
     pub fn new(code_storage: &'a C) -> Self {
         Self {
             code_storage,
-            module_reads: RefCell::new(FxHashMap::default()),
+            // Most txns touch modules at only a few addresses; pre-size to avoid rehashing.
+            module_reads: RefCell::new(FxHashMap::with_capacity_and_hasher(16, Default::default())),
         }
+    }
+
+    /// Number of distinct module reads recorded so far, i.e. the number of state keys
+    /// `into_recorded_reads` will yield. Lets callers reserve capacity before draining it,
+    /// since the `into_recorded_reads` iterator cannot report an exact size.
+    pub fn num_recorded_reads(&self) -> usize {
+        self.module_reads.borrow().values().map(|names| names.len()).sum()
     }
 
     /// Returns the state keys of modules fetched so far. Already deduplicated by
@@ -67,7 +75,10 @@ impl<'a, C> ReadRecordingCodeStorage<'a, C> {
 
     fn record(&self, address: &AccountAddress, module_name: &IdentStr) {
         let mut module_reads = self.module_reads.borrow_mut();
-        let names = module_reads.entry(*address).or_default();
+        // Pre-size the per-address name set for the modules read from it.
+        let names = module_reads
+            .entry(*address)
+            .or_insert_with(|| FxHashSet::with_capacity_and_hasher(16, Default::default()));
         // `contains` borrows the name, so repeated fetches of an already-seen module
         // allocate nothing; clone only on first sighting.
         if !names.contains(module_name) {

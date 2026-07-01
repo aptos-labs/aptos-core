@@ -83,6 +83,9 @@ impl ExecutorTask for AptosExecutorTask {
                     UnorderedReadSet::default()
                 } else {
                     let mut keys = resolver.take_recorded_reads();
+                    // `into_recorded_reads` yields from a flat_map, whose size hint is (0,
+                    // None), so reserve up front to avoid rehashing while merging in module reads.
+                    keys.reserve(code_storage.num_recorded_reads());
                     keys.extend(code_storage.into_recorded_reads());
                     UnorderedReadSet::new(keys)
                 };

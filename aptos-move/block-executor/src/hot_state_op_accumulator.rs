@@ -38,8 +38,9 @@ where
 
     pub fn new_with_config(max_promotions_per_block: usize) -> Self {
         Self {
-            to_make_hot: hashbrown::HashSet::new(),
-            writes: hashbrown::HashSet::new(),
+            // Small starting capacity to avoid rehashing from empty.
+            to_make_hot: hashbrown::HashSet::with_capacity(16),
+            writes: hashbrown::HashSet::with_capacity(16),
             max_promotions_per_block,
         }
     }

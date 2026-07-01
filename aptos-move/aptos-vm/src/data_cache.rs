@@ -99,7 +99,11 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             executor_view,
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
-            recorded_reads: ReadRecorder::default(),
+            // Pre-size for the handful of reads a typical transaction makes.
+            recorded_reads: Rc::new(RefCell::new(FxHashSet::with_capacity_and_hasher(
+                16,
+                Default::default(),
+            ))),
         }
     }
 
