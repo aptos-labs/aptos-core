@@ -7,7 +7,9 @@ use super::{
 use crate::GlobalOpts;
 use rmcp::{
     handler::server::router::tool::ToolRouter,
-    model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo},
+    model::{
+        CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo,
+    },
     tool_handler, ServerHandler,
 };
 use serde::Serialize;
@@ -180,7 +182,7 @@ impl FlowSession {
                 .map_err(|e| {
                     let msg = format_error_chain(&e);
                     log::info!("build failed for `{}`: {}", key, msg);
-                    rmcp::ErrorData::internal_error(
+                    rmcp::ErrorData::invalid_params(
                         format!("failed to build package `{}`: {}", key, msg),
                         None,
                     )
@@ -229,7 +231,7 @@ impl ServerHandler for FlowSession {
             );
         }
         ServerInfo {
-            protocol_version: Default::default(),
+            protocol_version: ProtocolVersion::default(),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
                 name: "move-flow".into(),
