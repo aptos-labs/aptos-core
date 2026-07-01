@@ -16,6 +16,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
+    output::UnorderedReadSet,
     resolver::{BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
@@ -66,12 +67,17 @@ impl ExecutorTask for AptosExecutorTask {
             .execute_single_transaction(txn, &resolver, view, &log_context, auxiliary_info)
         {
             Ok((vm_status, vm_output)) => {
-                if vm_output.status().is_discarded() {
+                // Discarded transactions commit no state changes, so their reads must not feed
+                // hot-state promotion. Only carry the read set for outputs that can commit.
+                let read_set = if vm_output.status().is_discarded() {
                     speculative_trace!(
                         &log_context,
                         format!("Transaction discarded, status: {:?}", vm_status),
                     );
-                }
+                    UnorderedReadSet::default()
+                } else {
+                    UnorderedReadSet::new(resolver.take_recorded_reads())
+                };
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         vm_status.message().cloned().unwrap_or_default(),
@@ -87,13 +93,17 @@ impl ExecutorTask for AptosExecutorTask {
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new_with_read_set(
+                        vm_output, read_set,
+                    ))
                 } else {
                     assert!(
                         Self::is_transaction_dynamic_change_set_capable(txn),
                         "DirectWriteSet should always create SkipRest transaction, validate_waypoint_change_set provides this guarantee"
                     );
-                    ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
+                    ExecutionStatus::Success(AptosTransactionOutput::new_with_read_set(
+                        vm_output, read_set,
+                    ))
                 }
             },
             // execute_single_transaction only returns an error when transactions that should never fail
