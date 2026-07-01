@@ -35,7 +35,9 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, module_write_set::ModuleWrite, output::VMOutput,
+    abstract_write_op::AbstractResourceWriteOp,
+    module_write_set::ModuleWrite,
+    output::{UnorderedReadSet, VMOutput},
     resolver::ResourceGroupSize,
 };
 use move_core_types::{
@@ -59,13 +61,23 @@ use vm_wrapper::AptosExecutorTask;
 pub struct AptosTransactionOutput {
     vm_output: Option<VMOutput>,
     committed_output: OnceCell<TransactionOutput>,
+    /// State keys read by the VM during the execution (incarnation) that produced this output.
+    ///
+    /// TODO(HotState): also consider recording the read kind (exists/metadata/value) and the
+    /// observed slot hotness, so the promotion policy can filter on them.
+    read_set: UnorderedReadSet,
 }
 
 impl AptosTransactionOutput {
     pub fn new(output: VMOutput) -> Self {
+        Self::new_with_read_set(output, UnorderedReadSet::default())
+    }
+
+    pub fn new_with_read_set(output: VMOutput, read_set: UnorderedReadSet) -> Self {
         Self {
             vm_output: Some(output),
             committed_output: OnceCell::new(),
+            read_set,
         }
     }
 
@@ -107,6 +119,7 @@ impl<'a> AfterMaterializationOutput<SignatureVerifiedTransaction>
 /// Before materialization guard wrapper that holds a read lock.
 pub struct BeforeMaterializationGuard<'a> {
     guard: &'a VMOutput,
+    read_set: &'a UnorderedReadSet,
 }
 
 impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMaterializationGuard<'_> {
@@ -154,6 +167,24 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         }
 
         writes
+    }
+
+    fn storage_keys_read(&self) -> impl Iterator<Item = &StateKey> {
+        self.read_set.as_inner().iter()
+    }
+
+    fn storage_keys_written(&self) -> impl Iterator<Item = &StateKey> {
+        // Every key receiving a value write becomes hot via the write itself, so the hot
+        // state accumulator must treat it as written and not promote it separately. Unlike
+        // get_write_summary (conflict detection), this includes in-place delayed field
+        // rewrites, aggregator v1 writes/deltas and module writes. The accumulator dedups,
+        // so the chained keys need not be unique.
+        self.guard
+            .resource_write_set()
+            .keys()
+            .chain(self.guard.module_write_set().keys())
+            .chain(self.guard.aggregator_v1_write_set().keys())
+            .chain(self.guard.aggregator_v1_delta_set().keys())
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
@@ -381,6 +412,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                 .vm_output
                 .as_ref()
                 .ok_or_else(|| code_invariant_error("Output must be set but not materialized"))?,
+            read_set: &self.read_set,
         })
     }
 
