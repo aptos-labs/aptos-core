@@ -16,9 +16,21 @@ async fn move_package_query_facts() {
         balance: u64,
     }
 
+    struct Receipt has drop, store {
+        amount: u64,
+    }
+
     #[event]
     struct TransferEvent has drop, store {
         amount: u64,
+    }
+
+    #[resource_group(scope = global)]
+    struct ObjectGroup {}
+
+    #[resource_group_member(group = 0xCAFE::coin::ObjectGroup)]
+    struct Wrapped has key {
+        value: u64,
     }
 
     enum Status has drop, store {
@@ -51,10 +63,24 @@ async fn move_package_query_facts() {
         let CoinStore<CoinType> { balance } = move_from<CoinStore<CoinType>>(addr);
         balance
     }
+
+    public fun split(amount: u64): (u64, u64) {
+        (amount, amount)
+    }
 }
 
 module 0xCAFE::coin_admin {
+    use 0xCAFE::coin::Receipt;
+
+    struct Holder has drop, store {
+        r: Receipt,
+    }
+
     public(friend) fun freeze_account(_addr: address) {}
+
+    public fun forward(r: Receipt): Receipt {
+        r
+    }
 }",
     )]);
     let dir = pkg.path().to_str().unwrap();
