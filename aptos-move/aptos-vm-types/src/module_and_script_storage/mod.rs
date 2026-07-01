@@ -3,6 +3,7 @@
 
 pub mod code_storage;
 pub mod module_storage;
+pub mod read_recording;
 
 mod state_view_adapter;
 pub use state_view_adapter::{AptosCodeStorageAdapter, AsAptosCodeStorage};

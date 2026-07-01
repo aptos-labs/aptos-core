@@ -202,10 +202,10 @@ impl<Key1, Key2> Default for TwoKeyRegistry<Key1, Key2> {
 
 pub static REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::default);
 
-const NUM_RESOURCE_SHARDS: usize = 8;
-const NUM_RESOURCE_GROUP_SHARDS: usize = 8;
-const NUM_MODULE_SHARDS: usize = 8;
-const NUM_TABLE_ITEM_SHARDS: usize = 8;
+const NUM_RESOURCE_SHARDS: usize = 32;
+const NUM_RESOURCE_GROUP_SHARDS: usize = 32;
+const NUM_MODULE_SHARDS: usize = 32;
+const NUM_TABLE_ITEM_SHARDS: usize = 32;
 const NUM_RAW_SHARDS: usize = 4;
 const NUM_POSITION_SHARDS: usize = 8;
 
