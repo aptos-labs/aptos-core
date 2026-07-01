@@ -29,6 +29,38 @@ use move_vm_types::code::{ambassador_impl_ScriptCache, Code, ScriptCache};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cell::RefCell, sync::Arc};
 
+thread_local! {
+    /// A module's `StateKey` is a pure function of its `(address, name)` and never changes, yet
+    /// interning one goes through the global, lock-guarded `StateKey` registry. Worker threads
+    /// re-read the same modules on every transaction, so memoize the interned keys per thread to
+    /// keep that lock off the extraction path. Bounded so an unbounded module working set can't
+    /// grow it without limit; the hot (framework) modules are seen first and stay cached.
+    static MODULE_STATE_KEYS: RefCell<FxHashMap<AccountAddress, FxHashMap<Identifier, StateKey>>> =
+        RefCell::new(FxHashMap::default());
+}
+
+/// Cap on distinct addresses memoized per thread, bounding the memo under a very large or
+/// adversarial module working set.
+const MODULE_STATE_KEY_CACHE_MAX_ADDRESSES: usize = 1 << 13;
+
+/// Interns a module `StateKey`, serving repeats from the per-thread memo so that the common case
+/// (a module already seen by this thread) avoids the global registry lock entirely.
+fn interned_module_state_key(address: AccountAddress, name: Identifier) -> StateKey {
+    MODULE_STATE_KEYS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(key) = cache.get(&address).and_then(|names| names.get(&name)) {
+            return key.clone();
+        }
+        let key = StateKey::module(&address, &name);
+        // Only new addresses are gated by the cap; an already-cached address keeps accumulating
+        // its modules so it is never left half-populated.
+        if cache.len() < MODULE_STATE_KEY_CACHE_MAX_ADDRESSES || cache.contains_key(&address) {
+            cache.entry(address).or_default().insert(name, key.clone());
+        }
+        key
+    })
+}
+
 /// Wraps a code storage and records every module the VM fetches through it, so that module
 /// accesses become part of the transaction's observed read set (the basis for hot state
 /// promotion).
@@ -69,7 +101,7 @@ impl<'a, C> ReadRecordingCodeStorage<'a, C> {
             .flat_map(|(address, names)| {
                 names
                     .into_iter()
-                    .map(move |name| StateKey::module(&address, &name))
+                    .map(move |name| interned_module_state_key(address, name))
             })
     }
 
