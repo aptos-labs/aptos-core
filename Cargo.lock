@@ -3320,7 +3320,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-move-flow"
-version = "1.0.4"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
@@ -3358,6 +3358,7 @@ dependencies = [
  "pathsearch",
  "regex",
  "rmcp",
+ "self_update",
  "serde",
  "serde_json",
  "tempfile",
