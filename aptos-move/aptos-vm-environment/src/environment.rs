@@ -24,9 +24,22 @@ use aptos_vm_types::storage::StorageGasParameters;
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
+#[cfg(fuzzing)]
+use once_cell::sync::OnceCell;
 use sha3::{Digest, Sha3_256};
 use std::sync::{Arc, OnceLock};
 use triomphe::Arc as TriompheArc;
+
+#[cfg(fuzzing)]
+type FuzzVmConfigOverride = Box<dyn Fn(&mut VMConfig) + Send + Sync>;
+
+#[cfg(fuzzing)]
+static FUZZ_VM_CONFIG_OVERRIDE: OnceCell<FuzzVmConfigOverride> = OnceCell::new();
+
+#[cfg(fuzzing)]
+pub fn set_vm_config_override_for_fuzzing(override_config: FuzzVmConfigOverride) {
+    FUZZ_VM_CONFIG_OVERRIDE.set(override_config).ok();
+}
 
 /// A runtime environment which can be used for VM initialization and more. Contains features
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
@@ -286,6 +299,14 @@ impl Environment {
             &timed_features,
             ty_builder,
         );
+        #[cfg(fuzzing)]
+        let vm_config = {
+            let mut vm_config = vm_config;
+            if let Some(override_config) = FUZZ_VM_CONFIG_OVERRIDE.get() {
+                override_config(&mut vm_config);
+            }
+            vm_config
+        };
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
         // We use an `Option` to handle the VK not being set on-chain.

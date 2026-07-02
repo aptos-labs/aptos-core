@@ -16,6 +16,9 @@ pub struct ConcurrentBTreeInterner<T: 'static> {
     inner: RwLock<InternerPool<T>>,
 }
 
+#[cfg(fuzzing)]
+pub struct ConcurrentBTreeInternerSnapshot<T: 'static>(Vec<T>);
+
 /// Pool storing the interned values.
 struct InternerPool<T: 'static> {
     /// The size for the next allocation of the active buffer.
@@ -199,6 +202,32 @@ where
     /// indices across flushes.
     pub fn flush(&self) {
         self.inner.write().flush();
+    }
+
+    #[cfg(fuzzing)]
+    pub fn snapshot_for_fuzzing(&self) -> ConcurrentBTreeInternerSnapshot<T>
+    where
+        T: Clone,
+    {
+        ConcurrentBTreeInternerSnapshot(
+            self.inner
+                .read()
+                .vec
+                .iter()
+                .map(|value| (**value).clone())
+                .collect(),
+        )
+    }
+
+    #[cfg(fuzzing)]
+    pub fn restore_for_fuzzing(&self, snapshot: ConcurrentBTreeInternerSnapshot<T>)
+    where
+        T: Clone,
+    {
+        self.flush();
+        for value in snapshot.0 {
+            self.intern(value);
+        }
     }
 }
 

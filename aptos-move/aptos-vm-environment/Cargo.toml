@@ -42,3 +42,6 @@ triomphe = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["testing", "fuzzing"] }
 serde = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

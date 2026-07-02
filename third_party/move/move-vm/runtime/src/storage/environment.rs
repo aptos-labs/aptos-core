@@ -38,6 +38,14 @@ use move_vm_types::{
     ty_interner::InternedTypePool,
 };
 use std::sync::Arc;
+#[cfg(fuzzing)]
+use {
+    crate::storage::ty_tag_converter::TypeTagCacheSnapshot,
+    move_vm_types::{
+        loaded_data::struct_name_indexing::StructNameIndexMapSnapshot,
+        module_id_interner::InternedModuleIdPoolSnapshot, ty_interner::InternedTypePoolSnapshot,
+    },
+};
 
 const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
 const MEM_MODULE_BYTES: &[u8] = include_bytes!("mem.mv");
@@ -76,6 +84,14 @@ pub struct RuntimeEnvironment {
 
     /// Pool of interned module ids.
     interned_module_id_pool: Arc<InternedModuleIdPool>,
+}
+
+#[cfg(fuzzing)]
+pub struct RuntimeEnvironmentSnapshot {
+    struct_name_index_map: StructNameIndexMapSnapshot,
+    ty_tag_cache: TypeTagCacheSnapshot,
+    interned_ty_pool: InternedTypePoolSnapshot,
+    interned_module_id_pool: InternedModuleIdPoolSnapshot,
 }
 
 impl RuntimeEnvironment {
@@ -390,6 +406,27 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.flush();
         self.interned_ty_pool.flush();
         self.interned_module_id_pool.flush();
+    }
+
+    #[cfg(fuzzing)]
+    pub fn snapshot_caches_for_fuzzing(&self) -> RuntimeEnvironmentSnapshot {
+        RuntimeEnvironmentSnapshot {
+            struct_name_index_map: self.struct_name_index_map.snapshot_for_fuzzing(),
+            ty_tag_cache: self.ty_tag_cache.snapshot_for_fuzzing(),
+            interned_ty_pool: self.interned_ty_pool.snapshot_for_fuzzing(),
+            interned_module_id_pool: self.interned_module_id_pool.snapshot_for_fuzzing(),
+        }
+    }
+
+    #[cfg(fuzzing)]
+    pub fn restore_caches_for_fuzzing(&self, snapshot: RuntimeEnvironmentSnapshot) {
+        self.interned_module_id_pool
+            .restore_for_fuzzing(snapshot.interned_module_id_pool);
+        self.struct_name_index_map
+            .restore_for_fuzzing(snapshot.struct_name_index_map);
+        self.interned_ty_pool
+            .restore_for_fuzzing(snapshot.interned_ty_pool);
+        self.ty_tag_cache.restore_for_fuzzing(snapshot.ty_tag_cache);
     }
 
     /// Flushes the global verified module cache. Should be used when verifier configuration has

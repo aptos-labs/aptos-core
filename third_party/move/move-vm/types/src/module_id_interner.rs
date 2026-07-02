@@ -2,6 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::interner::ConcurrentBTreeInterner;
+#[cfg(fuzzing)]
+use crate::interner::ConcurrentBTreeInternerSnapshot;
 use move_core_types::language_storage::ModuleId;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -10,6 +12,9 @@ pub struct InternedModuleId(usize);
 pub struct InternedModuleIdPool {
     inner: ConcurrentBTreeInterner<ModuleId>,
 }
+
+#[cfg(fuzzing)]
+pub struct InternedModuleIdPoolSnapshot(ConcurrentBTreeInternerSnapshot<ModuleId>);
 
 impl InternedModuleIdPool {
     pub fn new() -> Self {
@@ -36,6 +41,16 @@ impl InternedModuleIdPool {
 
     pub fn flush(&self) {
         self.inner.flush();
+    }
+
+    #[cfg(fuzzing)]
+    pub fn snapshot_for_fuzzing(&self) -> InternedModuleIdPoolSnapshot {
+        InternedModuleIdPoolSnapshot(self.inner.snapshot_for_fuzzing())
+    }
+
+    #[cfg(fuzzing)]
+    pub fn restore_for_fuzzing(&self, snapshot: InternedModuleIdPoolSnapshot) {
+        self.inner.restore_for_fuzzing(snapshot.0);
     }
 }
 
