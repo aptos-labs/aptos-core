@@ -3,6 +3,9 @@ name: "CodeQL"
 on:
   # Allow triggering manually
   workflow_dispatch:
+permissions:
+  contents: read
+
 
 jobs:
   analyze:

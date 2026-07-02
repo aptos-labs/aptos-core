@@ -80,6 +80,9 @@ on:
         required: false
         default: false
         description: "Skip version checks"
+permissions:
+  contents: read
+
 
 jobs:
   build-linux-x86:

@@ -105,6 +105,9 @@ on:
         default: false
         type: boolean
         description: Whether to post to Slack on failure
+permissions:
+  contents: read
+
 jobs:
   # This job determines which tests to run
   test-target-determinator:

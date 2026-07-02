@@ -91,6 +91,9 @@ on:
         description: "The maximum number of versions to process in a single job."
         type: number
         required: true
+permissions:
+  contents: read
+
 jobs:
   prepare:
     runs-on: ${{ inputs.RUNS_ON }}

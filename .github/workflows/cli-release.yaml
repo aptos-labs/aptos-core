@@ -25,6 +25,9 @@ on:
         default: false
         description: "Skip checks - If checked, the release will skip version checks"
 
+permissions:
+  contents: read
+
 
 jobs:
   # TODO: Deprecated, please use "Linux" instead as it's more straightforwardly named

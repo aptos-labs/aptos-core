@@ -65,6 +65,10 @@ on:
         type: boolean
         description: If true, the workflow will not run replay verify.
         default: false
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   validate-inputs:
     runs-on: ubuntu-latest
