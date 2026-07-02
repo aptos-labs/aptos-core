@@ -5609,6 +5609,12 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Re
                         let val = vals.get(r.idx as usize).ok_or_else(|| {
                             invariant_violation::<S>("index out of bounds".to_string())
                         })?;
+                        // Mirror the invariant guard that `IndexedRef::read_ref` enforces: an
+                        // indexed reference must point at a primitive element, never at a nested
+                        // container or another reference. Without this, a malformed/stale indexed
+                        // ref that the copy-based path would have rejected could be serialized.
+                        val.check_valid_for_indexed_ref(r)
+                            .map_err(S::Error::custom)?;
                         (SerializationReadyValue {
                             ctx: self.ctx,
                             layout: self.layout,
