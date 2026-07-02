@@ -12,6 +12,7 @@ use anyhow::Result;
 use aptos_crypto::{hash::CryptoHasher, HashValue};
 use aptos_infallible::RwLock;
 use bytes::Bytes;
+use crossbeam_utils::CachePadded;
 use hashbrown::HashMap;
 use move_core_types::{
     account_address::AccountAddress,
@@ -202,24 +203,25 @@ impl<Key1, Key2> Default for TwoKeyRegistry<Key1, Key2> {
 
 pub static REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::default);
 
-const NUM_RESOURCE_SHARDS: usize = 8;
-const NUM_RESOURCE_GROUP_SHARDS: usize = 8;
-const NUM_MODULE_SHARDS: usize = 8;
-const NUM_TABLE_ITEM_SHARDS: usize = 8;
+const NUM_RESOURCE_SHARDS: usize = 32;
+const NUM_RESOURCE_GROUP_SHARDS: usize = 32;
+const NUM_MODULE_SHARDS: usize = 32;
+const NUM_TABLE_ITEM_SHARDS: usize = 32;
 const NUM_RAW_SHARDS: usize = 4;
+// Positions are bounded by a single exchange's universe so the shard count is modest.
 const NUM_POSITION_SHARDS: usize = 8;
 
 #[derive(Default)]
 pub struct StateKeyRegistry {
-    resource_shards: [TwoKeyRegistry<StructTag, AccountAddress>; NUM_RESOURCE_SHARDS],
-    resource_group_shards: [TwoKeyRegistry<StructTag, AccountAddress>; NUM_RESOURCE_GROUP_SHARDS],
-    module_shards: [TwoKeyRegistry<AccountAddress, Identifier>; NUM_MODULE_SHARDS],
-    table_item_shards: [TwoKeyRegistry<TableHandle, Vec<u8>>; NUM_TABLE_ITEM_SHARDS],
-    raw_shards: [TwoKeyRegistry<Vec<u8>, ()>; NUM_RAW_SHARDS], // for tests only
-    /// (exchange, account) -> market -> Entry. Positions are bounded by a
-    /// single exchange's universe so the shard count is modest.
-    position_shards:
-        [TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress>; NUM_POSITION_SHARDS],
+    resource_shards: [CachePadded<TwoKeyRegistry<StructTag, AccountAddress>>; NUM_RESOURCE_SHARDS],
+    resource_group_shards:
+        [CachePadded<TwoKeyRegistry<StructTag, AccountAddress>>; NUM_RESOURCE_GROUP_SHARDS],
+    module_shards: [CachePadded<TwoKeyRegistry<AccountAddress, Identifier>>; NUM_MODULE_SHARDS],
+    table_item_shards: [CachePadded<TwoKeyRegistry<TableHandle, Vec<u8>>>; NUM_TABLE_ITEM_SHARDS],
+    raw_shards: [CachePadded<TwoKeyRegistry<Vec<u8>, ()>>; NUM_RAW_SHARDS], // for tests only
+    /// (exchange, account) -> market -> Entry.
+    position_shards: [CachePadded<TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress>>;
+        NUM_POSITION_SHARDS],
 }
 
 impl StateKeyRegistry {
