@@ -9,7 +9,7 @@ use aptos_storage_service_types::{
     StorageServiceError,
 };
 use claims::assert_matches;
-use mockall::predicate::eq;
+use mockall::predicate::{always, eq};
 
 #[tokio::test]
 async fn test_get_number_of_states_at_version() {
@@ -22,8 +22,8 @@ async fn test_get_number_of_states_at_version() {
     db_reader
         .expect_get_state_item_count()
         .times(1)
-        .with(eq(version))
-        .returning(move |_| Ok(number_of_states as usize));
+        .with(eq(version), always())
+        .returning(move |_, _| Ok(number_of_states as usize));
 
     // Create the storage client and server
     let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
@@ -72,8 +72,8 @@ async fn test_get_number_of_states_at_version_invalid() {
     db_reader
         .expect_get_state_item_count()
         .times(1)
-        .with(eq(version))
-        .returning(move |_| {
+        .with(eq(version), always())
+        .returning(move |_, _| {
             Err(AptosDbError::NotFound(
                 format_err!("Version does not exist!").to_string(),
             ))

@@ -693,6 +693,7 @@ mod test {
         let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version: 0,
             start_index: 0,
+            state_kind: aptos_storage_interface::StateKind::MainState,
         });
 
         // Create and return the stream engine

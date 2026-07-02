@@ -21,7 +21,7 @@ use aptos_storage_interface::{
         state_delta::StateDelta, state_update_refs::BatchedStateUpdateRefs,
         state_view::cached_state_view::ShardedStateCache,
     },
-    AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,
+    AptosDbError, DbReader, DbWriter, LedgerSummary, StateKind, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -439,9 +439,10 @@ impl DbWriter for FakeAptosDB {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        kind: StateKind,
     ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, StateValue>>> {
         self.inner
-            .get_state_snapshot_receiver(version, expected_root_hash)
+            .get_state_snapshot_receiver(version, expected_root_hash, kind)
     }
 
     fn finalize_state_snapshot(
@@ -873,8 +874,8 @@ impl DbReader for FakeAptosDB {
             .map_err(Into::into)
     }
 
-    fn get_state_item_count(&self, version: Version) -> Result<usize> {
-        self.inner.get_state_item_count(version)
+    fn get_state_item_count(&self, version: Version, kind: StateKind) -> Result<usize> {
+        self.inner.get_state_item_count(version, kind)
     }
 
     fn get_state_value_chunk_with_proof(
@@ -882,9 +883,10 @@ impl DbReader for FakeAptosDB {
         version: Version,
         start_idx: usize,
         chunk_size: usize,
+        kind: StateKind,
     ) -> Result<StateValueChunkWithProof> {
         self.inner
-            .get_state_value_chunk_with_proof(version, start_idx, chunk_size)
+            .get_state_value_chunk_with_proof(version, start_idx, chunk_size, kind)
     }
 
     fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
