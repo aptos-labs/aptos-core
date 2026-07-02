@@ -5565,7 +5565,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Co
                 let values = r.borrow();
                 (SerializationReadyValue {
                     ctx: self.ctx,
-                    layout: struct_layout,
+                    layout: struct_layout.as_ref(),
                     value: &*values,
                     depth: self.depth,
                 })
