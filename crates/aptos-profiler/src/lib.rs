@@ -26,6 +26,7 @@ impl ProfilerConfig {
 
 #[derive(Debug, Clone)]
 struct CpuProfilerConfig {
+    txt_result_path: PathBuf,
     frequency: i32,
     svg_result_path: PathBuf,
 }
@@ -33,6 +34,7 @@ struct CpuProfilerConfig {
 impl CpuProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
+            txt_result_path: PathBuf::from("./profiling_results/cpu_profile.txt"),
             frequency: 100,
             svg_result_path: PathBuf::from("./profiling_results/cpu_flamegraph.svg"),
         })
