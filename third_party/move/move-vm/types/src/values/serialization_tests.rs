@@ -895,4 +895,74 @@ mod tests {
             "generous depth limit must allow nested value"
         );
     }
+
+    #[test]
+    fn serialize_ref_indexed_closure_enforces_depth_one_level_deeper() {
+        use move_core_types::function::ClosureMask;
+
+        let mut ext = MockFunctionValueExtension::new();
+        ext.expect_get_serialization_data().returning(|af| {
+            Ok(af
+                .downcast_ref::<MockAbstractFunction>()
+                .expect("cast")
+                .data
+                .clone())
+        });
+
+        // A closure capturing one argument. Captured arguments add a nesting level. Closures are
+        // stored as primitives, so `borrow_loc` yields an `IndexedRef` -- the path whose depth
+        // accounting must mirror `IndexedRef::read_ref`, which copies the element at `depth + 1`.
+        let make_closure = || {
+            Value::closure(
+                Box::new(MockAbstractFunction::new(
+                    "f",
+                    vec![],
+                    ClosureMask::new(0b1),
+                    vec![MoveTypeLayout::U64],
+                )),
+                vec![Value::u64(7)],
+            )
+        };
+        let layout = MoveTypeLayout::Function;
+
+        let mut locals = Locals::new(1);
+        locals.store_loc(0, make_closure()).unwrap();
+        let get_ref = || {
+            locals
+                .borrow_loc(0)
+                .unwrap()
+                .value_as::<Reference>()
+                .unwrap()
+        };
+
+        let owned = make_closure();
+
+        // Smallest depth limit at which each path succeeds.
+        let owned_min = (1..=8u64)
+            .find(|&m| {
+                ValueSerDeContext::new(Some(m))
+                    .with_func_args_deserialization(&ext)
+                    .serialize(&owned, &layout)
+                    .unwrap()
+                    .is_some()
+            })
+            .expect("owned closure serializes within depth 8");
+        let ref_min = (1..=8u64)
+            .find(|&m| {
+                ValueSerDeContext::new(Some(m))
+                    .with_func_args_deserialization(&ext)
+                    .serialize_ref(&get_ref(), &layout)
+                    .unwrap()
+                    .is_some()
+            })
+            .expect("closure reference serializes within depth 8");
+
+        // Serializing through an indexed reference visits the element one level deeper than
+        // serializing the owned value, matching `IndexedRef::read_ref`'s `copy_value(depth + 1)`.
+        assert_eq!(
+            ref_min,
+            owned_min + 1,
+            "indexed reference must enforce the depth limit one level deeper than the owned value"
+        );
+    }
 }
