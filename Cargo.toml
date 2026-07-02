@@ -63,6 +63,7 @@ members = [
     "crates/aptos",
     "crates/aptos-admin-service",
     "crates/aptos-api-tester",
+    "crates/aptos-axum-webserver",
     "crates/aptos-batch-encryption",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
@@ -315,6 +316,7 @@ aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
+aptos-axum-webserver = { path = "crates/aptos-axum-webserver" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
 aptos-batch-encryption = { path = "crates/aptos-batch-encryption" }
@@ -535,6 +537,7 @@ async-recursion = "1.0.5"
 async-trait = "0.1.53"
 atty = "0.2.14"
 axum = "0.7.5"
+axum-server = { version = "0.6", features = ["tls-rustls"] }
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 base64 = "0.13.0"
@@ -860,6 +863,8 @@ tonic = { version = "0.12.3", features = [
 ] }
 tonic-reflection = "0.12.3"
 topological-sort = "0.2.2"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors"] }
 tracing = "0.1.37"
 tracing-log = "0.2.0"
 tracing-opentelemetry = "0.28.0"

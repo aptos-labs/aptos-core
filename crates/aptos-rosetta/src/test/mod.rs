@@ -36,6 +36,8 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{collections::HashSet, str::FromStr};
 
+mod http;
+
 const APT_ADDRESS: AccountAddress = AccountAddress::TEN;
 const OTHER_CURRENCY_ADDRESS: &str = "0x12341234123412341234123412341234";
 static OTHER_CURRENCY: Lazy<Currency> = Lazy::new(|| Currency {
