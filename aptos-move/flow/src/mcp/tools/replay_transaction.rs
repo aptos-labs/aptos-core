@@ -24,7 +24,6 @@ use aptos_types::{
     vm_status::AbortLocation,
 };
 use aptos_validator_interface::LocalModuleOverrides;
-use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{account_address::AccountAddress, vm_status::VMStatus};
 use rmcp::{
     handler::server::wrapper::Parameters, model::CallToolResult, schemars, tool, tool_router,
@@ -514,12 +513,7 @@ impl FlowSession {
                 drop(wrapper);
 
                 // Materialize the VMOutput so we can read gas + status.
-                // Use the unwrapped `debugger` so this call does not
-                // pollute the trace with an extra state-view event.
-                let state_view = debugger.state_view_at_version(txn_id);
-                let resolver = state_view.as_move_resolver();
-                let materialize_result =
-                    vm_output.try_materialize_into_transaction_output(&resolver);
+                let materialize_result = vm_output.into_transaction_output();
 
                 // Drain the trace after materialization. Doing it here lets
                 // us either embed it in the success response or append it to

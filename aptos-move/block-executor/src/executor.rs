@@ -29,10 +29,7 @@ use crate::{
     view::{LatestView, ParallelState, SequentialState, ViewState},
     worker_pool::WorkerPool,
 };
-use aptos_aggregator::{
-    delayed_change::{ApplyBase, DelayedChange},
-    delta_change_set::serialize,
-};
+use aptos_aggregator::delayed_change::{ApplyBase, DelayedChange};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
@@ -54,7 +51,7 @@ use aptos_types::{
         BlockOutput, FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
@@ -510,36 +507,6 @@ where
             &mut abort_manager,
         )?;
 
-        // Legacy aggregator v1 handling.
-        let mut prev_modified_aggregator_v1_keys = last_input_output
-            .modified_aggregator_v1_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
-        if let Some(output) = maybe_output {
-            let output_before_guard = output.before_materialization()?;
-
-            // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
-            // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
-            // commit-time validation in BlockSTMv2.
-            for (key, value) in output_before_guard.aggregator_v1_write_set().into_iter() {
-                prev_modified_aggregator_v1_keys.remove(&key);
-
-                versioned_cache.data().write(
-                    key,
-                    idx_to_execute,
-                    incarnation,
-                    TriompheArc::new(value),
-                    None,
-                )?;
-            }
-            for (key, delta) in output_before_guard.aggregator_v1_delta_set().into_iter() {
-                prev_modified_aggregator_v1_keys.remove(&key);
-                versioned_cache.data().add_delta(key, idx_to_execute, delta);
-            }
-        }
-        for key in prev_modified_aggregator_v1_keys {
-            versioned_cache.data().remove(&key, idx_to_execute);
-        }
-
         last_input_output.record(
             idx_to_execute,
             read_set,
@@ -628,7 +595,7 @@ where
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
+            .map_or_else(HashSet::new, |keys| keys.collect());
         let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
             .modified_group_key_and_tags_cloned(idx_to_execute)
             .into_iter()
@@ -692,31 +659,14 @@ where
 
             let resource_write_set = output_before_guard.resource_write_set();
 
-            // Then, process resource & aggregator_v1 writes.
-            for (k, v, maybe_layout) in resource_write_set
-                .into_iter()
-                .map(|(k, (v, maybe_layout))| (k, v, maybe_layout))
-                .chain(
-                    output_before_guard
-                        .aggregator_v1_write_set()
-                        .into_iter()
-                        .map(|(state_key, write_op)| (state_key, TriompheArc::new(write_op), None)),
-                )
-            {
+            // Then, process resource writes (aggregator v1 writes are part of this set).
+            for (k, (v, maybe_layout)) in resource_write_set.into_iter() {
                 if !prev_modified_resource_keys.remove(&k) {
                     needs_suffix_validation = true;
                 }
                 versioned_cache
                     .data()
                     .write(k, idx_to_execute, incarnation, v, maybe_layout)?;
-            }
-
-            // Then, apply deltas.
-            for (k, d) in output_before_guard.aggregator_v1_delta_set().into_iter() {
-                if !prev_modified_resource_keys.remove(&k) {
-                    needs_suffix_validation = true;
-                }
-                versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
 
             Ok(())
@@ -901,7 +851,6 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        is_v2: bool,
     ) -> Result<bool, PanicError> {
         if last_input_output.is_speculative_failure(txn_idx) {
             return Ok(false);
@@ -910,18 +859,7 @@ where
             .read_set(txn_idx)
             .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
 
-        if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
-            || (is_v2
-                && !read_set.validate_aggregator_v1_reads(
-                    versioned_cache.data(),
-                    last_input_output
-                        .modified_aggregator_v1_keys(txn_idx)
-                        .ok_or_else(|| {
-                            code_invariant_error("Modified aggregator v1 keys must be recorded")
-                        })?,
-                    txn_idx,
-                )?)
-        {
+        if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)? {
             return Ok(false);
         }
 
@@ -1015,12 +953,7 @@ where
             },
         }
 
-        if !Self::validate_and_commit_delayed_fields(
-            txn_idx,
-            versioned_cache,
-            last_input_output,
-            scheduler.is_v2(),
-        )? {
+        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
             return Err(code_invariant_error(format!(
                 "Delayed field validation after re-execution failed for txn {}",
                 txn_idx
@@ -1059,12 +992,7 @@ where
         let block_limit_processor = &mut shared_sync_params.block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
-        if !Self::validate_and_commit_delayed_fields(
-            txn_idx,
-            versioned_cache,
-            last_input_output,
-            scheduler.is_v2(),
-        )? {
+        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
             // Transaction needs to be re-executed, one final time.
             side_effect_at_commit = true;
 
@@ -1117,62 +1045,6 @@ where
             shared_sync_params.maybe_block_epilogue_txn_idx,
             &scheduler,
         )
-    }
-
-    fn materialize_aggregator_v1_delta_writes(
-        txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        base_view: &S,
-    ) -> Vec<(T::Key, WriteOp)> {
-        // Materialize all the aggregator v1 deltas.
-        let mut aggregator_v1_delta_writes = Vec::with_capacity(4);
-        if let Some(aggregator_v1_delta_keys_iter) =
-            last_input_output.aggregator_v1_delta_keys(txn_idx)
-        {
-            for k in aggregator_v1_delta_keys_iter {
-                // Note that delta materialization happens concurrently, but under concurrent
-                // commit_hooks (which may be dispatched by the coordinator), threads may end up
-                // contending on delta materialization of the same aggregator. However, the
-                // materialization is based on previously materialized values and should not
-                // introduce long critical sections. Moreover, with more aggregators, and given
-                // that the commit_hook will be performed at dispersed times based on the
-                // completion of the respective previous tasks of threads, this should not be
-                // an immediate bottleneck - confirmed by an experiment with 32 core and a
-                // single materialized aggregator. If needed, the contention may be further
-                // mitigated by batching consecutive commit_hooks.
-                let committed_delta = versioned_cache
-                    .data()
-                    .materialize_delta(&k, txn_idx)
-                    .unwrap_or_else(|op| {
-                        // TODO[agg_v1](cleanup): this logic should improve with the new AGGR data structure
-                        // TODO[agg_v1](cleanup): and the ugly base_view parameter will also disappear.
-                        let storage_value = base_view
-                            .get_state_value(&k)
-                            .expect("Error reading the base value for committed delta in storage");
-
-                        let w: T::Value = TransactionWrite::from_state_value(storage_value);
-                        let value_u128 = w
-                            .as_u128()
-                            .expect("Aggregator base value deserialization error")
-                            .expect("Aggregator base value must exist");
-
-                        versioned_cache.data().set_base_value(
-                            k.clone(),
-                            ValueWithLayout::RawFromStorage(TriompheArc::new(w)),
-                        );
-                        op.apply_to(value_u128)
-                            .expect("Materializing delta w. base value set must succeed")
-                    });
-
-                // Must contain committed value as we set the base value above.
-                aggregator_v1_delta_writes.push((
-                    k,
-                    WriteOp::legacy_modification(serialize(&committed_delta).into()),
-                ));
-            }
-        }
-        aggregator_v1_delta_writes
     }
 
     // If output_idx is set, then the finalized output is recorded at that index,
@@ -1264,19 +1136,11 @@ where
 
         let events = last_input_output.events(txn_idx);
         let materialized_events = map_id_to_values_events(events, &latest_view)?;
-        let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
-            txn_idx,
-            last_input_output,
-            shared_sync_params.versioned_cache,
-            shared_sync_params.base_view,
-        );
-
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
         let trace = last_input_output.record_materialized_txn_output(
             txn_idx,
-            aggregator_v1_delta_writes,
             materialized_resource_write_set
                 .into_iter()
                 .chain(serialized_groups)
@@ -2242,10 +2106,6 @@ where
             unsync_map.write(group_key, TriompheArc::new(metadata_op), None);
         }
 
-        for (key, write_op) in output_before_guard.aggregator_v1_write_set().into_iter() {
-            unsync_map.write(key, TriompheArc::new(write_op), None);
-        }
-
         for write in output_before_guard.module_write_set().values() {
             add_module_write_to_module_cache::<T>(
                 write,
@@ -2445,17 +2305,6 @@ where
                         num_committed_user_txns += 1;
                     }
 
-                    // Drop to acquire a write lock, then re-assign the output_before_guard.
-                    drop(output_before_guard);
-                    output.legacy_sequential_materialize_agg_v1(&latest_view);
-                    let output_before_guard = output.before_materialization()?;
-
-                    assert_eq!(
-                        output_before_guard.aggregator_v1_delta_set().len(),
-                        0,
-                        "Sequential execution must materialize deltas"
-                    );
-
                     if resource_group_bcs_fallback {
                         // Dynamic change set optimizations are enabled, and resource group serialization
                         // previously failed in bcs serialization for preparing final transaction outputs.
@@ -2610,10 +2459,6 @@ where
                         drop(output_before_guard);
 
                         let trace = output.incorporate_materialized_txn_output(
-                            // No aggregator v1 delta writes are needed for sequential execution.
-                            // They are already handled because we passed materialize_deltas=true
-                            // to execute_transaction.
-                            vec![],
                             materialized_resource_write_set
                                 .into_iter()
                                 .chain(serialized_groups.into_iter())

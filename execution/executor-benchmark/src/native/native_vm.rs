@@ -345,13 +345,7 @@ impl NativeVMExecutorTask {
         ));
 
         Ok((
-            VMChangeSet::new(
-                resource_write_set,
-                events,
-                delayed_field_change_set,
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
+            VMChangeSet::new(resource_write_set, events, delayed_field_change_set),
             gas_units,
         ))
     }

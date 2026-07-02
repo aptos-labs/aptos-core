@@ -23,7 +23,6 @@ use crate::{
 };
 use aptos_aggregator::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
-    delta_change_set::serialize,
     delta_math::DeltaHistory,
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
@@ -65,7 +64,11 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     CompiledModule,
 };
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    language_storage::ModuleId,
+    value::{IdentifierMappingKind, MoveTypeLayout},
+    vm_status::StatusCode,
+};
 use move_vm_runtime::{AsFunctionValueExtension, Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
@@ -126,10 +129,6 @@ impl ReadResult {
     pub(crate) fn from_data_read<V: TransactionWrite>(data: DataRead<V>) -> Self {
         match data {
             DataRead::Versioned(_, v, layout) => ReadResult::Value(v.as_state_value(), layout),
-            DataRead::Resolved(v) => {
-                // TODO[agg_v1](cleanup): Move AggV1 to Delayed fields, and then handle the layout if needed
-                ReadResult::Value(Some(StateValue::new_legacy(serialize(&v).into())), None)
-            },
             DataRead::MetadataAndResourceSize(_, _) => {
                 // Should be a Metadata or ResourceSize variant, not both.
                 unreachable!("Target read result for MetadataAndResourceSize is ambiguous");
@@ -168,10 +167,6 @@ impl GroupReadResult {
         match data {
             DataRead::Versioned(_, v, layout) => {
                 GroupReadResult::Value(v.extract_raw_bytes(), layout)
-            },
-            DataRead::Resolved(_) => {
-                // Resolved is only available in data MVHashMap for legacy AggregatorV1.
-                unreachable!("Resolved is not a possible group read result");
             },
             DataRead::MetadataAndResourceSize(_, _) | DataRead::Metadata(_) => {
                 // Metadata for the group does not go through the group MVHashMap and is handled
@@ -672,14 +667,7 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                         &target_kind,
                     );
                 },
-                Ok(Resolved(value)) => {
-                    return self.captured_reads.borrow_mut().capture_data_read(
-                        key.clone(),
-                        DataRead::Resolved(value),
-                        &target_kind,
-                    );
-                },
-                Err(Uninitialized) | Err(Unresolved(_)) => {
+                Err(Uninitialized) => {
                     // The underlying assumption here for not recording anything about the read is
                     // that the caller is expected to initialize the contents and serve the reads
                     // solely via the 'fetch_read' interface. Thus, the later, successful read,
@@ -706,13 +694,6 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                             //dependency resolved
                         },
                     }
-                },
-                Err(DeltaApplicationFailure) => {
-                    // AggregatorV1 may have delta application failure due to speculation.
-                    self.captured_reads.borrow_mut().mark_failure(false);
-                    return Ok(ReadResult::HaltSpeculativeExecution(
-                        "Delta application failure (must be speculative)".to_string(),
-                    ));
                 },
             };
         }
@@ -1820,19 +1801,40 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestVi
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
-        if let ViewState::Sync(parallel_state) = &self.latest_view {
-            parallel_state
-                .captured_reads
-                .borrow_mut()
-                .capture_aggregator_v1_read(state_key.clone());
-        }
-
-        // TODO[agg_v1](cleanup):
-        // Integrate aggregators V1. That is, we can lift the u128 value
-        // from the state item by passing the right layout here. This can
-        // be useful for cross-testing the old and the new flows.
-        // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
         self.get_resource_state_value(state_key, None)
+    }
+
+    fn get_aggregator_v1_id_for_delayed_field(
+        &self,
+        state_key: &Self::Identifier,
+    ) -> PartialVMResult<Option<DelayedFieldID>> {
+        // Treat the aggregator value (a bare u128 state item) as a delayed field: reading it with
+        // the aggregator layout exchanges it for a stable id (cached in the versioned data) and
+        // records the read so the value is materialized back at commit.
+        let layout = MoveTypeLayout::Native(
+            IdentifierMappingKind::Aggregator,
+            Box::new(MoveTypeLayout::U128),
+        );
+        let state_value = match self.get_resource_state_value(state_key, Some(&layout))? {
+            Some(state_value) => state_value,
+            None => return Ok(None),
+        };
+
+        // The exchanged bytes are the id's `as_u64()` written into the u128 slot it replaced.
+        let value = bcs::from_bytes::<u128>(state_value.bytes()).map_err(|e| {
+            PartialVMError::new(StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR)
+                .with_message(format!(
+                    "Failed to deserialize exchanged aggregator v1 value into a delayed \
+                     field id: {e}."
+                ))
+        })?;
+        let id = u64::try_from(value).map_err(|_| {
+            PartialVMError::new(StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR)
+                .with_message(format!(
+                    "Exchanged aggregator v1 value {value} does not fit a delayed field id."
+                ))
+        })?;
+        Ok(Some(DelayedFieldID::from(id)))
     }
 }
 

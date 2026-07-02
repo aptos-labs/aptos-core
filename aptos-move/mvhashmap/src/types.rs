@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_aggregator::{delta_change_set::DeltaOp, types::DelayedFieldsSpeculativeError};
+use aptos_aggregator::types::DelayedFieldsSpeculativeError;
 use aptos_types::{
     error::PanicOr,
     write_set::{TransactionWrite, WriteOpKind},
@@ -39,21 +39,13 @@ pub enum MVGroupError {
 pub enum MVDataError {
     /// No prior entry is found.
     Uninitialized,
-    /// Read resulted in an unresolved delta value.
-    Unresolved(DeltaOp),
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
-    /// Delta application failed, txn execution should fail.
-    DeltaApplicationFailure,
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MVDataOutput<V> {
-    /// Result of resolved delta op, always u128. Unlike with `Version`, we return
-    /// actual data because u128 is cheap to copy and validation can be done correctly
-    /// on values as well (ABA is not a problem).
-    Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
     Versioned(Version, ValueWithLayout<V>),
@@ -201,7 +193,6 @@ pub enum UnknownOrLayout<'a> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
         executable::ModulePath,
         state_store::state_value::StateValue,
@@ -288,7 +279,7 @@ pub(crate) mod test {
 
         pub(crate) fn from_u128(value: u128) -> Self {
             Self {
-                bytes: serialize(&value).into(),
+                bytes: value.to_be_bytes().to_vec().into(),
                 kind: WriteOpKind::Creation,
             }
         }
@@ -339,10 +330,5 @@ pub(crate) mod test {
     pub(crate) fn arc_value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> Arc<TestValue> {
         // Generate a Vec deterministically based on txn_idx and incarnation.
         Arc::new(value_for(txn_idx, incarnation))
-    }
-
-    // Convert value for txn_idx and incarnation into u128.
-    pub(crate) fn u128_for(txn_idx: TxnIndex, incarnation: Incarnation) -> u128 {
-        value_for(txn_idx, incarnation).as_u128().unwrap().unwrap()
     }
 }

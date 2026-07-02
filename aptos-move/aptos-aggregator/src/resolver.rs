@@ -2,19 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
     bounded_math::SignedU128,
-    delta_change_set::{serialize, DeltaOp},
-    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_types::{
-    error::{code_invariant_error, PanicError, PanicOr},
+    error::{PanicError, PanicOr},
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
         StateView,
     },
-    write_set::WriteOp,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
@@ -66,43 +63,16 @@ pub trait TAggregatorV1View {
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn get_aggregator_v1_state_value_size(
+    /// Exchanges the storage value of an aggregator V1 (a bare u128 at a state item) for a
+    /// stable `DelayedFieldID`, so its delta can be tracked through the delayed field machinery
+    /// and the value materialized back at commit. Returns `Ok(None)` when the aggregator value
+    /// is not present, and the default (here) for resolvers that cannot generate delayed field
+    /// ids; only the block executor's view implements the exchange.
+    fn get_aggregator_v1_id_for_delayed_field(
         &self,
-        id: &Self::Identifier,
-    ) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
-        Ok(maybe_state_value.map(|v| v.size() as u64))
-    }
-
-    /// Consumes a single delta of aggregator V1, and tries to materialize it
-    /// with a given identifier (state key). If materialization succeeds, a
-    /// write op is produced.
-    fn try_convert_aggregator_v1_delta_into_write_op(
-        &self,
-        id: &Self::Identifier,
-        delta_op: &DeltaOp,
-    ) -> PartialVMResult<WriteOp> {
-        let base = self.get_aggregator_v1_value(id)?.ok_or_else(|| {
-            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                .with_message("Cannot convert delta for deleted aggregator".to_string())
-        })?;
-        delta_op
-            .apply_to(base)
-            .map_err(|e| match &e {
-                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
-                    reason: DeltaApplicationFailureReason::Overflow,
-                    ..
-                }) => addition_v1_error(e),
-                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
-                    reason: DeltaApplicationFailureReason::Underflow,
-                    ..
-                }) => subtraction_v1_error(e),
-                // Because aggregator V1 never underflows or overflows, all other
-                // application errors are bugs.
-                _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
-                    .into(),
-            })
-            .map(|result| WriteOp::legacy_modification(serialize(&result).into()))
+        _id: &Self::Identifier,
+    ) -> PartialVMResult<Option<DelayedFieldID>> {
+        Ok(None)
     }
 }
 

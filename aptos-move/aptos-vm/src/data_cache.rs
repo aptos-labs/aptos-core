@@ -237,6 +237,14 @@ impl<E: ExecutorView> TAggregatorV1View for StorageAdapter<'_, E> {
         self.record_read(id);
         self.executor_view.get_aggregator_v1_state_value(id)
     }
+
+    fn get_aggregator_v1_id_for_delayed_field(
+        &self,
+        id: &Self::Identifier,
+    ) -> PartialVMResult<Option<DelayedFieldID>> {
+        self.executor_view
+            .get_aggregator_v1_id_for_delayed_field(id)
+    }
 }
 
 impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {

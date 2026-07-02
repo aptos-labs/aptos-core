@@ -1255,7 +1255,6 @@ impl AptosVM {
             module_storage,
         )?;
 
-        // TODO[agg_v1](fix): Charge for aggregator writes
         Ok(EpilogueSession::on_user_session_success(
             self,
             txn_data,
@@ -2502,11 +2501,6 @@ impl AptosVM {
         change_set: &VMChangeSet,
         module_write_set: &ModuleWriteSet,
     ) -> PartialVMResult<()> {
-        assert!(
-            change_set.aggregator_v1_write_set().is_empty(),
-            "Waypoint change set should not have any aggregator writes."
-        );
-
         // All Move executions satisfy the read-before-write property. Thus, we need to read each
         // access path that the write set is going to update (because the write set comes directly
         // form the transaction payload).
@@ -3603,20 +3597,21 @@ impl AptosSimulationVM {
         .expect("should succeed");
         let mut seed = vec![0u8; 32];
         rand::thread_rng().fill_bytes(&mut seed);
-        let write_op = AbstractResourceWriteOp::Write(WriteOp::legacy_creation(
-            bcs::to_bytes(&PerBlockRandomness {
-                epoch: 0,
-                round: 0,
-                seed: Some(seed),
-            })
-            .expect("should succeed")
-            .into(),
-        ));
+        let write_op = AbstractResourceWriteOp::Write(
+            WriteOp::legacy_creation(
+                bcs::to_bytes(&PerBlockRandomness {
+                    epoch: 0,
+                    round: 0,
+                    seed: Some(seed),
+                })
+                .expect("should succeed")
+                .into(),
+            ),
+            false,
+        );
         let patch_change_set = VMChangeSet::new(
             BTreeMap::from([(state_key, write_op)]),
             vec![],
-            BTreeMap::new(),
-            BTreeMap::new(),
             BTreeMap::new(),
         );
         let executor_view = base_view.as_executor_view();
@@ -3654,8 +3649,8 @@ impl AptosSimulationVM {
             &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
         );
         let txn_output = vm_output
-            .try_materialize_into_transaction_output(&resolver)
-            .expect("Materializing aggregator V1 deltas should never fail");
+            .into_transaction_output()
+            .expect("Converting to transaction output should never fail");
         (vm_status, txn_output)
     }
 }
