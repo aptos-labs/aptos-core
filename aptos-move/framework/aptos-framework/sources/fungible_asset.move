@@ -522,6 +522,11 @@ module aptos_framework::fungible_asset {
         BurnRef { metadata: self.metadata }
     }
 
+    /// Creates a mint copy ref that can be used to mint fungible assets from the given mint ref.
+    public(friend) fun generate_mint_copy_ref(self: &MintRef): MintRef {
+        MintRef { metadata: self.metadata }
+    }
+
     /// Creates a transfer ref that can be used to freeze/unfreeze/transfer fungible assets from the given fungible
     /// object's constructor ref.
     /// This can only be called at object creation time as constructor_ref is only available then.
