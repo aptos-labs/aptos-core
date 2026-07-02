@@ -5615,11 +5615,16 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Re
                         // ref that the copy-based path would have rejected could be serialized.
                         val.check_valid_for_indexed_ref(r)
                             .map_err(S::Error::custom)?;
+                        // `IndexedRef::read_ref` copies the referenced element at `depth + 1`, so
+                        // the copy-based path enforces the nesting-depth limit one level deeper
+                        // than the reference itself. Mirror that here (relevant for indexed refs to
+                        // closures, whose captured arguments add further nesting) so that the depth
+                        // boundary at which serialization fails matches the copy-based path.
                         (SerializationReadyValue {
                             ctx: self.ctx,
                             layout: self.layout,
                             value: val,
-                            depth: self.depth,
+                            depth: self.depth + 1,
                         })
                         .serialize(serializer)
                     },
