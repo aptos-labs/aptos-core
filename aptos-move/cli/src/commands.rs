@@ -555,6 +555,10 @@ pub struct TestPackage {
     #[clap(long = "fail-fast")]
     pub fail_fast: bool,
 
+    /// Run the test suite with `debug_assert!` macros disabled (they expand to `()`).
+    #[clap(long = "no-debug-assert", action = clap::ArgAction::SetFalse)]
+    pub debug_assert: bool,
+
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
 }
@@ -586,6 +590,7 @@ impl CliCommand<&'static str> for TestPackage {
             dev_mode: self.move_options.dev,
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
+            debug_assert: self.debug_assert,
             full_model_generation: !self.move_options.skip_checks_on_test_code,
             install_dir: self.move_options.output_dir.clone(),
             skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,

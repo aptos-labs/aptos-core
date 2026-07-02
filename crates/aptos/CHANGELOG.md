@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- Added `debug_assert!`, `debug_assert_eq!`, and `debug_assert_ne!` macros to the Move v2 compiler (require Move 2.5). Same forms as their non-`debug_` counterparts. On by default under `aptos move test`; `aptos move test --no-debug-assert` disables them.
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.
 
 ## [9.4.0]

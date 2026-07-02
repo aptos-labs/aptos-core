@@ -146,6 +146,8 @@ impl ModelBuilder {
         options.skip_attribute_checks = skip_attribute_checks;
         options.compile_test_code = self.resolution_graph.build_options.test_mode;
         options.compile_verify_code = self.resolution_graph.build_options.verify_mode;
+        options.compile_debug_assert = self.resolution_graph.build_options.test_mode
+            && self.resolution_graph.build_options.debug_assert;
         options.experiments.clone_from(
             &self
                 .resolution_graph
