@@ -299,7 +299,11 @@ impl<E: Pairing> PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let pk_range_proof = match maybe_hiding_kzg_setup {
-            Some((ck, vk)) => dekart_univariate_v2::Proof::setup(ell, vk, ck).0,
+            Some((ck, vk)) => {
+                let setup = dekart_univariate_v2::Proof::setup(ell, vk, ck).0;
+                assert!(setup.max_n == max_num_chunks_padded);
+                setup
+            },
             None => {
                 dekart_univariate_v2::Proof::setup_for_testing(
                     max_num_chunks_padded,
@@ -423,7 +427,7 @@ mod tests {
         println!(
             "{}: pp serialized size: {} MB",
             chrono::Local::now(),
-            bytes.len() / 1000 / 1000
+            bytes.len() / 1024 / 1024
         );
 
         let start = Instant::now();
