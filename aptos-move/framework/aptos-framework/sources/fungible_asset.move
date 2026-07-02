@@ -1128,8 +1128,14 @@ module aptos_framework::fungible_asset {
 
     /// Burn the `amount` of the fungible asset from the given store for gas charge.
     public(friend) fun address_burn_from_for_gas(
-        self: &BurnRef, store_addr: address, amount: u64
+        ref: &BurnRef,
+        store_addr: address,
+        amount: u64,
+        upgrade_to_concurrent: bool,
     ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
+        if (upgrade_to_concurrent) {
+            ensure_store_upgraded_to_concurrent_internal(store_addr);
+        };
         // ref metadata match is checked in burn() call
         self.burn(unchecked_withdraw_with_no_events(store_addr, amount));
     }
@@ -1314,6 +1320,17 @@ module aptos_framework::fungible_asset {
     public(friend) fun unchecked_deposit_with_no_events(
         store_addr: address, fa: FungibleAsset
     ) acquires FungibleStore, ConcurrentFungibleBalance {
+        unchecked_deposit_with_no_events_inline(store_addr, fa);
+    }
+
+    public(friend) fun deposit_for_gas(
+        store_addr: address,
+        fa: FungibleAsset,
+        upgrade_to_concurrent: bool,
+    ) acquires FungibleStore, ConcurrentFungibleBalance {
+        if (upgrade_to_concurrent) {
+            ensure_store_upgraded_to_concurrent_internal(store_addr);
+        };
         unchecked_deposit_with_no_events_inline(store_addr, fa);
     }
 
