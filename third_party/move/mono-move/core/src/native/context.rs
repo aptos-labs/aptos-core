@@ -188,6 +188,17 @@ pub trait NativeContext {
         ty: InternedType,
     ) -> Result<bool, VMInternalError>;
 
+    /// Borrows the resource of type `ty` at `address`, returning a reference to
+    /// it, or `None` if the resource does not exist. A mutable borrow first
+    /// deep-copies an external or stale value into the local heap
+    /// (copy-on-write).
+    fn borrow_resource(
+        &self,
+        address: AccountAddress,
+        mutable: bool,
+        ty: InternedType,
+    ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError>;
+
     /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> Result<Vec<u8>, VMInternalError>;
 

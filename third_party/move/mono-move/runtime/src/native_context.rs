@@ -119,6 +119,57 @@ impl<'a> ProductionNativeContext<'a> {
             returns_started: Cell::new(false),
         }
     }
+
+    /// Borrows the global-storage value at `storage_key`, rooting a reference to
+    /// it for the rest of the call, or `None` if the value does not exist. A
+    /// mutable borrow of an external or stale value first deep-copies it into
+    /// the local heap (copy-on-write).
+    fn borrow_storage_value(
+        &self,
+        storage_key: InMemoryStorageKey,
+        mutable: bool,
+    ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = if mutable {
+            match rws.try_borrow_global_mut(self.resource_provider, &storage_key) {
+                Ok(EntryPtr::Writable(ptr)) => ptr,
+                Ok(EntryPtr::NonWritable(ptr)) => {
+                    // Copy-on-write: an external or stale value must be copied
+                    // into the local heap before it can be mutated.
+                    let heap = unsafe { &mut **self.heap.get() };
+                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
+                    let copied = unsafe {
+                        deep_copy_or_gc(
+                            heap,
+                            self.desc_provider,
+                            rws,
+                            &self.pool,
+                            self.extensions,
+                            self.frame_ptr,
+                            TopFrame::Native(self.abi),
+                            ptr,
+                        )
+                    }
+                    .map_err(VMInternalError::from)?;
+                    rws.commit_borrow_global_mut(&storage_key, copied);
+                    copied
+                },
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            match rws.borrow_global(self.resource_provider, &storage_key) {
+                Ok(ptr) => ptr,
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        };
+        // SAFETY: `ptr` is the live value; the reference points at its start, so
+        // the offset is 0. The pool roots it for the rest of the call.
+        let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
+        Ok(Some(Ref::from_handle(handle)))
+    }
 }
 
 impl NativeContext for ProductionNativeContext<'_> {
@@ -434,6 +485,16 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(rws.exists(self.resource_provider, &key)?)
     }
 
+    fn borrow_resource(
+        &self,
+        address: AccountAddress,
+        mutable: bool,
+        ty: InternedType,
+    ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
+        let storage_key = InMemoryStorageKey::resource(address, ty);
+        self.borrow_storage_value(storage_key, mutable)
+    }
+
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> Result<Vec<u8>, VMInternalError> {
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
             VMInternalError::invariant_violation(format!("arg index {i} out of bounds"))
@@ -514,46 +575,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         value_ty: InternedType,
     ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
-        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let rws = unsafe { &mut **self.rws.get() };
-        let ptr = if mutable {
-            match rws.try_borrow_global_mut(self.resource_provider, &storage_key) {
-                Ok(EntryPtr::Writable(ptr)) => ptr,
-                Ok(EntryPtr::NonWritable(ptr)) => {
-                    // Copy-on-write: an external or stale value must be copied
-                    // into the local heap before it can be mutated.
-                    let heap = unsafe { &mut **self.heap.get() };
-                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
-                    let copied = unsafe {
-                        deep_copy_or_gc(
-                            heap,
-                            self.desc_provider,
-                            rws,
-                            &self.pool,
-                            self.extensions,
-                            self.frame_ptr,
-                            TopFrame::Native(self.abi),
-                            ptr,
-                        )
-                    }
-                    .map_err(VMInternalError::from)?;
-                    rws.commit_borrow_global_mut(&storage_key, copied);
-                    copied
-                },
-                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
-                Err(e) => return Err(e.into()),
-            }
-        } else {
-            match rws.borrow_global(self.resource_provider, &storage_key) {
-                Ok(ptr) => ptr,
-                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
-                Err(e) => return Err(e.into()),
-            }
-        };
-        // SAFETY: `ptr` is the live entry value; the reference points at its
-        // start, so the offset is 0. The pool roots it for the rest of the call.
-        let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
-        Ok(Some(Ref::from_handle(handle)))
+        self.borrow_storage_value(storage_key, mutable)
     }
 
     // TODO(cleanup): See if there's a way to separate out argument-reading from boxing.
