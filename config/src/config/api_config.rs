@@ -70,6 +70,11 @@ pub struct ApiConfig {
     ///
     /// If not set, `runtime_worker_multiplier` will multiply times the number of CPU cores on the machine
     pub max_runtime_workers: Option<usize>,
+    /// Optional: Maximum number of blocking threads for synchronous REST API work.
+    ///
+    /// If not set, this defaults to the runtime default. Dedicated high-throughput
+    /// API nodes may increase this to allow more concurrent blocking API requests.
+    pub max_blocking_threads: Option<usize>,
     /// Multiplier for number of worker threads with number of CPU cores
     ///
     /// If `max_runtime_workers` is set, this is ignored
@@ -134,6 +139,7 @@ impl Default for ApiConfig {
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
             max_runtime_workers: None,
+            max_blocking_threads: None,
             runtime_worker_multiplier: 2,
             gas_estimation: GasEstimationConfig::default(),
             periodic_gas_estimation_ms: Some(30_000),
@@ -189,6 +195,12 @@ impl ConfigSanitizer for ApiConfig {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 "runtime_worker_multiplier must be greater than 0!".into(),
+            ));
+        }
+        if api_config.max_blocking_threads == Some(0) {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_blocking_threads must be greater than 0!".into(),
             ));
         }
 
@@ -302,6 +314,23 @@ mod tests {
 
         // Sanitize the config and verify that it fails because
         // the runtime worker multiplier is invalid.
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_invalid_blocking_threads() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_blocking_threads: Some(0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
         let error =
             ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
                 .unwrap_err();
