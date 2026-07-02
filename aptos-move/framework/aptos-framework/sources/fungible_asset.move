@@ -1,7 +1,7 @@
 /// This defines the fungible asset module that can issue fungible asset of any `Metadata` object. The
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
     use aptos_framework::create_signer;
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
@@ -696,6 +696,31 @@ module aptos_framework::fungible_asset {
                 store_balance
             }
         } else { 0 }
+    }
+
+    /// Get the balance of a given store, as AggregatorSnapshot.
+    /// Allows us to obtain a balance object, without issuing a read - which would reduce parallelism.
+    ///
+    /// Note: This function will abort on FAs with `derived_balance` hook set up.
+    ///       Use `dispatchable_fungible_asset::balance` instead if you intend to work with those FAs.
+    public fun balance_snapshot<T: key>(store: Object<T>): AggregatorSnapshot<u64> acquires FungibleStore, ConcurrentFungibleBalance, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        assert!(
+            !has_balance_dispatch_function(fa_store.metadata),
+            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+        );
+        let store_addr = object::object_address(&store);
+        if (store_exists_inline(store_addr)) {
+            let store_balance = borrow_store_resource(&store).balance;
+            if (store_balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
+                let balance_resource = borrow_global<ConcurrentFungibleBalance>(store_addr);
+                aggregator_v2::snapshot(&balance_resource.balance)
+            } else {
+                aggregator_v2::create_snapshot(store_balance)
+            }
+        } else {
+            aggregator_v2::create_snapshot(0)
+        }
     }
 
     #[view]
@@ -1407,17 +1432,30 @@ module aptos_framework::fungible_asset {
         move_to(&metadata_object_signer, supply);
     }
 
+    #[view]
+    public fun is_concurrent<T: key>(store: Object<T>): bool {
+        exists<ConcurrentFungibleBalance>(object::object_address(&store))
+    }
+
+    /// Opts-in the given store into tracking balance in a concurrent manner (through Aggregators),
+    /// This allows witdraw, deposit, transfer, is_balance_at_least and balance_snapshot to
+    /// not create conflicts and maintain parallelism.
     public entry fun upgrade_store_to_concurrent<T: key>(
         owner: &signer, store: Object<T>
     ) acquires FungibleStore {
+        let fungible_store_address = store.object_address();
+        // be graceful if ConcurrentFungibleBalance already exists, but flag is off
+        if (exists<ConcurrentFungibleBalance>(fungible_store_address)) {
+            // skip checks, to make opt-in efficient if done before operation.
+            return;
+        };
+
         assert!(
             object::owns(store, signer::address_of(owner)),
             error::permission_denied(ENOT_STORE_OWNER)
         );
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         let fungible_store_address = store.object_address();
-        // be graceful if ConcurrentFungibleBalance already exists, but flag is off
-        if (exists<ConcurrentFungibleBalance>(fungible_store_address)) { return };
         assert!(
             allow_upgrade_to_concurrent_fungible_balance(),
             error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED)
