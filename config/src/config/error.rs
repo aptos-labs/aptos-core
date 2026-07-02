@@ -17,6 +17,12 @@ pub enum Error {
     Yaml(String, #[source] serde_yaml::Error),
     #[error("Config is missing expected value: {0}")]
     Missing(&'static str),
+    #[error("The environment variable {0} (used to decrypt an encrypted credential) is not set or is not valid UTF-8")]
+    MissingEnvVar(String),
+    #[error("Failed to decrypt an encrypted credential: {0}")]
+    Decryption(String),
+    #[error("Encrypted credential is malformed: {0}")]
+    InvalidCredential(String),
     #[error("Unexpected error: {0}")]
     Unexpected(String),
 }
