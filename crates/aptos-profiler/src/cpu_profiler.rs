@@ -6,12 +6,13 @@ use crate::{
     CpuProfilerConfig, Profiler,
 };
 use anyhow::Result;
-use pprof::ProfilerGuard;
+use pprof::{ProfilerGuard, Report};
 use regex::Regex;
-use std::{path::PathBuf, thread, time};
+use std::{io::Write, path::PathBuf, thread, time};
 
 pub struct CpuProfiler<'a> {
     frequency: i32,
+    txt_result_path: PathBuf,
     svg_result_path: PathBuf,
     guard: Option<ProfilerGuard<'a>>,
 }
@@ -20,6 +21,7 @@ impl<'a> CpuProfiler<'a> {
     pub(crate) fn new(config: &CpuProfilerConfig) -> Self {
         Self {
             frequency: config.frequency,
+            txt_result_path: config.txt_result_path.clone(),
             svg_result_path: config.svg_result_path.clone(),
             guard: None,
         }
@@ -44,6 +46,16 @@ impl<'a> CpuProfiler<'a> {
             }
         }
     }
+
+    fn write_report_outputs(&self, report: &Report) -> Result<()> {
+        let mut text_file = create_file_with_parents(self.txt_result_path.as_path())?;
+        write!(text_file, "{:?}", report)?;
+
+        let svg_file = create_file_with_parents(self.svg_result_path.as_path())?;
+        let _result = report.flamegraph(svg_file);
+
+        Ok(())
+    }
 }
 
 impl Profiler for CpuProfiler<'static> {
@@ -53,8 +65,7 @@ impl Profiler for CpuProfiler<'static> {
         thread::sleep(time::Duration::from_secs(duration_secs));
 
         if let Ok(report) = guard.report().build() {
-            let file = create_file_with_parents(self.svg_result_path.as_path())?;
-            let _result = report.flamegraph(file);
+            self.write_report_outputs(&report)?;
         };
 
         Ok(())
@@ -75,8 +86,7 @@ impl Profiler for CpuProfiler<'static> {
                 .frames_post_processor(Self::frames_post_processor())
                 .build()
             {
-                let file = create_file_with_parents(self.svg_result_path.as_path())?;
-                let _result = report.flamegraph(file);
+                self.write_report_outputs(&report)?;
             }
             self.destory_guard()?;
         }
@@ -85,7 +95,7 @@ impl Profiler for CpuProfiler<'static> {
 
     /// Expose the results as TXT
     fn expose_text_results(&self) -> Result<String> {
-        unimplemented!();
+        convert_svg_to_string(self.txt_result_path.as_path())
     }
 
     /// Expose the results as SVG
