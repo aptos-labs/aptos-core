@@ -14,6 +14,7 @@ use std::{self, num::NonZeroUsize, path::PathBuf, process, time::Duration};
 use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
+    encrypted_mempool::get_encrypted_mempool_test,
     indexer::get_indexer_test,
     land_blocking::get_land_blocking_test,
     multi_region::get_multi_region_test,
@@ -560,6 +561,7 @@ fn get_test_suite(
             as Box<dyn Fn() -> Option<ForgeConfig>>,
         boxed!(|| get_multi_region_test(test_name)),
         boxed!(|| get_pfn_test(test_name, duration)),
+        boxed!(|| get_encrypted_mempool_test(test_name, duration)),
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
         boxed!(|| get_state_sync_test(test_name)),
         boxed!(|| get_dag_test(test_name, duration, test_cmd)),
