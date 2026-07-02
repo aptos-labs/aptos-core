@@ -223,7 +223,7 @@ module 0x42::behavioral_predicates_examples {
         contains(&v, |x| (*x > 2) spec { ensures result == (x > 2); })
     }
     spec contains_test_found {
-        ensures result == true;  // TODO(#18560)
+        ensures result == true;
     }
 
     fun contains_opaque_test_found(): bool {
@@ -231,7 +231,29 @@ module 0x42::behavioral_predicates_examples {
         contains_opaque(&v, |x| (*x > 2) spec { ensures result == (x > 2); })
     }
     spec contains_opaque_test_found {
-        ensures result == true;  // TODO(#18560)
+        ensures result == true;
+    }
+
+    fun contains_opaque_test_found_from_constant_locals(): bool {
+        let first = 1;
+        let second = 4;
+        let third = 2;
+        let v = vector[first, second, third];
+        contains_opaque(&v, |x| (*x > 2) spec { ensures result == (x > 2); })
+    }
+    spec contains_opaque_test_found_from_constant_locals {
+        ensures result == true;
+    }
+
+    fun contains_opaque_test_found_from_locals(): bool {
+        let first = 1;
+        let second = first + 3;
+        let third = 2;
+        let v = vector[first, second, third];
+        contains_opaque(&v, |x| (*x > 2) spec { ensures result == (x > 2); })
+    }
+    spec contains_opaque_test_found_from_locals {
+        ensures result == true;
     }
 
     fun contains_test_not_found(): bool {
