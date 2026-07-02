@@ -3,6 +3,7 @@
 
 use super::{
     db::large_db_simple_test,
+    land_blocking::set_compatibility_test_features,
     realistic_workloads::{
         individual_workload_tests, mainnet_like_simulation_test, workload_mix_test,
         workload_vs_perf_benchmark,
@@ -191,6 +192,11 @@ pub fn k8s_test_suite() -> ForgeConfig {
         .add_network_test(EmitTransaction)
         .add_network_test(FrameworkUpgrade)
         .add_network_test(PerformanceBenchmark)
+        // FrameworkUpgrade runs mixed binary versions, so keep HOTNESS_IN_EPILOGUE off (as the
+        // compat and framework-upgrade suites do) to avoid old/new nodes disagreeing on output.
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            set_compatibility_test_features(helm_values);
+        }))
 }
 
 fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
