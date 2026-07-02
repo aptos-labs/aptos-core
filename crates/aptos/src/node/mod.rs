@@ -1611,6 +1611,8 @@ impl CliCommand<BlobValidationResult> for ValidatePublicParameters {
 mod tests {
     use crate::{CliResult, Tool};
     use clap::Parser;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     // TODO: there have to be cleaner ways to test things. Maybe a CLI test framework?
 
@@ -1640,6 +1642,28 @@ mod tests {
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/31.71.116.169/tcp/0001/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "testnet"];
         let error_message = run_tool_with_args(args).await.unwrap_err();
         assert_contains(error_message, "Timed out while checking endpoint");
+    }
+
+    #[tokio::test]
+    async fn test_verify_digest_key_missing_file() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let file_path = temp_file.path().to_string_lossy().to_string();
+        drop(temp_file);
+
+        let args = &["aptos", "node", "verify-digest-key", file_path.as_str()];
+        let error_message = run_tool_with_args(args).await.unwrap_err();
+        assert_contains(error_message, "Failed to read");
+    }
+
+    #[tokio::test]
+    async fn test_verify_digest_key_invalid_file_contents() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"not a digest key blob").unwrap();
+        let file_path = temp_file.path().to_string_lossy().to_string();
+
+        let args = &["aptos", "node", "verify-digest-key", file_path.as_str()];
+        let error_message = run_tool_with_args(args).await.unwrap_err();
+        assert_contains(error_message, "Failed to deserialize DigestKey");
     }
 
     async fn run_tool_with_args(args: &[&str]) -> CliResult {
