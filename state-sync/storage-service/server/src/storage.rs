@@ -21,6 +21,7 @@ use aptos_types::{
         AccumulatorRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -113,6 +114,24 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         start_index: u64,
         end_index: u64,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error>;
+
+    /// Returns the number of hot state items (hot state Merkle tree leaves) at
+    /// the specified version.
+    fn get_number_of_hot_states(
+        &self,
+        version: u64,
+    ) -> aptos_storage_service_types::Result<u64, Error>;
+
+    /// Returns a chunk holding a list of hot state values starting at the
+    /// specified `start_index` and ending at `end_index` (inclusive). In some
+    /// cases, fewer hot state values may be returned (e.g., due to network or
+    /// chunk limits).
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> aptos_storage_service_types::Result<HotStateValueChunkWithProof, Error>;
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
@@ -896,6 +915,114 @@ impl StorageReader {
         )
     }
 
+    /// Drains `value_iterator` into a list of values that respects the response size and time
+    /// limits, updating the truncation metrics. Shared by the cold and hot state value chunking
+    /// paths, which then build the chunk proof from the returned values.
+    fn collect_chunk_values_by_size<Value: Serialize>(
+        &self,
+        mut value_iterator: impl Iterator<Item = StorageResult<(StateKey, Value)>>,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        num_values_to_fetch: u64,
+        max_response_size: u64,
+        chunk_label: &str,
+    ) -> Result<Vec<(StateKey, Value)>, Error> {
+        // Create a response progress tracker
+        let mut response_progress_tracker = ResponseDataProgressTracker::new(
+            num_values_to_fetch,
+            max_response_size,
+            self.config.max_storage_read_wait_time_ms,
+            self.time_service.clone(),
+        );
+
+        // Fetch as many values as possible
+        let mut values = vec![];
+        while !response_progress_tracker.is_response_complete() {
+            match value_iterator.next() {
+                Some(Ok(value)) => {
+                    // Calculate the number of serialized bytes for the value
+                    let num_serialized_bytes = get_num_serialized_bytes(&value)
+                        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+
+                    // Add the value to the list
+                    if response_progress_tracker
+                        .data_items_fits_in_response(true, num_serialized_bytes)
+                    {
+                        values.push(value);
+                        response_progress_tracker.add_data_item(num_serialized_bytes);
+                    } else {
+                        break; // Cannot add any more data items
+                    }
+                },
+                Some(Err(error)) => {
+                    return Err(Error::StorageErrorEncountered(error.to_string()));
+                },
+                None => {
+                    // Log a warning that the iterator did not contain all the expected data
+                    warn!(
+                        "The iterator for {} is missing data! Version: {:?}, start index: {:?}, \
+                        end index: {:?}, num values to fetch: {:?}",
+                        chunk_label, version, start_index, end_index, num_values_to_fetch
+                    );
+                    break;
+                },
+            }
+        }
+
+        // Update the data truncation metrics
+        response_progress_tracker.update_data_truncation_metrics(chunk_label);
+
+        Ok(values)
+    }
+
+    /// Repeatedly fetches a chunk with proof using `fetch_chunk`, halving the requested count
+    /// until the response fits within a single network frame. Shared by the cold and hot legacy
+    /// chunking paths (which do not use size and time-aware chunking).
+    fn serve_chunk_with_proof_by_size_legacy<Chunk: Serialize>(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        mut num_values_to_fetch: u64,
+        max_response_size: u64,
+        chunk_label: &str,
+        fetch_chunk: impl Fn(u64) -> Result<Chunk, Error>,
+    ) -> Result<Chunk, Error> {
+        while num_values_to_fetch >= 1 {
+            let chunk_with_proof = fetch_chunk(num_values_to_fetch)?;
+            if num_values_to_fetch == 1 {
+                return Ok(chunk_with_proof); // We cannot return less than a single item
+            }
+
+            // Attempt to divide up the request if it overflows the message size
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&chunk_with_proof, max_response_size)?;
+            if !overflow_frame {
+                return Ok(chunk_with_proof);
+            }
+
+            metrics::increment_chunk_truncation_counter(metrics::TRUNCATION_FOR_SIZE, chunk_label);
+            let new_num_values_to_fetch = num_values_to_fetch / 2;
+            debug!(
+                "The request for {:?} values ({}) was too large (num bytes: {:?}, limit: {:?}). \
+                Retrying with {:?}.",
+                num_values_to_fetch,
+                chunk_label,
+                num_bytes,
+                max_response_size,
+                new_num_values_to_fetch
+            );
+            num_values_to_fetch = new_num_values_to_fetch; // Try again with half the amount of data
+        }
+
+        Err(Error::UnexpectedErrorEncountered(format!(
+            "Unable to serve the {} request! Version: {:?}, start index: {:?}, end index: {:?}. \
+            The data cannot fit into a single network frame!",
+            chunk_label, version, start_index, end_index
+        )))
+    }
+
     /// Returns a state value chunk with proof response (bound by the max response size in bytes)
     fn get_state_value_chunk_with_proof_by_size(
         &self,
@@ -907,8 +1034,8 @@ impl StorageReader {
     ) -> Result<StateValueChunkWithProof, Error> {
         // Calculate the number of state values to fetch
         let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
-        let max_num_state_values = self.config.max_state_chunk_size;
-        let num_state_values_to_fetch = min(expected_num_state_values, max_num_state_values);
+        let num_state_values_to_fetch =
+            min(expected_num_state_values, self.config.max_state_chunk_size);
 
         // If size and time-aware chunking are disabled, use the legacy implementation
         if !use_size_and_time_aware_chunking {
@@ -921,68 +1048,26 @@ impl StorageReader {
             );
         }
 
-        // Get the state value chunk iterator
-        let mut state_value_iterator = self.storage.get_state_value_chunk_iter(
+        // Fetch the state values (bound by the response size) and build the chunk with proof
+        let state_value_iterator = self.storage.get_state_value_chunk_iter(
             version,
             start_index as usize,
             num_state_values_to_fetch as usize,
         )?;
-
-        // Initialize the fetched state values
-        let mut state_values = vec![];
-
-        // Create a response progress tracker
-        let mut response_progress_tracker = ResponseDataProgressTracker::new(
+        let state_values = self.collect_chunk_values_by_size(
+            state_value_iterator,
+            version,
+            start_index,
+            end_index,
             num_state_values_to_fetch,
             max_response_size,
-            self.config.max_storage_read_wait_time_ms,
-            self.time_service.clone(),
-        );
-
-        // Fetch as many state values as possible
-        while !response_progress_tracker.is_response_complete() {
-            match state_value_iterator.next() {
-                Some(Ok(state_value)) => {
-                    // Calculate the number of serialized bytes for the state value
-                    let num_serialized_bytes = get_num_serialized_bytes(&state_value)
-                        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-
-                    // Add the state value to the list
-                    if response_progress_tracker
-                        .data_items_fits_in_response(true, num_serialized_bytes)
-                    {
-                        state_values.push(state_value);
-                        response_progress_tracker.add_data_item(num_serialized_bytes);
-                    } else {
-                        break; // Cannot add any more data items
-                    }
-                },
-                Some(Err(error)) => {
-                    return Err(Error::StorageErrorEncountered(error.to_string()));
-                },
-                None => {
-                    // Log a warning that the iterator did not contain all the expected data
-                    warn!(
-                        "The state value iterator is missing data! Version: {:?}, \
-                        start index: {:?}, end index: {:?}, num state values to fetch: {:?}",
-                        version, start_index, end_index, num_state_values_to_fetch
-                    );
-                    break;
-                },
-            }
-        }
-
-        // Create the state value chunk with proof
+            DataResponse::get_state_value_chunk_with_proof_label(),
+        )?;
         let state_value_chunk_with_proof = self.storage.get_state_value_chunk_proof(
             version,
             start_index as usize,
             state_values,
         )?;
-
-        // Update the data truncation metrics
-        response_progress_tracker
-            .update_data_truncation_metrics(DataResponse::get_state_value_chunk_with_proof_label());
-
         Ok(state_value_chunk_with_proof)
     }
 
@@ -993,42 +1078,114 @@ impl StorageReader {
         version: u64,
         start_index: u64,
         end_index: u64,
-        mut num_state_values_to_fetch: u64,
+        num_state_values_to_fetch: u64,
         max_response_size: u64,
     ) -> Result<StateValueChunkWithProof, Error> {
-        while num_state_values_to_fetch >= 1 {
-            let state_value_chunk_with_proof = self.storage.get_state_value_chunk_with_proof(
-                version,
-                start_index as usize,
-                num_state_values_to_fetch as usize,
-            )?;
-            if num_state_values_to_fetch == 1 {
-                return Ok(state_value_chunk_with_proof); // We cannot return less than a single item
-            }
+        self.serve_chunk_with_proof_by_size_legacy(
+            version,
+            start_index,
+            end_index,
+            num_state_values_to_fetch,
+            max_response_size,
+            DataResponse::get_state_value_chunk_with_proof_label(),
+            |num_to_fetch| {
+                self.storage
+                    .get_state_value_chunk_with_proof(
+                        version,
+                        start_index as usize,
+                        num_to_fetch as usize,
+                    )
+                    .map_err(Error::from)
+            },
+        )
+    }
 
-            // Attempt to divide up the request if it overflows the message size
-            let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&state_value_chunk_with_proof, max_response_size)?;
-            if !overflow_frame {
-                return Ok(state_value_chunk_with_proof);
-            } else {
-                metrics::increment_chunk_truncation_counter(
-                    metrics::TRUNCATION_FOR_SIZE,
-                    DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
-                        .get_label(),
-                );
-                let new_num_state_values_to_fetch = num_state_values_to_fetch / 2;
-                debug!("The request for {:?} state values was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
-                    num_state_values_to_fetch, num_bytes, max_response_size, new_num_state_values_to_fetch);
-                num_state_values_to_fetch = new_num_state_values_to_fetch; // Try again with half the amount of data
-            }
+    /// Returns a hot state value chunk with proof response (bound by the max response size in bytes)
+    fn get_hot_state_value_chunk_with_proof_by_size(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        max_response_size: u64,
+        use_size_and_time_aware_chunking: bool,
+    ) -> Result<HotStateValueChunkWithProof, Error> {
+        // Calculate the number of hot state values to fetch
+        let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
+        let num_state_values_to_fetch =
+            min(expected_num_state_values, self.config.max_state_chunk_size);
+
+        // If size and time-aware chunking are disabled, use the legacy implementation
+        if !use_size_and_time_aware_chunking {
+            return self.get_hot_state_value_chunk_with_proof_by_size_legacy(
+                version,
+                start_index,
+                end_index,
+                num_state_values_to_fetch,
+                max_response_size,
+            );
         }
 
-        Err(Error::UnexpectedErrorEncountered(format!(
-            "Unable to serve the get_state_value_chunk_with_proof request! Version: {:?}, \
-            start index: {:?}, end index: {:?}. The data cannot fit into a single network frame!",
-            version, start_index, end_index
-        )))
+        // Fetch the hot state values (bound by the response size) and build the chunk with proof
+        let hot_state_value_iterator = self.storage.get_hot_state_value_chunk_iter(
+            version,
+            start_index as usize,
+            num_state_values_to_fetch as usize,
+        )?;
+        let hot_state_values = self.collect_chunk_values_by_size(
+            hot_state_value_iterator,
+            version,
+            start_index,
+            end_index,
+            num_state_values_to_fetch,
+            max_response_size,
+            DataResponse::get_hot_state_value_chunk_with_proof_label(),
+        )?;
+        let hot_state_value_chunk_with_proof = self.storage.get_hot_state_value_chunk_proof(
+            version,
+            start_index as usize,
+            hot_state_values,
+        )?;
+        Ok(hot_state_value_chunk_with_proof)
+    }
+
+    /// Returns a hot state value chunk with proof response (bound by the max response size in
+    /// bytes). This is the legacy implementation (that does not use size and time-aware chunking).
+    /// Unlike the cold state path, the DB exposes only a split iterator/proof API for hot state,
+    /// so each attempt assembles the chunk by collecting the iterator and then building the proof.
+    fn get_hot_state_value_chunk_with_proof_by_size_legacy(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        num_state_values_to_fetch: u64,
+        max_response_size: u64,
+    ) -> Result<HotStateValueChunkWithProof, Error> {
+        self.serve_chunk_with_proof_by_size_legacy(
+            version,
+            start_index,
+            end_index,
+            num_state_values_to_fetch,
+            max_response_size,
+            DataResponse::get_hot_state_value_chunk_with_proof_label(),
+            |num_to_fetch| {
+                let hot_state_values = self
+                    .storage
+                    .get_hot_state_value_chunk_iter(
+                        version,
+                        start_index as usize,
+                        num_to_fetch as usize,
+                    )?
+                    .collect::<StorageResult<Vec<_>>>()
+                    .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+                self.storage
+                    .get_hot_state_value_chunk_proof(
+                        version,
+                        start_index as usize,
+                        hot_state_values,
+                    )
+                    .map_err(Error::from)
+            },
+        )
     }
 }
 
@@ -1213,6 +1370,29 @@ impl StorageReaderInterface for StorageReader {
             self.config.enable_size_and_time_aware_chunking,
         )
     }
+
+    fn get_number_of_hot_states(
+        &self,
+        version: u64,
+    ) -> aptos_storage_service_types::Result<u64, Error> {
+        let number_of_hot_states = self.storage.get_hot_state_item_count(version)?;
+        Ok(number_of_hot_states as u64)
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> aptos_storage_service_types::Result<HotStateValueChunkWithProof, Error> {
+        self.get_hot_state_value_chunk_with_proof_by_size(
+            version,
+            start_index,
+            end_index,
+            self.config.max_network_chunk_bytes,
+            self.config.enable_size_and_time_aware_chunking,
+        )
+    }
 }
 
 // A simple macro that wraps each storage read call with a timer
@@ -1344,6 +1524,22 @@ impl DbReader for TimedStorageReader {
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
         ) -> StorageResult<StateValueChunkWithProof>;
+
+        fn get_hot_state_item_count(&self, version: Version) -> StorageResult<usize>;
+
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(StateKey, HotStateValue)>> + '_>>;
+
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> StorageResult<HotStateValueChunkWithProof>;
 
         fn get_persisted_auxiliary_info_iterator(
             &self,
