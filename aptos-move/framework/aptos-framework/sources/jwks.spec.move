@@ -1,4 +1,9 @@
 spec aptos_framework::jwks {
+    spec remove_oidc_provider_internal(provider_set: &mut SupportedOIDCProviders, name: vector<u8>): Option<vector<u8>> {
+        pragma opaque;
+        aborts_if false;
+    }
+
     spec on_new_epoch(framework: &signer) {
         requires @aptos_framework == std::signer::address_of(framework);
         include config_buffer::OnNewEpochRequirement<SupportedOIDCProviders>;
@@ -48,15 +53,12 @@ spec aptos_framework::jwks {
 
     spec upsert_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> {
         pragma opaque;
-        pragma seed = 2;
         pragma aborts_if_is_partial;
         aborts_if std::signer::address_of(fx) != @aptos_framework;
         modifies global<config_buffer::PendingConfigs>(@aptos_framework);
     }
 
     spec remove_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>): Option<vector<u8>> {
-        // Raised above the default 40s because of prover timeout (property proved).
-        pragma verify_duration_estimate = 80;
         pragma opaque;
         pragma aborts_if_is_partial;
         aborts_if std::signer::address_of(fx) != @aptos_framework;

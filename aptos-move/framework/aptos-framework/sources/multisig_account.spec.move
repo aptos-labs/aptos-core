@@ -461,17 +461,52 @@ spec aptos_framework::multisig_account {
         metadata_values: vector<vector<u8>>,
     ) {
         use std::signer;
+        pragma verify = true;
         pragma aborts_if_is_partial;
-        // num_signatures_required must be in [1, len(owners)].
+        let multisig_address = signer::address_of(multisig_account);
         aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);
-        // After creation, MultisigAccount resource exists.
-        ensures exists<MultisigAccount>(signer::address_of(multisig_account));
-        let post multisig = global<MultisigAccount>(signer::address_of(multisig_account));
-        // num_signatures_required is set correctly.
+        aborts_if exists<MultisigAccount>(multisig_address);
+        aborts_if exists i in 0..len(owners): owners[i] == multisig_address;
+        aborts_if exists i in 0..len(owners), j in 0..len(owners):
+            i < j && owners[i] == owners[j];
+        ensures exists<MultisigAccount>(multisig_address);
+        let post multisig = global<MultisigAccount>(multisig_address);
+        ensures multisig.owners == owners;
         ensures multisig.num_signatures_required == num_signatures_required;
-        // Sequence numbers are initialized correctly.
         ensures multisig.last_executed_sequence_number == 0;
         ensures multisig.next_sequence_number == 1;
+    }
+
+    spec update_metadata_internal(
+        multisig_account: &signer,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        emit_event: bool,
+    ) {
+        use std::signer;
+        pragma opaque;
+        pragma aborts_if_is_partial;
+        let multisig_address = signer::address_of(multisig_account);
+        aborts_if len(keys) != len(values);
+        aborts_if !exists<MultisigAccount>(multisig_address);
+        modifies global<MultisigAccount>(multisig_address);
+        let pre = global<MultisigAccount>(multisig_address);
+        let post post_r = global<MultisigAccount>(multisig_address);
+        ensures exists<MultisigAccount>(multisig_address);
+        ensures post_r.owners == pre.owners;
+        ensures post_r.num_signatures_required == pre.num_signatures_required;
+        ensures post_r.transactions == pre.transactions;
+        ensures post_r.last_executed_sequence_number == pre.last_executed_sequence_number;
+        ensures post_r.next_sequence_number == pre.next_sequence_number;
+        ensures post_r.signer_cap == pre.signer_cap;
+    }
+
+    spec validate_owners(owners: &vector<address>, multisig_account: address) {
+        pragma opaque;
+        pragma verify = false;
+        aborts_if [abstract] exists i in 0..len(owners): owners[i] == multisig_account;
+        aborts_if [abstract] exists i in 0..len(owners), j in 0..len(owners) where i < j:
+            owners[i] == owners[j];
     }
 
     spec remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): (u64, u64) {
