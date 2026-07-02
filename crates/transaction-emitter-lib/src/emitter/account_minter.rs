@@ -568,7 +568,10 @@ pub fn create_and_fund_account_request(
 const CREATION_PARALLELISM: usize = 500;
 
 /// Copied from aptos crate, to not need to link it whole.
-/// Prompts for confirmation until a yes or no is given explicitly
+/// Prompts for confirmation until a yes or no is given explicitly.
+///
+/// Returns `false` if stdin reaches EOF or errors, preventing an infinite loop
+/// in non-interactive environments.
 pub fn prompt_yes(prompt: &str) -> bool {
     let mut result: Result<bool, ()> = Err(());
 
@@ -576,8 +579,10 @@ pub fn prompt_yes(prompt: &str) -> bool {
     while result.is_err() {
         println!("{} [yes/no] >", prompt);
         let mut input = String::new();
-        if std::io::stdin().read_line(&mut input).is_err() {
-            continue;
+        match std::io::stdin().read_line(&mut input) {
+            Ok(0) => return false,
+            Err(_) => return false,
+            Ok(_) => {},
         }
         result = match input.trim().to_lowercase().as_str() {
             "yes" | "y" => Ok(true),
