@@ -969,6 +969,22 @@ impl AptosVM {
         }
 
         dispatch_loader!(code_storage, loader, {
+            // Record the script's declared module dependencies (from a fresh deserialization)
+            // before loading it. A kept-but-failed script -- out of gas while charging
+            // dependencies, or rejected just below -- still commits its reads to the
+            // consensus-visible promotion set, so recording after a fallible step would leave the
+            // dependencies to `load_script`'s cache-gated fetches and make the promoted set depend
+            // on verified-script-cache warmth. If deserialization fails, `load_script` fails the
+            // same way below and there is nothing to record.
+            if let Ok(compiled_script) = self
+                .runtime_environment()
+                .deserialize_into_script(serialized_script.code())
+            {
+                for (address, module_name) in compiled_script.immediate_dependencies_iter() {
+                    code_storage.record_module_read(address, module_name);
+                }
+            }
+
             let legacy_loader_config = LegacyLoaderConfig {
                 charge_for_dependencies: self.gas_feature_version() >= RELEASE_V1_10,
                 charge_for_ty_tag_dependencies: self.gas_feature_version() >= RELEASE_V1_27,
@@ -985,15 +1001,6 @@ impl AptosVM {
             let script = func.owner_as_script()?;
             self.reject_unstable_bytecode_for_script(script)?;
             event_validation::verify_no_event_emission_in_compiled_script(script)?;
-
-            // Record the script's declared module dependencies as reads. These are a function of
-            // the script bytecode, so recording them here keeps the read set independent of the
-            // verified-script cache: its warmth depends on the execution schedule (parallel
-            // interleaving, aborts), so deriving these reads from cache-gated dependency fetches
-            // would make the hot-state promotion set nondeterministic across nodes.
-            for (address, module_name) in script.immediate_dependencies_iter() {
-                code_storage.record_module_read(address, module_name);
-            }
 
             let args = dispatch_transaction_arg_validation!(
                 session,
