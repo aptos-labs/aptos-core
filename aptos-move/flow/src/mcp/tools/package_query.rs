@@ -7,13 +7,14 @@ use super::super::{
     common::{mcp_err, resolve_function, tool_error, try_call},
     session::{into_call_tool_result, FlowSession},
 };
+use move_compiler_v2::env_pipeline::lambda_lifter::is_lambda_lifted_fun as is_lambda_lifted;
 use move_model::{
-    ast::{Attribute, ExpData, Operation},
+    ast::{Attribute, AttributeValue, ExpData, Operation},
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, QualifiedId, StructEnv,
         TypeParameter, Visibility,
     },
-    ty::ReferenceKind,
+    ty::{ReferenceKind, TypeDisplayContext},
 };
 use rmcp::{
     handler::server::wrapper::Parameters, model::CallToolResult, schemars, tool, tool_router,
@@ -55,7 +56,7 @@ enum QueryType {
 impl FlowSession {
     #[tool(
         description = "Query structural information about a Move package.",
-        annotations(read_only_hint = false, destructive_hint = false)
+        annotations(read_only_hint = true, destructive_hint = false)
     )]
     async fn move_package_query(
         &self,
@@ -108,7 +109,7 @@ impl FlowSession {
                 Ok(into_call_tool_result(&result))
             },
             QueryType::Facts => {
-                let result = build_facts(data.env());
+                let result = try_call("failed to build facts", || build_facts(data.env()))?;
                 log::info!("move_package_query facts: {} module(s)", result.len());
                 Ok(into_call_tool_result(&result))
             },
@@ -163,9 +164,12 @@ struct StructSummary {
 }
 
 #[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FunctionSummary {
     name: String,
     signature: String,
+    /// True for compiler-synthesized lambda-lifted functions.
+    is_lambda_lifted: bool,
 }
 
 /// Build a summary of each target module's constants, structs, and functions.
@@ -178,14 +182,7 @@ fn build_module_summary(env: &GlobalEnv) -> BTreeMap<String, ModuleSummary> {
 
             let constants: Vec<ConstantSummary> = module
                 .get_named_constants()
-                .map(|c| {
-                    let ctx = c.get_type_display_ctx();
-                    ConstantSummary {
-                        name: c.get_name().display(env.symbol_pool()).to_string(),
-                        type_: c.get_type().display(&ctx).to_string(),
-                        value: env.display(&c.get_value()).to_string(),
-                    }
-                })
+                .map(|c| build_constant_summary(env, &c))
                 .collect();
 
             let structs: Vec<StructSummary> = module
@@ -219,6 +216,7 @@ fn build_module_summary(env: &GlobalEnv) -> BTreeMap<String, ModuleSummary> {
                 .map(|f| FunctionSummary {
                     name: f.get_name_str(),
                     signature: f.get_header_string(),
+                    is_lambda_lifted: is_lambda_lifted(&f),
                 })
                 .collect();
 
@@ -328,6 +326,12 @@ struct FriendFacts {
 #[serde(rename_all = "camelCase")]
 struct AttributeFacts {
     name: String,
+    /// Present for an assignment attribute `#[name = value]`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+    /// Present for a nested attribute `#[name(inner, ...)]`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    args: Vec<AttributeFacts>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -387,9 +391,14 @@ struct FunctionFacts {
     attributes: Vec<AttributeFacts>,
     type_params: Vec<TypeParamFacts>,
     params: Vec<ParamFacts>,
-    return_type: Option<String>,
+    return_types: Vec<String>,
     acquires_inferred: Vec<String>,
     resource_access: ResourceAccessFacts,
+    /// True for lambda-lifted functions.
+    is_lambda_lifted: bool,
+    /// For a lambda-lifted function, the user function whose source defines the lambda.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    defined_in: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -434,9 +443,10 @@ fn build_module_facts(env: &GlobalEnv, module: &ModuleEnv<'_>) -> ModuleFacts {
 
     let attributes = attrs_to_facts(env, module.get_attributes());
 
+    let defined_in = defining_functions(env, module);
     let functions: Vec<FunctionFacts> = module
         .get_functions()
-        .map(|f| build_function_facts(env, &f))
+        .map(|f| build_function_facts(env, &f, &defined_in))
         .collect();
 
     let structs: Vec<StructFacts> = module
@@ -468,9 +478,51 @@ fn build_constant_summary(env: &GlobalEnv, c: &NamedConstantEnv<'_>) -> Constant
     }
 }
 
-fn build_function_facts(env: &GlobalEnv, func: &FunctionEnv<'_>) -> FunctionFacts {
+/// Maps each lambda-lifted function to the user function whose source
+/// contains it, chaining through nested closures.
+fn defining_functions(
+    env: &GlobalEnv,
+    module: &ModuleEnv<'_>,
+) -> BTreeMap<QualifiedId<FunId>, String> {
+    let mut result = BTreeMap::new();
+    for f in module.get_functions() {
+        if !is_lambda_lifted(&f) {
+            continue;
+        }
+        let lifted = f.get_qualified_id();
+        let mut current = lifted;
+        let mut visited = BTreeSet::new();
+        let name = loop {
+            let Some(host) = env
+                .get_function(current)
+                .get_using_functions()
+                .and_then(|using| using.into_iter().next())
+            else {
+                break None;
+            };
+            if !visited.insert(host) {
+                break None;
+            }
+            let host_env = env.get_function(host);
+            if !is_lambda_lifted(&host_env) {
+                break Some(host_env.get_name_str());
+            }
+            current = host;
+        };
+        if let Some(name) = name {
+            result.insert(lifted, name);
+        }
+    }
+    result
+}
+
+fn build_function_facts(
+    env: &GlobalEnv,
+    func: &FunctionEnv<'_>,
+    defined_in: &BTreeMap<QualifiedId<FunId>, String>,
+) -> FunctionFacts {
     let location = loc_to_file_span(env, &func.get_loc());
-    let type_ctx = func.get_type_display_ctx();
+    let type_ctx = qualified_type_ctx(func.get_type_display_ctx());
 
     let symbol_pool = env.symbol_pool();
     let params: Vec<ParamFacts> = func
@@ -482,7 +534,7 @@ fn build_function_facts(env: &GlobalEnv, func: &FunctionEnv<'_>) -> FunctionFact
         })
         .collect();
 
-    let return_type = format_return_type(func, &type_ctx);
+    let return_types = format_return_types(func, &type_ctx);
 
     let acquires_inferred: Vec<String> = func
         .get_acquired_structs()
@@ -500,6 +552,7 @@ fn build_function_facts(env: &GlobalEnv, func: &FunctionEnv<'_>) -> FunctionFact
     let resource_access = build_resource_access(env, func, &type_ctx);
 
     let attributes = attrs_to_facts(env, func.get_attributes());
+
     let is_view = func
         .get_attributes()
         .iter()
@@ -516,15 +569,17 @@ fn build_function_facts(env: &GlobalEnv, func: &FunctionEnv<'_>) -> FunctionFact
         attributes,
         type_params: type_params_to_facts(env, &func.get_type_parameters()),
         params,
-        return_type,
+        return_types,
         acquires_inferred,
         resource_access,
+        is_lambda_lifted: is_lambda_lifted(func),
+        defined_in: defined_in.get(&func.get_qualified_id()).cloned(),
     }
 }
 
 fn build_struct_facts(env: &GlobalEnv, s: &StructEnv<'_>) -> StructFacts {
     let location = loc_to_file_span(env, &s.get_loc());
-    let type_ctx = s.get_type_display_ctx();
+    let type_ctx = qualified_type_ctx(s.get_type_display_ctx());
     let symbol_pool = env.symbol_pool();
 
     let abilities: Vec<String> = s
@@ -603,13 +658,40 @@ fn type_params_to_facts(env: &GlobalEnv, params: &[TypeParameter]) -> Vec<TypePa
 }
 
 fn attrs_to_facts(env: &GlobalEnv, attrs: &[Attribute]) -> Vec<AttributeFacts> {
+    attrs.iter().map(|a| attr_to_facts(env, a)).collect()
+}
+
+/// Serialize a single attribute, preserving its arguments. `#[name(a, b = c)]`
+/// becomes `{ name, args: [...] }`; `#[name = value]` becomes `{ name, value }`.
+fn attr_to_facts(env: &GlobalEnv, attr: &Attribute) -> AttributeFacts {
     let symbol_pool = env.symbol_pool();
-    attrs
-        .iter()
-        .map(|a| AttributeFacts {
-            name: symbol_pool.string(a.name()).to_string(),
-        })
-        .collect()
+    match attr {
+        Attribute::Apply(_, name, sub) => AttributeFacts {
+            name: symbol_pool.string(*name).to_string(),
+            value: None,
+            args: sub.iter().map(|a| attr_to_facts(env, a)).collect(),
+        },
+        Attribute::Assign(_, name, val) => AttributeFacts {
+            name: symbol_pool.string(*name).to_string(),
+            value: Some(attr_value_to_string(env, val)),
+            args: vec![],
+        },
+    }
+}
+
+/// Render an attribute value: literals via the model's value display, named
+/// paths as fully-qualified `address::module::name` (or a bare name).
+fn attr_value_to_string(env: &GlobalEnv, val: &AttributeValue) -> String {
+    match val {
+        AttributeValue::Value(_, v) => env.display(v).to_string(),
+        AttributeValue::Name(_, module_opt, sym) => {
+            let name = sym.display(env.symbol_pool()).to_string();
+            match module_opt {
+                Some(module) => format!("{}::{}", module.display_full(env), name),
+                None => name,
+            }
+        },
+    }
 }
 
 fn visibility_str(func: &FunctionEnv<'_>) -> String {
@@ -624,24 +706,29 @@ fn visibility_str(func: &FunctionEnv<'_>) -> String {
     .to_string()
 }
 
-fn format_return_type(
-    func: &FunctionEnv<'_>,
-    type_ctx: &move_model::ty::TypeDisplayContext<'_>,
-) -> Option<String> {
-    use move_model::ty::Type;
-    let result = func.get_result_type();
-    if let Type::Tuple(ts) = &result
-        && ts.is_empty()
-    {
-        return None;
+/// A type-display context that renders every struct fully-qualified as `address::module::Name<...>`
+fn qualified_type_ctx(base: TypeDisplayContext<'_>) -> TypeDisplayContext<'_> {
+    TypeDisplayContext {
+        display_module_addr: true,
+        use_module_qualification: true,
+        ..base
     }
-    Some(result.display(type_ctx).to_string())
+}
+
+/// Render a function's return as a list of types: `[]` for no return, one entry
+/// for a scalar, and one entry per element for a tuple (multiple) return.
+fn format_return_types(func: &FunctionEnv<'_>, type_ctx: &TypeDisplayContext<'_>) -> Vec<String> {
+    func.get_result_type()
+        .flatten()
+        .iter()
+        .map(|t| t.display(type_ctx).to_string())
+        .collect()
 }
 /// Empty when the function has no AST body.
 fn build_resource_access(
     env: &GlobalEnv,
     func: &FunctionEnv<'_>,
-    type_ctx: &move_model::ty::TypeDisplayContext<'_>,
+    type_ctx: &TypeDisplayContext<'_>,
 ) -> ResourceAccessFacts {
     let Some(body) = func.get_def() else {
         return ResourceAccessFacts {
@@ -666,7 +753,7 @@ fn build_resource_access(
             if does_read || does_write {
                 let insts = env.get_node_instantiation(*node_id);
                 if let Some(ty) = insts.first() {
-                    let ty = qualified_resource_name(env, ty, type_ctx);
+                    let ty = ty.display(type_ctx).to_string();
                     if does_read {
                         reads.insert(ty.clone());
                     }
@@ -681,35 +768,6 @@ fn build_resource_access(
     ResourceAccessFacts {
         reads: reads.into_iter().collect(),
         writes: writes.into_iter().collect(),
-    }
-}
-
-/// Render the resource type of a global-storage operation as a fully-qualified
-/// `address::module::Struct<TypeArgs>` name, matching the format used by
-/// `acquiresInferred` so consumers can correlate the two. Falls back to the
-/// plain type display for non-struct types, which should not occur for storage
-/// operations.
-fn qualified_resource_name(
-    env: &GlobalEnv,
-    ty: &move_model::ty::Type,
-    type_ctx: &move_model::ty::TypeDisplayContext<'_>,
-) -> String {
-    use move_model::ty::Type;
-    let Type::Struct(mid, sid, type_args) = ty else {
-        return ty.display(type_ctx).to_string();
-    };
-    let base = env
-        .get_struct(mid.qualified(*sid))
-        .get_full_name_with_address();
-    if type_args.is_empty() {
-        base
-    } else {
-        let args = type_args
-            .iter()
-            .map(|t| t.display(type_ctx).to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!("{base}<{args}>")
     }
 }
 

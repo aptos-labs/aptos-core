@@ -23,11 +23,13 @@
     "functions": [
       {
         "name": "burn",
-        "signature": "public entry fun burn(t: Token)"
+        "signature": "public entry fun burn(t: Token)",
+        "isLambdaLifted": false
       },
       {
         "name": "mint",
-        "signature": "public fun mint(amount: u64,owner: address): Token"
+        "signature": "public fun mint(amount: u64,owner: address): Token",
+        "isLambdaLifted": false
       }
     ]
   }
