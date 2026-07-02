@@ -154,8 +154,7 @@ mod tests {
         // validator set and carrying the next epoch info.
         let (mut current_signers, current_verifier) = random_validator_verifier(1, None, true);
         let mut current_verifier = Arc::new(current_verifier);
-        let mut current_version = 123;
-        for epoch in &all_epoch {
+        for (current_version, epoch) in (123..).zip(all_epoch.iter()) {
             validator_verifier.push(current_verifier.clone());
             let (next_signers, next_verifier) =
                 random_validator_verifier((*epoch + 1) as usize, None, true);
@@ -193,7 +192,6 @@ mod tests {
             ));
             current_signers = next_signers;
             current_verifier = next_verifier;
-            current_version += 1;
         }
 
         // Test well-formed proof will succeed

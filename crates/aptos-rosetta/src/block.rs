@@ -102,7 +102,7 @@ async fn build_block(
 
     // Ensure the transactions are sorted in order, this is required by Rosetta
     // NOTE: sorting may be pretty expensive, depending on the size of the block
-    transactions.sort_by(|first, second| first.metadata.version.0.cmp(&second.metadata.version.0));
+    transactions.sort_by_key(|first| first.metadata.version.0);
 
     Ok(Block {
         block_identifier,

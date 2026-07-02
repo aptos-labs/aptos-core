@@ -205,7 +205,7 @@ impl Processor {
                 match futures::future::try_join_all(tasks).await {
                     Ok(mut res) => {
                         // Check for gaps
-                        res.sort_by(|a, b| a.0.cmp(&b.0));
+                        res.sort_by_key(|a| a.0);
                         let mut prev_start = None;
                         let mut prev_end = None;
 

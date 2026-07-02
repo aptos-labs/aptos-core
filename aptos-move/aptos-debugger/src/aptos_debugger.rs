@@ -346,7 +346,7 @@ impl AptosDebugger {
         let mut cur = vec![];
         let mut cur_aux_infos = vec![];
         let mut cur_version = begin;
-        for (txn, aux_info) in txns.into_iter().zip(auxiliary_infos.into_iter()) {
+        for (txn, aux_info) in txns.into_iter().zip(auxiliary_infos) {
             if txn.is_block_start() && !cur.is_empty() {
                 let to_execute = std::mem::take(&mut cur);
                 let to_execute_aux_infos = std::mem::take(&mut cur_aux_infos);

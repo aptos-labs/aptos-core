@@ -129,8 +129,9 @@ pub fn load_inputs(
     let mut inputs = vec![];
     for (block, read_set) in blocks.into_iter().zip(read_sets) {
         let read_set = Arc::new(read_set);
-        let mut version = block.begin_version;
-        for (i, txn) in block.transactions.iter().enumerate() {
+        for (version, (i, txn)) in
+            (block.begin_version..).zip(block.transactions.iter().enumerate())
+        {
             let aux_info = block.persisted_auxiliary_infos.get(i);
             if let Some((sender, entry, user_context, chain_id, session_id)) =
                 parse_user_transaction(txn, aux_info)
@@ -145,7 +146,6 @@ pub fn load_inputs(
                     read_set: Arc::clone(&read_set),
                 });
             }
-            version += 1;
         }
     }
     Ok(inputs)

@@ -290,8 +290,8 @@ pub fn add_prelude(
     context.insert("tuple_instances", &tuple_instances);
     let table_key_instances = mono_info
         .table_inst
-        .iter()
-        .flat_map(|(_, ty_args)| ty_args.iter().map(|(kty, _)| kty))
+        .values()
+        .flat_map(|ty_args| ty_args.iter().map(|(kty, _)| kty))
         .unique()
         .map(|ty| TypeInfo::new(env, options, ty, false))
         .collect_vec();

@@ -252,7 +252,9 @@ fn test_events(counter_ops: Vec<(usize, usize)>) {
         }
     });
 
-    while worker_done_cnt.load(Ordering::Relaxed) != 4 {}
+    while worker_done_cnt.load(Ordering::Relaxed) != 4 {
+        std::hint::spin_loop()
+    }
 
     spec_events.flush(num_counters);
     // Need the number of recorded events after last clear.

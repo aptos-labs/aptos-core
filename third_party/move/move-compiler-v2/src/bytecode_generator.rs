@@ -1860,7 +1860,7 @@ impl Generator<'_> {
                         .iter()
                         .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
                         .collect::<Vec<_>>();
-                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                    for (pat, temp) in pats.iter().zip(temps) {
                         self.gen_match_from_temp(
                             id,
                             pat,

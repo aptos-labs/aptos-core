@@ -442,8 +442,8 @@ aptos-protos = { path = "protos/rust" }
 aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
-aptos-release-tool = { path = "aptos-move/aptos-release-tool" }
 aptos-release-bundle = { path = "aptos-move/framework/release-bundle" }
+aptos-release-tool = { path = "aptos-move/aptos-release-tool" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }

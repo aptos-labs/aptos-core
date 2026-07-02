@@ -236,8 +236,7 @@ impl InternalIndexerDB {
         iter.seek(&(*event_key, start_seq_num))?;
 
         let mut result = Vec::new();
-        let mut cur_seq = start_seq_num;
-        for res in iter.take(limit as usize) {
+        for (cur_seq, res) in (start_seq_num..).zip(iter.take(limit as usize)) {
             let ((path, seq), (ver, idx)) = res?;
             if path != *event_key || ver > ledger_version {
                 break;
@@ -251,7 +250,6 @@ impl InternalIndexerDB {
                 bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
             }
             result.push((seq, ver, idx));
-            cur_seq += 1;
         }
 
         Ok(result)

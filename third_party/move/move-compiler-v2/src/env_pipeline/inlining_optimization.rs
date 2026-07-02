@@ -216,7 +216,7 @@ fn find_cycles_in_call_graph(
     for scc in kosaraju_scc(&graph) {
         if scc.len() > 1 {
             // cycle involving non-self-recursion
-            cycle_nodes.extend(scc.into_iter());
+            cycle_nodes.extend(scc);
         }
     }
     cycle_nodes
@@ -359,7 +359,7 @@ fn pick_from_eligible_and_compute_cost(
             locals_budget_remaining.checked_sub(callee_info.locals_per_site),
             code_size_budget_remaining.checked_sub(callee_info.code_size * sites.len()),
         ) {
-            call_sites_to_inline.extend(sites.into_iter());
+            call_sites_to_inline.extend(sites);
             // Note that we reduce the remaining budget for number of locals once for
             // all the callsites of a callee, because we expect to coalesce the locals at
             // different callsites.

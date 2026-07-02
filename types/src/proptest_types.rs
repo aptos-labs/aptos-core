@@ -219,7 +219,7 @@ impl AccountInfoUniverse {
                 AccountInfo::new(private_key, consensus_private_key)
             })
             .collect();
-        accounts.sort_by(|a, b| a.address.cmp(&b.address));
+        accounts.sort_by_key(|a| a.address);
         let validator_signer = ValidatorSigner::new(
             accounts[0].address,
             Arc::new(accounts[0].consensus_private_key.clone()),
