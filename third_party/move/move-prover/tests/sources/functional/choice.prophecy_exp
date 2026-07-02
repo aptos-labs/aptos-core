@@ -1,0 +1,125 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/choice.move:23:9
+   │
+23 │         ensures result == TRACE(choose x: u64 where x >= 4 && x <= 5);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/choice.move:17: simple_incorrect
+   =         b = <redacted>
+   =     at tests/sources/functional/choice.move:18: simple_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/choice.move:19: simple_incorrect
+   =     at tests/sources/functional/choice.move:23: simple_incorrect (spec)
+   =         `TRACE(choose x: u64 where x >= 4 && x <= 5)` = <redacted>
+
+error: choice expression requires a witness to exist
+   ┌─ tests/sources/functional/choice.move:56:9
+   │
+56 │         let choice = choose a: address where exists<R>(a) && global<R>(a).x == 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/choice.move:47: populate_R
+   =     at tests/sources/functional/choice.move:52: populate_R (spec)
+   =     at tests/sources/functional/choice.move:53: populate_R (spec)
+   =     at tests/sources/functional/choice.move:56: populate_R (spec)
+   =     at tests/sources/functional/choice.move:55: populate_R (spec)
+   =     at tests/sources/functional/choice.move:56: populate_R (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/choice.move:88:9
+   │
+88 │         ensures TRACE(choose i in 0..len(result) where result[i] == 2) == 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/choice.move:77: test_not_using_min_incorrect
+   =         v = <redacted>
+   =     at tests/sources/functional/choice.move:78: test_not_using_min_incorrect
+   =         v_ref = <redacted>
+   =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:80: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:81: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:83: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:84: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:76: test_not_using_min_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/choice.move:88: test_not_using_min_incorrect (spec)
+   =         `TRACE(choose i in 0..len(result) where result[i] == 2)` = <redacted>
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:101:9
+    │
+101 │         ensures result == TRACE(choose y: u64 where y > x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:96: test_choice_dup_expected_fail
+    =         x = <redacted>
+    =     at tests/sources/functional/choice.move:97: test_choice_dup_expected_fail
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:101: test_choice_dup_expected_fail (spec)
+    =         `TRACE(choose y: u64 where y > x)` = <redacted>
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:159:9
+    │
+159 │         ensures evidence1 == evidence2;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:157: test_different_choice_via_let (spec)
+    =     at tests/sources/functional/choice.move:158: test_different_choice_via_let (spec)
+    =     at tests/sources/functional/choice.move:159: test_different_choice_via_let (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:183:9
+    │
+183 │         ensures choose_some_positive_u64() == choose_another_positive_u64();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:183: test_different_choice_via_spec_fun (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:211:9
+    │
+211 │         ensures evidence1 == evidence2;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:207: test_same_choice_different_args_via_spec_fun
+    =     at tests/sources/functional/choice.move:209: test_same_choice_different_args_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:210: test_same_choice_different_args_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:207: test_same_choice_different_args_via_spec_fun
+    =         x = <redacted>
+    =         y = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:211: test_same_choice_different_args_via_spec_fun (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:220:9
+    │
+220 │         ensures result != (choose i: u64 where i >= k);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:237: test_same_choice_different_args_via_schema_2
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:220
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:303:9
+    │
+303 │ ╭         ensures !(get_ballot<Proposal>(signer::address_of(ballot_account), result).expiration_timestamp_secs
+304 │ │             <= 0);
+    │ ╰──────────────────^
+    │
+    =     at tests/sources/functional/choice.move:281: create_ballot
+    =         ballot_account = <redacted>
+    =     at tests/sources/functional/choice.move:285: create_ballot
+    =     at tests/sources/functional/choice.move:284: create_ballot
+    =     at tests/sources/functional/choice.move:292
+    =     at tests/sources/functional/choice.move:287: create_ballot
+    =     at tests/sources/functional/choice.move:273: new_ballot_id
+    =         counter = <redacted>
+    =     at tests/sources/functional/choice.move:276: new_ballot_id
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:283: create_ballot
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:303: create_ballot (spec)

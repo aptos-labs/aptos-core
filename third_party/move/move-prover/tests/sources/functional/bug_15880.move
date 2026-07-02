@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 module 0x42::m {
     use std::vector;
 

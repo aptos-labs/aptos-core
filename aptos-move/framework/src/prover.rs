@@ -136,6 +136,11 @@ pub struct ProverOptions {
     #[clap(long)]
     pub no_infer_lambda_specs: bool,
 
+    /// Experimental: use the path-free prophecy (RustHorn/Creusot) reference model
+    /// instead of the WriteBack-based static model. See the prover design notes.
+    #[clap(long)]
+    pub prophecy_refs: bool,
+
     /// Internal flag: use a temp dir for boogie output so parallel invocations
     /// don't interfere. Set automatically by test harnesses.
     #[clap(long, hide = true)]
@@ -280,6 +285,7 @@ impl ProverOptions {
                 skip_loop_analysis: self.keep_loops || base_opts.prover.skip_loop_analysis,
                 no_infer_lambda_specs: self.no_infer_lambda_specs
                     || base_opts.prover.no_infer_lambda_specs,
+                prophecy_refs: self.prophecy_refs || base_opts.prover.prophecy_refs,
                 ..base_opts.prover.clone()
             },
             backend: move_prover_boogie_backend::options::BoogieOptions {
@@ -305,6 +311,9 @@ impl ProverOptions {
                 split_vcs_by_assert: self.split_vcs_by_assert
                     || base_opts.backend.split_vcs_by_assert,
                 error_limit: self.error_limit.unwrap_or(base_opts.backend.error_limit),
+                // Mirror of prover.prophecy_refs; consumed by the Tera prelude. The
+                // standalone move-prover CLI sets this in `cli.rs::post_process`.
+                prophecy_refs: self.prophecy_refs || base_opts.backend.prophecy_refs,
                 ..base_opts.backend
             },
             ..base_opts

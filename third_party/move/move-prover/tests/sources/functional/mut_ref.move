@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 module 0x1::TestMutRef {
     use std::vector;
 

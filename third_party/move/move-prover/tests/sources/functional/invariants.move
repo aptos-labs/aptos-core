@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 module 0x42::TestInvariants {
     spec module {
         pragma verify = true;

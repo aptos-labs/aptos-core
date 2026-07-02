@@ -1,3 +1,7 @@
+// exclude_for: prophecy
+// The prophecy reference model does not yet support mutable references derived through
+// function values (BorrowEdge::Invoke): the static model havocs the lender at the Invoke
+// write-back, but the path-free model cannot identify the lender to over-approximate.
 module 0x42::test {
 
     // Immut refs

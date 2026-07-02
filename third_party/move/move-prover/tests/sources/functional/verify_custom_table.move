@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 // Similar to `verify_table.move`, but against a custom implementation.
 module 0x42::table {
     struct Table<phantom K: copy + drop, phantom V> has store {}

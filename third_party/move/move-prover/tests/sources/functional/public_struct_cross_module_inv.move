@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 // Cross-module data invariant test: module A defines a public struct S with an
 // invariant; module B holds a mutable reference and writes a violating value.
 // The prover should report exactly one error — in B's violate()

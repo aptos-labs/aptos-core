@@ -213,6 +213,11 @@ pub struct BoogieOptions {
     /// condition.
     #[arg(long, default_value_t = 5)]
     pub error_limit: usize,
+    /// Mirror of `ProverOptions::prophecy_refs`, set during option finalization.
+    /// Consumed only by the Tera prelude to select the path-free prophecy
+    /// `$Mutation` model. There is no separate CLI flag on the backend side.
+    #[arg(skip)]
+    pub prophecy_refs: bool,
 }
 
 impl Default for BoogieOptions {
@@ -251,6 +256,7 @@ impl Default for BoogieOptions {
             skip_instance_check: false,
             split_vcs_by_assert: false,
             error_limit: 5,
+            prophecy_refs: false,
         }
     }
 }

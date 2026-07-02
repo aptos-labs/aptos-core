@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 module 0x42::struct_invariant_mut_ref_param {
     use std::vector;
 

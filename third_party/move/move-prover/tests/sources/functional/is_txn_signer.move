@@ -1,3 +1,4 @@
+// separate_baseline: prophecy
 
 // separate_baseline: simplify
 // The separate baseline is legit and caused by a different choice in the generated model.

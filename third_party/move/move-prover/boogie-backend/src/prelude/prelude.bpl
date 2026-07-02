@@ -481,9 +481,17 @@ datatype $Location {
 // A mutable reference which also carries its current value. Since mutable references
 // are single threaded in Move, we can keep them together and treat them as a value
 // during mutation until the point they are stored back to their original location.
+{%- if options.prophecy_refs %}
+// Prophecy (RustHorn/Creusot) model: path-free. `v` is the current value, `f` is the
+// prophesied final value the reference will hold when its borrow is resolved.
+datatype $Mutation<T> {
+    $Mutation(v: T, f: T)
+}
+{%- else %}
 datatype $Mutation<T> {
     $Mutation(l: $Location, p: Vec int, v: T)
 }
+{%- endif %}
 
 // Representation of memory for a given type.
 datatype $Memory<T> {
@@ -550,6 +558,18 @@ function {:inline} $Dereference<T>(ref: $Mutation T): T {
     ref->v
 }
 
+{%- if options.prophecy_refs %}
+// Update the current value of a mutation, preserving the prophecy `f`.
+function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
+    $Mutation(v, m->f)
+}
+
+// Havoc the current value of a mutation, preserving the prophecy `f`.
+procedure {:inline 1} $HavocMutation<T>(m: $Mutation T) returns (r: $Mutation T) {
+    r->f := m->f;
+    // r->v stays uninitialized, thus havoced
+}
+{%- else %}
 // Update the value of a mutation.
 function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
     $Mutation(m->l, m->p, v)
@@ -621,6 +641,7 @@ function {:inline} $HasLocalLocation<T>(m: $Mutation T, idx: int): bool {
 function {:inline} $GlobalLocationAddress<T>(m: $Mutation T): int {
     (m->l)->a
 }
+{%- endif %}
 
 
 
