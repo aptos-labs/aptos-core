@@ -16,7 +16,10 @@ use rand::rngs::OsRng;
 use std::{env, num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 
-const SWARM_BUILD_NUM_RETRIES: u8 = 3;
+// Reduced from 3 to 1: with nextest retries = 1, total attempts per test = 2 × 2 = 4.
+// Previously 3 internal × 3 nextest = 16 total attempts, which amplified resource contention
+// when multiple tests ran in parallel on constrained CI instances.
+const SWARM_BUILD_NUM_RETRIES: u8 = 1;
 
 #[derive(Clone)]
 pub struct SwarmBuilder {

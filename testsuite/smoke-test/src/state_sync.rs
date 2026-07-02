@@ -171,42 +171,6 @@ async fn test_fullnode_execution_sync_epoch_changes() {
 }
 
 #[tokio::test]
-#[ignore] // Ignore this test because it is a subset of test_fullnode_output_sync_epoch_changes
-async fn test_fullnode_output_sync_no_epoch_changes() {
-    // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-
-    // Create a fullnode config that uses transaction outputs to sync
-    let mut vfn_config = NodeConfig::get_default_vfn_config();
-    vfn_config
-        .state_sync
-        .state_sync_driver
-        .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
-
-    // Create the fullnode and test its ability to sync
-    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
-    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
-}
-
-#[tokio::test]
-#[ignore] // Ignore this test because it is a subset of test_fullnode_execution_sync_epoch_changes
-async fn test_fullnode_execution_sync_no_epoch_changes() {
-    // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-
-    // Create a fullnode config that uses transactions to sync
-    let mut vfn_config = NodeConfig::get_default_vfn_config();
-    vfn_config
-        .state_sync
-        .state_sync_driver
-        .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
-
-    // Create the fullnode and test its ability to sync
-    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
-    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
-}
-
-#[tokio::test]
 async fn test_single_validator_reboot() {
     // Create a swarm of 1 validator
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -269,23 +233,9 @@ async fn test_validator_sync_and_participate_epoch_changes() {
 }
 
 #[tokio::test]
-#[ignore] // Ignore this test because it is a subset of test_validator_sync_and_participate_epoch_changes
-async fn test_validator_sync_and_participate_no_epoch_changes() {
-    // Test the default syncing method without epoch changes
-    test_validator_sync_and_participate(false, false).await;
-}
-
-#[tokio::test]
 async fn test_validator_fast_sync_and_participate_epoch_changes() {
     // Test fast syncing with epoch changes
     test_validator_sync_and_participate(true, true).await;
-}
-
-#[tokio::test]
-#[ignore] // Ignore this test because it is a subset of test_validator_fast_sync_and_participate_epoch_changes
-async fn test_validator_fast_sync_and_participate_no_epoch_changes() {
-    // Test fast syncing without epoch changes
-    test_validator_sync_and_participate(true, false).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
@@ -394,13 +344,6 @@ async fn test_validator_fast_sync_unrealistic_network_limit() {
 async fn test_validator_fast_sync_exponential_backoff_epoch_changes() {
     // Test fast syncing with exponential backoff and epoch changes
     test_validator_sync_exponential_backoff(true).await;
-}
-
-#[tokio::test]
-#[ignore] // Ignore this test because it is a subset of test_validator_fast_sync_exponential_backoff_epoch_changes
-async fn test_validator_fast_sync_exponential_backoff_no_epoch_changes() {
-    // Test fast syncing without exponential backoff and no epoch changes
-    test_validator_sync_exponential_backoff(false).await;
 }
 
 #[tokio::test]

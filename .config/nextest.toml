@@ -28,6 +28,9 @@ status-level = "skip"
 failure-output = "immediate-final"
 fail-fast = true
 # different than ci
-test-threads = 4
-retries = 3
+test-threads = 6
+# Reduced from 3 to 1: combined with SWARM_BUILD_NUM_RETRIES=1, gives 2×2=4 total
+# attempts per test (was 4×4=16). Fewer retries reduce resource contention when
+# multiple tests compete for ports on the same CI instance.
+retries = 1
 slow-timeout = { period = "1800s", terminate-after = 1 }
