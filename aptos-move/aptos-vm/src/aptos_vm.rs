@@ -115,7 +115,7 @@ use aptos_vm_types::{
 use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
@@ -985,6 +985,15 @@ impl AptosVM {
             let script = func.owner_as_script()?;
             self.reject_unstable_bytecode_for_script(script)?;
             event_validation::verify_no_event_emission_in_compiled_script(script)?;
+
+            // Record the script's declared module dependencies as reads. These are a function of
+            // the script bytecode, so recording them here keeps the read set independent of the
+            // verified-script cache: its warmth depends on the execution schedule (parallel
+            // interleaving, aborts), so deriving these reads from cache-gated dependency fetches
+            // would make the hot-state promotion set nondeterministic across nodes.
+            for (address, module_name) in script.immediate_dependencies_iter() {
+                code_storage.record_module_read(address, module_name);
+            }
 
             let args = dispatch_transaction_arg_validation!(
                 session,

@@ -17,4 +17,12 @@ pub trait AptosModuleStorage: ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
+
+    /// Records `(address, module_name)` as a module read by the current transaction, for hot
+    /// state promotion. The default is a no-op; only the read-recording storage overrides it.
+    ///
+    /// Lets callers record a script's declared dependencies from the loaded script, keeping
+    /// the recorded read set independent of the verified-script cache, whose warmth depends on
+    /// the execution schedule and must not influence the consensus-visible promoted set.
+    fn record_module_read(&self, _address: &AccountAddress, _module_name: &IdentStr) {}
 }
