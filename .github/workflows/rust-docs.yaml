@@ -1,0 +1,92 @@
+name: "Publish Rust Docs"
+
+# Build `cargo doc` for every workspace crate and publish the HTML to the
+# `gh-pages` branch, which GitHub Pages serves at
+# https://aptos-labs.github.io/aptos-core/. The deploy is a single orphan
+# commit per run (see .github/rust-docs/publish.sh) so the branch stays small
+# even though the rustdoc payload is large. Anything outside the rustdoc
+# payload that lives at the gh-pages root (currently just `move-book/`) is
+# carried over from the previous tip.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Re-publish whenever Rust source, the workspace manifest, the toolchain
+      # pin, or the deploy plumbing itself changes. Avoid re-running on pure
+      # Move/docs/markdown churn that wouldn't change rustdoc output.
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/rust-docs.yaml"
+      - ".github/rust-docs/**"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the docs but skip the push to gh-pages"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# Only one publish at a time — concurrent runs would race on the gh-pages
+# branch (we force-push). Don't cancel an in-flight publish; let it finish.
+concurrency:
+  group: rust-docs-publish
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    # Forks won't have permission to push to gh-pages; skip there entirely.
+    if: github.repository == 'aptos-labs/aptos-core'
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4.3.1
+        with:
+          fetch-depth: 1
+
+      - name: Set up Rust toolchain and system deps
+        uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          # Distinct cache key — rustdoc artifacts in target/doc are not
+          # produced by the regular check/test pipelines, so reusing those
+          # caches would mostly miss anyway. Keep them separate.
+          ADDITIONAL_KEY: rust-docs
+
+      - name: Build rustdoc for the entire workspace
+        run: |
+          set -euo pipefail
+          # `--no-deps` keeps us from rendering docs for every dependency on
+          # crates.io (which would balloon to many GB and add hours).
+          # `--keep-going` lets the build skip a crate that fails to render
+          # rather than aborting the whole workspace — partial docs are
+          # better than no docs.
+          cargo doc \
+            --workspace \
+            --no-deps \
+            --locked \
+            --keep-going
+
+      - name: Generate landing page
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: bash .github/rust-docs/build-index.sh
+
+      - name: Report build size
+        run: |
+          du -sh target/doc
+          echo "Crates rendered:"
+          find target/doc -mindepth 2 -maxdepth 2 -name index.html | wc -l
+
+      - name: Publish to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
+        run: bash .github/rust-docs/publish.sh
