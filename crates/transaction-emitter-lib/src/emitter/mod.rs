@@ -1098,15 +1098,36 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
+pub struct OrderlessWaitOutcome {
+    /// Hashes the summaries pass + fallback both failed to confirm as committed.
+    /// Treated as definitively not-committed (pending past deadline or server-side 404).
+    pub expired: HashMap<AccountAddress, HashSet<HashValue>>,
+    /// Hashes whose final state we couldn't determine: ran out of the fallback budget,
+    /// or the per-hash lookup itself errored. Reported separately from expired so the
+    /// stat doesn't silently absorb undetected commits.
+    pub unresolved: HashMap<AccountAddress, HashSet<HashValue>>,
+    /// Number of txns the per-hash fallback sweep confirmed on-chain. These are counted
+    /// as committed for TPS, but excluded from latency: the sweep runs past the
+    /// expiration deadline, so we don't have a meaningful completion time for them.
+    pub recovered: u64,
+    pub sum_of_completion_timestamps_millis: u128,
+}
+
 async fn wait_for_orderless_txns(
     start_time: Instant,
     client: &RestClient,
     account_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
-) -> (HashMap<AccountAddress, HashSet<HashValue>>, u128) {
+    fallback_lookup_cap: usize,
+) -> OrderlessWaitOutcome {
     if account_orderless_txns.is_empty() {
-        return (HashMap::new(), 0);
+        return OrderlessWaitOutcome {
+            expired: HashMap::new(),
+            unresolved: HashMap::new(),
+            recovered: 0,
+            sum_of_completion_timestamps_millis: 0,
+        };
     }
     let mut sum_of_completion_timestamps_millis = 0u128;
 
@@ -1204,7 +1225,125 @@ async fn wait_for_orderless_txns(
 
         time::sleep(sleep_between_cycles).await;
     }
-    (pending_account_txns, sum_of_completion_timestamps_millis)
+
+    classify_pending_orderless_txns(
+        client,
+        pending_account_txns,
+        fallback_lookup_cap,
+        sum_of_completion_timestamps_millis,
+    )
+    .await
+}
+
+/// Per-hash sweep over hashes the summaries-based wait loop couldn't confirm.
+///
+/// Bounded by `fallback_lookup_cap` per worker cycle so a runaway worker cannot
+/// fan out unbounded API calls. Hashes beyond the cap are returned in `unresolved`
+/// rather than being silently bucketed as expired.
+async fn classify_pending_orderless_txns(
+    client: &RestClient,
+    pending_account_txns: HashMap<AccountAddress, HashSet<HashValue>>,
+    fallback_lookup_cap: usize,
+    sum_of_completion_timestamps_millis: u128,
+) -> OrderlessWaitOutcome {
+    let mut expired: HashMap<AccountAddress, HashSet<HashValue>> = HashMap::new();
+    let mut unresolved: HashMap<AccountAddress, HashSet<HashValue>> = HashMap::new();
+
+    if pending_account_txns.is_empty() {
+        return OrderlessWaitOutcome {
+            expired,
+            unresolved,
+            recovered: 0,
+            sum_of_completion_timestamps_millis,
+        };
+    }
+
+    let total_pending: usize = pending_account_txns.values().map(|s| s.len()).sum();
+    let to_check_count = min(total_pending, fallback_lookup_cap);
+    let over_cap = total_pending.saturating_sub(fallback_lookup_cap);
+
+    // Flatten and split: first `to_check_count` go to per-hash lookup, the rest become unresolved.
+    let mut flattened: Vec<(AccountAddress, HashValue)> = pending_account_txns
+        .into_iter()
+        .flat_map(|(account, hashes)| hashes.into_iter().map(move |h| (account, h)))
+        .collect();
+    let to_classify: Vec<(AccountAddress, HashValue)> = flattened.drain(..to_check_count).collect();
+    for (account, hash) in flattened {
+        unresolved.entry(account).or_default().insert(hash);
+    }
+
+    if to_classify.is_empty() {
+        if over_cap > 0 {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(15)),
+                warn!(
+                    "[{}] orderless fallback skipped: {} hashes over cap {} (unresolved)",
+                    client.path_prefix_string(),
+                    over_cap,
+                    fallback_lookup_cap,
+                )
+            );
+        }
+        return OrderlessWaitOutcome {
+            expired,
+            unresolved,
+            recovered: 0,
+            sum_of_completion_timestamps_millis,
+        };
+    }
+
+    let results = join_all(to_classify.into_iter().map(|(account, hash)| async move {
+        (account, hash, client.get_transaction_by_hash(hash).await)
+    }))
+    .await;
+
+    let mut recovered = 0u64;
+    let attempted = results.len() as u64;
+    for (account, hash, result) in results {
+        match result {
+            Ok(response) => {
+                let txn = response.into_inner();
+                if txn.is_pending() {
+                    // Still in mempool past our deadline — won't commit.
+                    expired.entry(account).or_default().insert(hash);
+                } else {
+                    // On-chain (success or VM failure both count as observed/committed).
+                    // Counted as committed for TPS, but deliberately not added to
+                    // sum_of_completion_timestamps_millis: this sweep runs past the
+                    // expiration deadline, so the elapsed time here is not a meaningful
+                    // commit latency. The caller excludes `recovered` from latency stats.
+                    recovered += 1;
+                }
+            },
+            Err(RestError::Api(resp)) if resp.status_code == reqwest::StatusCode::NOT_FOUND => {
+                expired.entry(account).or_default().insert(hash);
+            },
+            Err(_) => {
+                unresolved.entry(account).or_default().insert(hash);
+            },
+        }
+    }
+
+    sample!(
+        SampleRate::Duration(Duration::from_secs(15)),
+        warn!(
+            "[{}] orderless fallback: attempted {}, recovered {}, expired_confirmed {}, unresolved {} (of which {} over cap {})",
+            client.path_prefix_string(),
+            attempted,
+            recovered,
+            expired.values().map(|s| s.len()).sum::<usize>(),
+            unresolved.values().map(|s| s.len()).sum::<usize>(),
+            over_cap,
+            fallback_lookup_cap,
+        )
+    );
+
+    OrderlessWaitOutcome {
+        expired,
+        unresolved,
+        recovered,
+        sum_of_completion_timestamps_millis,
+    }
 }
 
 /// This function waits for the submitted transactions to be committed, up to
