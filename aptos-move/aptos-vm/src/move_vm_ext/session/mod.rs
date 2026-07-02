@@ -229,9 +229,13 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.legacy_into_events();
 
+        // Drain staged position writes into the VMChangeSet bucket.
+        let position_context: aptos_position_natives::NativePositionContext = extensions.remove();
+        let position_writes_map = position_context.into_change_maps();
+
         let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
-        let change_set = Self::convert_change_set(
+        let mut change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -241,6 +245,12 @@ where
             configs.legacy_resource_creation_as_modification(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
+
+        let position_bucket = build_position_writeset(&position_writes_map)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        change_set
+            .set_position_bucket(position_bucket)
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(change_set)
     }
@@ -580,5 +590,50 @@ where
     extensions.add(NativeStateStorageContext::new(data_view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeObjectContext::default());
+
+    extensions.add(aptos_position_natives::NativePositionContext::new());
+
     extensions
+}
+
+/// Convert staged position writes (`None` = deletion) into a
+/// `StateKey -> WriteOp` map. Uses legacy creation/deletion since the
+/// staging map doesn't track prior presence.
+fn build_position_writeset(
+    writes: &std::collections::BTreeMap<
+        aptos_types::state_store::state_key::inner::TradingNativeKey,
+        Option<aptos_types::state_store::native_position::NativePosition>,
+    >,
+) -> PartialVMResult<
+    std::collections::BTreeMap<
+        aptos_types::state_store::state_key::StateKey,
+        aptos_types::write_set::WriteOp,
+    >,
+> {
+    use aptos_types::{
+        state_store::state_key::{inner::TradingNativeKey, StateKey},
+        write_set::WriteOp,
+    };
+    let mut out = std::collections::BTreeMap::new();
+    for (key, maybe_position) in writes {
+        let state_key = match key {
+            TradingNativeKey::Position {
+                exchange,
+                account,
+                market,
+            } => StateKey::position(*exchange, *account, *market),
+        };
+        let op = match maybe_position {
+            Some(pos) => {
+                let bytes = pos.serialize().map_err(|e| {
+                    PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                        .with_message(format!("failed to serialize NativePosition: {}", e))
+                })?;
+                WriteOp::legacy_creation(bytes.into())
+            },
+            None => WriteOp::legacy_deletion(),
+        };
+        out.insert(state_key, op);
+    }
+    Ok(out)
 }
