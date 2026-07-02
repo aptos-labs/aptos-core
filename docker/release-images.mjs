@@ -126,6 +126,8 @@ async function main() {
   for (const imageName of imageNamesToRelease) {
     imagesToRelease[imageName] = IMAGES_TO_RELEASE[imageName];
   }
+  // Accumulate each (source, target) we push so we can emit a summary at the end.
+  const imagesCopied = [];
   for (const [image, imageConfig] of Object.entries(imagesToRelease)) {
     for (const [profile, features] of Object.entries(imageConfig)) {
       // build profiles that are not the default "release" will have a separate prefix
@@ -156,6 +158,8 @@ async function main() {
                 `INFO: skipping copy of ${imageSource} to ${imageTarget} and ${imageTargetWithSha} due to dry run`,
               ),
             );
+            imagesCopied.push({ image, source: imageSource, target: imageTarget });
+            imagesCopied.push({ image, source: imageSource, target: imageTargetWithSha });
             continue;
           } else {
             console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
@@ -163,10 +167,44 @@ async function main() {
           }
           await $`${crane} copy ${imageSource} ${imageTarget}`;
           await $`${crane} copy ${imageSource} ${imageTargetWithSha}`;
+          imagesCopied.push({ image, source: imageSource, target: imageTarget });
+          imagesCopied.push({ image, source: imageSource, target: imageTargetWithSha });
         }
       }
     }
   }
+
+  writeStepSummary(parsedArgs, imagesCopied);
+}
+
+// Write a markdown summary of every copied target to $GITHUB_STEP_SUMMARY so
+// release runs surface exactly what was pushed (and to where) without having
+// to scroll through the raw crane logs. No-op outside GitHub Actions.
+function writeStepSummary(parsedArgs, imagesCopied) {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (!summaryPath || imagesCopied.length === 0) {
+    return;
+  }
+  const heading = parsedArgs.DRY_RUN
+    ? `### Images that would have been copied for \`${parsedArgs.IMAGE_TAG_PREFIX}\` (dry run)`
+    : `### Images copied for \`${parsedArgs.IMAGE_TAG_PREFIX}\``;
+  const lines = [
+    heading,
+    "",
+    `- git sha: \`${parsedArgs.GIT_SHA}\``,
+    `- copies: ${imagesCopied.length}`,
+    "",
+    "| Image | Source | Target |",
+    "| --- | --- | --- |",
+    ...imagesCopied.map(
+      ({ image, source, target }) => `| \`${image}\` | \`${source}\` | \`${target}\` |`,
+    ),
+    "",
+  ];
+  fs.appendFileSync(summaryPath, lines.join("\n") + "\n");
+  console.info(
+    chalk.green(`INFO: wrote summary of ${imagesCopied.length} copied tags to GITHUB_STEP_SUMMARY`),
+  );
 }
 
 // The image tag prefix is used to determine the release group. Examples:

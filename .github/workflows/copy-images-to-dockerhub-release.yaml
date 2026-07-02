@@ -22,9 +22,106 @@ permissions:
   id-token: write #required for GCP Workload Identity federation
 
 jobs:
+  # Pre-flight gate for aptos-node-v* tag pushes: aptos-node/Cargo.toml at
+  # the tagged commit must match the tag's version portion EXACTLY (including
+  # any -rc suffix), so the build_info version metric agrees with the tag
+  # and docker image. On mismatch this job fails (gating the copy via
+  # `needs`), and the downstream bump-release-version job opens a PR.
+  #
+  # Skipped on non-aptos-node-v* refs (network branches, indexer tags); the
+  # copy job's `if:` lets a skipped result fall through.
+  validate-aptos-node-version:
+    if: startsWith(github.ref, 'refs/tags/aptos-node-v') && !contains(github.ref_name, 'hotfix')
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      match: ${{ steps.compare.outputs.match }}
+      expected: ${{ steps.compare.outputs.expected }}
+      release_branch: ${{ steps.derive.outputs.release_branch }}
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v4
+
+      - name: Compare tag to aptos-node/Cargo.toml
+        id: compare
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          expected="${RELEASE_TAG#aptos-node-v}"
+          actual=$(grep -m1 '^version = ' aptos-node/Cargo.toml | sed -E 's/^version = "([^"]+)".*/\1/')
+          echo "tag version:    $expected"
+          echo "cargo version:  $actual"
+          echo "expected=${expected}" >> "$GITHUB_OUTPUT"
+          echo "actual=${actual}" >> "$GITHUB_OUTPUT"
+          if [ "$expected" = "$actual" ]; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Version check passed"
+              echo ""
+              echo "| Field | Value |"
+              echo "| --- | --- |"
+              echo "| Tag | \`$RELEASE_TAG\` |"
+              echo "| \`aptos-node/Cargo.toml\` version | \`$actual\` |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "match=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Version mismatch"
+              echo ""
+              echo "| Field | Value |"
+              echo "| --- | --- |"
+              echo "| Tag | \`$RELEASE_TAG\` |"
+              echo "| Expected \`aptos-node/Cargo.toml\` version | \`$expected\` |"
+              echo "| Actual \`aptos-node/Cargo.toml\` version | \`$actual\` |"
+              echo ""
+              echo "The \`bump-release-version\` workflow will open a bump PR against the release branch. This job will fail to block image promotion."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::aptos-node/Cargo.toml version '$actual' at tag $RELEASE_TAG does not match expected '$expected'."
+          fi
+
+      - name: Derive release branch from tag
+        if: steps.compare.outputs.match == 'false'
+        id: derive
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          # aptos-node-vX.Y.Z[-rc[.N]]  ->  aptos-release-vX.Y
+          if [[ "$RELEASE_TAG" =~ ^aptos-node-v([0-9]+)\.([0-9]+)\.[0-9]+(-rc(\.[0-9]+)?)?$ ]]; then
+            release_branch="aptos-release-v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+            echo "release_branch=${release_branch}" >> "$GITHUB_OUTPUT"
+            echo "release branch: ${release_branch}"
+          else
+            echo "::error::Tag '$RELEASE_TAG' does not match aptos-node-vX.Y.Z[-rc[.N]]"
+            exit 1
+          fi
+
+      - name: Fail workflow on version mismatch
+        if: steps.compare.outputs.match == 'false'
+        run: exit 1
+
+  # Delegate bump PR creation to the standalone bump-release-version workflow.
+  # That workflow handles Cargo.lock updates and uses a PAT, so it bypasses
+  # the org-level "Allow GHA to create PRs" restriction on GITHUB_TOKEN.
+  # Runs even though validate failed thanks to `always() && ...`.
+  bump-release-version-on-mismatch:
+    needs: [validate-aptos-node-version]
+    if: |
+      always() &&
+      needs.validate-aptos-node-version.result == 'failure' &&
+      needs.validate-aptos-node-version.outputs.match == 'false'
+    uses: ./.github/workflows/bump-release-version.yaml
+    with:
+      branch: ${{ needs.validate-aptos-node-version.outputs.release_branch }}
+      override-version: ${{ needs.validate-aptos-node-version.outputs.expected }}
+    secrets: inherit
+
   copy-images-to-docker-hub:
-    # Skip hotfix branches/tags; same substring rule as before, without shell interpolation.
-    if: ${{ !contains(github.ref_name, 'hotfix') }}
+    needs: [validate-aptos-node-version]
+    # Skip hotfix; for non-aptos-node-v* refs, validate is skipped — let those
+    # fall through (the skipped-result clause).
+    if: |
+      !contains(github.ref_name, 'hotfix') &&
+      (needs.validate-aptos-node-version.result == 'success' ||
+       needs.validate-aptos-node-version.result == 'skipped')
     uses: ./.github/workflows/copy-images-to-dockerhub.yaml
     with:
       image_tag_prefix: ${{ github.ref_name }}

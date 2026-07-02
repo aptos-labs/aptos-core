@@ -1,0 +1,24 @@
+name: Release action tests
+on:
+  pull_request:
+    paths:
+      - .github/actions/release-aptos-node/**
+      - .github/workflows/release-action-tests.yaml
+  push:
+    branches:
+      - main
+    paths:
+      - .github/actions/release-aptos-node/**
+      - .github/workflows/release-action-tests.yaml
+
+jobs:
+  bump-script-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Run bump_aptos_node_version.py unit tests
+        working-directory: .github/actions/release-aptos-node
+        run: python3 -m unittest bump_aptos_node_version -v

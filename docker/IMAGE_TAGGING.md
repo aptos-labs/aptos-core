@@ -89,7 +89,7 @@ Images are built by [`workflow-run-docker-rust-build.yaml`](../.github/workflows
 
 Triggered by pushing a tag or one of the named network branches (`devnet`, `testnet`, `mainnet`, etc.) via [`copy-images-to-dockerhub-release.yaml`](../.github/workflows/copy-images-to-dockerhub-release.yaml). The git ref name (`github.ref_name`) becomes `IMAGE_TAG_PREFIX`.
 
-For `aptos-node-vX.Y.Z` tags, [`docker/image-helpers.js`](image-helpers.js) (`assertTagMatchesSourceVersion`) validates that the version in the tag matches `aptos-node/Cargo.toml` before copying. The release PR that bumps that version is created by [`aptos-node-release.yaml`](../.github/workflows/aptos-node-release.yaml).
+For `aptos-node-vX.Y.Z[-rc[.N]]` tags, the `validate-aptos-node-version` job in [`copy-images-to-dockerhub-release.yaml`](../.github/workflows/copy-images-to-dockerhub-release.yaml) runs before the copy and requires `aptos-node/Cargo.toml` at the tagged commit to match the tag's version portion **exactly** (including any `-rc` suffix). On mismatch, the job fails (gating the copy via `needs:`) and a downstream `bump-release-version-on-mismatch` job invokes [`bump-release-version.yaml`](../.github/workflows/bump-release-version.yaml) via `workflow_call` to open a bump PR against the corresponding `aptos-release-vX.Y` branch. The bump workflow uses a PAT and also updates `Cargo.lock`. Merge the PR, then force-move the tag to the new commit and re-push to retrigger the workflow. The in-script check `assertTagMatchesSourceVersion` in [`docker/image-helpers.js`](image-helpers.js) is kept as a defense-in-depth backstop with the same exact-match semantics.
 
 ### Nightly
 
@@ -127,4 +127,4 @@ Each image declares which (profile, feature) combinations are released. Defined 
 
 ## Release validation
 
-For `aptos-node-vX.Y.Z` prefixes, the script validates that `X.Y.Z` matches the version in `aptos-node/Cargo.toml` before copying. Non-release prefixes (e.g. `devnet`, `nightly`) skip this check. See `assertTagMatchesSourceVersion` and `isReleaseImage` in [`docker/image-helpers.js`](image-helpers.js).
+For `aptos-node-vX.Y.Z[-rc[.N]]` prefixes, the script validates that the version portion matches `aptos-node/Cargo.toml` exactly before copying. Non-release prefixes (e.g. `devnet`, `nightly`) skip this check. See `assertTagMatchesSourceVersion` and `isReleaseImage` in [`docker/image-helpers.js`](image-helpers.js). This is the secondary gate; the primary gate is the `validate-aptos-node-version` workflow job described above.

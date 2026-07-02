@@ -8,8 +8,21 @@ on:
         required: true
         default: "aptos-release-v1."
       override-version:
-        description: "Optional version to override the calculated version"
+        description: "Optional version to override the calculated version (X.Y.Z or X.Y.Z-rc[.N])"
         required: false
+        default: ""
+  # Allow other workflows (e.g. copy-images-to-dockerhub-release on a
+  # tag-vs-Cargo.toml mismatch) to invoke this to open the bump PR.
+  workflow_call:
+    inputs:
+      branch:
+        description: "Release branch to bump"
+        required: true
+        type: string
+      override-version:
+        description: "Exact version to set (X.Y.Z or X.Y.Z-rc[.N]); when set, auto-derivation is skipped"
+        required: false
+        type: string
         default: ""
 
 permissions:
@@ -23,15 +36,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ inputs.branch }}
 
       - name: Determine next version and update aptos-node/Cargo.toml
         uses: actions/github-script@v6
         id: determine-version
         with:
           script: |
-            const branch = "${{ github.event.inputs.branch }}".trim();
-            const overrideVersion = "${{ github.event.inputs.override-version }}".trim();
+            const branch = "${{ inputs.branch }}".trim();
+            const overrideVersion = "${{ inputs.override-version }}".trim();
 
             // Read Cargo.toml
             const fs = require("fs");
@@ -48,11 +61,13 @@ jobs:
 
             let newVersion;
 
-            // If override version is provided, check if it's valid and use it directly
+            // If override version is provided, check if it's valid and use it directly.
+            // Accept release (X.Y.Z) and release-candidate (X.Y.Z-rc[.N]) shapes so this
+            // workflow can be driven by a tag-vs-Cargo.toml mismatch on an -rc tag.
             if (overrideVersion) {
-              const overrideVersionMatch = overrideVersion.match(/^\d+\.\d+\.\d+$/);
+              const overrideVersionMatch = overrideVersion.match(/^\d+\.\d+\.\d+(-rc(\.\d+)?)?$/);
               if (!overrideVersionMatch) {
-                throw new Error(`Invalid override version format: ${overrideVersion}. Expected format: x.y.z`);
+                throw new Error(`Invalid override version format: ${overrideVersion}. Expected: x.y.z or x.y.z-rc[.N]`);
               }
               console.log(`Using overridden version: ${overrideVersion}`);
               newVersion = overrideVersion;
@@ -98,7 +113,7 @@ jobs:
         with:
           token: ${{ secrets.APTOS_BOT_PAT }}
           branch: update-version-${{ github.run_id }}
-          base: ${{ github.event.inputs.branch }}
+          base: ${{ inputs.branch }}
           title: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
           body: "This PR bumps the aptos-node version to ${{ steps.determine-version.outputs.newVersion }} in ${{ steps.determine-version.outputs.releaseBranch }}."
           commit-message: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
