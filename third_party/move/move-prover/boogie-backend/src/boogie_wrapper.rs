@@ -36,6 +36,8 @@ use std::{
     fs,
     num::ParseIntError,
     option::Option::None,
+    sync::{mpsc, Arc, Mutex},
+    thread,
 };
 
 /// A type alias for the way how we use crate `pretty`'s document type. `pretty` is a
@@ -220,11 +222,168 @@ impl BoogieWrapper<'_> {
 
     /// Calls boogie and analyzes output.
     pub fn call_boogie_and_verify_output(&self, boogie_file: &str) -> anyhow::Result<()> {
-        let BoogieOutput { errors, all_output } = self.call_boogie(boogie_file)?;
+        let BoogieOutput {
+            mut errors,
+            all_output,
+        } = self.call_boogie(boogie_file)?;
         let boogie_log_file = self.options.get_boogie_log_file(boogie_file);
         let log_file_existed = std::path::Path::new(&boogie_log_file).exists();
         debug!("writing boogie log to {}", boogie_log_file);
         fs::write(&boogie_log_file, all_output)?;
+
+        // Tag each error with the .bpl basename for the same reason as in
+        // `analyze_subprocess_output`: when multiple shards run sequentially,
+        // mapping an error back to a shard from the message saves grep work.
+        let bpl_label = std::path::Path::new(boogie_file)
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| boogie_file.to_string());
+        for error in &mut errors {
+            error.message = format!("[{}] {}", bpl_label, error.message);
+        }
+
+        for error in &errors {
+            self.add_error(error);
+        }
+
+        if !log_file_existed && !self.options.keep_artifacts {
+            std::fs::remove_file(boogie_log_file).unwrap_or_default();
+        }
+
+        Ok(())
+    }
+
+    /// Analyze a previously-captured subprocess result (stdout/stderr/status) and
+    /// emit any errors found into the env. This is the env-touching half of
+    /// `call_boogie_and_verify_output` — the parallel driver path runs the
+    /// subprocesses on worker threads (no env access) and then calls this on the
+    /// main thread for each captured result in stable order.
+    pub fn analyze_subprocess_output(
+        &self,
+        boogie_file: &str,
+        raw: RawBoogieResult,
+    ) -> anyhow::Result<()> {
+        // Compute once and use as a prefix for every error/anyhow message so
+        // the user can always trace a failure back to a specific .bpl.
+        let bpl_label = std::path::Path::new(boogie_file)
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| boogie_file.to_string());
+
+        let output = match raw.subprocess_result {
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::TimedOut {
+                    let err = BoogieError {
+                        kind: BoogieErrorKind::Internal,
+                        loc: self.env.unknown_loc(),
+                        message: format!(
+                            "[{}] Boogie execution exceeded hard timeout of {}s",
+                            bpl_label, self.options.hard_timeout_secs
+                        ),
+                        execution_trace: vec![],
+                        model: None,
+                    };
+                    self.add_error(&err);
+                    return Ok(());
+                } else {
+                    return Err(anyhow!("[{}] cannot execute boogie: {}", bpl_label, err));
+                }
+            },
+            Ok(out) => out,
+        };
+        if self.options.num_instances > 1 {
+            debug!("Boogie instance with seed {} finished first", raw.seed);
+        }
+        let out = String::from_utf8_lossy(&output.stdout).to_string();
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        if out
+            .trim()
+            .starts_with("Fatal Error: ProverException: Cannot find specified prover")
+        {
+            return Err(anyhow!(
+                "[{}] The configured prover `{}` could not be found{}",
+                bpl_label,
+                if self.options.use_cvc5 {
+                    &self.options.cvc5_exe
+                } else {
+                    &self.options.z3_exe
+                },
+                if self.options.use_cvc5 {
+                    " (--use-cvc5 is set)"
+                } else {
+                    ""
+                }
+            ));
+        }
+        if out.trim().starts_with("Unable to monomorphize") {
+            return Err(anyhow!(
+                "[{}] Boogie error: {}\n\nstderr:\n{}",
+                bpl_label,
+                out,
+                err
+            ));
+        }
+        if out.contains("errors detected in") {
+            return Err(anyhow!(
+                "[{}] [internal] boogie exited with compilation errors:\n{}",
+                bpl_label,
+                out
+            ));
+        }
+        // Note: a "Prover error:" line (e.g. Z3 hitting "unknown constant" mid-VC
+        // before dying) is recoverable — Boogie may still have produced
+        // per-procedure inconclusive/verification messages on stdout for the
+        // VCs that completed before the crash. We harvest those below instead
+        // of treating the run as a hard error.
+        let mut errors = self.extract_verification_errors(&out);
+        errors.extend(self.extract_inconclusive_errors(&out));
+        errors.extend(self.extract_inconsistency_errors(&out));
+        if !output.status.success() {
+            // Boogie itself crashed or exited non-zero (SIGSEGV is a common
+            // case on large generic code; "Prover died" from Z3 OOM/SIGKILL is
+            // another). Promote this to a non-fatal env diagnostic so the rest
+            // of the per-module / per-VC pool can still run and report.
+            //
+            // If Boogie produced per-VC verification/inconclusive lines before
+            // dying, the extraction above already captured them — those will be
+            // surfaced after the crash note below. Without this ordering, a
+            // Z3-killed-mid-procedure run reports only "process exited" with no
+            // hint of which VCs were in flight.
+            let crash_err = BoogieError {
+                kind: BoogieErrorKind::Internal,
+                loc: self.env.unknown_loc(),
+                message: format!(
+                    "[{}] Boogie process exited with {} (stdout={:?}, stderr={:?})",
+                    bpl_label,
+                    output.status,
+                    truncate_for_diag(&out),
+                    truncate_for_diag(&err)
+                ),
+                execution_trace: vec![],
+                model: None,
+            };
+            self.add_error(&crash_err);
+            for error in &mut errors {
+                error.message = format!("[{}] {}", bpl_label, error.message);
+            }
+            for error in &errors {
+                self.add_error(error);
+            }
+            return Ok(());
+        }
+
+        let boogie_log_file = self.options.get_boogie_log_file(boogie_file);
+        let log_file_existed = std::path::Path::new(&boogie_log_file).exists();
+        debug!("writing boogie log to {}", boogie_log_file);
+        fs::write(&boogie_log_file, &out)?;
+
+        // In module / per-VC modes a single failure in one of many .bpl files is
+        // useless without knowing which file produced it. Tag every error from
+        // this Boogie invocation with the .bpl basename so users can map back
+        // to a module (or single VC) without grepping logs.
+        for error in &mut errors {
+            error.message = format!("[{}] {}", bpl_label, error.message);
+        }
 
         for error in &errors {
             self.add_error(error);
@@ -780,17 +939,31 @@ impl BoogieWrapper<'_> {
                     let loc = self
                         .get_loc_from_pos(make_position(line, col))
                         .unwrap_or_else(|| self.env.unknown_loc());
+                    // `str` captures e.g. " of '$1_stake_foo$verify' ". Strip
+                    // surrounding noise and quotes to surface the procedure name
+                    // in the message — without this the user sees "verification
+                    // timed out" with no clue which procedure it was.
+                    let proc_name = str
+                        .trim()
+                        .trim_start_matches("of")
+                        .trim()
+                        .trim_matches(|c| c == '\'' || c == '`' || c == ' ');
+                    let move_name = boogie_reverse_function_name(self.env, proc_name);
                     Some(BoogieError {
                         kind: BoogieErrorKind::Inconclusive,
                         loc,
                         message: if msg.contains("out of resource") || msg.contains("timed out") {
                             let timeout = self.options.vc_timeout;
                             format!(
-                                "verification out of resources/timeout (global timeout set to {}s)",
+                                "verification of `{}`{} out of resources/timeout (global timeout set to {}s)",
+                                proc_name,
+                                move_name
+                                    .map(|n| format!(" ({})", n))
+                                    .unwrap_or_default(),
                                 timeout
                             )
                         } else {
-                            "verification inconclusive".to_string()
+                            format!("verification of `{}` inconclusive", proc_name)
                         },
                         execution_trace: vec![],
                         model: None,
@@ -1836,4 +2009,138 @@ fn index_range_check(max: usize) -> impl FnOnce(usize) -> Result<usize, ModelPar
             )))
         }
     }
+}
+
+/// Truncate captured Boogie stdout/stderr for inclusion in a diagnostic
+/// message: when Boogie crashes we want enough context to debug, but a 100k-line
+/// log inlined into the codespan error renders the test output unreadable.
+/// Slices on a UTF-8 char boundary at or before `LIMIT` so non-ASCII bytes
+/// (rare in Boogie/Z3 output but possible) don't panic the prover while it's
+/// reporting a crash.
+fn truncate_for_diag(s: &str) -> String {
+    const LIMIT: usize = 500;
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        "<empty>".to_string()
+    } else if trimmed.len() > LIMIT {
+        let mut cut = LIMIT;
+        while cut > 0 && !trimmed.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        format!(
+            "{}... ({} more bytes)",
+            &trimmed[..cut],
+            trimmed.len() - cut
+        )
+    } else {
+        trimmed.to_string()
+    }
+}
+
+// -----------------------------------------------
+// # Parallel Boogie subprocess runner
+//
+// These free helpers exist so the driver can launch multiple Boogie subprocesses
+// concurrently for the `per_vc` mode (each `.bpl` carries one `$verify`
+// procedure). The subprocess invocation itself does not touch `GlobalEnv`, so it
+// is safe to run from worker threads; the captured raw output is then parsed and
+// reported on the main thread via `BoogieWrapper::analyze_subprocess_output`,
+// which preserves the existing single-threaded env mutation discipline.
+
+/// Captured subprocess result: the winning seed (from the per-instance portfolio)
+/// plus the raw `std::process::Output` or the I/O error from spawn/wait. No env
+/// references — safe to send across threads.
+pub struct RawBoogieResult {
+    pub seed: usize,
+    pub subprocess_result: std::io::Result<std::process::Output>,
+}
+
+/// Run Boogie on one `.bpl` file as a subprocess via the existing portfolio
+/// runner. No `GlobalEnv` access. Safe to call from a worker thread.
+pub fn run_boogie_subprocess(options: &BoogieOptions, boogie_file: &str) -> RawBoogieResult {
+    let mut effective = options.clone();
+    // Per-`.bpl` Z3 trace filename — parallel workers otherwise all write to
+    // the same path and clobber each other.
+    if let Some(base) = &options.z3_trace_file {
+        let stem = std::path::Path::new(boogie_file)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        effective.z3_trace_file = Some(format!("{}.{}", base, stem));
+    }
+    let task = RunBoogieWithSeeds {
+        options: effective,
+        boogie_file: boogie_file.to_string(),
+    };
+    let (seed, subprocess_result) = ProverTaskRunner::run_tasks(
+        task,
+        options.num_instances,
+        options.sequential_task,
+        options.hard_timeout_secs,
+    );
+    RawBoogieResult {
+        seed,
+        subprocess_result,
+    }
+}
+
+/// Run Boogie on each `.bpl` file in `boogie_files` concurrently, with at most
+/// `parallelism` subprocesses in flight at a time. Returns the captured raw
+/// outputs in input order so the caller can analyze them deterministically
+/// regardless of completion order.
+pub fn run_boogies_parallel(
+    options: &BoogieOptions,
+    boogie_files: &[String],
+    parallelism: usize,
+) -> Vec<RawBoogieResult> {
+    let parallelism = parallelism.max(1);
+    let n = boogie_files.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    // Channel-based worker pool: workers pull (index, path) from a shared queue
+    // and push (index, result) onto the result channel. The main thread feeds
+    // all work, drops the work-tx so workers exit cleanly, and bins results by
+    // index so the returned Vec preserves input order.
+    let (work_tx, work_rx) = mpsc::channel::<(usize, String)>();
+    let work_rx = Arc::new(Mutex::new(work_rx));
+    let (result_tx, result_rx) = mpsc::channel::<(usize, RawBoogieResult)>();
+
+    thread::scope(|s| {
+        for _ in 0..parallelism.min(n) {
+            let work_rx = work_rx.clone();
+            let result_tx = result_tx.clone();
+            let opts = options.clone();
+            s.spawn(move || loop {
+                let next = {
+                    let rx = work_rx.lock().expect("work mutex poisoned");
+                    rx.recv()
+                };
+                match next {
+                    Ok((idx, path)) => {
+                        let raw = run_boogie_subprocess(&opts, &path);
+                        let _ = result_tx.send((idx, raw));
+                    },
+                    Err(_) => break, // channel closed; no more work
+                }
+            });
+        }
+        drop(result_tx);
+
+        for (idx, path) in boogie_files.iter().enumerate() {
+            work_tx
+                .send((idx, path.clone()))
+                .expect("worker pool collapsed before consuming all work");
+        }
+        drop(work_tx); // signal end-of-work
+
+        let mut by_idx: Vec<Option<RawBoogieResult>> = (0..n).map(|_| None).collect();
+        while let Ok((idx, raw)) = result_rx.recv() {
+            by_idx[idx] = Some(raw);
+        }
+        by_idx
+            .into_iter()
+            .map(|o| o.expect("missing per-vc result; worker dropped a task"))
+            .collect()
+    })
 }
