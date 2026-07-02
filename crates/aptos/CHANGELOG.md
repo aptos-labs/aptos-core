@@ -5,6 +5,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 # Unreleased
 
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.
+- Made the CLI friendlier for non-interactive use (coding agents, CI, scripts):
+  - Fixed an infinite loop where confirmation prompts would spin forever when stdin reached EOF (e.g. closed or redirected from `/dev/null`).
+  - Added an `APTOS_NON_INTERACTIVE` environment variable that forces non-interactive mode.
+  - Confirmation prompts and `aptos init`'s prompts now detect non-interactive sessions (`APTOS_NON_INTERACTIVE` set or stdin not a TTY) and fail fast with an actionable error naming the flag to pass (e.g. `--assume-yes`, `--network`, `--rest-url`) instead of blocking.
+  - `aptos update` and related binary-replacing commands now require `--assume-yes` in a non-interactive session, instead of silently downloading and replacing a binary when stdin is closed.
+  - Added `Examples:` sections to the `--help` of common commands (`account`, `key`, `info`, and `move`).
+  - Made key/account argument and missing-account errors actionable by naming the exact flags to use.
 
 ## [9.4.0]
 - Set language version 2.4 and bytecode version v10 as default.

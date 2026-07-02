@@ -115,6 +115,8 @@ impl BinaryUpdater for AptosUpdateTool {
             InstallationMethod::Other => {},
         }
 
+        super::update_helper::ensure_update_confirmable(self.prompt_options.assume_yes)?;
+
         // Determine the target we should download. This is necessary because we don't
         // name our binary releases using the target triples nor do we build specifically
         // for all major triples, so we have to generalize to one of the binaries we do

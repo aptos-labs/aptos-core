@@ -14,6 +14,15 @@ use clap::Parser;
 /// This will create an account if it doesn't exist with the faucet.  This is mostly useful
 /// for local development and devnet.
 #[derive(Debug, Default, Parser)]
+#[clap(after_help = "Examples:
+  # Fund the current profile's account with the default amount
+  $ aptos account fund-with-faucet
+
+  # Fund a specific account with 1 APT (100000000 Octas)
+  $ aptos account fund-with-faucet --account 0xc0ffee --amount 100000000
+
+  # Fund using an explicit faucet URL (e.g. a local testnet)
+  $ aptos account fund-with-faucet --account 0xc0ffee --faucet-url http://localhost:8081")]
 pub struct FundWithFaucet {
     /// Address to fund
     ///
