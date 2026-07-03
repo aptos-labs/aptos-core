@@ -5067,6 +5067,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "futures",
  "lru",
  "move-core-types",
  "tokio",

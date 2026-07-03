@@ -14,8 +14,6 @@ use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeSet, path::PathBuf};
 use url::Url;
 
-const BATCH_SIZE: u64 = 500;
-
 #[derive(Subcommand)]
 pub enum Cmd {
     /// Collect and dump the data
@@ -38,6 +36,10 @@ pub enum Cmd {
         /// Dump the write set of txns
         #[clap(long, default_value_t = false)]
         dump_write_set: bool,
+        /// Only collect source code: skip txn execution, state/txn-index dumping
+        /// and compile-validation of the dumped sources
+        #[clap(long, default_value_t = false)]
+        skip_txn_execution: bool,
         /// With this set, only dump transactions that are sent to this account
         #[clap(long)]
         target_account: Option<AccountAddress>,
@@ -112,10 +114,17 @@ pub struct Argument {
     /// Number of txns to scan/execute
     #[clap(long)]
     limit: u64,
+
+    /// Number of txns to scan per batch, fetched as concurrent pages of 100
+    #[clap(long, default_value_t = 500)]
+    batch_size: u64,
 }
 
 impl Argument {
     fn validate(&self) -> Result<(), String> {
+        if self.batch_size == 0 {
+            return Err("batch size must be at least 1".to_string());
+        }
         let overlap = Self::overlapping_features(&self.enable_features, &self.disable_features);
         if overlap.is_empty() {
             Ok(())
@@ -161,9 +170,10 @@ async fn main() -> Result<()> {
             skip_publish_txns,
             skip_source_code_check: skip_source_code,
             dump_write_set,
+            skip_txn_execution,
             target_account,
         } => {
-            let batch_size = BATCH_SIZE;
+            let batch_size = args.batch_size;
             let output = if let Some(path) = output_path {
                 path
             } else {
@@ -187,6 +197,7 @@ async fn main() -> Result<()> {
                 skip_failed_txns,
                 skip_publish_txns,
                 dump_write_set,
+                skip_txn_execution,
                 skip_source_code,
                 target_account,
                 args.enable_features,
@@ -206,7 +217,7 @@ async fn main() -> Result<()> {
             base_experiments,
             compared_experiments,
         } => {
-            let batch_size = BATCH_SIZE;
+            let batch_size = args.batch_size;
             let output = if let Some(path) = output_path {
                 path
             } else {
