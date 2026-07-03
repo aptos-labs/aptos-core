@@ -30,17 +30,27 @@ use aptos_types::{
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::TableHandle,
+        TStateView,
     },
     transaction::{
-        signature_verified_transaction::into_signature_verified_block, ExecutionStatus,
-        Transaction, TransactionArgument, TransactionStatus,
+        signature_verified_transaction::into_signature_verified_block, AuxiliaryInfo,
+        ExecutionStatus, Transaction, TransactionArgument, TransactionStatus,
     },
     utility_coin::AptosCoinType,
 };
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use aptos_vm::{
+    aptos_vm::{AptosVM, AptosVMBlockExecutor},
+    data_cache::AsMoveResolver,
+    VMBlockExecutor,
+};
+use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::{
+    read_recording::ReadRecordingCodeStorage, AsAptosCodeStorage,
+};
 use move_core_types::{
     account_address::AccountAddress, ident_str, language_storage::StructTag,
-    parser::parse_struct_tag,
+    parser::parse_struct_tag, vm_status::StatusCode,
 };
 use std::collections::BTreeSet;
 
@@ -704,5 +714,127 @@ fn test_block_promotions_cover_reads_and_exclude_writes() {
         promoted_and_written.is_empty(),
         "Promoted keys also written in the block: {:?}",
         promoted_and_written,
+    );
+}
+
+/// Regression test: a script transaction's recorded module reads (which feed the block epilogue's
+/// `to_make_hot`) must not depend on the warmth of the verified-script cache.
+///
+/// `validate_and_execute_script` records the script's declared module dependencies only *after*
+/// `load_script` and the post-load checks succeed. A script that emits an event passes
+/// `load_script` (so the verified script is built and cached) but is then rejected by
+/// `verify_no_event_emission_in_compiled_script`, so it is kept-and-charged (its reads feed
+/// promotion) yet never reaches that recording step. Recording then falls back to the loader,
+/// which is verified-script-cache-gated: a cold cache loads and records every dependency, while a
+/// warm cache only *charges* them and skips special-address framework modules. The recorded set
+/// must be identical either way.
+///
+/// This drives one transaction directly through `execute_single_transaction` so it can (a) inspect
+/// that single transaction's own recorded reads — the block-level `to_make_hot` helpers above
+/// aggregate across transactions, masking one txn's under-recording — and (b) pin the
+/// verified-script cache warmth deterministically, which a block cannot (the cache is per-block and
+/// only the racy parallel schedule decides whether the committing incarnation is warm).
+#[test]
+fn test_failed_script_promotions_independent_of_script_cache() {
+    let mut h = MoveHarness::new();
+    // The script emits an event, which the compiler's extended checks reject; skip the bailout so
+    // the (VM-rejectable) bytecode is still produced, matching `tests::module_event`.
+    let mut build_options = BuildOptions::move_2().set_latest_language();
+    build_options
+        .experiments
+        .push("skip-bailout-on-extended-checks".to_string());
+
+    let publisher = h.new_account_at(helper_address());
+    assert_success!(h.publish_package_with_options(
+        &publisher,
+        &common::test_dir_path("hot_state.data/emit_pack"),
+        build_options.clone(),
+    ));
+    let sender = h.new_account_with_key_pair();
+
+    let package = BuiltPackage::build(
+        common::test_dir_path("hot_state.data/emit_pack"),
+        build_options,
+    )
+    .expect("emit_pack must build");
+    let script = package
+        .extract_script_code()
+        .pop()
+        .expect("emit_script must exist");
+    let txn = into_signature_verified_block(vec![Transaction::UserTransaction(h.create_script(
+        &sender,
+        script,
+        vec![],
+        vec![],
+    ))])
+    .pop()
+    .unwrap();
+
+    let state_view = h.executor.get_state_view();
+    let env = AptosEnvironment::new(state_view);
+    let vm = AptosVM::new(&env);
+
+    // Runs the transaction once against `adapter` (whose verified-script cache persists across
+    // calls, unlike the per-call recording wrapper) and returns the module keys it recorded as
+    // reads. Also pins the scenario: the txn is rejected for emitting an event, and is kept (so its
+    // reads actually feed promotion) rather than discarded.
+    let run = |adapter: &_| -> BTreeSet<StateKey> {
+        let code_storage = ReadRecordingCodeStorage::new(adapter);
+        let resolver = state_view.as_move_resolver();
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let (vm_status, output) = vm
+            .execute_single_transaction(
+                &txn,
+                &resolver,
+                &code_storage,
+                &log_context,
+                &AuxiliaryInfo::default(),
+            )
+            .expect("script execution should not hard-error");
+        assert_eq!(
+            vm_status.status_code(),
+            StatusCode::INVALID_OPERATION_IN_SCRIPT,
+            "script must be rejected for emitting an event (else the recording step is reached)",
+        );
+        assert!(
+            !output.status().is_discarded(),
+            "the rejected script txn must be kept, else its reads never feed to_make_hot",
+        );
+        code_storage.into_recorded_reads().into_iter().collect()
+    };
+
+    // Cold: a fresh code storage misses the verified-script cache.
+    let cold_adapter = state_view.as_aptos_code_storage(vm.runtime_environment());
+    let cold_reads = run(&cold_adapter);
+
+    // Warm: reuse one code storage. The first (priming) run caches the verified script; the second,
+    // whose reads we keep, hits the warm cache — as a later incarnation in a block would.
+    let warm_adapter = state_view.as_aptos_code_storage(vm.runtime_environment());
+    let _ = run(&warm_adapter);
+    let warm_reads = run(&warm_adapter);
+
+    let event_module = StateKey::module(&AccountAddress::ONE, ident_str!("event"));
+    let coin_module = StateKey::module(&AccountAddress::ONE, ident_str!("coin"));
+    let emitter_module = StateKey::module(&helper_address(), ident_str!("emitter"));
+
+    // A cold cache records all declared dependencies, framework modules (special addresses)
+    // included; the non-special user module is recorded on both paths and serves as a control.
+    assert!(
+        cold_reads.contains(&event_module),
+        "cold run must record 0x1::event"
+    );
+    assert!(
+        cold_reads.contains(&coin_module),
+        "cold run must record 0x1::coin"
+    );
+    assert!(cold_reads.contains(&emitter_module));
+    assert!(warm_reads.contains(&emitter_module));
+
+    let cold_only: Vec<_> = cold_reads.difference(&warm_reads).collect();
+    assert_eq!(
+        cold_reads, warm_reads,
+        "a kept-failed script txn's recorded module reads must not depend on verified-script-cache \
+         warmth; modules recorded only on the cold path: {:?}",
+        cold_only,
     );
 }
