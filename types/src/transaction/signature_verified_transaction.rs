@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    contract_event::ContractEvent,
+    block_executor::speculative_value::ValueWithLayout,
     state_store::state_key::StateKey,
     timestamp::TimestampResource,
     transaction::{
@@ -89,8 +89,8 @@ impl SignatureVerifiedTransaction {
 }
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {
-    type Event = ContractEvent;
     type Key = StateKey;
+    type SpeculativeValue = ValueWithLayout<WriteOp>;
     type Tag = StructTag;
     type Value = WriteOp;
 
@@ -136,7 +136,7 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
             .into()
     }
 
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
+    fn pre_write_values(&self) -> Vec<(Self::Key, Self::SpeculativeValue)> {
         let timestamp = match self {
             SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(metadata_txn)) => {
                 Some(metadata_txn.timestamp_usecs())
@@ -159,7 +159,12 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
                         .expect("u64 BCS serialization cannot fail")
                         .into(),
                 );
-                vec![(state_key, value)]
+                // The timestamp resource has no delayed fields, so the pre-written value
+                // is already in its exchanged form with no layout.
+                vec![(
+                    state_key,
+                    ValueWithLayout::Exchanged(triomphe::Arc::new(value), None),
+                )]
             },
             None => vec![],
         }
@@ -227,7 +232,7 @@ mod tests {
         // Should return exactly one pre-write entry for the timestamp
         assert_eq!(pre_write_values.len(), 1);
 
-        let (state_key, write_op) = &pre_write_values[0];
+        let (state_key, value) = &pre_write_values[0];
 
         // Verify the state key is for the timestamp resource
         let expected_state_key =
@@ -235,9 +240,11 @@ mod tests {
                 .expect("TimestampResource is a valid MoveResource");
         assert_eq!(state_key, &expected_state_key);
 
-        // Verify the value is the serialized timestamp
+        // Verify the value is the serialized timestamp, in the exchanged form
+        // with no layout.
         let expected_value = bcs::to_bytes(&timestamp_usecs).unwrap();
-        assert_eq!(write_op.bytes(), Some(&expected_value.into()));
+        assert!(matches!(value, ValueWithLayout::Exchanged(_, None)));
+        assert_eq!(value.extract_value().bytes(), Some(&expected_value.into()));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::types::InputOutputKey;
+use crate::{record::Record, types::InputOutputKey, view::ViewArgs};
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -9,8 +9,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::{
-        AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction,
-        TransactionOutput as TypesTransactionOutput,
+        AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction, CommittedTransactionOutput,
     },
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -21,10 +20,10 @@ use aptos_vm_types::{
         BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
     },
 };
+use bytes::Bytes;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
@@ -50,10 +49,51 @@ pub enum ExecutionStatus<O, E> {
     DelayedFieldsCodeInvariantError(String),
 }
 
-/// Inference result of a transaction.
-pub struct Accesses<K> {
-    pub keys_read: Vec<K>,
-    pub keys_written: Vec<K>,
+/// The VM-facing contract of Block-STM. One implementation per VM family:
+/// every legacy [`ExecutorTask`] gets one via a blanket implementation (see
+/// `record.rs`), while future VMs implement it directly. The executor's
+/// pipeline (apply, validation, commit sequencing, materialization
+/// orchestration) is written once against this trait and the [`Record`] the
+/// execution produces.
+///
+/// [`Record`]: crate::record::Record
+pub trait TransactionExecutor {
+    /// Type of transaction and its associated key and value.
+    type Txn: Transaction;
+
+    /// Type of auxiliary info.
+    type AuxiliaryInfo: AuxiliaryInfoTrait;
+
+    /// Type of error when the executor failed to process a transaction and needs to abort.
+    type Error: Debug + Clone + Send + Sync + Eq + 'static;
+
+    /// The artifact of executing one transaction: its reads, writes and outputs.
+    type Record: Record<Txn = Self::Txn, Error = Self::Error> + 'static;
+
+    /// Create an instance of the transaction executor.
+    fn init(
+        environment: &AptosEnvironment,
+        state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        // If true, runtime checks for user payloads may not be performed during execution time.
+        // Instead, the execution trace will be collected, for later async replay with extra
+        // checks during Block-STM's post-commit parallel processing.
+        //
+        // Note: for each transaction, based on entrypoint, VM may decide not to delay the checks.
+        async_runtime_checks_enabled: bool,
+    ) -> Self;
+
+    /// Execute a single transaction against the VM's own view of the current
+    /// (speculative) state, built from the given VM-neutral ingredients.
+    /// Returns the record of the execution; a record exists for all non-panic
+    /// outcomes, so that the reads of failed incarnations remain available for
+    /// validation.
+    fn execute_transaction_v2<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
+        &self,
+        args: &ViewArgs<'_, Self::Txn, S>,
+        txn: &Self::Txn,
+        auxiliary_info: &Self::AuxiliaryInfo,
+        txn_idx: TxnIndex,
+    ) -> Result<Self::Record, PanicError>;
 }
 
 /// Trait for single threaded transaction executor.
@@ -89,7 +129,6 @@ pub trait ExecutorTask {
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
-            <Self::Txn as Transaction>::Value,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
@@ -104,13 +143,27 @@ pub trait ExecutorTask {
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
+/// Materializes speculative values into their committed form. Implemented by
+/// the read view, which holds the context (the committed delayed field values)
+/// needed to replace speculative placeholders with the final values. Passed to
+/// the legacy output at materialization so it can patch the data it owns (e.g.
+/// its events) without the executor copying it out and back in.
+pub trait Materializer {
+    /// Replaces the delayed-field identifiers in the given serialized value
+    /// (of the given layout) with the committed values.
+    fn replace_identifiers_with_values(
+        &self,
+        bytes: &[u8],
+        layout: &MoveTypeLayout,
+    ) -> Result<Bytes, PanicError>;
+}
+
 /// Traits for execution result of a single transaction.
 pub trait BeforeMaterializationOutput<Txn: Transaction> {
     /// Get the writes of a transaction from its output, separately for resources
     /// and modules. Aggregator V1 writes are ordinary entries of the resource write set.
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<Txn::Key, (TriompheArc<Txn::Value>, Option<TriompheArc<MoveTypeLayout>>)>;
+    /// Values are produced in the multi-version representation the versioned map stores.
+    fn resource_write_set(&self) -> HashMap<Txn::Key, Txn::SpeculativeValue>;
 
     fn module_write_set(&self) -> &BTreeMap<Txn::Key, ModuleWrite<Txn::Value>>;
 
@@ -123,17 +176,16 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
 
     fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(Txn::Key, StateValueMetadata)>;
 
-    /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<(Txn::Event, Option<MoveTypeLayout>)>;
-
+    /// Group metadata and inner resource values are produced in the multi-version
+    /// representation the versioned map stores. The metadata carries no layout.
     fn resource_group_write_set(
         &self,
     ) -> HashMap<
         Txn::Key,
         (
-            Txn::Value,
+            Txn::SpeculativeValue,
             ResourceGroupSize,
-            BTreeMap<Txn::Tag, (Txn::Value, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<Txn::Tag, Txn::SpeculativeValue>,
         ),
     >;
 
@@ -152,10 +204,10 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     // For now, the below interfaces for keys and metada and keys and tags are provided
     // to avoid unnecessarily cloning the whole resource group write set.
     // TODO: get rid of these interfaces when we can have zero-copy access to the output.
-    fn resource_group_metadata_ops(&self) -> Vec<(Txn::Key, Txn::Value)> {
+    fn resource_group_metadata_ops(&self) -> Vec<(Txn::Key, Txn::SpeculativeValue)> {
         self.resource_group_write_set()
             .into_iter()
-            .map(|(key, (op, _, _))| (key, op))
+            .map(|(key, (metadata, _, _))| (key, metadata))
             .collect()
     }
 
@@ -186,26 +238,14 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     fn storage_keys_written(&self) -> impl Iterator<Item = &Txn::Key>;
 }
 
-pub trait AfterMaterializationOutput<Txn: Transaction> {
-    /// Return the fee statement of the transaction.
-    fn fee_statement(&self) -> FeeStatement;
-
-    /// Returns true iff it has a new epoch event.
-    fn has_new_epoch_event(&self) -> bool;
-}
-
 pub trait TransactionOutput: Send + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
+    /// The materialized output produced from this (speculative) output.
+    type CommittedOutput: CommittedTransactionOutput;
     type BeforeMaterializationGuard<'a>: BeforeMaterializationOutput<Self::Txn> + 'a
     where
         Self: 'a;
-    type AfterMaterializationGuard<'a>: AfterMaterializationOutput<Self::Txn> + 'a
-    where
-        Self: 'a;
-
-    // Used by transaction commit listener (for sharded executor).
-    fn committed_output(&self) -> &OnceCell<TypesTransactionOutput>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
@@ -221,22 +261,6 @@ pub trait TransactionOutput: Send + Debug {
     fn before_materialization<'a>(
         &'a self,
     ) -> Result<Self::BeforeMaterializationGuard<'a>, PanicError>;
-    fn after_materialization<'a>(
-        &'a self,
-    ) -> Result<Self::AfterMaterializationGuard<'a>, PanicError>;
-
-    /// Returns true iff the transaction status is Keep(Success).
-    fn is_materialized_and_success(&self) -> bool;
-    /// The purpose of this method is to return true if the output has been materialized
-    /// (i.e. incorporate_materialized_txn_output has been called), or false otherwise.
-    /// The method can also assert any invariants provided by the trait implementation
-    /// and the caller. For instance, in the current block executor implementation,
-    /// final output placeholders are initialized via skip_output method and not modified
-    /// until materialization - so if the output is not materialized, it must be a placeholder.
-    ///
-    /// Must be called after concurrent block execution is complete, including materializing
-    /// all required outputs (currently used to check invariants for block epilogue txn).
-    fn check_materialization(&self) -> Result<bool, PanicError>;
 
     // Below methods perform various types of materialization. These may modify
     // the stored output representation and hence must be carefully implemented
@@ -244,7 +268,11 @@ pub trait TransactionOutput: Send + Debug {
 
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized delayed fields and group
-    /// updates (recorded in output separately) are incorporated into the transaction output.
+    /// updates (recorded in output separately) are incorporated into the transaction
+    /// output, and materializes the data the output owns itself (its events) using
+    /// the given materializer, consuming the stored (speculative) output and returning
+    /// the final materialized [`Self::CommittedOutput`] together with the collected
+    /// execution trace.
     /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
     /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
@@ -253,8 +281,6 @@ pub trait TransactionOutput: Send + Debug {
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
-        patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) -> Result<Trace, PanicError>;
-
-    fn set_txn_output_for_non_dynamic_change_set(&mut self);
+        materializer: &impl Materializer,
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError>;
 }

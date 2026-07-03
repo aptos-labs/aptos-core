@@ -3,46 +3,36 @@
 
 use super::{
     types::{
-        test::{arc_value_for, KeyType, TestValue},
+        test::{value_for, KeyType},
         MVDataError, MVDataOutput,
     },
     unsync_map::UnsyncMap,
     *,
 };
-use crate::types::ValueWithLayout;
+use crate::types::MVValue;
 use aptos_types::{
-    on_chain_config::CurrentTimeMicroseconds,
-    state_store::state_value::{StateValue, StateValueMetadata},
+    on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
     write_set::WriteOpKind,
 };
-use bytes::Bytes;
 use claims::{assert_none, assert_some_eq};
-use triomphe::Arc;
 
 mod dependencies;
 mod proptest_types;
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()> = UnsyncMap::new();
+    let map = UnsyncMap::<_, usize, _, ()>::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 
     // Reads that should go the DB return None
     assert_none!(map.fetch_data(&ap));
     // Ensure write registers the new value.
-    //TODO[agg_v2](tests): Hardocoding layout to None. Test when layout is Some(.) as well.
-    map.write(ap.clone(), arc_value_for(10, 1), None);
-    assert_some_eq!(
-        map.fetch_data(&ap),
-        ValueWithLayout::Exchanged(arc_value_for(10, 1), None)
-    );
+    map.write(ap.clone(), value_for(10, 1));
+    assert_some_eq!(map.fetch_data(&ap), value_for(10, 1));
     // Ensure the next write overwrites the value.
-    map.write(ap.clone(), arc_value_for(14, 1), None);
-    assert_some_eq!(
-        map.fetch_data(&ap),
-        ValueWithLayout::Exchanged(arc_value_for(14, 1), None)
-    );
+    map.write(ap.clone(), value_for(14, 1));
+    assert_some_eq!(map.fetch_data(&ap), value_for(14, 1));
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,23 +40,7 @@ struct TestMetadataValue {
     metadata: u64,
 }
 
-impl TransactionWrite for TestMetadataValue {
-    fn bytes(&self) -> Option<&Bytes> {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn write_op_kind(&self) -> WriteOpKind {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn as_state_value(&self) -> Option<StateValue> {
-        unimplemented!("Irrelevant for the test")
-    }
-
+impl TestMetadataValue {
     fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
         Some(StateValueMetadata::legacy(
             self.metadata,
@@ -75,9 +49,28 @@ impl TransactionWrite for TestMetadataValue {
             },
         ))
     }
+}
 
-    fn set_bytes(&mut self, _bytes: Bytes) {
-        unimplemented!("Irrelevant for the test")
+impl MVValue for TestMetadataValue {
+    fn eq_value(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn eq_metadata(&self, other: &Self) -> bool {
+        self.as_state_value_metadata() == other.as_state_value_metadata()
+    }
+
+    fn bytes_len(&self) -> Option<usize> {
+        None
+    }
+
+    fn is_deletion(&self) -> bool {
+        // Metadata-only entries are never deletions in these tests.
+        false
+    }
+
+    fn write_op_kind(&self) -> WriteOpKind {
+        unimplemented!("Irrelevant for the tests")
     }
 }
 
@@ -85,22 +78,22 @@ impl TransactionWrite for TestMetadataValue {
 fn write_metadata() {
     let ap = KeyType(b"/foo/b".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ()> = MVHashMap::new();
+    let mvtbl = MVHashMap::<_, usize, _, ()>::new();
 
     let metadata_5 = TestMetadataValue { metadata: 5 };
     let metadata_6 = TestMetadataValue { metadata: 6 };
 
     assert!(mvtbl
         .data()
-        .write_metadata(ap.clone(), 10, 1, metadata_5.clone()));
+        .write_metadata(ap.clone(), 10, 1, metadata_5.clone(),));
     assert!(mvtbl.data().write_metadata(ap.clone(), 10, 1, metadata_6));
     assert!(mvtbl
         .data()
-        .write_metadata(ap.clone(), 10, 1, metadata_5.clone()));
+        .write_metadata(ap.clone(), 10, 1, metadata_5.clone(),));
     // Should be equal to recorded metadata and return false (no change).
     assert!(!mvtbl
         .data()
-        .write_metadata(ap.clone(), 10, 1, metadata_5.clone()));
+        .write_metadata(ap.clone(), 10, 1, metadata_5.clone(),));
 
     assert!(mvtbl.data().write_metadata(ap.clone(), 11, 1, metadata_5));
 }
@@ -114,7 +107,7 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ()> = MVHashMap::new();
+    let mvtbl = MVHashMap::<_, usize, _, ()>::new();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data_no_record(&ap1, 5);
@@ -123,7 +116,7 @@ fn create_write_read_placeholder_struct() {
     // Write by txn 10.
     mvtbl
         .data()
-        .write(ap1.clone(), 10, 1, arc_value_for(10, 1), None)
+        .write(ap1.clone(), 10, 1, value_for(10, 1))
         .unwrap();
 
     // Reads that should go the DB return Err(Uninitialized)
@@ -135,49 +128,25 @@ fn create_write_read_placeholder_struct() {
 
     // Reads for a higher txn return the entry written by txn 10.
     let r_10 = mvtbl.data().fetch_data_no_record(&ap1, 15);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((10, 1)),
-            ValueWithLayout::Exchanged(arc_value_for(10, 1), None)
-        )),
-        r_10
-    );
+    assert_eq!(Ok(Versioned(Ok((10, 1)), value_for(10, 1))), r_10);
 
     // More writes.
     mvtbl
         .data()
-        .write(ap1.clone(), 12, 0, arc_value_for(12, 0), None)
+        .write(ap1.clone(), 12, 0, value_for(12, 0))
         .unwrap();
     mvtbl
         .data()
-        .write(ap1.clone(), 8, 3, arc_value_for(8, 3), None)
+        .write(ap1.clone(), 8, 3, value_for(8, 3))
         .unwrap();
 
     // Verify reads return the latest write below the reader index.
     let r_12 = mvtbl.data().fetch_data_no_record(&ap1, 15);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((12, 0)),
-            ValueWithLayout::Exchanged(arc_value_for(12, 0), None)
-        )),
-        r_12
-    );
+    assert_eq!(Ok(Versioned(Ok((12, 0)), value_for(12, 0))), r_12);
     let r_10 = mvtbl.data().fetch_data_no_record(&ap1, 11);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((10, 1)),
-            ValueWithLayout::Exchanged(arc_value_for(10, 1), None)
-        )),
-        r_10
-    );
+    assert_eq!(Ok(Versioned(Ok((10, 1)), value_for(10, 1))), r_10);
     let r_8 = mvtbl.data().fetch_data_no_record(&ap1, 10);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((8, 3)),
-            ValueWithLayout::Exchanged(arc_value_for(8, 3), None)
-        )),
-        r_8
-    );
+    assert_eq!(Ok(Versioned(Ok((8, 3)), value_for(8, 3))), r_8);
 
     // Mark the entry written by 10 as an estimate.
     mvtbl.data().mark_estimate(&ap1, 10);
@@ -190,44 +159,26 @@ fn create_write_read_placeholder_struct() {
     mvtbl.data().remove(&ap1, 10);
     mvtbl
         .data()
-        .write(ap2.clone(), 10, 2, arc_value_for(10, 2), None)
+        .write(ap2.clone(), 10, 2, value_for(10, 2))
         .unwrap();
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.data().fetch_data_no_record(&ap1, 11);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((8, 3)),
-            ValueWithLayout::Exchanged(arc_value_for(8, 3), None)
-        )),
-        r_8
-    );
+    assert_eq!(Ok(Versioned(Ok((8, 3)), value_for(8, 3))), r_8);
 
     // Reads, writes for ap2 and ap3.
     mvtbl
         .data()
-        .write(ap2.clone(), 5, 0, arc_value_for(5, 0), None)
+        .write(ap2.clone(), 5, 0, value_for(5, 0))
         .unwrap();
     mvtbl
         .data()
-        .write(ap3.clone(), 20, 4, arc_value_for(20, 4), None)
+        .write(ap3.clone(), 20, 4, value_for(20, 4))
         .unwrap();
     let r_5 = mvtbl.data().fetch_data_no_record(&ap2, 10);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((5, 0)),
-            ValueWithLayout::Exchanged(arc_value_for(5, 0), None)
-        )),
-        r_5
-    );
+    assert_eq!(Ok(Versioned(Ok((5, 0)), value_for(5, 0))), r_5);
     let r_20 = mvtbl.data().fetch_data_no_record(&ap3, 21);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((20, 4)),
-            ValueWithLayout::Exchanged(arc_value_for(20, 4), None)
-        )),
-        r_20
-    );
+    assert_eq!(Ok(Versioned(Ok((20, 4)), value_for(20, 4))), r_20);
 
     // Clear ap1 and ap3.
     mvtbl.data().remove(&ap1, 12);
@@ -242,29 +193,5 @@ fn create_write_read_placeholder_struct() {
 
     // Read entry by txn 10 at ap2.
     let r_10 = mvtbl.data().fetch_data_no_record(&ap2, 15);
-    assert_eq!(
-        Ok(Versioned(
-            Ok((10, 2)),
-            ValueWithLayout::Exchanged(arc_value_for(10, 2), None)
-        )),
-        r_10
-    );
-}
-
-#[test]
-#[should_panic]
-fn aggregator_base_mismatch() {
-    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::empty();
-    let ap = KeyType(b"/foo/b".to_vec());
-
-    vd.set_base_value(
-        ap.clone(),
-        ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(1))),
-    );
-    // This call must panic, because it provides a mismatching base value:
-    // However, only base value length is compared in assert.
-    vd.set_base_value(
-        ap,
-        ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(2))),
-    );
+    assert_eq!(Ok(Versioned(Ok((10, 2)), value_for(10, 2))), r_10);
 }

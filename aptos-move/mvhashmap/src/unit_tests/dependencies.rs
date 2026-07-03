@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{
-    types::{test::KeyType, Incarnation, MVDataError, MVDataOutput, TxnIndex, ValueWithLayout},
+    types::{test::KeyType, Incarnation, MVDataError, MVDataOutput, TxnIndex},
     MVHashMap,
 };
 use crate::{types::ShiftedTxnIndex, unit_tests::proptest_types::MockValue};
@@ -19,7 +19,6 @@ use std::{
     time::Duration,
 };
 use test_case::test_case;
-use triomphe::Arc;
 
 #[derive(Debug, Clone)]
 enum Operator<V: Debug + Clone> {
@@ -93,7 +92,7 @@ fn test_dependencies(
             }
         }
 
-        let map = MVHashMap::<KeyType<[u8; 32]>, usize, MockValue<[u8; 32]>, ()>::new();
+        let map = MVHashMap::<_, usize, _, ()>::new();
 
         // Each read may get invalidated and be rescheduled, but since each original
         // txn performs at most one read, total number of rescheduled reads at any given
@@ -109,7 +108,7 @@ fn test_dependencies(
             .map(|_| AtomicUsize::new(1))
             .collect::<Vec<_>>();
 
-        let current_idx: AtomicUsize = AtomicUsize::new(0);
+        let current_idx = AtomicUsize::new(0);
         rayon::scope(|s| {
             for _ in 0..num_workers {
                 s.spawn(|_| loop {
@@ -132,8 +131,7 @@ fn test_dependencies(
                                                 key,
                                                 idx as TxnIndex,
                                                 0,
-                                                Arc::new(MockValue::new(Some(*v))),
-                                                None,
+                                                MockValue::new(Some(*v)),
                                             )
                                             .unwrap(),
                                     );
@@ -146,8 +144,7 @@ fn test_dependencies(
                                                 key.clone(),
                                                 idx as TxnIndex,
                                                 0,
-                                                Arc::new(MockValue::new(Some(*v))),
-                                                None,
+                                                MockValue::new(Some(*v)),
                                             )
                                             .unwrap(),
                                     );
@@ -191,30 +188,20 @@ fn test_dependencies(
                                         || {
                                             // Comparison ignores version since push invalidation
                                             // is based only on values.
-                                            value
-                                                == ValueWithLayout::Exchanged(
-                                                    Arc::new(MockValue::new(None)),
-                                                    None,
-                                                )
+                                            value == MockValue::new(None)
                                         },
                                         |(_expected_txn_idx, expected_output)| {
                                             // Comparison ignores expected_txn_idx since push
                                             // validation is based only on values.
-                                            value
-                                                == ValueWithLayout::Exchanged(
-                                                    Arc::new(expected_output.clone()),
-                                                    None,
-                                                )
+                                            value == expected_output.clone()
                                         },
                                     )
                             },
                             Err(MVDataError::Uninitialized) => {
-                                map.data().set_base_value(
+                                map.data().set_base_value_with(
                                     KeyType(key),
-                                    ValueWithLayout::Exchanged(
-                                        Arc::new(MockValue::new(None)),
-                                        None,
-                                    ),
+                                    MockValue::new(None),
+                                    |_, _| {},
                                 );
                                 assert_ok!(rescheduled_reads.push((txn_idx, incarnation + 1)));
                                 false
@@ -236,10 +223,7 @@ fn test_dependencies(
             .iter()
             .all(|correct_flag| correct_flag.load(Ordering::Relaxed) & 1 == 1));
 
-        let mut expected_deps: HashMap<
-            KeyType<[u8; 32]>,
-            BTreeMap<ShiftedTxnIndex, BTreeMap<TxnIndex, Incarnation>>,
-        > = HashMap::new();
+        let mut expected_deps = HashMap::<_, BTreeMap<_, BTreeMap<_, Incarnation>>>::new();
         for (idx, txn) in transactions.iter().enumerate() {
             if let Operator::Read = txn.1 {
                 let expected_idx = baseline

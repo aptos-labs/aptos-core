@@ -19,6 +19,7 @@ use crate::{
     counters,
     scheduler::{DependencyResult, DependencyStatus, TWaitForDependency},
     scheduler_wrapper::SchedulerWrapper,
+    task::Materializer,
     value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
@@ -223,7 +224,8 @@ trait ResourceGroupState<T: Transaction> {
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction> {
-    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    pub(crate) versioned_map:
+        &'a MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
@@ -513,7 +515,7 @@ fn wait_for_dependency(
 
 impl<'a, T: Transaction> ParallelState<'a, T> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        shared_map: &'a MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
@@ -594,7 +596,10 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
 
 impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
-        self.versioned_map.data().set_base_value(key, value);
+        // Base values are provided raw-from-storage here; on a race keep whatever is stored.
+        self.versioned_map
+            .data()
+            .set_base_value_with(key, value, |_existing, _incoming| {});
     }
 
     /// Captures a read from the VM execution, but not unresolved deltas, as in this case it is the
@@ -637,12 +642,22 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                             assert_eq!(version, Err(StorageVersion), "Fetched resource has unknown layout but the version is not Err(StorageVersion)");
                             match patch_base_value(v.as_ref(), layout) {
                                 Ok(patched_value) => {
-                                    self.versioned_map.data().set_base_value(
+                                    // Upgrade the raw base value to the exchanged form; if another
+                                    // transaction already exchanged it, keep the stored value.
+                                    self.versioned_map.data().set_base_value_with(
                                         key.clone(),
                                         ValueWithLayout::Exchanged(
                                             TriompheArc::new(patched_value),
                                             layout.cloned().map(TriompheArc::new),
                                         ),
+                                        |existing, incoming| {
+                                            if matches!(
+                                                existing,
+                                                ValueWithLayout::RawFromStorage(_)
+                                            ) {
+                                                *existing = incoming;
+                                            }
+                                        },
                                     );
                                     // Refetch in case a concurrent change went through.
                                     continue;
@@ -703,6 +718,10 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
         group_key: T::Key,
         base_values: Vec<(T::Tag, T::Value)>,
     ) -> PartialVMResult<()> {
+        let base_values = base_values
+            .into_iter()
+            .map(|(tag, v)| (tag, ValueWithLayout::RawFromStorage(TriompheArc::new(v))))
+            .collect();
         self.versioned_map
             .group_data()
             .set_raw_base_values(group_key.clone(), base_values)
@@ -760,14 +779,24 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                             );
                             match patch_base_value(v.as_ref(), layout) {
                                 Ok(patched_value) => {
-                                    self.versioned_map
-                                        .group_data()
-                                        .update_tagged_base_value_with_layout(
-                                            group_key.clone(),
-                                            resource_tag.clone(),
-                                            patched_value,
+                                    // Upgrade the raw base value to the exchanged form; if another
+                                    // transaction already exchanged it, keep the stored value.
+                                    self.versioned_map.group_data().set_base_value_with(
+                                        group_key.clone(),
+                                        resource_tag.clone(),
+                                        ValueWithLayout::Exchanged(
+                                            TriompheArc::new(patched_value),
                                             layout.cloned().map(TriompheArc::new),
-                                        );
+                                        ),
+                                        |existing, incoming| {
+                                            if matches!(
+                                                existing,
+                                                ValueWithLayout::RawFromStorage(_)
+                                            ) {
+                                                *existing = incoming;
+                                            }
+                                        },
+                                    );
                                     // Re-fetch in case a concurrent change went through.
                                     continue;
                                 },
@@ -794,14 +823,19 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                     // TagNotFound means group was initialized (o.w. Uninitialized branch
                     // would be visited), but the tag didn't exist. So record an empty resource
                     // as a base value, and do continue to retry the read.
-                    self.versioned_map
-                        .group_data()
-                        .update_tagged_base_value_with_layout(
-                            group_key.clone(),
-                            resource_tag.clone(),
-                            TransactionWrite::from_state_value(None),
+                    self.versioned_map.group_data().set_base_value_with(
+                        group_key.clone(),
+                        resource_tag.clone(),
+                        ValueWithLayout::Exchanged(
+                            TriompheArc::new(TransactionWrite::from_state_value(None)),
                             None,
-                        );
+                        ),
+                        |existing, incoming| {
+                            if matches!(existing, ValueWithLayout::RawFromStorage(_)) {
+                                *existing = incoming;
+                            }
+                        },
+                    );
                     continue;
                 },
                 Err(Dependency(dep_idx)) => {
@@ -820,7 +854,7 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
 }
 
 pub(crate) struct SequentialState<'a, T: Transaction> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     pub(crate) read_set: RefCell<UnsyncReadSet<T, ModuleId>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
@@ -828,7 +862,7 @@ pub(crate) struct SequentialState<'a, T: Transaction> {
 
 impl<'a, T: Transaction> SequentialState<'a, T> {
     pub fn new(
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        unsync_map: &'a UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     ) -> Self {
@@ -930,7 +964,15 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
         base_values: Vec<(T::Tag, T::Value)>,
     ) -> PartialVMResult<()> {
         self.unsync_map
-            .set_group_base_values(group_key.clone(), base_values)
+            .set_group_base_values(
+                group_key.clone(),
+                base_values.into_iter().map(|(tag, value)| {
+                    (
+                        tag,
+                        ValueWithLayout::RawFromStorage(TriompheArc::new(value)),
+                    )
+                }),
+            )
             .map_err(|e| {
                 self.read_set.borrow_mut().incorrect_use = true;
                 PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
@@ -958,17 +1000,17 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                         match patch_base_value(v.as_ref(), layout) {
                             Ok(patched_value) => {
                                 let arced_layout = layout.cloned().map(TriompheArc::new);
-                                self.unsync_map.update_tagged_base_value_with_layout(
-                                    group_key.clone(),
-                                    resource_tag.clone(),
-                                    patched_value.clone(),
-                                    arced_layout.clone(),
-                                );
-
-                                value = ValueWithLayout::Exchanged(
+                                let exchanged = ValueWithLayout::Exchanged(
                                     TriompheArc::new(patched_value),
                                     arced_layout,
                                 );
+                                self.unsync_map.update_tagged_base_value(
+                                    group_key.clone(),
+                                    resource_tag.clone(),
+                                    exchanged.clone(),
+                                );
+
+                                value = exchanged;
                             },
                             Err(e) => {
                                 error!("Couldn't patch a group value from unsync map: {}", e);
@@ -1046,6 +1088,71 @@ impl<T: Transaction> ViewState<'_, T> {
             ViewState::Sync(state) => state,
             ViewState::Unsync(state) => state,
         }
+    }
+}
+
+/// VM-neutral ingredients a view into the (speculative) block state is built
+/// from. The executor hands these to the VM integration, which constructs its
+/// own concrete view (the legacy VM builds a [`LatestView`]); the same
+/// ingredients also parameterize materialization at commit time.
+pub struct ViewArgs<'a, T: Transaction, S> {
+    pub(crate) base_view: &'a S,
+    pub(crate) global_module_cache:
+        &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    pub(crate) runtime_environment: &'a RuntimeEnvironment,
+    pub(crate) state: ViewStateArgs<'a, T>,
+}
+
+/// The mode-specific part of [`ViewArgs`], mirroring [`ViewState`].
+pub(crate) enum ViewStateArgs<'a, T: Transaction> {
+    Parallel {
+        versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
+        scheduler: SchedulerWrapper<'a>,
+        start_shared_counter: u32,
+        shared_counter: &'a AtomicU32,
+        incarnation: Incarnation,
+    },
+    Sequential {
+        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
+        start_counter: u32,
+        counter: &'a RefCell<u32>,
+    },
+}
+
+impl<'a, T, S> ViewArgs<'a, T, S>
+where
+    T: Transaction<SpeculativeValue = ValueWithLayout<<T as Transaction>::Value>>,
+    S: TStateView<Key = T::Key>,
+{
+    /// Builds the legacy VM's view from the ingredients.
+    pub(crate) fn build_view(&self, txn_idx: TxnIndex) -> LatestView<'a, T, S> {
+        let view_state = match &self.state {
+            ViewStateArgs::Parallel {
+                versioned_cache,
+                scheduler,
+                start_shared_counter,
+                shared_counter,
+                incarnation,
+            } => ViewState::Sync(ParallelState::new(
+                versioned_cache,
+                *scheduler,
+                *start_shared_counter,
+                shared_counter,
+                *incarnation,
+            )),
+            ViewStateArgs::Sequential {
+                unsync_map,
+                start_counter,
+                counter,
+            } => ViewState::Unsync(SequentialState::new(unsync_map, *start_counter, counter)),
+        };
+        LatestView::new(
+            self.base_view,
+            self.global_module_cache,
+            self.runtime_environment,
+            view_state,
+            txn_idx,
+        )
     }
 }
 
@@ -1253,7 +1360,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     /// to replace any aggregator / snapshot values.
     pub(crate) fn replace_identifiers_with_values(
         &self,
-        bytes: &Bytes,
+        bytes: &[u8],
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<(Bytes, HashSet<DelayedFieldID>)> {
         // Cfg due to deserialize_to_delayed_field_id use.
@@ -1322,7 +1429,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     fn get_reads_needing_exchange_sequential(
         &self,
         read_set: &HashSet<T::Key>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>, PanicError>
@@ -1412,7 +1519,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     fn get_group_reads_needing_exchange_sequential(
         &self,
         group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
@@ -1614,6 +1721,26 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
                 .interrupt_requested(self.txn_idx, state.incarnation),
             ViewState::Unsync(_) => false,
         }
+    }
+}
+
+impl<T: Transaction, S: TStateView<Key = T::Key> + Sync> Materializer for LatestView<'_, T, S> {
+    fn replace_identifiers_with_values(
+        &self,
+        bytes: &[u8],
+        layout: &MoveTypeLayout,
+    ) -> Result<Bytes, PanicError> {
+        // Resolves to the inherent method (which takes precedence over this
+        // trait method), converting its error into an invariant error.
+        let (bytes, _) = self
+            .replace_identifiers_with_values(bytes, layout)
+            .map_err(|_| {
+                code_invariant_error(format!(
+                    "Failed to replace identifiers with values in a value with layout {:?}",
+                    layout
+                ))
+            })?;
+        Ok(bytes)
     }
 }
 
@@ -1986,10 +2113,7 @@ mod test {
     use super::*;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
-        combinatorial_tests::{
-            mock_executor::MockEvent,
-            types::{KeyType, ValueType},
-        },
+        combinatorial_tests::types::{KeyType, ValueType},
         scheduler::{DependencyResult, Scheduler, TWaitForDependency},
         view::{delayed_field_try_add_delta_outcome_impl, get_delayed_field_value_impl, ViewState},
     };
@@ -2081,8 +2205,8 @@ mod test {
     struct TestTransactionType {}
 
     impl BlockExecutableTransaction for TestTransactionType {
-        type Event = MockEvent;
         type Key = KeyType<u32>;
+        type SpeculativeValue = ValueWithLayout<ValueType>;
         type Tag = u32;
         type Value = ValueType;
 
@@ -2925,7 +3049,7 @@ mod test {
     }
 
     struct Holder {
-        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
+        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueWithLayout<ValueType>, DelayedFieldID>,
         counter: RefCell<u32>,
         base_view: MockStateView<KeyType<u32>>,
         empty_global_module_cache:
@@ -2974,7 +3098,7 @@ mod test {
         counter: AtomicU32,
         base_view: MockStateView<KeyType<u32>>,
         runtime_environment: RuntimeEnvironment,
-        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
+        versioned_map: MVHashMap<KeyType<u32>, u32, ValueWithLayout<ValueType>, DelayedFieldID>,
         scheduler: Scheduler,
     }
 

@@ -2,20 +2,18 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    types::{TxnIndex, UnsyncGroupError, ValueWithLayout},
+    types::{MVValue, TxnIndex, UnsyncGroupError},
     BlockStateStats,
 };
 use anyhow::anyhow;
 use aptos_aggregator::types::DelayedFieldValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
-    executable::ModulePath,
     vm::modules::AptosModuleExtension,
-    write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
 use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache};
 use serde::Serialize;
@@ -33,15 +31,9 @@ use triomphe::Arc as TriompheArc;
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
-pub struct UnsyncMap<
-    K: ModulePath,
-    T: Hash + Clone + Debug + Eq + Serialize,
-    V: TransactionWrite,
-    I: Copy,
-> {
-    // Only use Arc to provide unified interfaces with the MVHashMap.
-    resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
-    group_cache: RefCell<HashMap<K, RefCell<(HashMap<T, ValueWithLayout<V>>, ResourceGroupSize)>>>,
+pub struct UnsyncMap<K, T, V, I> {
+    resource_map: RefCell<HashMap<K, V>>,
+    group_cache: RefCell<HashMap<K, RefCell<(HashMap<T, V>, ResourceGroupSize)>>>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
     // Code caches for modules and scripts.
@@ -53,13 +45,7 @@ pub struct UnsyncMap<
     total_base_delayed_field_size: AtomicU64,
 }
 
-impl<
-        K: ModulePath + Hash + Clone + Eq,
-        T: Hash + Clone + Debug + Eq + Serialize,
-        V: TransactionWrite,
-        I: Hash + Clone + Copy + Eq,
-    > Default for UnsyncMap<K, T, V, I>
-{
+impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
     fn default() -> Self {
         Self {
             resource_map: RefCell::new(HashMap::new()),
@@ -73,12 +59,12 @@ impl<
     }
 }
 
-impl<
-        K: ModulePath + Hash + Clone + Eq + Debug,
-        T: Hash + Clone + Debug + Eq + Serialize,
-        V: TransactionWrite,
-        I: Hash + Clone + Copy + Eq,
-    > UnsyncMap<K, T, V, I>
+impl<K, T, V, I> UnsyncMap<K, T, V, I>
+where
+    K: Hash + Clone + Eq + Debug,
+    T: Hash + Clone + Debug + Eq + Serialize,
+    V: MVValue,
+    I: Hash + Clone + Copy + Eq,
 {
     pub fn new() -> Self {
         Self::default()
@@ -125,10 +111,7 @@ impl<
         group_key: K,
         base_values: impl IntoIterator<Item = (T, V)>,
     ) -> anyhow::Result<()> {
-        let base_map: HashMap<T, ValueWithLayout<V>> = base_values
-            .into_iter()
-            .map(|(t, v)| (t, ValueWithLayout::RawFromStorage(TriompheArc::new(v))))
-            .collect();
+        let base_map: HashMap<T, V> = base_values.into_iter().collect();
         let base_size = group_size_as_sum(
             base_map
                 .iter()
@@ -151,23 +134,14 @@ impl<
         Ok(())
     }
 
-    pub fn update_tagged_base_value_with_layout(
-        &self,
-        group_key: K,
-        tag: T,
-        value: V,
-        layout: Option<TriompheArc<MoveTypeLayout>>,
-    ) {
+    pub fn update_tagged_base_value(&self, group_key: K, tag: T, value: V) {
         self.group_cache
             .borrow_mut()
             .get_mut(&group_key)
             .expect("Unable to fetch the entry for the group key in group_cache")
             .borrow_mut()
             .0
-            .insert(
-                tag,
-                ValueWithLayout::Exchanged(TriompheArc::new(value), layout),
-            );
+            .insert(tag, value);
     }
 
     pub fn get_group_size(&self, group_key: &K) -> Option<ResourceGroupSize> {
@@ -181,7 +155,7 @@ impl<
         &self,
         group_key: &K,
         value_tag: &T,
-    ) -> Result<ValueWithLayout<V>, UnsyncGroupError> {
+    ) -> Result<V, UnsyncGroupError> {
         self.group_cache.borrow().get(group_key).map_or(
             Err(UnsyncGroupError::Uninitialized),
             |group_map| {
@@ -200,7 +174,7 @@ impl<
         &self,
         group_key: &K,
     ) -> (
-        impl Iterator<Item = (T, ValueWithLayout<V>)> + use<K, T, V, I>,
+        impl Iterator<Item = (T, V)> + use<K, T, V, I>,
         ResourceGroupSize,
     ) {
         let binding = self.group_cache.borrow();
@@ -215,11 +189,11 @@ impl<
     pub fn insert_group_ops(
         &self,
         group_key: &K,
-        group_ops: impl IntoIterator<Item = (T, (V, Option<TriompheArc<MoveTypeLayout>>))>,
+        group_ops: impl IntoIterator<Item = (T, V)>,
         group_size: ResourceGroupSize,
     ) -> Result<(), PanicError> {
-        for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
-            self.insert_group_op(group_key, value_tag, group_op, maybe_layout)?;
+        for (value_tag, group_op) in group_ops.into_iter() {
+            self.insert_group_op(group_key, value_tag, group_op)?;
         }
         self.group_cache
             .borrow_mut()
@@ -230,15 +204,10 @@ impl<
         Ok(())
     }
 
-    fn insert_group_op(
-        &self,
-        group_key: &K,
-        value_tag: T,
-        v: V,
-        maybe_layout: Option<TriompheArc<MoveTypeLayout>>,
-    ) -> Result<(), PanicError> {
+    fn insert_group_op(&self, group_key: &K, value_tag: T, v: V) -> Result<(), PanicError> {
         use aptos_types::write_set::WriteOpKind::*;
         use std::collections::hash_map::Entry::*;
+        let kind = v.write_op_kind();
         match (
             self.group_cache
                 .borrow_mut()
@@ -247,30 +216,21 @@ impl<
                 .borrow_mut()
                 .0
                 .entry(value_tag.clone()),
-            v.write_op_kind(),
+            kind,
         ) {
             (Occupied(entry), Deletion) => {
                 entry.remove();
             },
             (Occupied(mut entry), Modification) => {
-                entry.insert(ValueWithLayout::Exchanged(
-                    TriompheArc::new(v),
-                    maybe_layout,
-                ));
+                entry.insert(v);
             },
             (Vacant(entry), Creation) => {
-                entry.insert(ValueWithLayout::Exchanged(
-                    TriompheArc::new(v),
-                    maybe_layout,
-                ));
+                entry.insert(v);
             },
-            (l, r) => {
+            (_, kind) => {
                 return Err(code_invariant_error(format!(
-                    "WriteOp kind {:?} not consistent with previous value at tag {:?}. Existing: {:?}, new: {:?}",
-                    v.write_op_kind(),
-                    value_tag,
-		    l,
-		    r,
+                    "WriteOp kind {:?} not consistent with the existing value at tag {:?}",
+                    kind, value_tag,
                 )));
             },
         }
@@ -278,26 +238,11 @@ impl<
         Ok(())
     }
 
-    pub fn fetch_data(&self, key: &K) -> Option<ValueWithLayout<V>> {
+    pub fn fetch_data(&self, key: &K) -> Option<V> {
         self.resource_map.borrow().get(key).cloned()
     }
 
-    pub fn fetch_exchanged_data(
-        &self,
-        key: &K,
-    ) -> Result<(TriompheArc<V>, TriompheArc<MoveTypeLayout>), PanicError> {
-        let data = self.fetch_data(key);
-        if let Some(ValueWithLayout::Exchanged(value, Some(layout))) = data {
-            Ok((value, layout))
-        } else {
-            Err(code_invariant_error(format!(
-                "Read value needing exchange {:?} does not exist or not in Exchanged format",
-                data
-            )))
-        }
-    }
-
-    pub fn fetch_group_data(&self, key: &K) -> Option<Vec<(TriompheArc<T>, ValueWithLayout<V>)>> {
+    pub fn fetch_group_data(&self, key: &K) -> Option<Vec<(TriompheArc<T>, V)>> {
         self.group_cache.borrow().get(key).map(|group_map| {
             group_map
                 .borrow()
@@ -312,18 +257,11 @@ impl<
         self.delayed_field_map.borrow().get(id).cloned()
     }
 
-    pub fn write(
-        &self,
-        key: K,
-        value: TriompheArc<V>,
-        layout: Option<TriompheArc<MoveTypeLayout>>,
-    ) {
-        self.resource_map
-            .borrow_mut()
-            .insert(key, ValueWithLayout::Exchanged(value, layout));
+    pub fn write(&self, key: K, value: V) {
+        self.resource_map.borrow_mut().insert(key, value);
     }
 
-    pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
+    pub fn set_base_value(&self, key: K, value: V) {
         let cur_size = value.bytes_len();
         if self.resource_map.borrow_mut().insert(key, value).is_none() {
             if let Some(cur_size) = cur_size {
@@ -350,12 +288,13 @@ impl<
 mod test {
     use super::*;
     use crate::types::test::{KeyType, TestValue};
+    use aptos_types::write_set::TransactionWrite;
     use claims::{assert_err, assert_err_eq, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn finalize_group_as_hashmap(
         map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()>,
         key: &KeyType<Vec<u8>>,
-    ) -> HashMap<usize, ValueWithLayout<TestValue>> {
+    ) -> HashMap<usize, TestValue> {
         map.finalize_group(key).0.collect()
     }
 
@@ -371,81 +310,44 @@ mod test {
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
         )
         .unwrap();
-        assert_ok!(map.insert_group_op(&ap, 2, TestValue::with_kind(202, false), None));
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(203, false), None));
+        assert_ok!(map.insert_group_op(&ap, 2, TestValue::with_kind(202, false)));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(203, false)));
         let committed = finalize_group_as_hashmap(&map, &ap);
 
-        // // The value at tag 1 is from base, while 2 and 3 are from txn 3.
-        // // (Arc compares with value equality)
+        // The value at tag 1 is from base, while 2 and 3 are from txn 3.
         assert_eq!(committed.len(), 3);
-        assert_some_eq!(
-            committed.get(&1),
-            &ValueWithLayout::RawFromStorage(TriompheArc::new(TestValue::with_kind(1, true)))
-        );
-        assert_some_eq!(
-            committed.get(&2),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(202, false)), None)
-        );
-        assert_some_eq!(
-            committed.get(&3),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(203, false)), None)
-        );
+        assert_some_eq!(committed.get(&1), &TestValue::with_kind(1, true));
+        assert_some_eq!(committed.get(&2), &TestValue::with_kind(202, false));
+        assert_some_eq!(committed.get(&3), &TestValue::with_kind(203, false));
 
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(303, false), None));
-        assert_ok!(map.insert_group_op(&ap, 4, TestValue::with_kind(304, true), None));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(303, false)));
+        assert_ok!(map.insert_group_op(&ap, 4, TestValue::with_kind(304, true)));
         let committed = finalize_group_as_hashmap(&map, &ap);
         assert_eq!(committed.len(), 4);
-        assert_some_eq!(
-            committed.get(&1),
-            &ValueWithLayout::RawFromStorage(TriompheArc::new(TestValue::with_kind(1, true)))
-        );
-        assert_some_eq!(
-            committed.get(&2),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(202, false)), None)
-        );
-        assert_some_eq!(
-            committed.get(&3),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(303, false)), None)
-        );
-        assert_some_eq!(
-            committed.get(&4),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(304, true)), None)
-        );
+        assert_some_eq!(committed.get(&1), &TestValue::with_kind(1, true));
+        assert_some_eq!(committed.get(&2), &TestValue::with_kind(202, false));
+        assert_some_eq!(committed.get(&3), &TestValue::with_kind(303, false));
+        assert_some_eq!(committed.get(&4), &TestValue::with_kind(304, true));
 
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::with_kind(100, true), None));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
-        assert_err!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
+        assert_ok!(map.insert_group_op(&ap, 0, TestValue::with_kind(100, true)));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion()));
+        assert_err!(map.insert_group_op(&ap, 1, TestValue::deletion()));
         let committed = finalize_group_as_hashmap(&map, &ap);
         assert_eq!(committed.len(), 4);
-        assert_some_eq!(
-            committed.get(&0),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(100, true)), None)
-        );
+        assert_some_eq!(committed.get(&0), &TestValue::with_kind(100, true));
         assert_none!(committed.get(&1));
-        assert_some_eq!(
-            committed.get(&2),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(202, false)), None)
-        );
-        assert_some_eq!(
-            committed.get(&3),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(303, false)), None)
-        );
-        assert_some_eq!(
-            committed.get(&4),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(304, true)), None)
-        );
+        assert_some_eq!(committed.get(&2), &TestValue::with_kind(202, false));
+        assert_some_eq!(committed.get(&3), &TestValue::with_kind(303, false));
+        assert_some_eq!(committed.get(&4), &TestValue::with_kind(304, true));
 
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::deletion(), None));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::with_kind(400, true), None));
-        assert_ok!(map.insert_group_op(&ap, 2, TestValue::deletion(), None));
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::deletion(), None));
-        assert_ok!(map.insert_group_op(&ap, 4, TestValue::deletion(), None));
+        assert_ok!(map.insert_group_op(&ap, 0, TestValue::deletion()));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::with_kind(400, true)));
+        assert_ok!(map.insert_group_op(&ap, 2, TestValue::deletion()));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::deletion()));
+        assert_ok!(map.insert_group_op(&ap, 4, TestValue::deletion()));
         let committed = finalize_group_as_hashmap(&map, &ap);
         assert_eq!(committed.len(), 1);
-        assert_some_eq!(
-            committed.get(&1),
-            &ValueWithLayout::Exchanged(TriompheArc::new(TestValue::with_kind(400, true)), None)
-        );
+        assert_some_eq!(committed.get(&1), &TestValue::with_kind(400, true));
     }
 
     #[should_panic]
@@ -470,7 +372,7 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true), None));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true)));
     }
 
     #[should_panic]
@@ -515,19 +417,19 @@ mod test {
         .unwrap();
         assert_err!(map.insert_group_ops(
             &ap,
-            vec![(0, (TestValue::modification_with_len(2), None))],
+            vec![(0, TestValue::modification_with_len(2))],
             exp_size,
         ));
         assert_err!(map.insert_group_ops(
             &ap,
-            vec![(1, (TestValue::creation_with_len(2), None))],
+            vec![(1, TestValue::creation_with_len(2))],
             exp_size,
         ));
         assert_ok!(map.insert_group_ops(
             &ap,
             vec![
-                (0, (TestValue::creation_with_len(2), None)),
-                (1, (TestValue::modification_with_len(2), None))
+                (0, TestValue::creation_with_len(2)),
+                (1, TestValue::modification_with_len(2))
             ],
             exp_size
         ));
@@ -543,8 +445,8 @@ mod test {
         assert_ok!(map.insert_group_ops(
             &ap,
             vec![
-                (4, (TestValue::modification_with_len(3), None)),
-                (5, (TestValue::creation_with_len(3), None)),
+                (4, TestValue::modification_with_len(3)),
+                (5, TestValue::creation_with_len(3)),
             ],
             exp_size
         ));
@@ -560,8 +462,8 @@ mod test {
         assert_ok!(map.insert_group_ops(
             &ap,
             vec![
-                (0, (TestValue::modification_with_len(4), None)),
-                (1, (TestValue::modification_with_len(4), None))
+                (0, TestValue::modification_with_len(4)),
+                (1, TestValue::modification_with_len(4))
             ],
             exp_size
         ));
@@ -589,7 +491,7 @@ mod test {
         for i in 1..5 {
             assert_ok_eq!(
                 map.fetch_group_tagged_data(&ap, &i),
-                ValueWithLayout::RawFromStorage(TriompheArc::new(TestValue::creation_with_len(i)),)
+                TestValue::creation_with_len(i)
             );
         }
         assert_err_eq!(
@@ -601,9 +503,9 @@ mod test {
             UnsyncGroupError::TagNotFound
         );
 
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::modification_with_len(8), None));
-        assert_ok!(map.insert_group_op(&ap, 6, TestValue::creation_with_len(9), None));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion()));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::modification_with_len(8)));
+        assert_ok!(map.insert_group_op(&ap, 6, TestValue::creation_with_len(9)));
 
         assert_err_eq!(
             map.fetch_group_tagged_data(&ap, &1),
@@ -611,11 +513,11 @@ mod test {
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &3),
-            ValueWithLayout::Exchanged(TriompheArc::new(TestValue::modification_with_len(8)), None,)
+            TestValue::modification_with_len(8)
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &6),
-            ValueWithLayout::Exchanged(TriompheArc::new(TestValue::creation_with_len(9)), None,)
+            TestValue::creation_with_len(9)
         );
 
         // others unaffected.
@@ -625,11 +527,11 @@ mod test {
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &2),
-            ValueWithLayout::RawFromStorage(TriompheArc::new(TestValue::creation_with_len(2)),)
+            TestValue::creation_with_len(2)
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &4),
-            ValueWithLayout::RawFromStorage(TriompheArc::new(TestValue::creation_with_len(4)),)
+            TestValue::creation_with_len(4)
         );
     }
 }

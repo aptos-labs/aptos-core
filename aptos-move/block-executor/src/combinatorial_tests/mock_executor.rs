@@ -7,8 +7,7 @@ use crate::{
         RESERVED_TAG,
     },
     task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
-        TransactionOutput,
+        BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, Materializer, TransactionOutput,
     },
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
@@ -19,14 +18,14 @@ use aptos_aggregator::{
     delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::{DeltaOp, DeltaWithMax},
 };
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     contract_event::TransactionEvent,
     error::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::AuxiliaryInfo,
+    transaction::{AuxiliaryInfo, CommittedTransactionOutput},
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -123,7 +122,7 @@ macro_rules! try_with_status {
     };
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct MockOutput<K, E> {
     pub(crate) writes: Vec<(K, ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
     // Key, metadata_op, inner_ops
@@ -135,6 +134,9 @@ pub(crate) struct MockOutput<K, E> {
     )>,
     pub(crate) module_writes: BTreeMap<K, ModuleWrite<ValueType>>,
     pub(crate) deltas: Vec<(K, DeltaOp, Option<(DelayedFieldID, bool)>)>,
+    // TODO: test event materialization (mock events carry no delayed fields and
+    // are currently not inspected by the baseline).
+    #[allow(dead_code)]
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
     pub(crate) delayed_field_reads: Vec<(DelayedFieldID, u128, K)>,
@@ -260,7 +262,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     pub(crate) fn add_group_reads(
         &mut self,
         view: &(impl TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + TExecutorView<K, u32, MoveTypeLayout, ValueType>),
+              + TExecutorView<K, u32, MoveTypeLayout>),
         group_reads: &[(K, u32, bool)],
         delayed_fields_enabled: bool,
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
@@ -299,7 +301,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     pub(crate) fn add_group_queries(
         &mut self,
         view: &(impl TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + TExecutorView<K, u32, MoveTypeLayout, ValueType>),
+              + TExecutorView<K, u32, MoveTypeLayout>),
         group_queries: &[(K, bool)],
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
         for (group_key, query_metadata) in group_queries {
@@ -343,7 +345,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>>
     where
         View: TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-            + TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+            + TExecutorView<K, u32, MoveTypeLayout>,
     {
         // Group writes
         for (key, metadata, inner_ops) in group_writes {
@@ -483,7 +485,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     // Group view is because get_delayed_field_id_from_resource dispatches, but there is
     // a TODO to have TExecutorView contain TResourceGroupView anyway.
     where
-        View: TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        View: TExecutorView<K, u32, MoveTypeLayout>
             + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>,
     {
         for (k, new_value, has_delta) in resource_writes.iter() {
@@ -509,7 +511,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Returns self for method chaining
     pub(crate) fn add_deltas(
         &mut self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         deltas: &[(K, DeltaOp, Option<u32>)],
         delta_test_kind: DeltaTestKind,
@@ -548,7 +550,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Helper to extract a delayed field ID for a resource key (assuming value is exchanged).
     fn get_delayed_field_id_from_resource(
         &mut self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         key: &K,
         maybe_tag: Option<u32>,
@@ -589,7 +591,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Returns an error ExecutionStatus if the read fails.
     fn add_delayed_field_from_read_result(
         &mut self,
-        view: &impl TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout>,
         key: &K,
         bytes: &[u8],
     ) -> Result<(), ExecutionStatus<MockOutput<K, E>, usize>> {
@@ -689,13 +691,9 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type AfterMaterializationGuard<'a> = &'a Self;
     type BeforeMaterializationGuard<'a> = &'a Self;
+    type CommittedOutput = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
-
-    fn committed_output(&self) -> &OnceCell<aptos_types::transaction::TransactionOutput> {
-        unimplemented!("Not used in tests");
-    }
 
     fn skip_output() -> Self {
         Self::skipped_output(None)
@@ -709,34 +707,50 @@ where
         Ok(self)
     }
 
-    fn after_materialization(&self) -> Result<Self::AfterMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        Ok(!self.skipped)
-    }
-
     fn incorporate_materialized_txn_output(
         &mut self,
         patched_resource_write_set: Vec<(K, ValueType)>,
-        _patched_events: Vec<E>,
-    ) -> Result<Trace, PanicError> {
+        _materializer: &impl Materializer,
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         assert_ok!(self
             .patched_resource_write_set
             .set(patched_resource_write_set.clone().into_iter().collect()));
-        // TODO: Also test patched events.
-        Ok(Trace::empty())
+        // TODO: Also test patched events (mock events carry no delayed fields, so
+        // they pass through unpatched).
+        // The mock's committed output is a snapshot of itself, carrying the reads
+        // and patched writes the baseline verifies.
+        Ok((self.clone(), Trace::empty()))
+    }
+}
+
+impl<K, E> CommittedTransactionOutput for MockOutput<K, E>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
+{
+    fn fee_statement(&self) -> FeeStatement {
+        mock_fee_statement(self.total_gas)
     }
 
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {
-        // No compatibility issues here since the move-vm doesn't use the dynamic flag.
+    fn has_new_epoch_event(&self) -> bool {
+        // For tests, it is ok to return false.
+        false
     }
 
-    fn is_materialized_and_success(&self) -> bool {
-        // TODO(BlockSTMv2): Actually test that materialize is called.
-        // A skipped transaction is not a success.
+    fn is_retry(&self) -> bool {
+        self.skipped
+    }
+
+    fn is_success(&self) -> bool {
         !self.skipped
+    }
+
+    fn retry_placeholder() -> Self {
+        Self::skipped_output(None)
+    }
+
+    fn discard_placeholder(discard_code: StatusCode) -> Self {
+        Self::with_discard_code(discard_code)
     }
 }
 
@@ -745,15 +759,16 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<K, (TriompheArc<ValueType>, Option<TriompheArc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<K, ValueWithLayout<ValueType>> {
         self.writes
             .iter()
             .map(|(key, value, maybe_layout)| {
                 (
                     key.clone(),
-                    (TriompheArc::new(value.clone()), maybe_layout.clone()),
+                    ValueWithLayout::Exchanged(
+                        TriompheArc::new(value.clone()),
+                        maybe_layout.clone(),
+                    ),
                 )
             })
             .collect()
@@ -807,14 +822,26 @@ where
     ) -> HashMap<
         K,
         (
-            ValueType,
+            ValueWithLayout<ValueType>,
             ResourceGroupSize,
-            BTreeMap<u32, (ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<u32, ValueWithLayout<ValueType>>,
         ),
     > {
         self.group_writes
             .iter()
-            .map(|(key, value, size, ops)| (key.clone(), (value.clone(), *size, ops.clone())))
+            .map(|(key, value, size, ops)| {
+                let ops = ops
+                    .iter()
+                    .map(|(tag, (v, l))| {
+                        (
+                            *tag,
+                            ValueWithLayout::Exchanged(TriompheArc::new(v.clone()), l.clone()),
+                        )
+                    })
+                    .collect();
+                let metadata = ValueWithLayout::Exchanged(TriompheArc::new(value.clone()), None);
+                (key.clone(), (metadata, *size, ops))
+            })
             .collect()
     }
 
@@ -856,25 +883,6 @@ where
         std::iter::empty()
     }
 
-    fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
-        self.events.iter().map(|e| (e.clone(), None)).collect()
-    }
-
-    fn fee_statement(&self) -> FeeStatement {
-        mock_fee_statement(self.total_gas)
-    }
-
-    fn has_new_epoch_event(&self) -> bool {
-        // For tests, it is ok to return false.
-        false
-    }
-}
-
-impl<K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
-{
     fn fee_statement(&self) -> FeeStatement {
         mock_fee_statement(self.total_gas)
     }
@@ -932,7 +940,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
               + AptosCodeStorage
               + BlockSynchronizationKillSwitch),

@@ -2,14 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_aggregator::types::DelayedFieldsSpeculativeError;
-use aptos_types::{
-    error::PanicOr,
-    write_set::{TransactionWrite, WriteOpKind},
-};
-use fail::fail_point;
+// The speculative value abstraction lives in aptos-types (it is part of the
+// block-executable transaction contract); re-export for existing users.
+pub use aptos_types::block_executor::speculative_value::{MVValue, ValueWithLayout};
+use aptos_types::error::PanicOr;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::atomic::AtomicU32;
-use triomphe::Arc;
 
 pub type AtomicTxnIndex = AtomicU32;
 pub type TxnIndex = u32;
@@ -48,7 +46,7 @@ pub enum MVDataError {
 pub enum MVDataOutput<V> {
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
-    Versioned(Version, ValueWithLayout<V>),
+    Versioned(Version, V),
 }
 
 // TODO[agg_v2](cleanup): once VersionedAggregators is separated from the MVHashMap,
@@ -117,72 +115,6 @@ impl ShiftedTxnIndex {
     }
 }
 
-// TODO[agg_v2](cleanup): consider adding `DoesntExist` variant.
-// Currently, "not existing value" is represented as Deletion.
-#[derive(Debug, PartialEq, Eq)]
-pub enum ValueWithLayout<V> {
-    // When we read from storage, but don't have access to layout, we can only store the raw value.
-    // This should never be returned to the user, before exchange is performed.
-    RawFromStorage(Arc<V>),
-    // We've used the optional layout, and applied exchange to the storage value.
-    // The type layout is Some if there is a delayed field in the resource.
-    // The type layout is None if there is no delayed field in the resource.
-    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>),
-}
-
-impl<T> Clone for ValueWithLayout<T> {
-    fn clone(&self) -> Self {
-        match self {
-            ValueWithLayout::RawFromStorage(value) => {
-                ValueWithLayout::RawFromStorage(value.clone())
-            },
-            ValueWithLayout::Exchanged(value, layout) => {
-                ValueWithLayout::Exchanged(value.clone(), layout.clone())
-            },
-        }
-    }
-}
-
-impl<V: TransactionWrite> ValueWithLayout<V> {
-    pub fn write_op_kind(&self) -> WriteOpKind {
-        match self {
-            ValueWithLayout::RawFromStorage(value) => value.write_op_kind(),
-            ValueWithLayout::Exchanged(value, _) => value.write_op_kind(),
-        }
-    }
-
-    pub fn bytes_len(&self) -> Option<usize> {
-        fail_point!("value_with_layout_bytes_len", |_| { Some(10) });
-        match self {
-            ValueWithLayout::RawFromStorage(value) | ValueWithLayout::Exchanged(value, _) => {
-                value.bytes().map(|b| b.len())
-            },
-        }
-    }
-
-    pub fn extract_value_no_layout(&self) -> &V {
-        match self {
-            ValueWithLayout::RawFromStorage(value) => value.as_ref(),
-            ValueWithLayout::Exchanged(value, None) => value.as_ref(),
-            ValueWithLayout::Exchanged(_, Some(_)) => panic!("Unexpected layout"),
-        }
-    }
-
-    /// Returns a reference to the underlying value, regardless of whether a layout is present.
-    /// Unlike `extract_value_no_layout`, this method does not panic when a layout is present.
-    pub fn extract_value(&self) -> &V {
-        match self {
-            ValueWithLayout::RawFromStorage(value) => value.as_ref(),
-            ValueWithLayout::Exchanged(value, _) => value.as_ref(),
-        }
-    }
-
-    /// Returns true if this value has a layout (i.e., contains delayed fields).
-    pub fn has_layout(&self) -> bool {
-        matches!(self, ValueWithLayout::Exchanged(_, Some(_)))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub enum UnknownOrLayout<'a> {
     Unknown,
@@ -194,33 +126,15 @@ pub enum UnknownOrLayout<'a> {
 pub(crate) mod test {
     use super::*;
     use aptos_types::{
-        executable::ModulePath,
         state_store::state_value::StateValue,
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
-    use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
     use std::{fmt::Debug, hash::Hash};
 
     #[derive(Clone, Eq, Hash, PartialEq, Debug)]
-    pub(crate) struct KeyType<K: Hash + Clone + Debug + Eq>(
-        /// Wrapping the types used for testing to add ModulePath trait implementation.
-        pub K,
-    );
-
-    impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
-        fn is_module_path(&self) -> bool {
-            false
-        }
-
-        fn from_address_and_module_name(
-            _address: &AccountAddress,
-            _module_name: &IdentStr,
-        ) -> Self {
-            unreachable!("Irrelevant for test")
-        }
-    }
+    pub(crate) struct KeyType<K: Hash + Clone + Debug + Eq>(pub K);
 
     #[test]
     fn test_shifted_idx() {
@@ -321,14 +235,30 @@ pub(crate) mod test {
         }
     }
 
-    // Generate a Vec deterministically based on txn_idx and incarnation.
-    fn value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> TestValue {
-        TestValue::new(vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5])
+    impl MVValue for TestValue {
+        fn eq_value(&self, other: &Self) -> bool {
+            self == other
+        }
+
+        fn eq_metadata(&self, _other: &Self) -> bool {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn bytes_len(&self) -> Option<usize> {
+            (!self.bytes.is_empty()).then_some(self.bytes.len())
+        }
+
+        fn is_deletion(&self) -> bool {
+            matches!(self.kind, WriteOpKind::Deletion)
+        }
+
+        fn write_op_kind(&self) -> WriteOpKind {
+            self.kind.clone()
+        }
     }
 
-    // Generate the value_for txn_idx and incarnation in arc.
-    pub(crate) fn arc_value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> Arc<TestValue> {
-        // Generate a Vec deterministically based on txn_idx and incarnation.
-        Arc::new(value_for(txn_idx, incarnation))
+    // Generate a Vec deterministically based on txn_idx and incarnation.
+    pub(crate) fn value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> TestValue {
+        TestValue::new(vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5])
     }
 }

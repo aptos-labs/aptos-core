@@ -60,7 +60,6 @@ pub(crate) fn run_tests_with_groups(
                 }
 
                 let output = execute_block_parallel::<
-                    MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                     NonEmptyGroupDataView<KeyType<[u8; 32]>>,
                     DefaultTxnProvider<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,

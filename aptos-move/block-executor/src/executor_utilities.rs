@@ -1,17 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    counters, errors::*, task::ExecutorTask, txn_last_input_output::TxnLastInputOutput,
-    view::LatestView,
-};
+use crate::{counters, errors::*, record::Record, records::Records, view::LatestView};
 use aptos_logger::error;
 use aptos_mvhashmap::{
-    types::{TxnIndex, ValueWithLayout},
+    types::{MVValue, TxnIndex, ValueWithLayout},
     MVHashMap,
 };
 use aptos_types::{
-    contract_event::TransactionEvent,
     error::{code_invariant_error, PanicError},
     state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
@@ -27,73 +23,16 @@ use rand::{thread_rng, Rng};
 use std::collections::BTreeMap;
 use triomphe::Arc as TriompheArc;
 
-// TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
-// not possible due to type & API mismatch.
-macro_rules! groups_to_finalize {
-    ($outputs:expr, $($txn_idx:expr),*) => {{
-        let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
-
-        group_write_ops.into_iter()
-            .map(|val| (val, false))
-            .chain([()].into_iter().flat_map(|_| {
-                // Lazily evaluated only after iterating over group_write_ops.
-                $outputs.group_reads_needing_delayed_field_exchange($($txn_idx),*)
-                    .into_iter()
-                    .map(|(key, metadata)| {
-                        ((key, TransactionWrite::from_state_value(Some(
-                            StateValue::new_with_metadata(Bytes::new(), metadata)
-                        ))), true)
-                    })
-            }))
-    }};
-}
-
-// Selects and prepares resource writes that require ID replacement for delayed fields.
-// - reads needing replacement: returns the error if data is not in Exchanged format.
-// - normal resource writes: select writes that have layout set and are not a deletion.
-//
-// Since reads needing exchange also do not contain deletions (see 'does_value_need_exchange')
-// logic in value_exchange.rs, it is guaranteed that no returned values is a deletion.
-macro_rules! resource_writes_to_materialize {
-    ($writes:expr, $outputs:expr, $data_source:expr, $($txn_idx:expr),*) => {{
-	$outputs
-        .reads_needing_delayed_field_exchange($($txn_idx),*)
-        .into_iter()
-	    .map(|(key, metadata, layout)| -> Result<_, PanicError> {
-	        let (value, existing_layout) = $data_source.fetch_exchanged_data(&key, $($txn_idx),*)?;
-            randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
-            let new_value = TriompheArc::new(TransactionWrite::from_state_value(Some(
-                StateValue::new_with_metadata(
-                    value.bytes().cloned().unwrap_or_else(Bytes::new),
-                    metadata,
-                ))
-            ));
-            Ok((key, new_value, layout))
-        })
-        .chain(
-	        $writes.into_iter().filter_map(|(key, (value, maybe_layout))| {
-		        maybe_layout.map(|layout| {
-                    (!value.is_deletion()).then_some(Ok((key, value, layout)))
-                }).flatten()
-            })
-        )
-        .collect::<Result<Vec<_>, _>>()
-    }};
-}
-
-pub(crate) use groups_to_finalize;
-pub(crate) use resource_writes_to_materialize;
-
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
     finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
     group_size: ResourceGroupSize,
-    metadata_op: T::Value,
+    metadata_op: ValueWithLayout<T::Value>,
     is_read_needing_exchange: bool,
 ) -> Result<
     (
         T::Key,
-        T::Value,
+        ValueWithLayout<T::Value>,
         Vec<(T::Tag, ValueWithLayout<T::Value>)>,
         ResourceGroupSize,
     ),
@@ -194,7 +133,7 @@ pub(crate) fn map_id_to_values_in_group_writes<
 >(
     finalized_groups: Vec<(
         T::Key,
-        T::Value,
+        ValueWithLayout<T::Value>,
         Vec<(T::Tag, ValueWithLayout<T::Value>)>,
         ResourceGroupSize,
     )>,
@@ -221,9 +160,11 @@ pub(crate) fn map_id_to_values_in_group_writes<
             };
             patched_resource_vec.push((tag, value));
         }
+        // Group metadata carries no layout, so it needs no id replacement. This is
+        // the single point where group writes leave the multi-version representation.
         patched_finalized_groups.push((
             group_key,
-            group_metadata_op,
+            group_metadata_op.into_value(),
             patched_resource_vec,
             group_size,
         ));
@@ -246,35 +187,6 @@ pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = 
             ))
         })
         .collect::<std::result::Result<_, PanicError>>()
-}
-
-// For each delayed field in the event, replace delayed field identifier with value.
-pub(crate) fn map_id_to_values_events<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
-    latest_view: &LatestView<T, S>,
-) -> Result<Vec<T::Event>, PanicError> {
-    events
-        .map(|(event, layout)| {
-            if let Some(layout) = layout {
-                let event_data = event.get_event_data();
-                latest_view
-                    .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
-                    .map(|(bytes, _)| {
-                        let mut patched_event = event;
-                        patched_event.set_event_data(bytes.to_vec());
-                        patched_event
-                    })
-                    .map_err(|_| {
-                        code_invariant_error(format!(
-                            "Failed to replace identifiers with values in an event {:?}",
-                            layout
-                        ))
-                    })
-            } else {
-                Ok(event)
-            }
-        })
-        .collect::<Result<Vec<_>, PanicError>>()
 }
 
 // Parse the input `value` and replace delayed field identifiers with corresponding values
@@ -305,13 +217,13 @@ fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
     }
 }
 
-pub(crate) fn update_transaction_on_abort<T, E>(
+pub(crate) fn update_transaction_on_abort<T, R>(
     txn_idx: TxnIndex,
-    last_input_output: &TxnLastInputOutput<T, E::Output>,
-    versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    last_input_output: &Records<T, R>,
+    versioned_cache: &MVHashMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
 ) where
     T: Transaction,
-    E: ExecutorTask<Txn = T>,
+    R: Record<Txn = T>,
 {
     counters::SPECULATIVE_ABORT_COUNT.inc();
 

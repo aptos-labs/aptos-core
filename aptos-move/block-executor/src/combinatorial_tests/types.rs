@@ -6,6 +6,7 @@ use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaO
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
+    block_executor::speculative_value::ValueWithLayout,
     contract_event::TransactionEvent,
     executable::ModulePath,
     on_chain_config::CurrentTimeMicroseconds,
@@ -36,6 +37,7 @@ use std::{
     marker::PhantomData,
     sync::{atomic::AtomicUsize, Arc},
 };
+use triomphe::Arc as TriompheArc;
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
@@ -488,8 +490,8 @@ impl<
         E: Debug + Clone + Send + Sync + TransactionEvent + 'static,
     > Transaction for MockTransaction<K, E>
 {
-    type Event = E;
     type Key = K;
+    type SpeculativeValue = ValueWithLayout<ValueType>;
     type Tag = u32;
     type Value = ValueType;
 
@@ -501,9 +503,19 @@ impl<
         Self::StateCheckpoint
     }
 
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
+    fn pre_write_values(&self) -> Vec<(Self::Key, Self::SpeculativeValue)> {
         match self {
-            MockTransaction::Write { pre_writes, .. } => pre_writes.clone(),
+            MockTransaction::Write { pre_writes, .. } => pre_writes
+                .iter()
+                .map(|(key, value)| {
+                    // Pre-written mock values carry no delayed fields, so they are
+                    // already in their exchanged form with no layout.
+                    (
+                        key.clone(),
+                        ValueWithLayout::Exchanged(TriompheArc::new(value.clone()), None),
+                    )
+                })
+                .collect(),
             _ => vec![],
         }
     }
@@ -944,7 +956,7 @@ pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum GroupSizeOrMetadata {
     Size(u64),
     Metadata(Option<StateValueMetadata>),

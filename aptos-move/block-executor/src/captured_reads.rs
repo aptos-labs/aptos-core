@@ -881,7 +881,7 @@ where
     fn validate_data_reads_impl<'a>(
         &'a self,
         iter: impl Iterator<Item = (&'a T::Key, &'a DataRead<T::Value>)>,
-        data_map: &VersionedData<T::Key, T::Value>,
+        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         use MVDataError::*;
@@ -909,7 +909,7 @@ where
 
     pub(crate) fn validate_data_reads(
         &self,
-        data_map: &VersionedData<T::Key, T::Value>,
+        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
@@ -1003,7 +1003,7 @@ where
 
     pub(crate) fn validate_group_reads(
         &self,
-        group_map: &VersionedGroupData<T::Key, T::Tag, T::Value>,
+        group_map: &VersionedGroupData<T::Key, T::Tag, ValueWithLayout<T::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         use MVGroupError::*;
@@ -1375,10 +1375,7 @@ mod test {
     use super::*;
     use crate::{
         code_cache_global::GlobalModuleCache,
-        combinatorial_tests::{
-            mock_executor::MockEvent,
-            types::{raw_metadata, KeyType, ValueType},
-        },
+        combinatorial_tests::types::{raw_metadata, KeyType, ValueType},
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use claims::{
@@ -1678,8 +1675,8 @@ mod test {
     struct TestTransactionType {}
 
     impl Transaction for TestTransactionType {
-        type Event = MockEvent;
         type Key = KeyType<u32>;
+        type SpeculativeValue = ValueWithLayout<ValueType>;
         type Tag = u32;
         type Value = ValueType;
 
@@ -2071,7 +2068,8 @@ mod test {
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
 
-        let mvhashmap = MVHashMap::<KeyType<u32>, u32, ValueType, DelayedFieldID>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueWithLayout<ValueType>, DelayedFieldID>::new();
 
         captured_reads.incorrect_use = false;
         captured_reads.non_delayed_field_speculative_failure = false;
