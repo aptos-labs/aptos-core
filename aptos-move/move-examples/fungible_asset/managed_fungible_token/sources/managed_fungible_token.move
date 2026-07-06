@@ -3,6 +3,7 @@
 module example_addr::managed_fungible_token {
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::{Self, Object};
+    use std::signer;
     use std::string::{utf8, String};
     use std::option;
     use aptos_token_objects::token::{create_named_token, create_token_seed};
@@ -11,8 +12,12 @@ module example_addr::managed_fungible_token {
 
     const ASSET_SYMBOL: vector<u8> = b"YOLO";
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Initialize metadata object and store the refs.
-    fun init_module(admin: &signer) {
+    public entry fun initialize(admin: &signer) {
+        assert!(signer::address_of(admin) == @example_addr, ENOT_AUTHORIZED);
         let collection_name: String = utf8(b"test collection name");
         let token_name: String = utf8(b"test token name");
         create_fixed_collection(
@@ -58,6 +63,6 @@ module example_addr::managed_fungible_token {
 
     #[test(creator = @example_addr)]
     fun test_init(creator: &signer) {
-        init_module(creator);
+        initialize(creator);
     }
 }

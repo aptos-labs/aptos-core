@@ -1,6 +1,9 @@
 module account::test_option {
     use std::option;
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 3;
+
     struct FunctionStore has key {
         f: ||R has copy+drop+store,
     }
@@ -13,7 +16,8 @@ module account::test_option {
 
     struct R2<T: copy + drop +store>(T) has copy, drop, key, store;
 
-    fun init_module(account: &signer) {
+    public entry fun initialize(account: &signer) {
+        assert!(std::signer::address_of(account) == @account, ENOT_AUTHORIZED);
         let v = R(1);
         let v2 = R2(option::none<u64>());
         let v3 = R2(option::some<u32>(1));

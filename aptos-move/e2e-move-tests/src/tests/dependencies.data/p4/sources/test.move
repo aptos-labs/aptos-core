@@ -9,11 +9,14 @@ module 0xcafe::a2 {
 }
 
 module 0xcafe::a3 {
+    const ENOT_AUTHORIZED: u64 = 1;
+
     struct Counter has key {
         value: u64,
     }
 
-    fun init_module(account: &signer) {
+    public entry fun initialize(account: &signer) {
+        assert!(std::signer::address_of(account) == @0xcafe, ENOT_AUTHORIZED);
         move_to(account, Counter { value: 0 });
     }
 

@@ -24,6 +24,8 @@ module knight::knight {
     const EPROPERTIES_NOT_MUTABLE: u64 = 5;
     // The collection does not exist
     const ECOLLECTION_DOES_NOT_EXIST: u64 = 6;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 7;
 
     /// The knight token collection name
     const KNIGHT_COLLECTION_NAME: vector<u8> = b"Knight Collection Name";
@@ -66,7 +68,8 @@ module knight::knight {
     }
 
     /// Initializes the module, creating the knight token collection.
-    fun init_module(sender: &signer) {
+    public entry fun initialize(sender: &signer) {
+        assert!(signer::address_of(sender) == @knight, ENOT_AUTHORIZED);
         // Create a collection for knight tokens.
         create_knight_collection(sender);
     }
@@ -235,7 +238,7 @@ module knight::knight {
         // Creator creates the collection, and mints corn and meat tokens in it.
         // ---------------------------------------------------------------------
         food::init_module_for_test(creator);
-        init_module(creator);
+        initialize(creator);
 
         // -------------------------------------------------------
         // Creator mints and sends 90 corns and 20 meats to User1.

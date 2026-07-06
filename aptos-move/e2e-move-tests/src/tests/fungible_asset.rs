@@ -65,6 +65,27 @@ fn test_basic_fungible_token() {
     assert_success!(h.run_entry_function(
         &root,
         str::parse(&format!(
+            "0x{}::coin_example::initialize",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::managed_fungible_token::initialize",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
             "0x{}::coin::create_coin_conversion_map",
             (*root.address()).to_hex()
         ))

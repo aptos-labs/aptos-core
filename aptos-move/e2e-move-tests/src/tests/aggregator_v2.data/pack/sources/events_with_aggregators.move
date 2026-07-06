@@ -6,6 +6,8 @@ module 0x1::events_with_aggregators {
 
     const E_COUNTER_ALREADY_EXISTS: u64 = 0;
     const E_COUNTER_DOES_NOT_EXIST: u64 = 1;
+    /// The signer is not the module's account.
+    const E_NOT_AUTHORIZED: u64 = 2;
 
     struct EventV1 has drop, store {
         value: AggregatorSnapshot<u64>,
@@ -24,8 +26,9 @@ module 0x1::events_with_aggregators {
         counter: Aggregator<u64>,
     }
 
-    fun init_module(account: &signer) {
+    public entry fun initialize(account: &signer) {
         let addr = signer::address_of(account);
+        assert!(addr == @0x1, E_NOT_AUTHORIZED);
         assert!(!exists<Counter>(addr), E_COUNTER_ALREADY_EXISTS);
 
         let counter = Counter {

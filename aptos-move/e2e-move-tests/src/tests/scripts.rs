@@ -39,6 +39,27 @@ fn test_script_with_object_parameter() {
     assert_success!(result);
 
     assert_success!(h.run_entry_function(
+        &alice,
+        str::parse(&format!(
+            "0x{}::coin_example::initialize",
+            (*alice.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+    assert_success!(h.run_entry_function(
+        &alice,
+        str::parse(&format!(
+            "0x{}::managed_fungible_token::initialize",
+            (*alice.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    assert_success!(h.run_entry_function(
         &root,
         str::parse(&format!(
             "0x{}::coin::create_coin_conversion_map",
@@ -97,7 +118,7 @@ fn test_script_with_object_parameter() {
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())
-        .sequence_number(13)
+        .sequence_number(15)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign();
@@ -109,7 +130,7 @@ fn test_script_with_object_parameter() {
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())
-        .sequence_number(14)
+        .sequence_number(16)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign();

@@ -16,9 +16,13 @@ module swap::package_manager {
         addresses: SmartTable<String, address>,
     }
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Initialize PermissionConfig to establish control over the resource account.
     /// This function is invoked only when this package is deployed the first time.
-    fun init_module(swap_signer: &signer) {
+    public entry fun initialize(swap_signer: &signer) {
+        assert!(std::signer::address_of(swap_signer) == @swap, ENOT_AUTHORIZED);
         let signer_cap = resource_account::retrieve_resource_account_cap(swap_signer, @deployer);
         move_to(swap_signer, PermissionConfig {
             addresses: smart_table::new<String, address>(),

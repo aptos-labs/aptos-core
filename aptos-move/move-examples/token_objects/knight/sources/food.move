@@ -72,8 +72,12 @@ module knight::food {
         value: u64,
     }
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 7;
+
     /// Initializes the module, creating the food collection and creating two fungible tokens such as Corn, and Meat.
-    fun init_module(sender: &signer) {
+    public entry fun initialize(sender: &signer) {
+        assert!(signer::address_of(sender) == @knight, ENOT_AUTHORIZED);
         // Create a collection for food tokens.
         create_food_collection(sender);
         // Create two food token (i.e., Corn and Meat) as fungible tokens, meaning that there can be multiple units of them.
@@ -274,7 +278,7 @@ module knight::food {
 
     #[test_only]
     public fun init_module_for_test(creator: &signer) {
-        init_module(creator);
+        initialize(creator);
     }
 
     #[test(creator = @knight, user1 = @0x456, user2 = @0x789)]
@@ -285,7 +289,7 @@ module knight::food {
         // ---------------------------------------------------------------------
         // Creator creates the collection, and mints corn and meat tokens in it.
         // ---------------------------------------------------------------------
-        init_module(creator);
+        initialize(creator);
 
         // -------------------------------------------
         // Creator mints and sends 100 corns to User1.

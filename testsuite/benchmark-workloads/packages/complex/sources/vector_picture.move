@@ -13,6 +13,9 @@ module 0xABCD::vector_picture {
     /// Color checked is max.
     const E_MAX_COLOR: u64 = 3;
 
+    /// The caller is not the module publisher.
+    const E_NOT_AUTHORIZED: u64 = 2;
+
     struct AllPalettes has key {
         all: vector<address>,
     }
@@ -28,7 +31,8 @@ module 0xABCD::vector_picture {
         b: u8,
     }
 
-    fun init_module(publisher: &signer) {
+    public entry fun initialize(publisher: &signer) {
+        assert!(signer::address_of(publisher) == @publisher_address, E_NOT_AUTHORIZED);
         move_to<AllPalettes>(
             publisher,
             AllPalettes {

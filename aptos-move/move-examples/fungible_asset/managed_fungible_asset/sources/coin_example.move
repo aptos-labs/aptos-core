@@ -5,12 +5,17 @@ module example_addr::coin_example {
     use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
     use aptos_framework::object::Object;
     use example_addr::managed_fungible_asset;
+    use std::signer;
     use std::string::utf8;
 
     const ASSET_SYMBOL: vector<u8> = b"YOLO";
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Initialize metadata object and store the refs.
-    fun init_module(admin: &signer) {
+    public entry fun initialize(admin: &signer) {
+        assert!(signer::address_of(admin) == @example_addr, ENOT_AUTHORIZED);
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         managed_fungible_asset::initialize(
             constructor_ref,
@@ -81,12 +86,10 @@ module example_addr::coin_example {
 
     #[test_only]
     use aptos_framework::primary_fungible_store;
-    #[test_only]
-    use std::signer;
 
     #[test(creator = @example_addr)]
     fun test_basic_flow(creator: &signer) {
-        init_module(creator);
+        initialize(creator);
         let creator_address = signer::address_of(creator);
         let aaron_address = @0xface;
 
@@ -106,7 +109,7 @@ module example_addr::coin_example {
     #[test(creator = @example_addr, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50001, location = example_addr::managed_fungible_asset)]
     fun test_permission_denied(creator: &signer, aaron: &signer) {
-        init_module(creator);
+        initialize(creator);
         let creator_address = signer::address_of(creator);
         mint(aaron, creator_address, 100);
     }

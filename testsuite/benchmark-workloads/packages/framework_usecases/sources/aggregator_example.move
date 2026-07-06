@@ -31,7 +31,7 @@ module 0xABCD::aggregator_example {
 
     // Create the global `Counter`.
     // Stored under the module publisher address.
-    fun init_module(publisher: &signer) {
+    public entry fun initialize(publisher: &signer) {
         assert!(
             signer::address_of(publisher) == @publisher_address,
             ENOT_AUTHORIZED,

@@ -143,7 +143,8 @@ module mint_nft::create_nft_getting_production_ready {
     /// Specified proof of knowledge required to prove ownership of a public key is invalid
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 6;
 
-    fun init_module(resource_signer: &signer) {
+    public entry fun initialize(resource_signer: &signer) {
+        assert!(signer::address_of(resource_signer) == @mint_nft, ENOT_AUTHORIZED);
         let collection_name = string::utf8(b"Collection name");
         let description = string::utf8(b"Description");
         let collection_uri = string::utf8(b"Collection uri");
@@ -326,7 +327,7 @@ module mint_nft::create_nft_getting_production_ready {
         // create a resource account from the origin account, mocking the module publishing process
         resource_account::create_resource_account(&origin_account, vector::empty<u8>(), vector::empty<u8>());
 
-        init_module(resource_account);
+        initialize(resource_account);
 
         let admin = create_account_for_test(@admin_addr);
         let pk_bytes = ed25519::validated_public_key_to_bytes(collection_token_minter_public_key);

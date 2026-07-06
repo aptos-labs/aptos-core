@@ -32,9 +32,13 @@ module package::package_manager {
         addresses: SmartTable<String, address>,
     }
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Initialize PermissionConfig to establish control over the resource account.
     /// This function is invoked only when this package is deployed the first time.
-    fun init_module(package_signer: &signer) {
+    public entry fun initialize(package_signer: &signer) {
+        assert!(std::signer::address_of(package_signer) == @package, ENOT_AUTHORIZED);
         let signer_cap = resource_account::retrieve_resource_account_cap(package_signer, @deployer);
         move_to(package_signer, PermissionConfig {
             addresses: smart_table::new<String, address>(),

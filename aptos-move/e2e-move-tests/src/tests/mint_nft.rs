@@ -112,6 +112,17 @@ fn mint_nft_e2e() {
         .privkey
         .sign_arbitrary_message(&mint_proof_msg.unwrap());
 
+    assert_success!(h.run_entry_function(
+        &resource_account,
+        str::parse(&format!(
+            "0x{}::create_nft_getting_production_ready::initialize",
+            resource_address.to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+
     // call mint_event_ticket function with the user's mint proof signature and public key
     assert_success!(h.run_entry_function(
         &nft_receiver,

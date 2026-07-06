@@ -30,6 +30,15 @@ async fn test_gen_object() {
     });
     context.publish_package(&mut user, txn).await;
 
+    context
+        .api_execute_entry_function(
+            &mut user,
+            &format!("0x{}::hero::initialize", user_addr.to_hex()),
+            json!([]),
+            json!([]),
+        )
+        .await;
+
     // Read default data
     let collection_addr = account_address::create_collection_address(user_addr, "Hero Quest!");
     let token_addr = account_address::create_token_address(user_addr, "Hero Quest!", "Wukong");

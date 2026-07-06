@@ -10,6 +10,9 @@ module 0xABCD::smart_table_picture {
     /// The caller tried to mutate an item outside the bounds of the vector.
     const E_INDEX_OUT_OF_BOUNDS: u64 = 1;
 
+    /// The caller is not the module publisher.
+    const E_NOT_AUTHORIZED: u64 = 2;
+
     struct AllPalettes has key {
         all: vector<address>,
     }
@@ -19,7 +22,8 @@ module 0xABCD::smart_table_picture {
         pixels: SmartTable<u32, u8>,
     }
 
-    fun init_module(publisher: &signer) {
+    public entry fun initialize(publisher: &signer) {
+        assert!(signer::address_of(publisher) == @publisher_address, E_NOT_AUTHORIZED);
         move_to<AllPalettes>(
             publisher,
             AllPalettes {

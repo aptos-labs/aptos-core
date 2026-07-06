@@ -17,6 +17,8 @@ module hero::hero {
     const EINVALID_WEAPON_UNEQUIP: u64 = 5;
     const EINVALID_GEM_UNEQUIP: u64 = 6;
     const EINVALID_TYPE: u64 = 7;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 8;
 
     struct OnChainConfig has key {
         collection: String,
@@ -61,7 +63,8 @@ module hero::hero {
         weight: u64,
     }
 
-    fun init_module(account: &signer) {
+    public entry fun initialize(account: &signer) {
+        assert!(signer::address_of(account) == @hero, ENOT_AUTHORIZED);
         let collection = string::utf8(b"Hero Quest!");
         collection::create_unlimited_collection(
             account,
@@ -266,9 +269,9 @@ module hero::hero {
         (object::address_to_object<Hero>(token_address), borrow_global<Hero>(token_address))
     }
 
-    #[test(account = @0x3)]
+    #[test(account = @hero)]
     fun test_hero_with_gem_weapon(account: &signer) acquires Hero, OnChainConfig, Weapon {
-        init_module(account);
+        initialize(account);
 
         let hero = create_hero(
             account,

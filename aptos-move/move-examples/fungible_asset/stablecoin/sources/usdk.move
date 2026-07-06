@@ -99,7 +99,8 @@ module stablecoin::usdk {
     /// Ensure any stores for the stablecoin are untransferable.
     /// Store Roles, Management and State resources in the Metadata object.
     /// Override deposit and withdraw functions of the newly created asset/token to add custom denylist logic.
-    fun init_module(usdk_signer: &signer) {
+    public entry fun initialize(usdk_signer: &signer) {
+        assert!(signer::address_of(usdk_signer) == @stablecoin, EUNAUTHORIZED);
         // Create the stablecoin with primary store support.
         let constructor_ref = &object::create_named_object(usdk_signer, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
@@ -337,6 +338,6 @@ module stablecoin::usdk {
 
     #[test_only]
     public fun init_for_test(usdk_signer: &signer) {
-        init_module(usdk_signer);
+        initialize(usdk_signer);
     }
 }

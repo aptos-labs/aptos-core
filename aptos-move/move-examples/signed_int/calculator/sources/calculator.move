@@ -1,6 +1,9 @@
 module account::calculator {
     use std::signer::address_of;
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Input to the calculator
     enum Input {
         Number(i64),
@@ -29,7 +32,8 @@ module account::calculator {
         }
     }
 
-    fun init_module(s: &signer) {
+    public entry fun initialize(s: &signer) {
+        assert!(address_of(s) == @account, ENOT_AUTHORIZED);
         move_to(s, State::Value(-1))
     }
 

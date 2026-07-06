@@ -17,13 +17,16 @@ module staking::oracle {
 
     /// Price read from oracle is stale
     const ESTALE_PRICE: u64 = 1;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 2;
 
     struct OracleConfig has key {
         /// Maximum age of the price in seconds. If the price is older than this, reading the price will fail.
         max_age_secs: u64,
     }
 
-    fun init_module(staking_signer: &signer) {
+    public entry fun initialize(staking_signer: &signer) {
+        assert!(std::signer::address_of(staking_signer) == @staking, ENOT_AUTHORIZED);
         move_to(staking_signer, OracleConfig {
             max_age_secs: INITIAL_MAX_AGE_SECS,
         });

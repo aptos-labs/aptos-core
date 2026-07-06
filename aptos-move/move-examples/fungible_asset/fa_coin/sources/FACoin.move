@@ -16,6 +16,8 @@ module FACoin::fa_coin {
     const ENOT_OWNER: u64 = 1;
     /// The FA coin is paused.
     const EPAUSED: u64 = 2;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 3;
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
 
@@ -36,7 +38,8 @@ module FACoin::fa_coin {
 
     /// Initialize metadata object and store the refs.
     // :!:>initialize
-    fun init_module(admin: &signer) {
+    public entry fun initialize(admin: &signer) {
+        assert!(signer::address_of(admin) == @FACoin, ENOT_AUTHORIZED);
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
@@ -189,7 +192,7 @@ module FACoin::fa_coin {
     fun test_basic_flow(
         creator: &signer,
     ) acquires ManagedFungibleAsset, State {
-        init_module(creator);
+        initialize(creator);
         let creator_address = signer::address_of(creator);
         let aaron_address = @0xface;
 
@@ -212,7 +215,7 @@ module FACoin::fa_coin {
         creator: &signer,
         aaron: &signer
     ) acquires ManagedFungibleAsset {
-        init_module(creator);
+        initialize(creator);
         let creator_address = signer::address_of(creator);
         mint(aaron, creator_address, 100);
     }
@@ -222,7 +225,7 @@ module FACoin::fa_coin {
     fun test_paused(
         creator: &signer,
     ) acquires ManagedFungibleAsset, State {
-        init_module(creator);
+        initialize(creator);
         let creator_address = signer::address_of(creator);
         mint(creator, creator_address, 100);
         set_pause(creator, true);

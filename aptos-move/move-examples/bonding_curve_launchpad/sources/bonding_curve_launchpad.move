@@ -19,6 +19,8 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     const EFA_FROZEN: u64 = 13;
     /// Swap amount_in is non-positive.
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
 
     //---------------------------Events---------------------------
     #[event]
@@ -43,7 +45,8 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     }
 
     //---------------------------Init---------------------------
-    fun init_module(account: &signer) {
+    public entry fun initialize(account: &signer) {
+        assert!(std::signer::address_of(account) == @bonding_curve_launchpad, ENOT_AUTHORIZED);
         // Create and store the permissioned_withdraw function (global freezing based on FA status) while access to
         // the account signer is available.
         let permissioned_withdraw = function_info::new_function_info(

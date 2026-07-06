@@ -9,9 +9,10 @@ module upgrade_and_govern::parameters {
     const GENESIS_PARAMETER_1: u64 = 123;
     const GENESIS_PARAMETER_2: u64 = 456;
 
-    fun init_module(
+    public entry fun initialize(
         upgrade_and_govern: &signer
     ) {
+        assert!(address_of(upgrade_and_govern) == @upgrade_and_govern, E_INVALID_AUTHORITY);
         let governance_parameters = GovernanceParameters{
             parameter_1: GENESIS_PARAMETER_1,
             parameter_2: GENESIS_PARAMETER_2};

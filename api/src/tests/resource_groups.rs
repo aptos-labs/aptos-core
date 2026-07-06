@@ -54,6 +54,16 @@ async fn test_gen_resource_group(
     });
     context.publish_package(&mut admin0, txn).await;
 
+    let admin0_addr = admin0.address();
+    context
+        .api_execute_entry_function(
+            &mut admin0,
+            &format!("{}::primary::initialize", admin0_addr),
+            json!([]),
+            json!([]),
+        )
+        .await;
+
     let named_addresses_clone = named_addresses.clone();
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
