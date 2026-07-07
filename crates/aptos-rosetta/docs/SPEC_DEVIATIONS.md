@@ -322,3 +322,24 @@ the construction round-trip test; revisit consistency during the rewrite.
 `UPDATE_COMMISSION_FUNCTION = "update_commision"` (misspelled) mirrors the
 on-chain entry function name, which cannot be corrected without a framework
 change (`src/types/move_types.rs:54-56`).
+
+---
+
+## 15. rosetta-cli conformance assets
+
+Conformance is a **manual** step (no CI/smoke-test wiring): run `rosetta-cli`
+with `rosetta_cli.json` + `aptos.ros` against a running online (`:8082`) /
+offline (`:8083`) pair. The automated in-process equivalent is
+`testsuite/smoke-test/src/rosetta.rs` (drives the Rust `RosettaClient` against a
+LocalSwarm). Load-bearing dependencies these assets bake in:
+
+- **Network name `"TESTING"`** — `ChainId::from_str("TESTING")` must resolve to
+  `ChainId::test()` (chain id 4). Verified by `types/src/chain_id.rs`.
+- **APT currency shape** — `aptos.ros` uses APT as `{symbol: APT, decimals: 8,
+  metadata.move_type: 0x1::aptos_coin::AptosCoin}` with **no `fa_address`**,
+  exactly matching `common::native_coin` (see §5). Changing `native_coin` to
+  carry `fa_address = 0xA` would break the DSL's currency matching.
+- **Block hash separator is `-`** (`<chain_id>-<block_height>`), not `:` — see
+  §2. (`README.md` previously stated `:`; corrected 2026-07.)
+- Only `create_account` / `withdraw` / `deposit` operations and Ed25519
+  single-signer construction are exercised (see §6.1, §10).
