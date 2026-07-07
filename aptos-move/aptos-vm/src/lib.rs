@@ -139,6 +139,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::ModuleStorage;
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
@@ -174,6 +175,12 @@ pub trait VMBlockExecutor: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus>;
+
+    /// Invalidates the given modules in the executor's cross-block module cache. Called at commit
+    /// time for a block that published modules via the deferred publishing flow, so the next block
+    /// re-reads the new code from storage. Default is a no-op for executors without a persistent
+    /// module cache.
+    fn invalidate_published_modules(&self, _module_ids: Vec<ModuleId>) {}
 
     /// Executes a block of transactions and returns output for each one of them, without applying
     /// any block limit.

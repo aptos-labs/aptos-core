@@ -6,6 +6,7 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use claims::assert_ok;
@@ -21,7 +22,8 @@ struct ModuleData {
 
 #[test]
 fn init_module() {
-    let mut h = MoveHarness::new();
+    // Deferred module publishing does not run init_module, so keep it disabled for these tests.
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
 
     // Load the code
     let acc = h.aptos_framework_account();
@@ -49,7 +51,8 @@ fn init_module() {
 
 #[test]
 fn init_module_when_republishing_package() {
-    let mut h = MoveHarness::new();
+    // Deferred module publishing does not run init_module, so keep it disabled for these tests.
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
 
     // Deploy a package that initially does not have the module that has the init_module function.
     let acc = h.aptos_framework_account();
@@ -73,7 +76,8 @@ fn init_module_when_republishing_package() {
 
 #[test]
 fn init_module_with_abort_and_republish() {
-    let mut h = MoveHarness::new();
+    // Deferred module publishing does not run init_module, so keep it disabled for these tests.
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x12").unwrap());
 
     let mut p1 = PackageBuilder::new("Pack");
@@ -104,7 +108,8 @@ fn init_module_with_abort_and_republish() {
 #[test_case(true)]
 #[test_case(false)]
 fn invalid_init_module(allow_extended_checks_to_fail: bool) {
-    let mut h = MoveHarness::new();
+    // Deferred module publishing does not run init_module, so keep it disabled for these tests.
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x42").unwrap());
 
     let package_paths = [

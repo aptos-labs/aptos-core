@@ -1636,9 +1636,12 @@ where
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
         shared_sync_params: &SharedSyncParams<T, E, S>,
-    ) -> Result<Option<T>, PanicError> {
+    ) -> Result<(Option<T>, Vec<ModuleId>), PanicError> {
         let _timer = PARALLEL_FINALIZE_SECONDS.start_timer();
         let mut maybe_block_epilogue_txn = None;
+        // Modules published by the block epilogue (deferred publishing). Recorded so the global
+        // module cache can be invalidated at commit time.
+        let mut published_module_ids = vec![];
 
         let versioned_cache = shared_sync_params.versioned_cache;
         let num_txns = signature_verified_block.num_txns();
@@ -1753,6 +1756,10 @@ where
                     runtime_environment,
                     &self.config,
                 )?;
+                // Record the modules published by the epilogue before its output is materialized.
+                // The epilogue bypasses `publish_module_write_set`, so its module writes are not
+                // added to the module cache during execution; they are invalidated at commit time.
+                published_module_ids = last_input_output.published_module_ids(epilogue_txn_idx)?;
                 self.materialize_txn_commit(
                     epilogue_txn_idx,
                     scheduler,
@@ -1773,7 +1780,7 @@ where
             final_results.acquire().dereference_mut().pop();
         }
 
-        Ok(maybe_block_epilogue_txn)
+        Ok((maybe_block_epilogue_txn, published_module_ids))
     }
 
     pub(crate) fn execute_transactions_parallel_v2(
@@ -1898,32 +1905,34 @@ where
         });
         drop(timer);
 
-        let (has_error, maybe_block_epilogue_txn) = if shared_maybe_error.load(Ordering::SeqCst) {
-            (true, None)
-        } else {
-            match self.finalize_parallel_execution(
-                maybe_executor.into_inner(),
-                signature_verified_block,
-                !scheduler.post_commit_processing_queue_is_empty(),
-                transaction_slice_metadata,
-                SchedulerWrapper::V2(&scheduler, 0),
-                module_cache_manager_guard.environment(),
-                &shared_sync_params,
-            ) {
-                Ok(maybe_block_epilogue_txn) => {
-                    // Update state counters & insert verified modules into cache (safe after error check).
-                    counters::update_state_counters(versioned_cache.stats(), true);
-                    (
-                        module_cache_manager_guard
-                            .module_cache_mut()
-                            .insert_verified(versioned_cache.take_modules_iter())
-                            .is_err(),
-                        maybe_block_epilogue_txn,
-                    )
-                },
-                Err(_) => (true, None),
-            }
-        };
+        let (has_error, maybe_block_epilogue_txn, published_module_ids) =
+            if shared_maybe_error.load(Ordering::SeqCst) {
+                (true, None, vec![])
+            } else {
+                match self.finalize_parallel_execution(
+                    maybe_executor.into_inner(),
+                    signature_verified_block,
+                    !scheduler.post_commit_processing_queue_is_empty(),
+                    transaction_slice_metadata,
+                    SchedulerWrapper::V2(&scheduler, 0),
+                    module_cache_manager_guard.environment(),
+                    &shared_sync_params,
+                ) {
+                    Ok((maybe_block_epilogue_txn, published_module_ids)) => {
+                        // Update state counters & insert verified modules into cache (safe after error check).
+                        counters::update_state_counters(versioned_cache.stats(), true);
+                        (
+                            module_cache_manager_guard
+                                .module_cache_mut()
+                                .insert_verified(versioned_cache.take_modules_iter())
+                                .is_err(),
+                            maybe_block_epilogue_txn,
+                            published_module_ids,
+                        )
+                    },
+                    Err(_) => (true, None, vec![]),
+                }
+            };
 
         // Explicit async drops even when there is an error.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1933,10 +1942,10 @@ where
         }
 
         // Return final result
-        Ok(BlockOutput::new(
-            final_results.into_inner(),
-            maybe_block_epilogue_txn,
-        ))
+        Ok(
+            BlockOutput::new(final_results.into_inner(), maybe_block_epilogue_txn)
+                .with_published_modules(published_module_ids),
+        )
     }
 
     /// Testing-only public wrapper (behind the `testing` feature) so PoCs in other crates can
@@ -2082,32 +2091,34 @@ where
         });
         drop(timer);
 
-        let (has_error, maybe_block_epilogue_txn) = if shared_maybe_error.load(Ordering::SeqCst) {
-            (true, None)
-        } else {
-            match self.finalize_parallel_execution(
-                maybe_executor.into_inner(),
-                signature_verified_block,
-                scheduler.pop_from_commit_queue().is_ok(),
-                transaction_slice_metadata,
-                SchedulerWrapper::V1(&scheduler, &skip_module_reads_validation),
-                module_cache_manager_guard.environment(),
-                &shared_sync_params,
-            ) {
-                Ok(maybe_block_epilogue_txn) => {
-                    // Update state counters & insert verified modules into cache (safe after error check).
-                    counters::update_state_counters(versioned_cache.stats(), true);
-                    (
-                        module_cache_manager_guard
-                            .module_cache_mut()
-                            .insert_verified(versioned_cache.take_modules_iter())
-                            .is_err(),
-                        maybe_block_epilogue_txn,
-                    )
-                },
-                Err(_) => (true, None),
-            }
-        };
+        let (has_error, maybe_block_epilogue_txn, published_module_ids) =
+            if shared_maybe_error.load(Ordering::SeqCst) {
+                (true, None, vec![])
+            } else {
+                match self.finalize_parallel_execution(
+                    maybe_executor.into_inner(),
+                    signature_verified_block,
+                    scheduler.pop_from_commit_queue().is_ok(),
+                    transaction_slice_metadata,
+                    SchedulerWrapper::V1(&scheduler, &skip_module_reads_validation),
+                    module_cache_manager_guard.environment(),
+                    &shared_sync_params,
+                ) {
+                    Ok((maybe_block_epilogue_txn, published_module_ids)) => {
+                        // Update state counters & insert verified modules into cache (safe after error check).
+                        counters::update_state_counters(versioned_cache.stats(), true);
+                        (
+                            module_cache_manager_guard
+                                .module_cache_mut()
+                                .insert_verified(versioned_cache.take_modules_iter())
+                                .is_err(),
+                            maybe_block_epilogue_txn,
+                            published_module_ids,
+                        )
+                    },
+                    Err(_) => (true, None, vec![]),
+                }
+            };
 
         // Explicit async drops even when there is an error.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -2117,10 +2128,10 @@ where
         }
 
         // Return final result
-        Ok(BlockOutput::new(
-            final_results.into_inner(),
-            maybe_block_epilogue_txn,
-        ))
+        Ok(
+            BlockOutput::new(final_results.into_inner(), maybe_block_epilogue_txn)
+                .with_published_modules(published_module_ids),
+        )
     }
 
     fn gen_block_epilogue<'a>(
@@ -2141,7 +2152,12 @@ where
         {
             return Ok(T::state_checkpoint(block_id));
         }
-        if !features.is_calculate_transaction_fee_for_distribution_enabled() {
+        // A V0 payload has no Move call, so the code publish queue would not be drained. When
+        // deferred module publishing is enabled, produce a Move-calling payload (with an empty fee
+        // distribution) so the epilogue runs every block and drains the queue.
+        if !features.is_calculate_transaction_fee_for_distribution_enabled()
+            && !features.is_deferred_module_publishing_enabled()
+        {
             return Ok(T::block_epilogue_v0(
                 block_id,
                 block_end_info.to_persistent(),
@@ -2230,6 +2246,7 @@ where
             T::Key,
             (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>),
         >,
+        is_block_epilogue: bool,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
         for (key, (write_op, layout)) in resource_write_set.into_iter() {
             unsync_map.write(key, write_op, layout);
@@ -2246,14 +2263,19 @@ where
             unsync_map.write(key, TriompheArc::new(write_op), None);
         }
 
-        for write in output_before_guard.module_write_set().values() {
-            add_module_write_to_module_cache::<T>(
-                write,
-                txn_idx,
-                runtime_environment,
-                global_module_cache,
-                unsync_map.module_cache(),
-            )?;
+        // The block epilogue's module writes (deferred publishing) are not added to the module
+        // cache during execution; they are invalidated at commit time instead. For all other
+        // transactions, publish module writes into the per-block and global caches as usual.
+        if !is_block_epilogue {
+            for write in output_before_guard.module_write_set().values() {
+                add_module_write_to_module_cache::<T>(
+                    write,
+                    txn_idx,
+                    runtime_environment,
+                    global_module_cache,
+                    unsync_map.module_cache(),
+                )?;
+            }
         }
 
         let mut second_phase = Vec::new();
@@ -2339,6 +2361,9 @@ where
         );
 
         let mut block_epilogue_txn = None;
+        // Modules published by the block epilogue (deferred publishing), recorded so the global
+        // module cache can be invalidated at commit time.
+        let mut published_module_ids = vec![];
         // Counts user-txn `accumulate_fee_statement` calls. Incremented alongside each
         // accumulate so any loop-exit path (including the bcs-fallback `continue`) keeps
         // this in sync. Passed as `num_committed` to `finish_*` so block-level counters
@@ -2556,6 +2581,17 @@ where
                         );
                     }
 
+                    // Record the modules published by the block epilogue (deferred publishing) so
+                    // the global module cache can be invalidated at commit time.
+                    let is_block_epilogue = idx == num_txns;
+                    if is_block_epilogue {
+                        published_module_ids = output_before_guard
+                            .module_write_set()
+                            .values()
+                            .map(|write| write.module_id().clone())
+                            .collect();
+                    }
+
                     // Apply the writes.
                     let resource_write_set = output_before_guard.resource_write_set();
                     Self::apply_output_sequential(
@@ -2565,6 +2601,7 @@ where
                         &unsync_map,
                         &output_before_guard,
                         resource_write_set.clone(),
+                        is_block_epilogue,
                     )?;
 
                     // If dynamic change set materialization part (indented for clarity/variable scope):
@@ -2690,7 +2727,7 @@ where
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        Ok(BlockOutput::new(ret, block_epilogue_txn))
+        Ok(BlockOutput::new(ret, block_epilogue_txn).with_published_modules(published_module_ids))
     }
 
     pub fn execute_block(

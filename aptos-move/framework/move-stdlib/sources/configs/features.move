@@ -780,6 +780,19 @@ module std::features {
         is_enabled(ORDERLESS_TRANSACTIONS)
     }
 
+    /// Whether lazy loading is enabled, so that only immediate dependencies are linked and charged
+    /// at load time rather than the whole transitive closure.
+    /// Lifetime: transient
+    const ENABLE_LAZY_LOADING: u64 = 95;
+
+    public fun get_lazy_loading_feature(): u64 {
+        ENABLE_LAZY_LOADING
+    }
+
+    public fun is_lazy_loading_enabled(): bool {
+        is_enabled(ENABLE_LAZY_LOADING)
+    }
+
     /// Whether to calculate the transaction fee for distribution.
     const CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION: u64 = 96;
 
@@ -958,6 +971,21 @@ module std::features {
     /// accumulator. Requires `TRANSACTION_INFO_V1`.
     /// Lifetime: permanent
     const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
+
+    /// When enabled, module publishing verifies and charges gas in the publishing
+    /// transaction, then queues the verified bytecode as a resource. The actual module
+    /// writes are materialized at the block epilogue, so published code becomes active
+    /// only from the next block.
+    /// Lifetime: permanent
+    const DEFERRED_MODULE_PUBLISHING: u64 = 124;
+
+    public fun get_deferred_module_publishing_feature(): u64 {
+        DEFERRED_MODULE_PUBLISHING
+    }
+
+    public fun is_deferred_module_publishing_enabled(): bool {
+        is_enabled(DEFERRED_MODULE_PUBLISHING)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

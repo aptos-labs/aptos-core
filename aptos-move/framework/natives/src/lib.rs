@@ -19,6 +19,7 @@ pub mod hash;
 pub mod object;
 pub mod object_code_deployment;
 pub mod permissioned_signer;
+pub mod publish_verification;
 pub mod randomness;
 pub mod state_storage;
 pub mod storage_slot;

@@ -221,7 +221,12 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 /// TODO: for some reason this test did not capture a serious bug in `code::check_coexistence`.
 #[test]
 fn code_publishing_upgrade_loader_cache_consistency() {
-    let mut h = MoveHarness::new();
+    // This test publishes multiple packages to the same address in a single block, which the
+    // deferred module publishing flow does not allow (one publish per address per block). Run with
+    // the legacy publish flow.
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DEFERRED_MODULE_PUBLISHING,
+    ]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Create a sequence of package upgrades
@@ -322,7 +327,11 @@ fn code_publishing_using_resource_account() {
 
 #[test]
 fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
-    let mut h = MoveHarness::new();
+    // This test relies on init_module running (and failing) during publish, which the deferred
+    // module publishing flow does not run. Run with the legacy publish flow.
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DEFERRED_MODULE_PUBLISHING,
+    ]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // First module publish attempt failed when executing the init_module.
@@ -429,6 +438,9 @@ fn test_module_publishing_does_not_fallback() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
+    // This test exercises mid-block module materialization and init_module, which are legacy
+    // (non-deferred) publish behaviors. Run with the legacy publish flow.
+    h.enable_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
     let account = h.new_account_at(addr);
 
@@ -531,6 +543,9 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
+    // This test exercises mid-block speculative execution of module publishing, a legacy
+    // (non-deferred) publish behavior. Run with the legacy publish flow.
+    h.enable_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let addr = AccountAddress::random();
     let account = h.new_account_at(addr);
 
@@ -604,7 +619,11 @@ fn assert_move_abort(status: TransactionStatus, expected_abort_code: u64) {
 
 #[test]
 fn test_init_module_should_not_publish_modules() {
-    let mut h = MoveHarness::new();
+    // This test relies on init_module running during publish, which the deferred module publishing
+    // flow does not run. Run with the legacy publish flow.
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DEFERRED_MODULE_PUBLISHING,
+    ]);
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let account = h.new_account_at(addr);
 

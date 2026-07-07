@@ -175,6 +175,14 @@ pub trait BlockExecutorTrait: Send + Sync {
     fn finish(&self);
 
     fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView>;
+
+    /// Returns whether the given (already executed) block published any modules via the deferred
+    /// module publishing flow. Used by the consensus pipeline to make a publishing block a commit
+    /// barrier (the next block does not execute until this one is pre-committed and its published
+    /// modules are invalidated in the module cache). Defaults to `false`.
+    fn block_has_published_modules(&self, _block_id: HashValue) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]

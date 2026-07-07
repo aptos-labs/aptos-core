@@ -205,6 +205,11 @@ pub enum FeatureFlag {
     /// When enabled, execution populates `TransactionInfoV1`'s hot state root hash, so it
     /// is committed to the ledger accumulator. Requires `TRANSACTION_INFO_V1`.
     HOT_STATE_ROOT_IN_TXN_INFO = 123,
+    /// When enabled, module publishing verifies and charges gas in the publishing
+    /// transaction, then queues the verified bytecode as a resource. The actual
+    /// module writes are materialized at the block epilogue. Published code becomes
+    /// active only from the next block.
+    DEFERRED_MODULE_PUBLISHING = 124,
 }
 
 impl FeatureFlag {
@@ -321,6 +326,7 @@ impl FeatureFlag {
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
+            Self::DEFERRED_MODULE_PUBLISHING,
         ]
     }
 }
@@ -562,6 +568,10 @@ impl Features {
 
     pub fn is_hot_state_root_in_txn_info_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO)
+    }
+
+    pub fn is_deferred_module_publishing_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DEFERRED_MODULE_PUBLISHING)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

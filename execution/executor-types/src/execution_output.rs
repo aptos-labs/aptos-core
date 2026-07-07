@@ -20,6 +20,7 @@ use aptos_types::{
     },
 };
 use derive_more::Deref;
+use move_core_types::language_storage::ModuleId;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Deref)]
@@ -43,6 +44,7 @@ impl ExecutionOutput {
         hot_state_updates: HotStateUpdates,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
+        published_modules: Vec<ModuleId>,
         subscribable_events: Planned<Vec<ContractEvent>>,
         transaction_info_v1: bool,
         hot_state_root_in_txn_info: bool,
@@ -71,6 +73,7 @@ impl ExecutionOutput {
             hot_state_updates,
             block_end_info,
             next_epoch_state,
+            published_modules,
             subscribable_events,
             transaction_info_v1,
             hot_state_root_in_txn_info,
@@ -91,6 +94,7 @@ impl ExecutionOutput {
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
+            published_modules: vec![],
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: false,
             hot_state_root_in_txn_info: false,
@@ -113,6 +117,7 @@ impl ExecutionOutput {
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
+            published_modules: vec![],
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: false,
             hot_state_root_in_txn_info: false,
@@ -137,6 +142,7 @@ impl ExecutionOutput {
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
+            published_modules: vec![],
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: self.transaction_info_v1,
             hot_state_root_in_txn_info: self.hot_state_root_in_txn_info,
@@ -189,6 +195,10 @@ pub struct Inner {
     /// Only present if the block is the last block of an epoch, and is parsed output of the
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
+    /// Modules published by the block epilogue (deferred module publishing). The global module
+    /// cache is invalidated for these modules at commit time so the next block reads the new code.
+    /// Empty when the feature is disabled or no modules were published.
+    pub published_modules: Vec<ModuleId>,
     pub subscribable_events: Planned<Vec<ContractEvent>>,
     /// Whether to assemble `TransactionInfoV1` (instead of `TransactionInfoV0`) in the
     /// subsequent state-checkpoint / ledger-update phases.

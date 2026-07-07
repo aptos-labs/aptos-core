@@ -12,7 +12,9 @@ use aptos_gas_schedule::{
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
-    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
+    gas_algebra::{InternalGas, NumBytes},
+    identifier::Identifier,
+    language_storage::ModuleId,
 };
 use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
@@ -114,6 +116,15 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
         self.inner
             .loader_context()
             .charge_gas_for_dependencies(module_id)
+            .map_err(LimitExceededError::from_err)
+    }
+
+    /// Charges I/O gas for a future write of a state slot whose key and value together occupy
+    /// `num_bytes` bytes. Used by `code::verify_package` to pre-charge the module-write I/O that is
+    /// materialized at the block epilogue.
+    pub fn charge_io_gas_for_write(&mut self, num_bytes: NumBytes) -> SafeNativeResult<()> {
+        self.gas_meter()
+            .charge_io_gas_for_native_write(num_bytes)
             .map_err(LimitExceededError::from_err)
     }
 

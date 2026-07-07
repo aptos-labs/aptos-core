@@ -3,6 +3,7 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
+use aptos_types::on_chain_config::FeatureFlag;
 use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +64,10 @@ fn setup(harness: &mut MoveHarness) -> Account {
 
 #[test]
 fn test_chain_id_from_aptos_framework() {
-    let mut harness = MoveHarness::new();
+    // Deferred module publishing does not run init_module, which this package relies on to create
+    // the ChainIdStore resource, so keep it disabled here.
+    let mut harness =
+        MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let account = setup(&mut harness);
 
     assert_eq!(
@@ -74,7 +78,10 @@ fn test_chain_id_from_aptos_framework() {
 
 #[test]
 fn test_chain_id_from_type_info() {
-    let mut harness = MoveHarness::new();
+    // Deferred module publishing does not run init_module, which this package relies on to create
+    // the ChainIdStore resource, so keep it disabled here.
+    let mut harness =
+        MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let account = setup(&mut harness);
 
     assert_eq!(

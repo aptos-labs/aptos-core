@@ -12,6 +12,7 @@ module aptos_framework::block {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_with_dkg;
+    use aptos_framework::code;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
@@ -336,12 +337,18 @@ module aptos_framework::block {
         };
     }
 
+    /// Runs at the end of a block. Records fee distribution and drains the code publish queue,
+    /// returning the packages (each a vector of module bytecode blobs) queued during the block.
+    /// The AptosVM materializes the returned packages into module writes. The return value is only
+    /// consumed when the deferred module publishing feature is enabled; otherwise the queue is
+    /// empty and an empty vector is returned.
     fun block_epilogue(
         vm: &signer,
         fee_distribution_validator_indices: vector<u64>,
         fee_amounts_octa: vector<u64>
-    ) {
+    ): vector<vector<vector<u8>>> {
         stake::record_fee(vm, fee_distribution_validator_indices, fee_amounts_octa);
+        code::drain_publish_queue()
     }
 
     #[view]

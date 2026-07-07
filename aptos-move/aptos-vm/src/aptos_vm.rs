@@ -19,6 +19,7 @@ use crate::{
             },
             view_with_change_set::ExecutorViewWithChangeSet,
         },
+        write_op_converter::WriteOpConverter,
         AptosMoveResolver, AsExecutorView, AsResourceGroupView, SessionExt, SessionId,
         UserTransactionContext,
     },
@@ -26,10 +27,7 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
-    verifier::{
-        event_validation, native_validation, resource_groups, transaction_arg_validation,
-        view_function,
-    },
+    verifier::{transaction_arg_validation, view_function},
     VMBlockExecutor, VMValidator,
 };
 use aptos_block_executor::{
@@ -85,7 +83,6 @@ use aptos_types::{
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
-        verify_module_metadata_for_module_publishing,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteOp,
@@ -112,6 +109,7 @@ use aptos_vm_types::{
     },
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
+use bytes::Bytes;
 use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
@@ -984,7 +982,7 @@ impl AptosVM {
             // Check that unstable bytecode cannot be executed on mainnet and verify events.
             let script = func.owner_as_script()?;
             self.reject_unstable_bytecode_for_script(script)?;
-            event_validation::verify_no_event_emission_in_compiled_script(script)?;
+            aptos_framework_natives::publish_verification::event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
             // Record the script's declared module dependencies as reads. These are a function of
             // the script bytecode, so recording them here keeps the read set independent of the
@@ -1808,77 +1806,19 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         gas_meter: &mut impl GasMeter,
         modules: &[CompiledModule],
-        mut expected_modules: BTreeSet<String>,
+        expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
-        self.reject_unstable_bytecode(modules)?;
-        native_validation::validate_module_natives(modules)?;
-
-        for m in modules {
-            if !expected_modules.remove(m.self_id().name().as_str()) {
-                return Err(Self::metadata_validation_error(&format!(
-                    "unregistered module: '{}'",
-                    m.self_id().name()
-                )));
-            }
-            if let Some(allowed) = &allowed_deps {
-                for dep in m.immediate_dependencies() {
-                    if !allowed
-                        .get(dep.address())
-                        .map(|modules| {
-                            modules.contains("") || modules.contains(dep.name().as_str())
-                        })
-                        .unwrap_or(false)
-                    {
-                        return Err(Self::metadata_validation_error(&format!(
-                            "unregistered dependency: '{}'",
-                            dep
-                        )));
-                    }
-                }
-            }
-            verify_module_metadata_for_module_publishing(m, self.features())
-                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
-        }
-
-        resource_groups::validate_resource_groups(
+        aptos_framework_natives::publish_verification::publish::validate_publish_request(
             self.features(),
+            self.chain_id().is_mainnet(),
             module_storage,
             traversal_context,
             gas_meter,
             modules,
-        )?;
-        event_validation::validate_module_events(
-            self.features(),
-            module_storage,
-            traversal_context,
-            modules,
-        )?;
-
-        if !expected_modules.is_empty() {
-            return Err(Self::metadata_validation_error(
-                "not all registered modules published",
-            ));
-        }
-        Ok(())
-    }
-
-    /// Check whether the bytecode can be published to mainnet based on the unstable tag in the metadata
-    fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
-        if self.chain_id().is_mainnet() {
-            for module in modules {
-                if let Some(metadata) = get_compilation_metadata(module) {
-                    if metadata.unstable {
-                        return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
-                            .with_message(
-                                "code marked unstable is not published on mainnet".to_string(),
-                            )
-                            .finish(Location::Undefined));
-                    }
-                }
-            }
-        }
-        Ok(())
+            expected_modules,
+            allowed_deps,
+        )
     }
 
     /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
@@ -1893,12 +1833,6 @@ impl AptosVM {
             }
         }
         Ok(())
-    }
-
-    fn metadata_validation_error(msg: &str) -> VMError {
-        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-            .with_message(format!("metadata and code bundle mismatch: {}", msg))
-            .finish(Location::Undefined)
     }
 
     fn validate_signed_transaction(
@@ -2764,6 +2698,38 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
+    /// Materializes the packages returned by `block_epilogue` (each a vector of module bytecode
+    /// blobs) into a module write set. The bytecode was already verified by `code::verify_package`
+    /// when it was queued, so this only deserializes to recover the module ids and builds the
+    /// write ops (deciding creation vs. modification from the current on-chain state).
+    fn build_epilogue_module_write_set(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        packages: Vec<Vec<Vec<u8>>>,
+    ) -> Result<ModuleWriteSet, VMStatus> {
+        let mut bundle = vec![];
+        for package in packages {
+            for blob in package {
+                let module =
+                    CompiledModule::deserialize_with_config(&blob, self.deserializer_config())
+                        .map_err(|_| {
+                            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                                .finish(Location::Undefined)
+                                .into_vm_status()
+                        })?;
+                bundle.push((module.self_id(), Bytes::from(blob)));
+            }
+        }
+
+        let woc =
+            WriteOpConverter::new(resolver, self.features().is_storage_slot_metadata_enabled());
+        let write_ops = woc
+            .convert_modules_into_write_ops(module_storage, bundle.into_iter())
+            .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+        Ok(ModuleWriteSet::new(write_ops))
+    }
+
     fn process_block_epilogue(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -2810,30 +2776,63 @@ impl AptosVM {
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-        let output = match session
-            .execute_function_bypass_visibility(
-                &BLOCK_MODULE,
-                BLOCK_EPILOGUE,
-                vec![],
-                serialize_values(&args),
-                &mut gas_meter,
-                &mut traversal_context,
-                module_storage,
-            )
-            .map(|_return_vals| ())
-            .or_else(|e| expect_only_successful_execution(e, BLOCK_EPILOGUE.as_str(), log_context))
-        {
-            Ok(_) => get_system_transaction_output(
-                session,
-                module_storage,
-                &self.storage_gas_params(log_context)?.change_set_configs,
-            )?,
+        let change_set_configs = &self.storage_gas_params(log_context)?.change_set_configs;
+        let output = match session.execute_function_bypass_visibility(
+            &BLOCK_MODULE,
+            BLOCK_EPILOGUE,
+            vec![],
+            serialize_values(&args),
+            &mut gas_meter,
+            &mut traversal_context,
+            module_storage,
+        ) {
+            Ok(return_vals) => {
+                // When deferred module publishing is enabled, `block_epilogue` returns the packages
+                // queued during the block. Materialize them into module writes on the epilogue
+                // output. When disabled, the returned vector is empty and is ignored.
+                let module_write_set = if self.features().is_deferred_module_publishing_enabled() {
+                    let bytes = return_vals
+                        .return_values
+                        .into_iter()
+                        .next()
+                        .map(|(bytes, _layout)| bytes)
+                        .ok_or_else(|| {
+                            VMStatus::error(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                Some("block_epilogue must return the queued packages".to_string()),
+                            )
+                        })?;
+                    let packages: Vec<Vec<Vec<u8>>> = bcs::from_bytes(&bytes).map_err(|_| {
+                        VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            Some("failed to deserialize queued packages".to_string()),
+                        )
+                    })?;
+                    self.build_epilogue_module_write_set(resolver, module_storage, packages)?
+                } else {
+                    ModuleWriteSet::empty()
+                };
+                let change_set = session.finish(change_set_configs, module_storage)?;
+                VMOutput::new(
+                    change_set,
+                    module_write_set,
+                    FeeStatement::zero(),
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                )
+            },
             Err(e) => {
-                error!(
-                    "Unexpected error from BlockEpilogue txn: {e:?}, fallback to return success."
-                );
-                let status = TransactionStatus::Keep(ExecutionStatus::Success);
-                VMOutput::empty_with_status(status)
+                match expect_only_successful_execution(e, BLOCK_EPILOGUE.as_str(), log_context) {
+                    Ok(_) => {
+                        get_system_transaction_output(session, module_storage, change_set_configs)?
+                    },
+                    Err(e) => {
+                        error!(
+                        "Unexpected error from BlockEpilogue txn: {e:?}, fallback to return success."
+                    );
+                        let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                        VMOutput::empty_with_status(status)
+                    },
+                }
             },
         };
 
@@ -3405,6 +3404,10 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         Self {
             module_cache_manager: AptosModuleCacheManager::new(),
         }
+    }
+
+    fn invalidate_published_modules(&self, module_ids: Vec<ModuleId>) {
+        self.module_cache_manager.invalidate(module_ids);
     }
 
     fn execute_block(

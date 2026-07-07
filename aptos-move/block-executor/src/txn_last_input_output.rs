@@ -575,6 +575,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         Ok(published)
     }
 
+    /// Returns the ids of the modules written by the transaction (empty if none). Used to record
+    /// the modules published by the block epilogue so the global module cache can be invalidated
+    /// at commit time. Must be called before the output is materialized.
+    pub(crate) fn published_module_ids(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<Vec<ModuleId>, PanicError> {
+        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        let output_before_guard = output_wrapper
+            .check_success_or_skip_status()?
+            .before_materialization()?;
+        Ok(output_before_guard
+            .module_write_set()
+            .values()
+            .map(|write| write.module_id().clone())
+            .collect())
+    }
+
     pub(crate) fn delayed_field_keys(
         &self,
         txn_idx: TxnIndex,

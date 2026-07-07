@@ -275,12 +275,20 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         self.new_account_at(AccountAddress::ONE)
     }
 
-    /// Runs a signed transaction. On success, applies the write set.
+    /// Runs a signed transaction. On success, applies the write set. When the block epilogue is
+    /// enabled (deferred module publishing), the transaction is run as a one-transaction block and
+    /// the block epilogue's write set (which materializes published modules) is also applied.
     pub fn run_raw(&mut self, txn: SignedTransaction) -> TransactionOutput {
-        let output = self.executor.execute_transaction(txn);
+        let mut outputs = self.executor.execute_block(vec![txn]).unwrap().into_iter();
+        let output = outputs.next().expect("at least one output");
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
             self.executor.append_events(output.events().to_vec());
+        }
+        for epilogue_output in outputs {
+            if matches!(epilogue_output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(epilogue_output.write_set());
+            }
         }
         output
     }
@@ -295,21 +303,39 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         &mut self,
         txn: SignedTransaction,
     ) -> (TransactionStatus, Vec<ContractEvent>) {
-        let output = self.executor.execute_transaction(txn);
+        let mut outputs = self.executor.execute_block(vec![txn]).unwrap().into_iter();
+        let output = outputs.next().expect("at least one output");
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
+        }
+        // Apply the block epilogue's write set (materializes deferred module publishes).
+        for epilogue_output in outputs {
+            if matches!(epilogue_output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(epilogue_output.write_set());
+            }
         }
         (output.status().to_owned(), output.events().to_owned())
     }
 
-    /// Runs a block of signed transactions. On success, applies the write set.
+    /// Runs a block of signed transactions. On success, applies the write set. When a block
+    /// epilogue is appended (deferred module publishing), its write set is applied but its status
+    /// is not returned, so callers observe exactly one status per input transaction.
     pub fn run_block(&mut self, txn_block: Vec<SignedTransaction>) -> Vec<TransactionStatus> {
+        let num_txns = txn_block.len();
         let mut result = vec![];
-        for output in self.executor.execute_block(txn_block).unwrap() {
+        for (i, output) in self
+            .executor
+            .execute_block(txn_block)
+            .unwrap()
+            .into_iter()
+            .enumerate()
+        {
             if matches!(output.status(), TransactionStatus::Keep(_)) {
                 self.executor.apply_write_set(output.write_set());
             }
-            result.push(output.status().to_owned())
+            if i < num_txns {
+                result.push(output.status().to_owned());
+            }
         }
         result
     }
@@ -332,17 +358,21 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         result
     }
 
-    /// Runs a block of signed transactions. On success, applies the write set.
+    /// Runs a block of signed transactions. On success, applies the write set. When a block
+    /// epilogue is appended (deferred module publishing), its write set is applied but its output
+    /// is not returned, so callers observe exactly one output per input transaction.
     pub fn run_block_get_output(
         &mut self,
         txn_block: Vec<SignedTransaction>,
     ) -> Vec<TransactionOutput> {
-        let result = assert_ok!(self.executor.execute_block(txn_block));
+        let num_txns = txn_block.len();
+        let mut result = assert_ok!(self.executor.execute_block(txn_block));
         for output in &result {
             if matches!(output.status(), TransactionStatus::Keep(_)) {
                 self.executor.apply_write_set(output.write_set());
             }
         }
+        result.truncate(num_txns);
         result
     }
 

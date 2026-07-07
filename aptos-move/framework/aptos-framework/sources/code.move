@@ -16,6 +16,7 @@ module aptos_framework::code {
     use aptos_framework::permissioned_signer;
 
     friend aptos_framework::object_code_deployment;
+    friend aptos_framework::block;
 
     // ----------------------------------------------------------------------
     // Code Publishing
@@ -111,6 +112,28 @@ module aptos_framework::code {
     /// Current permissioned signer cannot publish codes.
     const ENO_CODE_PERMISSION: u64 = 0xB;
 
+    /// A package is already queued for publishing at this address in the current block.
+    const EALREADY_QUEUED: u64 = 0xC;
+
+    /// Global index of code addresses with a package queued for publishing in the current block.
+    /// Only addresses are stored here; the bytecode is sharded into a per-address `QueuedPackage`.
+    /// Drained by the block epilogue, which materializes the queued packages into module writes.
+    /// Wrapped in an enum so the representation can change without a storage migration.
+    enum PublishQueue has key {
+        V1 {
+            pending: vector<address>,
+        }
+    }
+
+    /// A single package awaiting materialization, stored at its code address. Constructed only by
+    /// `enqueue_package` after successful verification, so the block epilogue trusts its contents
+    /// and does not re-verify.
+    enum QueuedPackage has key {
+        V1 {
+            code: vector<vector<u8>>,
+        }
+    }
+
     struct CodePublishingPermission has copy, drop, store {}
 
     /// Permissions
@@ -165,7 +188,7 @@ module aptos_framework::code {
 
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
-    public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
+    public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry, PublishQueue {
         check_code_publishing_permission(owner);
         // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
         assert!(
@@ -218,12 +241,73 @@ module aptos_framework::code {
         });
 
         // Request publish
-        if (features::code_dependency_check_enabled())
+        if (features::is_deferred_module_publishing_enabled() && features::is_lazy_loading_enabled()) {
+            // Verify and charge for the package now, then queue the verified bytecode. The actual
+            // module writes are materialized at the block epilogue. Deferred publishing only links
+            // immediate dependencies, so it is coupled to lazy loading; the eager path keeps using
+            // the legacy publish flow, which charges the whole transitive dependency closure.
+            verify_package(addr, module_names, allowed_deps, copy code, policy.policy);
+            enqueue_package(owner, addr, code);
+        } else if (features::code_dependency_check_enabled()) {
             request_publish_with_allowed_deps(addr, module_names, allowed_deps, code, policy.policy)
-        else
-        // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
-        // compatible code.
+        } else {
+            // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
+            // compatible code.
             request_publish(addr, module_names, code, policy.policy)
+        }
+    }
+
+    /// Initializes the publish queue index. Called when the deferred module publishing feature is
+    /// enabled (and at genesis), since a user transaction cannot create a resource at the framework
+    /// address.
+    public fun initialize_publish_queue(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<PublishQueue>(@aptos_framework)) {
+            move_to(aptos_framework, PublishQueue::V1 { pending: vector::empty() });
+        }
+    }
+
+    /// Queues a verified package for publishing at the block epilogue. The bytecode is stored at
+    /// the code address (sharded per publisher); the address is recorded in the global index.
+    fun enqueue_package(
+        owner: &signer,
+        code_address: address,
+        code: vector<vector<u8>>,
+    ) acquires PublishQueue {
+        // At most one package may be queued per address per block.
+        assert!(!exists<QueuedPackage>(code_address), error::already_exists(EALREADY_QUEUED));
+        move_to(owner, QueuedPackage::V1 { code });
+
+        let queue = &mut PublishQueue[@aptos_framework];
+        match (queue) {
+            PublishQueue::V1 { pending } => pending.push_back(code_address),
+        }
+    }
+
+    /// Drains the publish queue, returning the queued packages (each a vector of module bytecode
+    /// blobs). Called by the block epilogue; the AptosVM materializes the returned packages into
+    /// module writes. Returns an empty vector if the queue has not been initialized.
+    public(friend) fun drain_publish_queue(): vector<vector<vector<u8>>>
+    acquires PublishQueue, QueuedPackage {
+        if (!exists<PublishQueue>(@aptos_framework)) {
+            return vector[]
+        };
+        let queue = &mut PublishQueue[@aptos_framework];
+        let addresses = match (queue) {
+            PublishQueue::V1 { pending } => {
+                let addresses = *pending;
+                *pending = vector[];
+                addresses
+            }
+        };
+        let packages = vector[];
+        addresses.for_each(|code_address| {
+            let code = match (move_from<QueuedPackage>(code_address)) {
+                QueuedPackage::V1 { code } => code,
+            };
+            packages.push_back(code);
+        });
+        packages
     }
 
     public fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) acquires PackageRegistry {
@@ -253,7 +337,7 @@ module aptos_framework::code {
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
-    acquires PackageRegistry {
+    acquires PackageRegistry, PublishQueue {
         publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
     }
 
@@ -364,6 +448,18 @@ module aptos_framework::code {
     native fun request_publish(
         owner: address,
         expected_modules: vector<String>,
+        bundle: vector<vector<u8>>,
+        policy: u8
+    );
+
+    /// Native function that verifies a package (compatibility, bytecode verification, linking,
+    /// metadata / resource-group / event checks) and charges the associated gas, aborting on any
+    /// failure. Used by the deferred publishing flow: the verified bytecode is queued and the
+    /// module writes are materialized at the block epilogue.
+    native fun verify_package(
+        owner: address,
+        expected_modules: vector<String>,
+        allowed_deps: vector<AllowedDep>,
         bundle: vector<vector<u8>>,
         policy: u8
     );

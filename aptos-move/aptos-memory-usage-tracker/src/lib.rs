@@ -214,6 +214,8 @@ where
 
     delegate_mut! {
         fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+
+        fn charge_io_gas_for_native_write(&mut self, num_bytes: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]

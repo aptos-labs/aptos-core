@@ -33,6 +33,7 @@ bon = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
 itertools = { workspace = true }
+move-core-types = { workspace = true }
 once_cell = { workspace = true }
 ouroboros = { workspace = true }
 rayon = { workspace = true }

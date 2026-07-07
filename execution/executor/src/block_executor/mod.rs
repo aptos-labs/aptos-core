@@ -165,6 +165,13 @@ where
         self.maybe_initialize()?;
         self.inner.read().as_ref().unwrap().state_view(block_id)
     }
+
+    fn block_has_published_modules(&self, block_id: HashValue) -> bool {
+        self.inner
+            .read()
+            .as_ref()
+            .is_some_and(|inner| inner.block_has_published_modules(block_id))
+    }
 }
 
 struct BlockExecutorInner<V> {
@@ -409,6 +416,16 @@ where
             TRANSACTIONS_SAVED.observe(num_txns as f64);
         }
 
+        // Invalidate the modules published by this block (deferred module publishing) in the block
+        // executor's cross-block module cache, so the next block re-reads the new code from storage.
+        // The publishing barrier ensures the next block does not execute against a stale cache
+        // before this runs.
+        let published_modules = block.output.execution_output.published_modules.clone();
+        if !published_modules.is_empty() {
+            self.block_executor
+                .invalidate_published_modules(published_modules);
+        }
+
         Ok(())
     }
 
@@ -458,5 +475,11 @@ where
             Arc::clone(&self.db.reader),
             block.output.result_state().latest().clone(),
         )?)
+    }
+
+    fn block_has_published_modules(&self, block_id: HashValue) -> bool {
+        self.block_tree
+            .get_block(block_id)
+            .is_ok_and(|block| !block.output.execution_output.published_modules.is_empty())
     }
 }

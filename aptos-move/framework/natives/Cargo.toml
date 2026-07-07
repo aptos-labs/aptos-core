@@ -42,6 +42,7 @@ bcs = { workspace = true }
 better_any = { workspace = true }
 blake2-rfc = { workspace = true }
 bulletproofs = { workspace = true }
+bytes = { workspace = true }
 byteorder = { workspace = true }
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 either = { workspace = true }

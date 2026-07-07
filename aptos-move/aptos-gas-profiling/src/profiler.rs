@@ -210,6 +210,12 @@ where
         res
     }
 
+    fn charge_io_gas_for_native_write(&mut self, num_bytes: NumBytes) -> PartialVMResult<()> {
+        let (_cost, res) =
+            self.delegate_charge(|base| base.charge_io_gas_for_native_write(num_bytes));
+        res
+    }
+
     fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
         // Delegate first so we can record the actual amount charged -- this matters
         // when the base meter only partially charges (e.g. hitting OUT_OF_GAS).

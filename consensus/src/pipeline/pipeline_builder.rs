@@ -591,6 +591,7 @@ impl PipelineBuilder {
             Self::execute(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
+                parent.pre_commit_fut.clone(),
                 rand_check_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
@@ -931,6 +932,7 @@ impl PipelineBuilder {
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
+        parent_block_pre_commit_fut: TaskFuture<PreCommitResult>,
         rand_check: TaskFuture<RandResult>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
@@ -940,6 +942,12 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
+        // Deferred module publishing barrier: if the parent block published modules, wait for it to
+        // be pre-committed (which invalidates those modules in the cross-block module cache) before
+        // executing this block, so this block does not execute against stale cached code.
+        if executor.block_has_published_modules(block.parent_id()) {
+            parent_block_pre_commit_fut.await?;
+        }
         let (user_txns, block_gas_limit, decryption_outcome) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);

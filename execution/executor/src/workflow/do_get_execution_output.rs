@@ -29,6 +29,7 @@ use aptos_storage_interface::state_store::{
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
+use move_core_types::language_storage::ModuleId;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
@@ -120,6 +121,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
+        let published_modules = block_output.published_modules().to_vec();
         let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
@@ -187,6 +189,7 @@ impl DoGetExecutionOutput {
             .transaction_info_v1(onchain_config.transaction_info_v1())
             .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
+            .published_modules(published_modules)
             .build()
     }
 
@@ -232,6 +235,8 @@ impl DoGetExecutionOutput {
             .transaction_info_v1(onchain_config.transaction_info_v1())
             .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
+            // Sharded execution does not use the deferred module publishing flow.
+            .published_modules(vec![])
             .build()
     }
 
@@ -261,6 +266,9 @@ impl DoGetExecutionOutput {
             .transaction_info_v1(onchain_config.transaction_info_v1())
             .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
+            // The state-sync/replay-from-outputs path does not carry structured module ids; the
+            // module cache is refreshed via check_ready on non-consecutive slices instead.
+            .published_modules(vec![])
             .build()?;
 
         let ret = out.clone();
@@ -379,6 +387,7 @@ impl Parser {
         transaction_info_v1: bool,
         hot_state_root_in_txn_info: bool,
         compute_trading_native_state_roots: bool,
+        published_modules: Vec<ModuleId>,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
 
@@ -465,6 +474,7 @@ impl Parser {
             .hot_state_updates(hot_state_updates)
             .maybe_block_end_info(block_end_info)
             .maybe_next_epoch_state(next_epoch_state)
+            .published_modules(published_modules)
             .subscribable_events(Planned::place_holder())
             .transaction_info_v1(transaction_info_v1)
             .hot_state_root_in_txn_info(hot_state_root_in_txn_info)
@@ -665,6 +675,7 @@ mod tests {
             .transaction_info_v1(false)
             .hot_state_root_in_txn_info(false)
             .compute_trading_native_state_roots(false)
+            .published_modules(vec![])
             .build()
             .unwrap();
         assert_eq!(

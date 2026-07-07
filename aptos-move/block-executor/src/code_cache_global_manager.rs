@@ -243,6 +243,19 @@ impl AptosModuleCacheManager {
 
         Ok(guard)
     }
+
+    /// Marks the given modules as overridden in the global module cache so the next block re-reads
+    /// them from storage. Called at commit time for a block that published modules via the deferred
+    /// publishing flow. Best-effort: if the manager lock cannot be acquired the invalidation is
+    /// skipped (the publishing barrier ensures the next block does not execute against a stale cache
+    /// before this runs).
+    pub fn invalidate(&self, module_ids: impl IntoIterator<Item = ModuleId>) {
+        if let Some(guard) = self.inner.try_lock() {
+            for module_id in module_ids {
+                guard.module_cache.mark_overridden(&module_id);
+            }
+        }
+    }
 }
 
 /// A guard that can be acquired from [AptosModuleCacheManager]. Variants represent successful and

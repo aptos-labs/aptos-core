@@ -205,6 +205,14 @@ pub trait NativeGasMeter: DependencyGasMeter {
 
     /// Tracks heap memory usage.
     fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()>;
+
+    /// Charges I/O gas for a write of a state slot whose key and value together occupy
+    /// `num_bytes` bytes. Used by natives that reserve I/O for a write that is materialized later
+    /// (e.g. `code::verify_package`, which pre-charges the module-write I/O done at the block
+    /// epilogue). Defaults to a no-op for meters that do not track I/O gas.
+    fn charge_io_gas_for_native_write(&mut self, _num_bytes: NumBytes) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 /// Trait that defines a generic gas meter interface, allowing clients of the Move VM to implement

@@ -3,14 +3,18 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::natives::event::ECANNOT_CREATE_EVENT;
-use aptos_types::{move_utils::MemberId, transaction::ExecutionStatus};
+use aptos_types::{
+    move_utils::MemberId, on_chain_config::FeatureFlag, transaction::ExecutionStatus,
+};
 use claims::assert_ok;
 use move_core_types::account_address::AccountAddress;
 use std::str::FromStr;
 
 #[test]
 fn test_events_ty_tag_size_too_large() {
-    let mut h = MoveHarness::new();
+    // Deferred module publishing does not run init_module, which this package relies on to create
+    // the event-handle resources, so keep it disabled here.
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::DEFERRED_MODULE_PUBLISHING]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
 
     assert_success!(h.publish_package(&acc, &common::test_dir_path("events.data/pack")));

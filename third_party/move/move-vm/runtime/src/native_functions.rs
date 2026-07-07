@@ -141,6 +141,26 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             traversal_context,
         }
     }
+
+    /// Returns a `ModuleStorageWrapper` over the underlying module storage together with mutable
+    /// access to the traversal context and a dependency gas meter. This lets a native function
+    /// stage and verify a module bundle (e.g. `code::verify_package`) using the standard staging
+    /// and validation machinery, which requires a concrete `impl ModuleStorage` and a
+    /// `DependencyGasMeter`. The wrapper owns a copy of the `'a` module-storage reference, so it
+    /// does not borrow `self` and can outlive the returned mutable borrows.
+    pub fn module_storage_wrapper_with_metering(
+        &mut self,
+    ) -> (
+        ModuleStorageWrapper<'a>,
+        &mut TraversalContext<'c>,
+        &mut dyn DependencyGasMeter,
+    ) {
+        (
+            ModuleStorageWrapper::new(self.module_storage),
+            self.traversal_context,
+            self.gas_meter,
+        )
+    }
 }
 
 impl<'b, 'c> NativeContext<'_, 'b, 'c> {
@@ -508,8 +528,18 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
 }
 
 // Wrappers to use trait objects where static dispatch is expected.
-struct ModuleStorageWrapper<'a> {
+pub struct ModuleStorageWrapper<'a> {
     module_storage: &'a dyn ModuleStorage,
+}
+
+impl<'a> ModuleStorageWrapper<'a> {
+    /// Wraps a `&dyn ModuleStorage` so it can be used where a concrete `impl ModuleStorage` is
+    /// required. This is needed by native functions that stage and verify a module bundle (e.g.
+    /// `code::verify_package`), because the staging machinery is generic over `M: ModuleStorage`
+    /// and a native only has a trait object.
+    pub fn new(module_storage: &'a dyn ModuleStorage) -> Self {
+        Self { module_storage }
+    }
 }
 
 impl<'a> LayoutCache for ModuleStorageWrapper<'a> {

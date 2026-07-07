@@ -92,6 +92,15 @@ where
     fn use_heap_memory_in_native_context(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn charge_io_gas_for_native_write(&mut self, num_bytes: NumBytes) -> PartialVMResult<()> {
+        // A single new state slot whose key and value together occupy `num_bytes` bytes. This
+        // mirrors the per-write I/O in `io_gas_per_write` for gas feature version >= 12 (the only
+        // versions where deferred module publishing can be enabled).
+        let cost = STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
+            + STORAGE_IO_PER_STATE_BYTE_WRITE * num_bytes;
+        self.algebra.charge_io(cost)
+    }
 }
 
 impl<A> GasMeter for StandardGasMeter<A>

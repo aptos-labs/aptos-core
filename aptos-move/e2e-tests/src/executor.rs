@@ -54,7 +54,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, BlockOutput, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
+        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
         Transaction, TransactionExecutableRef, TransactionOutput, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput,
     },
@@ -147,6 +147,12 @@ fn empty_in_memory_state_store() -> FakeExecutorStateStore {
 enum BlockState {
     None,
     Fuzzing(SharedCacheState),
+    /// Executes each block with `TransactionSliceMetadata::Block`, so the block executor appends a
+    /// block epilogue. This is required to test the deferred module publishing flow (the publish
+    /// queue is drained and materialized by the epilogue). Uses a fresh module cache per block (like
+    /// `None`), so there is no cross-block cache staleness and sequential/parallel comparison runs
+    /// stay consistent.
+    BlockEpilogue { next_block_id: Cell<u64> },
 }
 
 /// Shared cache state used only in fuzzing/test flows to enable hot module cache persistence and
@@ -248,6 +254,19 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             block_state: BlockState::None,
         };
         executor.apply_write_set(write_set);
+        // When deferred module publishing is enabled, modules are materialized by the block
+        // epilogue. Run each block with a block epilogue so that single-transaction test APIs (which
+        // execute a one-transaction block) still publish modules. Deferred publishing is coupled to
+        // lazy loading (the eager path keeps using the legacy publish flow), so both must be on.
+        if Features::fetch_config(&executor.state_store)
+            .ok()
+            .flatten()
+            .is_some_and(|features| {
+                features.is_deferred_module_publishing_enabled() && features.is_lazy_loading_enabled()
+            })
+        {
+            executor.enable_block_epilogue();
+        }
         executor
     }
 
@@ -835,12 +854,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Executes the transaction as a singleton block and applies the resulting write set to the
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
-        let mut outputs = self.execute_block(vec![transaction]).unwrap();
-        assert!(outputs.len() == 1, "transaction outputs size mismatch");
-        let output = outputs.pop().unwrap();
+        let outputs = self.execute_block(vec![transaction]).unwrap();
+        // The first output is the user transaction; in block-epilogue mode a block epilogue output
+        // follows (materializes deferred module publishes). Apply all `Keep` outputs.
+        let output = self.apply_block_outputs(outputs);
         match output.status() {
             TransactionStatus::Keep(status) => {
-                self.apply_write_set(output.write_set());
                 assert_eq!(
                     status,
                     &ExecutionStatus::Success,
@@ -852,6 +871,25 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             TransactionStatus::Discard(status) => panic!("transaction discarded with {:?}", status),
             TransactionStatus::Retry => panic!("transaction status is retry"),
         }
+    }
+
+    /// Applies the write sets of all `Keep` outputs (the user transaction and any block epilogue
+    /// appended in block-epilogue mode) to the data store, and returns the first (user transaction)
+    /// output.
+    fn apply_block_outputs(&mut self, outputs: Vec<TransactionOutput>) -> TransactionOutput {
+        let mut outputs = outputs.into_iter();
+        let user_output = outputs
+            .next()
+            .expect("A block must have at least one output");
+        if matches!(user_output.status(), TransactionStatus::Keep(_)) {
+            self.apply_write_set(user_output.write_set());
+        }
+        for epilogue_output in outputs {
+            if matches!(epilogue_output.status(), TransactionStatus::Keep(_)) {
+                self.apply_write_set(epilogue_output.write_set());
+            }
+        }
+        user_output
     }
 
     fn execute_transaction_block_impl_with_state_view(
@@ -872,7 +910,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             .collect::<Vec<_>>();
         let txn_provider = DefaultTxnProvider::new(txn_block, auxiliary_info);
         let metadata = self.get_txn_slice_metadata();
-        let result = {
+        let block_output =
             AptosVMBlockExecutorWrapper::execute_block::<_, NoOpTransactionCommitHook<VMStatus>, _>(
                 &txn_provider,
                 &state_view,
@@ -881,11 +919,21 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 config,
                 metadata,
                 None,
-            )
-            .map(BlockOutput::into_transaction_outputs_forced)
-        };
-        let outputs = result?;
-        Ok(outputs)
+            )?;
+
+        // Invalidate the modules published by the block epilogue (deferred module publishing) in
+        // the shared module cache, mirroring the commit-time invalidation done by the real block
+        // executor. Without this, a subsequent block would read stale cached code for an upgraded
+        // module. Only relevant when a shared cache manager is used (block mode); with a fresh
+        // per-call cache there is nothing to invalidate.
+        if let Some(manager) = self.module_cache_manager_opt() {
+            let published_modules = block_output.published_modules().to_vec();
+            if !published_modules.is_empty() {
+                manager.invalidate(published_modules);
+            }
+        }
+
+        Ok(block_output.into_transaction_outputs_forced())
     }
 
     /// Returns a reference to the shared module cache manager if enabled (fuzzing/test). Otherwise
@@ -893,24 +941,35 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     fn module_cache_manager_opt(&self) -> Option<&AptosModuleCacheManager> {
         match &self.block_state {
             BlockState::Fuzzing(shared) => Some(&shared.manager),
-            BlockState::None => None,
+            BlockState::None | BlockState::BlockEpilogue { .. } => None,
         }
     }
 
     /// Generates a [TransactionSliceMetadata::Block] when running with a shared cache (fuzzing/test)
     /// to enable cache reuse across calls. For normal runs, returns [None].
     fn get_txn_slice_metadata(&self) -> TransactionSliceMetadata {
-        match &self.block_state {
-            BlockState::Fuzzing(shared) => {
-                let child = shared.next_block_id.get();
-                shared.next_block_id.set(child + 1);
-                TransactionSliceMetadata::block(
-                    HashValue::from_u64(child - 1),
-                    HashValue::from_u64(child),
-                )
-            },
-            BlockState::None => TransactionSliceMetadata::unknown(),
-        }
+        let next_block_id = match &self.block_state {
+            BlockState::Fuzzing(shared) => &shared.next_block_id,
+            BlockState::BlockEpilogue { next_block_id } => next_block_id,
+            BlockState::None => return TransactionSliceMetadata::unknown(),
+        };
+        let child = next_block_id.get();
+        next_block_id.set(child + 1);
+        TransactionSliceMetadata::block(
+            HashValue::from_u64(child - 1),
+            HashValue::from_u64(child),
+        )
+    }
+
+    /// Enables block-epilogue mode: each executed block appends a block epilogue transaction. This
+    /// is required to exercise the deferred module publishing flow, where the publish queue is
+    /// drained and modules are materialized by the epilogue. Note that in this mode a block's
+    /// outputs include the epilogue output, so use the block APIs (e.g. `run_block`) rather than the
+    /// single-transaction ones.
+    pub fn enable_block_epilogue(&mut self) {
+        self.block_state = BlockState::BlockEpilogue {
+            next_block_id: Cell::new(1),
+        };
     }
 
     #[cfg(fuzzing)]
@@ -928,7 +987,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     .unwrap();
                 Some(guard.snapshot_hot_cache())
             },
-            BlockState::None => None,
+            BlockState::None | BlockState::BlockEpilogue { .. } => None,
         }
     }
 
@@ -1118,12 +1177,15 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
     pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {
         let txn_block = vec![txn];
-        let mut outputs = self
+        let outputs = self
             .execute_block(txn_block)
             .expect("The VM should not fail to startup");
+        // The first output is the user transaction; in block-epilogue mode a block epilogue output
+        // follows (discarded here, since this method does not apply write sets).
         outputs
-            .pop()
-            .expect("A block with one transaction should have one output")
+            .into_iter()
+            .next()
+            .expect("A block with one transaction should have at least one output")
     }
 
     pub fn execute_transaction_with_gas_profiler(
