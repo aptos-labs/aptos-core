@@ -318,6 +318,7 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         pragma aborts_if_is_partial;
         include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         let addr = signer::address_of(account);
