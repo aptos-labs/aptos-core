@@ -12,6 +12,7 @@ use move_model::{
     model::{GlobalEnv, VerificationScope},
 };
 use move_prover::cli::Options;
+use move_prover_boogie_backend::options::VerifyGranularity;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -124,6 +125,13 @@ pub struct ProverOptions {
     /// produce counterexamples; useful for diagnosing per-function timeouts.
     #[clap(long)]
     pub split_vcs_by_assert: bool,
+
+    /// Granularity for partitioning verify targets into `.bpl` files:
+    /// `shard` (default) groups by hash, `module` emits one .bpl per module,
+    /// `vc` emits one .bpl per verify target. `module` and `vc` are mutually
+    /// exclusive with `shards > 1`.
+    #[clap(long, value_enum)]
+    pub granularity: Option<VerifyGranularity>,
 
     /// Maximum number of counterexamples reported per verification
     /// condition.
@@ -304,6 +312,7 @@ impl ProverOptions {
                     || base_opts.backend.skip_instance_check,
                 split_vcs_by_assert: self.split_vcs_by_assert
                     || base_opts.backend.split_vcs_by_assert,
+                granularity: self.granularity.unwrap_or(base_opts.backend.granularity),
                 error_limit: self.error_limit.unwrap_or(base_opts.backend.error_limit),
                 ..base_opts.backend
             },

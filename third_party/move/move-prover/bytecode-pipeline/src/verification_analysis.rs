@@ -233,10 +233,14 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         let options = ProverOptions::get(env);
 
         // If we are verifying only one function or module, check that this indeed exists.
+        // Accept both simple ("math128") and qualified ("0x1::math128") forms — same
+        // semantics as `matches_name` uses at the actual scope check below.
         match &options.verify_scope {
             VerificationScope::OnlyModule(name) => {
-                let sym = env.symbol_pool().make(name);
-                if !env.find_module_by_name(sym).is_some_and(|m| m.is_target()) {
+                if !env
+                    .get_modules()
+                    .any(|m| m.matches_name(name) && m.is_target())
+                {
                     env.error(
                         &env.unknown_loc(),
                         &format!("module target {} does not exist in target modules", name),
@@ -262,8 +266,10 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         for excl in &options.verify_exclude {
             match excl {
                 VerificationScope::OnlyModule(name) => {
-                    let sym = env.symbol_pool().make(name);
-                    if !env.find_module_by_name(sym).is_some_and(|m| m.is_target()) {
+                    if !env
+                        .get_modules()
+                        .any(|m| m.matches_name(name) && m.is_target())
+                    {
                         env.error(
                             &env.unknown_loc(),
                             &format!(

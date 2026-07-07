@@ -53,6 +53,7 @@ use move_model::{
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
     well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
+pub use move_prover_bytecode_pipeline::verify_target::VerifyTargetSelector;
 use move_prover_bytecode_pipeline::{
     mono_analysis,
     mono_analysis::{ClosureInfo, FunParamInfo, StructFieldInfo},
@@ -70,10 +71,7 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 macro_rules! bv_op_not_enabled_error {
     ($bytecode:expr, $fun_target:expr, $env:expr, $loc:expr) => {
@@ -103,7 +101,7 @@ enum ApplyFrameAccess {
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
-    for_shard: Option<usize>,
+    for_selector: VerifyTargetSelector,
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
@@ -241,14 +239,14 @@ impl<'env> BoogieTranslator<'env> {
     pub fn new(
         env: &'env GlobalEnv,
         options: &'env BoogieOptions,
-        for_shard: Option<usize>,
+        for_selector: VerifyTargetSelector,
         targets: &'env FunctionTargetsHolder,
         writer: &'env CodeWriter,
     ) -> Self {
         Self {
             env,
             options,
-            for_shard,
+            for_selector,
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
@@ -277,17 +275,20 @@ impl<'env> BoogieTranslator<'env> {
         if !fun_variant.is_verified() {
             return false;
         }
-        if let Some(shard) = self.for_shard {
-            // Check whether the shard is included.
-            if self.options.only_shard.is_some() && self.options.only_shard != Some(shard + 1) {
+        // Honor `--only-shard` (1-based) for sharded mode regardless of which
+        // shard the selector targets.
+        if let VerifyTargetSelector::Shard { idx, .. } = &self.for_selector {
+            if self.options.only_shard.is_some() && self.options.only_shard != Some(*idx + 1) {
                 return false;
             }
-            // Check whether it is part of the shard.
-            let mut hasher = DefaultHasher::new();
-            fun_target.func_env.get_full_name_str().hash(&mut hasher);
-            if (hasher.finish() as usize) % self.options.shards != shard {
-                return false;
-            }
+        }
+        if !self.for_selector.includes(
+            fun_target.func_env.module_env.get_id(),
+            fun_target.func_env.get_qualified_id(),
+            fun_variant,
+            &fun_target.func_env.get_full_name_str(),
+        ) {
+            return false;
         }
         // Check whether the estimated duration is too large for configured timeout
         let options = self.options;
@@ -664,14 +665,28 @@ impl<'env> BoogieTranslator<'env> {
 
         // Emit any finalization items required by spec translation.
         self.spec_translator.finalize();
-        let shard_info = if let Some(shard) = self.for_shard {
-            format!(" (for shard #{} of {})", shard + 1, self.options.shards)
-        } else {
-            "".to_string()
+        let selector_info = match &self.for_selector {
+            VerifyTargetSelector::All => String::new(),
+            VerifyTargetSelector::Shard { idx, total } => {
+                format!(" (for shard #{} of {})", idx + 1, total)
+            },
+            VerifyTargetSelector::Module { module_id } => format!(
+                " (for module {})",
+                self.env.get_module(*module_id).get_full_name_str()
+            ),
+            VerifyTargetSelector::Single { qid, variant } => format!(
+                " (for verify target {}::{} [{}])",
+                self.env.get_module(qid.module_id).get_full_name_str(),
+                self.env
+                    .get_function(*qid)
+                    .get_name()
+                    .display(self.env.symbol_pool()),
+                variant
+            ),
         };
         info!(
             "{} verification conditions{}",
-            verified_functions_count, shard_info
+            verified_functions_count, selector_info
         );
     }
 

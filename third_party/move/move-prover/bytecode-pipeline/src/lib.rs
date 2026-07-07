@@ -18,4 +18,5 @@ pub mod pipeline_factory;
 pub mod spec_inference;
 pub mod spec_instrumentation;
 pub mod verification_analysis;
+pub mod verify_target;
 pub mod well_formed_instrumentation;
