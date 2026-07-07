@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use chrono::DateTime;
 use clap::Args;
 use determinator::{
     rules::{DeterminatorMarkChanged, DeterminatorPostRule, DeterminatorRules, PathRule},
@@ -44,9 +43,6 @@ const IGNORED_DETERMINATOR_PATHS: [&str; 8] = [
     "scripts/*",
     "terraform/*",
 ];
-
-// The maximum number of days allowed since the merge-base commit for the branch.
-const MAX_NUM_DAYS_SINCE_MERGE_BASE: u64 = 7;
 
 // The delimiter used to separate the package path and the package name.
 pub const PACKAGE_NAME_DELIMITER: &str = "#";
@@ -148,52 +144,6 @@ impl SelectedPackageArgs {
             "Failed to fetch or recompute remote metadata for merge-base commit: {:?}",
             merge_base
         ))
-    }
-
-    /// Ensures the merge base is not too old
-    pub fn check_merge_base(&self) -> anyhow::Result<()> {
-        // Identify the merge base
-        let merge_base = self.identify_merge_base()?;
-
-        // Get the commit timestamp of the merge-base
-        let commit_timestamp_output = Command::new("git")
-            .arg("show")
-            .arg("-s")
-            .arg("--format=%cI")
-            .arg(&merge_base)
-            .output()
-            .expect("failed to execute git show");
-        let commit_timestamp = parse_string_from_output(commit_timestamp_output);
-
-        // Log the merge-base and commit timestamp
-        info!(
-            "Identified the merge base: {:?} (commit date: {:?})",
-            merge_base, commit_timestamp
-        );
-
-        // Calculate the time difference between the merge-base and the current time (in days)
-        let commit_datetime = DateTime::parse_from_rfc3339(&commit_timestamp)
-            .expect("failed to parse commit timestamp");
-        let current_datetime = DateTime::parse_from_rfc3339(&chrono::Utc::now().to_rfc3339())
-            .expect("failed to parse current timestamp");
-        let time_difference_days = current_datetime
-            .signed_duration_since(commit_datetime)
-            .num_days() as u64;
-
-        // Check if the merge-base is too old
-        if time_difference_days >= MAX_NUM_DAYS_SINCE_MERGE_BASE {
-            return Err(anyhow!(
-                "The merge base is too old! Maximum: {:?} (days), Merge-base: {:?} (days)! Please rebase your branch!",
-                MAX_NUM_DAYS_SINCE_MERGE_BASE, time_difference_days
-            ));
-        } else {
-            info!(
-                "The merge base is within the maximum number of days. Maximum: {:?} (days), Merge-base: {:?} (days)",
-                MAX_NUM_DAYS_SINCE_MERGE_BASE, time_difference_days
-            );
-        }
-
-        Ok(())
     }
 
     /// Identifies the changed files compared to the merge base, and

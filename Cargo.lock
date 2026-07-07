@@ -702,7 +702,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "camino",
- "chrono",
  "clap 4.5.21",
  "clap-verbosity-flag",
  "determinator",

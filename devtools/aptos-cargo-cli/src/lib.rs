@@ -73,7 +73,6 @@ pub enum AptosCargoCommand {
     AffectedPackages(CommonArgs),
     ChangedFiles(CommonArgs),
     Check(CommonArgs),
-    CheckMergeBase(CommonArgs),
     Xclippy(CommonArgs),
     Fmt(CommonArgs),
     Nextest(CommonArgs),
@@ -102,7 +101,6 @@ impl AptosCargoCommand {
             AptosCargoCommand::AffectedPackages(args) => args,
             AptosCargoCommand::ChangedFiles(args) => args,
             AptosCargoCommand::Check(args) => args,
-            AptosCargoCommand::CheckMergeBase(args) => args,
             AptosCargoCommand::Xclippy(args) => args,
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
@@ -166,10 +164,6 @@ impl AptosCargoCommand {
                 // Calculate and display the changed files
                 let (_, _, changed_files) = package_args.identify_changed_files()?;
                 output_changed_files(changed_files)
-            },
-            AptosCargoCommand::CheckMergeBase(_) => {
-                // Check the merge base
-                package_args.check_merge_base()
             },
             AptosCargoCommand::TargetedCLITests(_) => {
                 // Run the targeted CLI tests (if necessary).
