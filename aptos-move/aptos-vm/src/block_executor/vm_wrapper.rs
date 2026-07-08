@@ -34,6 +34,20 @@ pub struct AptosExecutorTask {
     id: StateViewId,
 }
 
+impl AptosExecutorTask {
+    fn is_transaction_dynamic_change_set_capable(txn: &SignatureVerifiedTransaction) -> bool {
+        if txn.is_valid() {
+            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
+            {
+                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
+                // resource_groups_split_in_change_set is enabled.
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl ExecutorTask for AptosExecutorTask {
     type AuxiliaryInfo = AuxiliaryInfo;
     type Error = VMStatus;
@@ -140,18 +154,6 @@ impl ExecutorTask for AptosExecutorTask {
         }
     }
 
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
-        if txn.is_valid() {
-            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
-            {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_groups_split_in_change_set is enabled.
-                return false;
-            }
-        }
-        true
-    }
-
     fn pre_write_values(
         txn: &SignatureVerifiedTransaction,
     ) -> Vec<(StateKey, ValueWithLayout<WriteOp>)> {
@@ -193,7 +195,7 @@ impl ExecutorTask for AptosExecutorTask {
 mod tests {
     use super::*;
     use aptos_crypto::HashValue;
-    use aptos_types::{block_metadata::BlockMetadata, write_set::TransactionWrite};
+    use aptos_types::block_metadata::BlockMetadata;
 
     #[test]
     fn test_pre_write_values_for_block_metadata() {

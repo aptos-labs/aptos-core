@@ -10,15 +10,15 @@ use crate::{
     limit_processor::BlockGasLimitProcessor,
     task::{
         BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, Materializer,
-        TransactionExecutor, TransactionOutput,
+        TransactionExecutor, TransactionOutput, TxnKey,
     },
-    types::InputOutputKey,
+    types::{InputOutputKey, ResourceGroupTag},
     view::{LatestView, ViewArgs, ViewStateArgs},
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_logger::error;
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDelayedFieldsError, MVValue, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -37,10 +37,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, prelude::*};
-use aptos_vm_types::{
-    change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
-    resolver::ResourceGroupSize,
-};
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
 use bytes::Bytes;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
@@ -51,12 +48,13 @@ use parking_lot::Mutex;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt::Debug,
+    hash::Hash,
 };
 use triomphe::Arc as TriompheArc;
 
 /// The read set captured while executing a transaction with the legacy VM.
-pub(crate) type TxnInput<T> =
-    CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
+pub(crate) type TxnInput<O> =
+    CapturedReads<O, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
 /// The status a record was produced with, as exposed to the executor. Mirrors
 /// [`ExecutionStatus`], borrowing the error / message from the record.
@@ -85,13 +83,28 @@ impl<E> RecordStatus<'_, E> {
 /// The artifact of executing one transaction (one incarnation): everything the
 /// VM produced, i.e. the observed reads together with the produced writes and
 /// outputs. Block-STM's pipeline is generic over this: the apply loops iterate
-/// the write sets (typed by the transaction's speculative value), validation
+/// the write sets (typed by the record's speculative value), validation
 /// asks the record to validate its own reads against the shared multi-version
 /// structures, commit sequencing reads the facts, and materialization turns
 /// the record into the committed output.
 pub trait Record: Send + Sync {
     type Txn: Transaction;
     type Error: Debug + Clone + Send + Sync + Eq + 'static;
+    /// The key of the multi-version structures, in the VM's representation
+    /// (the legacy VM uses the storage key itself; a VM may choose a more
+    /// compact / interned form). The storage key of the transaction
+    /// (`Txn::Key`) remains the boundary towards the state view, the block
+    /// epilogue and hot state; the VM converts between the two.
+    type Key: Hash + Eq + Clone + Debug + Send + Sync;
+    /// The tag distinguishing the resources of a resource group, in the VM's
+    /// representation. Keys the multi-version group structures together with
+    /// the group key.
+    type Tag: ResourceGroupTag;
+    /// The value stored in the multi-version structures during speculative
+    /// execution. Carries whatever the VM needs to interpret a speculative
+    /// write (for the legacy VM, the value with an optional delayed-field
+    /// type layout).
+    type Value: MVValue;
     type CommittedOutput: CommittedTransactionOutput;
 
     // ---------------------------------------------------------------------
@@ -115,26 +128,18 @@ pub trait Record: Send + Sync {
     // and module publishing. Empty when the status carries no output.
     // ---------------------------------------------------------------------
 
-    fn resource_write_set(
-        &self,
-    ) -> Result<
-        HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::SpeculativeValue>,
-        PanicError,
-    >;
+    fn resource_write_set(&self) -> Result<HashMap<Self::Key, Self::Value>, PanicError>;
 
     #[allow(clippy::type_complexity)]
     fn resource_group_write_set(
         &self,
     ) -> Result<
         HashMap<
-            <Self::Txn as Transaction>::Key,
+            Self::Key,
             (
-                <Self::Txn as Transaction>::SpeculativeValue,
+                Self::Value,
                 ResourceGroupSize,
-                BTreeMap<
-                    <Self::Txn as Transaction>::Tag,
-                    <Self::Txn as Transaction>::SpeculativeValue,
-                >,
+                BTreeMap<Self::Tag, Self::Value>,
             ),
         >,
         PanicError,
@@ -142,15 +147,7 @@ pub trait Record: Send + Sync {
 
     /// The written group keys with the sets of tags written in each group.
     #[allow(clippy::type_complexity)]
-    fn resource_group_tags(
-        &self,
-    ) -> Result<
-        Vec<(
-            <Self::Txn as Transaction>::Key,
-            HashSet<<Self::Txn as Transaction>::Tag>,
-        )>,
-        PanicError,
-    >;
+    fn resource_group_tags(&self) -> Result<Vec<(Self::Key, HashSet<Self::Tag>)>, PanicError>;
 
     fn delayed_field_change_set(
         &self,
@@ -158,25 +155,21 @@ pub trait Record: Send + Sync {
 
     fn for_each_resource_key(
         &self,
-        callback: &mut dyn FnMut(&<Self::Txn as Transaction>::Key) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&Self::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     #[allow(clippy::type_complexity)]
     fn for_each_resource_group_key_and_tags(
         &self,
-        callback: &mut dyn FnMut(
-            &<Self::Txn as Transaction>::Key,
-            HashSet<&<Self::Txn as Transaction>::Tag>,
-        ) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&Self::Key, HashSet<&Self::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
-    /// Iterates the module writes of the output. May only be called for
-    /// success / skip-rest records (module publishing happens at commit).
+    /// Iterates the module writes of the output, as the module id and the
+    /// state value the write publishes. May only be called for success /
+    /// skip-rest records (module publishing happens at commit).
     fn for_each_module_write(
         &self,
-        callback: &mut dyn FnMut(
-            &ModuleWrite<<Self::Txn as Transaction>::Value>,
-        ) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     // ---------------------------------------------------------------------
@@ -186,20 +179,13 @@ pub trait Record: Send + Sync {
 
     fn validate_data_reads(
         &self,
-        data_map: &VersionedData<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::SpeculativeValue,
-        >,
+        data_map: &VersionedData<Self::Key, Self::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool;
 
     fn validate_group_reads(
         &self,
-        group_map: &VersionedGroupData<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-            <Self::Txn as Transaction>::SpeculativeValue,
-        >,
+        group_map: &VersionedGroupData<Self::Key, Self::Tag, Self::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool;
 
@@ -237,17 +223,10 @@ pub trait Record: Send + Sync {
     // ---------------------------------------------------------------------
 
     #[allow(clippy::type_complexity)]
-    fn read_summary(
-        &self,
-    ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
+    fn read_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
 
     #[allow(clippy::type_complexity)]
-    fn write_summary(
-        &self,
-    ) -> Result<
-        HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>,
-        PanicError,
-    >;
+    fn write_summary(&self) -> Result<HashSet<InputOutputKey<Self::Key, Self::Tag>>, PanicError>;
 
     fn fee_statement(&self) -> Result<FeeStatement, PanicError>;
 
@@ -257,10 +236,16 @@ pub trait Record: Send + Sync {
     /// the committed output we don't know its exact size.
     fn output_approx_size(&self) -> Result<u64, PanicError>;
 
-    /// Feeds the hot state accumulator with the keys this record read and wrote.
+    /// Feeds the hot state accumulator with the keys this record read and
+    /// wrote (as storage keys).
+    #[allow(clippy::type_complexity)]
     fn accumulate_hot_state(
         &self,
-        block_limit_processor: &mut BlockGasLimitProcessor<Self::Txn>,
+        block_limit_processor: &mut BlockGasLimitProcessor<
+            <Self::Txn as Transaction>::Key,
+            Self::Key,
+            Self::Tag,
+        >,
     ) -> Result<(), PanicError>;
 
     // ---------------------------------------------------------------------
@@ -272,12 +257,7 @@ pub trait Record: Send + Sync {
     /// by the sequential bcs fallback re-run to discard such transactions.
     fn sequential_group_serialization_error(
         &self,
-        unsync_map: &UnsyncMap<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-            <Self::Txn as Transaction>::SpeculativeValue,
-            DelayedFieldID,
-        >,
+        unsync_map: &UnsyncMap<Self::Key, Self::Tag, Self::Value, DelayedFieldID>,
     ) -> Result<bool, PanicError>;
 
     /// Whether the reads were used incorrectly during (sequential) execution.
@@ -297,21 +277,23 @@ pub trait Record: Send + Sync {
     /// may not be concurrent with any other access to the record's output.
     fn materialize<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
-        args: &ViewArgs<'_, Self::Txn, S>,
+        args: &ViewArgs<'_, Self, S>,
         txn_idx: TxnIndex,
         environment: &AptosEnvironment,
-    ) -> Result<Self::CommittedOutput, PanicOr<ResourceGroupSerializationError>>;
+    ) -> Result<Self::CommittedOutput, PanicOr<ResourceGroupSerializationError>>
+    where
+        Self: Sized;
 }
 
 /// The reads captured by one execution, in the representation of the mode the
 /// transaction was executed in (mirroring `ViewState`).
-enum LegacyReads<T: Transaction> {
-    Parallel(TxnInput<T>),
-    Sequential(UnsyncReadSet<T, ModuleId>),
+enum LegacyReads<O: TransactionOutput> {
+    Parallel(TxnInput<O>),
+    Sequential(UnsyncReadSet<O>),
 }
 
-impl<T: Transaction> LegacyReads<T> {
-    fn parallel(&self) -> &TxnInput<T> {
+impl<O: TransactionOutput> LegacyReads<O> {
+    fn parallel(&self) -> &TxnInput<O> {
         match self {
             LegacyReads::Parallel(reads) => reads,
             LegacyReads::Sequential(_) => {
@@ -337,20 +319,15 @@ enum LegacyStatus<E> {
 /// materialization consumes it (in place) while the record is shared behind an
 /// `Arc`; all accessors take the lock briefly. Materialization may not be
 /// concurrent with any other output access.
-pub struct LegacyRecord<T, O, E>
-where
-    T: Transaction,
-    O: TransactionOutput<Txn = T>,
-{
-    reads: LegacyReads<T>,
+pub struct LegacyRecord<O: TransactionOutput, E> {
+    reads: LegacyReads<O>,
     status: LegacyStatus<E>,
     output: Mutex<Option<O>>,
 }
 
-impl<T, O, E> LegacyRecord<T, O, E>
+impl<O, E> LegacyRecord<O, E>
 where
-    T: Transaction<SpeculativeValue = ValueWithLayout<<T as Transaction>::Value>>,
-    O: TransactionOutput<Txn = T>,
+    O: TransactionOutput,
     E: Debug + Clone + Send + Sync + Eq + 'static,
 {
     /// Bundles the reads captured by a parallel execution with the execution
@@ -358,7 +335,7 @@ where
     /// the delayed-field read error for speculative aborts (so that failed
     /// validation is guaranteed).
     pub(crate) fn from_execution_status(
-        mut reads: TxnInput<T>,
+        mut reads: TxnInput<O>,
         result: ExecutionStatus<O, E>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
@@ -402,7 +379,7 @@ where
     /// fatal block errors itself. The incorrect-use check is deferred until
     /// after materialization (mirroring the sequential flow).
     pub(crate) fn from_execution_status_sequential(
-        reads: UnsyncReadSet<T, ModuleId>,
+        reads: UnsyncReadSet<O>,
         result: ExecutionStatus<O, E>,
     ) -> Self {
         let (status, output) = match result {
@@ -445,13 +422,13 @@ where
 
     fn resource_group_metadata_ops(
         &self,
-    ) -> Result<Vec<(T::Key, T::SpeculativeValue)>, PanicError> {
+    ) -> Result<Vec<(TxnKey<O>, ValueWithLayout<O::Value>)>, PanicError> {
         self.with_output_or(|guard| guard.resource_group_metadata_ops(), Vec::new)
     }
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Result<Vec<(T::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)>, PanicError> {
+    ) -> Result<Vec<(TxnKey<O>, StateValueMetadata, TriompheArc<MoveTypeLayout>)>, PanicError> {
         self.with_output_or(
             |guard| guard.reads_needing_delayed_field_exchange(),
             Vec::new,
@@ -460,7 +437,7 @@ where
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> Result<Vec<(T::Key, StateValueMetadata)>, PanicError> {
+    ) -> Result<Vec<(TxnKey<O>, StateValueMetadata)>, PanicError> {
         self.with_output_or(
             |guard| guard.group_reads_needing_delayed_field_exchange(),
             Vec::new,
@@ -472,8 +449,8 @@ where
     /// exchanged format.
     fn fetch_exchanged_data(
         &self,
-        key: &T::Key,
-    ) -> Result<(TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>), PanicError> {
+        key: &TxnKey<O>,
+    ) -> Result<(TriompheArc<O::Value>, TriompheArc<MoveTypeLayout>), PanicError> {
         use crate::captured_reads::{DataRead, ReadKind};
         let data_read = self
             .reads
@@ -496,7 +473,7 @@ where
     /// not be concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
         &self,
-        materializer: &impl Materializer<Key = T::Key>,
+        materializer: &impl Materializer<Key = TxnKey<O>>,
     ) -> Result<(O::CommittedOutput, Trace), PanicError> {
         let mut output = self.output.lock();
         let output = output.as_mut().ok_or_else(|| {
@@ -512,16 +489,18 @@ where
 /// value-level patches via the view, and serves the group and exchanged-read
 /// bytes precomputed by the record (both derived from the multi-version state
 /// the output cannot access itself).
-struct LegacyMaterializer<'a, 'b, T: Transaction, S: TStateView<Key = T::Key>> {
-    view: &'b LatestView<'a, T, S>,
-    serialized_groups: HashMap<T::Key, Bytes>,
-    exchanged_reads: HashMap<T::Key, Bytes>,
+struct LegacyMaterializer<'a, 'b, O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> {
+    view: &'b LatestView<'a, O, S>,
+    serialized_groups: HashMap<TxnKey<O>, Bytes>,
+    exchanged_reads: HashMap<TxnKey<O>, Bytes>,
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> Materializer
-    for LegacyMaterializer<'_, '_, T, S>
+impl<O, S> Materializer for LegacyMaterializer<'_, '_, O, S>
+where
+    O: TransactionOutput,
+    S: TStateView<Key = TxnKey<O>>,
 {
-    type Key = T::Key;
+    type Key = TxnKey<O>;
 
     fn replace_identifiers_with_values(
         &self,
@@ -540,30 +519,35 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> Materializer
         Ok(bytes)
     }
 
-    fn serialized_group_bytes(&self, key: &T::Key) -> Result<Bytes, PanicError> {
+    fn serialized_group_bytes(&self, key: &TxnKey<O>) -> Result<Bytes, PanicError> {
         self.serialized_groups.get(key).cloned().ok_or_else(|| {
             code_invariant_error(format!("No serialized group bytes for key {:?}", key))
         })
     }
 
-    fn exchanged_read_bytes(&self, key: &T::Key) -> Result<Bytes, PanicError> {
+    fn exchanged_read_bytes(&self, key: &TxnKey<O>) -> Result<Bytes, PanicError> {
         self.exchanged_reads.get(key).cloned().ok_or_else(|| {
             code_invariant_error(format!("No exchanged read bytes for key {:?}", key))
         })
     }
 }
 
-impl<T, O, E> Record for LegacyRecord<T, O, E>
+impl<O, E> Record for LegacyRecord<O, E>
 where
-    // The value-shape bound reflects that the legacy record's reads, writes and
-    // views are built on `ValueWithLayout`.
-    T: Transaction<SpeculativeValue = ValueWithLayout<<T as Transaction>::Value>>,
-    O: TransactionOutput<Txn = T> + 'static,
+    O: TransactionOutput + 'static,
     E: Debug + Clone + Send + Sync + Eq + 'static,
 {
     type CommittedOutput = O::CommittedOutput;
     type Error = E;
-    type Txn = T;
+    // The legacy record keys the multi-version structures by the storage key
+    // itself.
+    type Key = TxnKey<O>;
+    // The legacy record's group tag is the output's tag.
+    type Tag = O::Tag;
+    type Txn = O::Txn;
+    // The legacy record's reads, writes and views are built on
+    // `ValueWithLayout` over the output's committed value.
+    type Value = ValueWithLayout<O::Value>;
 
     fn status(&self) -> RecordStatus<'_, E> {
         match &self.status {
@@ -586,7 +570,9 @@ where
         }
     }
 
-    fn resource_write_set(&self) -> Result<HashMap<T::Key, T::SpeculativeValue>, PanicError> {
+    fn resource_write_set(
+        &self,
+    ) -> Result<HashMap<TxnKey<O>, ValueWithLayout<O::Value>>, PanicError> {
         self.with_output_or(|guard| guard.resource_write_set(), HashMap::new)
     }
 
@@ -594,11 +580,11 @@ where
         &self,
     ) -> Result<
         HashMap<
-            T::Key,
+            TxnKey<O>,
             (
-                T::SpeculativeValue,
+                ValueWithLayout<O::Value>,
                 ResourceGroupSize,
-                BTreeMap<T::Tag, T::SpeculativeValue>,
+                BTreeMap<O::Tag, ValueWithLayout<O::Value>>,
             ),
         >,
         PanicError,
@@ -606,7 +592,7 @@ where
         self.with_output_or(|guard| guard.resource_group_write_set(), HashMap::new)
     }
 
-    fn resource_group_tags(&self) -> Result<Vec<(T::Key, HashSet<T::Tag>)>, PanicError> {
+    fn resource_group_tags(&self) -> Result<Vec<(TxnKey<O>, HashSet<O::Tag>)>, PanicError> {
         self.with_output_or(|guard| guard.legacy_v1_resource_group_tags(), Vec::new)
     }
 
@@ -618,14 +604,14 @@ where
 
     fn for_each_resource_key(
         &self,
-        callback: &mut dyn FnMut(&T::Key) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&TxnKey<O>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         self.with_output_or(|guard| guard.for_each_resource_key(callback), || Ok(()))?
     }
 
     fn for_each_resource_group_key_and_tags(
         &self,
-        callback: &mut dyn FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&TxnKey<O>, HashSet<&O::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         self.with_output_or(
             |guard| guard.for_each_resource_group_key_and_tags(callback),
@@ -635,21 +621,25 @@ where
 
     fn for_each_module_write(
         &self,
-        callback: &mut dyn FnMut(&ModuleWrite<T::Value>) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         let output = self.output.lock();
         let output = output.as_ref().ok_or_else(|| {
             code_invariant_error("Module writes may only be iterated on committable outputs")
         })?;
         for write in output.before_materialization()?.module_write_set().values() {
-            callback(write)?;
+            let state_value = write
+                .write_op()
+                .as_state_value()
+                .ok_or_else(|| code_invariant_error("Modules cannot be deleted".to_string()))?;
+            callback(write.module_id(), state_value)?;
         }
         Ok(())
     }
 
     fn validate_data_reads(
         &self,
-        data_map: &VersionedData<T::Key, T::SpeculativeValue>,
+        data_map: &VersionedData<TxnKey<O>, ValueWithLayout<O::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         self.reads
@@ -659,7 +649,7 @@ where
 
     fn validate_group_reads(
         &self,
-        group_map: &VersionedGroupData<T::Key, T::Tag, T::SpeculativeValue>,
+        group_map: &VersionedGroupData<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         self.reads
@@ -705,14 +695,14 @@ where
         self.reads.parallel().blockstm_v2_incarnation()
     }
 
-    fn read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    fn read_summary(&self) -> HashSet<InputOutputKey<TxnKey<O>, O::Tag>> {
         match &self.reads {
             LegacyReads::Parallel(reads) => reads.get_read_summary(),
             LegacyReads::Sequential(reads) => reads.get_read_summary(),
         }
     }
 
-    fn write_summary(&self) -> Result<HashSet<InputOutputKey<T::Key, T::Tag>>, PanicError> {
+    fn write_summary(&self) -> Result<HashSet<InputOutputKey<TxnKey<O>, O::Tag>>, PanicError> {
         self.with_output_or(|guard| guard.get_write_summary(), HashSet::new)
     }
 
@@ -730,7 +720,7 @@ where
 
     fn accumulate_hot_state(
         &self,
-        block_limit_processor: &mut BlockGasLimitProcessor<T>,
+        block_limit_processor: &mut BlockGasLimitProcessor<TxnKey<O>, TxnKey<O>, O::Tag>,
     ) -> Result<(), PanicError> {
         self.with_output_or(
             |guard| {
@@ -745,7 +735,7 @@ where
 
     fn sequential_group_serialization_error(
         &self,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
+        unsync_map: &UnsyncMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
     ) -> Result<bool, PanicError> {
         let finalize = |group_key| -> (BTreeMap<_, _>, ResourceGroupSize) {
             let (group, size) = unsync_map.finalize_group(&group_key);
@@ -826,9 +816,9 @@ where
         }
     }
 
-    fn materialize<S: TStateView<Key = T::Key> + Sync>(
+    fn materialize<S: TStateView<Key = TxnKey<O>> + Sync>(
         &self,
-        args: &ViewArgs<'_, T, S>,
+        args: &ViewArgs<'_, Self, S>,
         txn_idx: TxnIndex,
         environment: &AptosEnvironment,
     ) -> Result<O::CommittedOutput, PanicOr<ResourceGroupSerializationError>> {
@@ -871,7 +861,7 @@ where
                             .group_data()
                             .finalize_group(&group_key, txn_idx)?;
 
-                        map_finalized_group::<T>(
+                        map_finalized_group(
                             group_key,
                             finalized_group,
                             group_size,
@@ -881,10 +871,10 @@ where
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let materialized_finalized_groups =
-                    map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
+                    map_id_to_values_in_group_writes::<O, S>(finalized_groups, &latest_view)?;
                 // A group serialization failure in parallel mode is an invariant
                 // violation (the sizes were validated during execution).
-                serialize_groups::<T>(materialized_finalized_groups).map_err(|e| {
+                serialize_groups(materialized_finalized_groups).map_err(|e| {
                     code_invariant_error(format!("Panic error in serializing groups {e:?}"))
                 })?
             },
@@ -892,7 +882,7 @@ where
                 let finalized_groups = groups_to_finalize
                     .map(|((group_key, metadata_op), is_read_needing_exchange)| {
                         let (group_ops_iter, group_size) = unsync_map.finalize_group(&group_key);
-                        map_finalized_group::<T>(
+                        map_finalized_group(
                             group_key,
                             group_ops_iter.collect(),
                             group_size,
@@ -902,9 +892,9 @@ where
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let materialized_finalized_groups =
-                    map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
+                    map_id_to_values_in_group_writes::<O, S>(finalized_groups, &latest_view)?;
                 // The sequential caller turns this into the bcs fallback re-run.
-                serialize_groups::<T>(materialized_finalized_groups).map_err(PanicOr::Or)?
+                serialize_groups(materialized_finalized_groups).map_err(PanicOr::Or)?
             },
             (ViewStateArgs::Parallel { .. }, LegacyReads::Sequential(_))
             | (ViewStateArgs::Sequential { .. }, LegacyReads::Parallel(_)) => {
@@ -1026,13 +1016,10 @@ where
 /// glue builds the V1 view (`LatestView`) from the VM-neutral view
 /// ingredients, runs the transaction against it, and bundles the captured
 /// reads with the execution result into a [`LegacyRecord`].
-impl<E: ExecutorTask> TransactionExecutor for E
-where
-    E::Txn: Transaction<SpeculativeValue = ValueWithLayout<<E::Txn as Transaction>::Value>>,
-{
+impl<E: ExecutorTask> TransactionExecutor for E {
     type AuxiliaryInfo = E::AuxiliaryInfo;
     type Error = E::Error;
-    type Record = LegacyRecord<E::Txn, E::Output, E::Error>;
+    type Record = LegacyRecord<E::Output, E::Error>;
     type Txn = E::Txn;
 
     fn init(
@@ -1045,7 +1032,7 @@ where
 
     fn execute_transaction_v2<S: TStateView<Key = <E::Txn as Transaction>::Key> + Sync>(
         &self,
-        args: &ViewArgs<'_, E::Txn, S>,
+        args: &ViewArgs<'_, Self::Record, S>,
         txn: &E::Txn,
         auxiliary_info: &E::AuxiliaryInfo,
         txn_idx: TxnIndex,
@@ -1072,7 +1059,7 @@ where
         txn: &E::Txn,
     ) -> Vec<(
         <E::Txn as Transaction>::Key,
-        <E::Txn as Transaction>::SpeculativeValue,
+        ValueWithLayout<<E::Output as TransactionOutput>::Value>,
     )> {
         <E as ExecutorTask>::pre_write_values(txn)
     }

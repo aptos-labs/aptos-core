@@ -110,12 +110,10 @@ where
 
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), block_gas_limit);
     let block_executor = BlockExecutor::<
-        MockTxn,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         ViewType,
         NoOpTransactionCommitHook<usize>,
         Provider,
-        AuxiliaryInfo,
     >::new(config, None);
 
     if block_stm_v2 {

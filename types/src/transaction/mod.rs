@@ -5,7 +5,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    block_executor::speculative_value::MVValue,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
@@ -70,7 +69,6 @@ use crate::{
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     validator_txn::ValidatorTransaction,
-    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -86,7 +84,6 @@ pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
-use serde::de::DeserializeOwned;
 use std::{
     collections::BTreeSet,
     hash::Hash,
@@ -3590,25 +3587,6 @@ impl TryFrom<Transaction> for SignedTransaction {
 /// transaction will write to a key value storage as their side effect.
 pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
-    /// specifying a tag, and output requires merging all resources together (Note: this may change
-    /// in the future if write-set format changes to be per-resource, could be more performant).
-    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
-    type Tag: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + DeserializeOwned
-        + Serialize;
-    type Value: Send + Sync + Debug + Clone + Eq + PartialEq + TransactionWrite;
-    /// The value as stored in the multi-version data structures during speculative
-    /// execution. Carries whatever the VM needs to interpret a speculative write
-    /// (for the V1 VM, the value with an optional delayed-field type layout).
-    type SpeculativeValue: MVValue;
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;

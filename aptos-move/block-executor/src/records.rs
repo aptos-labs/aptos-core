@@ -40,7 +40,7 @@ use std::{
 /// manages: the skip-rest override (set when the block is cut, since the
 /// record itself is shared immutably) and the facts computed once when the
 /// record was stored.
-struct RecordEntry<T: Transaction, R> {
+struct RecordEntry<R: Record> {
     /// The record is behind an `Arc` so that validation can clone it out and
     /// validate without holding the slot lock, concurrently with a newer
     /// incarnation replacing the entry.
@@ -48,11 +48,11 @@ struct RecordEntry<T: Transaction, R> {
     /// Whether the commit path turned this (successful) record into a
     /// skip-rest one because a block limit was reached.
     forced_skip_rest: bool,
-    maybe_read_write_summary: Option<ReadWriteSummary<T>>,
+    maybe_read_write_summary: Option<ReadWriteSummary<R::Key, R::Tag>>,
     maybe_approx_output_size: Option<u64>,
 }
 
-impl<T: Transaction, R: Record<Txn = T>> RecordEntry<T, R> {
+impl<R: Record> RecordEntry<R> {
     fn check_success_or_skip_status(&self) -> Result<&Arc<R>, PanicError> {
         if !self.record.status().is_success_or_skip_rest() {
             return Err(code_invariant_error(format!(
@@ -66,18 +66,14 @@ impl<T: Transaction, R: Record<Txn = T>> RecordEntry<T, R> {
 
 /// The store of the records of the latest completed incarnation of each
 /// transaction in the block (with one extra slot for the block epilogue txn).
-pub struct Records<T: Transaction, R: Record<Txn = T>> {
-    records: Vec<CachePadded<Mutex<Option<RecordEntry<T, R>>>>>,
+pub struct Records<R: Record> {
+    records: Vec<CachePadded<Mutex<Option<RecordEntry<R>>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
     // speculative nature of parallel execution.
     speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
-impl<T, R> Records<T, R>
-where
-    T: Transaction,
-    R: Record<Txn = T>,
-{
+impl<R: Record> Records<R> {
     /// num_txns passed here is typically larger than the number of txns in the block,
     /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
@@ -175,7 +171,11 @@ where
         txn_idx: TxnIndex,
         num_txns: TxnIndex,
         num_workers: usize,
-        block_limit_processor: &mut BlockGasLimitProcessor<T>,
+        block_limit_processor: &mut BlockGasLimitProcessor<
+            <R::Txn as Transaction>::Key,
+            R::Key,
+            R::Tag,
+        >,
         maybe_block_epilogue_txn_idx: &ExplicitSyncWrapper<Option<TxnIndex>>,
         scheduler: &SchedulerWrapper,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
@@ -279,7 +279,7 @@ where
     pub(crate) fn for_each_resource_key_no_aggregator_v1(
         &self,
         txn_idx: TxnIndex,
-        mut callback: impl FnMut(&T::Key) -> Result<(), PanicError>,
+        mut callback: impl FnMut(&R::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         if let Some(record) = self.get_record(txn_idx) {
             record.for_each_resource_key(&mut callback)?;
@@ -291,7 +291,7 @@ where
     pub(crate) fn for_each_resource_group_key_and_tags(
         &self,
         txn_idx: TxnIndex,
-        mut callback: impl FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+        mut callback: impl FnMut(&R::Key, HashSet<&R::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         if let Some(record) = self.get_record(txn_idx) {
             record.for_each_resource_group_key_and_tags(&mut callback)?;
@@ -302,7 +302,7 @@ where
     pub(crate) fn modified_group_key_and_tags_cloned(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, HashSet<T::Tag>)> {
+    ) -> Vec<(R::Key, HashSet<R::Tag>)> {
         self.get_record(txn_idx).map_or_else(Vec::new, |record| {
             record.resource_group_tags().expect("Output must be set")
         })
@@ -313,7 +313,7 @@ where
     pub(crate) fn modified_resource_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = T::Key>> {
+    ) -> Option<impl Iterator<Item = R::Key>> {
         let record = self.record_if_success_or_skip_rest(txn_idx)?;
         Some(
             record
@@ -333,7 +333,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
+        versioned_cache: &MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
         scheduler: &SchedulerWrapper<'_>,
     ) -> Result<bool, PanicError> {
@@ -350,13 +350,14 @@ where
 
         let mut published = false;
         let mut module_ids_for_v2 = BTreeSet::new();
-        record.for_each_module_write(&mut |write| {
+        record.for_each_module_write(&mut |module_id, state_value| {
             published = true;
             if scheduler.is_v2() {
-                module_ids_for_v2.insert(write.module_id().clone());
+                module_ids_for_v2.insert(module_id.clone());
             }
-            add_module_write_to_module_cache::<T>(
-                write,
+            add_module_write_to_module_cache(
+                module_id,
+                state_value,
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
@@ -387,10 +388,10 @@ where
     // the committed output: WriteOps for materialized aggregator values corresponding
     // to the (deltas) in the recorded final output of the transaction, finalized
     // group updates, and materialized events.
-    pub(crate) fn materialize<S: TStateView<Key = T::Key> + Sync>(
+    pub(crate) fn materialize<S: TStateView<Key = <R::Txn as Transaction>::Key> + Sync>(
         &self,
         txn_idx: TxnIndex,
-        args: &ViewArgs<'_, T, S>,
+        args: &ViewArgs<'_, R, S>,
         environment: &AptosEnvironment,
     ) -> Result<R::CommittedOutput, PanicError> {
         let record = self

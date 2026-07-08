@@ -6,7 +6,10 @@
 use crate::types::delayed_field_mock_serialization::{
     deserialize_to_delayed_field_id, mock_layout,
 };
-use crate::view::{LatestView, ViewState};
+use crate::{
+    task::{TransactionOutput, TxnKey},
+    view::{LatestView, ViewState},
+};
 use aptos_aggregator::{
     resolver::TDelayedFieldView,
     types::{DelayedFieldValue, ReadPosition},
@@ -15,7 +18,6 @@ use aptos_mvhashmap::{types::TxnIndex, versioned_delayed_fields::TVersionedDelay
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
@@ -34,17 +36,22 @@ use move_vm_types::{
 use std::{cell::RefCell, collections::HashSet};
 use triomphe::Arc as TriompheArc;
 
-pub(crate) struct TemporaryValueToIdentifierMapping<'a, T: Transaction, S: TStateView<Key = T::Key>>
-{
-    latest_view: &'a LatestView<'a, T, S>,
+pub(crate) struct TemporaryValueToIdentifierMapping<
+    'a,
+    O: TransactionOutput,
+    S: TStateView<Key = TxnKey<O>>,
+> {
+    latest_view: &'a LatestView<'a, O, S>,
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
     delayed_field_ids: RefCell<HashSet<DelayedFieldID>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TemporaryValueToIdentifierMapping<'a, T, S> {
-    pub fn new(latest_view: &'a LatestView<'a, T, S>, txn_idx: TxnIndex) -> Self {
+impl<'a, O: TransactionOutput, S: TStateView<Key = TxnKey<O>>>
+    TemporaryValueToIdentifierMapping<'a, O, S>
+{
+    pub fn new(latest_view: &'a LatestView<'a, O, S>, txn_idx: TxnIndex) -> Self {
         Self {
             latest_view,
             txn_idx,
@@ -64,8 +71,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TemporaryValueToIdentifier
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'_, T, S>
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> ValueToIdentifierMapping
+    for TemporaryValueToIdentifierMapping<'_, O, S>
 {
     fn value_to_identifier(
         &self,
@@ -107,10 +114,10 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
     }
 }
 
-impl<T, S> LatestView<'_, T, S>
+impl<O, S> LatestView<'_, O, S>
 where
-    T: Transaction,
-    S: TStateView<Key = T::Key>,
+    O: TransactionOutput,
+    S: TStateView<Key = TxnKey<O>>,
 {
     /// Given bytes, where values were already exchanged with identifiers, returns a list of
     /// identifiers present in it.
@@ -156,7 +163,7 @@ where
     // Deletion returns a PanicError.
     pub(crate) fn does_value_need_exchange(
         &self,
-        value: &T::Value,
+        value: &O::Value,
         layout: &MoveTypeLayout,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
     ) -> Result<bool, PanicError> {
@@ -177,14 +184,14 @@ where
     // Exclude deletions, and values that do not contain any delayed field IDs that were written to.
     pub(crate) fn filter_value_for_exchange(
         &self,
-        value: &T::Value,
+        value: &O::Value,
         layout: &TriompheArc<MoveTypeLayout>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
-        key: &T::Key,
+        key: &TxnKey<O>,
     ) -> Option<
         Result<
             (
-                T::Key,
+                TxnKey<O>,
                 (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>),
             ),
             PanicError,

@@ -148,9 +148,6 @@ struct TestTransaction {
 
 impl BlockExecutableTransaction for TestTransaction {
     type Key = StateKey;
-    type SpeculativeValue = ValueWithLayout<WriteOp>;
-    type Tag = StructTag;
-    type Value = WriteOp;
 
     fn user_txn_bytes_len(&self) -> usize {
         0
@@ -163,7 +160,9 @@ struct TestOutput;
 impl TransactionOutput for TestOutput {
     type BeforeMaterializationGuard<'a> = &'a Self;
     type CommittedOutput = aptos_types::transaction::TransactionOutput;
+    type Tag = StructTag;
     type Txn = TestTransaction;
+    type Value = WriteOp;
 
     fn skip_output() -> Self {
         Self
@@ -188,7 +187,7 @@ impl TransactionOutput for TestOutput {
     }
 }
 
-impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
+impl BeforeMaterializationOutput<TestOutput> for &TestOutput {
     fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         HashMap::new()
     }
@@ -339,10 +338,6 @@ impl ExecutorTask for TestTask {
 
         ExecutionStatus::Success(TestOutput)
     }
-
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        unreachable!("Never used for tests")
-    }
 }
 
 fn testcase(label: &str, txn: TestTransaction, expected: Expected) {
@@ -358,12 +353,10 @@ fn testcase(label: &str, txn: TestTransaction, expected: Expected) {
         DefaultTxnProvider::<TestTransaction, AuxiliaryInfo>::new_without_info(vec![txn]);
     let mut guard = AptosModuleCacheManagerGuard::none_with_delayed_fields_for_testing(state_view);
     let executor = BlockExecutor::<
-        TestTransaction,
         TestTask,
         _,
         NoOpTransactionCommitHook<TestOutput>,
         DefaultTxnProvider<TestTransaction, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(BlockExecutorConfig::new_maybe_block_limit(2, None), None);
     let _ = executor.execute_transactions_parallel_for_testing(
         &txn_provider,

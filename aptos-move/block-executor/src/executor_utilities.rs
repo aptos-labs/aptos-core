@@ -1,7 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{counters, errors::*, record::Record, records::Records, view::LatestView};
+use crate::{
+    counters,
+    errors::*,
+    record::Record,
+    records::Records,
+    task::{TransactionOutput, TxnKey},
+    types::ResourceGroupTag,
+    view::LatestView,
+};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVValue, TxnIndex, ValueWithLayout},
@@ -10,7 +18,6 @@ use aptos_mvhashmap::{
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     state_store::TStateView,
-    transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, prelude::*};
@@ -20,20 +27,24 @@ use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Debug,
+    hash::Hash,
+};
 use triomphe::Arc as TriompheArc;
 
-pub(crate) fn map_finalized_group<T: Transaction>(
-    group_key: T::Key,
-    finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+pub(crate) fn map_finalized_group<K, TG, V: TransactionWrite + Debug + Send + Sync + Clone + Eq>(
+    group_key: K,
+    finalized_group: Vec<(TG, ValueWithLayout<V>)>,
     group_size: ResourceGroupSize,
-    metadata_op: ValueWithLayout<T::Value>,
+    metadata_op: ValueWithLayout<V>,
     is_read_needing_exchange: bool,
 ) -> Result<
     (
-        T::Key,
-        ValueWithLayout<T::Value>,
-        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        K,
+        ValueWithLayout<V>,
+        Vec<(TG, ValueWithLayout<V>)>,
         ResourceGroupSize,
     ),
     PanicError,
@@ -58,14 +69,13 @@ pub(crate) fn map_finalized_group<T: Transaction>(
     }
 }
 
-pub(crate) fn serialize_groups<T: Transaction>(
-    finalized_groups: Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, TriompheArc<T::Value>)>,
-        ResourceGroupSize,
-    )>,
-) -> Result<HashMap<T::Key, Bytes>, ResourceGroupSerializationError> {
+pub(crate) fn serialize_groups<
+    K: Hash + Eq + Debug,
+    TG: ResourceGroupTag,
+    V: TransactionWrite + Debug + Send + Sync + Clone + Eq,
+>(
+    finalized_groups: Vec<(K, V, Vec<(TG, TriompheArc<V>)>, ResourceGroupSize)>,
+) -> Result<HashMap<K, Bytes>, ResourceGroupSerializationError> {
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),
@@ -75,7 +85,7 @@ pub(crate) fn serialize_groups<T: Transaction>(
     finalized_groups
         .into_iter()
         .map(|(group_key, metadata_op, finalized_group, group_size)| {
-            let btree: BTreeMap<T::Tag, Bytes> = finalized_group
+            let btree: BTreeMap<TG, Bytes> = finalized_group
                 .into_iter()
                 .map(|(resource_tag, arc_v)| {
                     let bytes = arc_v
@@ -124,22 +134,23 @@ pub(crate) fn gen_id_start_value(sequential: bool) -> u32 {
     thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn map_id_to_values_in_group_writes<
-    T: Transaction,
-    S: TStateView<Key = T::Key> + Sync,
+    O: TransactionOutput,
+    S: TStateView<Key = TxnKey<O>> + Sync,
 >(
     finalized_groups: Vec<(
-        T::Key,
-        ValueWithLayout<T::Value>,
-        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        TxnKey<O>,
+        ValueWithLayout<O::Value>,
+        Vec<(O::Tag, ValueWithLayout<O::Value>)>,
         ResourceGroupSize,
     )>,
-    latest_view: &LatestView<T, S>,
+    latest_view: &LatestView<O, S>,
 ) -> Result<
     Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, TriompheArc<T::Value>)>,
+        TxnKey<O>,
+        O::Value,
+        Vec<(O::Tag, TriompheArc<O::Value>)>,
         ResourceGroupSize,
     )>,
     PanicError,
@@ -170,11 +181,11 @@ pub(crate) fn map_id_to_values_in_group_writes<
 }
 
 // Parse the input `value` and replace delayed field identifiers with corresponding values
-fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    value: &TriompheArc<T::Value>,
+fn replace_ids_with_values<O: TransactionOutput, S: TStateView<Key = TxnKey<O>> + Sync>(
+    value: &TriompheArc<O::Value>,
     layout: &MoveTypeLayout,
-    latest_view: &LatestView<T, S>,
-) -> Result<T::Value, PanicError> {
+    latest_view: &LatestView<O, S>,
+) -> Result<O::Value, PanicError> {
     let mut value = (**value).clone();
 
     if let Some(value_bytes) = value.bytes() {
@@ -197,14 +208,11 @@ fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
     }
 }
 
-pub(crate) fn update_transaction_on_abort<T, R>(
+pub(crate) fn update_transaction_on_abort<R: Record>(
     txn_idx: TxnIndex,
-    last_input_output: &Records<T, R>,
-    versioned_cache: &MVHashMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
-) where
-    T: Transaction,
-    R: Record<Txn = T>,
-{
+    last_input_output: &Records<R>,
+    versioned_cache: &MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
+) {
     counters::SPECULATIVE_ABORT_COUNT.inc();
 
     // Any logs from the aborted execution should be cleared and not reported.

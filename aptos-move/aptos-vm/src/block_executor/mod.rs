@@ -85,7 +85,7 @@ pub struct BeforeMaterializationGuard<'a> {
     read_set: &'a UnorderedReadSet,
 }
 
-impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMaterializationGuard<'_> {
+impl BeforeMaterializationOutput<AptosTransactionOutput> for BeforeMaterializationGuard<'_> {
     fn fee_statement(&self) -> FeeStatement {
         *self.guard.fee_statement()
     }
@@ -348,7 +348,9 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type BeforeMaterializationGuard<'a> = BeforeMaterializationGuard<'a>;
     type CommittedOutput = TransactionOutput;
+    type Tag = StructTag;
     type Txn = SignatureVerifiedTransaction;
+    type Value = WriteOp;
 
     /// Execution output for transactions that comes after SkipRest signal or when there was a
     /// problem creating the output (e.g. group serialization issue).
@@ -436,11 +438,7 @@ impl<
             transaction_slice_metadata,
         )?;
 
-        let executor =
-            BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
-                config,
-                transaction_commit_listener,
-            );
+        let executor = BlockExecutor::<E, S, L, TP>::new(config, transaction_commit_listener);
 
         let ret = executor.execute_block(
             signature_verified_block,

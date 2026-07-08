@@ -51,12 +51,10 @@ fn test_block_epilogue_happy_path() {
     let transactions = vec![t_0, t_1];
 
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         None,
@@ -115,12 +113,10 @@ fn test_block_epilogue_block_gas_limit_reached() {
     let transactions = vec![t_0, t_1];
 
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(1)),
         None,
@@ -203,12 +199,10 @@ fn test_resource_group_deletion() {
         delayed_field_testing: false,
     };
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         None,
@@ -275,12 +269,10 @@ fn resource_group_bcs_fallback() {
         delayed_field_testing: false,
     };
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         None,
@@ -384,12 +376,10 @@ fn interrupt_requested() {
 
     let data_view = MockStateView::empty();
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         None,
@@ -424,12 +414,10 @@ fn block_output_err_precedence() {
 
     let data_view = MockStateView::empty();
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         None,
@@ -461,12 +449,10 @@ fn skip_rest_gas_limit() {
 
     let data_view = MockStateView::empty();
     let block_executor = BlockExecutor::<
-        MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
-        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         None,
@@ -496,14 +482,7 @@ where
             phantom: PhantomData,
         };
 
-        BlockExecutor::<
-            MockTransaction<K, E>,
-            MockTask<K, E>,
-            DeltaDataView<K>,
-            NoOpTransactionCommitHook<usize>,
-            _,
-            AuxiliaryInfo,
-        >::new(
+        BlockExecutor::<MockTask<K, E>, DeltaDataView<K>, NoOpTransactionCommitHook<usize>, _>::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             None,
         )
@@ -515,14 +494,7 @@ where
         )
     } else {
         let data_view = MockStateView::empty();
-        BlockExecutor::<
-            MockTransaction<K, E>,
-            MockTask<K, E>,
-            MockStateView<K>,
-            NoOpTransactionCommitHook<usize>,
-            _,
-            AuxiliaryInfo,
-        >::new(
+        BlockExecutor::<MockTask<K, E>, MockStateView<K>, NoOpTransactionCommitHook<usize>, _>::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             None,
         )

@@ -4,6 +4,7 @@
 use crate::{
     captured_reads::CacheRead,
     counters::GLOBAL_MODULE_CACHE_MISS_SECONDS,
+    task::{TransactionOutput, TxnKey},
     view::{LatestView, ViewState},
 };
 use ambassador::delegate_to_methods;
@@ -13,7 +14,6 @@ use aptos_types::on_chain_config::CurrentTimeMicroseconds;
 use aptos_types::{
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
@@ -38,13 +38,17 @@ use move_vm_types::code::{
 };
 use std::{hash::Hash, sync::Arc};
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment for LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> WithRuntimeEnvironment
+    for LatestView<'_, O, S>
+{
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.runtime_environment
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> ModuleCodeBuilder
+    for LatestView<'_, O, S>
+{
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -54,7 +58,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestVi
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let constructed_key = T::Key::from_address_and_module_name(key.address(), key.name());
+        let constructed_key = <TxnKey<O>>::from_address_and_module_name(key.address(), key.name());
         self.get_raw_base_value(&constructed_key)
             .map_err(|err| err.finish(Location::Undefined))?
             .map(|mut state_value| {
@@ -75,7 +79,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestVi
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> ModuleCache for LatestView<'_, O, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -206,7 +210,9 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> AptosModuleStorage
+    for LatestView<'_, O, S>
+{
     fn unmetered_get_module_state_value_metadata(
         &self,
         address: &AccountAddress,
@@ -233,7 +239,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestV
 
 #[delegate_to_methods]
 #[delegate(ScriptCache, target_ref = "as_script_cache")]
-impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> LatestView<'_, O, S> {
     /// Returns the script cache.
     fn as_script_cache(
         &self,
@@ -261,7 +267,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> LayoutCache for LatestView<'_, O, S> {
     fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
         self.global_module_cache.get_struct_layout_entry(key)
     }

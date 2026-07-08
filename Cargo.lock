@@ -744,6 +744,7 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-global-context",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -755,6 +756,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "serde",
  "test-case",
  "triomphe",
 ]

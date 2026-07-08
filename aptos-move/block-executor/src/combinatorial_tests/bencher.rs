@@ -130,12 +130,10 @@ where
         let mut guard = AptosModuleCacheManagerGuard::none();
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo>,
-            AuxiliaryInfo,
         >::new(config, None)
         .execute_transactions_parallel(
             &self.txns_provider,

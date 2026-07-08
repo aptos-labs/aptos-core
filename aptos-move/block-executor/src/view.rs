@@ -17,8 +17,10 @@ use crate::{
     },
     code_cache_global::GlobalModuleCache,
     counters,
+    record::{LegacyRecord, Record},
     scheduler::{DependencyResult, DependencyStatus, TWaitForDependency},
     scheduler_wrapper::SchedulerWrapper,
+    task::{TransactionOutput, TxnKey},
     value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
@@ -47,7 +49,6 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
     },
-    transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
@@ -106,8 +107,8 @@ pub enum GroupReadResult {
 }
 
 impl ReadResult {
-    pub(crate) fn from_value<T: Transaction>(
-        value: ValueWithLayout<T::Value>,
+    pub(crate) fn from_value<V: TransactionWrite>(
+        value: ValueWithLayout<V>,
         kind: &ReadKind,
     ) -> Result<Self, PanicError> {
         // We set an arbitrary version, as in the end ReadResult does not require version
@@ -146,8 +147,8 @@ impl ReadResult {
 }
 
 impl GroupReadResult {
-    pub(crate) fn from_value<T: Transaction>(
-        value: ValueWithLayout<T::Value>,
+    pub(crate) fn from_value<V: TransactionWrite>(
+        value: ValueWithLayout<V>,
         kind: &ReadKind,
     ) -> Result<Self, PanicError> {
         // We set an arbitrary version, as below (from_data_read) internally ignores it.
@@ -191,51 +192,51 @@ impl GroupReadResult {
     }
 }
 
-trait ResourceState<T: Transaction> {
-    fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>);
+trait ResourceState<O: TransactionOutput> {
+    fn set_base_value(&self, key: TxnKey<O>, value: ValueWithLayout<O::Value>);
 
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
-        key: &T::Key,
+        key: &TxnKey<O>,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+        patch_base_value: &dyn Fn(&O::Value, Option<&MoveTypeLayout>) -> PartialVMResult<O::Value>,
     ) -> PartialVMResult<ReadResult>;
 }
 
-trait ResourceGroupState<T: Transaction> {
+trait ResourceGroupState<O: TransactionOutput> {
     fn set_raw_group_base_values(
         &self,
-        group_key: T::Key,
-        base_values: Vec<(T::Tag, T::Value)>,
+        group_key: TxnKey<O>,
+        base_values: Vec<(O::Tag, O::Value)>,
     ) -> PartialVMResult<()>;
 
     fn read_cached_group_tagged_data_by_kind(
         &self,
         txn_idx: TxnIndex,
-        group_key: &T::Key,
-        resource_tag: &T::Tag,
+        group_key: &TxnKey<O>,
+        resource_tag: &O::Tag,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+        patch_base_value: &dyn Fn(&O::Value, Option<&MoveTypeLayout>) -> PartialVMResult<O::Value>,
     ) -> PartialVMResult<GroupReadResult>;
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction> {
+pub(crate) struct ParallelState<'a, O: TransactionOutput> {
     pub(crate) versioned_map:
-        &'a MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        &'a MVHashMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
     scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
     incarnation: Incarnation,
     pub(crate) captured_reads:
-        RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+        RefCell<CapturedReads<O, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
 
-fn get_delayed_field_value_impl<T: Transaction>(
+fn get_delayed_field_value_impl<O: TransactionOutput>(
     captured_reads: &RefCell<
-        CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        CapturedReads<O, ModuleId, CompiledModule, Module, AptosModuleExtension>,
     >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
     wait_for: &dyn TWaitForDependency,
@@ -374,9 +375,9 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
 
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
-fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
+fn delayed_field_try_add_delta_outcome_impl<O: TransactionOutput>(
     captured_reads: &RefCell<
-        CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        CapturedReads<O, ModuleId, CompiledModule, Module, AptosModuleExtension>,
     >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
     wait_for: &dyn TWaitForDependency,
@@ -512,9 +513,9 @@ fn wait_for_dependency(
     }
 }
 
-impl<'a, T: Transaction> ParallelState<'a, T> {
+impl<'a, O: TransactionOutput> ParallelState<'a, O> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        shared_map: &'a MVHashMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
         shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
@@ -543,7 +544,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
 
     fn read_group_size(
         &self,
-        group_key: &T::Key,
+        group_key: &TxnKey<O>,
         txn_idx: TxnIndex,
     ) -> PartialVMResult<Option<ResourceGroupSize>> {
         use MVGroupError::*;
@@ -593,8 +594,8 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
     }
 }
 
-impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
-    fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
+impl<O: TransactionOutput> ResourceState<O> for ParallelState<'_, O> {
+    fn set_base_value(&self, key: TxnKey<O>, value: ValueWithLayout<O::Value>) {
         // Base values are provided raw-from-storage here; on a race keep whatever is stored.
         self.versioned_map
             .data()
@@ -606,10 +607,10 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
-        key: &T::Key,
+        key: &TxnKey<O>,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+        patch_base_value: &dyn Fn(&O::Value, Option<&MoveTypeLayout>) -> PartialVMResult<O::Value>,
     ) -> PartialVMResult<ReadResult> {
         use MVDataError::*;
         use MVDataOutput::*;
@@ -711,11 +712,11 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
     }
 }
 
-impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
+impl<O: TransactionOutput> ResourceGroupState<O> for ParallelState<'_, O> {
     fn set_raw_group_base_values(
         &self,
-        group_key: T::Key,
-        base_values: Vec<(T::Tag, T::Value)>,
+        group_key: TxnKey<O>,
+        base_values: Vec<(O::Tag, O::Value)>,
     ) -> PartialVMResult<()> {
         let base_values = base_values
             .into_iter()
@@ -734,11 +735,11 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
     fn read_cached_group_tagged_data_by_kind(
         &self,
         txn_idx: TxnIndex,
-        group_key: &T::Key,
-        resource_tag: &T::Tag,
+        group_key: &TxnKey<O>,
+        resource_tag: &O::Tag,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+        patch_base_value: &dyn Fn(&O::Value, Option<&MoveTypeLayout>) -> PartialVMResult<O::Value>,
     ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
@@ -852,16 +853,17 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
     }
 }
 
-pub(crate) struct SequentialState<'a, T: Transaction> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
-    pub(crate) read_set: RefCell<UnsyncReadSet<T, ModuleId>>,
+pub(crate) struct SequentialState<'a, O: TransactionOutput> {
+    pub(crate) unsync_map:
+        &'a UnsyncMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
+    pub(crate) read_set: RefCell<UnsyncReadSet<O>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
 }
 
-impl<'a, T: Transaction> SequentialState<'a, T> {
+impl<'a, O: TransactionOutput> SequentialState<'a, O> {
     pub fn new(
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        unsync_map: &'a UnsyncMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     ) -> Self {
@@ -886,18 +888,18 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
     }
 }
 
-impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
-    fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
+impl<O: TransactionOutput> ResourceState<O> for SequentialState<'_, O> {
+    fn set_base_value(&self, key: TxnKey<O>, value: ValueWithLayout<O::Value>) {
         self.unsync_map.set_base_value(key, value);
     }
 
     fn read_cached_data_by_kind(
         &self,
         _txn_idx: TxnIndex,
-        key: &T::Key,
+        key: &TxnKey<O>,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+        patch_base_value: &dyn Fn(&O::Value, Option<&MoveTypeLayout>) -> PartialVMResult<O::Value>,
     ) -> PartialVMResult<ReadResult> {
         Ok(match self.unsync_map.fetch_data(key) {
             Some(mut value) => {
@@ -927,7 +929,7 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
                     }
                 }
 
-                match ReadResult::from_value::<T>(value, &target_kind) {
+                match ReadResult::from_value(value, &target_kind) {
                     Ok(read_result) => {
                         // Get read summary in CapturedReads filters only value reads,
                         // to be consistent, UnsyncReadSet does not record other kinds.
@@ -956,11 +958,11 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
     }
 }
 
-impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
+impl<O: TransactionOutput> ResourceGroupState<O> for SequentialState<'_, O> {
     fn set_raw_group_base_values(
         &self,
-        group_key: T::Key,
-        base_values: Vec<(T::Tag, T::Value)>,
+        group_key: TxnKey<O>,
+        base_values: Vec<(O::Tag, O::Value)>,
     ) -> PartialVMResult<()> {
         self.unsync_map
             .set_group_base_values(
@@ -982,11 +984,11 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
     fn read_cached_group_tagged_data_by_kind(
         &self,
         _txn_idx: TxnIndex,
-        group_key: &T::Key,
-        resource_tag: &T::Tag,
+        group_key: &TxnKey<O>,
+        resource_tag: &O::Tag,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+        patch_base_value: &dyn Fn(&O::Value, Option<&MoveTypeLayout>) -> PartialVMResult<O::Value>,
     ) -> PartialVMResult<GroupReadResult> {
         match self
             .unsync_map
@@ -1020,7 +1022,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                     }
                 }
 
-                match GroupReadResult::from_value::<T>(value, &target_kind) {
+                match GroupReadResult::from_value(value, &target_kind) {
                     Ok(group_read_result) => {
                         // Only record Value reads into the read set to keep sequential
                         // and parallel ReadWriteSummary consistent. In the parallel path,
@@ -1048,7 +1050,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
             Err(UnsyncGroupError::TagNotFound) => {
                 let empty_data_read = DataRead::Versioned(
                     Err(StorageVersion),
-                    TriompheArc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    TriompheArc::<O::Value>::new(TransactionWrite::from_state_value(None)),
                     None,
                 );
                 if target_kind == ReadKind::Value {
@@ -1069,20 +1071,20 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
     }
 }
 
-pub(crate) enum ViewState<'a, T: Transaction> {
-    Sync(ParallelState<'a, T>),
-    Unsync(SequentialState<'a, T>),
+pub(crate) enum ViewState<'a, O: TransactionOutput> {
+    Sync(ParallelState<'a, O>),
+    Unsync(SequentialState<'a, O>),
 }
 
-impl<T: Transaction> ViewState<'_, T> {
-    fn get_resource_state(&self) -> &dyn ResourceState<T> {
+impl<O: TransactionOutput> ViewState<'_, O> {
+    fn get_resource_state(&self) -> &dyn ResourceState<O> {
         match self {
             ViewState::Sync(state) => state,
             ViewState::Unsync(state) => state,
         }
     }
 
-    fn get_resource_group_state(&self) -> &dyn ResourceGroupState<T> {
+    fn get_resource_group_state(&self) -> &dyn ResourceGroupState<O> {
         match self {
             ViewState::Sync(state) => state,
             ViewState::Unsync(state) => state,
@@ -1091,40 +1093,44 @@ impl<T: Transaction> ViewState<'_, T> {
 }
 
 /// VM-neutral ingredients a view into the (speculative) block state is built
-/// from. The executor hands these to the VM integration, which constructs its
-/// own concrete view (the legacy VM builds a [`LatestView`]); the same
-/// ingredients also parameterize materialization at commit time.
-pub struct ViewArgs<'a, T: Transaction, S> {
+/// from, typed by the record the execution produces. The executor hands these
+/// to the VM integration, which constructs its own concrete view (the legacy
+/// VM builds a [`LatestView`]); the same ingredients also parameterize
+/// materialization at commit time.
+pub struct ViewArgs<'a, R: Record, S> {
     pub(crate) base_view: &'a S,
     pub(crate) global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
-    pub(crate) state: ViewStateArgs<'a, T>,
+    pub(crate) state: ViewStateArgs<'a, R>,
 }
 
 /// The mode-specific part of [`ViewArgs`], mirroring [`ViewState`].
-pub(crate) enum ViewStateArgs<'a, T: Transaction> {
+pub(crate) enum ViewStateArgs<'a, R: Record> {
     Parallel {
-        versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
+        versioned_cache: &'a MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
         scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
         incarnation: Incarnation,
     },
     Sequential {
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::SpeculativeValue, DelayedFieldID>,
+        unsync_map: &'a UnsyncMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     },
 }
 
-impl<'a, T, S> ViewArgs<'a, T, S>
+impl<'a, O, E, S> ViewArgs<'a, LegacyRecord<O, E>, S>
 where
-    T: Transaction<SpeculativeValue = ValueWithLayout<<T as Transaction>::Value>>,
-    S: TStateView<Key = T::Key>,
+    O: TransactionOutput + 'static,
+    E: Debug + Clone + Send + Sync + Eq + 'static,
+    S: TStateView<Key = TxnKey<O>>,
 {
-    /// Builds the legacy VM's view from the ingredients.
-    pub(crate) fn build_view(&self, txn_idx: TxnIndex) -> LatestView<'a, T, S> {
+    /// Builds the legacy VM's view from the ingredients. Only the legacy
+    /// record (whose value shape is `ValueWithLayout`) supports the legacy
+    /// view.
+    pub(crate) fn build_view(&self, txn_idx: TxnIndex) -> LatestView<'a, O, S> {
         let view_state = match &self.state {
             ViewStateArgs::Parallel {
                 versioned_cache,
@@ -1160,16 +1166,16 @@ where
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
+pub(crate) struct LatestView<'a, O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> {
     base_view: &'a S,
     pub(crate) global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
-    pub(crate) latest_view: ViewState<'a, T>,
+    pub(crate) latest_view: ViewState<'a, O>,
     pub(crate) txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
+impl<'a, O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> LatestView<'a, O, S> {
     pub(crate) fn new(
         base_view: &'a S,
         global_module_cache: &'a GlobalModuleCache<
@@ -1179,7 +1185,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             AptosModuleExtension,
         >,
         runtime_environment: &'a RuntimeEnvironment,
-        latest_view: ViewState<'a, T>,
+        latest_view: ViewState<'a, O>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
@@ -1192,7 +1198,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 
     #[cfg(test)]
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<TxnKey<O>, O::Tag>> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.borrow().get_read_summary(),
             ViewState::Unsync(state) => state.read_set.borrow().get_read_summary(),
@@ -1202,7 +1208,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     /// Drains the parallel captured reads.
     pub(crate) fn take_parallel_reads(
         &self,
-    ) -> CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension> {
+    ) -> CapturedReads<O, ModuleId, CompiledModule, Module, AptosModuleExtension> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
@@ -1212,7 +1218,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 
     /// Drains the unsync read set.
-    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T, ModuleId> {
+    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<O> {
         match &self.latest_view {
             ViewState::Sync(_) => {
                 unreachable!("Take unsync reads called in parallel setting")
@@ -1230,7 +1236,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     pub(crate) fn get_raw_base_value(
         &self,
-        state_key: &T::Key,
+        state_key: &TxnKey<O>,
     ) -> PartialVMResult<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
@@ -1255,9 +1261,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     fn patch_base_value(
         &self,
-        value: &T::Value,
+        value: &O::Value,
         layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<T::Value> {
+    ) -> PartialVMResult<O::Value> {
         // Cfg due to deserialize_to_delayed_field_u128 use.
         #[cfg(test)]
         fail_point!("delayed_field_test", |_| {
@@ -1427,12 +1433,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     fn get_reads_needing_exchange_sequential(
         &self,
-        read_set: &HashSet<T::Key>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        read_set: &HashSet<TxnKey<O>>,
+        unsync_map: &UnsyncMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
-        skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>, PanicError>
-    {
+        skip: &HashSet<TxnKey<O>>,
+    ) -> Result<
+        BTreeMap<TxnKey<O>, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         read_set
             .iter()
             .filter_map(|key| {
@@ -1460,10 +1468,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     fn get_group_reads_needing_exchange_parallel(
         &self,
-        parallel_state: &ParallelState<'a, T>,
+        parallel_state: &ParallelState<'a, O>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
-        skip: &HashSet<T::Key>,
-    ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
+        skip: &HashSet<TxnKey<O>>,
+    ) -> PartialVMResult<BTreeMap<TxnKey<O>, (StateValueMetadata, u64)>> {
         let reads_with_delayed_fields = parallel_state
             .captured_reads
             .borrow()
@@ -1517,11 +1525,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     fn get_group_reads_needing_exchange_sequential(
         &self,
-        group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        group_read_set: &HashMap<TxnKey<O>, HashSet<O::Tag>>,
+        unsync_map: &UnsyncMap<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>, DelayedFieldID>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
-        skip: &HashSet<T::Key>,
-    ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
+        skip: &HashSet<TxnKey<O>>,
+    ) -> PartialVMResult<BTreeMap<TxnKey<O>, (StateValueMetadata, u64)>> {
         group_read_set
             .iter()
             .filter(|(key, _tags)| !skip.contains(key))
@@ -1576,8 +1584,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     fn get_resource_from_group_impl(
         &self,
-        group_key: &T::Key,
-        resource_tag: &T::Tag,
+        group_key: &TxnKey<O>,
+        resource_tag: &O::Tag,
         layout: UnknownOrLayout,
         kind: ReadKind,
     ) -> PartialVMResult<GroupReadResult> {
@@ -1614,7 +1622,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     fn get_resource_state_value_impl(
         &self,
-        state_key: &T::Key,
+        state_key: &TxnKey<O>,
         layout: UnknownOrLayout,
         kind: ReadKind,
     ) -> PartialVMResult<ReadResult> {
@@ -1674,8 +1682,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         }
     }
 
-    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> PartialVMResult<()> {
-        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
+    fn initialize_mvhashmap_base_group_contents(
+        &self,
+        group_key: &TxnKey<O>,
+    ) -> PartialVMResult<()> {
+        let (base_group, metadata_op): (BTreeMap<O::Tag, Bytes>, _) =
             match self.get_raw_base_value(group_key)? {
                 Some(state_value) => (
                     bcs::from_bytes(state_value.bytes()).map_err(|e| {
@@ -1710,8 +1721,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
-    for LatestView<'_, T, S>
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> BlockSynchronizationKillSwitch
+    for LatestView<'_, O, S>
 {
     fn interrupt_requested(&self) -> bool {
         match &self.latest_view {
@@ -1723,8 +1734,8 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'_, T, S> {
-    type Key = T::Key;
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> TResourceView for LatestView<'_, O, S> {
+    type Key = TxnKey<O>;
     type Layout = MoveTypeLayout;
 
     fn get_resource_state_value(
@@ -1781,10 +1792,12 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestView<'_, T, S> {
-    type GroupKey = T::Key;
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> TResourceGroupView
+    for LatestView<'_, O, S>
+{
+    type GroupKey = TxnKey<O>;
     type Layout = MoveTypeLayout;
-    type ResourceTag = T::Tag;
+    type ResourceTag = O::Tag;
 
     fn resource_group_size(
         &self,
@@ -1880,8 +1893,10 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestV
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for LatestView<'_, T, S> {
-    type Key = T::Key;
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> StateStorageView
+    for LatestView<'_, O, S>
+{
+    type Key = TxnKey<O>;
 
     fn id(&self) -> StateViewId {
         self.base_view.id()
@@ -1897,8 +1912,10 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for LatestVie
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestView<'_, T, S> {
-    type Identifier = T::Key;
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> TAggregatorV1View
+    for LatestView<'_, O, S>
+{
+    type Identifier = TxnKey<O>;
 
     fn get_aggregator_v1_state_value(
         &self,
@@ -1937,10 +1954,12 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestVi
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestView<'_, T, S> {
+impl<O: TransactionOutput, S: TStateView<Key = TxnKey<O>>> TDelayedFieldView
+    for LatestView<'_, O, S>
+{
     type Identifier = DelayedFieldID;
-    type ResourceGroupTag = T::Tag;
-    type ResourceKey = T::Key;
+    type ResourceGroupTag = O::Tag;
+    type ResourceKey = TxnKey<O>;
 
     fn get_delayed_field_value(
         &self,
@@ -2092,7 +2111,10 @@ mod test {
     use super::*;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
-        combinatorial_tests::types::{KeyType, ValueType},
+        combinatorial_tests::{
+            mock_executor::{MockEvent, MockOutput},
+            types::{KeyType, ValueType},
+        },
         scheduler::{DependencyResult, Scheduler, TWaitForDependency},
         view::{delayed_field_try_add_delta_outcome_impl, get_delayed_field_value_impl, ViewState},
     };
@@ -2110,7 +2132,6 @@ mod test {
     use aptos_types::{
         error::PanicOr,
         state_store::{state_value::StateValue, MockStateView},
-        transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
     };
     use aptos_vm_types::resolver::TResourceView;
@@ -2180,25 +2201,13 @@ mod test {
         }
     }
 
-    #[derive(Clone, Debug)]
-    struct TestTransactionType {}
-
-    impl BlockExecutableTransaction for TestTransactionType {
-        type Key = KeyType<u32>;
-        type SpeculativeValue = ValueWithLayout<ValueType>;
-        type Tag = u32;
-        type Value = ValueType;
-
-        fn user_txn_bytes_len(&self) -> usize {
-            0
-        }
-    }
+    type TestOutput = MockOutput<KeyType<u32>, MockEvent>;
 
     #[test]
     fn test_history_updates() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<
-            TestTransactionType,
+            TestOutput,
             ModuleId,
             CompiledModule,
             Module,
@@ -2343,7 +2352,7 @@ mod test {
     fn test_aggregator_overflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<
-            TestTransactionType,
+            TestOutput,
             ModuleId,
             CompiledModule,
             Module,
@@ -2488,7 +2497,7 @@ mod test {
     fn test_aggregator_underflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<
-            TestTransactionType,
+            TestOutput,
             ModuleId,
             CompiledModule,
             Module,
@@ -2633,7 +2642,7 @@ mod test {
     fn test_read_kind_upgrade_fail() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<
-            TestTransactionType,
+            TestOutput,
             ModuleId,
             CompiledModule,
             Module,
@@ -2775,7 +2784,7 @@ mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let global_module_cache = GlobalModuleCache::empty();
 
-        let latest_view = LatestView::<TestTransactionType, MockStateView<KeyType<u32>>>::new(
+        let latest_view = LatestView::<TestOutput, MockStateView<KeyType<u32>>>::new(
             &base_view,
             &global_module_cache,
             &runtime_environment,
@@ -3058,11 +3067,11 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-    ) -> LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>> {
-        let sequential_state: SequentialState<'a, TestTransactionType> =
+    ) -> LatestView<'a, TestOutput, MockStateView<KeyType<u32>>> {
+        let sequential_state: SequentialState<'a, TestOutput> =
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
-        LatestView::<'a, TestTransactionType, MockStateView<KeyType<u32>>>::new(
+        LatestView::<'a, TestOutput, MockStateView<KeyType<u32>>>::new(
             &h.base_view,
             &h.empty_global_module_cache,
             &h.runtime_environment,
@@ -3103,20 +3112,19 @@ mod test {
 
         fn new_view(&self) -> ViewsComparison<'_> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
-            let latest_view_par =
-                LatestView::<TestTransactionType, MockStateView<KeyType<u32>>>::new(
-                    &self.base_view,
-                    &self.holder.empty_global_module_cache,
-                    &self.runtime_environment,
-                    ViewState::Sync(ParallelState::new(
-                        &self.versioned_map,
-                        SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
-                        self.start_counter,
-                        &self.counter,
-                        0,
-                    )),
-                    1,
-                );
+            let latest_view_par = LatestView::<TestOutput, MockStateView<KeyType<u32>>>::new(
+                &self.base_view,
+                &self.holder.empty_global_module_cache,
+                &self.runtime_environment,
+                ViewState::Sync(ParallelState::new(
+                    &self.versioned_map,
+                    SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
+                    self.start_counter,
+                    &self.counter,
+                    0,
+                )),
+                1,
+            );
 
             ViewsComparison {
                 latest_view_seq,
@@ -3126,8 +3134,8 @@ mod test {
     }
 
     struct ViewsComparison<'a> {
-        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>>,
-        latest_view_par: LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>>,
+        latest_view_seq: LatestView<'a, TestOutput, MockStateView<KeyType<u32>>>,
+        latest_view_par: LatestView<'a, TestOutput, MockStateView<KeyType<u32>>>,
     }
 
     impl ViewsComparison<'_> {

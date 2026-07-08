@@ -3,6 +3,7 @@
 
 use crate::{
     code_cache_global::GlobalModuleCache,
+    task::{TransactionOutput, TxnKey},
     types::InputOutputKey,
     view::{GroupReadResult, LatestView, ReadResult},
 };
@@ -24,7 +25,6 @@ use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
     vm_status::StatusCode,
     write_set::TransactionWrite,
@@ -53,6 +53,7 @@ use std::{
         hash_map::Entry::{self, Occupied, Vacant},
         BTreeMap, BTreeSet, HashMap, HashSet,
     },
+    fmt::Debug,
     hash::Hash,
     ops::Deref,
     sync::Arc,
@@ -373,11 +374,11 @@ impl DataReadComparator {
 /// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
 #[derive(Derivative, Clone)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct GroupRead<T: Transaction> {
+pub(crate) struct GroupRead<TG, V> {
     /// The size of the resource group can be read (used for gas charging).
     pub(crate) collected_size: Option<ResourceGroupSize>,
     /// Reads to individual resources in the group, keyed by a tag.
-    pub(crate) inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
+    pub(crate) inner_reads: HashMap<TG, DataRead<V>>,
 }
 
 /// Defines different ways `DelayedFieldResolver` can be used to read its values
@@ -519,9 +520,9 @@ pub enum CacheRead<T> {
 /// resolution from MVHashMap/storage should be captured. This enforces an invariant that
 /// 'capture_read' will never be called with a read that can be resolved from the already
 /// captured variant (e.g. Size, Metadata, or exists if SizeAndMetadata is already captured).
-pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
-    data_reads: HashMap<T::Key, DataRead<T::Value>>,
-    group_reads: HashMap<T::Key, GroupRead<T>>,
+pub(crate) struct CapturedReads<O: TransactionOutput, K, DC, VC, S> {
+    data_reads: HashMap<TxnKey<O>, DataRead<O::Value>>,
+    group_reads: HashMap<TxnKey<O>, GroupRead<O::Tag, O::Value>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
 
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
@@ -540,13 +541,13 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_read_comparator: DataReadComparator,
 }
 
-impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
+impl<O: TransactionOutput, K, DC, VC, S> Default for CapturedReads<O, K, DC, VC, S> {
     fn default() -> Self {
         Self::new(None)
     }
 }
 
-impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
+impl<O: TransactionOutput, K, DC, VC, S> CapturedReads<O, K, DC, VC, S> {
     pub(crate) fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
         Self {
             data_reads: HashMap::new(),
@@ -571,9 +572,9 @@ enum UpdateResult {
     Inconsistency,
 }
 
-impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
+impl<O, K, DC, VC, S> CapturedReads<O, K, DC, VC, S>
 where
-    T: Transaction,
+    O: TransactionOutput,
     K: Hash + Eq + Ord + Clone,
     VC: Deref<Target = Arc<DC>>,
     S: WithSize,
@@ -583,13 +584,15 @@ where
     }
 
     // Return an iterator over the captured reads.
-    pub(crate) fn get_read_values_with_delayed_fields<SV: TStateView<Key = T::Key>>(
+    pub(crate) fn get_read_values_with_delayed_fields<SV: TStateView<Key = TxnKey<O>>>(
         &self,
-        view: &LatestView<T, SV>,
+        view: &LatestView<O, SV>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
-        skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>, PanicError>
-    {
+        skip: &HashSet<TxnKey<O>>,
+    ) -> Result<
+        BTreeMap<TxnKey<O>, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.data_reads
             .iter()
             .filter_map(|(key, data_read)| {
@@ -609,8 +612,8 @@ where
     // Return an iterator over the captured group reads that contain a delayed field
     pub(crate) fn get_group_read_values_with_delayed_fields<'a>(
         &'a self,
-        skip: &'a HashSet<T::Key>,
-    ) -> impl Iterator<Item = (&'a T::Key, &'a GroupRead<T>)> {
+        skip: &'a HashSet<TxnKey<O>>,
+    ) -> impl Iterator<Item = (&'a TxnKey<O>, &'a GroupRead<O::Tag, O::Value>)> {
         self.group_reads.iter().filter(|(key, group_read)| {
             !skip.contains(key)
                 && group_read
@@ -626,9 +629,9 @@ where
     // Required usage pattern: if existing entry contains enough information to
     // deduce the read, update_entry should not be called by the caller (i.e.
     // the need to cache the read must already be established).
-    fn update_entry<Q, V: TransactionWrite + PartialEq>(
-        entry: Entry<Q, DataRead<V>>,
-        read: DataRead<V>,
+    fn update_entry<Q, W: TransactionWrite + PartialEq>(
+        entry: Entry<Q, DataRead<W>>,
+        read: DataRead<W>,
         data_read_comparator: &DataReadComparator,
     ) -> UpdateResult {
         match entry {
@@ -670,7 +673,7 @@ where
 
     pub(crate) fn capture_group_size(
         &mut self,
-        group_key: T::Key,
+        group_key: TxnKey<O>,
         group_size: ResourceGroupSize,
     ) -> anyhow::Result<()> {
         let group = self.group_reads.entry(group_key).or_default();
@@ -685,7 +688,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn group_size(&self, group_key: &T::Key) -> Option<ResourceGroupSize> {
+    pub(crate) fn group_size(&self, group_key: &TxnKey<O>) -> Option<ResourceGroupSize> {
         self.group_reads
             .get(group_key)
             .and_then(|group| group.collected_size)
@@ -696,9 +699,9 @@ where
     // is mapped in view.rs. TODO: we may want to unify the interfaces / handling.
     pub(crate) fn capture_group_read(
         &mut self,
-        group_key: T::Key,
-        tag: T::Tag,
-        data_read: DataRead<T::Value>,
+        group_key: TxnKey<O>,
+        tag: O::Tag,
+        data_read: DataRead<O::Value>,
         target_kind: &ReadKind,
     ) -> PartialVMResult<GroupReadResult> {
         let data_read = data_read.convert_to(target_kind).ok_or_else(|| {
@@ -723,8 +726,8 @@ where
 
     pub(crate) fn capture_data_read(
         &mut self,
-        group_key: T::Key,
-        data_read: DataRead<T::Value>,
+        group_key: TxnKey<O>,
+        data_read: DataRead<O::Value>,
         target_kind: &ReadKind,
     ) -> PartialVMResult<ReadResult> {
         let data_read = data_read.convert_to(target_kind).ok_or_else(|| {
@@ -749,9 +752,9 @@ where
     // Incorrect use is handled by setting incorrect_use and returning PanicError.
     fn capture_read(
         &mut self,
-        state_key: T::Key,
-        maybe_tag: Option<T::Tag>,
-        read: DataRead<T::Value>,
+        state_key: TxnKey<O>,
+        maybe_tag: Option<O::Tag>,
+        read: DataRead<O::Value>,
     ) -> Result<(), PanicOr<()>> {
         let ret = match maybe_tag {
             Some(tag) => {
@@ -785,10 +788,10 @@ where
     // If maybe_tag is provided, then we check the group, otherwise, normal reads.
     pub(crate) fn get_by_kind(
         &self,
-        state_key: &T::Key,
-        maybe_tag: Option<&T::Tag>,
+        state_key: &TxnKey<O>,
+        maybe_tag: Option<&O::Tag>,
         kind: ReadKind,
-    ) -> Option<DataRead<T::Value>> {
+    ) -> Option<DataRead<O::Value>> {
         assert!(
             kind != ReadKind::Metadata || maybe_tag.is_none(),
             "May not request metadata of a group member"
@@ -880,8 +883,8 @@ where
 
     fn validate_data_reads_impl<'a>(
         &'a self,
-        iter: impl Iterator<Item = (&'a T::Key, &'a DataRead<T::Value>)>,
-        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
+        iter: impl Iterator<Item = (&'a TxnKey<O>, &'a DataRead<O::Value>)>,
+        data_map: &VersionedData<TxnKey<O>, ValueWithLayout<O::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         use MVDataError::*;
@@ -909,7 +912,7 @@ where
 
     pub(crate) fn validate_data_reads(
         &self,
-        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
+        data_map: &VersionedData<TxnKey<O>, ValueWithLayout<O::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
@@ -1003,7 +1006,7 @@ where
 
     pub(crate) fn validate_group_reads(
         &self,
-        group_map: &VersionedGroupData<T::Key, T::Tag, ValueWithLayout<T::Value>>,
+        group_map: &VersionedGroupData<TxnKey<O>, O::Tag, ValueWithLayout<O::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         use MVGroupError::*;
@@ -1031,7 +1034,7 @@ where
                     },
                     Err(TagNotFound) => {
                         let sentinel_deletion =
-                            TriompheArc::<T::Value>::new(TransactionWrite::from_state_value(None));
+                            TriompheArc::<O::Value>::new(TransactionWrite::from_state_value(None));
                         assert!(sentinel_deletion.is_deletion());
                         matches!(
                             self.data_read_comparator.compare_data_reads(
@@ -1109,13 +1112,13 @@ where
     }
 }
 
-impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
+impl<O, K, DC, VC, S> CapturedReads<O, K, DC, VC, S>
 where
-    T: Transaction,
+    O: TransactionOutput,
     K: Hash + Eq + Ord + Clone + WithAddress + WithName,
     VC: Deref<Target = Arc<DC>>,
 {
-    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<TxnKey<O>, O::Tag>> {
         let mut ret = HashSet::new();
         for (key, read) in &self.data_reads {
             if let DataRead::Versioned(_, _, _) = read {
@@ -1133,7 +1136,7 @@ where
 
         // TODO(loader_v2): Test summaries are the same.
         for key in self.module_reads.keys() {
-            let key = T::Key::from_address_and_module_name(key.address(), key.name());
+            let key = <TxnKey<O>>::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
         }
 
@@ -1149,25 +1152,21 @@ where
 
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct UnsyncReadSet<T: Transaction, K> {
-    pub(crate) resource_reads: HashSet<T::Key>,
-    pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
+pub(crate) struct UnsyncReadSet<O: TransactionOutput> {
+    pub(crate) resource_reads: HashSet<TxnKey<O>>,
+    pub(crate) group_reads: HashMap<TxnKey<O>, HashSet<O::Tag>>,
     pub(crate) delayed_field_reads: HashSet<DelayedFieldID>,
-    module_reads: HashSet<K>,
+    module_reads: HashSet<ModuleId>,
     pub(crate) incorrect_use: bool,
 }
 
-impl<T, K> UnsyncReadSet<T, K>
-where
-    T: Transaction,
-    K: Hash + Eq + Ord + Clone + WithAddress + WithName,
-{
+impl<O: TransactionOutput> UnsyncReadSet<O> {
     /// Captures the module read for sequential execution.
-    pub(crate) fn capture_module_read(&mut self, key: K) {
+    pub(crate) fn capture_module_read(&mut self, key: ModuleId) {
         self.module_reads.insert(key);
     }
 
-    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<TxnKey<O>, O::Tag>> {
         let mut ret = HashSet::new();
         for key in &self.resource_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
@@ -1180,7 +1179,7 @@ where
         }
 
         for key in &self.module_reads {
-            let key = T::Key::from_address_and_module_name(key.address(), key.name());
+            let key = <TxnKey<O>>::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
         }
 
@@ -1209,9 +1208,9 @@ pub(crate) struct SnapshotModuleView<'a> {
 }
 
 impl<'a> SnapshotModuleView<'a> {
-    pub(crate) fn new<T: Transaction>(
+    pub(crate) fn new<O: TransactionOutput>(
         captured_reads: &'a CapturedReads<
-            T,
+            O,
             ModuleId,
             CompiledModule,
             Module,
@@ -1375,7 +1374,10 @@ mod test {
     use super::*;
     use crate::{
         code_cache_global::GlobalModuleCache,
-        combinatorial_tests::types::{raw_metadata, KeyType, ValueType},
+        combinatorial_tests::{
+            mock_executor::{MockEvent, MockOutput},
+            types::{raw_metadata, KeyType, ValueType},
+        },
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use claims::{
@@ -1395,21 +1397,21 @@ mod test {
     macro_rules! test_captured_reads {
         (update_entry, $entry:expr, $read:expr) => {
             CapturedReads::<
-                TestTransactionType,
-                u32,
-                MockDeserializedCode,
-                MockVerifiedCode,
-                MockExtension,
-            >::update_entry($entry, $read, &DataReadComparator::new(None))
+                                        TestOutput,
+                                        u32,
+                                        MockDeserializedCode,
+                                        MockVerifiedCode,
+                                        MockExtension,
+                                    >::update_entry($entry, $read, &DataReadComparator::new(None))
         };
         (new) => {
             CapturedReads::<
-                TestTransactionType,
-                u32,
-                MockDeserializedCode,
-                MockVerifiedCode,
-                MockExtension,
-            >::new(None)
+                                        TestOutput,
+                                        u32,
+                                        MockDeserializedCode,
+                                        MockVerifiedCode,
+                                        MockExtension,
+                                    >::new(None)
         };
     }
 
@@ -1671,19 +1673,7 @@ mod test {
         );
     }
 
-    #[derive(Clone, Debug)]
-    struct TestTransactionType {}
-
-    impl Transaction for TestTransactionType {
-        type Key = KeyType<u32>;
-        type SpeculativeValue = ValueWithLayout<ValueType>;
-        type Tag = u32;
-        type Value = ValueType;
-
-        fn user_txn_bytes_len(&self) -> usize {
-            0
-        }
-    }
+    type TestOutput = MockOutput<KeyType<u32>, MockEvent>;
 
     macro_rules! assert_update_incorrect {
         ($m:expr, $x:expr, $y:expr) => {{

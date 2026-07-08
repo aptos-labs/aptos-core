@@ -2,16 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    block_executor::speculative_value::ValueWithLayout,
     state_store::state_key::StateKey,
     transaction::{
         BlockEndInfo, BlockExecutableTransaction, FeeDistribution, SignedTransaction,
         TBlockEndInfoExt, Transaction,
     },
-    write_set::WriteOp,
 };
 use aptos_crypto::HashValue;
-use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fmt::Debug};
 
@@ -89,9 +87,6 @@ impl SignatureVerifiedTransaction {
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Key = StateKey;
-    type SpeculativeValue = ValueWithLayout<WriteOp>;
-    type Tag = StructTag;
-    type Value = WriteOp;
 
     fn user_txn_bytes_len(&self) -> usize {
         match self {
@@ -171,4 +166,3 @@ impl TransactionProvider for Transaction {
         Some(self)
     }
 }
-

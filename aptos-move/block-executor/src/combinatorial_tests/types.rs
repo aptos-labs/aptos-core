@@ -511,9 +511,6 @@ impl<
     > Transaction for MockTransaction<K, E>
 {
     type Key = K;
-    type SpeculativeValue = ValueWithLayout<ValueType>;
-    type Tag = u32;
-    type Value = ValueType;
 
     fn user_txn_bytes_len(&self) -> usize {
         0

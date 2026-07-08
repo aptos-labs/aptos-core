@@ -1,9 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{record::Record, types::InputOutputKey, view::ViewArgs};
+use crate::{
+    record::Record,
+    types::{InputOutputKey, ResourceGroupTag},
+    view::ViewArgs,
+};
 use aptos_aggregator::delayed_change::DelayedChange;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
@@ -11,6 +15,7 @@ use aptos_types::{
     transaction::{
         AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction, CommittedTransactionOutput,
     },
+    write_set::TransactionWrite,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
@@ -20,12 +25,15 @@ use aptos_vm_types::{
         BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
     },
 };
+use mono_move_global_context::GlobalContext;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use serde::de::DeserializeOwned;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
+    sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
 
@@ -81,6 +89,16 @@ pub trait TransactionExecutor {
         async_runtime_checks_enabled: bool,
     ) -> Self;
 
+    /// Create an instance of the transaction executor for the given worker, with access to the
+    /// global context of the mono VM. Used instead of [TransactionExecutor::init] when the mono
+    /// VM is enabled.
+    fn init_v2(_worker_id: usize, _global_context: Arc<GlobalContext>) -> Self
+    where
+        Self: Sized,
+    {
+        unimplemented!("init_v2 is only implemented by the mono VM executor")
+    }
+
     /// Execute a single transaction against the VM's own view of the current
     /// (speculative) state, built from the given VM-neutral ingredients.
     /// Returns the record of the execution; a record exists for all non-panic
@@ -88,22 +106,22 @@ pub trait TransactionExecutor {
     /// validation.
     fn execute_transaction_v2<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
-        args: &ViewArgs<'_, Self::Txn, S>,
+        args: &ViewArgs<'_, Self::Record, S>,
         txn: &Self::Txn,
         auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
     ) -> Result<Self::Record, PanicError>;
 
     /// The writes the transaction is statically known to produce, in the VM's
-    /// speculative value representation. Used to pre-populate the multi-version
-    /// map before execution; the executor verifies at commit that the actual
-    /// write set covers the pre-written keys.
+    /// speculative key and value representation. Used to pre-populate the
+    /// multi-version map before execution; the executor verifies at commit
+    /// that the actual write set covers the pre-written keys.
     #[allow(clippy::type_complexity)]
     fn pre_write_values(
         _txn: &Self::Txn,
     ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::SpeculativeValue,
+        <Self::Record as Record>::Key,
+        <Self::Record as Record>::Value,
     )> {
         vec![]
     }
@@ -140,11 +158,11 @@ pub trait ExecutorTask {
         &self,
         view: &(impl TExecutorView<
             <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
+            <Self::Output as TransactionOutput>::Tag,
             MoveTypeLayout,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
-            ResourceTag = <Self::Txn as Transaction>::Tag,
+            ResourceTag = <Self::Output as TransactionOutput>::Tag,
             Layout = MoveTypeLayout,
         > + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
@@ -153,8 +171,6 @@ pub trait ExecutorTask {
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
-
     /// The writes the transaction is statically known to produce. See
     /// [`TransactionExecutor::pre_write_values`].
     #[allow(clippy::type_complexity)]
@@ -162,7 +178,7 @@ pub trait ExecutorTask {
         _txn: &Self::Txn,
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::SpeculativeValue,
+        ValueWithLayout<<Self::Output as TransactionOutput>::Value>,
     )> {
         vec![]
     }
@@ -170,60 +186,67 @@ pub trait ExecutorTask {
 
 pub use aptos_vm_types::materializer::Materializer;
 
-/// Traits for execution result of a single transaction.
-pub trait BeforeMaterializationOutput<Txn: Transaction> {
+/// The storage key type of an output's transaction.
+pub(crate) type TxnKey<O> = <<O as TransactionOutput>::Txn as Transaction>::Key;
+
+/// Traits for execution result of a single transaction. `O` is the
+/// (speculative) output the guard exposes: keys are the storage keys of its
+/// transaction, tags and values the output's (see [`TransactionOutput::Tag`]
+/// and [`TransactionOutput::Value`]); the legacy multi-version representation
+/// wraps the value in a [`ValueWithLayout`].
+pub trait BeforeMaterializationOutput<O: TransactionOutput> {
     /// Get the writes of a transaction from its output, separately for resources
     /// and modules. Aggregator V1 writes are ordinary entries of the resource write set.
     /// Values are produced in the multi-version representation the versioned map stores.
-    fn resource_write_set(&self) -> HashMap<Txn::Key, Txn::SpeculativeValue>;
+    fn resource_write_set(&self) -> HashMap<TxnKey<O>, ValueWithLayout<O::Value>>;
 
-    fn module_write_set(&self) -> &BTreeMap<Txn::Key, ModuleWrite<Txn::Value>>;
+    fn module_write_set(&self) -> &BTreeMap<TxnKey<O>, ModuleWrite<O::Value>>;
 
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(Txn::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)>;
+    ) -> Vec<(TxnKey<O>, StateValueMetadata, TriompheArc<MoveTypeLayout>)>;
 
-    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(Txn::Key, StateValueMetadata)>;
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(TxnKey<O>, StateValueMetadata)>;
 
     /// Group metadata and inner resource values are produced in the multi-version
     /// representation the versioned map stores. The metadata carries no layout.
     fn resource_group_write_set(
         &self,
     ) -> HashMap<
-        Txn::Key,
+        TxnKey<O>,
         (
-            Txn::SpeculativeValue,
+            ValueWithLayout<O::Value>,
             ResourceGroupSize,
-            BTreeMap<Txn::Tag, Txn::SpeculativeValue>,
+            BTreeMap<O::Tag, ValueWithLayout<O::Value>>,
         ),
     >;
 
     fn for_each_resource_key(
         &self,
-        callback: &mut dyn FnMut(&Txn::Key) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&TxnKey<O>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     fn for_each_resource_group_key_and_tags(
         &self,
         // This is &mut dyn and not Impl to sidestep an internal compiler error:
         // https://github.com/rust-lang/rust/issues/145188.
-        callback: &mut dyn FnMut(&Txn::Key, HashSet<&Txn::Tag>) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&TxnKey<O>, HashSet<&O::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     // For now, the below interfaces for keys and metada and keys and tags are provided
     // to avoid unnecessarily cloning the whole resource group write set.
     // TODO: get rid of these interfaces when we can have zero-copy access to the output.
-    fn resource_group_metadata_ops(&self) -> Vec<(Txn::Key, Txn::SpeculativeValue)> {
+    fn resource_group_metadata_ops(&self) -> Vec<(TxnKey<O>, ValueWithLayout<O::Value>)> {
         self.resource_group_write_set()
             .into_iter()
             .map(|(key, (metadata, _, _))| (key, metadata))
             .collect()
     }
 
-    fn legacy_v1_resource_group_tags(&self) -> Vec<(Txn::Key, HashSet<Txn::Tag>)> {
+    fn legacy_v1_resource_group_tags(&self) -> Vec<(TxnKey<O>, HashSet<O::Tag>)> {
         self.resource_group_write_set()
             .into_iter()
             .map(|(key, (_, _, group_ops))| (key, group_ops.keys().cloned().collect()))
@@ -241,21 +264,29 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     /// Sum of all sizes of writes (keys + write_ops) and events.
     fn output_approx_size(&self) -> u64;
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<Txn::Key, Txn::Tag>>;
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<TxnKey<O>, O::Tag>>;
 
     /// State keys read by the VM during the execution that produced this output.
-    fn storage_keys_read(&self) -> impl Iterator<Item = &Txn::Key>;
+    fn storage_keys_read(&self) -> impl Iterator<Item = &TxnKey<O>>;
 
     /// Keys written when this output commits.
-    fn storage_keys_written(&self) -> impl Iterator<Item = &Txn::Key>;
+    fn storage_keys_written(&self) -> impl Iterator<Item = &TxnKey<O>>;
 }
 
-pub trait TransactionOutput: Send + Debug {
+pub trait TransactionOutput: Send + Debug + Sized {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
+    /// The tag distinguishing the resources of a resource group in the
+    /// output's write sets. The legacy view additionally decodes group blobs
+    /// fetched from storage, hence the deserialization bound.
+    type Tag: ResourceGroupTag + DeserializeOwned;
+    /// The committed value representation of the output's writes. The
+    /// multi-version structures of the legacy pipeline store it wrapped in a
+    /// [`ValueWithLayout`].
+    type Value: Send + Sync + Debug + Clone + Eq + TransactionWrite;
     /// The materialized output produced from this (speculative) output.
     type CommittedOutput: CommittedTransactionOutput;
-    type BeforeMaterializationGuard<'a>: BeforeMaterializationOutput<Self::Txn> + 'a
+    type BeforeMaterializationGuard<'a>: BeforeMaterializationOutput<Self> + 'a
     where
         Self: 'a;
 

@@ -696,7 +696,9 @@ where
 {
     type BeforeMaterializationGuard<'a> = &'a Self;
     type CommittedOutput = MockOutput<K, E>;
+    type Tag = u32;
     type Txn = MockTransaction<K, E>;
+    type Value = ValueType;
 
     fn skip_output() -> Self {
         Self::skipped_output(None)
@@ -793,7 +795,7 @@ where
     }
 }
 
-impl<K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
+impl<K, E> BeforeMaterializationOutput<MockOutput<K, E>> for &MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
@@ -1058,10 +1060,6 @@ where
                 ExecutionStatus::Success(MockOutput::empty_success_output())
             },
         }
-    }
-
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        true
     }
 
     fn pre_write_values(txn: &Self::Txn) -> Vec<(K, ValueWithLayout<ValueType>)> {
