@@ -609,18 +609,25 @@ fn update_optimistic_fetch_metrics(
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
 ) {
     // Calculate the total number of optimistic fetches for each network
-    let mut num_validator_optimistic_fetches = 0;
-    let mut num_vfn_optimistic_fetches = 0;
-    let mut num_public_optimistic_fetches = 0;
+    let mut num_validator_optimistic_fetches: u64 = 0;
+    let mut num_vfn_optimistic_fetches: u64 = 0;
+    let mut num_public_optimistic_fetches: u64 = 0;
     for optimistic_fetch in optimistic_fetches.iter() {
         // Get the peer network ID
         let peer_network_id = optimistic_fetch.key();
 
         // Increment the number of optimistic fetches for the peer's network
         match peer_network_id.network_id() {
-            NetworkId::Validator => num_validator_optimistic_fetches += 1,
-            NetworkId::Vfn => num_vfn_optimistic_fetches += 1,
-            NetworkId::Public => num_public_optimistic_fetches += 1,
+            NetworkId::Validator => {
+                num_validator_optimistic_fetches =
+                    num_validator_optimistic_fetches.saturating_add(1)
+            },
+            NetworkId::Vfn => {
+                num_vfn_optimistic_fetches = num_vfn_optimistic_fetches.saturating_add(1)
+            },
+            NetworkId::Public => {
+                num_public_optimistic_fetches = num_public_optimistic_fetches.saturating_add(1)
+            },
         }
     }
 
@@ -628,16 +635,16 @@ fn update_optimistic_fetch_metrics(
     metrics::set_gauge(
         &metrics::OPTIMISTIC_FETCH_COUNT,
         NetworkId::Validator.as_str(),
-        num_validator_optimistic_fetches as u64,
+        num_validator_optimistic_fetches,
     );
     metrics::set_gauge(
         &metrics::OPTIMISTIC_FETCH_COUNT,
         NetworkId::Vfn.as_str(),
-        num_vfn_optimistic_fetches as u64,
+        num_vfn_optimistic_fetches,
     );
     metrics::set_gauge(
         &metrics::OPTIMISTIC_FETCH_COUNT,
         NetworkId::Public.as_str(),
-        num_public_optimistic_fetches as u64,
+        num_public_optimistic_fetches,
     );
 }

@@ -924,10 +924,10 @@ fn check_synced_ledger_lag(
 
         // Get the current timestamp and max version lag (in microseconds)
         let current_timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
-        let max_version_lag_usecs = max_lag_secs * NUM_MICROSECONDS_IN_SECOND;
+        let max_version_lag_usecs = max_lag_secs.saturating_mul(NUM_MICROSECONDS_IN_SECOND);
 
-        // Return true iff the synced ledger info timestamp is within the max version lag
-        ledger_info_timestamp_usecs + max_version_lag_usecs > current_timestamp_usecs
+        // Return true iff the synced ledger info timestamp is within the max version lag.
+        ledger_info_timestamp_usecs.saturating_add(max_version_lag_usecs) > current_timestamp_usecs
     } else {
         false // No synced ledger info was found!
     }

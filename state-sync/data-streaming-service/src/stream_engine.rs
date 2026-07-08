@@ -1995,7 +1995,7 @@ impl SubscriptionStream {
 
     /// Increments the next subscription stream index
     pub fn increment_subscription_stream_index(&mut self) {
-        self.next_subscription_stream_index += 1;
+        self.next_subscription_stream_index = self.next_subscription_stream_index.saturating_add(1);
     }
 }
 

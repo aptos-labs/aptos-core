@@ -220,7 +220,9 @@ pub async fn get_data_notification(
         Ok(data_notification)
     } else {
         // Increase the number of consecutive timeouts for the data stream
-        active_data_stream.num_consecutive_timeouts += 1;
+        active_data_stream.num_consecutive_timeouts = active_data_stream
+            .num_consecutive_timeouts
+            .saturating_add(1);
 
         // Check if we've timed out too many times
         if active_data_stream.num_consecutive_timeouts >= max_num_stream_timeouts {
