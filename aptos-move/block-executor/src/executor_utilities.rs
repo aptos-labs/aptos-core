@@ -20,7 +20,7 @@ use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use triomphe::Arc as TriompheArc;
 
 pub(crate) fn map_finalized_group<T: Transaction>(
@@ -65,7 +65,7 @@ pub(crate) fn serialize_groups<T: Transaction>(
         Vec<(T::Tag, TriompheArc<T::Value>)>,
         ResourceGroupSize,
     )>,
-) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
+) -> Result<HashMap<T::Key, Bytes>, ResourceGroupSerializationError> {
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),
@@ -74,45 +74,42 @@ pub(crate) fn serialize_groups<T: Transaction>(
 
     finalized_groups
         .into_iter()
-        .map(
-            |(group_key, mut metadata_op, finalized_group, group_size)| {
-                let btree: BTreeMap<T::Tag, Bytes> = finalized_group
-                    .into_iter()
-                    .map(|(resource_tag, arc_v)| {
-                        let bytes = arc_v
-                            .extract_raw_bytes()
-                            .expect("Deletions should already be applied");
-                        (resource_tag, bytes)
-                    })
-                    .collect();
+        .map(|(group_key, metadata_op, finalized_group, group_size)| {
+            let btree: BTreeMap<T::Tag, Bytes> = finalized_group
+                .into_iter()
+                .map(|(resource_tag, arc_v)| {
+                    let bytes = arc_v
+                        .extract_raw_bytes()
+                        .expect("Deletions should already be applied");
+                    (resource_tag, bytes)
+                })
+                .collect();
 
-                match bcs::to_bytes(&btree) {
-                    Ok(group_bytes) => {
-                        if (!btree.is_empty() || group_size.get() != 0)
-                            && group_bytes.len() as u64 != group_size.get()
-                        {
-                            alert!(
-                                "Serialized resource group size mismatch key = {:?} num items {}, \
-				 len {} recorded size {}, op {:?}",
-                                group_key,
-                                btree.len(),
-                                group_bytes.len(),
-                                group_size.get(),
-                                metadata_op,
-                            );
-                            Err(ResourceGroupSerializationError)
-                        } else {
-                            metadata_op.set_bytes(group_bytes.into());
-                            Ok((group_key, metadata_op))
-                        }
-                    },
-                    Err(e) => {
-                        alert!("Unexpected resource group error {:?}", e);
+            match bcs::to_bytes(&btree) {
+                Ok(group_bytes) => {
+                    if (!btree.is_empty() || group_size.get() != 0)
+                        && group_bytes.len() as u64 != group_size.get()
+                    {
+                        alert!(
+                            "Serialized resource group size mismatch key = {:?} num items {}, \
+			     len {} recorded size {}, op {:?}",
+                            group_key,
+                            btree.len(),
+                            group_bytes.len(),
+                            group_size.get(),
+                            metadata_op,
+                        );
                         Err(ResourceGroupSerializationError)
-                    },
-                }
-            },
-        )
+                    } else {
+                        Ok((group_key, group_bytes.into()))
+                    }
+                },
+                Err(e) => {
+                    alert!("Unexpected resource group error {:?}", e);
+                    Err(ResourceGroupSerializationError)
+                },
+            }
+        })
         .collect()
 }
 
@@ -170,23 +167,6 @@ pub(crate) fn map_id_to_values_in_group_writes<
         ));
     }
     Ok(patched_finalized_groups)
-}
-
-// For each delayed field in resource write set, replace the identifiers with values
-// (ignoring other writes). Currently also checks the keys are unique.
-pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    resource_write_set: Vec<(T::Key, TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>)>,
-    latest_view: &LatestView<T, S>,
-) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
-    resource_write_set
-        .into_iter()
-        .map(|(key, write_op, layout)| {
-            Ok::<_, PanicError>((
-                key,
-                replace_ids_with_values(&write_op, &layout, latest_view)?,
-            ))
-        })
-        .collect::<std::result::Result<_, PanicError>>()
 }
 
 // Parse the input `value` and replace delayed field identifiers with corresponding values

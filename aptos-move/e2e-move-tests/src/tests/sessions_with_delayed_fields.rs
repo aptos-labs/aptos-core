@@ -179,8 +179,7 @@ impl TransactionOutput for TestOutput {
 
     fn incorporate_materialized_txn_output(
         &mut self,
-        _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
-        _materializer: &impl Materializer,
+        _materializer: &impl Materializer<Key = StateKey>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         Ok((
             aptos_types::transaction::TransactionOutput::new_empty_success(),

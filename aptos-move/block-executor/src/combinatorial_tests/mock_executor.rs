@@ -21,10 +21,13 @@ use aptos_aggregator::{
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     contract_event::TransactionEvent,
-    error::PanicError,
+    error::{code_invariant_error, PanicError},
     executable::ModulePath,
     fee_statement::FeeStatement,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::{AuxiliaryInfo, CommittedTransactionOutput},
     write_set::{TransactionWrite, WriteOpKind},
 };
@@ -210,7 +213,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Returns self for method chaining
     pub(crate) fn add_resource_reads(
         &mut self,
-        view: &impl TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout>,
         key_pairs: &[(K, bool)],
         delayed_fields_enabled: bool,
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
@@ -709,12 +712,48 @@ where
 
     fn incorporate_materialized_txn_output(
         &mut self,
-        patched_resource_write_set: Vec<(K, ValueType)>,
-        _materializer: &impl Materializer,
+        materializer: &impl Materializer<Key = K>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
-        assert_ok!(self
-            .patched_resource_write_set
-            .set(patched_resource_write_set.clone().into_iter().collect()));
+        // Mirrors the output-side patching of the real VM output: patches own
+        // writes carrying a layout in place, and pulls the serialized group /
+        // exchanged read bytes for the keys this output owns.
+        let mut patched = HashMap::new();
+        for (key, value, maybe_layout) in &self.writes {
+            if maybe_layout.is_some() && !value.is_deletion() {
+                let bytes = value.bytes().ok_or_else(|| {
+                    code_invariant_error(format!(
+                        "Value to be exchanged doesn't have bytes: {:?}",
+                        value
+                    ))
+                })?;
+                let layout = maybe_layout.as_ref().expect("Layout is set");
+                let mut patched_value = value.clone();
+                patched_value
+                    .set_bytes(materializer.replace_identifiers_with_values(bytes, layout)?);
+                patched.insert(key.clone(), patched_value);
+            }
+        }
+        for (key, metadata_op, _, _) in &self.group_writes {
+            let mut patched_value = metadata_op.clone();
+            patched_value.set_bytes(materializer.serialized_group_bytes(key)?);
+            patched.insert(key.clone(), patched_value);
+        }
+        for (key, (metadata, _)) in &self.reads_needing_exchange {
+            let value = ValueType::from_state_value(Some(StateValue::new_with_metadata(
+                materializer.exchanged_read_bytes(key)?,
+                metadata.clone(),
+            )));
+            patched.insert(key.clone(), value);
+        }
+        for (key, metadata) in &self.group_reads_needing_exchange {
+            let value = ValueType::from_state_value(Some(StateValue::new_with_metadata(
+                materializer.serialized_group_bytes(key)?,
+                metadata.clone(),
+            )));
+            patched.insert(key.clone(), value);
+        }
+        assert_ok!(self.patched_resource_write_set.set(patched));
+
         // TODO: Also test patched events (mock events carry no delayed fields, so
         // they pass through unpatched).
         // The mock's committed output is a snapshot of itself, carrying the reads

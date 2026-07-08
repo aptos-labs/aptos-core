@@ -22,7 +22,7 @@ use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
-    contract_event::{ContractEvent, TransactionEvent},
+    contract_event::ContractEvent,
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
@@ -374,8 +374,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     fn incorporate_materialized_txn_output(
         &mut self,
-        materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
-        materializer: &impl Materializer,
+        materializer: &impl Materializer<Key = StateKey>,
     ) -> Result<(TransactionOutput, Trace), PanicError> {
         // Before creating the output, extract the trace for replay.
         let mut vm_output = self
@@ -384,28 +383,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output must be set to incorporate materialized data");
         let trace = vm_output.take_trace();
 
-        // Materialize the events: in events carrying a type layout (i.e.
-        // containing delayed fields), replace the identifiers in the event
-        // data with the committed values.
-        let materialized_events = vm_output
-            .events()
-            .iter()
-            .map(|(event, maybe_layout)| match maybe_layout {
-                None => Ok(event.clone()),
-                Some(layout) => {
-                    let bytes = materializer
-                        .replace_identifiers_with_values(event.get_event_data(), layout)?;
-                    let mut patched_event = event.clone();
-                    patched_event.set_event_data(bytes.to_vec());
-                    Ok(patched_event)
-                },
-            })
-            .collect::<Result<Vec<_>, PanicError>>()?;
-
-        let committed_output = vm_output.into_transaction_output_with_materialized_write_set(
-            materialized_resource_write_set,
-            materialized_events,
-        )?;
+        let committed_output = vm_output.into_transaction_output_materialized(materializer)?;
         Ok((committed_output, trace))
     }
 }

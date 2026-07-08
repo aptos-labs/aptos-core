@@ -20,7 +20,6 @@ use aptos_vm_types::{
         BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
     },
 };
-use bytes::Bytes;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
@@ -143,20 +142,7 @@ pub trait ExecutorTask {
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
-/// Materializes speculative values into their committed form. Implemented by
-/// the read view, which holds the context (the committed delayed field values)
-/// needed to replace speculative placeholders with the final values. Passed to
-/// the legacy output at materialization so it can patch the data it owns (e.g.
-/// its events) without the executor copying it out and back in.
-pub trait Materializer {
-    /// Replaces the delayed-field identifiers in the given serialized value
-    /// (of the given layout) with the committed values.
-    fn replace_identifiers_with_values(
-        &self,
-        bytes: &[u8],
-        layout: &MoveTypeLayout,
-    ) -> Result<Bytes, PanicError>;
-}
+pub use aptos_vm_types::materializer::Materializer;
 
 /// Traits for execution result of a single transaction.
 pub trait BeforeMaterializationOutput<Txn: Transaction> {
@@ -267,20 +253,15 @@ pub trait TransactionOutput: Send + Debug {
     // to avoid data races with the accessor methods.
 
     /// Will be called once per transaction when the output is ready to be committed.
-    /// Ensures that any writes corresponding to materialized delayed fields and group
-    /// updates (recorded in output separately) are incorporated into the transaction
-    /// output, and materializes the data the output owns itself (its events) using
-    /// the given materializer, consuming the stored (speculative) output and returning
+    /// Materializes the output in place using the given materializer: patches the
+    /// writes and events that carry delayed fields, and replaces group writes with
+    /// their serialized form, consuming the stored (speculative) output and returning
     /// the final materialized [`Self::CommittedOutput`] together with the collected
     /// execution trace.
     /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
     /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
         &mut self,
-        patched_resource_write_set: Vec<(
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        )>,
-        materializer: &impl Materializer,
+        materializer: &impl Materializer<Key = <Self::Txn as Transaction>::Key>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError>;
 }

@@ -4,12 +4,13 @@
 use crate::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::{ChangeSetInterface, VMChangeSet},
+    materializer::Materializer,
     module_write_set::{ModuleWrite, ModuleWriteSet},
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_types::{
     contract_event::ContractEvent,
-    error::{code_invariant_error, PanicError},
+    error::PanicError,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
@@ -183,26 +184,18 @@ impl VMOutput {
         ))
     }
 
-    /// Replaces the change set events / resources with the patched ones (that carry
-    /// materialized delayed fields). Drains delayed fields (everything is materialized)
-    /// and returns a [`TransactionOutput`].
-    pub fn into_transaction_output_with_materialized_write_set(
+    /// Materializes the change set in place using the given materializer:
+    /// patches the resource writes and events that carry delayed fields.
+    /// Drains delayed fields (everything is materialized) and returns a
+    /// [`TransactionOutput`].
+    pub fn into_transaction_output_materialized(
         mut self,
-        patched_resource_write_set: Vec<(StateKey, WriteOp)>,
-        patched_events: Vec<ContractEvent>,
+        materializer: &impl Materializer<Key = StateKey>,
     ) -> Result<TransactionOutput, PanicError> {
-        // materialize delayed fields into resource writes
         self.change_set
-            .extend_resource_write_set(patched_resource_write_set.into_iter())?;
+            .materialize_resource_write_set(materializer)?;
         let _ = self.change_set.drain_delayed_field_change_set();
-
-        // materialize delayed fields into events
-        if patched_events.len() != self.events().len() {
-            return Err(code_invariant_error(
-                "Different number of events and patched events in the output.",
-            ));
-        }
-        self.change_set.set_events(patched_events.into_iter());
+        self.change_set.materialize_events(materializer)?;
 
         self.into_transaction_output()
     }

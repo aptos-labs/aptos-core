@@ -19,7 +19,6 @@ use crate::{
     counters,
     scheduler::{DependencyResult, DependencyStatus, TWaitForDependency},
     scheduler_wrapper::SchedulerWrapper,
-    task::Materializer,
     value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
@@ -1721,26 +1720,6 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
                 .interrupt_requested(self.txn_idx, state.incarnation),
             ViewState::Unsync(_) => false,
         }
-    }
-}
-
-impl<T: Transaction, S: TStateView<Key = T::Key> + Sync> Materializer for LatestView<'_, T, S> {
-    fn replace_identifiers_with_values(
-        &self,
-        bytes: &[u8],
-        layout: &MoveTypeLayout,
-    ) -> Result<Bytes, PanicError> {
-        // Resolves to the inherent method (which takes precedence over this
-        // trait method), converting its error into an invariant error.
-        let (bytes, _) = self
-            .replace_identifiers_with_values(bytes, layout)
-            .map_err(|_| {
-                code_invariant_error(format!(
-                    "Failed to replace identifiers with values in a value with layout {:?}",
-                    layout
-                ))
-            })?;
-        Ok(bytes)
     }
 }
 

@@ -6,17 +6,14 @@ use crate::{
     code_cache_global::GlobalModuleCache,
     counters,
     errors::ResourceGroupSerializationError,
-    executor_utilities::{
-        map_finalized_group, map_id_to_values_in_group_writes, map_id_to_values_in_write_set,
-        serialize_groups,
-    },
+    executor_utilities::{map_finalized_group, map_id_to_values_in_group_writes, serialize_groups},
     limit_processor::BlockGasLimitProcessor,
     task::{
         BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, Materializer,
         TransactionExecutor, TransactionOutput,
     },
     types::InputOutputKey,
-    view::{ViewArgs, ViewStateArgs},
+    view::{LatestView, ViewArgs, ViewStateArgs},
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_logger::error;
@@ -492,15 +489,14 @@ where
         }
     }
 
-    /// Finalizes the stored output into the committed output, incorporating
-    /// materialized writes and materializing the data the output owns itself
-    /// (its events), consuming the stored (speculative) output.
+    /// Finalizes the stored output into the committed output, materializing
+    /// the output in place (patching the writes and events it owns via the
+    /// materializer), consuming the stored (speculative) output.
     /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may
     /// not be concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
         &self,
-        patched_resource_write_set: Vec<(T::Key, T::Value)>,
-        materializer: &impl Materializer,
+        materializer: &impl Materializer<Key = T::Key>,
     ) -> Result<(O::CommittedOutput, Trace), PanicError> {
         let mut output = self.output.lock();
         let output = output.as_mut().ok_or_else(|| {
@@ -508,7 +504,52 @@ where
             // non-committed status here is a code invariant violation.
             code_invariant_error("Only committed (success / skip-rest) outputs can be materialized")
         })?;
-        output.incorporate_materialized_txn_output(patched_resource_write_set, materializer)
+        output.incorporate_materialized_txn_output(materializer)
+    }
+}
+
+/// The materializer handed to the legacy output at incorporation: resolves
+/// value-level patches via the view, and serves the group and exchanged-read
+/// bytes precomputed by the record (both derived from the multi-version state
+/// the output cannot access itself).
+struct LegacyMaterializer<'a, 'b, T: Transaction, S: TStateView<Key = T::Key>> {
+    view: &'b LatestView<'a, T, S>,
+    serialized_groups: HashMap<T::Key, Bytes>,
+    exchanged_reads: HashMap<T::Key, Bytes>,
+}
+
+impl<T: Transaction, S: TStateView<Key = T::Key>> Materializer
+    for LegacyMaterializer<'_, '_, T, S>
+{
+    type Key = T::Key;
+
+    fn replace_identifiers_with_values(
+        &self,
+        bytes: &[u8],
+        layout: &MoveTypeLayout,
+    ) -> Result<Bytes, PanicError> {
+        let (bytes, _) = self
+            .view
+            .replace_identifiers_with_values(bytes, layout)
+            .map_err(|_| {
+                code_invariant_error(format!(
+                    "Failed to replace identifiers with values in a value with layout {:?}",
+                    layout
+                ))
+            })?;
+        Ok(bytes)
+    }
+
+    fn serialized_group_bytes(&self, key: &T::Key) -> Result<Bytes, PanicError> {
+        self.serialized_groups.get(key).cloned().ok_or_else(|| {
+            code_invariant_error(format!("No serialized group bytes for key {:?}", key))
+        })
+    }
+
+    fn exchanged_read_bytes(&self, key: &T::Key) -> Result<Bytes, PanicError> {
+        self.exchanged_reads.get(key).cloned().ok_or_else(|| {
+            code_invariant_error(format!("No exchanged read bytes for key {:?}", key))
+        })
     }
 }
 
@@ -874,64 +915,58 @@ where
             },
         };
 
-        // Select resource writes needing delayed field exchange: reads that
-        // observed exchanged values (fetched from the captured reads in
-        // parallel mode, and from the unsync map in sequential mode), and
-        // writes carrying a layout.
-        let resource_writes_to_materialize =
-            self.reads_needing_delayed_field_exchange()?
-                .into_iter()
-                .map(|(key, metadata, layout)| -> Result<_, PanicError> {
-                    let (value, existing_layout) = match &args.state {
-                        ViewStateArgs::Parallel { .. } => self.fetch_exchanged_data(&key)?,
-                        ViewStateArgs::Sequential { unsync_map, .. } => {
-                            match unsync_map.fetch_data(&key) {
-                                Some(ValueWithLayout::Exchanged(value, Some(layout))) => {
-                                    (value, layout)
-                                },
-                                data => {
-                                    return Err(code_invariant_error(format!(
+        // The values of reads needing delayed field exchange: observed values
+        // (fetched from the captured reads in parallel mode, and from the
+        // unsync map in sequential mode) with the delayed-field identifiers
+        // replaced by the committed values. Writes carrying a layout hold
+        // their own bytes and are patched by the output itself during
+        // incorporation.
+        let exchanged_reads = self
+            .reads_needing_delayed_field_exchange()?
+            .into_iter()
+            .map(|(key, _metadata, layout)| -> Result<_, PanicError> {
+                let (value, existing_layout) = match &args.state {
+                    ViewStateArgs::Parallel { .. } => self.fetch_exchanged_data(&key)?,
+                    ViewStateArgs::Sequential { unsync_map, .. } => {
+                        match unsync_map.fetch_data(&key) {
+                            Some(ValueWithLayout::Exchanged(value, Some(layout))) => {
+                                (value, layout)
+                            },
+                            data => {
+                                return Err(code_invariant_error(format!(
                                     "Read value needing exchange {:?} does not exist or not in \
                                      Exchanged format",
                                     data
                                 )));
-                                },
-                            }
-                        },
-                    };
-                    randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
-                    let new_value = TriompheArc::new(TransactionWrite::from_state_value(Some(
-                        StateValue::new_with_metadata(
-                            value.bytes().cloned().unwrap_or_else(Bytes::new),
-                            metadata,
-                        ),
-                    )));
-                    Ok((key, new_value, layout))
-                })
-                .chain(self.resource_write_set()?.into_iter().filter_map(
-                    |(key, value)| match value {
-                        ValueWithLayout::Exchanged(value, Some(layout)) => {
-                            (!value.is_deletion()).then_some(Ok((key, value, layout)))
-                        },
-                        ValueWithLayout::Exchanged(_, None)
-                        | ValueWithLayout::RawFromStorage(_) => None,
+                            },
+                        }
                     },
-                ))
-                .collect::<Result<Vec<_>, _>>()?;
-        let materialized_resource_write_set =
-            map_id_to_values_in_write_set(resource_writes_to_materialize, &latest_view)?;
+                };
+                randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
+                let bytes = value.bytes().cloned().unwrap_or_else(Bytes::new);
+                let (patched_bytes, _) = latest_view
+                    .replace_identifiers_with_values(&bytes, &layout)
+                    .map_err(|_| {
+                        code_invariant_error(format!(
+                            "Failed to replace identifiers with values in a resource {:?}",
+                            layout
+                        ))
+                    })?;
+                Ok((key, patched_bytes))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?;
 
-        // This call finalizes the output (materializing the events it owns via the
-        // view) and may not be concurrent with any other accesses to the output
-        // (e.g. querying the write-set, events, etc), as these read accesses are
-        // not synchronized and assumed to have terminated.
-        let (committed_output, trace) = self.incorporate_materialized_txn_output(
-            materialized_resource_write_set
-                .into_iter()
-                .chain(serialized_groups)
-                .collect(),
-            &latest_view,
-        )?;
+        // This call finalizes the output, materializing it in place (patching
+        // the writes and events it owns via the materializer), and may not be
+        // concurrent with any other accesses to the output (e.g. querying the
+        // write-set, events, etc), as these read accesses are not synchronized
+        // and assumed to have terminated.
+        let materializer = LegacyMaterializer {
+            view: &latest_view,
+            serialized_groups,
+            exchanged_reads,
+        };
+        let (committed_output, trace) = self.incorporate_materialized_txn_output(&materializer)?;
 
         match &self.reads {
             LegacyReads::Parallel(reads) => {
