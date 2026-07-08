@@ -1063,6 +1063,10 @@ where
     fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
         true
     }
+
+    fn pre_write_values(txn: &Self::Txn) -> Vec<(K, ValueWithLayout<ValueType>)> {
+        txn.pre_write_values()
+    }
 }
 
 /// Railway-oriented pattern wrapper for builder operations

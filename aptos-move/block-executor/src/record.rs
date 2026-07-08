@@ -1067,4 +1067,13 @@ where
             },
         }
     }
+
+    fn pre_write_values(
+        txn: &E::Txn,
+    ) -> Vec<(
+        <E::Txn as Transaction>::Key,
+        <E::Txn as Transaction>::SpeculativeValue,
+    )> {
+        <E as ExecutorTask>::pre_write_values(txn)
+    }
 }

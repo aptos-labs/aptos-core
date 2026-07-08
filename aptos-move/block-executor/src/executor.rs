@@ -130,7 +130,7 @@ where
     /// all pre-written keys were actually written, triggering fallback to sequential execution
     /// if not.
     fn verify_pre_writes(txn: &T, record: &E::Record) -> Result<(), PanicError> {
-        let pre_write_entries = T::pre_write_values(txn);
+        let pre_write_entries = E::pre_write_values(txn);
         if pre_write_entries.is_empty() {
             return Ok(()); // No pre-writes, nothing to verify
         }
@@ -1502,7 +1502,7 @@ where
         let mut versioned_cache = MVHashMap::new();
         if self.config.local.enable_pre_write {
             for txn_idx in 0..num_txns {
-                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                let values = E::pre_write_values(signature_verified_block.get_txn(txn_idx));
                 for (k, v) in values {
                     // pre-write doesn't need to use write_v2 because there's no dependencies.
                     versioned_cache
@@ -1658,7 +1658,7 @@ where
         let mut versioned_cache = MVHashMap::new();
         if self.config.local.enable_pre_write {
             for txn_idx in 0..signature_verified_block.num_txns() as u32 {
-                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                let values = E::pre_write_values(signature_verified_block.get_txn(txn_idx));
                 for (k, v) in values {
                     versioned_cache
                         .data()

@@ -93,6 +93,20 @@ pub trait TransactionExecutor {
         auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
     ) -> Result<Self::Record, PanicError>;
+
+    /// The writes the transaction is statically known to produce, in the VM's
+    /// speculative value representation. Used to pre-populate the multi-version
+    /// map before execution; the executor verifies at commit that the actual
+    /// write set covers the pre-written keys.
+    #[allow(clippy::type_complexity)]
+    fn pre_write_values(
+        _txn: &Self::Txn,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::SpeculativeValue,
+    )> {
+        vec![]
+    }
 }
 
 /// Trait for single threaded transaction executor.
@@ -140,6 +154,18 @@ pub trait ExecutorTask {
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
+
+    /// The writes the transaction is statically known to produce. See
+    /// [`TransactionExecutor::pre_write_values`].
+    #[allow(clippy::type_complexity)]
+    fn pre_write_values(
+        _txn: &Self::Txn,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::SpeculativeValue,
+    )> {
+        vec![]
+    }
 }
 
 pub use aptos_vm_types::materializer::Materializer;

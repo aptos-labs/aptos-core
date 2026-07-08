@@ -3642,10 +3642,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     ) -> Self {
         unimplemented!()
     }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::SpeculativeValue)> {
-        vec![]
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

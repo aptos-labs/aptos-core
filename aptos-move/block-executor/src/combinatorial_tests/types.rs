@@ -483,6 +483,26 @@ impl<K, E> MockTransaction<K, E> {
             },
         }
     }
+
+    pub(crate) fn pre_write_values(&self) -> Vec<(K, ValueWithLayout<ValueType>)>
+    where
+        K: Clone,
+    {
+        match self {
+            MockTransaction::Write { pre_writes, .. } => pre_writes
+                .iter()
+                .map(|(key, value)| {
+                    // Pre-written mock values carry no delayed fields, so they are
+                    // already in their exchanged form with no layout.
+                    (
+                        key.clone(),
+                        ValueWithLayout::Exchanged(TriompheArc::new(value.clone()), None),
+                    )
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
 }
 
 impl<
@@ -501,23 +521,6 @@ impl<
 
     fn state_checkpoint(_block_id: HashValue) -> Self {
         Self::StateCheckpoint
-    }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::SpeculativeValue)> {
-        match self {
-            MockTransaction::Write { pre_writes, .. } => pre_writes
-                .iter()
-                .map(|(key, value)| {
-                    // Pre-written mock values carry no delayed fields, so they are
-                    // already in their exchanged form with no layout.
-                    (
-                        key.clone(),
-                        ValueWithLayout::Exchanged(TriompheArc::new(value.clone()), None),
-                    )
-                })
-                .collect(),
-            _ => vec![],
-        }
     }
 }
 
