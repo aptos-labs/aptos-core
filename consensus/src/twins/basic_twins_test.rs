@@ -105,6 +105,9 @@ fn drop_config_test() {
         assert!(node0_commit.is_some());
 
         // Check that the commit log for n2 is empty
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         let node2_commit = match nodes[2].commit_cb_receiver.try_next() {
             Ok(Some(node_commit)) => Some(node_commit),
             _ => None,
@@ -167,6 +170,9 @@ fn twins_vote_dedup_test() {
         // have been created
         let mut commit_seen = false;
         for node in &mut nodes {
+            // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in
+            // the pinned futures-rs backport fork.
+            #[allow(deprecated)]
             if let Ok(Some(_node_commit)) = node.commit_cb_receiver.try_next() {
                 commit_seen = true;
             }

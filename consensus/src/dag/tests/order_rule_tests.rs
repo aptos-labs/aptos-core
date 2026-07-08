@@ -150,6 +150,9 @@ proptest! {
                         order_rule.process_new_node(flatten_nodes[idx].metadata());
                     }
                     let mut ordered = vec![];
+                    // `try_next` is deprecated upstream in favor of `try_recv`, unavailable
+                    // in the pinned futures-rs backport fork.
+                    #[allow(deprecated)]
                     while let Ok(Some(mut ordered_nodes)) = receiver.try_next() {
                         ordered.append(&mut ordered_nodes);
                     }
@@ -162,6 +165,9 @@ proptest! {
         let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
         order_rule.process_all();
         let mut ordered = vec![];
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         while let Ok(Some(mut ordered_nodes)) = receiver.try_next() {
             ordered.append(&mut ordered_nodes);
         }
@@ -250,6 +256,9 @@ fn test_order_rule_basic() {
         vec![(4, 1), (4, 0), (5, 2)],
     ];
     let mut batch = 0;
+    // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+    // pinned futures-rs backport fork.
+    #[allow(deprecated)]
     while let Ok(Some(ordered_nodes)) = receiver.try_next() {
         assert_eq!(
             ordered_nodes

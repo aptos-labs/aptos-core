@@ -614,6 +614,9 @@ mod tests {
         {
             rand_store.add_share(share).unwrap();
         }
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         assert!(result_rx.try_next().is_err());
         for metadata in blocks_1.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata, Some(resolved_rand_check(true)));
@@ -627,6 +630,9 @@ mod tests {
         for metadata in blocks_2.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata, Some(resolved_rand_check(true)));
         }
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         assert!(result_rx.try_next().is_err());
 
         for share in ctxt.authors[1..6]
@@ -670,6 +676,9 @@ mod tests {
         }
 
         // No decision yet because the future hasn't resolved
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         assert!(result_rx.try_next().is_err());
 
         // Resolve the future — the spawned task proceeds to aggregate
@@ -698,6 +707,9 @@ mod tests {
         for m in metadata.iter() {
             rand_store.add_rand_metadata(m.clone(), Some(resolved_rand_check(true)));
         }
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         assert!(result_rx.try_next().is_err());
 
         // Add shares one by one — aggregation should trigger when threshold is met
@@ -742,6 +754,9 @@ mod tests {
         // The spawned task sees the future resolved to false → skips aggregation silently
         // (Skip sending is handled by the shared future in rand_manager, not by try_aggregate)
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         assert!(result_rx.try_next().is_err());
     }
 
@@ -767,6 +782,9 @@ mod tests {
             rand_store.add_share(share).unwrap();
         }
         // No decision yet — still waiting for metadata
+        // `try_next` is deprecated upstream in favor of `try_recv`, unavailable in the
+        // pinned futures-rs backport fork.
+        #[allow(deprecated)]
         assert!(result_rx.try_next().is_err());
 
         // Now add metadata with resolved future — threshold already met → aggregation triggered

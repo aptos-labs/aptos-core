@@ -487,6 +487,9 @@ impl SecretShareManager {
                 }
                 Some(reset) = reset_rx.next() => {
                     let mut dropped = 0;
+                    // `try_next` is deprecated upstream in favor of `try_recv`, which the
+                    // pinned futures-rs backport fork does not yet provide.
+                    #[allow(deprecated)]
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {
                         dropped += 1;
                     }

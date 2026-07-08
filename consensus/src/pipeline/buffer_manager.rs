@@ -580,6 +580,9 @@ impl BufferManager {
         self.previous_commit_time = Instant::now();
         self.commit_proof_rb_handle.take();
         // purge the incoming blocks queue
+        // `UnboundedReceiver::try_next` is deprecated upstream in favor of `try_recv`,
+        // but the pinned futures-rs backport fork does not yet provide `try_recv`.
+        #[allow(deprecated)]
         while let Ok(Some(blocks)) = self.block_rx.try_next() {
             for b in blocks.ordered_blocks {
                 if let Some(futs) = b.abort_pipeline() {

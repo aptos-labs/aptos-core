@@ -213,6 +213,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         // Drain stale decision messages (Success/Skip) from previously spawned
         // aggregation tasks and shared futures to prevent them from affecting
         // new blocks that may arrive at the same rounds after reset.
+        // `try_next` is deprecated upstream in favor of `try_recv`, which the pinned
+        // futures-rs backport fork does not yet provide.
+        #[allow(deprecated)]
         while matches!(self.decision_rx.try_next(), Ok(Some(_))) {}
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
@@ -398,6 +401,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
+                    // `try_next` is deprecated upstream in favor of `try_recv`, which the
+                    // pinned futures-rs backport fork does not yet provide.
+                    #[allow(deprecated)]
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     self.process_reset(reset);
                 }
