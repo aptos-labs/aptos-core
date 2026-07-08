@@ -77,14 +77,17 @@ module aptos_framework::dispatchable_fungible_asset {
         let func_opt = fungible_asset::withdraw_dispatch_function(store);
         if (func_opt.is_some()) {
             let func = func_opt.borrow();
-            function_info::load_module_from_function(func);
-            let fa = dispatchable_withdraw(
-                store,
-                amount,
-                borrow_transfer_ref(store),
-                func,
-            );
-            fa
+            if (function_info::function_value_dispatch_enabled()) {
+                dispatch_withdraw_hook(func, store, amount, borrow_transfer_ref(store))
+            } else {
+                function_info::load_module_from_function(func);
+                dispatchable_withdraw(
+                    store,
+                    amount,
+                    borrow_transfer_ref(store),
+                    func,
+                )
+            }
         } else {
             fungible_asset::unchecked_withdraw(store.object_address(), amount)
         }
@@ -98,13 +101,17 @@ module aptos_framework::dispatchable_fungible_asset {
         let func_opt = fungible_asset::deposit_dispatch_function(store);
         if (func_opt.is_some()) {
             let func = func_opt.borrow();
-            function_info::load_module_from_function(func);
-            dispatchable_deposit(
-                store,
-                fa,
-                borrow_transfer_ref(store),
-                func
-            )
+            if (function_info::function_value_dispatch_enabled()) {
+                dispatch_deposit_hook(func, store, fa, borrow_transfer_ref(store))
+            } else {
+                function_info::load_module_from_function(func);
+                dispatchable_deposit(
+                    store,
+                    fa,
+                    borrow_transfer_ref(store),
+                    func
+                )
+            }
         } else {
             fungible_asset::unchecked_deposit(store.object_address(), fa)
         }
@@ -146,9 +153,7 @@ module aptos_framework::dispatchable_fungible_asset {
     public fun derived_balance<T: key>(store: Object<T>): u64 {
         let func_opt = fungible_asset::derived_balance_dispatch_function(store);
         if (func_opt.is_some()) {
-            let func = func_opt.borrow();
-            function_info::load_module_from_function(func);
-            dispatchable_derived_balance(store, func)
+            dispatched_derived_balance(func_opt.borrow(), store)
         } else {
             fungible_asset::balance(store)
         }
@@ -161,11 +166,20 @@ module aptos_framework::dispatchable_fungible_asset {
     public fun is_derived_balance_at_least<T: key>(store: Object<T>, amount: u64): bool {
         let func_opt = fungible_asset::derived_balance_dispatch_function(store);
         if (func_opt.is_some()) {
-            let func = func_opt.borrow();
-            function_info::load_module_from_function(func);
-            dispatchable_derived_balance(store, func) >= amount
+            dispatched_derived_balance(func_opt.borrow(), store) >= amount
         } else {
             fungible_asset::is_balance_at_least(store, amount)
+        }
+    }
+
+    /// Runs the derived-balance hook via the enabled dispatch mechanism. Inline, so both
+    /// callers compile to the same code as if the branch were written in place.
+    inline fun dispatched_derived_balance<T: key>(func: &FunctionInfo, store: Object<T>): u64 {
+        if (function_info::function_value_dispatch_enabled()) {
+            dispatch_derived_balance_hook(func, store)
+        } else {
+            function_info::load_module_from_function(func);
+            dispatchable_derived_balance(store, func)
         }
     }
 
@@ -177,8 +191,12 @@ module aptos_framework::dispatchable_fungible_asset {
         let func_opt = fungible_asset::derived_supply_dispatch_function(metadata);
         if (func_opt.is_some()) {
             let func = func_opt.borrow();
-            function_info::load_module_from_function(func);
-            dispatchable_derived_supply(metadata, func)
+            if (function_info::function_value_dispatch_enabled()) {
+                dispatch_derived_supply_hook(func, metadata)
+            } else {
+                function_info::load_module_from_function(func);
+                dispatchable_derived_supply(metadata, func)
+            }
         } else {
             fungible_asset::supply(metadata)
         }
@@ -191,6 +209,50 @@ module aptos_framework::dispatchable_fungible_asset {
             error::not_found(ESTORE_NOT_FOUND)
         );
         &borrow_global<TransferRefStore>(metadata_addr).transfer_ref
+    }
+
+    #[module_lock]
+    /// Runs a withdraw hook as a function value, replacing the legacy native dispatch, as
+    /// do the following runners; `#[module_lock]` preserves AIP-73 reentrancy semantics.
+    fun dispatch_withdraw_hook<T: key>(
+        function: &FunctionInfo,
+        store: Object<T>,
+        amount: u64,
+        transfer_ref: &TransferRef,
+    ): FungibleAsset {
+        let f = function.load_function_value<
+            |Object<T>, u64, &TransferRef|FungibleAsset has copy + drop>();
+        f(store, amount, transfer_ref)
+    }
+
+    #[module_lock]
+    fun dispatch_deposit_hook<T: key>(
+        function: &FunctionInfo,
+        store: Object<T>,
+        fa: FungibleAsset,
+        transfer_ref: &TransferRef,
+    ) {
+        let f = function.load_function_value<
+            |Object<T>, FungibleAsset, &TransferRef| has copy + drop>();
+        f(store, fa, transfer_ref)
+    }
+
+    #[module_lock]
+    fun dispatch_derived_balance_hook<T: key>(
+        function: &FunctionInfo,
+        store: Object<T>,
+    ): u64 {
+        let f = function.load_function_value<|Object<T>|u64 has copy + drop>();
+        f(store)
+    }
+
+    #[module_lock]
+    fun dispatch_derived_supply_hook<T: key>(
+        function: &FunctionInfo,
+        metadata: Object<T>,
+    ): Option<u128> {
+        let f = function.load_function_value<|Object<T>|Option<u128> has copy + drop>();
+        f(metadata)
     }
 
     native fun dispatchable_withdraw<T: key>(

@@ -971,6 +971,20 @@ module std::features {
         is_enabled(GAS_REFUND_FA_MINT)
     }
 
+    /// Whether `FunctionInfo`-based dispatch (dispatchable fungible assets and account
+    /// abstraction) runs via function values from `std::reflect` instead of the legacy
+    /// native dispatch machinery. Requires `FUNCTION_REFLECTION`.
+    /// Lifetime: transient
+    const FUNCTION_VALUE_DISPATCH: u64 = 125;
+
+    public fun get_function_value_dispatch_feature(): u64 {
+        FUNCTION_VALUE_DISPATCH
+    }
+
+    public fun is_function_value_dispatch_enabled(): bool {
+        is_enabled(FUNCTION_VALUE_DISPATCH)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
