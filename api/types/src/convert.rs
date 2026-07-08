@@ -160,36 +160,51 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     /// `try_into_resources_from_resource_group`), where the returned meter is threaded across an
     /// entire page/group so the whole batch shares one byte budget. `find_resource` also takes a
     /// fresh meter from this method, but uses it to bound a single resource-group decode in
-    /// isolation.
+    /// isolation. `try_into_resource` takes one to bound a single resource, checking it after the
+    /// `AnnotatedMoveStruct` -> `MoveResource` conversion so the API-type materialization counts too.
     ///
-    /// The **per-call-bounded** entry points (`try_into_resource`, `move_struct_fields`,
-    /// `try_into_move_value`) do not use this — they rely on `self.inner`'s own fresh meter, so
-    /// each call gets an independent budget. The annotator owns the budget value; the converter no
-    /// longer stores its own copy.
+    /// The remaining **per-call-bounded** entry points (`move_struct_fields`, `try_into_move_value`)
+    /// do not use this — they rely on `self.inner`'s own fresh meter, so each call gets an
+    /// independent budget. The annotator owns the budget value; the converter no longer stores its
+    /// own copy.
     fn resource_annotation_meter(&self) -> Meter {
         self.inner.fresh_meter()
     }
 
+    /// Annotate one resource and charge its full materialization — annotation plus the
+    /// `AnnotatedMoveStruct` -> `MoveResource` (API-type/JSON) conversion — against `meter`.
+    ///
+    /// Single source of truth for the per-resource metering protocol shared by the batch
+    /// (`annotate_with_limit`) and single (`try_into_resource`) entry points: keeping the
+    /// view + convert + `check()` sequence in one place is what stops the two from drifting.
+    ///
     /// INVARIANT: must stay synchronous. `Meter` reads thread-local live bytes; an `.await`
-    /// between `fresh_meter()` and the `check()`s would measure an unrelated task's thread and
+    /// between `fresh_meter()` and the `check()` would measure an unrelated task's thread and
     /// silently corrupt the budget. Keep the whole annotation tree on one thread, await-free.
+    fn annotate_one(
+        &self,
+        tag: &StructTag,
+        bytes: &[u8],
+        meter: &mut Meter,
+    ) -> Result<MoveResource> {
+        let annotated = self.inner.view_resource_with_limit(tag, bytes, meter)?;
+        let resource: MoveResource = annotated.try_into()?;
+        meter.check()?;
+        Ok(resource)
+    }
+
+    // INVARIANT: threads one `Meter` across every element — see `annotate_one`. The shared batch
+    // budget is measured on one thread, so this call tree must never `.await`.
     fn annotate_with_limit<'b, T: Borrow<StructTag>>(
         &self,
         data: impl Iterator<Item = (T, &'b [u8])>,
         meter: &mut Meter,
     ) -> Result<Vec<MoveResource>> {
-        data.map(|(typ, bytes)| {
-            let annotated = self
-                .inner
-                .view_resource_with_limit(typ.borrow(), bytes, meter)?;
-            let resource: MoveResource = annotated.try_into()?;
-            meter.check()?;
-            Ok(resource)
-        })
-        .collect()
+        data.map(|(typ, bytes)| self.annotate_one(typ.borrow(), bytes, meter))
+            .collect()
     }
 
-    // INVARIANT: must stay synchronous — see `annotate_with_limit`. The shared batch `Meter`
+    // INVARIANT: must stay synchronous — see `annotate_one`. The shared batch `Meter`
     // measures thread-local live bytes, so this call tree must never `.await`.
     pub fn try_into_resources<'b>(
         &self,
@@ -198,8 +213,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         self.annotate_with_limit(data, &mut self.resource_annotation_meter())
     }
 
+    // INVARIANT: must stay synchronous — see `annotate_one`. The `Meter` measures thread-local
+    // live bytes, so this call tree must never `.await`.
     pub fn try_into_resource(&self, tag: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
-        self.inner.view_resource(tag, bytes)?.try_into()
+        self.annotate_one(tag, bytes, &mut self.resource_annotation_meter())
     }
 
     pub fn is_resource_group(&self, tag: &StructTag) -> bool {
