@@ -229,8 +229,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 match state_view.get_state_value_bytes(&key)? {
                     Some(group_bytes) => {
                         let mut meter = self.resource_annotation_meter();
-                        let group = decode_resource_group_with_limit(&group_bytes, &mut meter)?;
-                        group.get(tag).cloned().map(Bytes::from)
+                        let mut group = decode_resource_group_with_limit(&group_bytes, &mut meter)?;
+                        // Take ownership of the requested member rather than cloning it: `group`
+                        // is dropped immediately after, so removing avoids a full copy of a value
+                        // that can approach the annotation budget.
+                        group.remove(tag).map(Bytes::from)
                     },
                     None => None,
                 }
