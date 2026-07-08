@@ -75,14 +75,10 @@ mod metered {
 
     #[test]
     fn shared_meter_bounds_aggregate_across_calls() {
-        // A single meter threaded across many *retained* values must abort once their
-        // cumulative live footprint exceeds the budget, even though each value alone is
-        // far under it. This is the contract the events-page converter relies on.
-        //
-        // Contrast (why the fix is needed): looping over `view_value` instead would seed a
-        // *fresh* meter per value, each measured from an ever-higher baseline, so none would
-        // abort and the page aggregate would grow unbounded. That per-call path is intentionally
-        // left unchanged and is exercised by the single-value sanity assertion below.
+        // One meter shared across many *retained* values must abort once their cumulative live
+        // footprint exceeds the budget, though each value alone is far under it — the contract the
+        // events-page converter relies on. (Looping `view_value` would seed a fresh meter per value
+        // and never see the aggregate; that per-call path is left to the sanity assert below.)
         let blob = vec_u64_blob(80_000);
         let ty = TypeTag::Vector(Box::new(TypeTag::U64));
         let annotator = MoveValueAnnotator::new_with_meter_config(
