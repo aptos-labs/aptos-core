@@ -841,7 +841,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let mut ret = Vec::with_capacity(events.len());
         for event in events {
             let (ty, data_blob) = ty_and_data(event);
-            let data = self.inner.view_value_with_limit(ty, data_blob, &mut meter)?;
+            let data = self
+                .inner
+                .view_value_with_limit(ty, data_blob, &mut meter)?;
             ret.push((event, MoveValue::try_from(data)?.json()?).into());
             meter.check()?;
         }
