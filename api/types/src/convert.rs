@@ -819,29 +819,41 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         }))
     }
 
-    pub fn try_into_events(&self, events: &[ContractEvent]) -> Result<Vec<Event>> {
-        let mut ret = vec![];
+    // INVARIANT: must stay synchronous — see `annotate_with_limit`. The shared `Meter` measures
+    // thread-local live bytes, so the whole page must be annotated on one thread without `.await`.
+    //
+    // One meter is threaded across the whole page so its cumulative live-byte budget bounds the
+    // page *aggregate*, not each event in isolation. `ty_and_data` extracts the annotatable
+    // `(type, blob)` from each event kind; the trailing `check()` also charges the retained JSON
+    // that `view_value_with_limit`'s internal checks run before.
+    fn annotate_events<'e, E, T>(
+        &self,
+        events: &'e [E],
+        ty_and_data: impl Fn(&E) -> (&TypeTag, &[u8]),
+    ) -> Result<Vec<T>>
+    where
+        T: From<(&'e E, serde_json::Value)>,
+    {
+        let mut meter = self.resource_annotation_meter();
+        let mut ret = Vec::with_capacity(events.len());
         for event in events {
-            let data = self
-                .inner
-                .view_value(event.type_tag(), event.event_data())?;
+            let (ty, data_blob) = ty_and_data(event);
+            let data = self.inner.view_value_with_limit(ty, data_blob, &mut meter)?;
             ret.push((event, MoveValue::try_from(data)?.json()?).into());
+            meter.check()?;
         }
         Ok(ret)
+    }
+
+    pub fn try_into_events(&self, events: &[ContractEvent]) -> Result<Vec<Event>> {
+        self.annotate_events(events, |e| (e.type_tag(), e.event_data()))
     }
 
     pub fn try_into_versioned_events(
         &self,
         events: &[EventWithVersion],
     ) -> Result<Vec<VersionedEvent>> {
-        let mut ret = vec![];
-        for event in events {
-            let data = self
-                .inner
-                .view_value(event.event.type_tag(), event.event.event_data())?;
-            ret.push((event, MoveValue::try_from(data)?.json()?).into());
-        }
-        Ok(ret)
+        self.annotate_events(events, |e| (e.event.type_tag(), e.event.event_data()))
     }
 
     pub fn try_into_signed_transaction_poem(

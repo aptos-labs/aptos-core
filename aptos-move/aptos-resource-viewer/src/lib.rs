@@ -56,6 +56,15 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         self.0.view_value(ty_tag, blob)
     }
 
+    pub fn view_value_with_limit(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        meter: &mut Meter,
+    ) -> anyhow::Result<AnnotatedMoveValue> {
+        self.0.view_value_with_limit(ty_tag, blob, meter)
+    }
+
     pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Arc<CompiledModule>>> {
         self.0.view_module(module_id)
     }
