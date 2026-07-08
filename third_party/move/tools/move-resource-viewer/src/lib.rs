@@ -701,9 +701,21 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
-        let mut meter = self.fresh_meter();
-        let ty = self.resolve_type_impl(ty_tag, &mut meter)?;
-        self.view_value_by_fat_type(&ty, blob, &mut meter)
+        self.view_value_with_limit(ty_tag, blob, &mut self.fresh_meter())
+    }
+
+    /// Annotate a single value against a caller-supplied [`Meter`]. Threading one meter across a
+    /// batch (e.g. a page of events) bounds the batch's *aggregate* live heap, mirroring
+    /// [`view_resource_with_limit`] for resources. Callers wanting an isolated per-call budget use
+    /// [`view_value`], which seeds a fresh meter.
+    pub fn view_value_with_limit(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        meter: &mut Meter,
+    ) -> anyhow::Result<AnnotatedMoveValue> {
+        let ty = self.resolve_type_impl(ty_tag, meter)?;
+        self.view_value_by_fat_type(&ty, blob, meter)
     }
 
     /// Collect information about tables contained in the value represented by the blob.
