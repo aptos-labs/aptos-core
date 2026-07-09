@@ -300,8 +300,8 @@ impl PendingVotes {
                 error!(
                     SecurityEvent::ConsensusEquivocatingVote,
                     remote_peer = vote.author(),
-                    vote = vote,
-                    previous_vote = previously_seen_vote
+                    vote = %vote,
+                    previous_vote = %previously_seen_vote
                 );
 
                 return VoteReceptionResult::EquivocateVote;

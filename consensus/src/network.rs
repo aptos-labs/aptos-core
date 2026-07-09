@@ -301,7 +301,7 @@ impl NetworkSender {
             .map_err(|e| {
                 error!(
                     SecurityEvent::InvalidRetrievedBlock,
-                    request_block_response = response,
+                    request_block_response = %response,
                     error = ?e,
                 );
                 e
@@ -1050,7 +1050,7 @@ impl NetworkTask {
                         | ConsensusMsg::BlockRetrievalResponse(_)
                         | ConsensusMsg::BatchResponse(_)
                         | ConsensusMsg::BatchResponseV2(_) => {
-                            warn!(remote_peer = peer_id, "Unexpected RPC msg: {:?}", msg);
+                            warn!(remote_peer = peer_id, "Unexpected RPC msg: {}", msg.name());
                             continue;
                         },
                     };
