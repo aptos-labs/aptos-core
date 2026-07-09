@@ -60,6 +60,9 @@ impl StateApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
+        fail_point_poem("endpoint_get_account_resource")?;
+        self.context
+            .check_api_output_enabled("Get account resource", &accept_type)?;
         resource_type
             .0
             .verify(0)
@@ -67,9 +70,6 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
-        fail_point_poem("endpoint_get_account_resource")?;
-        self.context
-            .check_api_output_enabled("Get account resource", &accept_type)?;
 
         let api = self.clone();
         api_spawn_blocking(move || {
@@ -153,6 +153,9 @@ impl StateApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
+        fail_point_poem("endpoint_get_table_item")?;
+        self.context
+            .check_api_output_enabled("Get table item", &accept_type)?;
         table_item_request
             .0
             .verify()
@@ -160,9 +163,6 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
-        fail_point_poem("endpoint_get_table_item")?;
-        self.context
-            .check_api_output_enabled("Get table item", &accept_type)?;
         let api = self.clone();
         api_spawn_blocking(move || {
             api.table_item(

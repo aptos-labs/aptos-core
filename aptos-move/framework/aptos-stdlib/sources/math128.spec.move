@@ -37,6 +37,7 @@ spec aptos_std::math128 {
 
     spec floor_log2(x: u128): u8 {
         pragma opaque;
+        pragma seed = 2;
         aborts_if x == 0;
         ensures result <= 127;
         ensures [abstract] spec_pow(2, result) <= x;

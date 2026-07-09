@@ -3320,7 +3320,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-move-flow"
-version = "1.0.4"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
@@ -3358,6 +3358,7 @@ dependencies = [
  "pathsearch",
  "regex",
  "rmcp",
+ "self_update",
  "serde",
  "serde_json",
  "tempfile",
@@ -3950,6 +3951,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "regex",
  "reqwest 0.11.23",
  "serde",
  "serde_json",
@@ -3975,6 +3977,29 @@ dependencies = [
  "move-core-types",
  "move-model",
  "serde",
+]
+
+[[package]]
+name = "aptos-release-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-release-builder",
+ "aptos-rest-client",
+ "aptos-types",
+ "chrono",
+ "clap 4.5.60",
+ "git2 0.16.1",
+ "hex",
+ "move-command-line-common",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "sha2 0.9.9",
+ "tempfile",
+ "tokio",
+ "toml 0.7.8",
+ "url",
 ]
 
 [[package]]
@@ -4977,6 +5002,7 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
+ "crossbeam-utils",
  "dashmap 7.0.0-rc2",
  "derivative",
  "fixed",
@@ -5041,6 +5067,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "futures",
  "lru",
  "move-core-types",
  "tokio",
@@ -5129,6 +5156,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
+ "rustc-hash 2.1.1",
  "serde",
  "test-case",
  "triomphe",
@@ -5264,6 +5292,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
+ "rustc-hash 2.1.1",
  "serde",
  "test-case",
  "triomphe",
@@ -7841,9 +7870,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.19"
+version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
+checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crunchy"
@@ -12901,6 +12930,7 @@ name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
  "blake2-rfc",
+ "libsecp256k1",
  "mono-move-core",
  "move-core-types",
  "ripemd",

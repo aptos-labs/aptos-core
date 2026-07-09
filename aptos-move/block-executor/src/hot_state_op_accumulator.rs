@@ -11,7 +11,12 @@ pub struct BlockHotStateOpAccumulator<Key> {
     /// Keys read but never written to across the entire block are to be made hot (or refreshed
     /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
     /// effect of the block epilogue.
-    to_make_hot: BTreeSet<Key>,
+    ///
+    /// Unordered: `StateKey`'s `Hash`/`Eq` use the precomputed key hash and `Arc` pointer
+    /// equality, while `Ord` dereferences and compares key contents, so a per-read `BTreeSet`
+    /// insert is comparatively costly. The deterministic order the epilogue needs is imposed
+    /// once, when the cap is applied in `get_keys_to_make_hot`.
+    to_make_hot: hashbrown::HashSet<Key>,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
     /// so no need to issue separate HotStateOps to promote them to the hot state.
@@ -34,7 +39,7 @@ where
 
     pub fn new_with_config(max_promotions_per_block: usize) -> Self {
         Self {
-            to_make_hot: BTreeSet::new(),
+            to_make_hot: hashbrown::HashSet::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
         }
@@ -58,20 +63,28 @@ where
             if self.writes.contains(key) {
                 continue;
             }
-            self.to_make_hot.insert(key.clone());
+            // Most reads repeat keys seen in earlier transactions (e.g. framework modules),
+            // so clone only when the key is new to the set.
+            self.to_make_hot.get_or_insert_owned(key);
         }
     }
 
     pub fn get_keys_to_make_hot(&self) -> BTreeSet<Key> {
         let num_eligible = self.to_make_hot.len();
-        if num_eligible > self.max_promotions_per_block {
-            COUNTER.inc_with_by(
-                &["promotions_dropped_over_cap"],
-                (num_eligible - self.max_promotions_per_block) as u64,
-            );
+        if num_eligible <= self.max_promotions_per_block {
+            // Under the cap: collecting into the BTreeSet imposes the deterministic order.
+            return self.to_make_hot.iter().cloned().collect();
         }
-        self.to_make_hot
-            .iter()
+        COUNTER.inc_with_by(
+            &["promotions_dropped_over_cap"],
+            (num_eligible - self.max_promotions_per_block) as u64,
+        );
+        // Over the cap: keep the smallest keys. `to_make_hot` is unordered, so sort before
+        // applying the cap to select the same subset regardless of read/iteration order.
+        let mut eligible = self.to_make_hot.iter().collect::<Vec<_>>();
+        eligible.sort_unstable();
+        eligible
+            .into_iter()
             .take(self.max_promotions_per_block)
             .cloned()
             .collect()

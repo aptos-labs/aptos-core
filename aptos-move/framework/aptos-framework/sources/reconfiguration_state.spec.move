@@ -22,16 +22,17 @@ spec aptos_framework::reconfiguration_state {
     spec is_in_progress(): bool {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_is_in_progress();
+        ensures [abstract] result == spec_is_in_progress();
+        ensures [concrete] result == (exists<State>(@aptos_framework) &&
+            copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
+                == b"0x1::reconfiguration_state::StateActive");
     }
 
     spec fun spec_is_in_progress(): bool {
-        if (!exists<State>(@aptos_framework)) {
-            false
-        } else {
-            copyable_any::type_name(global<State>(@aptos_framework).variant).bytes == b"0x1::reconfiguration_state::StateActive"
-        }
+        exists<State>(@aptos_framework) && spec_state_is_active(global<State>(@aptos_framework))
     }
+
+    spec fun spec_state_is_active(s: State): bool;
 
     spec State {
         use aptos_std::from_bcs;

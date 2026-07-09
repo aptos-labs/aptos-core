@@ -325,6 +325,13 @@ impl NativeContext for ProductionNativeContext<'_> {
             ));
         }
         let len = bytes.len() as u64;
+        if len == 0 {
+            // TODO(correctness): audit empty <=> null vector invariant
+            // SAFETY: passing `null` is always safe.
+            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
+            return Ok(Vector::from_handle(handle));
+        }
+
         // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
         // through `&self` at once is sound — at most one `&mut` per field is
         // live (see the type-level aliasing rule).

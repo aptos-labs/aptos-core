@@ -1,10 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_50, gas_params::natives::aptos_framework::*,
+};
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
-    SafeNativeResult,
+    SafeNativeError, SafeNativeResult,
 };
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use better_any::{Tid, TidAble};
@@ -25,6 +27,10 @@ use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
 };
+
+/// Returned by `exists_at` when its type argument is not a resource (struct) type with the
+/// `key` ability.
+const ENOT_A_RESOURCE_TYPE: u64 = 11;
 
 /// Cached emitted module events.
 #[derive(Default, Tid)]
@@ -82,6 +88,16 @@ fn native_exists_at(
     let address = safely_pop_arg!(args, AccountAddress);
 
     context.charge(OBJECT_EXISTS_AT_BASE)?;
+
+    // Only structs can be resources in global storage. A non-struct type (e.g., a function type
+    // that declared the `key` ability) would reach the data cache and trip a VM invariant
+    // violation, so reject it here with a deterministic, kept abort instead.
+    if context.gas_feature_version() >= RELEASE_V1_50 && !type_.is_struct_or_enum() {
+        return Err(SafeNativeError::abort_with_message(
+            ENOT_A_RESOURCE_TYPE,
+            "Object type argument must be a resource (struct) type",
+        ));
+    }
 
     let (exists, num_bytes) = context.exists_at(address, type_).map_err(|err| {
         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(

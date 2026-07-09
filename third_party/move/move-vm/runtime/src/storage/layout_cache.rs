@@ -18,6 +18,7 @@
 //!   2. Arguably, we need layouts for root-like values only (e.g., those with `key` ability).
 
 use crate::LayoutWithDelayedFields;
+use ambassador::delegatable_trait;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::language_storage::ModuleId;
 use move_vm_types::{loaded_data::struct_name_indexing::StructNameIndex, ty_interner::TypeVecId};
@@ -94,6 +95,7 @@ pub struct StructKey {
 }
 
 /// Interface for fetching and storing layouts into the cache.
+#[delegatable_trait]
 pub trait LayoutCache {
     /// If layout root is cached, returns the cached entry (with the modules that were used to
     /// construct it). The reader must ensure to read the module-set for gas charging of validation

@@ -28,6 +28,7 @@ use futures::executor::block_on;
 use handlebars::Handlebars;
 use move_binary_format::file_format_common::VERSION_DEFAULT;
 use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::HashMap,
@@ -193,25 +194,75 @@ impl<'de> Deserialize<'de> for GasScheduleLocator {
     }
 }
 
+/// Raw base URL for published gas schedules in `aptos-labs/aptos-networks`.
+const APTOS_NETWORKS_RAW: &str = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main";
+
+/// A release version like `v1.45.1` or `v1.16.1-rc` (vs. a URL or file path): a
+/// leading `v`, three numeric components, and an optional pre-release suffix.
+static GAS_VERSION_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^v\d+\.\d+\.\d+(-[\w.-]+)?$").expect("valid version regex"));
+
 impl GasScheduleLocator {
-    async fn fetch_gas_schedule(&self) -> Result<GasScheduleV2> {
-        println!("{:?}", self);
+    pub async fn fetch_gas_schedule(&self) -> Result<GasScheduleV2> {
         match self {
+            // A plain version (e.g. `v1.45.1`) has no dedicated locator variant,
+            // so it deserializes as a "local file"; detect and resolve it against
+            // aptos-networks before treating the string as a real path.
+            GasScheduleLocator::LocalFile(s) if GAS_VERSION_RE.is_match(s) => {
+                fetch_gas_by_version(s).await
+            },
             GasScheduleLocator::LocalFile(path) => {
-                let file_contents = fs::read_to_string(path)?;
-                let gas_schedule: GasScheduleV2 = serde_json::from_str(&file_contents)?;
-                Ok(gas_schedule)
+                let file_contents = fs::read_to_string(path)
+                    .with_context(|| format!("failed to read gas schedule from {}", path))?;
+                serde_json::from_str(&file_contents)
+                    .with_context(|| format!("failed to parse gas schedule from {}", path))
             },
-            GasScheduleLocator::RemoteFile(url) => {
-                let response = reqwest::get(url.as_str()).await?;
-                let gas_schedule: GasScheduleV2 = response.json().await?;
-                Ok(gas_schedule)
-            },
+            GasScheduleLocator::RemoteFile(url) => fetch_gas_url(url.as_str()).await,
             GasScheduleLocator::Current => Ok(aptos_gas_schedule_updator::current_gas_schedule(
                 LATEST_GAS_FEATURE_VERSION,
             )),
         }
     }
+}
+
+/// Fetch a published gas schedule for `version` from aptos-networks, trying the
+/// bundle location first and the legacy `gas/` directory second.
+async fn fetch_gas_by_version(version: &str) -> Result<GasScheduleV2> {
+    let candidates = [
+        format!(
+            "{}/framework-releases/{}/gas/new.json",
+            APTOS_NETWORKS_RAW, version
+        ),
+        format!("{}/gas/{}.json", APTOS_NETWORKS_RAW, version),
+    ];
+    let mut last_err = None;
+    for url in &candidates {
+        match fetch_gas_url(url).await {
+            Ok(schedule) => return Ok(schedule),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(anyhow!(
+        "could not fetch gas schedule for version {} from aptos-networks; tried {} and {} (last error: {})",
+        version,
+        candidates[0],
+        candidates[1],
+        last_err.expect("at least one candidate is always tried"),
+    ))
+}
+
+/// HTTP-fetch and parse a gas schedule, treating a non-success status (e.g. 404)
+/// as an error so callers can fall back to another location.
+async fn fetch_gas_url(url: &str) -> Result<GasScheduleV2> {
+    let response = reqwest::get(url)
+        .await
+        .with_context(|| format!("request to {} failed", url))?
+        .error_for_status()
+        .with_context(|| format!("{} returned an error status", url))?;
+    response
+        .json()
+        .await
+        .with_context(|| format!("failed to parse gas schedule from {}", url))
 }
 
 impl ReleaseEntry {
@@ -888,3 +939,27 @@ fn get_signer_arg(is_testnet: bool, next_execution_hash: &Option<HashValue>) -> 
 
 /// Estimated async reconfiguration time.
 static MAX_ASYNC_RECONFIG_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60));
+
+#[cfg(test)]
+mod tests {
+    use super::GAS_VERSION_RE;
+
+    #[test]
+    fn gas_version_vs_path() {
+        for v in ["v1.45.1", "v1.16.1-rc", "v1.16.1-rc.1", "v10.0.0"] {
+            assert!(GAS_VERSION_RE.is_match(v), "{v} should match");
+        }
+        for p in [
+            "gas.json",
+            "/tmp/x.json",
+            "v1.45.1.json",
+            "vX.WW.Z",
+            "1.45.1",
+            "v1.45",
+            "current",
+            "",
+        ] {
+            assert!(!GAS_VERSION_RE.is_match(p), "{p} should not match");
+        }
+    }
+}

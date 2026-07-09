@@ -48,6 +48,7 @@ bon = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
+crossbeam-utils = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
 fixed = { workspace = true }

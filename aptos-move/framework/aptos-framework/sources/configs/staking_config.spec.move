@@ -161,15 +161,21 @@ spec aptos_framework::staking_config {
         ensures (features::spec_periodical_reward_rate_decrease_enabled() &&
             (global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64) != 0) ==>
                 result_2 <= MAX_U64;
+    } proof {
+        split features::spec_periodical_reward_rate_decrease_enabled();
     }
 
     spec reward_rate(): (u64, u64) {
-        let config = global<StakingConfig>(@aptos_framework);
         aborts_if !exists<StakingConfig>(@aptos_framework);
         include StakingRewardsConfigRequirement;
+        ensures result_1 <= MAX_REWARDS_RATE;
+        ensures result_2 > 0;
+        ensures result_1 <= result_2;
         ensures (features::spec_periodical_reward_rate_decrease_enabled() &&
             (global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64) != 0) ==>
-            result_1 <= MAX_REWARDS_RATE && result_2 <= MAX_U64;
+                result_2 <= MAX_U64;
+    } proof {
+        split features::spec_periodical_reward_rate_decrease_enabled();
     }
 
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {

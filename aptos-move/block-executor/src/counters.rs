@@ -450,6 +450,17 @@ pub static HOT_STATE_OP_ACCUMULATOR_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static HOT_STATE_PROMOTIONS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_hot_state_promotions_per_block",
+        // metric description
+        "Number of keys the block end info designates for hot state promotion",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 16).unwrap(),
+    )
+    .unwrap()
+});
+
 pub static NUM_INTERNED_TYPES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "num_interned_types",

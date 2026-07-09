@@ -31,6 +31,29 @@ cargo run --release -p mono-move-replay-benchmark -- bench \
 `capture` records each transaction together with the full module dependency closure it needs, so a
 cold replay can resolve every module (not just the ones the original on-chain execution loaded).
 
+There is also an option to benchmark a single transaction at a time.
+
+```bash
+cargo run -p mono-move-replay-benchmark -- bench \
+      --transactions-file data/5663916074_txns \
+      --inputs-file data/5663916074_inputs \
+      --warmup 50 --samples 2000
+```
+
+For profiling, it is usually convenient to record measurements per VM.
+For that, use `--vm (both | v1 | v2)` flag when running the benchmark.
+For example, collecting the profile with samply for V1 VM is simply:
+
+```bash
+cargo build --release -p mono-move-replay-benchmar
+
+samply record \
+      ./target/release/mono-move-replay-benchmark bench \
+      --transactions-file data/5663916074_txns \
+      --inputs-file data/5663916074_inputs \
+      --vm v1 --warmup 50 --samples 2000
+```
+
 ## What is measured
 
 All setup is done once up front; the timer wraps only "deserialize/place the entry arguments +

@@ -8,27 +8,16 @@
 pub use mono_move_core::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 
 // ---------------------------------------------------------------------------
-// Step result
-// ---------------------------------------------------------------------------
-
-#[derive(Debug)]
-pub enum StepResult {
-    /// There are more instructions to execute.
-    Continue,
-    /// The outermost function has returned — execution is complete.
-    Done,
-    /// Execution hit an `Abort` / `AbortMsg` micro-op. The code is the
-    /// u64 abort code; the message is populated when `AbortMsg` ran.
-    Aborted { code: u64, message: Option<String> },
-}
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 
 pub(crate) const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
+
+/// Initial capacity, in elements, of a vector allocated lazily on its first
+/// `push_back`.
+pub(crate) const VEC_PUSHBACK_INIT_CAPACITY: u64 = 4;
 
 /// Maximum size of an `AbortMsg` message, in bytes.
 /// TODO(cleanup): make this configurable in some VM config.

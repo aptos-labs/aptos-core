@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[[bin]]
+name = "mono-move-replay-benchmark"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-block-executor = { workspace = true }
@@ -38,7 +42,3 @@ move-vm-types = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-
-[[bin]]
-name = "mono-move-replay-benchmark"
-path = "src/main.rs"

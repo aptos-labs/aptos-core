@@ -36,6 +36,11 @@ impl ProposalMsg {
             "Proposal {} for a NIL block",
             self.proposal
         );
+        ensure!(
+            !self.proposal.is_opt_block(),
+            "Proposal {} for an opt block",
+            self.proposal
+        );
         self.proposal
             .verify_well_formed()
             .context("Fail to verify ProposalMsg's block")?;

@@ -1,0 +1,8 @@
+processed 6 tasks
+task 1 lines 10-39:  publish --private-key Alice [module Alice::events_test {]
+task 2 lines 41-41:  run --signers Alice -- Alice::events_test::emit_v1_ok
+task 3 lines 43-43:  run --signers Alice -- Alice::events_test::emit_v1_too_large
+Error: Failed to execute transaction. ExecutionStatus: MoveAbort { location: 0000000000000000000000000000000000000000000000000000000000000001::event, code: 1, info: Some(AbortInfo { reason_name: "ECANNOT_CREATE_EVENT", description: "Event v1 size is not computable: type tag may be invalid or too complex" }) }
+task 4 lines 45-45:  run --signers Alice -- Alice::events_test::emit_v2_ok
+task 5 lines 47-47:  run --signers Alice -- Alice::events_test::emit_v2_too_large
+Error: Failed to execute transaction. ExecutionStatus: MoveAbort { location: 0000000000000000000000000000000000000000000000000000000000000001::event, code: 1, info: Some(AbortInfo { reason_name: "ECANNOT_CREATE_EVENT", description: "Event v2 size is not computable: type tag may be invalid or too complex" }) }

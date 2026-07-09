@@ -73,6 +73,7 @@ once_cell = { workspace = true }
 ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+rustc-hash = { workspace = true }
 serde = { workspace = true }
 triomphe = { workspace = true }
 

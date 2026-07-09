@@ -1,0 +1,38 @@
+[package]
+name = "aptos-release-tool"
+description = "Tooling for building, verifying, and deploying self-contained framework release bundles"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[[bin]]
+name = "aptos-release-tool"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-release-builder = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-types = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+git2 = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+move-command-line-common = { workspace = true }
+tempfile = { workspace = true }

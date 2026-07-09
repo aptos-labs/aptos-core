@@ -91,9 +91,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
-            }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
@@ -117,6 +114,27 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 .expect("approx_output_size needs to be computed if block_output_limit is set");
         } else {
             assert_none!(approx_output_size);
+        }
+    }
+
+    /// Returns whether hot state promotions are being accumulated for this block. Callers
+    /// use this to skip extracting the per-transaction key sets when they would be unused.
+    pub(crate) fn is_hot_state_accumulation_enabled(&self) -> bool {
+        self.hot_state_op_accumulator.is_some()
+    }
+
+    /// Feeds the hot state accumulator with the keys the transaction read (the VM-observed
+    /// read set carried by the output) and the keys it writes. Called per transaction in
+    /// commit order.
+    pub(crate) fn accumulate_hot_state_rw<'a>(
+        &mut self,
+        writes: impl Iterator<Item = &'a T::Key>,
+        reads: impl Iterator<Item = &'a T::Key>,
+    ) where
+        T::Key: 'a,
+    {
+        if let Some(accumulator) = &mut self.hot_state_op_accumulator {
+            accumulator.add_transaction(writes, reads);
         }
     }
 
@@ -300,6 +318,9 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         };
 
         let to_make_hot = self.get_keys_to_make_hot();
+        if self.hot_state_op_accumulator.is_some() {
+            counters::HOT_STATE_PROMOTIONS_PER_BLOCK.observe(to_make_hot.len() as f64);
+        }
         TBlockEndInfoExt::new(inner, to_make_hot)
     }
 

@@ -906,6 +906,14 @@ where
         HashSet::new()
     }
 
+    fn storage_keys_read(&self) -> impl Iterator<Item = &K> {
+        std::iter::empty()
+    }
+
+    fn storage_keys_written(&self) -> impl Iterator<Item = &K> {
+        std::iter::empty()
+    }
+
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }

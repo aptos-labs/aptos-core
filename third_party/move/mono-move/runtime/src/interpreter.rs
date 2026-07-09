@@ -24,9 +24,9 @@ use crate::{
     },
     native_context::ProductionNativeContext,
     types::{
-        StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
+        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        VEC_PUSHBACK_INIT_CAPACITY,
     },
     value_utils, ExecutionContext,
 };
@@ -55,19 +55,46 @@ use std::ptr::{null, NonNull};
 // Runtime state
 // ---------------------------------------------------------------------------
 
+/// The VM's virtual registers.
+///
+/// # Performance note
+///
+/// The dispatch loop operates on a local copy that the compiler can hopefully
+/// keep in real CPU registers, writing it back only on entry/exit. A reference
+/// to these must never escape into a non-inlined function, or the compiler may
+/// be forced to spill them to the stack.
+#[derive(Clone, Copy)]
+pub(crate) struct VMRegisters {
+    /// Index of the next instruction to execute within `func`'s code.
+    pub(crate) pc: usize,
+    /// Frame pointer of the current call frame.
+    pub(crate) fp: *mut u8,
+    /// The function currently executing.
+    pub(crate) func: NonNull<Function>,
+}
+
+impl VMRegisters {
+    /// Registers initialized with a fresh root frame, ready to begin execution.
+    fn new(stack_base: *mut u8, func: &Function) -> Self {
+        Self {
+            pc: 0,
+            // SAFETY: `stack_base` points to a stack allocation far larger than
+            // `FRAME_METADATA_SIZE`, so the offset stays in bounds.
+            fp: unsafe { stack_base.add(FRAME_METADATA_SIZE) },
+            func: NonNull::from(func),
+        }
+    }
+}
+
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
     /// Per-transaction context (function resolution, gas counters,
     /// descriptor table, etc.).
     pub(crate) exec_ctx: &'a mut T,
 
-    pub(crate) pc: usize,
-    /// Pointer to the currently executing function.
-    pub(crate) current_func: NonNull<Function>,
-    /// Absolute pointer into the linear stack memory. Operand accesses are a
-    /// single addition (`fp + offset`).
-    /// Recomputed only during calls and returns.
-    pub(crate) frame_ptr: *mut u8,
+    /// The VM registers; the dispatch loop works on a local copy and writes it
+    /// back here on exit.
+    pub(crate) registers: VMRegisters,
 
     pub(crate) stack: MemoryRegion,
     pub(crate) heap: Heap,
@@ -102,7 +129,6 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
 
         let stack = MemoryRegion::new(DEFAULT_STACK_SIZE);
         let base = stack.as_ptr();
-        let frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
 
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
@@ -112,9 +138,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
 
         Self {
             exec_ctx,
-            pc: 0,
-            current_func: NonNull::from(entry),
-            frame_ptr,
+            registers: VMRegisters::new(base, entry),
             stack,
             heap: Heap::new(heap_size),
             root_pool: RootPool::new(),
@@ -193,9 +217,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
-        self.frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
-        self.pc = 0;
-        self.current_func = NonNull::from(func);
+        self.registers = VMRegisters::new(base, func);
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
@@ -209,7 +231,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         if func.zero_frame {
             unsafe {
                 std::ptr::write_bytes(
-                    self.frame_ptr.add(func.param_region_size),
+                    self.registers.fp.add(func.param_region_size),
                     0,
                     func.extended_frame_size - func.param_region_size,
                 );
@@ -313,7 +335,15 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         values: &[u64],
     ) -> RuntimeResult<u64> {
         let n = values.len() as u64;
-        let ptr = alloc_vec!(self, self.frame_ptr, descriptor_id, 8, n)?;
+        let ptr = alloc_vec!(
+            self,
+            self.registers.fp,
+            self.registers.pc,
+            self.registers.func,
+            descriptor_id,
+            8,
+            n
+        )?;
         unsafe {
             write_u64(ptr, VEC_LENGTH_OFFSET, n);
             let data = ptr.add(VEC_DATA_OFFSET);
@@ -842,1096 +872,1173 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         target: CodeOffset,
         gas_taken: u64,
         gas_fallthrough: u64,
-    ) -> RuntimeResult<StepResult> {
+        regs: &mut VMRegisters,
+    ) -> RuntimeResult<()> {
         if cond {
             self.exec_ctx.gas_meter().charge(gas_taken)?;
-            self.pc = target.into();
+            regs.pc = target.into();
         } else {
             self.exec_ctx.gas_meter().charge(gas_fallthrough)?;
-            self.pc += 1;
+            regs.pc += 1;
         }
-        Ok(StepResult::Continue)
+        Ok(())
     }
 
-    #[inline(always)]
-    pub fn step(&mut self) -> RuntimeResult<StepResult> {
-        // SAFETY: Current function is always a valid, non-null pointer because
-        // it is derived from function reference (e.g., entrypoint) or when
-        // executing a call instruction, which stores a valid pointer.
-        let func = unsafe { self.current_func.as_ref() };
+    pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
+        // Hoist the VM registers into a local so the dispatch loop keeps
+        // them in CPU registers rather than reloading from `self.registers`
+        // each iteration. Only sync back to `self` on exit.
+        let mut regs = self.registers;
 
-        let code = func.code.get();
+        // Charge the entry function's entry block before any of its instructions run.
+        let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
+        self.exec_ctx.gas_meter().charge(entry_gas)?;
 
-        if self.pc >= code.len() {
-            invariant_violation!(PcOutOfBounds {
-                pc: self.pc,
-                func_name: func.name().to_string(),
-                code_len: code.len(),
-            });
-        }
+        let outcome = loop {
+            // SAFETY: Current function is always a valid, non-null pointer because
+            // it is derived from function reference (e.g., entrypoint) or when
+            // executing a call instruction, which stores a valid pointer.
+            let func = unsafe { regs.func.as_ref() };
 
-        let fp = self.frame_ptr;
-        let instr = &code[self.pc];
+            let code = func.code.get();
 
-        // SAFETY: fp points into the interpreter's linear stack; all byte
-        // offsets are within the current frame (enforced by the bytecode
-        // compiler). Heap pointers read from the frame are kept valid by GC.
-        unsafe {
-            // TODO(perf): explore faster dispatch -- super-instructions (fuse
-            // common sequences like load+compare+branch), threaded/computed-goto
-            // dispatch, and copy-and-patch JIT.
-            match *instr {
-                // ----- Control flow (set pc explicitly, return early) -----
-                MicroOp::CallIndirect {
-                    module_id,
-                    func_name,
-                    ty_args,
-                } => {
-                    // TODO(perf): full flow should be like this:
-                    //
-                    //   1. IC lookup:
-                    //      - Hit:  return pointer,
-                    //      - Miss: goto 2.
-                    //   2. target = load_function(...)
-                    //   3. IC insert target
-                    //   4. Patching:
-                    //      If can patch caller, try it.
-                    let target = self
-                        .exec_ctx
-                        .load_function(module_id, func_name, ty_args)
-                        .map_err(RuntimeError::Loader)?;
-                    // SAFETY: `target` points to a `Function`, which is not reclaimed during
-                    // execution as guaranteed by the execution guard.
-                    return self.call(func, fp, target.as_ref_unchecked());
-                },
-                MicroOp::CallDirect { ptr } => {
-                    return self.call(func, fp, ptr.as_ref_unchecked());
-                },
+            if regs.pc >= code.len() {
+                invariant_violation!(PcOutOfBounds {
+                    pc: regs.pc,
+                    func_name: func.name().to_string(),
+                    code_len: code.len(),
+                });
+            }
 
-                MicroOp::CallNative {
-                    native_idx,
-                    ty_args,
-                    ref abi,
-                } => {
-                    return self.exec_call_native(func, fp, native_idx, ty_args, abi);
-                },
+            let fp = regs.fp;
+            let instr = &code[regs.pc];
 
-                MicroOp::JumpNotZeroU64 {
-                    target,
-                    src,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, src) != 0,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
+            // SAFETY: fp points into the interpreter's linear stack; all byte
+            // offsets are within the current frame (enforced by the bytecode
+            // compiler). Heap pointers read from the frame are kept valid by GC.
+            unsafe {
+                // TODO(perf): explore faster dispatch -- super-instructions (fuse
+                // common sequences like load+compare+branch), threaded/computed-goto
+                // dispatch, and copy-and-patch JIT.
+                match *instr {
+                    // ----- Control flow (set pc explicitly, return early) -----
+                    MicroOp::CallIndirect {
+                        module_id,
+                        func_name,
+                        ty_args,
+                    } => {
+                        // TODO(perf): full flow should be like this:
+                        //
+                        //   1. IC lookup:
+                        //      - Hit:  return pointer,
+                        //      - Miss: goto 2.
+                        //   2. target = load_function(...)
+                        //   3. IC insert target
+                        //   4. Patching:
+                        //      If can patch caller, try it.
+                        let target = self
+                            .exec_ctx
+                            .load_function(module_id, func_name, ty_args)
+                            .map_err(RuntimeError::Loader)?;
+                        // SAFETY: `target` points to a `Function`, which is not reclaimed during
+                        // execution as guaranteed by the execution guard.
+                        self.call(func, &mut regs, target.as_ref_unchecked())?;
+                        continue;
+                    },
+                    MicroOp::CallDirect { ptr } => {
+                        self.call(func, &mut regs, ptr.as_ref_unchecked())?;
+                        continue;
+                    },
 
-                MicroOp::JumpNotZeroByte {
-                    target,
-                    src,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    // Read as `u8` only to test against zero; the byte's sign is
-                    // irrelevant.
-                    return self.cond_branch(
-                        read_u8(fp, src) != 0,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpZeroByte {
-                    target,
-                    src,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    // Read as `u8` only to test against zero; the byte's sign is
-                    // irrelevant.
-                    return self.cond_branch(
-                        read_u8(fp, src) == 0,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpIntCmp(ref op) => {
-                    return self.cond_branch(
-                        int_cmp_bool(fp, op.lhs, op.op, &op.rhs),
-                        op.target,
-                        op.gas_taken,
-                        op.gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpValueCmp(ref op) => {
-                    // Operands are the aggregate values at their slots; a
-                    // vector slot holds a pointer read through to its heap data.
-                    let a = fp.add(op.lhs.into());
-                    let b = fp.add(op.rhs.into());
-                    let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
-                    return self.cond_branch(
-                        eq ^ op.negate,
-                        op.target,
-                        op.gas_taken,
-                        op.gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpValueRefCmp(ref op) => {
-                    // Operands are references; read through the fat pointers to
-                    // obtain the operand data pointers.
-                    let (lb, lo) = read_fat_ptr(fp, op.lhs);
-                    let (rb, ro) = read_fat_ptr(fp, op.rhs);
-                    let eq = value_utils::equals(
-                        self.exec_ctx,
-                        lb.add(lo as usize),
-                        rb.add(ro as usize),
-                        op.ty,
-                    )?;
-                    return self.cond_branch(
-                        eq ^ op.negate,
-                        op.target,
-                        op.gas_taken,
-                        op.gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpGreaterEqualU64Imm {
-                    target,
-                    src,
-                    imm,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, src) >= imm,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpLessU64Imm {
-                    target,
-                    src,
-                    imm,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, src) < imm,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpGreaterU64Imm {
-                    target,
-                    src,
-                    imm,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, src) > imm,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpLessEqualU64Imm {
-                    target,
-                    src,
-                    imm,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, src) <= imm,
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpLessU64 {
-                    target,
-                    lhs,
-                    rhs,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, lhs) < read_u64(fp, rhs),
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpGreaterEqualU64 {
-                    target,
-                    lhs,
-                    rhs,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, lhs) >= read_u64(fp, rhs),
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::JumpNotEqualU64 {
-                    target,
-                    lhs,
-                    rhs,
-                    gas_taken,
-                    gas_fallthrough,
-                } => {
-                    return self.cond_branch(
-                        read_u64(fp, lhs) != read_u64(fp, rhs),
-                        target,
-                        gas_taken,
-                        gas_fallthrough,
-                    );
-                },
-
-                MicroOp::Jump { target, gas } => {
-                    self.exec_ctx.gas_meter().charge(gas)?;
-                    self.pc = target.into();
-                    return Ok(StepResult::Continue);
-                },
-
-                MicroOp::Return => {
-                    let meta = fp.sub(FRAME_METADATA_SIZE);
-
-                    let saved_func_ptr =
-                        read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
-                    if saved_func_ptr.is_null() {
-                        return Ok(StepResult::Done);
-                    }
-                    // SAFETY: We have just checked that the saved function
-                    // pointer is non-null.
-                    self.current_func = NonNull::new_unchecked(saved_func_ptr as *mut Function);
-
-                    self.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
-                    self.frame_ptr = read_ptr(meta, META_SAVED_FP_OFFSET);
-                    return Ok(StepResult::Continue);
-                },
-
-                MicroOp::Abort { code } => {
-                    let code = read_u64(fp, code);
-                    return Ok(StepResult::Aborted {
-                        code,
-                        message: None,
-                    });
-                },
-
-                MicroOp::AbortMsg { code, message } => {
-                    let code = read_u64(fp, code);
-                    let vec_ptr = read_ptr(fp, message);
-                    let len = read_vec_len(vec_ptr) as usize;
-                    let message = if len == 0 {
-                        String::new()
-                    } else {
-                        // TODO(metering): charge gas for abort message bytes.
-                        if len > ABORT_MESSAGE_SIZE_LIMIT {
-                            return Err(RuntimeError::AbortMessageTooLong {
-                                len,
-                                max: ABORT_MESSAGE_SIZE_LIMIT,
-                            });
+                    MicroOp::CallNative {
+                        native_idx,
+                        ty_args,
+                        ref abi,
+                    } => {
+                        // On abort, halt; otherwise native success falls through to
+                        // the common tail, which advances the pc by one.
+                        if let Some((code, message)) =
+                            self.exec_call_native(func, regs, native_idx, ty_args, abi)?
+                        {
+                            break RuntimeStatus::Aborted { code, message };
                         }
-                        // SAFETY: `vec_ptr` is non-null for non-zero lengths
-                        // and points at a heap vector with `len` initialized
-                        // bytes at `VEC_DATA_OFFSET`.
-                        let data = vec_ptr.add(VEC_DATA_OFFSET);
-                        String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
-                            .map_err(|_| RuntimeError::InvalidAbortMessage)?
-                    };
-                    return Ok(StepResult::Aborted {
-                        code,
-                        message: Some(message),
-                    });
-                },
+                    },
 
-                // ----- Arithmetic -----
-                MicroOp::StoreImm1 { dst, imm } => write_u8(fp, dst, imm),
-                MicroOp::StoreImm2 { dst, ref imm } => write_int::<[u8; 2]>(fp, dst, *imm),
-                MicroOp::StoreImm4 { dst, ref imm } => write_int::<[u8; 4]>(fp, dst, *imm),
-                MicroOp::StoreImm8 { dst, ref imm } => write_int::<[u8; 8]>(fp, dst, *imm),
-                MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
-                MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
-                MicroOp::StoreImmVec { dst, idx } => {
-                    self.exec_store_imm_vec(dst, idx)?;
-                },
+                    MicroOp::JumpNotZeroU64 {
+                        target,
+                        src,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, src) != 0,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
 
-                // Add
-                MicroOp::AddU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_add).ok_or_else(|| {
-                        RuntimeError::ArithmeticOverflow {
-                            op: ArithOp::Add,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
-                MicroOp::AddU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_add).ok_or_else(|| {
-                        RuntimeError::ArithmeticOverflow {
-                            op: ArithOp::Add,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
+                    MicroOp::JumpNotZeroByte {
+                        target,
+                        src,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        // Read as `u8` only to test against zero; the byte's sign is
+                        // irrelevant.
+                        self.cond_branch(
+                            read_u8(fp, src) != 0,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
 
-                // Sub
-                MicroOp::SubU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_sub).ok_or_else(|| {
-                        RuntimeError::ArithmeticUnderflow {
-                            op: ArithOp::Sub,
-                            ty: IntTy::U64,
+                    MicroOp::JumpZeroByte {
+                        target,
+                        src,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        // Read as `u8` only to test against zero; the byte's sign is
+                        // irrelevant.
+                        self.cond_branch(
+                            read_u8(fp, src) == 0,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpIntCmp(ref op) => {
+                        self.cond_branch(
+                            int_cmp_bool(fp, op.lhs, op.op, &op.rhs),
+                            op.target,
+                            op.gas_taken,
+                            op.gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpValueCmp(ref op) => {
+                        // Operands are the aggregate values at their slots; a
+                        // vector slot holds a pointer read through to its heap data.
+                        let a = fp.add(op.lhs.into());
+                        let b = fp.add(op.rhs.into());
+                        let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
+                        self.cond_branch(
+                            eq ^ op.negate,
+                            op.target,
+                            op.gas_taken,
+                            op.gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpValueRefCmp(ref op) => {
+                        // Operands are references; read through the fat pointers to
+                        // obtain the operand data pointers.
+                        let (lb, lo) = read_fat_ptr(fp, op.lhs);
+                        let (rb, ro) = read_fat_ptr(fp, op.rhs);
+                        let eq = value_utils::equals(
+                            self.exec_ctx,
+                            lb.add(lo as usize),
+                            rb.add(ro as usize),
+                            op.ty,
+                        )?;
+                        self.cond_branch(
+                            eq ^ op.negate,
+                            op.target,
+                            op.gas_taken,
+                            op.gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpGreaterEqualU64Imm {
+                        target,
+                        src,
+                        imm,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, src) >= imm,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpLessU64Imm {
+                        target,
+                        src,
+                        imm,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, src) < imm,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpGreaterU64Imm {
+                        target,
+                        src,
+                        imm,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, src) > imm,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpLessEqualU64Imm {
+                        target,
+                        src,
+                        imm,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, src) <= imm,
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpLessU64 {
+                        target,
+                        lhs,
+                        rhs,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, lhs) < read_u64(fp, rhs),
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpGreaterEqualU64 {
+                        target,
+                        lhs,
+                        rhs,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, lhs) >= read_u64(fp, rhs),
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::JumpNotEqualU64 {
+                        target,
+                        lhs,
+                        rhs,
+                        gas_taken,
+                        gas_fallthrough,
+                    } => {
+                        self.cond_branch(
+                            read_u64(fp, lhs) != read_u64(fp, rhs),
+                            target,
+                            gas_taken,
+                            gas_fallthrough,
+                            &mut regs,
+                        )?;
+                        continue;
+                    },
+
+                    MicroOp::Jump { target, gas } => {
+                        self.exec_ctx.gas_meter().charge(gas)?;
+                        regs.pc = target.into();
+                        continue;
+                    },
+
+                    MicroOp::Return => {
+                        let meta = fp.sub(FRAME_METADATA_SIZE);
+
+                        let saved_func_ptr =
+                            read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
+                        if saved_func_ptr.is_null() {
+                            break RuntimeStatus::Success;
                         }
-                    })?
-                },
-                MicroOp::SubU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub).ok_or_else(|| {
-                        RuntimeError::ArithmeticUnderflow {
-                            op: ArithOp::Sub,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
-                // dst = imm - src, so flip the operand order.
-                MicroOp::RSubU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, |s, i| u64::checked_sub(i, s))
-                        .ok_or_else(|| RuntimeError::ArithmeticUnderflow {
-                            op: ArithOp::Sub,
-                            ty: IntTy::U64,
+                        // SAFETY: We have just checked that the saved function
+                        // pointer is non-null.
+                        regs.func = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+
+                        regs.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
+                        regs.fp = read_ptr(meta, META_SAVED_FP_OFFSET);
+                        continue;
+                    },
+
+                    MicroOp::Abort { code } => {
+                        let code = read_u64(fp, code);
+                        break RuntimeStatus::Aborted {
+                            code,
+                            message: None,
+                        };
+                    },
+
+                    MicroOp::AbortMsg { code, message } => {
+                        let code = read_u64(fp, code);
+                        let vec_ptr = read_ptr(fp, message);
+                        let len = read_vec_len(vec_ptr) as usize;
+                        let message = if len == 0 {
+                            String::new()
+                        } else {
+                            // TODO(metering): charge gas for abort message bytes.
+                            if len > ABORT_MESSAGE_SIZE_LIMIT {
+                                return Err(RuntimeError::AbortMessageTooLong {
+                                    len,
+                                    max: ABORT_MESSAGE_SIZE_LIMIT,
+                                });
+                            }
+                            // SAFETY: `vec_ptr` is non-null for non-zero lengths
+                            // and points at a heap vector with `len` initialized
+                            // bytes at `VEC_DATA_OFFSET`.
+                            let data = vec_ptr.add(VEC_DATA_OFFSET);
+                            String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
+                                .map_err(|_| RuntimeError::InvalidAbortMessage)?
+                        };
+                        break RuntimeStatus::Aborted {
+                            code,
+                            message: Some(message),
+                        };
+                    },
+
+                    // ----- Arithmetic -----
+                    MicroOp::StoreImm1 { dst, imm } => write_u8(fp, dst, imm),
+                    MicroOp::StoreImm2 { dst, ref imm } => write_int::<[u8; 2]>(fp, dst, *imm),
+                    MicroOp::StoreImm4 { dst, ref imm } => write_int::<[u8; 4]>(fp, dst, *imm),
+                    MicroOp::StoreImm8 { dst, ref imm } => write_int::<[u8; 8]>(fp, dst, *imm),
+                    MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
+                    MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
+                    MicroOp::StoreImmVec { dst, idx } => {
+                        self.exec_store_imm_vec(regs, dst, idx)?;
+                    },
+
+                    // Add
+                    MicroOp::AddU64 { dst, lhs, rhs } => {
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_add).ok_or_else(|| {
+                            RuntimeError::ArithmeticOverflow {
+                                op: ArithOp::Add,
+                                ty: IntTy::U64,
+                            }
                         })?
-                },
+                    },
+                    MicroOp::AddU64Imm { dst, src, imm } => {
+                        checked_imm_op_u64(fp, dst, src, imm, u64::checked_add).ok_or_else(
+                            || RuntimeError::ArithmeticOverflow {
+                                op: ArithOp::Add,
+                                ty: IntTy::U64,
+                            },
+                        )?
+                    },
 
-                // Mul
-                MicroOp::MulU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_mul).ok_or_else(|| {
-                        RuntimeError::ArithmeticOverflow {
-                            op: ArithOp::Mul,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
-                MicroOp::MulU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul).ok_or_else(|| {
-                        RuntimeError::ArithmeticOverflow {
-                            op: ArithOp::Mul,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
+                    // Sub
+                    MicroOp::SubU64 { dst, lhs, rhs } => {
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_sub).ok_or_else(|| {
+                            RuntimeError::ArithmeticUnderflow {
+                                op: ArithOp::Sub,
+                                ty: IntTy::U64,
+                            }
+                        })?
+                    },
+                    MicroOp::SubU64Imm { dst, src, imm } => {
+                        checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub).ok_or_else(
+                            || RuntimeError::ArithmeticUnderflow {
+                                op: ArithOp::Sub,
+                                ty: IntTy::U64,
+                            },
+                        )?
+                    },
+                    // dst = imm - src, so flip the operand order.
+                    MicroOp::RSubU64Imm { dst, src, imm } => {
+                        checked_imm_op_u64(fp, dst, src, imm, |s, i| u64::checked_sub(i, s))
+                            .ok_or_else(|| RuntimeError::ArithmeticUnderflow {
+                                op: ArithOp::Sub,
+                                ty: IntTy::U64,
+                            })?
+                    },
 
-                // Div / Mod
-                MicroOp::DivU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div).ok_or_else(|| {
-                        RuntimeError::DivisionByZero {
-                            op: ArithOp::Div,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
-                // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
-                // cannot trigger Rust's div-by-zero panic. Asserted below in
-                // debug builds as a defensive check.
-                MicroOp::DivU64Imm { dst, src, imm } => {
-                    debug_assert!(
-                        imm != 0,
-                        "DivU64Imm: imm must be non-zero (verifier invariant)"
-                    );
-                    imm_op_u64(fp, dst, src, imm, |s, i| s / i)
-                },
-                MicroOp::ModU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem).ok_or_else(|| {
-                        RuntimeError::DivisionByZero {
-                            op: ArithOp::Mod,
-                            ty: IntTy::U64,
-                        }
-                    })?
-                },
-                // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
-                // cannot trigger Rust's div-by-zero panic. Asserted below in
-                // debug builds as a defensive check.
-                MicroOp::ModU64Imm { dst, src, imm } => {
-                    debug_assert!(
-                        imm != 0,
-                        "ModU64Imm: imm must be non-zero (verifier invariant)"
-                    );
-                    imm_op_u64(fp, dst, src, imm, |s, i| s % i)
-                },
+                    // Mul
+                    MicroOp::MulU64 { dst, lhs, rhs } => {
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_mul).ok_or_else(|| {
+                            RuntimeError::ArithmeticOverflow {
+                                op: ArithOp::Mul,
+                                ty: IntTy::U64,
+                            }
+                        })?
+                    },
+                    MicroOp::MulU64Imm { dst, src, imm } => {
+                        checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul).ok_or_else(
+                            || RuntimeError::ArithmeticOverflow {
+                                op: ArithOp::Mul,
+                                ty: IntTy::U64,
+                            },
+                        )?
+                    },
 
-                // Bitwise (infallible)
-                MicroOp::BitAndU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a & b),
-                MicroOp::BitOrU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a | b),
-                MicroOp::BitXorU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a ^ b),
+                    // Div / Mod
+                    MicroOp::DivU64 { dst, lhs, rhs } => {
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div).ok_or_else(|| {
+                            RuntimeError::DivisionByZero {
+                                op: ArithOp::Div,
+                                ty: IntTy::U64,
+                            }
+                        })?
+                    },
+                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
+                    // cannot trigger Rust's div-by-zero panic. Asserted below in
+                    // debug builds as a defensive check.
+                    MicroOp::DivU64Imm { dst, src, imm } => {
+                        debug_assert!(
+                            imm != 0,
+                            "DivU64Imm: imm must be non-zero (verifier invariant)"
+                        );
+                        imm_op_u64(fp, dst, src, imm, |s, i| s / i)
+                    },
+                    MicroOp::ModU64 { dst, lhs, rhs } => {
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem).ok_or_else(|| {
+                            RuntimeError::DivisionByZero {
+                                op: ArithOp::Mod,
+                                ty: IntTy::U64,
+                            }
+                        })?
+                    },
+                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
+                    // cannot trigger Rust's div-by-zero panic. Asserted below in
+                    // debug builds as a defensive check.
+                    MicroOp::ModU64Imm { dst, src, imm } => {
+                        debug_assert!(
+                            imm != 0,
+                            "ModU64Imm: imm must be non-zero (verifier invariant)"
+                        );
+                        imm_op_u64(fp, dst, src, imm, |s, i| s % i)
+                    },
 
-                // Shifts
-                MicroOp::ShlU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| v << s)
+                    // Bitwise (infallible)
+                    MicroOp::BitAndU64 { dst, lhs, rhs } => {
+                        binop_u64(fp, dst, lhs, rhs, |a, b| a & b)
+                    },
+                    MicroOp::BitOrU64 { dst, lhs, rhs } => {
+                        binop_u64(fp, dst, lhs, rhs, |a, b| a | b)
+                    },
+                    MicroOp::BitXorU64 { dst, lhs, rhs } => {
+                        binop_u64(fp, dst, lhs, rhs, |a, b| a ^ b)
+                    },
+
+                    // Shifts
+                    MicroOp::ShlU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
+                        v << s
+                    })
                     .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
                         op: ArithOp::Shl,
                         ty: IntTy::U64,
                         shift_amount,
                         bit_width: 64,
                     })?,
-                // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
-                // cannot wrap or trigger UB. Asserted below in debug builds as a
-                // defensive check.
-                MicroOp::ShlU64Imm { dst, src, imm } => {
-                    debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
-                    imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
-                },
-                MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| v >> s)
+                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
+                    // cannot wrap or trigger UB. Asserted below in debug builds as a
+                    // defensive check.
+                    MicroOp::ShlU64Imm { dst, src, imm } => {
+                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
+                        imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
+                    },
+                    MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
+                        v >> s
+                    })
                     .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
                         op: ArithOp::Shr,
                         ty: IntTy::U64,
                         shift_amount,
                         bit_width: 64,
                     })?,
-                // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
-                // cannot wrap or trigger UB. Asserted below in debug builds as a
-                // defensive check.
-                MicroOp::ShrU64Imm { dst, src, imm } => {
-                    debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
-                    imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
-                },
+                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
+                    // cannot wrap or trigger UB. Asserted below in debug builds as a
+                    // defensive check.
+                    MicroOp::ShrU64Imm { dst, src, imm } => {
+                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
+                        imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
+                    },
 
-                MicroOp::StoreRandomU64 { dst } => {
-                    let val: u64 = self.rng.r#gen();
-                    write_u64(fp, dst, val);
-                },
+                    MicroOp::StoreRandomU64 { dst } => {
+                        let val: u64 = self.rng.r#gen();
+                        write_u64(fp, dst, val);
+                    },
 
-                MicroOp::ForceGC => {
-                    gc_collect!(self)?;
-                },
+                    MicroOp::ForceGC => {
+                        gc_collect!(self, regs.fp, regs.pc, regs.func)?;
+                    },
 
-                MicroOp::Move8 { dst, src } => {
-                    let v = read_u64(fp, src);
-                    write_u64(fp, dst, v);
-                },
+                    MicroOp::Move8 { dst, src } => {
+                        let v = read_u64(fp, src);
+                        write_u64(fp, dst, v);
+                    },
 
-                MicroOp::Move { dst, src, size } => {
-                    // TODO(perf): consider adding a provably non-overlapping variant of this op.
-                    // Overlap-safe `copy`: `dst` and `src` may partially overlap.
-                    // E.g. the return-value shuffle may move results in the same home region.
-                    std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
-                },
+                    MicroOp::Move { dst, src, size } => {
+                        // TODO(perf): consider adding a provably non-overlapping variant of this op.
+                        // Overlap-safe `copy`: `dst` and `src` may partially overlap.
+                        // E.g. the return-value shuffle may move results in the same home region.
+                        std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
+                    },
 
-                // ----- Vector instructions -----
-                MicroOp::VecNew { dst } => {
-                    write_ptr(fp, dst, std::ptr::null());
-                },
+                    // ----- Vector instructions -----
+                    MicroOp::VecNew { dst } => {
+                        write_ptr(fp, dst, std::ptr::null());
+                    },
 
-                MicroOp::VecLen { dst, vec_ref } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let len = read_vec_len(vec_ptr);
-                    write_u64(fp, dst, len);
-                },
-
-                MicroOp::VecPushBack {
-                    vec_ref,
-                    elem,
-                    elem_size,
-                    descriptor_id,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let mut vec_ptr = read_ptr(ref_base, ref_off as usize);
-
-                    if vec_ptr.is_null() {
-                        vec_ptr = alloc_vec!(self, fp, descriptor_id, elem_size, 4)?;
-                        // Re-read base after potential GC.
+                    MicroOp::VecLen { dst, vec_ref } => {
                         let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                        write_ptr(ref_base, ref_off as usize, vec_ptr);
-                    }
+                        let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                        let len = read_vec_len(vec_ptr);
+                        write_u64(fp, dst, len);
+                    },
 
-                    let len = read_vec_len(vec_ptr);
-                    let total = read_obj_size(vec_ptr) as usize;
-                    let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
-                        / elem_size as usize) as u64;
+                    MicroOp::VecPushBack {
+                        vec_ref,
+                        elem,
+                        elem_size,
+                        descriptor_id,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        let mut vec_ptr = read_ptr(ref_base, ref_off as usize);
 
-                    if len >= cap_in_elems {
-                        vec_ptr = grow_vec_ref!(self, fp, vec_ref.into(), elem_size, len + 1)?;
-                    }
+                        if vec_ptr.is_null() {
+                            vec_ptr = alloc_vec!(
+                                self,
+                                fp,
+                                regs.pc,
+                                regs.func,
+                                descriptor_id,
+                                elem_size,
+                                VEC_PUSHBACK_INIT_CAPACITY
+                            )?;
+                            // Re-read base after potential GC.
+                            let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                            write_ptr(ref_base, ref_off as usize, vec_ptr);
+                        }
 
-                    std::ptr::copy_nonoverlapping(
-                        fp.add(elem.into()),
-                        vec_elem_ptr(vec_ptr, len, elem_size) as *mut u8,
-                        elem_size as usize,
-                    );
-                    write_u64(vec_ptr, VEC_LENGTH_OFFSET, len + 1);
-                },
+                        let len = read_vec_len(vec_ptr);
+                        let total = read_obj_size(vec_ptr) as usize;
+                        let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
+                            / elem_size as usize) as u64;
 
-                MicroOp::VecPopBack {
-                    dst,
-                    vec_ref,
-                    elem_size,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let len = read_vec_len(vec_ptr);
-                    if len == 0 {
-                        return Err(RuntimeError::PopFromEmptyVector);
-                    }
-                    let new_len = len - 1;
-                    std::ptr::copy_nonoverlapping(
-                        vec_elem_ptr(vec_ptr, new_len, elem_size),
-                        fp.add(dst.into()),
-                        elem_size as usize,
-                    );
-                    write_u64(vec_ptr, VEC_LENGTH_OFFSET, new_len);
-                },
+                        if len >= cap_in_elems {
+                            vec_ptr = grow_vec_ref!(
+                                self,
+                                fp,
+                                regs.pc,
+                                regs.func,
+                                vec_ref.into(),
+                                elem_size,
+                                len + 1
+                            )?;
+                        }
 
-                MicroOp::VecLoadElem {
-                    dst,
-                    vec_ref,
-                    idx,
-                    elem_size,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let idx = read_u64(fp, idx);
-                    let len = read_vec_len(vec_ptr);
-                    if idx >= len {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::LoadElem,
-                            idx,
-                            len,
-                        });
-                    }
-                    std::ptr::copy_nonoverlapping(
-                        vec_elem_ptr(vec_ptr, idx, elem_size),
-                        fp.add(dst.into()),
-                        elem_size as usize,
-                    );
-                },
+                        std::ptr::copy_nonoverlapping(
+                            fp.add(elem.into()),
+                            vec_elem_ptr(vec_ptr, len, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                        write_u64(vec_ptr, VEC_LENGTH_OFFSET, len + 1);
+                    },
 
-                MicroOp::VecStoreElem {
-                    vec_ref,
-                    idx,
-                    src,
-                    elem_size,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let idx = read_u64(fp, idx);
-                    let len = read_vec_len(vec_ptr);
-                    if idx >= len {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::StoreElem,
-                            idx,
-                            len,
-                        });
-                    }
-                    std::ptr::copy_nonoverlapping(
-                        fp.add(src.into()),
-                        vec_elem_ptr(vec_ptr, idx, elem_size) as *mut u8,
-                        elem_size as usize,
-                    );
-                },
+                    MicroOp::VecPopBack {
+                        dst,
+                        vec_ref,
+                        elem_size,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                        let len = read_vec_len(vec_ptr);
+                        if len == 0 {
+                            return Err(RuntimeError::PopFromEmptyVector);
+                        }
+                        let new_len = len - 1;
+                        std::ptr::copy_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, new_len, elem_size),
+                            fp.add(dst.into()),
+                            elem_size as usize,
+                        );
+                        write_u64(vec_ptr, VEC_LENGTH_OFFSET, new_len);
+                    },
 
-                MicroOp::VecPack(ref op) => {
-                    self.exec_vec_pack(fp, op)?;
-                },
-
-                MicroOp::VecUnpack(ref op) => {
-                    self.exec_vec_unpack(fp, op)?;
-                },
-
-                MicroOp::VecSwap {
-                    vec_ref,
-                    idx_a,
-                    idx_b,
-                    elem_size,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let idx_a = read_u64(fp, idx_a);
-                    let idx_b = read_u64(fp, idx_b);
-                    let len = read_vec_len(vec_ptr);
-                    // Indices are checked before the equal-indices no-op.
-                    for idx in [idx_a, idx_b] {
+                    MicroOp::VecLoadElem {
+                        dst,
+                        vec_ref,
+                        idx,
+                        elem_size,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                        let idx = read_u64(fp, idx);
+                        let len = read_vec_len(vec_ptr);
                         if idx >= len {
                             return Err(RuntimeError::VectorIndexOutOfBounds {
-                                op: VecOp::Swap,
+                                op: VecOp::LoadElem,
                                 idx,
                                 len,
                             });
                         }
-                    }
-                    // Equal pointers are UB for `swap_nonoverlapping`; distinct
-                    // in-bounds indices guarantee disjoint element ranges.
-                    if idx_a != idx_b {
-                        std::ptr::swap_nonoverlapping(
-                            vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
-                            vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                        std::ptr::copy_nonoverlapping(
+                            vec_elem_ptr(vec_ptr, idx, elem_size),
+                            fp.add(dst.into()),
                             elem_size as usize,
                         );
-                    }
-                },
+                    },
 
-                // ----- Reference (fat pointer) instructions -----
-                MicroOp::VecBorrow {
-                    dst,
-                    vec_ref,
-                    idx,
-                    elem_size,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
-                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
-                    let idx = read_u64(fp, idx);
-                    let len = read_vec_len(vec_ptr);
-                    if idx >= len {
-                        return Err(RuntimeError::VectorIndexOutOfBounds {
-                            op: VecOp::Borrow,
-                            idx,
-                            len,
-                        });
-                    }
-                    let offset = VEC_DATA_OFFSET as u64 + idx * elem_size as u64;
-                    write_fat_ptr(fp, dst, vec_ptr, offset);
-                },
-
-                MicroOp::SlotBorrow { dst, local } => {
-                    write_fat_ptr(fp, dst, fp.add(local.into()), 0);
-                },
-
-                MicroOp::ReadRef { dst, ref_ptr, size } => {
-                    let (base, offset) = read_fat_ptr(fp, ref_ptr);
-                    let target = base.add(offset as usize);
-                    // Overlap-safe `copy`: `dst` and `*ref` may alias.
-                    std::ptr::copy(target, fp.add(dst.into()), size as usize);
-                },
-
-                MicroOp::WriteRef { ref_ptr, src, size } => {
-                    let (base, offset) = read_fat_ptr(fp, ref_ptr);
-                    let target = base.add(offset as usize);
-                    // Overlap-safe `copy`: `src` and `*ref` may alias.
-                    std::ptr::copy(fp.add(src.into()), target, size as usize);
-                },
-
-                MicroOp::DeriveRefOffsetImm {
-                    dst_ref,
-                    src_ref,
-                    offset,
-                } => {
-                    let (base, src_off) = read_fat_ptr(fp, src_ref);
-                    write_fat_ptr(fp, dst_ref, base, src_off + offset as u64);
-                },
-
-                MicroOp::ReadRefOffset {
-                    dst,
-                    ref_ptr,
-                    offset,
-                    size,
-                } => {
-                    let (base, ref_off) = read_fat_ptr(fp, ref_ptr);
-                    let target = base.add(ref_off as usize + offset as usize);
-                    // Overlap-safe `copy`: `dst` and `*ref` may alias.
-                    std::ptr::copy(target, fp.add(dst.into()), size as usize);
-                },
-
-                MicroOp::WriteRefOffset {
-                    ref_ptr,
-                    offset,
-                    src,
-                    size,
-                } => {
-                    let (base, ref_off) = read_fat_ptr(fp, ref_ptr);
-                    let target = base.add(ref_off as usize + offset as usize);
-                    // Overlap-safe `copy`: `src` and `*ref` may alias.
-                    std::ptr::copy(fp.add(src.into()), target, size as usize);
-                },
-
-                // ----- Heap object instructions (structs and enums) -----
-                MicroOp::HeapNew { dst, descriptor_id } => {
-                    let ptr = alloc_obj!(self, fp, descriptor_id)?;
-                    write_ptr(fp, dst, ptr);
-                },
-
-                MicroOp::HeapMoveFrom8 {
-                    dst,
-                    heap_ptr,
-                    offset,
-                } => {
-                    let obj_ptr = read_ptr(fp, heap_ptr);
-                    let val = read_u64(obj_ptr, offset as usize);
-                    write_u64(fp, dst, val);
-                },
-
-                MicroOp::HeapMoveFrom {
-                    dst,
-                    heap_ptr,
-                    offset,
-                    size,
-                } => {
-                    let obj_ptr = read_ptr(fp, heap_ptr);
-                    std::ptr::copy_nonoverlapping(
-                        obj_ptr.add(offset as usize),
-                        fp.add(dst.into()),
-                        size as usize,
-                    );
-                },
-
-                MicroOp::HeapMoveTo8 {
-                    heap_ptr,
-                    offset,
-                    src,
-                } => {
-                    let obj_ptr = read_ptr(fp, heap_ptr);
-                    let val = read_u64(fp, src);
-                    write_u64(obj_ptr, offset as usize, val);
-                },
-
-                MicroOp::HeapMoveToImm8 {
-                    heap_ptr,
-                    offset,
-                    imm,
-                } => {
-                    let obj_ptr = read_ptr(fp, heap_ptr);
-                    write_u64(obj_ptr, offset as usize, imm);
-                },
-
-                MicroOp::HeapMoveTo {
-                    heap_ptr,
-                    offset,
-                    src,
-                    size,
-                } => {
-                    let obj_ptr = read_ptr(fp, heap_ptr);
-                    std::ptr::copy_nonoverlapping(
-                        fp.add(src.into()),
-                        obj_ptr.add(offset as usize),
-                        size as usize,
-                    );
-                },
-
-                MicroOp::HeapBorrow {
-                    dst,
-                    obj_ref,
-                    offset,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, obj_ref);
-                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                    // Unlike vectors, heap objects are never null — they
-                    // are always allocated by HeapNew before being borrowed.
-                    debug_assert!(!obj_ptr.is_null(), "HeapBorrow: null object pointer");
-                    write_fat_ptr(fp, dst, obj_ptr, offset as u64);
-                },
-
-                MicroOp::PackClosure(ref op) => {
-                    self.exec_pack_closure(fp, op)?;
-                },
-                MicroOp::CallClosure(ref op) => {
-                    return self.exec_call_closure(func, fp, op);
-                },
-
-                MicroOp::IntAdd(ref op) => exec_int_add(fp, op)?,
-                MicroOp::IntSub(ref op) => exec_int_sub(fp, op)?,
-                MicroOp::IntMul(ref op) => exec_int_mul(fp, op)?,
-                MicroOp::IntDiv(ref op) => exec_int_div(fp, op)?,
-                MicroOp::IntMod(ref op) => exec_int_mod(fp, op)?,
-                MicroOp::IntBitAnd(ref op) => exec_int_bit_and(fp, op)?,
-                MicroOp::IntBitOr(ref op) => exec_int_bit_or(fp, op)?,
-                MicroOp::IntBitXor(ref op) => exec_int_bit_xor(fp, op)?,
-                MicroOp::IntShl(ref op) => exec_int_shl(fp, op)?,
-                MicroOp::IntShr(ref op) => exec_int_shr(fp, op)?,
-                MicroOp::IntNegate(ref op) => exec_int_negate(fp, op)?,
-                MicroOp::IntCast(ref op) => exec_int_cast(fp, op)?,
-
-                MicroOp::Exists { addr, ty, dst } => {
-                    let address = read_account_address(fp, addr);
-                    let exists = self.read_write_set.exists(
-                        self.exec_ctx.resource_provider(),
-                        &InMemoryStorageKey::resource(address, ty),
-                    )?;
-                    write_bool(fp, dst, exists);
-                },
-
-                MicroOp::BorrowGlobal { addr, ty, dst } => {
-                    let address = read_account_address(fp, addr);
-                    let ptr = self.read_write_set.borrow_global(
-                        self.exec_ctx.resource_provider(),
-                        &InMemoryStorageKey::resource(address, ty),
-                    )?;
-                    // A reference is a 16-byte fat pointer; the borrow points
-                    // at the start of the resource, so the offset half is 0.
-                    write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
-                },
-
-                MicroOp::BorrowGlobalMut { addr, ty, dst } => {
-                    let address = read_account_address(fp, addr);
-                    let key = InMemoryStorageKey::resource(address, ty);
-                    let ptr = match self
-                        .read_write_set
-                        .try_borrow_global_mut(self.exec_ctx.resource_provider(), &key)?
-                    {
-                        EntryPtr::Writable(ptr) => ptr,
-                        EntryPtr::NonWritable(ptr) => {
-                            let ptr = self.deep_copy(ptr)?;
-                            self.read_write_set.commit_borrow_global_mut(&key, ptr);
-                            ptr
-                        },
-                    };
-                    // A reference is a 16-byte fat pointer; the borrow points
-                    // at the start of the resource, so the offset half is 0.
-                    write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
-                },
-
-                MicroOp::MoveFrom { addr, ty, dst } => {
-                    let address = read_account_address(fp, addr);
-                    let key = InMemoryStorageKey::resource(address, ty);
-                    let entry_ptr = self
-                        .read_write_set
-                        .try_move_from(self.exec_ctx.resource_provider(), &key)?;
-                    let ptr = match entry_ptr {
-                        EntryPtr::Writable(ptr) => ptr,
-                        EntryPtr::NonWritable(ptr) => {
-                            let ptr = self.deep_copy(ptr)?;
-                            self.read_write_set.commit_move_from(&key);
-                            ptr
-                        },
-                    };
-                    write_ptr(fp, dst, ptr.as_ptr());
-                },
-
-                MicroOp::MoveTo {
-                    signer_ref,
-                    ty,
-                    src,
-                } => {
-                    // Dereference the `&signer` to obtain the 32-byte publishing address
-                    let (base, offset) = read_fat_ptr(fp, signer_ref);
-                    let address = read_account_address(base, offset as usize);
-                    let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
-                        invariant_violation!(MoveToNullSource);
-                    };
-
-                    self.read_write_set.move_to(
-                        self.exec_ctx.resource_provider(),
-                        &InMemoryStorageKey::resource(address, ty),
-                        ptr,
-                    )?;
-                },
-                MicroOp::IntCmp(ref op) => {
-                    let result = int_cmp_bool(fp, op.lhs, op.op, &op.rhs);
-                    write_u8(fp, op.dst, result as u8);
-                },
-                MicroOp::ValueCmp(ref op) => {
-                    // Operands are the aggregate values at their slots; a
-                    // vector slot holds a pointer read through to its heap data.
-                    let a = fp.add(op.lhs.into());
-                    let b = fp.add(op.rhs.into());
-                    let eq = value_utils::equals(&*self.exec_ctx, a, b, op.ty)?;
-                    write_bool(fp, op.dst, eq ^ op.negate);
-                },
-                MicroOp::ValueRefCmp(ref op) => {
-                    // Operands are references; read through the fat pointers to
-                    // obtain the operand data pointers.
-                    let (lb, lo) = read_fat_ptr(fp, op.lhs);
-                    let (rb, ro) = read_fat_ptr(fp, op.rhs);
-                    let eq = value_utils::equals(
-                        &*self.exec_ctx,
-                        lb.add(lo as usize),
-                        rb.add(ro as usize),
-                        op.ty,
-                    )?;
-                    write_bool(fp, op.dst, eq ^ op.negate);
-                },
-                MicroOp::BoolNot { dst, src } => write_bool(fp, dst, !read_bool(fp, src)),
-                MicroOp::BoolAnd { dst, lhs, rhs } => {
-                    let left = read_bool(fp, lhs);
-                    let right = read_bool(fp, rhs);
-                    write_bool(fp, dst, left && right)
-                },
-                MicroOp::BoolOr { dst, lhs, rhs } => {
-                    let left = read_bool(fp, lhs);
-                    let right = read_bool(fp, rhs);
-                    write_bool(fp, dst, left || right)
-                },
-                MicroOp::EnumTestTag {
-                    dst,
-                    enum_ref,
-                    variant,
-                } => {
-                    // Deref the enum fat pointer to the heap object, then read the tag.
-                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
-                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                    let tag = read_enum_tag(obj_ptr);
-                    write_bool(fp, dst, tag == variant);
-                },
-
-                MicroOp::EnumBorrowVariantField {
-                    dst,
-                    enum_ref,
-                    ref offsets,
-                } => {
-                    // Deref the enum fat pointer to the heap object, read the
-                    // tag, then borrow the field at that variant's offset.
-                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
-                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                    let tag = read_enum_tag(obj_ptr);
-                    let Some(variant_offset) = offsets.get(tag as usize) else {
-                        // A tag past the variant table is heap corruption (a
-                        // well-formed enum's tag is always in range), not a
-                        // user-level mismatch. Surface it as an invariant
-                        // violation.
-                        invariant_violation!(EnumTagOutOfRange {
-                            tag,
-                            variant_count: offsets.len(),
-                        });
-                    };
-                    match variant_offset {
-                        Some(offset) => write_fat_ptr(fp, dst, obj_ptr, *offset as u64),
-                        // Tag in range but this variant does not declare the
-                        // field (move semantics for this is a runtime error).
-                        None => return Err(RuntimeError::EnumVariantMismatch { tag }),
-                    }
-                },
-
-                MicroOp::EnumCheckVariant { enum_ptr, variant } => {
-                    // `enum_ptr` is the heap-pointer value; runtime error if
-                    // its tag is not the expected variant.
-                    let obj_ptr = read_ptr(fp, enum_ptr);
-                    let tag = read_enum_tag(obj_ptr);
-                    if tag != variant {
-                        return Err(RuntimeError::EnumVariantMismatch { tag });
-                    }
-                },
-
-                MicroOp::EnumNew {
-                    dst,
-                    descriptor_id,
-                    variant,
-                } => {
-                    let obj_ptr = alloc_obj!(self, fp, descriptor_id)?;
-                    // No safe point between the allocation and these
-                    // non-allocating writes: stamp the tag through the fresh
-                    // pointer, then publish it to `dst`.
-                    write_enum_tag(obj_ptr, variant);
-                    write_ptr(fp, dst, obj_ptr);
-                },
-
-                MicroOp::EnumReadVariantField {
-                    dst,
-                    enum_ref,
-                    offset,
-                    size,
-                } => {
-                    // Double deref of the enum fat pointer to the heap object,
-                    // then copy the field bytes directly — no intermediate
-                    // scratch reference. The offset is a static uniform offset
-                    // (no tag dispatch).
-                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
-                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                    // Non-overlapping: `dst` is a stack-region slot, the field
-                    // is heap-object bytes.
-                    std::ptr::copy_nonoverlapping(
-                        obj_ptr.add(offset as usize),
-                        fp.add(dst.into()),
-                        size as usize,
-                    );
-                },
-
-                MicroOp::EnumWriteVariantField {
-                    enum_ref,
-                    offset,
-                    src,
-                    size,
-                } => {
-                    let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
-                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                    // Non-overlapping: `src` is a stack-region slot, the field
-                    // is heap-object bytes.
-                    std::ptr::copy_nonoverlapping(
-                        fp.add(src.into()),
-                        obj_ptr.add(offset as usize),
-                        size as usize,
-                    );
-                },
-
-                MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {
-                    // Pre-condition: each `base + off` holds a heap pointer
-                    // byte-copied from another value, so the pointee is still
-                    // shared with that value. Replace each non-null pointer
-                    // with a pointer to a fresh deep copy, making the value at
-                    // `base` independent (Move value semantics). Null (e.g. an
-                    // empty vector) stays null.
-                    //
-                    // TODO(metering): the IR-level cost of the materializing
-                    // instruction charges only the shallow byte move, not this
-                    // heap-graph copy. Change charging to reflect at least the
-                    // amount of work done.
-                    //
-                    // TODO(perf): the materializing op currently emits a byte
-                    // move into `base` followed by this in-place fixup that
-                    // re-reads from `base`. A fused `src -> dst` deep copy
-                    // would drop the separate move and the re-read. It would
-                    // need deep-copying variants of `ReadRef`, `Read*Field`,
-                    // etc.
-                    if let &[off] = offsets.as_ref() {
-                        // Fast path for copying whole-enum / whole-vector /
-                        // aggregate with one heap backed field: a single owned
-                        // pointer at one offset. Uses single-root `deep_copy`,
-                        // avoiding the batch's per-op `Vec`s.
-                        if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
-                            let new = self.deep_copy(src)?;
-                            write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                    MicroOp::VecStoreElem {
+                        vec_ref,
+                        idx,
+                        src,
+                        elem_size,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                        let idx = read_u64(fp, idx);
+                        let len = read_vec_len(vec_ptr);
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::StoreElem,
+                                idx,
+                                len,
+                            });
                         }
-                    } else {
-                        let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
-                        let mut sources: Vec<NonNull<u8>> = Vec::with_capacity(offsets.len());
-                        for &off in offsets.iter() {
-                            if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
-                                live_offsets.push(off);
-                                sources.push(src);
+                        std::ptr::copy_nonoverlapping(
+                            fp.add(src.into()),
+                            vec_elem_ptr(vec_ptr, idx, elem_size) as *mut u8,
+                            elem_size as usize,
+                        );
+                    },
+
+                    MicroOp::VecPack(ref op) => {
+                        self.exec_vec_pack(regs, op)?;
+                    },
+
+                    MicroOp::VecUnpack(ref op) => {
+                        self.exec_vec_unpack(fp, op)?;
+                    },
+
+                    MicroOp::VecSwap {
+                        vec_ref,
+                        idx_a,
+                        idx_b,
+                        elem_size,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                        let idx_a = read_u64(fp, idx_a);
+                        let idx_b = read_u64(fp, idx_b);
+                        let len = read_vec_len(vec_ptr);
+                        // Indices are checked before the equal-indices no-op.
+                        for idx in [idx_a, idx_b] {
+                            if idx >= len {
+                                return Err(RuntimeError::VectorIndexOutOfBounds {
+                                    op: VecOp::Swap,
+                                    idx,
+                                    len,
+                                });
                             }
                         }
-                        let copies = self.deep_copy_batch(&sources)?;
-                        for (off, new) in live_offsets.iter().zip(copies) {
-                            write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                        // Equal pointers are UB for `swap_nonoverlapping`; distinct
+                        // in-bounds indices guarantee disjoint element ranges.
+                        if idx_a != idx_b {
+                            std::ptr::swap_nonoverlapping(
+                                vec_elem_ptr(vec_ptr, idx_a, elem_size) as *mut u8,
+                                vec_elem_ptr(vec_ptr, idx_b, elem_size) as *mut u8,
+                                elem_size as usize,
+                            );
                         }
-                    }
-                },
-            }
-        }
+                    },
 
-        self.pc += 1;
-        Ok(StepResult::Continue)
+                    // ----- Reference (fat pointer) instructions -----
+                    MicroOp::VecBorrow {
+                        dst,
+                        vec_ref,
+                        idx,
+                        elem_size,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        let vec_ptr = read_ptr(ref_base, ref_off as usize);
+                        let idx = read_u64(fp, idx);
+                        let len = read_vec_len(vec_ptr);
+                        if idx >= len {
+                            return Err(RuntimeError::VectorIndexOutOfBounds {
+                                op: VecOp::Borrow,
+                                idx,
+                                len,
+                            });
+                        }
+                        let offset = VEC_DATA_OFFSET as u64 + idx * elem_size as u64;
+                        write_fat_ptr(fp, dst, vec_ptr, offset);
+                    },
+
+                    MicroOp::SlotBorrow { dst, local } => {
+                        write_fat_ptr(fp, dst, fp.add(local.into()), 0);
+                    },
+
+                    MicroOp::ReadRef { dst, ref_ptr, size } => {
+                        let (base, offset) = read_fat_ptr(fp, ref_ptr);
+                        let target = base.add(offset as usize);
+                        // Overlap-safe `copy`: `dst` and `*ref` may alias.
+                        std::ptr::copy(target, fp.add(dst.into()), size as usize);
+                    },
+
+                    MicroOp::WriteRef { ref_ptr, src, size } => {
+                        let (base, offset) = read_fat_ptr(fp, ref_ptr);
+                        let target = base.add(offset as usize);
+                        // Overlap-safe `copy`: `src` and `*ref` may alias.
+                        std::ptr::copy(fp.add(src.into()), target, size as usize);
+                    },
+
+                    MicroOp::DeriveRefOffsetImm {
+                        dst_ref,
+                        src_ref,
+                        offset,
+                    } => {
+                        let (base, src_off) = read_fat_ptr(fp, src_ref);
+                        write_fat_ptr(fp, dst_ref, base, src_off + offset as u64);
+                    },
+
+                    MicroOp::ReadRefOffset {
+                        dst,
+                        ref_ptr,
+                        offset,
+                        size,
+                    } => {
+                        let (base, ref_off) = read_fat_ptr(fp, ref_ptr);
+                        let target = base.add(ref_off as usize + offset as usize);
+                        // Overlap-safe `copy`: `dst` and `*ref` may alias.
+                        std::ptr::copy(target, fp.add(dst.into()), size as usize);
+                    },
+
+                    MicroOp::WriteRefOffset {
+                        ref_ptr,
+                        offset,
+                        src,
+                        size,
+                    } => {
+                        let (base, ref_off) = read_fat_ptr(fp, ref_ptr);
+                        let target = base.add(ref_off as usize + offset as usize);
+                        // Overlap-safe `copy`: `src` and `*ref` may alias.
+                        std::ptr::copy(fp.add(src.into()), target, size as usize);
+                    },
+
+                    // ----- Heap object instructions (structs and enums) -----
+                    MicroOp::HeapNew { dst, descriptor_id } => {
+                        let ptr = alloc_obj!(self, fp, regs.pc, regs.func, descriptor_id)?;
+                        write_ptr(fp, dst, ptr);
+                    },
+
+                    MicroOp::HeapMoveFrom8 {
+                        dst,
+                        heap_ptr,
+                        offset,
+                    } => {
+                        let obj_ptr = read_ptr(fp, heap_ptr);
+                        let val = read_u64(obj_ptr, offset as usize);
+                        write_u64(fp, dst, val);
+                    },
+
+                    MicroOp::HeapMoveFrom {
+                        dst,
+                        heap_ptr,
+                        offset,
+                        size,
+                    } => {
+                        let obj_ptr = read_ptr(fp, heap_ptr);
+                        std::ptr::copy_nonoverlapping(
+                            obj_ptr.add(offset as usize),
+                            fp.add(dst.into()),
+                            size as usize,
+                        );
+                    },
+
+                    MicroOp::HeapMoveTo8 {
+                        heap_ptr,
+                        offset,
+                        src,
+                    } => {
+                        let obj_ptr = read_ptr(fp, heap_ptr);
+                        let val = read_u64(fp, src);
+                        write_u64(obj_ptr, offset as usize, val);
+                    },
+
+                    MicroOp::HeapMoveToImm8 {
+                        heap_ptr,
+                        offset,
+                        imm,
+                    } => {
+                        let obj_ptr = read_ptr(fp, heap_ptr);
+                        write_u64(obj_ptr, offset as usize, imm);
+                    },
+
+                    MicroOp::HeapMoveTo {
+                        heap_ptr,
+                        offset,
+                        src,
+                        size,
+                    } => {
+                        let obj_ptr = read_ptr(fp, heap_ptr);
+                        std::ptr::copy_nonoverlapping(
+                            fp.add(src.into()),
+                            obj_ptr.add(offset as usize),
+                            size as usize,
+                        );
+                    },
+
+                    MicroOp::HeapBorrow {
+                        dst,
+                        obj_ref,
+                        offset,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, obj_ref);
+                        let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                        // Unlike vectors, heap objects are never null — they
+                        // are always allocated by HeapNew before being borrowed.
+                        debug_assert!(!obj_ptr.is_null(), "HeapBorrow: null object pointer");
+                        write_fat_ptr(fp, dst, obj_ptr, offset as u64);
+                    },
+
+                    MicroOp::PackClosure(ref op) => {
+                        self.exec_pack_closure(regs, op)?;
+                    },
+                    MicroOp::CallClosure(ref op) => {
+                        regs = self.exec_call_closure(func, regs, op)?;
+                        continue;
+                    },
+
+                    MicroOp::IntAdd(ref op) => exec_int_add(fp, op)?,
+                    MicroOp::IntSub(ref op) => exec_int_sub(fp, op)?,
+                    MicroOp::IntMul(ref op) => exec_int_mul(fp, op)?,
+                    MicroOp::IntDiv(ref op) => exec_int_div(fp, op)?,
+                    MicroOp::IntMod(ref op) => exec_int_mod(fp, op)?,
+                    MicroOp::IntBitAnd(ref op) => exec_int_bit_and(fp, op)?,
+                    MicroOp::IntBitOr(ref op) => exec_int_bit_or(fp, op)?,
+                    MicroOp::IntBitXor(ref op) => exec_int_bit_xor(fp, op)?,
+                    MicroOp::IntShl(ref op) => exec_int_shl(fp, op)?,
+                    MicroOp::IntShr(ref op) => exec_int_shr(fp, op)?,
+                    MicroOp::IntNegate(ref op) => exec_int_negate(fp, op)?,
+                    MicroOp::IntCast(ref op) => exec_int_cast(fp, op)?,
+
+                    MicroOp::Exists { addr, ty, dst } => {
+                        let address = read_account_address(fp, addr);
+                        let exists = self.read_write_set.exists(
+                            self.exec_ctx.resource_provider(),
+                            &InMemoryStorageKey::resource(address, ty),
+                        )?;
+                        write_bool(fp, dst, exists);
+                    },
+
+                    MicroOp::BorrowGlobal { addr, ty, dst } => {
+                        let address = read_account_address(fp, addr);
+                        let ptr = self.read_write_set.borrow_global(
+                            self.exec_ctx.resource_provider(),
+                            &InMemoryStorageKey::resource(address, ty),
+                        )?;
+                        // A reference is a 16-byte fat pointer; the borrow points
+                        // at the start of the resource, so the offset half is 0.
+                        write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
+                    },
+
+                    MicroOp::BorrowGlobalMut { addr, ty, dst } => {
+                        let address = read_account_address(fp, addr);
+                        let key = InMemoryStorageKey::resource(address, ty);
+                        let ptr = match self
+                            .read_write_set
+                            .try_borrow_global_mut(self.exec_ctx.resource_provider(), &key)?
+                        {
+                            EntryPtr::Writable(ptr) => ptr,
+                            EntryPtr::NonWritable(ptr) => {
+                                let ptr = self.deep_copy(regs, ptr)?;
+                                self.read_write_set.commit_borrow_global_mut(&key, ptr);
+                                ptr
+                            },
+                        };
+                        // A reference is a 16-byte fat pointer; the borrow points
+                        // at the start of the resource, so the offset half is 0.
+                        write_fat_ptr(fp, dst, ptr.as_ptr(), 0);
+                    },
+
+                    MicroOp::MoveFrom { addr, ty, dst } => {
+                        let address = read_account_address(fp, addr);
+                        let key = InMemoryStorageKey::resource(address, ty);
+                        let entry_ptr = self
+                            .read_write_set
+                            .try_move_from(self.exec_ctx.resource_provider(), &key)?;
+                        let ptr = match entry_ptr {
+                            EntryPtr::Writable(ptr) => ptr,
+                            EntryPtr::NonWritable(ptr) => {
+                                let ptr = self.deep_copy(regs, ptr)?;
+                                self.read_write_set.commit_move_from(&key);
+                                ptr
+                            },
+                        };
+                        write_ptr(fp, dst, ptr.as_ptr());
+                    },
+
+                    MicroOp::MoveTo {
+                        signer_ref,
+                        ty,
+                        src,
+                    } => {
+                        // Dereference the `&signer` to obtain the 32-byte publishing address
+                        let (base, offset) = read_fat_ptr(fp, signer_ref);
+                        let address = read_account_address(base, offset as usize);
+                        let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
+                            invariant_violation!(MoveToNullSource);
+                        };
+
+                        self.read_write_set.move_to(
+                            self.exec_ctx.resource_provider(),
+                            &InMemoryStorageKey::resource(address, ty),
+                            ptr,
+                        )?;
+                    },
+                    MicroOp::IntCmp(ref op) => {
+                        let result = int_cmp_bool(fp, op.lhs, op.op, &op.rhs);
+                        write_u8(fp, op.dst, result as u8);
+                    },
+                    MicroOp::ValueCmp(ref op) => {
+                        // Operands are the aggregate values at their slots; a
+                        // vector slot holds a pointer read through to its heap data.
+                        let a = fp.add(op.lhs.into());
+                        let b = fp.add(op.rhs.into());
+                        let eq = value_utils::equals(&*self.exec_ctx, a, b, op.ty)?;
+                        write_bool(fp, op.dst, eq ^ op.negate);
+                    },
+                    MicroOp::ValueRefCmp(ref op) => {
+                        // Operands are references; read through the fat pointers to
+                        // obtain the operand data pointers.
+                        let (lb, lo) = read_fat_ptr(fp, op.lhs);
+                        let (rb, ro) = read_fat_ptr(fp, op.rhs);
+                        let eq = value_utils::equals(
+                            &*self.exec_ctx,
+                            lb.add(lo as usize),
+                            rb.add(ro as usize),
+                            op.ty,
+                        )?;
+                        write_bool(fp, op.dst, eq ^ op.negate);
+                    },
+                    MicroOp::BoolNot { dst, src } => write_bool(fp, dst, !read_bool(fp, src)),
+                    MicroOp::BoolAnd { dst, lhs, rhs } => {
+                        let left = read_bool(fp, lhs);
+                        let right = read_bool(fp, rhs);
+                        write_bool(fp, dst, left && right)
+                    },
+                    MicroOp::BoolOr { dst, lhs, rhs } => {
+                        let left = read_bool(fp, lhs);
+                        let right = read_bool(fp, rhs);
+                        write_bool(fp, dst, left || right)
+                    },
+                    MicroOp::EnumTestTag {
+                        dst,
+                        enum_ref,
+                        variant,
+                    } => {
+                        // Deref the enum fat pointer to the heap object, then read the tag.
+                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                        let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                        let tag = read_enum_tag(obj_ptr);
+                        write_bool(fp, dst, tag == variant);
+                    },
+
+                    MicroOp::EnumBorrowVariantField {
+                        dst,
+                        enum_ref,
+                        ref offsets,
+                    } => {
+                        // Deref the enum fat pointer to the heap object, read the
+                        // tag, then borrow the field at that variant's offset.
+                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                        let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                        let tag = read_enum_tag(obj_ptr);
+                        let Some(variant_offset) = offsets.get(tag as usize) else {
+                            // A tag past the variant table is heap corruption (a
+                            // well-formed enum's tag is always in range), not a
+                            // user-level mismatch. Surface it as an invariant
+                            // violation.
+                            invariant_violation!(EnumTagOutOfRange {
+                                tag,
+                                variant_count: offsets.len(),
+                            });
+                        };
+                        match variant_offset {
+                            Some(offset) => write_fat_ptr(fp, dst, obj_ptr, *offset as u64),
+                            // Tag in range but this variant does not declare the
+                            // field (move semantics for this is a runtime error).
+                            None => return Err(RuntimeError::EnumVariantMismatch { tag }),
+                        }
+                    },
+
+                    MicroOp::EnumCheckVariant { enum_ptr, variant } => {
+                        // `enum_ptr` is the heap-pointer value; runtime error if
+                        // its tag is not the expected variant.
+                        let obj_ptr = read_ptr(fp, enum_ptr);
+                        let tag = read_enum_tag(obj_ptr);
+                        if tag != variant {
+                            return Err(RuntimeError::EnumVariantMismatch { tag });
+                        }
+                    },
+
+                    MicroOp::EnumNew {
+                        dst,
+                        descriptor_id,
+                        variant,
+                    } => {
+                        let obj_ptr = alloc_obj!(self, fp, regs.pc, regs.func, descriptor_id)?;
+                        // No safe point between the allocation and these
+                        // non-allocating writes: stamp the tag through the fresh
+                        // pointer, then publish it to `dst`.
+                        write_enum_tag(obj_ptr, variant);
+                        write_ptr(fp, dst, obj_ptr);
+                    },
+
+                    MicroOp::EnumReadVariantField {
+                        dst,
+                        enum_ref,
+                        offset,
+                        size,
+                    } => {
+                        // Double deref of the enum fat pointer to the heap object,
+                        // then copy the field bytes directly — no intermediate
+                        // scratch reference. The offset is a static uniform offset
+                        // (no tag dispatch).
+                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                        let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                        // Non-overlapping: `dst` is a stack-region slot, the field
+                        // is heap-object bytes.
+                        std::ptr::copy_nonoverlapping(
+                            obj_ptr.add(offset as usize),
+                            fp.add(dst.into()),
+                            size as usize,
+                        );
+                    },
+
+                    MicroOp::EnumWriteVariantField {
+                        enum_ref,
+                        offset,
+                        src,
+                        size,
+                    } => {
+                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                        let obj_ptr = read_ptr(ref_base, ref_off as usize);
+                        // Non-overlapping: `src` is a stack-region slot, the field
+                        // is heap-object bytes.
+                        std::ptr::copy_nonoverlapping(
+                            fp.add(src.into()),
+                            obj_ptr.add(offset as usize),
+                            size as usize,
+                        );
+                    },
+
+                    MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {
+                        // Pre-condition: each `base + off` holds a heap pointer
+                        // byte-copied from another value, so the pointee is still
+                        // shared with that value. Replace each non-null pointer
+                        // with a pointer to a fresh deep copy, making the value at
+                        // `base` independent (Move value semantics). Null (e.g. an
+                        // empty vector) stays null.
+                        //
+                        // TODO(metering): the IR-level cost of the materializing
+                        // instruction charges only the shallow byte move, not this
+                        // heap-graph copy. Change charging to reflect at least the
+                        // amount of work done.
+                        //
+                        // TODO(perf): the materializing op currently emits a byte
+                        // move into `base` followed by this in-place fixup that
+                        // re-reads from `base`. A fused `src -> dst` deep copy
+                        // would drop the separate move and the re-read. It would
+                        // need deep-copying variants of `ReadRef`, `Read*Field`,
+                        // etc.
+                        if let &[off] = offsets.as_ref() {
+                            // Fast path for copying whole-enum / whole-vector /
+                            // aggregate with one heap backed field: a single owned
+                            // pointer at one offset. Uses single-root `deep_copy`,
+                            // avoiding the batch's per-op `Vec`s.
+                            if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
+                                let new = self.deep_copy(regs, src)?;
+                                write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                            }
+                        } else {
+                            let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
+                            let mut sources: Vec<NonNull<u8>> = Vec::with_capacity(offsets.len());
+                            for &off in offsets.iter() {
+                                if let Some(src) =
+                                    NonNull::new(read_ptr(fp, (base.0 + off) as usize))
+                                {
+                                    live_offsets.push(off);
+                                    sources.push(src);
+                                }
+                            }
+                            let copies = self.deep_copy_batch(regs, &sources)?;
+                            for (off, new) in live_offsets.iter().zip(copies) {
+                                write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
+                            }
+                        }
+                    },
+                }
+            }
+
+            regs.pc += 1;
+        };
+
+        self.registers = regs;
+        Ok(outcome)
     }
 
     /// Allocates vector from constant pool and writes data pointer into `dst`.
+    #[inline(never)]
     fn exec_store_imm_vec(
         &mut self,
+        regs: VMRegisters,
         dst: FrameOffset,
         idx: ConstantPoolIndex,
     ) -> RuntimeResult<()> {
-        // SAFETY: `current_func` points to the live, currently-executing
-        // function.
-        let module_id = unsafe { self.current_func.as_ref() }.module_id;
+        // SAFETY: `regs.func` points to the live, currently-executing function.
+        let module_id = unsafe { regs.func.as_ref() }.module_id;
         let (ty, bytes) = self.exec_ctx.load_constant(module_id, idx)?;
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
         unsafe {
-            let dst = self.frame_ptr.add(usize::from(dst));
+            let dst = regs.fp.add(usize::from(dst));
             deserialize_or_gc(
                 self.exec_ctx,
                 &mut self.heap,
@@ -1942,10 +2049,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 &mut self.read_write_set,
                 &self.root_pool,
                 self.exec_ctx.extensions(),
-                self.frame_ptr,
+                regs.fp,
                 crate::heap::TopFrame::Function {
-                    func: self.current_func,
-                    pc: self.pc,
+                    func: regs.func,
+                    pc: regs.pc,
                 },
             )
         }
@@ -1958,16 +2065,28 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// - `fp` is the current frame pointer.
+    /// - `regs.fp` is the current frame pointer.
     /// - `op.dst` and each `op.srcs` slot are in-bounds for the current frame.
-    unsafe fn exec_vec_pack(&mut self, fp: *mut u8, op: &VecPackOp) -> RuntimeResult<()> {
+    // Outlined to keep the dispatch loop small: an inlined body here adds to
+    // the register pressure that competes for `fp`'s register across the loop.
+    #[inline(never)]
+    unsafe fn exec_vec_pack(&mut self, regs: VMRegisters, op: &VecPackOp) -> RuntimeResult<()> {
+        let fp = regs.fp;
         let count = op.srcs.len() as u64;
         // TODO(perf): `alloc_vec!` zero-fills the whole allocation, but every
         // payload byte is overwritten below before the op returns and no GC can
         // intervene afterwards. A fully-initialized-payload alloc variant would
         // avoid the dead memset. Padding needs to be carefully considered for
         // the optimization.
-        let vec_ptr = alloc_vec!(self, fp, op.descriptor_id, op.elem_size, count)?;
+        let vec_ptr = alloc_vec!(
+            self,
+            fp,
+            regs.pc,
+            regs.func,
+            op.descriptor_id,
+            op.elem_size,
+            count
+        )?;
         unsafe {
             write_u64(vec_ptr, VEC_LENGTH_OFFSET, count);
             for (elem_idx, src) in op.srcs.iter().enumerate() {
@@ -2022,7 +2141,11 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// Source must point to the data region of a live object whose header is
     /// at `src - OBJECT_HEADER_SIZE`.
-    unsafe fn deep_copy(&mut self, root: NonNull<u8>) -> RuntimeResult<NonNull<u8>> {
+    unsafe fn deep_copy(
+        &mut self,
+        regs: VMRegisters,
+        root: NonNull<u8>,
+    ) -> RuntimeResult<NonNull<u8>> {
         // SAFETY: by this function's contract `root` points to a live object.
         unsafe {
             deep_copy_or_gc(
@@ -2031,10 +2154,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 &mut self.read_write_set,
                 &self.root_pool,
                 self.exec_ctx.extensions(),
-                self.frame_ptr,
+                regs.fp,
                 TopFrame::Function {
-                    func: self.current_func,
-                    pc: self.pc,
+                    func: regs.func,
+                    pc: regs.pc,
                 },
                 root,
             )
@@ -2058,6 +2181,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// header is at `source - OBJECT_HEADER_SIZE`.
     unsafe fn deep_copy_batch(
         &mut self,
+        regs: VMRegisters,
         sources: &[NonNull<u8>],
     ) -> RuntimeResult<Vec<NonNull<u8>>> {
         // SAFETY: each source is a live object (caller contract); the handle
@@ -2089,7 +2213,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         if !needs_gc {
             return Ok(out);
         }
-        gc_collect!(self)?;
+        gc_collect!(self, regs.fp, regs.pc, regs.func)?;
         out.clear();
         for guard in &guards {
             // SAFETY: as above, after relocation.
@@ -2128,20 +2252,26 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// - `fp` is the current frame pointer.
+    /// - `regs.fp` is the current frame pointer.
     /// - Each `op.captured` slot is in-bounds for the current frame (the
     ///   verifier checks this).
     /// - The closure descriptor must list `CLOSURE_CAPTURED_DATA_PTR_OFFSET`
     ///   (relative to the data segment, so `32 - 8 = 24`) in its
     ///   `pointer_offsets`, so GC traces the captured-data pointer after
     ///   the closure is reachable via the frame slot.
-    unsafe fn exec_pack_closure(&mut self, fp: *mut u8, op: &PackClosureOp) -> RuntimeResult<()> {
+    #[inline(never)]
+    unsafe fn exec_pack_closure(
+        &mut self,
+        regs: VMRegisters,
+        op: &PackClosureOp,
+    ) -> RuntimeResult<()> {
+        let fp = regs.fp;
         unsafe {
             // Fast path: non-capturing closure. Skip the second allocation
             // and leave `captured_data_ptr` as the zeroed/null value written
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
-                let closure = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
+                let closure = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
                 self.write_closure_func_ref_and_mask(closure, op);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
@@ -2155,7 +2285,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // skipped). Rooting keeps the closure live across the second
             // allocation and lets GC update the rooted slot in-place if
             // the object is relocated.
-            let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
+            let closure_ptr = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
             // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
             let closure_root = self.root_pool.root_object(closure_ptr);
 
@@ -2167,7 +2297,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             let captured_desc_id = op
                 .captured_data_descriptor_id
                 .expect("verifier ensures Some when captured is non-empty");
-            let captured_data = alloc_captured_data!(self, fp, op.values_size, captured_desc_id)?;
+            let captured_data = alloc_captured_data!(
+                self,
+                fp,
+                regs.pc,
+                regs.func,
+                op.values_size,
+                captured_desc_id
+            )?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
             // Persist the exact values-region size so `CallClosure` can validate
             // a lazily-resolved callee's captured layout against it; the header
@@ -2250,7 +2387,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// # Safety
     ///
     /// - `func` is the currently executing function (caller).
-    /// - `fp` is the current frame pointer.
+    /// - `regs` carries the caller's VM registers.
     /// - `op.closure_src` holds a non-null heap pointer to a valid closure
     ///   object.
     /// - The callee's `param_slots` list has one (offset, size) entry per
@@ -2259,12 +2396,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// - The captured values in the captured-data object are packed in
     ///   param order and their sizes match the corresponding `param_slots`
     ///   entries (enforced by `PackClosure`).
+    #[inline(never)]
     unsafe fn exec_call_closure(
         &mut self,
         func: &Function,
-        fp: *mut u8,
+        mut regs: VMRegisters,
         op: &CallClosureOp,
-    ) -> RuntimeResult<StepResult> {
+    ) -> RuntimeResult<VMRegisters> {
+        let fp = regs.fp;
         unsafe {
             let closure = read_ptr(fp, op.closure_src);
             if closure.is_null() {
@@ -2449,7 +2588,8 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // Standard call protocol: save metadata and switch to the
             // callee frame. Use the unchecked variant — we already
             // validated the stack above.
-            self.call_unchecked(func, fp, callee, new_fp)
+            self.call_unchecked(func, &mut regs, callee, new_fp)?;
+            Ok(regs)
         }
     }
 
@@ -2482,17 +2622,19 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// `callee` must point to a valid, live `Function`. `fp` must be the
-    /// current frame pointer and `caller` the currently executing function.
+    /// `callee` must point to a valid, live `Function`. `regs` must carry the
+    /// caller's VM registers and `caller` be the currently executing
+    /// function.
     #[inline(always)]
     unsafe fn call(
         &mut self,
         caller: &Function,
-        fp: *mut u8,
+        regs: &mut VMRegisters,
         callee: &Function,
-    ) -> RuntimeResult<StepResult> {
-        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee.extended_frame_size)? };
-        unsafe { self.call_unchecked(caller, fp, callee, new_fp) }
+    ) -> RuntimeResult<()> {
+        let new_fp =
+            unsafe { self.check_stack_for_call(caller, regs.fp, callee.extended_frame_size)? };
+        unsafe { self.call_unchecked(caller, regs, callee, new_fp) }
     }
 
     /// Perform the standard call protocol after the caller has already
@@ -2503,7 +2645,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     /// # Safety
     ///
     /// In addition to the contract on [`Self::call`], `new_fp` must equal
-    /// `fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
+    /// `regs.fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
     /// `new_fp + callee.extended_frame_size` must be within the stack
     /// (i.e., the caller has already passed the check that
     /// [`Self::check_stack_for_call`] performs).
@@ -2511,10 +2653,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     unsafe fn call_unchecked(
         &mut self,
         caller: &Function,
-        fp: *mut u8,
+        regs: &mut VMRegisters,
         callee: &Function,
         new_fp: *mut u8,
-    ) -> RuntimeResult<StepResult> {
+    ) -> RuntimeResult<()> {
         // Charge the callee's entry block before any of its instructions run.
         self.exec_ctx.gas_meter().charge(callee.entry_gas)?;
         unsafe {
@@ -2526,12 +2668,14 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 let zero_size = callee.extended_frame_size - callee.param_region_size;
                 std::ptr::write_bytes(new_fp.add(callee.param_region_size), 0, zero_size);
             }
-            self.write_frame_metadata(caller, fp);
-            self.frame_ptr = new_fp;
+            // Save the caller's registers into its frame metadata before
+            // switching `regs` to the callee.
+            self.write_frame_metadata(caller, regs);
         }
-        self.pc = 0;
-        self.current_func = NonNull::from(callee);
-        Ok(StepResult::Continue)
+        regs.fp = new_fp;
+        regs.pc = 0;
+        regs.func = NonNull::from(callee);
+        Ok(())
     }
 
     /// Write the calling-convention frame metadata `(saved_pc, saved_fp,
@@ -2541,18 +2685,18 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// `caller` must be the currently executing function and `fp` the
-    /// current frame pointer.
+    /// `caller` must be the currently executing function and `regs` must carry
+    /// the caller's VM registers.
     #[inline(always)]
-    unsafe fn write_frame_metadata(&self, caller: &Function, fp: *mut u8) {
+    unsafe fn write_frame_metadata(&self, caller: &Function, regs: &VMRegisters) {
         unsafe {
-            let meta = fp.add(caller.param_and_local_sizes_sum);
-            write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
-            write_ptr(meta, META_SAVED_FP_OFFSET, fp);
+            let meta = regs.fp.add(caller.param_and_local_sizes_sum);
+            write_u64(meta, META_SAVED_PC_OFFSET, (regs.pc + 1) as u64);
+            write_ptr(meta, META_SAVED_FP_OFFSET, regs.fp);
             write_ptr(
                 meta,
                 META_SAVED_FUNC_PTR_OFFSET,
-                self.current_func.as_ptr() as *const u8,
+                regs.func.as_ptr() as *const u8,
             );
         }
     }
@@ -2561,23 +2705,23 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ///
     /// # Safety
     ///
-    /// `caller` must be the currently executing function and `fp` the
-    /// current frame pointer.
+    /// `caller` must be the currently executing function and `regs` must carry
+    /// the caller's VM registers.
     unsafe fn exec_call_native(
         &mut self,
         caller: &Function,
-        fp: *mut u8,
+        regs: VMRegisters,
         native_idx: NativeIdx,
         ty_args: InternedTypeList,
         abi: &NativeABI,
-    ) -> RuntimeResult<StepResult> {
+    ) -> RuntimeResult<Option<(u64, Option<String>)>> {
         // Check if we have enough space on the stack to allocate the native's frame.
         let new_fp =
-            unsafe { self.check_stack_for_call(caller, fp, abi.total_frame_size() as usize)? };
+            unsafe { self.check_stack_for_call(caller, regs.fp, abi.total_frame_size() as usize)? };
 
         // Write frame metadata just like normal calls. This is still needed
         // as some natives may want to inspect the call stack.
-        unsafe { self.write_frame_metadata(caller, fp) };
+        unsafe { self.write_frame_metadata(caller, &regs) };
 
         // Zero out return-slot bytes that extend past the args, for extra safety.
         if abi.total_frame_size() > abi.args_end() {
@@ -2590,8 +2734,11 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             }
         }
 
-        let saved_fp = self.frame_ptr;
-        self.frame_ptr = new_fp;
+        // The native's own allocations scan GC roots from `self.registers.fp`,
+        // so point it at the native frame for the duration of the call, then
+        // restore the caller frame.
+        let saved_fp = regs.fp;
+        self.registers.fp = new_fp;
         let result = {
             let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
                 self.exec_ctx.native_call_borrows();
@@ -2621,35 +2768,12 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             );
             func(&ctx)
         };
-        self.frame_ptr = saved_fp;
+        self.registers.fp = saved_fp;
 
         match result {
-            Ok(NativeStatus::Success) => {
-                self.pc += 1;
-                Ok(StepResult::Continue)
-            },
-            Ok(NativeStatus::Abort { code, message }) => Ok(StepResult::Aborted { code, message }),
+            Ok(NativeStatus::Success) => Ok(None),
+            Ok(NativeStatus::Abort { code, message }) => Ok(Some((code, message))),
             Err(e) => Err(e.into_runtime_error()),
-        }
-    }
-
-    // TODO(perf): Hoist pc, fp, and current_func into local variables in the run loop
-    // instead of reading/writing self.pc, self.frame_ptr, self.current_func each
-    // iteration. LLVM can't keep them in registers because heap operations
-    // (VecPushBack, etc.) take &mut self, which may alias these fields.
-    // Write back only on CallFunc/Return.
-    pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
-        // Charge the entry function's entry block before any of its instructions run.
-        let func = unsafe { self.current_func.as_ref() };
-        self.exec_ctx.gas_meter().charge(func.entry_gas)?;
-        loop {
-            match self.step()? {
-                StepResult::Continue => {},
-                StepResult::Done => return Ok(RuntimeStatus::Success),
-                StepResult::Aborted { code, message } => {
-                    return Ok(RuntimeStatus::Aborted { code, message })
-                },
-            }
         }
     }
 }

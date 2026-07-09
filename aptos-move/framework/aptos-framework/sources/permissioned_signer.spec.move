@@ -11,12 +11,10 @@ spec aptos_framework::permissioned_signer {
             );
     }
 
-    spec fun spec_is_permissioned_signer_impl(s: signer): bool;
-
     spec is_permissioned_signer_impl(s: &signer): bool {
         pragma opaque;
         aborts_if [abstract] false;
-        ensures [abstract] result == spec_is_permissioned_signer_impl(s);
+        ensures [abstract] result == std::signer::spec_is_permissioned_signer_impl(s);
     }
 
     spec fun spec_is_permissioned_signer(s: signer): bool {
@@ -25,7 +23,7 @@ spec aptos_framework::permissioned_signer {
         if (!features::spec_is_enabled(PERMISSIONED_SIGNER)) {
             false
         } else {
-            spec_is_permissioned_signer_impl(s)
+            std::signer::spec_is_permissioned_signer_impl(s)
         }
     }
 
@@ -132,6 +130,7 @@ spec aptos_framework::permissioned_signer {
         };
         let pre_has = big_ordered_map::spec_contains_key(pre_perms, key);
         let pre_stored = big_ordered_map::spec_get(pre_perms, key);
+        ensures exists<PermissionStorage>(addr) == old(exists<PermissionStorage>(addr));
 
         ensures [concrete] !spec_is_permissioned_signer(s) ==> result == true;
         ensures [concrete] (spec_is_permissioned_signer(s) && !pre_has) ==> result == false;
@@ -144,6 +143,7 @@ spec aptos_framework::permissioned_signer {
                 && !(pre_stored is StoredPermission::Unlimited))
             ==> (result == (pre_stored.0 >= 1));
         ensures [abstract] result == spec_check_permission_exists(s, perm);
+        ensures [abstract] !spec_is_permissioned_signer(s) ==> result == true;
     }
 
     spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool;

@@ -846,6 +846,18 @@ module std::features {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
+    /// Whether multisig script payloads are enabled. Allows multisig accounts to
+    /// propose and execute Move script payloads, not just entry functions.
+    const MULTISIG_SCRIPT: u64 = 110;
+
+    public fun get_multisig_script_feature(): u64 {
+        MULTISIG_SCRIPT
+    }
+
+    public fun is_multisig_script_enabled(): bool {
+        is_enabled(MULTISIG_SCRIPT)
+    }
+
     /// Whether the transaction limits feature is enabled. Allows transactions
     /// to request higher execution/IO gas limits backed by staking voting power.
     const TRANSACTION_LIMITS: u64 = 111;
