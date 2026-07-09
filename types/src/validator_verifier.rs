@@ -546,14 +546,21 @@ fn sum_voting_power(address_to_validator_info: &[ValidatorConsensusInfo]) -> u12
 
 impl fmt::Display for ValidatorVerifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        // Bound the number of validators to avoid excessive output
+        const MAX_VALIDATORS_TO_DISPLAY: usize = 300;
+
+        // Display the validator set
         write!(f, "ValidatorSet: [")?;
-        for info in &self.validator_infos {
+        for info in self.validator_infos.iter().take(MAX_VALIDATORS_TO_DISPLAY) {
             write!(
                 f,
                 "{}: {}, ",
                 info.address.short_str_lossless(),
                 info.voting_power
             )?;
+        }
+        if self.validator_infos.len() > MAX_VALIDATORS_TO_DISPLAY {
+            write!(f, "... ({} total validators)", self.validator_infos.len())?;
         }
         write!(f, "]")
     }
