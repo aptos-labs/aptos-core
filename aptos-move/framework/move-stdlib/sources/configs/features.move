@@ -942,6 +942,26 @@ module std::features {
     /// Lifetime: permanent
     const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 122;
 
+<<<<<<< HEAD
+=======
+    /// When enabled together with `TRANSACTION_INFO_V1`, execution populates
+    /// `TransactionInfoV1`'s hot state root hash, so it is committed to the ledger
+    /// accumulator. Requires `TRANSACTION_INFO_V1`.
+    /// Lifetime: permanent
+    const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
+
+    /// When enabled, the gas refund in the epilogue mints APT directly as a fungible asset
+    /// via the paired `MintRef` (stored in `transaction_fee::AptosFAMintCapabilities`), instead
+    /// of minting a coin and converting it. This avoids touching the legacy coin supply
+    /// aggregator (v1), reducing Block-STM contention on refund transactions.
+    /// Lifetime: transient
+    const GAS_REFUND_FA_MINT: u64 = 124;
+
+    public fun gas_refund_fa_mint_enabled(): bool {
+        is_enabled(GAS_REFUND_FA_MINT)
+    }
+
+>>>>>>> c514c562d0 ([framework] Mint gas refund as APT FA via MintRef (#20132))
     // ============================================================================================
     // Feature Flag Implementation
 

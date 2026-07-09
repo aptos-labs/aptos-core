@@ -506,6 +506,14 @@ spec aptos_framework::stake {
         ensures post_stake_pool.delegated_voter == new_voter;
     }
 
+<<<<<<< HEAD
+=======
+    spec initialize_pending_transaction_fee {
+        pragma verify = false; // TODO: set because of timeout.
+        modifies global<PendingTransactionFee>(@aptos_framework);
+    }
+
+>>>>>>> c514c562d0 ([framework] Mint gas refund as APT FA via MintRef (#20132))
     spec on_new_epoch {
         pragma verify = false; // TODO: set because of timeout (property proved).
         pragma disable_invariants_in_body;
