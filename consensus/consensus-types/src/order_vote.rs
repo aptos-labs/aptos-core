@@ -62,10 +62,6 @@ impl OrderVote {
         &self.ledger_info
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
-        self.signature.signature()
-    }
-
     // Question: SignatureWithStatus has interior mutability. Is it okay to expose this?
     pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature

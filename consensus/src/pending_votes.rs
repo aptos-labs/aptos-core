@@ -716,7 +716,13 @@ mod tests {
             pending_votes.insert_vote(&vote_0, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
-        partial_sigs.add_signature(signers[0].author(), vote_0.signature().clone());
+        partial_sigs.add_signature(
+            signers[0].author(),
+            vote_0
+                .signature_with_status()
+                .decompressed_signature()
+                .unwrap(),
+        );
 
         // same author voting for the same thing -> DuplicateVote
         assert_eq!(
@@ -728,7 +734,13 @@ mod tests {
             pending_votes.insert_vote(&vote_1, &validator_verifier),
             VoteReceptionResult::VoteAdded(2)
         );
-        partial_sigs.add_signature(signers[1].author(), vote_1.signature().clone());
+        partial_sigs.add_signature(
+            signers[1].author(),
+            vote_1
+                .signature_with_status()
+                .decompressed_signature()
+                .unwrap(),
+        );
 
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 0);
 
@@ -749,7 +761,13 @@ mod tests {
             },
         }
 
-        partial_sigs.add_signature(signers[3].author(), vote_3.signature().clone());
+        partial_sigs.add_signature(
+            signers[3].author(),
+            vote_3
+                .signature_with_status()
+                .decompressed_signature()
+                .unwrap(),
+        );
         let aggregated_sig = validator_verifier
             .aggregate_signatures(partial_sigs.signatures_iter())
             .unwrap();

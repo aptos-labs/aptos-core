@@ -107,11 +107,6 @@ impl Vote {
         &self.ledger_info
     }
 
-    /// Return the signature of the vote
-    pub fn signature(&self) -> &bls12381::Signature {
-        self.signature.signature()
-    }
-
     pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
     }

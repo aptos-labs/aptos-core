@@ -38,6 +38,7 @@ use serde::{
     ser::Serializer,
     Deserialize, Serialize,
 };
+use std::{fmt, sync::OnceLock};
 
 /// The serde data-model name used by `bls12381::Signature`'s `SerializeKey`
 /// derive. Must match so the on-wire encoding (and traced format) is identical.
@@ -45,31 +46,90 @@ const SIGNATURE_NAME: &str = "Signature";
 
 /// Compressed-bytes form of a `bls12381::Signature`. Wire-identical to
 /// `bls12381::Signature`, but decoding does not decompress the G2 point.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct LazyBlsSignature([u8; bls12381::Signature::LENGTH]);
+#[derive(Clone)]
+pub struct LazyBlsSignature {
+    /// The compressed 96-byte wire encoding. This is the canonical identity of
+    /// the signature: the only field serialized, compared, or hashed.
+    bytes: [u8; bls12381::Signature::LENGTH],
+    /// Lazily-populated decompressed point, cached so that a signature we
+    /// constructed from an already-decompressed point (e.g. a freshly
+    /// aggregated multi-signature) does not pay the G2 decompression again
+    /// when it is immediately verified. Never serialized, and not part of the
+    /// value's identity (`Eq`/`Hash` ignore it).
+    ///
+    /// `OnceLock` (not `OnceCell`) because signatures are shared and
+    /// decompressed across rayon threads. `Box`ed so an *empty* cache costs
+    /// only a pointer, not an inline ~192-byte point — this keeps the
+    /// footprint of untrusted, still-compressed wire signatures small (a
+    /// peer-supplied `SignedBatchInfoMsg` is decoded in full before its length
+    /// cap is enforced, so per-signature memory is attacker-amplifiable).
+    decompressed: OnceLock<Box<bls12381::Signature>>,
+}
 
 impl LazyBlsSignature {
-    /// Capture the compressed wire bytes of a known-valid signature.
+    /// Capture the compressed wire bytes of a known-valid signature, keeping the
+    /// already-decompressed point cached so a subsequent [`Self::decompress`]
+    /// (e.g. the verify right after local aggregation) is free.
     pub fn from_signature(sig: &bls12381::Signature) -> Self {
-        Self(sig.to_bytes())
+        let decompressed = OnceLock::new();
+        // Infallible on a fresh cell.
+        let _ = decompressed.set(Box::new(sig.clone()));
+        Self {
+            bytes: sig.to_bytes(),
+            decompressed,
+        }
     }
 
     /// Subgroup-unchecked G2 decompression — the expensive operation we defer
     /// until a payload has cleared structural validation. (The subgroup check
-    /// itself still happens later, inside signature verification.)
+    /// itself still happens later, inside signature verification.) The result
+    /// is cached, so repeated calls — and signatures constructed via
+    /// [`Self::from_signature`] — do not decompress again.
     pub fn decompress(&self) -> Result<bls12381::Signature, CryptoMaterialError> {
-        bls12381::Signature::try_from(self.0.as_slice())
+        if let Some(sig) = self.decompressed.get() {
+            return Ok((**sig).clone());
+        }
+        let sig = bls12381::Signature::try_from(self.bytes.as_slice())?;
+        // Ignore a race where another thread cached it first; the value is
+        // deterministic either way.
+        let _ = self.decompressed.set(Box::new(sig.clone()));
+        Ok(sig)
     }
 
     /// The raw 96-byte compressed encoding. Lets callers that only need the
     /// bytes (e.g. API hex export) avoid decompression entirely.
     pub fn to_bytes(&self) -> [u8; bls12381::Signature::LENGTH] {
-        self.0
+        self.bytes
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn from_raw_bytes_for_test(bytes: [u8; bls12381::Signature::LENGTH]) -> Self {
-        Self(bytes)
+        Self {
+            bytes,
+            decompressed: OnceLock::new(),
+        }
+    }
+}
+
+// Identity is the compressed bytes only; the decompression cache is a transient
+// performance aid and must not affect equality, hashing, or debug output.
+impl PartialEq for LazyBlsSignature {
+    fn eq(&self, other: &Self) -> bool {
+        self.bytes == other.bytes
+    }
+}
+
+impl Eq for LazyBlsSignature {}
+
+impl std::hash::Hash for LazyBlsSignature {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.bytes.hash(state);
+    }
+}
+
+impl fmt::Debug for LazyBlsSignature {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LazyBlsSignature(0x{})", hex::encode(self.bytes))
     }
 }
 
@@ -80,13 +140,13 @@ impl Serialize for LazyBlsSignature {
     {
         if serializer.is_human_readable() {
             // Mirror `to_encoded_string`: "0x" + hex(bytes).
-            serializer.serialize_str(&format!("0x{}", hex::encode(self.0)))
+            serializer.serialize_str(&format!("0x{}", hex::encode(self.bytes)))
         } else {
             // Mirror `SerializeKey`: a newtype struct named "Signature" wrapping
             // a serde_bytes byte string (length-prefixed in BCS).
             serializer.serialize_newtype_struct(
                 SIGNATURE_NAME,
-                serde_bytes::Bytes::new(self.0.as_slice()),
+                serde_bytes::Bytes::new(self.bytes.as_slice()),
             )
         }
     }
@@ -97,7 +157,21 @@ impl<'de> Deserialize<'de> for LazyBlsSignature {
     where
         D: Deserializer<'de>,
     {
-        let bytes: Vec<u8> = if deserializer.is_human_readable() {
+        // Copy out exactly `LENGTH` bytes from a length-checked slice. The
+        // length is validated *before* the copy, so a wrong-length field
+        // (up to the 64 MiB network message cap on the consensus ingress path)
+        // is rejected without allocating an owned copy of the input.
+        fn to_array<E: de::Error>(bytes: &[u8]) -> Result<[u8; bls12381::Signature::LENGTH], E> {
+            <[u8; bls12381::Signature::LENGTH]>::try_from(bytes).map_err(|_| {
+                E::custom(format!(
+                    "invalid BLS signature length: {} (expected {})",
+                    bytes.len(),
+                    bls12381::Signature::LENGTH
+                ))
+            })
+        }
+
+        if deserializer.is_human_readable() {
             // Mirror `from_encoded_string`: tolerate an AIP-80 prefix and/or a
             // leading "0x", then hex-decode.
             let encoded = <String>::deserialize(deserializer)?;
@@ -105,27 +179,27 @@ impl<'de> Deserialize<'de> for LazyBlsSignature {
                 .strip_prefix(bls12381::Signature::AIP_80_PREFIX)
                 .unwrap_or(&encoded);
             let stripped = stripped.strip_prefix("0x").unwrap_or(stripped);
-            hex::decode(stripped).map_err(de::Error::custom)?
+            let bytes = hex::decode(stripped).map_err(de::Error::custom)?;
+            Ok(Self {
+                bytes: to_array(&bytes)?,
+                decompressed: OnceLock::new(),
+            })
         } else {
             // Mirror `DeserializeKey`: a newtype struct named "Signature"
-            // wrapping a borrowed byte slice. Capture the bytes WITHOUT calling
-            // `bls12381::Signature::try_from` (which would decompress).
+            // wrapping a *borrowed* byte slice. Length-check the borrowed slice
+            // and copy out exactly `LENGTH` bytes, WITHOUT calling
+            // `bls12381::Signature::try_from` (which would decompress) and
+            // without first copying the whole (possibly oversized) field.
             #[derive(Deserialize)]
             #[serde(rename = "Signature")]
             struct Value<'a>(&'a [u8]);
 
             let value = Value::deserialize(deserializer)?;
-            value.0.to_vec()
-        };
-
-        let arr: [u8; bls12381::Signature::LENGTH] = bytes.try_into().map_err(|v: Vec<u8>| {
-            de::Error::custom(format!(
-                "invalid BLS signature length: {} (expected {})",
-                v.len(),
-                bls12381::Signature::LENGTH
-            ))
-        })?;
-        Ok(Self(arr))
+            Ok(Self {
+                bytes: to_array(value.0)?,
+                decompressed: OnceLock::new(),
+            })
+        }
     }
 }
 
@@ -166,6 +240,52 @@ mod tests {
         }
     }
 
+    /// The empty (uncached) footprint must stay small: untrusted wire
+    /// signatures are decoded before any length cap is enforced, so a bloated
+    /// per-signature size is attacker-amplifiable. Boxing the cache keeps an
+    /// empty `LazyBlsSignature` near the 96-byte payload plus a pointer, rather
+    /// than reserving an inline ~192-byte decompressed point.
+    #[test]
+    fn uncached_footprint_is_small() {
+        let size = std::mem::size_of::<LazyBlsSignature>();
+        assert!(
+            size <= 128,
+            "LazyBlsSignature grew to {size} bytes; an empty cache must not \
+             reserve the decompressed point inline (box it)",
+        );
+    }
+
+    /// The decompression cache is a transient perf aid and must not affect
+    /// identity: a cached (`from_signature`) and an uncached (`from_raw_bytes`)
+    /// instance with the same bytes must be equal, hash equally, and serialize
+    /// identically. `AggregateSignature`'s derived `Eq` relies on this.
+    #[test]
+    fn cache_does_not_affect_identity() {
+        use std::hash::{Hash, Hasher};
+
+        let sig = sample_signature();
+        let cached = LazyBlsSignature::from_signature(&sig); // cache pre-filled
+        let uncached = LazyBlsSignature::from_raw_bytes_for_test(sig.to_bytes()); // cache empty
+
+        assert_eq!(cached, uncached, "cache must not affect equality");
+        assert_eq!(
+            bcs::to_bytes(&cached).unwrap(),
+            bcs::to_bytes(&uncached).unwrap(),
+            "cache must not affect encoding",
+        );
+
+        let hash = |v: &LazyBlsSignature| {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            v.hash(&mut h);
+            h.finish()
+        };
+        assert_eq!(hash(&cached), hash(&uncached), "cache must not affect hash");
+
+        // Both decompress to the same signature, cached or not.
+        assert_eq!(cached.decompress().unwrap(), sig);
+        assert_eq!(uncached.decompress().unwrap(), sig);
+    }
+
     /// Human-readable (JSON) encoding must also match bitwise.
     #[test]
     fn lazy_bls_wire_compat_json() {
@@ -189,6 +309,14 @@ mod tests {
         // (newtype-struct-wrapped serde_bytes), then attempt to decode as lazy.
         let short = serde_bytes::ByteBuf::from(vec![0u8; 95]);
         let bytes = bcs::to_bytes(&short).unwrap();
+        assert!(bcs::from_bytes::<LazyBlsSignature>(&bytes).is_err());
+
+        // An oversized field (bounded on the wire only by the network message
+        // cap) must also be rejected. The borrowed slice is length-checked
+        // before any copy, so this rejects without allocating a ~1 MiB owned
+        // buffer.
+        let oversized = serde_bytes::ByteBuf::from(vec![0u8; 1 << 20]);
+        let bytes = bcs::to_bytes(&oversized).unwrap();
         assert!(bcs::from_bytes::<LazyBlsSignature>(&bytes).is_err());
     }
 }

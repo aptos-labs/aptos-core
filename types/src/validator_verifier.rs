@@ -278,7 +278,11 @@ impl ValidatorVerifier {
         if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
             && !signature_with_status.is_verified()
         {
-            self.verify(author, message, signature_with_status.signature())?;
+            // Decompress the signature only now, after the cheap author check.
+            let signature = signature_with_status
+                .decompressed_signature()
+                .map_err(|_| VerifyError::InvalidMultiSignature)?;
+            self.verify(author, message, &signature)?;
             signature_with_status.set_verified();
         }
         Ok(())
@@ -296,9 +300,9 @@ impl ValidatorVerifier {
             .with_min_len(4) // At least 4 signatures are verified in each task
             .filter_map(|(account_address, signature)| {
                 if signature.is_verified()
-                    || self
-                        .verify(account_address, message, signature.signature())
-                        .is_ok()
+                    || signature
+                        .decompressed_signature()
+                        .is_ok_and(|sig| self.verify(account_address, message, &sig).is_ok())
                 {
                     signature.set_verified();
                     Some((account_address, signature))

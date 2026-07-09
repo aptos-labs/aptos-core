@@ -172,7 +172,12 @@ pub fn make_proposal_with_parent_and_overrides(
         PartialSignatures::empty(),
     );
 
-    ledger_info_with_signatures.add_signature(vote.author(), vote.signature().clone());
+    ledger_info_with_signatures.add_signature(
+        vote.author(),
+        vote.signature_with_status()
+            .decompressed_signature()
+            .unwrap(),
+    );
 
     let qc = QuorumCert::new(
         vote_data,
