@@ -878,14 +878,19 @@ module aptos_framework::coin {
     }
 
     public(friend) fun burn_from_for_gas<CoinType>(
-        account_addr: address, amount: u64, burn_cap: &BurnCapability<CoinType>
-    ) acquires CoinInfo, CoinConversionMap, PairedFungibleAssetRefs {
+        account_addr: address,
+        amount: u64,
+        burn_cap: &BurnCapability<CoinType>,
+        upgrade_to_concurrent: bool,
+    ) acquires CoinInfo, CoinStore, CoinConversionMap, PairedFungibleAssetRefs {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount == 0) { return };
 
         borrow_paired_burn_ref(burn_cap).address_burn_from_for_gas(primary_fungible_store::primary_store_address(
                 account_addr, ensure_paired_metadata<CoinType>()
-            ), amount);
+            ),
+            amount,
+            upgrade_to_concurrent);
     }
 
     /// Deposit the coin balance into the recipient's account and emit an event.
@@ -913,14 +918,16 @@ module aptos_framework::coin {
     /// Deposit the coin balance into the recipient's account without checking if the account is frozen.
     /// This is for internal use only and doesn't emit an DepositEvent.
     public(friend) fun deposit_for_gas_fee<CoinType>(
-        account_addr: address, coin: Coin<CoinType>
+        account_addr: address,
+        coin: Coin<CoinType>,
+        upgrade_to_concurrent: bool,
     ) acquires CoinConversionMap, CoinInfo {
         let fa = coin_to_fungible_asset(coin);
         let metadata = fa.asset_metadata();
         let store =
             primary_fungible_store::ensure_primary_store_exists(account_addr, metadata);
         fungible_asset::unchecked_deposit_with_no_events(
-            store.object_address(), fa
+            store.object_address(), fa, upgrade_to_concurrent
         );
     }
 
@@ -1866,13 +1873,13 @@ module aptos_framework::coin {
             10
         );
 
-        deposit_for_gas_fee(account_addr, mint<FakeMoney>(100, &mint_cap));
+        deposit_for_gas_fee(account_addr, mint<FakeMoney>(100, &mint_cap), false);
         assert!(
             event::emitted_events<fungible_asset::Deposit>().length() == 1,
             10
         );
 
-        deposit_for_gas_fee(aaron_addr, mint<FakeMoney>(50, &mint_cap));
+        deposit_for_gas_fee(aaron_addr, mint<FakeMoney>(50, &mint_cap), false);
         assert!(
             event::emitted_events<fungible_asset::Deposit>().length() == 1,
             10
@@ -1885,7 +1892,7 @@ module aptos_framework::coin {
             0
         );
         assert!(balance<FakeMoney>(account_addr) == 100, 0);
-        deposit_for_gas_fee(bob_addr, mint<FakeMoney>(1, &mint_cap));
+        deposit_for_gas_fee(bob_addr, mint<FakeMoney>(1, &mint_cap), false);
         assert!(
             event::emitted_events<fungible_asset::Deposit>().length() == 1,
             10
@@ -1895,7 +1902,7 @@ module aptos_framework::coin {
             event::emitted_events<fungible_asset::Withdraw>().length() == 0,
             10
         );
-        burn_from_for_gas(aaron_addr, 1, &burn_cap);
+        burn_from_for_gas(aaron_addr, 1, &burn_cap, false);
         assert!(
             event::emitted_events<fungible_asset::Withdraw>().length() == 0,
             10

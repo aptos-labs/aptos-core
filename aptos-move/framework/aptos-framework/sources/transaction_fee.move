@@ -69,19 +69,19 @@ module aptos_framework::transaction_fee {
 
     /// Burn transaction fees in epilogue.
     friend fun burn_fee(
-        account: address, fee: u64
+        account: address, fee: u64, upgrade_to_concurrent: bool
     ) {
         let burn_ref = &AptosFABurnCapabilities[@aptos_framework].burn_ref;
-        aptos_account::burn_from_fungible_store_for_gas(burn_ref, account, fee);
+        aptos_account::burn_from_fungible_store_for_gas(burn_ref, account, fee, upgrade_to_concurrent);
     }
 
     /// Mint refund in epilogue.
     friend fun mint_and_refund(
-        account: address, refund: u64
+        account: address, refund: u64, upgrade_to_concurrent: bool
     ) {
         let mint_cap = &AptosCoinMintCapability[@aptos_framework].mint_cap;
         let refund_coin = coin::mint(refund, mint_cap);
-        coin::deposit_for_gas_fee(account, refund_coin);
+        coin::deposit_for_gas_fee(account, refund_coin, upgrade_to_concurrent);
     }
 
     /// Only called during genesis.

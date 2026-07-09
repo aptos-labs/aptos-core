@@ -959,6 +959,14 @@ module std::features {
     /// Lifetime: permanent
     const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
 
+    const UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE: u64 = 124;
+
+    public fun get_upgrade_fee_payer_to_concurrent_fa_store_feature(): u64 { UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE }
+
+    public fun is_upgrade_fee_payer_to_concurrent_fa_store_enabled(): bool acquires Features {
+        is_enabled(UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

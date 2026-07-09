@@ -271,12 +271,12 @@ module aptos_framework::aptos_account {
 
     /// Burn from APT Primary FungibleStore for gas charge
     public(friend) fun burn_from_fungible_store_for_gas(
-        ref: &BurnRef, account: address, amount: u64
+        ref: &BurnRef, account: address, amount: u64, upgrade_to_concurrent: bool
     ) {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount != 0) {
             let store_addr = primary_fungible_store_address(account);
-            ref.address_burn_from_for_gas(store_addr, amount);
+            ref.address_burn_from_for_gas(store_addr, amount, upgrade_to_concurrent);
         };
     }
 

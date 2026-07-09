@@ -284,6 +284,7 @@ spec aptos_framework::aptos_account {
         ref: &BurnRef,
         account: address,
         amount: u64,
+        upgrade_to_concurrent: bool,
     ) {
         // TODO: temporary mockup.
         pragma verify = false;

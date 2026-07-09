@@ -71,7 +71,7 @@ spec aptos_framework::transaction_fee {
     }
 
     /// `AptosCoinCapabilities` should be exists.
-    spec burn_fee(account: address, fee: u64) {
+    spec burn_fee(account: address, fee: u64, upgrade_to_concurrent: bool) {
         use std::option;
         use aptos_std::type_info;
         use aptos_framework::optional_aggregator;
@@ -115,7 +115,7 @@ spec aptos_framework::transaction_fee {
         ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
     }
 
-    spec mint_and_refund(account: address, refund: u64) {
+    spec mint_and_refund(account: address, refund: u64, upgrade_to_concurrent: bool) {
         use aptos_std::type_info;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::coin::{CoinInfo, CoinStore};

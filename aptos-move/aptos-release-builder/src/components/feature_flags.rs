@@ -174,6 +174,7 @@ pub enum FeatureFlag {
     NativeCollateral,
     ComputeTradingNativeStateRoots,
     HotStateRootInTxnInfo,
+    UpgradeFeePayerToConcurrentFaStore,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -453,6 +454,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS
             },
             FeatureFlag::HotStateRootInTxnInfo => AptosFeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO,
+            FeatureFlag::UpgradeFeePayerToConcurrentFaStore => {
+                AptosFeatureFlag::UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE
+            },
         }
     }
 }
@@ -659,6 +663,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::ComputeTradingNativeStateRoots
             },
             AptosFeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO => FeatureFlag::HotStateRootInTxnInfo,
+            AptosFeatureFlag::UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE => {
+                FeatureFlag::UpgradeFeePayerToConcurrentFaStore
+            },
         }
     }
 }
