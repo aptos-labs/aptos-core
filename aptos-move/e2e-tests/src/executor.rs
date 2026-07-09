@@ -1006,7 +1006,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[allow(unused_mut)]
         let mut config: BlockExecutorConfig = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
-                blockstm_v2: false,
+                blockstm_v2: true,
                 concurrency_level: 1,
                 allow_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,

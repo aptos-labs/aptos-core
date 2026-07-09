@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/inline_spec_no_opaque.move:44:9
+   │
+44 │         ensures result == x + 1; // error: post-condition does not hold (body adds 2)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/inline_spec_no_opaque.move:39: bad_inc
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/inline_spec_no_opaque.move:40: bad_inc
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/inline_spec_no_opaque.move:43: bad_inc (spec)
+   =     at tests/sources/functional/closures/inline/inline_spec_no_opaque.move:44: bad_inc (spec)

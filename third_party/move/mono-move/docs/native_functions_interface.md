@@ -101,7 +101,7 @@ ctx.alloc(size: usize, descriptor_id: DescriptorId) -> *mut u8     // lower-leve
 
 These don't make memory access fully safe — natives still work with raw memory underneath — but they replace ad-hoc pointer arithmetic with methods that know what they're accessing.
 
-**GC safety.** Allocations during a native call can trigger GC, which relocates heap objects. Any wrapper (or raw pointer) the native is actively holding needs to be pinned through `PinnedRoots` so it survives — and gets updated by — collection. How that threads through the wrapper types may shift the final API: a wrapper might carry a `PinGuard<'_>` whose lifetime constrains how it composes with `&mut ctx` borrows. Details TBD.
+**GC safety.** Allocations during a native call can trigger GC, which relocates heap objects. Any wrapper (or raw pointer) the native is actively holding needs to be pinned through `RootPool` so it survives — and gets updated by — collection. How that threads through the wrapper types may shift the final API: a wrapper might carry a root handle whose lifetime constrains how it composes with `&mut ctx` borrows. Details TBD.
 
 - **Descriptor registration.** Custom heap shapes introduced by natives register their `ObjectDescriptor`s with the program-wide `ObjectDescriptorTable` at VM startup; the returned `DescriptorId`s are what `ctx.alloc_*` takes. Extensions (§6) are the natural owner — they hold the lifetime and naming of the heap shapes their natives operate on — but standalone natives can register too.
 - **No shadow arenas.** Today's `AlgebraContext.objs` / `NativeRistrettoPointContext.points` aren't carried forward — uncounted growth, beyond the gas budget. The crypto natives must be **rewritten**: the handle-into-arena indirection (`RistrettoPoint { handle: u64 }` + Rust-side `Vec`) becomes a real heap struct holding the bytes directly, with a proper `ObjectDescriptor`. Off the Decibel path; separate milestone.
@@ -162,7 +162,7 @@ impl MyExtension {
 
 - `init` (per extension, not on the trait) **constructs** a fresh extension at session start. Only the heap is available at this point — there's no calling frame, so the full native context doesn't exist yet. The extension allocates its heap data structures via `heap.alloc_*` and stores the resulting pointers in fields of `Self`. Returning `Self` (rather than mutating `&mut self`) avoids a half-initialized "before init" state with placeholder pointer fields.
 - `finalize` runs at session end — wrap up (BCS-serialize accumulated state, extract a change set for the host, etc.).
-- `gc_roots` yields a mutable reference to each heap root pointer the extension owns. The GC iterates during collection and writes the (possibly relocated) pointer back through each reference — alongside the call-stack walk and `PinnedRoots`.
+- `gc_roots` yields a mutable reference to each heap root pointer the extension owns. The GC iterates during collection and writes the (possibly relocated) pointer back through each reference — alongside the call-stack walk and `RootPool`.
 
 **Access from natives:**
 

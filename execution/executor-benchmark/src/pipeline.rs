@@ -17,6 +17,7 @@ use aptos_indexer_grpc_table_info::table_info_service::TableInfoService;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_metrics_core::IntCounterVecHelper;
+use aptos_transaction_generator_lib::TransactionFeedback;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, TransactionPayload, Version},
@@ -76,6 +77,7 @@ where
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
         indexer_wrapper: Option<(Arc<TableInfoService>, Arc<AtomicU64>, Arc<AtomicBool>)>,
+        transaction_feedback: Option<Arc<dyn TransactionFeedback>>,
     ) -> (Self, SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
@@ -153,6 +155,7 @@ where
             config.allow_discards,
             config.allow_retries,
             staged_events_clone,
+            transaction_feedback,
         );
 
         let print_transactions = config.print_transactions;

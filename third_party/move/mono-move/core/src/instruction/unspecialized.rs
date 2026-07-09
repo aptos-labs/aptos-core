@@ -13,7 +13,7 @@
 //! the operand type at runtime.
 
 use super::{CodeOffset, FrameOffset};
-use crate::types::{InternedType, Type};
+use crate::types::{self, InternedType, Type};
 use move_core_types::int256::{I256, U256};
 use std::fmt;
 
@@ -80,6 +80,25 @@ impl IntTy {
             Type::I256 => IntTy::I256,
             _ => return None,
         })
+    }
+
+    /// The interned [`Type`] for this integer type.
+    /// This is the inverse of [`from_type`](Self::from_type).
+    pub const fn interned_ty(self) -> InternedType {
+        match self {
+            IntTy::U8 => types::U8_TY,
+            IntTy::U16 => types::U16_TY,
+            IntTy::U32 => types::U32_TY,
+            IntTy::U64 => types::U64_TY,
+            IntTy::U128 => types::U128_TY,
+            IntTy::U256 => types::U256_TY,
+            IntTy::I8 => types::I8_TY,
+            IntTy::I16 => types::I16_TY,
+            IntTy::I32 => types::I32_TY,
+            IntTy::I64 => types::I64_TY,
+            IntTy::I128 => types::I128_TY,
+            IntTy::I256 => types::I256_TY,
+        }
     }
 }
 
@@ -275,7 +294,7 @@ impl fmt::Display for IntOperand {
 ///     in-bounds frame regions of width `rhs.byte_width()`.
 ///   - For bitwise kinds (BitAnd / BitOr / BitXor), `rhs` is unsigned.
 ///
-/// TODO: consider reverse-imm variants (e.g. `dst = imm - lhs` for `Sub`,
+/// TODO(perf): consider reverse-imm variants (e.g. `dst = imm - lhs` for `Sub`,
 /// and equivalents for `Div`/`Mod`) — non-commutative ops can't express
 /// `imm op slot` with the current shape and instead need a separate slot
 /// load + binop, which is one extra micro-op per such case.
@@ -305,7 +324,7 @@ impl fmt::Display for ShiftOperand {
 /// `dst = lhs <direction> rhs`. Aborts if `rhs >= ty.bit_width()`.
 /// Invariant: `ty` is unsigned (verifier-enforced).
 ///
-/// TODO: consider folding into [`IntBinaryOp`] (letting [`IntOperand`]
+/// TODO(cleanup): consider folding into [`IntBinaryOp`] (letting [`IntOperand`]
 /// carry the always-`u8` shift amount). Kept separate today since shifts
 /// don't share the binary dispatch path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -355,6 +374,20 @@ pub enum CmpKind {
     Ge,
     Eq,
     Neq,
+}
+
+impl CmpKind {
+    /// Return the logically negated comparison.
+    pub fn negate(self) -> Self {
+        match self {
+            CmpKind::Lt => CmpKind::Ge,
+            CmpKind::Ge => CmpKind::Lt,
+            CmpKind::Gt => CmpKind::Le,
+            CmpKind::Le => CmpKind::Gt,
+            CmpKind::Eq => CmpKind::Neq,
+            CmpKind::Neq => CmpKind::Eq,
+        }
+    }
 }
 
 impl fmt::Display for CmpKind {
@@ -445,4 +478,46 @@ pub struct JumpValueRefCmpOp {
     pub ty: InternedType,
     pub gas_taken: u64,
     pub gas_fallthrough: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cmp_kind_double_negate_is_identity() {
+        for kind in [
+            CmpKind::Lt,
+            CmpKind::Le,
+            CmpKind::Gt,
+            CmpKind::Ge,
+            CmpKind::Eq,
+            CmpKind::Neq,
+        ] {
+            assert_eq!(kind.negate().negate(), kind);
+        }
+    }
+
+    #[test]
+    fn interned_ty_then_from_type_is_identity() {
+        for ty in [
+            IntTy::U8,
+            IntTy::U16,
+            IntTy::U32,
+            IntTy::U64,
+            IntTy::U128,
+            IntTy::U256,
+            IntTy::I8,
+            IntTy::I16,
+            IntTy::I32,
+            IntTy::I64,
+            IntTy::I128,
+            IntTy::I256,
+        ] {
+            assert_eq!(
+                IntTy::from_type(types::view_type(ty.interned_ty())),
+                Some(ty)
+            );
+        }
+    }
 }

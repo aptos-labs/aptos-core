@@ -2437,10 +2437,11 @@ where
                         read_write_summary,
                         approx_output_size,
                     );
+
                     if idx < num_txns {
                         // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns
-                        // tracks only user txns. Includes bcs-fallback discards (which accumulate
-                        // a fee statement before being discarded), consistent with the accumulator.
+                        // tracks only user txns. Includes bcs-fallback discards, which still
+                        // accumulate a fee statement before being discarded.
                         num_committed_user_txns += 1;
                     }
 
@@ -2544,6 +2545,16 @@ where
                             continue;
                         }
                     };
+
+                    // Feed only committed transactions to the hot-state accumulator, in commit
+                    // order: bcs-fallback discards have continued above, and genuine discards
+                    // carry empty read/write sets.
+                    if block_limit_processor.is_hot_state_accumulation_enabled() {
+                        block_limit_processor.accumulate_hot_state_rw(
+                            output_before_guard.storage_keys_written(),
+                            output_before_guard.storage_keys_read(),
+                        );
+                    }
 
                     // Apply the writes.
                     let resource_write_set = output_before_guard.resource_write_set();

@@ -1365,6 +1365,9 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
             }) {
                 self.env.set_node_instantiation(new_id, new_inst);
             }
+            if let Some(weight) = self.env.get_quant_weight(id) {
+                self.env.set_quant_weight(new_id, weight);
+            }
             Some(new_id)
         } else {
             None
@@ -1425,5 +1428,73 @@ fn check_data_invariants(struct_env: &StructEnv) {
                 )
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_core_types::account_address::AccountAddress;
+    use move_model::{
+        ast::{Address, ModuleName, Spec},
+        exp_rewriter::ExpRewriterFunctions,
+        ty::BOOL_TYPE,
+    };
+    use std::collections::BTreeMap;
+
+    fn fresh_env() -> GlobalEnv {
+        let mut env = GlobalEnv::new();
+        let loc = Loc::default();
+        let addr = Address::Numerical(AccountAddress::ZERO);
+        let module_name = ModuleName::new(addr, env.symbol_pool().make("test_mod"));
+        env.add(
+            loc,
+            module_name,
+            vec![],
+            vec![],
+            vec![],
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            vec![],
+            vec![],
+            vec![],
+            Spec::default(),
+            vec![],
+        );
+        env
+    }
+
+    #[test]
+    fn spec_converter_rewrite_node_id_preserves_quant_weight() {
+        let mut env = fresh_env();
+
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        env.set_quant_weight(id, 17);
+
+        let function_mapping: BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>> =
+            BTreeMap::new();
+        let mut converter = SpecConverter::new(&mut env, &function_mapping, true);
+        let new_id = converter
+            .rewrite_node_id(id)
+            .expect("rewrite produced a new node id");
+
+        assert_ne!(new_id, id);
+        assert_eq!(env.get_quant_weight(new_id), Some(17));
+    }
+
+    #[test]
+    fn spec_converter_rewrite_node_id_skips_outside_spec() {
+        let mut env = fresh_env();
+
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        env.set_quant_weight(id, 9);
+
+        let function_mapping: BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>> =
+            BTreeMap::new();
+        let mut converter = SpecConverter::new(&mut env, &function_mapping, false);
+        assert!(converter.rewrite_node_id(id).is_none());
+
+        assert_eq!(env.get_quant_weight(id), Some(9));
     }
 }

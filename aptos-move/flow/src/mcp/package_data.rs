@@ -6,8 +6,12 @@ use codespan_reporting::{
     diagnostic::Severity,
     term::{emit, termcolor::NoColor, Config},
 };
+use move_compiler_v2::Experiment;
 use move_model::model::{FunId, GlobalEnv, ModuleId, QualifiedId};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 /// Source stage that produced a set of diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -66,6 +70,11 @@ pub(crate) struct PackageData {
     has_compilation_errors: bool,
     /// Per-source diagnostic messages, keyed by the stage that produced them.
     diagnostics: BTreeMap<DiagnosticSource, Vec<String>>,
+    /// Path used to build `env`; retained so tools can rebuild a fresh env
+    /// with a per-call filter (matching CLI `aptos move prove -f` semantics).
+    path: PathBuf,
+    /// Args used to build `env`; retained for the same reason as `path`.
+    args: McpArgs,
 }
 
 // SAFETY: `GlobalEnv` is `!Send` because it uses `Rc` and `NonNull` internally for its
@@ -80,29 +89,7 @@ impl PackageData {
     /// Only fails on I/O errors or invalid package path. All compilation errors and
     /// warnings are stored in the returned `GlobalEnv`.
     pub(crate) fn init(path: &Path, args: &McpArgs) -> anyhow::Result<Self> {
-        let named_addresses = args
-            .named_addresses
-            .iter()
-            .map(|(name, addr)| (name.clone(), addr.into_inner()))
-            .collect();
-        let env = aptos_framework::build_model(
-            args.dev_mode,
-            // test_mode off: test code is handled separately by run_move_unit_tests.
-            // verify_mode on: #[verify_only] specs are needed by the prover.
-            false, // test_mode
-            true,  // verify_mode
-            path,
-            named_addresses,
-            args.target_filter.clone(),
-            args.bytecode_version,
-            None,
-            Some(args.language_version),
-            false,
-            aptos_framework::extended_checks::get_all_attribute_names().clone(),
-            args.experiments.clone(),
-            true,  // always build with bytecode
-            false, // all_files_as_targets
-        )?;
+        let env = Self::build_env(path, args, args.target_filter.clone())?;
         let compilation_diagnostics = render_diagnostics(&env);
         let has_compilation_errors = env.has_errors();
         log_diagnostics(&compilation_diagnostics, DiagnosticSource::Compiler);
@@ -113,10 +100,93 @@ impl PackageData {
             verified: None,
             has_compilation_errors,
             diagnostics,
+            path: path.to_path_buf(),
+            args: args.clone(),
         })
     }
 
+    /// Build a fresh `GlobalEnv` whose primary-target set is narrowed by a
+    /// positive `filter` and/or a list of module names to demote, composed on
+    /// top of the session-level `target_filter` so per-call narrowing cannot
+    /// widen the scope beyond what the session was started with. The cached
+    /// env held by `PackageData` is unchanged. Errors when both knobs are empty.
+    pub(crate) fn build_filtered_env(
+        &self,
+        filter: Option<&str>,
+        excluded_modules: &[String],
+    ) -> anyhow::Result<GlobalEnv> {
+        if filter.is_none() && excluded_modules.is_empty() {
+            anyhow::bail!("build_filtered_env called with no filter and no exclusions");
+        }
+        let mut args = self.args.clone();
+        args.experiments
+            .push(Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string());
+        let mut env = Self::build_env(&self.path, &args, args.target_filter.clone())?;
+        let filter_module = filter.map(|f| super::tools::module_part_of(f).to_string());
+        let exclude_names: std::collections::BTreeSet<&str> =
+            excluded_modules.iter().map(|s| s.as_str()).collect();
+        // Best-effort file-granular demote; on file-share conflicts, fall
+        // back to verify_scope on the unchanged env.
+        if filter_module.is_some() || !exclude_names.is_empty() {
+            let demote_result = env.demote_modules_from_primary_targets(|m| {
+                let filter_demotes = filter_module
+                    .as_ref()
+                    .is_some_and(|name| !m.matches_name(name));
+                let exclude_demotes = exclude_names.iter().any(|n| m.matches_name(n));
+                filter_demotes || exclude_demotes
+            });
+            if let Err(blocked) = demote_result {
+                log::warn!(
+                    "build_filtered_env: filter `{:?}` / exclude `{:?}` cannot \
+                     narrow without splitting a source file (siblings: {:?}); \
+                     falling back to verify_scope on the broader env",
+                    filter_module,
+                    excluded_modules,
+                    blocked
+                );
+            }
+        }
+        Ok(env)
+    }
+
+    /// Lower-level helper that calls `aptos_framework::build_model` with the given
+    /// `target_filter`. Shared between `init` (session-global filter) and
+    /// `build_filtered_env` (per-call filter).
+    fn build_env(
+        path: &Path,
+        args: &McpArgs,
+        target_filter: Option<String>,
+    ) -> anyhow::Result<GlobalEnv> {
+        let named_addresses = args
+            .named_addresses
+            .iter()
+            .map(|(name, addr)| (name.clone(), addr.into_inner()))
+            .collect();
+        aptos_framework::build_model(
+            args.dev_mode,
+            // test_mode off: test code is handled separately by run_move_unit_tests.
+            // verify_mode on: #[verify_only] specs are needed by the prover.
+            false, // test_mode
+            true,  // verify_mode
+            path,
+            named_addresses,
+            target_filter,
+            args.bytecode_version,
+            None,
+            Some(args.language_version),
+            false,
+            aptos_framework::extended_checks::get_all_attribute_names().clone(),
+            args.experiments.clone(),
+            true,  // always build with bytecode
+            false, // all_files_as_targets
+        )
+    }
+
     /// Access the compiled `GlobalEnv`.
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+
     pub(crate) fn env(&self) -> &GlobalEnv {
         &self.env
     }

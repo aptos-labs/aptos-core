@@ -5,10 +5,10 @@ use crate::{
     commands::init_logger_and_metrics,
     runner::{BenchmarkRunner, ReplayBlock},
     state_view::ReadSet,
-    workload::TransactionBlock,
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
+use aptos_types::transaction::TransactionBlock;
 use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
 };

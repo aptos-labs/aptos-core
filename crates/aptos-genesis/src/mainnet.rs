@@ -151,6 +151,7 @@ impl MainnetGenesisInfo {
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
                 initial_jwks: vec![],
                 keyless_groth16_vk: None,
+                initialize_decryption_at_genesis: true,
             },
         )
     }

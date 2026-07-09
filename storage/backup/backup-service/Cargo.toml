@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+fuzzing = ["aptos-db/fuzzing"]
+
 [dependencies]
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
@@ -34,6 +37,3 @@ aptos-config = { workspace = true }
 aptos-db = { workspace = true, features = ["fuzzing"] }
 aptos-temppath = { workspace = true }
 reqwest = { workspace = true }
-
-[features]
-fuzzing = ["aptos-db/fuzzing"]

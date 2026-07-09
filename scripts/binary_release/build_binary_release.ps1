@@ -33,11 +33,16 @@ $Env:VCPKG_ROOT = 'C:\vcpkg\'
 
 # Determine the cargo path - try common locations
 $CARGO_PATH = $null
+# Known-path overrides for crates whose directory name doesn't match the crate name.
+$knownPaths = @{
+    "aptos-move-flow" = "aptos-move\flow\Cargo.toml"
+}
 $possiblePaths = @(
+    $knownPaths[$CrateName],
     "crates\$CrateName\Cargo.toml",
     "$CrateName\Cargo.toml",
     "aptos-move\$CrateName\Cargo.toml"
-)
+) | Where-Object { $_ }
 
 foreach ($path in $possiblePaths) {
     if (Test-Path $path) {

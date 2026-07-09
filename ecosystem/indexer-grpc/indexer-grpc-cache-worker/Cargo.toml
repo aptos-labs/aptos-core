@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+integration-tests = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
@@ -39,6 +42,3 @@ jemallocator = { workspace = true }
 aptos-config = { workspace = true }
 reqwest = { workspace = true }
 tempfile = { workspace = true }
-
-[features]
-integration-tests = []

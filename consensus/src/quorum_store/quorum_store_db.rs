@@ -52,6 +52,8 @@ pub trait QuorumStoreStorage: Sync + Send {
 
 /// The name of the quorum store db file
 pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDB";
+/// Upperbound for total live WAL size.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 pub struct QuorumStoreDB {
     db: DB,
@@ -67,6 +69,7 @@ impl QuorumStoreDB {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+        opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
         let db = DB::open(path.clone(), QUORUM_STORE_DB_NAME, column_families, opts)
             .expect("QuorumstoreDB open failed; unable to continue");
 

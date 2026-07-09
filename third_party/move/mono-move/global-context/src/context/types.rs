@@ -3,7 +3,7 @@
 
 //! Type interning infrastructure.
 //!
-//! The pure type model ([`Type`], [`FieldLayout`], [`NominalLayout`], etc.)
+//! The pure type model ([`Type`], etc.)
 //! lives in `mono_move_core::types`. This module provides the interning
 //! machinery that deduplicates types in the global arena, plus cross-format
 //! hashing/equality between [`SignatureToken`]s and interned [`Type`]s.
@@ -151,7 +151,7 @@ impl Hash for TypeInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         use Type::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
@@ -218,7 +218,6 @@ impl Hash for TypeInternerKey {
                 module_id,
                 name,
                 ty_args,
-                layout: _,
             } => {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
@@ -279,7 +278,7 @@ impl PartialEq for TypeInternerKey {
     fn eq(&self, other: &Self) -> bool {
         use Type::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         // SAFETY: It is safe to dereference pointers because the caller
         // ensures they remain valid during the lifetime of the key.
@@ -379,7 +378,7 @@ impl Hash for SignatureTokenKey<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         use SignatureToken::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         match self.0 {
             Bool => {
@@ -549,7 +548,7 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
     fn equivalent(&self, key: &TypeInternerKey) -> bool {
         use SignatureToken::*;
 
-        // TODO: non-recursive implementation.
+        // TODO(metering): non-recursive implementation.
 
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.

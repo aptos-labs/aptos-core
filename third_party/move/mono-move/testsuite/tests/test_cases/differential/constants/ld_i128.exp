@@ -1,6 +1,15 @@
 === stackless ===
 // module 0x1::test
 
+fun pos(): i128 {
+  slots: params(0), locals(0), temps(1)
+    r0: i128
+  code:
+  L0:
+    0: r0 := ld_i128 1267650600228229401496703205376
+    1: ret [r0]
+}
+
 fun add_const(r0): i128 {
   slots: params(1), locals(0), temps(1)
     r0: i128
@@ -37,17 +46,16 @@ fun neg(): i128 {
     0: r0 := ld_i128 -1267650600228229401496703205376
     1: ret [r0]
 }
-
-fun pos(): i128 {
-  slots: params(0), locals(0), temps(1)
-    r0: i128
-  code:
-  L0:
-    0: r0 := ld_i128 1267650600228229401496703205376
-    1: ret [r0]
-}
 === micro-ops ===
 // module 0x1::test
+
+fun pos() {
+  frame_data_size: 16
+  entry_gas: 104
+  code:
+    0: StoreImm16 [0] <- #1267650600228229401496703205376
+    1: Return
+}
 
 fun add_const() {
   frame_data_size: 32
@@ -79,13 +87,5 @@ fun neg() {
   entry_gas: 104
   code:
     0: StoreImm16 [0] <- #340282365653287863235145205935065006080
-    1: Return
-}
-
-fun pos() {
-  frame_data_size: 16
-  entry_gas: 104
-  code:
-    0: StoreImm16 [0] <- #1267650600228229401496703205376
     1: Return
 }

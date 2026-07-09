@@ -158,6 +158,17 @@ pub(crate) fn create_function_type(
     mask: ClosureMask,
     abilities: AbilitySet,
 ) -> PartialVMResult<Type> {
+    if ty_builder.count_function_type_node {
+        return ty_builder.create_function_ty(
+            func.param_tys(),
+            mask,
+            func.return_tys(),
+            abilities,
+            func.ty_args(),
+        );
+    }
+
+    // Legacy behavior.
     let args = mask
         .extract(func.param_tys(), false)
         .into_iter()

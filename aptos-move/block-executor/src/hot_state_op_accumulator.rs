@@ -10,8 +10,13 @@ use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 pub struct BlockHotStateOpAccumulator<Key> {
     /// Keys read but never written to across the entire block are to be made hot (or refreshed
     /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
-    /// effect of the block epilogue (subject to per block limit)
-    to_make_hot: BTreeSet<Key>,
+    /// effect of the block epilogue.
+    ///
+    /// Unordered: `StateKey`'s `Hash`/`Eq` use the precomputed key hash and `Arc` pointer
+    /// equality, while `Ord` dereferences and compares key contents, so a per-read `BTreeSet`
+    /// insert is comparatively costly. The deterministic order the epilogue needs is imposed
+    /// once, when the cap is applied in `get_keys_to_make_hot`.
+    to_make_hot: hashbrown::HashSet<Key>,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
     /// so no need to issue separate HotStateOps to promote them to the hot state.
@@ -24,7 +29,8 @@ impl<Key> BlockHotStateOpAccumulator<Key>
 where
     Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug,
 {
-    /// TODO(HotState): make on-chain config
+    /// TODO(HotState): make on-chain config. Also consider capping by total key size instead of
+    /// number.
     const MAX_PROMOTIONS_PER_BLOCK: usize = 1024 * 10;
 
     pub fn new() -> Self {
@@ -33,7 +39,7 @@ where
 
     pub fn new_with_config(max_promotions_per_block: usize) -> Self {
         Self {
-            to_make_hot: BTreeSet::new(),
+            to_make_hot: hashbrown::HashSet::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
         }
@@ -54,18 +60,89 @@ where
         }
 
         for key in reads {
-            if self.to_make_hot.len() >= self.max_promotions_per_block {
-                COUNTER.inc_with(&["max_promotions_per_block_hit"]);
-                continue;
-            }
             if self.writes.contains(key) {
                 continue;
             }
-            self.to_make_hot.insert(key.clone());
+            // Most reads repeat keys seen in earlier transactions (e.g. framework modules),
+            // so clone only when the key is new to the set.
+            self.to_make_hot.get_or_insert_owned(key);
         }
     }
 
     pub fn get_keys_to_make_hot(&self) -> BTreeSet<Key> {
-        self.to_make_hot.clone()
+        let num_eligible = self.to_make_hot.len();
+        if num_eligible <= self.max_promotions_per_block {
+            // Under the cap: collecting into the BTreeSet imposes the deterministic order.
+            return self.to_make_hot.iter().cloned().collect();
+        }
+        COUNTER.inc_with_by(
+            &["promotions_dropped_over_cap"],
+            (num_eligible - self.max_promotions_per_block) as u64,
+        );
+        // Over the cap: keep the smallest keys. `to_make_hot` is unordered, so sort before
+        // applying the cap to select the same subset regardless of read/iteration order.
+        let mut eligible = self.to_make_hot.iter().collect::<Vec<_>>();
+        eligible.sort_unstable();
+        eligible
+            .into_iter()
+            .take(self.max_promotions_per_block)
+            .cloned()
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(accu: &mut BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
+        accu.add_transaction(std::iter::empty(), keys.iter());
+    }
+
+    fn write(accu: &mut BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
+        accu.add_transaction(keys.iter(), std::iter::empty());
+    }
+
+    fn set(keys: &[u64]) -> BTreeSet<u64> {
+        keys.iter().copied().collect()
+    }
+
+    /// When more keys are eligible than the cap allows, the surviving subset must be the same
+    /// regardless of the order reads are observed in (the bug being that HashSet-ordered reads
+    /// made the dropped subset process-dependent).
+    #[test]
+    fn cap_selects_smallest_keys_independent_of_order() {
+        let mut forward = BlockHotStateOpAccumulator::<u64>::new_with_config(3);
+        for k in 0..10 {
+            read(&mut forward, &[k]);
+        }
+
+        let mut reverse = BlockHotStateOpAccumulator::<u64>::new_with_config(3);
+        for k in (0..10).rev() {
+            read(&mut reverse, &[k]);
+        }
+
+        let expected = set(&[0, 1, 2]);
+        assert_eq!(forward.get_keys_to_make_hot(), expected);
+        assert_eq!(reverse.get_keys_to_make_hot(), expected);
+    }
+
+    #[test]
+    fn written_keys_are_not_promoted() {
+        let mut accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
+        // 2 is read and written in the same txn; the write makes it hot, so it must not also be
+        // promoted by the epilogue.
+        accu.add_transaction([2u64].iter(), [1u64, 2, 3].iter());
+        // A read of an already-written key in a later txn is likewise ignored.
+        read(&mut accu, &[2]);
+        assert_eq!(accu.get_keys_to_make_hot(), set(&[1, 3]));
+    }
+
+    #[test]
+    fn write_after_read_removes_promotion() {
+        let mut accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
+        read(&mut accu, &[1, 2]);
+        write(&mut accu, &[1]);
+        assert_eq!(accu.get_keys_to_make_hot(), set(&[2]));
     }
 }

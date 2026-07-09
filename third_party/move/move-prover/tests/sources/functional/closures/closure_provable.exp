@@ -12,7 +12,5 @@ error: post-condition does not hold
    =         f = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/closures/closure_provable.move:5: exec
-   =     at tests/sources/functional/closures/closure_provable.move:26: call_exec3_fail
-   =         y = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/closures/closure_provable.move:30: call_exec3_fail (spec)

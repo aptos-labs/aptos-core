@@ -4,7 +4,7 @@
 /// Configuration for maintenance phase of [`crate::GlobalContext`].
 #[derive(Clone)]
 pub struct MaintenanceConfig {
-    // TODO: add actual configs here.
+    // TODO(completeness, metering): add actual configs here.
     pub dummy: u64,
 }
 

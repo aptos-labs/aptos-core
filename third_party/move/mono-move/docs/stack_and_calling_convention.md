@@ -79,7 +79,7 @@ At any given safe point, the full set of GC roots on the frame is the union of `
 
 **Safe points** are the only instructions where GC can trigger:
 
-- **Allocating instructions** (`HeapNew`, `VecPushBack`, `ForceGC`): GC runs during the instruction, so the safe point is at that instruction's own PC.
+- **Allocating instructions** (see `MicroOp::is_allocating`): GC runs during the instruction, so the safe point is at that instruction's own PC.
 - **Call return sites**: when a callee triggers GC, the caller's saved PC is `call_pc + 1`. The safe point for a caller frame is the instruction *after* the call — at that point, the shared arg/return region holds return values, not arguments.
 
 When `zero_frame` is true, pointer slots are zeroed on entry so the GC always sees either a valid heap pointer or null — never stale data. `FrameLayoutInfo` is designed to be extended with additional per-slot type or layout information in the future (e.g., slot type tags for debugging or stronger runtime verification).

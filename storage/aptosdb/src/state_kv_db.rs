@@ -145,34 +145,11 @@ impl StateKvDb {
         };
         let state_kv_metadata_db_path = Self::metadata_db_path(metadata_db_root_path, is_hot);
 
-        let state_kv_metadata_db = Arc::new(Self::open_db(
-            state_kv_metadata_db_path.clone(),
-            metadata_db_name(is_hot),
-            &state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-            is_hot,
-            delete_on_restart,
-        )?);
-
-        info!(
-            state_kv_metadata_db_path = state_kv_metadata_db_path,
-            is_hot = is_hot,
-            "Opened state kv metadata db!"
-        );
-
-        let state_kv_db_shards = (0..NUM_STATE_SHARDS)
-            .into_par_iter()
-            .map(|shard_id| {
-                let shard_root_path = if is_hot {
-                    db_paths.hot_state_kv_db_shard_root_path(shard_id)
-                } else {
-                    db_paths.state_kv_db_shard_root_path(shard_id)
-                };
-                let db = Self::open_shard(
-                    shard_root_path,
-                    shard_id,
+        let (metadata_db, shards) = std::thread::scope(|s| {
+            let metadata_handle = s.spawn(|| {
+                let db = Self::open_db(
+                    state_kv_metadata_db_path.clone(),
+                    metadata_db_name(is_hot),
                     &state_kv_db_config,
                     env,
                     block_cache,
@@ -181,17 +158,55 @@ impl StateKvDb {
                     delete_on_restart,
                 )
                 .unwrap_or_else(|e| {
-                    let db_type = if is_hot { "hot state kv" } else { "state kv" };
-                    panic!("Failed to open {db_type} db shard {shard_id}: {e:?}.")
+                    panic!("Failed to open state kv metadata db (is_hot: {is_hot}): {e:?}.")
                 });
                 Arc::new(db)
-            })
-            .collect::<Vec<_>>()
+            });
+
+            let shard_handles: Vec<_> = (0..NUM_STATE_SHARDS)
+                .map(|shard_id| {
+                    s.spawn(move || {
+                        let shard_root_path = if is_hot {
+                            db_paths.hot_state_kv_db_shard_root_path(shard_id)
+                        } else {
+                            db_paths.state_kv_db_shard_root_path(shard_id)
+                        };
+                        let db = Self::open_shard(
+                            shard_root_path,
+                            shard_id,
+                            &state_kv_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            is_hot,
+                            delete_on_restart,
+                        )
+                        .unwrap_or_else(|e| {
+                            let db_type = if is_hot { "hot state kv" } else { "state kv" };
+                            panic!("Failed to open {db_type} db shard {shard_id}: {e:?}.")
+                        });
+                        Arc::new(db)
+                    })
+                })
+                .collect();
+
+            // Joined in shard-id order so each array index matches its shard id.
+            let shards = shard_handles
+                .into_iter()
+                .map(|handle| handle.join().expect("State kv shard open thread panicked"))
+                .collect::<Vec<_>>();
+            let metadata_db = metadata_handle
+                .join()
+                .expect("State kv metadata open thread panicked");
+            (metadata_db, shards)
+        });
+
+        let state_kv_db_shards: [_; NUM_STATE_SHARDS] = shards
             .try_into()
-            .unwrap();
+            .expect("Collected exactly NUM_STATE_SHARDS shards");
 
         let state_kv_db = Self {
-            inner: ShardedKvDb::new(state_kv_metadata_db, state_kv_db_shards),
+            inner: ShardedKvDb::new(metadata_db, state_kv_db_shards),
             is_hot,
         };
 

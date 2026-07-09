@@ -541,7 +541,7 @@ pub fn convert_modules_into_write_ops(
 }
 
 /// Initializes and returns Aptos native extensions.
-pub(crate) fn make_aptos_extensions<'a, DataView>(
+pub fn make_aptos_extensions<'a, DataView>(
     data_view: &'a DataView,
     chain_id: ChainId,
     vm_config: &VMConfig,

@@ -707,7 +707,13 @@ fn mock_fee_statement(total_gas: u64) -> FeeStatement {
     // Next two arguments are different kinds of execution gas that are counted
     // towards the block limit. We split the total into two pieces for these arguments.
     // TODO: add variety to generating fee statement based on total gas.
-    FeeStatement::new(total_gas, total_gas / 2, total_gas.div_ceil(2), 0, 0)
+    FeeStatement::builder()
+        .total_charge_gas_units(total_gas)
+        .execution_gas_units(total_gas / 2)
+        .io_gas_units(total_gas.div_ceil(2))
+        .storage_fee_octas(0)
+        .storage_fee_refund_octas(0)
+        .build()
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -898,6 +904,14 @@ where
     fn get_write_summary(&self) -> HashSet<crate::types::InputOutputKey<K, u32>> {
         _ = self.called_write_summary.set(());
         HashSet::new()
+    }
+
+    fn storage_keys_read(&self) -> impl Iterator<Item = &K> {
+        std::iter::empty()
+    }
+
+    fn storage_keys_written(&self) -> impl Iterator<Item = &K> {
+        std::iter::empty()
     }
 
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {

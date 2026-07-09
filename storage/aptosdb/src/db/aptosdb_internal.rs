@@ -48,9 +48,9 @@ use std::{
 impl AptosDB {
     fn new_with_dbs(
         ledger_db: LedgerDb,
-        hot_state_merkle_db: Option<StateMerkleDb>,
+        hot_state_merkle_db: StateMerkleDb,
         state_merkle_db: StateMerkleDb,
-        hot_state_kv_db: Option<StateKvDb>,
+        hot_state_kv_db: StateKvDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
@@ -60,31 +60,33 @@ impl AptosDB {
         hot_state_config: HotStateConfig,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
-        let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
+        let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
         let state_merkle_db = Arc::new(state_merkle_db);
-        let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
+        let hot_state_kv_db = Arc::new(hot_state_kv_db);
         let state_kv_db = Arc::new(state_kv_db);
-        let state_pruner = StatePruner::new(
-            hot_state_merkle_db.clone(),
-            Arc::clone(&state_merkle_db),
-            hot_state_kv_db.clone(),
-            Arc::clone(&state_kv_db),
-            pruner_config,
+        let state_pruner = StatePruner::builder()
+            .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
+            .state_merkle_db(Arc::clone(&state_merkle_db))
+            .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+            .state_kv_db(Arc::clone(&state_kv_db))
+            .config(pruner_config)
+            .build();
+        let state_store = Arc::new(
+            StateStore::builder()
+                .ledger_db(Arc::clone(&ledger_db))
+                .hot_state_merkle_db(hot_state_merkle_db)
+                .state_merkle_db(Arc::clone(&state_merkle_db))
+                .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+                .state_kv_db(Arc::clone(&state_kv_db))
+                .state_pruner(state_pruner)
+                .buffered_state_target_items(buffered_state_target_items)
+                .hack_for_tests(hack_for_tests)
+                .empty_buffered_state_for_restore(empty_buffered_state_for_restore)
+                .skip_usage(true)
+                .maybe_internal_indexer_db(internal_indexer_db.clone())
+                .hot_state_config(hot_state_config)
+                .build(),
         );
-        let state_store = Arc::new(StateStore::new(
-            Arc::clone(&ledger_db),
-            hot_state_merkle_db,
-            Arc::clone(&state_merkle_db),
-            hot_state_kv_db.clone(),
-            Arc::clone(&state_kv_db),
-            state_pruner,
-            buffered_state_target_items,
-            hack_for_tests,
-            empty_buffered_state_for_restore,
-            true, /* skip_usage */
-            internal_indexer_db.clone(),
-            hot_state_config,
-        ));
 
         // The native-position DB isn't open here; it attaches later
         // via `AptosDB::init_native_position`, which re-binds the
@@ -155,10 +157,9 @@ impl AptosDB {
         // initializing the pruner, so the pruner doesn't catch up from 0 over an empty DB.
         if !readonly
             && hot_state_config.delete_on_restart
-            && let Some(db) = hot_state_kv_db.as_ref()
             && let Some(synced_version) = ledger_db.metadata_db().get_synced_version()?
         {
-            db.write_pruner_progress(synced_version)?;
+            hot_state_kv_db.write_pruner_progress(synced_version)?;
         }
 
         // Capture before `pruner_config` is moved; the position pruners
@@ -206,9 +207,11 @@ impl AptosDB {
                     .state_pruner
                     .state_kv_pruner
                     .maybe_set_pruner_target_db_version(version);
-                if let Some(pruner) = &myself.state_store.state_pruner.hot_state_kv_pruner {
-                    pruner.maybe_set_pruner_target_db_version(version);
-                }
+                myself
+                    .state_store
+                    .state_pruner
+                    .hot_state_kv_pruner
+                    .maybe_set_pruner_target_db_version(version);
             }
             if let Some(version) = myself.get_latest_state_checkpoint_version()? {
                 myself
@@ -221,12 +224,16 @@ impl AptosDB {
                     .state_pruner
                     .epoch_snapshot_pruner
                     .maybe_set_pruner_target_db_version(version);
-                if let Some(pruner) = &myself.state_store.state_pruner.hot_state_merkle_pruner {
-                    pruner.maybe_set_pruner_target_db_version(version);
-                }
-                if let Some(pruner) = &myself.state_store.state_pruner.hot_epoch_snapshot_pruner {
-                    pruner.maybe_set_pruner_target_db_version(version);
-                }
+                myself
+                    .state_store
+                    .state_pruner
+                    .hot_state_merkle_pruner
+                    .maybe_set_pruner_target_db_version(version);
+                myself
+                    .state_store
+                    .state_pruner
+                    .hot_epoch_snapshot_pruner
+                    .maybe_set_pruner_target_db_version(version);
             }
 
             // Activate the native-position pruners; otherwise their
@@ -241,7 +248,13 @@ impl AptosDB {
                         .value_pruner
                         .maybe_set_pruner_target_db_version(version);
                 }
-                if let Some(version) = bundle.snapshot_version {
+                // Drive the merkle pruners to the persisted base version
+                // (set after init's seed + replay).
+                if let Some(version) = bundle
+                    .persisted
+                    .as_ref()
+                    .and_then(|persisted| persisted.get().version())
+                {
                     position_pruner
                         .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(version);
@@ -270,7 +283,10 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             None,
-            HotStateConfig::default(),
+            HotStateConfig {
+                delete_on_restart: !readonly,
+                ..HotStateConfig::default()
+            },
         )
         .expect("Unable to open AptosDB")
     }
@@ -301,9 +317,9 @@ impl AptosDB {
             )?;
 
         let ledger_db = Arc::new(ledger_db);
-        let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
+        let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
         let state_merkle_db = Arc::new(state_merkle_db);
-        let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
+        let hot_state_kv_db = Arc::new(hot_state_kv_db);
         let state_kv_db = Arc::new(state_kv_db);
 
         let mut batch = SchemaBatch::new();
@@ -317,8 +333,8 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             Arc::clone(&state_kv_db),
             Arc::clone(&state_merkle_db),
-            hot_state_kv_db.clone(),
-            hot_state_merkle_db.clone(),
+            Arc::clone(&hot_state_kv_db),
+            Arc::clone(&hot_state_merkle_db),
             /*crash_if_difference_is_too_large=*/ false,
             delete_hot_state_on_restart,
         );
@@ -391,6 +407,60 @@ impl AptosDB {
             .state_store
             .state_pruner
             .state_kv_pruner
+            .get_min_readable_version();
+        ensure!(
+            version >= min_readable_version,
+            "{} at version {} is pruned, min available version is {}.",
+            data_type,
+            version,
+            min_readable_version
+        );
+        Ok(())
+    }
+
+    pub(super) fn error_if_hot_state_merkle_pruned(
+        &self,
+        data_type: &str,
+        version: Version,
+    ) -> Result<()> {
+        let min_readable_version = self
+            .state_store
+            .state_db
+            .state_pruner
+            .hot_state_merkle_pruner
+            .get_min_readable_version();
+        if version >= min_readable_version {
+            return Ok(());
+        }
+
+        let min_readable_epoch_snapshot_version = self
+            .state_store
+            .state_db
+            .state_pruner
+            .hot_epoch_snapshot_pruner
+            .get_min_readable_version();
+        if version >= min_readable_epoch_snapshot_version {
+            self.ledger_db.metadata_db().ensure_epoch_ending(version)
+        } else {
+            bail!(
+                "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",
+                data_type,
+                version,
+                min_readable_version,
+                min_readable_epoch_snapshot_version,
+            )
+        }
+    }
+
+    pub(super) fn error_if_hot_state_kv_pruned(
+        &self,
+        data_type: &str,
+        version: Version,
+    ) -> Result<()> {
+        let min_readable_version = self
+            .state_store
+            .state_pruner
+            .hot_state_kv_pruner
             .get_min_readable_version();
         ensure!(
             version >= min_readable_version,

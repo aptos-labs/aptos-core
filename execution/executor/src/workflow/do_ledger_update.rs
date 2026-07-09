@@ -27,33 +27,40 @@ impl DoLedgerUpdate {
     ) -> Result<LedgerUpdateOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_ledger_update"]);
 
-        // Assemble `TransactionInfo`s. The variant (V0 vs V1) is driven by whether
-        // `hot_state_checkpoint_hashes` is present: `DoStateCheckpoint` produces `Some`
-        // iff V1 should be emitted, based on the `TRANSACTION_INFO_V1` on-chain feature
-        // threaded via `ExecutionOutput::transaction_info_v1`.
+        // Assemble `TransactionInfo`s. The variant (V0 vs V1) is driven by the
+        // `TRANSACTION_INFO_V1` on-chain feature, threaded via
+        // `ExecutionOutput::transaction_info_v1`. The hot state root hash a V1 carries is
+        // present only when `HOT_STATE_ROOT_IN_TXN_INFO` is also on (`DoStateCheckpoint`
+        // produces `Some` hashes iff so); otherwise the V1 leaves it `None`.
         let (transaction_infos, transaction_info_hashes) = Self::assemble_transaction_infos(
             &execution_output.to_commit,
+            execution_output.transaction_info_v1,
             &state_checkpoint_output.state_checkpoint_hashes,
             state_checkpoint_output
                 .hot_state_checkpoint_hashes
+                .as_deref(),
+            state_checkpoint_output
+                .position_state_checkpoint_hashes
                 .as_deref(),
         );
 
         // Calculate root hash
         let transaction_accumulator = Arc::new(parent_accumulator.append(&transaction_info_hashes));
 
-        Ok(LedgerUpdateOutput::new(
-            transaction_infos,
-            transaction_info_hashes,
-            transaction_accumulator,
-            parent_accumulator,
-        ))
+        Ok(LedgerUpdateOutput::builder()
+            .transaction_infos(transaction_infos)
+            .transaction_info_hashes(transaction_info_hashes)
+            .transaction_accumulator(transaction_accumulator)
+            .parent_accumulator(parent_accumulator)
+            .build())
     }
 
     fn assemble_transaction_infos(
         to_commit: &TransactionsWithOutput,
+        transaction_info_v1: bool,
         state_checkpoint_hashes: &[Option<HashValue>],
         hot_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
+        position_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
     ) -> (Vec<TransactionInfo>, Vec<HashValue>) {
         let _timer = OTHER_TIMERS.timer_with(&["assemble_transaction_infos"]);
 
@@ -85,27 +92,32 @@ impl DoLedgerUpdate {
                     .status()
                     .as_kept_status()
                     .expect("Already sorted.");
-                let txn_info = if let Some(hot) = hot_state_checkpoint_hashes {
-                    TransactionInfo::new_v1(
-                        txn.committed_hash(),
-                        write_set_hash,
-                        event_root_hash,
-                        state_checkpoint_hash,
-                        hot[i],
-                        txn_output.gas_used(),
-                        status,
-                        auxiliary_info_hash,
-                    )
+                let txn_info = if transaction_info_v1 {
+                    TransactionInfo::builder_v1()
+                        .transaction_hash(txn.committed_hash())
+                        .state_change_hash(write_set_hash)
+                        .event_root_hash(event_root_hash)
+                        .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                        .maybe_hot_state_checkpoint_hash(
+                            hot_state_checkpoint_hashes.and_then(|hot| hot[i]),
+                        )
+                        .gas_used(txn_output.gas_used())
+                        .status(status)
+                        .maybe_auxiliary_info_hash(auxiliary_info_hash)
+                        .maybe_position_state_checkpoint_hash(
+                            position_state_checkpoint_hashes.and_then(|p| p[i]),
+                        )
+                        .build()
                 } else {
-                    TransactionInfo::new(
-                        txn.committed_hash(),
-                        write_set_hash,
-                        event_root_hash,
-                        state_checkpoint_hash,
-                        txn_output.gas_used(),
-                        status,
-                        auxiliary_info_hash,
-                    )
+                    TransactionInfo::builder_v0()
+                        .transaction_hash(txn.committed_hash())
+                        .state_change_hash(write_set_hash)
+                        .event_root_hash(event_root_hash)
+                        .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                        .gas_used(txn_output.gas_used())
+                        .status(status)
+                        .maybe_auxiliary_info_hash(auxiliary_info_hash)
+                        .build()
                 };
                 let txn_info_hash = txn_info.hash();
                 (txn_info, txn_info_hash)

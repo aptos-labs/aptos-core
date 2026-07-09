@@ -572,3 +572,525 @@ impl LedgerState {
             && self.last_checkpoint.is_the_same(&other.last_checkpoint)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state_store::state_view::hot_state_view::EmptyHotState;
+    use aptos_types::{
+        state_store::{state_slot::StateSlotKind, state_value::StateValue},
+        write_set::{BaseStateOp, WriteOp},
+    };
+
+    const TEST_CONFIG: HotStateConfig = HotStateConfig {
+        max_items_per_shard: 100,
+        refresh_interval_versions: 100,
+        delete_on_restart: false,
+        compute_root_hash: true,
+    };
+
+    /// Refresh interval used by the `apply_one_update` tests. Small so versions stay readable.
+    const REFRESH: Version = 10;
+
+    fn key(s: &str) -> StateKey {
+        StateKey::raw(s.as_bytes())
+    }
+
+    fn val(s: &[u8]) -> StateValue {
+        StateValue::new_legacy(s.to_vec().into())
+    }
+
+    fn khash(k: &StateKey) -> HashValue {
+        *k.crypto_hash_ref()
+    }
+
+    fn upd<'a>(version: Version, state_op: &'a BaseStateOp) -> StateUpdateRef<'a> {
+        StateUpdateRef { version, state_op }
+    }
+
+    /// Builds the (base, top) `MapLayer` pair for an overlay holding `entries`. The caller turns it
+    /// into a `LayeredMap` with `top.view_layers_after(&base)`; splitting it this way keeps the
+    /// layers owned by the test so the borrow checker is happy with the `LayeredMap` referencing
+    /// them.
+    fn layers(
+        entries: &[(HashValue, StateSlot)],
+    ) -> (
+        MapLayer<HashValue, StateSlot>,
+        MapLayer<HashValue, StateSlot>,
+    ) {
+        let base: MapLayer<HashValue, StateSlot> = MapLayer::new_family("test");
+        let top = if entries.is_empty() {
+            base.clone()
+        } else {
+            base.view_layers_after(&base).new_layer(entries)
+        };
+        (base, top)
+    }
+
+    fn empty_lru<'a>(overlay: &'a LayeredMap<HashValue, StateSlot>) -> HotStateLRU<'a> {
+        HotStateLRU::new(
+            NonZeroUsize::new(100).unwrap(),
+            Arc::new(EmptyHotState),
+            overlay,
+            None,
+            None,
+            0,
+            0,
+        )
+    }
+
+    /// Makes `k` hot by applying a write at `version`. Returns nothing; just primes the LRU so a
+    /// later `MakeHot` can exercise the refresh path.
+    fn seed_hot(
+        lru: &mut HotStateLRU<'_>,
+        overlay: &LayeredMap<HashValue, StateSlot>,
+        cache: &StateCacheShard,
+        k: &StateKey,
+        version: Version,
+    ) {
+        let op = BaseStateOp::Modification(val(b"v"));
+        State::apply_one_update(lru, overlay, cache, k, &upd(version, &op), REFRESH);
+    }
+
+    /// Builds an empty `State` that is a child of `parent` at `version`, sharing the layer family
+    /// rooted at `root` so delta/descendant queries remain valid.
+    fn empty_descendant(root: &State, parent: &State, version: Version) -> State {
+        let shards = std::array::from_fn(|i| {
+            parent.shards()[i]
+                .view_layers_after(&root.shards()[i])
+                .new_layer(&[])
+        });
+        State::new_with_updates(
+            Some(version),
+            Arc::new(shards),
+            Default::default(),
+            StateStorageUsage::zero(),
+            TEST_CONFIG,
+        )
+    }
+
+    // ===== apply_one_update: writes =====
+
+    #[test]
+    fn test_write_creation_inserts_hot_occupied() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        let op = BaseStateOp::Creation(val(b"v0"));
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(7, &op), REFRESH).unwrap();
+
+        assert_eq!(result.state_key, k);
+        assert_eq!(result.value.value_opt(), Some(&val(b"v0")));
+        assert_eq!(result.value.hot_since_version(), 7);
+        assert_eq!(result.value_version, Some(7));
+        assert_eq!(result.superseded_version, None);
+
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert!(slot.is_hot() && slot.is_occupied());
+        assert_eq!(slot.expect_hot_since_version(), 7);
+        assert_eq!(slot.expect_value_version(), 7);
+    }
+
+    #[test]
+    fn test_write_deletion_inserts_hot_vacant() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        let op = WriteOp::legacy_deletion().into_base_op();
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(3, &op), REFRESH).unwrap();
+
+        assert_eq!(result.value.value_opt(), None);
+        assert_eq!(result.value.hot_since_version(), 3);
+        assert_eq!(result.value_version, None);
+        assert_eq!(result.superseded_version, None);
+
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert!(slot.is_hot() && !slot.is_occupied());
+    }
+
+    #[test]
+    fn test_write_supersedes_existing_hot() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        let op0 = BaseStateOp::Modification(val(b"v0"));
+        State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(1, &op0), REFRESH);
+        let op1 = BaseStateOp::Modification(val(b"v1"));
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(5, &op1), REFRESH)
+                .unwrap();
+
+        // The second write supersedes the first, reporting the first's hot_since_version.
+        assert_eq!(result.superseded_version, Some(1));
+        assert_eq!(result.value.value_opt(), Some(&val(b"v1")));
+        assert_eq!(result.value.hot_since_version(), 5);
+
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert_eq!(slot.expect_hot_since_version(), 5);
+        // A write advances value_version too; a refresh (tested below) would not.
+        assert_eq!(slot.expect_value_version(), 5);
+    }
+
+    // ===== apply_one_update: MakeHot promotion =====
+
+    #[test]
+    fn test_make_hot_promotes_cold_occupied_from_cache() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        // The key was read cold (occupied) during execution and recorded in the cache.
+        let k = key("a");
+        cache.insert(
+            k.clone(),
+            StateSlot::new(k.clone(), StateSlotKind::ColdOccupied {
+                value_version: 2,
+                value: val(b"v"),
+            }),
+        );
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(9, &op), REFRESH).unwrap();
+
+        assert_eq!(result.superseded_version, None);
+        // The value and its version carry over from the cold slot; only hot_since is new.
+        assert_eq!(result.value_version, Some(2));
+        assert_eq!(result.value.value_opt(), Some(&val(b"v")));
+        assert_eq!(result.value.hot_since_version(), 9);
+
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert!(slot.is_hot() && slot.is_occupied());
+        assert_eq!(slot.expect_hot_since_version(), 9);
+        assert_eq!(slot.expect_value_version(), 2);
+    }
+
+    #[test]
+    fn test_make_hot_promotes_cold_vacant_from_cache() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        cache.insert(
+            k.clone(),
+            StateSlot::new(k.clone(), StateSlotKind::ColdVacant),
+        );
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(4, &op), REFRESH).unwrap();
+
+        assert_eq!(result.superseded_version, None);
+        assert_eq!(result.value_version, None);
+        assert_eq!(result.value.value_opt(), None);
+        assert_eq!(result.value.hot_since_version(), 4);
+
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert!(slot.is_hot() && !slot.is_occupied());
+    }
+
+    #[test]
+    fn test_make_hot_promotes_cold_slot_in_overlay() {
+        // A key evicted to cold earlier in the speculative chain sits in the overlay, not the
+        // cache. MakeHot must find it there and re-promote it.
+        let k = key("a");
+        let kh = khash(&k);
+        let cold = StateSlot::new(k.clone(), StateSlotKind::ColdOccupied {
+            value_version: 1,
+            value: val(b"v"),
+        });
+        let (base, top) = layers(&[(kh, cold)]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(6, &op), REFRESH).unwrap();
+
+        assert_eq!(result.superseded_version, None);
+        assert_eq!(result.value_version, Some(1));
+        assert_eq!(result.value.hot_since_version(), 6);
+
+        let slot = lru.get_slot(&kh).unwrap();
+        assert!(slot.is_hot());
+        assert_eq!(slot.expect_hot_since_version(), 6);
+    }
+
+    // ===== apply_one_update: refresh interval =====
+
+    #[test]
+    fn test_make_hot_refresh_below_interval_is_noop() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        seed_hot(&mut lru, &overlay, &cache, &k, 0); // hot since 0
+
+        // 0 + 10 <= 9 is false: not enough versions elapsed, no refresh, no op emitted.
+        let op = BaseStateOp::MakeHot;
+        let result = State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(9, &op), REFRESH);
+
+        assert!(result.is_none(), "below-interval make-hot must not refresh");
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert_eq!(
+            slot.expect_hot_since_version(),
+            0,
+            "hot_since must be unchanged"
+        );
+    }
+
+    #[test]
+    fn test_make_hot_refresh_at_interval_boundary() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        seed_hot(&mut lru, &overlay, &cache, &k, 0); // hot since 0
+
+        // 0 + 10 <= 10 is true: refresh fires exactly at the boundary.
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(10, &op), REFRESH)
+                .expect("boundary make-hot must refresh");
+
+        assert_eq!(result.superseded_version, Some(0));
+        assert_eq!(result.value.hot_since_version(), 10);
+        // The value is untouched by a refresh; only hot_since advances.
+        assert_eq!(result.value_version, Some(0));
+        assert_eq!(result.value.value_opt(), Some(&val(b"v")));
+
+        let slot = lru.get_slot(&khash(&k)).unwrap();
+        assert_eq!(slot.expect_hot_since_version(), 10);
+    }
+
+    #[test]
+    fn test_make_hot_refresh_above_interval() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        seed_hot(&mut lru, &overlay, &cache, &k, 0);
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(11, &op), REFRESH)
+                .expect("above-interval make-hot must refresh");
+
+        assert_eq!(result.superseded_version, Some(0));
+        assert_eq!(result.value.hot_since_version(), 11);
+    }
+
+    #[test]
+    fn test_make_hot_zero_interval_refreshes() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        seed_hot(&mut lru, &overlay, &cache, &k, 0);
+
+        // refresh_interval == 0: any later version refreshes (0 + 0 <= 1).
+        let op = BaseStateOp::MakeHot;
+        let result = State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(1, &op), 0)
+            .expect("zero interval always refreshes");
+        assert_eq!(result.value.hot_since_version(), 1);
+    }
+
+    // ===== usage accounting =====
+
+    #[test]
+    fn test_update_usage_sums_deltas() {
+        let state = State::new_at_version(Some(0), StateStorageUsage::new(10, 1000), TEST_CONFIG);
+        let mut deltas = vec![(0i64, 0i64); NUM_STATE_SHARDS];
+        deltas[0] = (3, 100);
+        deltas[5] = (-1, -40);
+        let usage = state.update_usage(deltas);
+        assert_eq!(usage.items(), 12);
+        assert_eq!(usage.bytes(), 1060);
+    }
+
+    #[test]
+    fn test_usage_delta_new_occupied_key() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+
+        // A newly created key was read cold-absent, so the cache holds a ColdVacant slot.
+        let k = key("a");
+        cache.insert(
+            k.clone(),
+            StateSlot::new(k.clone(), StateSlotKind::ColdVacant),
+        );
+        let op = BaseStateOp::Creation(val(b"hello"));
+        let mut updates = HashMap::new();
+        updates.insert(&k, upd(1, &op));
+
+        let (items, bytes) = State::usage_delta_for_shard(&cache, &overlay, &updates);
+        assert_eq!(items, 1);
+        assert_eq!(bytes as usize, k.size() + val(b"hello").size());
+    }
+
+    #[test]
+    fn test_usage_delta_overwrite_changes_bytes_only() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+
+        let k = key("a");
+        cache.insert(
+            k.clone(),
+            StateSlot::new(k.clone(), StateSlotKind::ColdOccupied {
+                value_version: 0,
+                value: val(b"x"),
+            }),
+        );
+        let op = BaseStateOp::Modification(val(b"yyyy"));
+        let mut updates = HashMap::new();
+        updates.insert(&k, upd(1, &op));
+
+        let (items, bytes) = State::usage_delta_for_shard(&cache, &overlay, &updates);
+        // Item count unchanged; the key size cancels, leaving only the value-size difference.
+        assert_eq!(items, 0);
+        assert_eq!(bytes, val(b"yyyy").size() as i64 - val(b"x").size() as i64);
+    }
+
+    #[test]
+    fn test_usage_delta_deletion_removes_item() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+
+        let k = key("a");
+        cache.insert(
+            k.clone(),
+            StateSlot::new(k.clone(), StateSlotKind::ColdOccupied {
+                value_version: 0,
+                value: val(b"x"),
+            }),
+        );
+        let op = WriteOp::legacy_deletion().into_base_op();
+        let mut updates = HashMap::new();
+        updates.insert(&k, upd(1, &op));
+
+        let (items, bytes) = State::usage_delta_for_shard(&cache, &overlay, &updates);
+        assert_eq!(items, -1);
+        assert_eq!(bytes, -((k.size() + val(b"x").size()) as i64));
+    }
+
+    #[test]
+    fn test_usage_delta_make_hot_ignored() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+
+        // MakeHot carries no value change, so it never touches usage (and never reads the cache).
+        let k = key("a");
+        let op = BaseStateOp::MakeHot;
+        let mut updates = HashMap::new();
+        updates.insert(&k, upd(1, &op));
+
+        let (items, bytes) = State::usage_delta_for_shard(&cache, &overlay, &updates);
+        assert_eq!((items, bytes), (0, 0));
+    }
+
+    // ===== State / LedgerState accessors and invariants =====
+
+    #[test]
+    fn test_version_accessors() {
+        let empty = State::new_empty(TEST_CONFIG);
+        assert_eq!(empty.next_version(), 0);
+        assert_eq!(empty.version(), None);
+
+        let at5 = State::new_at_version(Some(5), StateStorageUsage::new(1, 2), TEST_CONFIG);
+        assert_eq!(at5.next_version(), 6);
+        assert_eq!(at5.version(), Some(5));
+        assert_eq!(at5.usage().items(), 1);
+        assert_eq!(at5.usage().bytes(), 2);
+    }
+
+    #[test]
+    fn test_is_the_same() {
+        let a = State::new_empty(TEST_CONFIG);
+        assert!(a.is_the_same(&a.clone()));
+        let b = State::new_empty(TEST_CONFIG);
+        assert!(!a.is_the_same(&b));
+    }
+
+    #[test]
+    fn test_descendant_and_delta_base() {
+        let s0 = State::new_empty(TEST_CONFIG);
+        let s1 = empty_descendant(&s0, &s0, 0);
+
+        assert!(s1.is_descendant_of(&s0));
+        assert!(s0.can_be_delta_base_of(&s1));
+        assert!(s0.can_be_delta_base_of(&s0));
+
+        // A state from an independent layer family cannot serve as a delta base.
+        let other = State::new_empty(TEST_CONFIG);
+        assert!(!other.can_be_delta_base_of(&s1));
+    }
+
+    #[test]
+    fn test_hot_state_metadata_accessors() {
+        let mut md: [HotStateMetadata; NUM_STATE_SHARDS] = Default::default();
+        let head = HashValue::new([1u8; HashValue::LENGTH]);
+        let tail = HashValue::new([2u8; HashValue::LENGTH]);
+        md[3] = HotStateMetadata::new(Some(head), Some(tail), 5, 999);
+
+        let state = State::new_at_version_with_hot_state_metadata(
+            Some(0),
+            StateStorageUsage::zero(),
+            TEST_CONFIG,
+            md,
+        );
+
+        assert_eq!(state.latest_hot_key(3), Some(head));
+        assert_eq!(state.oldest_hot_key(3), Some(tail));
+        assert_eq!(state.num_hot_items(3), 5);
+        assert_eq!(state.hot_value_bytes(3), 999);
+        // Untouched shards stay at their defaults.
+        assert_eq!(state.latest_hot_key(0), None);
+        assert_eq!(state.num_hot_items(0), 0);
+    }
+
+    #[test]
+    fn test_ledger_state_empty_is_checkpoint() {
+        let ls = LedgerState::new_empty(TEST_CONFIG);
+        assert!(ls.is_checkpoint());
+        assert_eq!(ls.latest().next_version(), 0);
+        assert_eq!(ls.last_checkpoint().next_version(), 0);
+    }
+
+    #[test]
+    fn test_ledger_state_non_checkpoint() {
+        let s0 = State::new_empty(TEST_CONFIG);
+        let s1 = empty_descendant(&s0, &s0, 0);
+        let ls = LedgerState::new(s1.clone(), s0.clone());
+
+        assert!(!ls.is_checkpoint());
+        assert!(ls.latest().is_the_same(&s1));
+        assert!(ls.last_checkpoint().is_the_same(&s0));
+    }
+}

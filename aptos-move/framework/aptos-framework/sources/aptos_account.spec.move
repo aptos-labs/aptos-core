@@ -108,18 +108,18 @@ spec aptos_framework::aptos_account {
     /// Check if the address existed.
     /// Check if the AptosCoin under the address existed.
     spec assert_account_is_registered_for_apt(addr: address) {
-        pragma aborts_if_is_partial;
-        // aborts_if !account::spec_exists_at(addr);
-        // TODO(fa_migration)
-        //aborts_if !coin::spec_is_account_registered<AptosCoin>(addr);
+        aborts_if !account::spec_exists_at(addr);
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
     }
 
     spec set_allow_direct_coin_transfers(account: &signer, allow: bool) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        // let addr = signer::address_of(account);
-        // include !exists<DirectTransferConfig>(addr) ==> account::NewEventHandleAbortsIf;
-        // ensures global<DirectTransferConfig>(addr).allow_arbitrary_coin_transfers == allow;
+        let addr = signer::address_of(account);
+        include !exists<DirectTransferConfig>(addr) ==>
+            account::NewEventHandleAbortsIf { account };
+        modifies global<DirectTransferConfig>(addr);
+        modifies global<account::Account>(addr);
+        ensures exists<DirectTransferConfig>(addr);
+        ensures global<DirectTransferConfig>(addr).allow_arbitrary_coin_transfers == allow;
     }
 
     spec batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
@@ -216,10 +216,6 @@ spec aptos_framework::aptos_account {
         aborts_if exists i in 0..len(recipients):
             account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
 
-        // register_coin properties
-        // TODO(fa_migration)
-        // aborts_if exists i in 0..len(recipients):
-        //     //!coin::spec_is_account_registered<CoinType>(recipients[i]) && !type_info::spec_is_struct<CoinType>();
     }
 
     spec deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) {

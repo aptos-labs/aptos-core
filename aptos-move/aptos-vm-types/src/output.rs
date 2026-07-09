@@ -24,6 +24,7 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use rustc_hash::FxHashSet;
 use std::{collections::BTreeMap, mem};
 
 /// Output produced by the VM after executing a transaction.
@@ -259,5 +260,30 @@ impl VMOutput {
         self.change_set.set_events(patched_events.into_iter());
 
         self.into_transaction_output()
+    }
+}
+
+/// A transaction's read set, used for hot-state promotion. Unordered at the
+/// per-transaction level; ordering is imposed later when aggregating per-block.
+///
+/// Data and module keys are kept as recorded. Both sides are already deduplicated and
+/// they can never contain the same key (module and data state keys are disjoint), so
+/// merging them into one set would only re-hash every module key.
+#[derive(Clone, Debug, Default)]
+pub struct UnorderedReadSet {
+    data_keys: FxHashSet<StateKey>,
+    module_keys: FxHashSet<StateKey>,
+}
+
+impl UnorderedReadSet {
+    pub fn new(data_keys: FxHashSet<StateKey>, module_keys: FxHashSet<StateKey>) -> Self {
+        Self {
+            data_keys,
+            module_keys,
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &StateKey> {
+        self.data_keys.iter().chain(self.module_keys.iter())
     }
 }

@@ -10,7 +10,7 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - Framework:
-          bytecode_version: 7
+          bytecode_version: 10
           git_hash: ~
   - name: gas
     metadata:
@@ -45,7 +45,7 @@ proposals:
             - struct_constructors
             - cryptography_algebra_natives
             - bls12381_structures
-          disabled: []
+          disabled: [ ]
       - Consensus:
           V1:
             decoupled_execution: true

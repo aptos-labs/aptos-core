@@ -80,42 +80,29 @@ spec aptos_framework::code {
     }
 
     spec initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata) {
+        pragma opaque;
         let aptos_addr = signer::address_of(aptos_framework);
         let owner_addr = signer::address_of(package_owner);
+        modifies global<PackageRegistry>(owner_addr);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-
         ensures exists<PackageRegistry>(owner_addr);
     }
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
-        // TODO: Can't verify 'vector::enumerate' loop.
         pragma aborts_if_is_partial;
         let addr = signer::address_of(owner);
         modifies global<PackageRegistry>(addr);
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
-        // include AbortsIfPermissionedSigner { s: owner };
+        include AbortsIfPermissionedSigner { s: owner };
     }
 
     spec publish_package_txn {
-        // TODO: Calls `publish_package`.
-        pragma verify = false;
     }
 
     spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
-        // TODO: Can't verify 'vector::enumerate' loop.
         pragma aborts_if_is_partial;
         aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
         aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
-    }
-
-    spec check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep> {
-        // TODO: Can't verify 'vector::enumerate' loop.
-        pragma verify = false;
-    }
-
-    spec check_coexistence(old_pack: &PackageMetadata, new_modules: &vector<String>) {
-        // TODO: Can't verify 'vector::enumerate' loop.
-        pragma verify = false;
     }
 
     spec get_module_names(pack: &PackageMetadata): vector<String> {
@@ -126,14 +113,13 @@ spec aptos_framework::code {
     }
 
     spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
-        // TODO: Can't verify 'vector::for_each_mut' loop.
         pragma aborts_if_is_partial;
 
         let code_object_addr = code_object.inner;
         aborts_if !exists<object::ObjectCore>(code_object_addr);
         aborts_if !exists<PackageRegistry>(code_object_addr);
         aborts_if !object::is_owner(code_object, signer::address_of(publisher));
-        // include AbortsIfPermissionedSigner { s: publisher };
+        include AbortsIfPermissionedSigner { s: publisher };
 
         modifies global<PackageRegistry>(code_object_addr);
     }

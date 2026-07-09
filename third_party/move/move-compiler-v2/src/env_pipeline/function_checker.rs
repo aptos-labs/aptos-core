@@ -109,7 +109,7 @@ pub fn check_access_after_inlining(env: &GlobalEnv) {
             for (callee_id, sites) in def.used_funs_with_uses() {
                 let callee = env.get_function(callee_id);
 
-                if callee.is_inline() {
+                if callee.is_inline() && !callee.is_inline_opaque_retained() {
                     for site in &sites {
                         env.diag(
                             Severity::Bug,

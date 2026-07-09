@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[lib]
+bench = false
+
 [dependencies]
 ahash = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -34,9 +37,6 @@ rocksdb = { workspace = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 jemallocator = { workspace = true }
-
-[lib]
-bench = false
 
 [[bench]]
 name = "sorting"

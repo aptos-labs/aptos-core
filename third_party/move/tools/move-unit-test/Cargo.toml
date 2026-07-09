@@ -9,6 +9,13 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[[bin]]
+name = "move-unit-test"
+path = "src/main.rs"
+
+[features]
+table-extension = ["move-vm-test-utils/table-extension"]
+
 [dependencies]
 anyhow = { workspace = true }
 better_any = { workspace = true }
@@ -45,15 +52,6 @@ move-model = { path = "../../move-model" }
 move-package = { path = "../move-package" }
 tempfile = { workspace = true }
 
-[[bin]]
-name = "move-unit-test"
-path = "src/main.rs"
-
 [[test]]
 name = "move_unit_test_testsuite"
 harness = false
-
-[features]
-table-extension = [
-    "move-vm-test-utils/table-extension"
-]

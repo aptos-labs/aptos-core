@@ -93,7 +93,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
         let mut updated_funs = BTreeMap::new();
         let mut new_funs = vec![];
         for fun in module.get_functions() {
-            if fun.is_inline() && !options.include_inline_functions
+            if fun.is_inline() && !fun.is_inline_verified() && !options.include_inline_functions
                 || fun.is_native_or_intrinsic()
                 || fun.is_lemma()
             {
@@ -516,11 +516,14 @@ impl<'a> LambdaLifter<'a> {
 impl ExpRewriterFunctions for LambdaLifter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Intercept descent and compute lambdas being exempted from lifting, currently
-        // those passed as parameters to inline functions.
+        // those passed as parameters to inline functions. Calls to retained inline-opaque
+        // functions survive inlining (verify mode), so their lambda arguments must be
+        // lifted like for regular function calls.
         if !self.options.include_inline_functions {
             if let ExpData::Call(_, Operation::MoveFunction(mid, fid), args) = exp.as_ref() {
                 let env = self.fun_env.module_env.env;
-                if env.get_function(mid.qualified(*fid)).is_inline() {
+                let callee = env.get_function(mid.qualified(*fid));
+                if callee.is_inline() && !callee.is_inline_opaque_retained() {
                     for arg in args {
                         if matches!(arg.as_ref(), ExpData::Lambda(..)) {
                             self.exempted_lambdas.insert(arg.node_id());

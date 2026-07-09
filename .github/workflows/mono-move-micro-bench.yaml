@@ -1,0 +1,84 @@
+name: "mono-move-micro-bench"
+on:
+  workflow_dispatch:
+  # Untrusted PR code runs on a self-hosted runner. Restricted to same-repo PRs
+  # with the `mono-move` label (forks excluded below); re-runs on each push so a
+  # fix shows new numbers.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+concurrency:
+  group: mono-move-micro-bench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write # Post the sticky benchmark comment.
+
+jobs:
+  mono-move-micro-bench:
+    # Dispatch, or a same-repo (non-fork) PR carrying the `mono-move` label.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'mono-move') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: benchmark-c3d-60
+    timeout-minutes: 30
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0 # Full history so the base ref is reachable.
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      # Copy the bench tooling out of the worktree, since the A/B driver checks
+      # out other refs and would otherwise replace the running scripts.
+      - name: Stage bench tooling
+        run: |
+          mkdir -p "$RUNNER_TEMP/perf"
+          cp third_party/move/mono-move/testsuite/benches/perf/compare.py \
+             third_party/move/mono-move/testsuite/benches/perf/run.sh \
+             third_party/move/mono-move/testsuite/benches/perf/config.json \
+             "$RUNNER_TEMP/perf/"
+
+      - name: Run A/B benchmark gate
+        id: gate
+        run: |
+          set +e
+          # run.sh resolves the merge-base of HEAD_SHA and origin/main itself.
+          bash "$RUNNER_TEMP/perf/run.sh" ab \
+            origin/main "$HEAD_SHA" \
+            --out "$RUNNER_TEMP/mono-move-bench.md"
+          code=$?
+          if [ ! -f "$RUNNER_TEMP/mono-move-bench.md" ]; then
+            printf '### mono-move benchmark gate\n\nBenches failed to run (build or runtime error). See job logs.\n' \
+              > "$RUNNER_TEMP/mono-move-bench.md"
+          fi
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Write step summary
+        if: always()
+        run: cat "$RUNNER_TEMP/mono-move-bench.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post sticky PR comment
+        # A read-only token (e.g. fork PRs) cannot comment; don't fail the gate.
+        continue-on-error: true
+        if: ${{ always() && github.event.number != null }}
+        uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
+        with:
+          header: mono-move-micro-bench
+          recreate: true
+          path: ${{ runner.temp }}/mono-move-bench.md
+
+      - name: Fail on regression
+        if: ${{ steps.gate.outputs.exit_code != '0' }}
+        run: |
+          echo "mono-move benchmark gate failed: regression beyond the noise band." >&2
+          exit 1

@@ -20,7 +20,9 @@ pub struct LedgerUpdateOutput {
     inner: Arc<DropHelper<Inner>>,
 }
 
+#[bon::bon]
 impl LedgerUpdateOutput {
+    #[builder(finish_fn = build)]
     pub fn new(
         transaction_infos: Vec<TransactionInfo>,
         transaction_info_hashes: Vec<HashValue>,

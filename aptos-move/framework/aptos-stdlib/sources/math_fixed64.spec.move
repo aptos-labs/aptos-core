@@ -1,6 +1,6 @@
 spec aptos_std::math_fixed64 {
     spec sqrt(x: FixedPoint64): FixedPoint64 {
-        aborts_if [abstract] false;
+        aborts_if false;
     }
 
     /// `mul_div` aborts when z is zero or when x * y / z overflows u128.

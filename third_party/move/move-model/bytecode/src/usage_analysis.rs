@@ -337,7 +337,7 @@ impl FunctionTargetProcessor for UsageProcessor {
                 continue;
             }
             for fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() {
                     continue;
                 }
                 for (_, ref target) in targets.get_targets(&fun) {

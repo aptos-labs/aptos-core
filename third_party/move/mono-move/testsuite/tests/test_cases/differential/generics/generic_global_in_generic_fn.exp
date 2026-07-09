@@ -1,0 +1,189 @@
+=== micro-ops ===
+// module 0x42::generic_global_in_generic_fn
+
+fun both() {
+  frame_data_size: 128
+  entry_gas: 268
+  code:
+    0: SlotBorrow [152] <- &[0]
+    1: Move8 [168] <- [64]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put<u64>
+    3: SlotBorrow [152] <- &[0]
+    4: StoreImm1 [168] <- #1
+    5: CallIndirect 0x42::generic_global_in_generic_fn::put<bool>
+    6: Move(32) [152] <- [32]
+    7: CallIndirect 0x42::generic_global_in_generic_fn::is_present<u64>
+    8: JumpZeroByte @43 [152] gas_taken=4 gas_fallthrough=113
+    9: Move(32) [152] <- [32]
+    10: CallIndirect 0x42::generic_global_in_generic_fn::is_present<bool>
+    11: Move(1) [72] <- [152]
+    12: JumpZeroByte @41 [72] gas_taken=4 gas_fallthrough=2
+    13: StoreImm8 [64] <- #100
+    14: Move(32) [152] <- [32]
+    15: CallIndirect 0x42::generic_global_in_generic_fn::take<u64>
+    16: Move8 [80] <- [152]
+    17: Move(32) [152] <- [32]
+    18: CallIndirect 0x42::generic_global_in_generic_fn::take<bool>
+    19: Move(1) [88] <- [152]
+    20: Move(32) [152] <- [32]
+    21: CallIndirect 0x42::generic_global_in_generic_fn::is_present<u64>
+    22: JumpNotZeroByte @39 [152] gas_taken=4 gas_fallthrough=113
+    23: Move(32) [152] <- [32]
+    24: CallIndirect 0x42::generic_global_in_generic_fn::is_present<bool>
+    25: BoolNot [89] <- ![152]
+    26: JumpZeroByte @37 [89] gas_taken=4 gas_fallthrough=2
+    27: StoreImm8 [96] <- #1
+    28: AddU64 [104] <- [80] + [64]
+    29: JumpZeroByte @35 [88] gas_taken=4 gas_fallthrough=2
+    30: StoreImm8 [112] <- #10
+    31: AddU64 [120] <- [104] + [112]
+    32: AddU64 [120] <- [120] + [96]
+    33: Move8 [0] <- [120]
+    34: Return
+    35: StoreImm8 [112] <- #0
+    36: Jump @31 gas=64
+    37: StoreImm8 [96] <- #0
+    38: Jump @28 gas=8
+    39: StoreImm1 [89] <- #0
+    40: Jump @26 gas=3
+    41: StoreImm8 [64] <- #0
+    42: Jump @14 gas=358
+    43: StoreImm1 [72] <- #0
+    44: Jump @12 gas=3
+}
+
+fun bump_d(): skipped (generic function not instantiated)
+
+fun double_publish_u64() {
+  frame_data_size: 40
+  entry_gas: 178
+  code:
+    0: SlotBorrow [64] <- &[0]
+    1: Move8 [80] <- [32]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put<u64>
+    3: SlotBorrow [64] <- &[0]
+    4: Move8 [80] <- [32]
+    5: CallIndirect 0x42::generic_global_in_generic_fn::put<u64>
+    6: Return
+}
+
+fun equal_u64() {
+  frame_data_size: 80
+  entry_gas: 199
+  code:
+    0: SlotBorrow [104] <- &[0]
+    1: Move8 [120] <- [64]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put<u64>
+    3: Move(32) [104] <- [32]
+    4: CallIndirect 0x42::generic_global_in_generic_fn::refs_equal<u64>
+    5: JumpZeroByte @12 [104] gas_taken=4 gas_fallthrough=2
+    6: StoreImm8 [64] <- #1
+    7: Move(32) [104] <- [32]
+    8: CallIndirect 0x42::generic_global_in_generic_fn::take<u64>
+    9: Move8 [72] <- [104]
+    10: Move8 [0] <- [64]
+    11: Return
+    12: StoreImm8 [64] <- #0
+    13: Jump @7 gas=188
+}
+
+fun is_present(): skipped (generic function not instantiated)
+
+fun mutate_u64() {
+  frame_data_size: 72
+  entry_gas: 389
+  code:
+    0: SlotBorrow [96] <- &[0]
+    1: Move8 [112] <- [64]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put_d<u64>
+    3: AddU64Imm [128] <- [64] + #5
+    4: Move(32) [96] <- [32]
+    5: CallIndirect 0x42::generic_global_in_generic_fn::bump_d<u64>
+    6: Move(32) [96] <- [32]
+    7: CallIndirect 0x42::generic_global_in_generic_fn::take_d<u64>
+    8: Move8 [0] <- [96]
+    9: Return
+}
+
+fun presence_u64() {
+  frame_data_size: 88
+  entry_gas: 199
+  code:
+    0: SlotBorrow [112] <- &[0]
+    1: Move8 [128] <- [64]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put<u64>
+    3: Move(32) [112] <- [32]
+    4: CallIndirect 0x42::generic_global_in_generic_fn::is_present<u64>
+    5: JumpZeroByte @19 [112] gas_taken=4 gas_fallthrough=2
+    6: StoreImm8 [64] <- #10
+    7: Move(32) [112] <- [32]
+    8: CallIndirect 0x42::generic_global_in_generic_fn::take<u64>
+    9: Move8 [80] <- [112]
+    10: Move(32) [112] <- [32]
+    11: CallIndirect 0x42::generic_global_in_generic_fn::is_present<u64>
+    12: JumpZeroByte @17 [112] gas_taken=4 gas_fallthrough=2
+    13: StoreImm8 [72] <- #1
+    14: AddU64 [80] <- [64] + [72]
+    15: Move8 [0] <- [80]
+    16: Return
+    17: StoreImm8 [72] <- #0
+    18: Jump @14 gas=59
+    19: StoreImm8 [64] <- #0
+    20: Jump @7 gas=245
+}
+
+fun put(): skipped (generic function not instantiated)
+
+fun put_d(): skipped (generic function not instantiated)
+
+fun refs_equal(): skipped (generic function not instantiated)
+
+fun roundtrip_bool() {
+  frame_data_size: 80
+  entry_gas: 178
+  code:
+    0: SlotBorrow [104] <- &[0]
+    1: Move(1) [120] <- [64]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put<bool>
+    3: Move(32) [104] <- [32]
+    4: CallIndirect 0x42::generic_global_in_generic_fn::take<bool>
+    5: JumpZeroByte @9 [104] gas_taken=56 gas_fallthrough=56
+    6: StoreImm8 [72] <- #1
+    7: Move8 [0] <- [72]
+    8: Return
+    9: StoreImm8 [72] <- #0
+    10: Move8 [0] <- [72]
+    11: Return
+}
+
+fun roundtrip_u64() {
+  frame_data_size: 72
+  entry_gas: 250
+  code:
+    0: SlotBorrow [96] <- &[0]
+    1: Move8 [112] <- [64]
+    2: CallIndirect 0x42::generic_global_in_generic_fn::put<u64>
+    3: Move(32) [96] <- [32]
+    4: CallIndirect 0x42::generic_global_in_generic_fn::take<u64>
+    5: Move8 [0] <- [96]
+    6: Return
+}
+
+fun take(): skipped (generic function not instantiated)
+
+fun take_d(): skipped (generic function not instantiated)
+
+fun take_missing_bool() {
+  frame_data_size: 40
+  entry_gas: 111
+  code:
+    0: Move(32) [64] <- [0]
+    1: CallIndirect 0x42::generic_global_in_generic_fn::take<bool>
+    2: JumpZeroByte @6 [64] gas_taken=56 gas_fallthrough=56
+    3: StoreImm8 [32] <- #1
+    4: Move8 [0] <- [32]
+    5: Return
+    6: StoreImm8 [32] <- #0
+    7: Move8 [0] <- [32]
+    8: Return
+}

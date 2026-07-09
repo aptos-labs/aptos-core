@@ -11,6 +11,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use aptos_types::transaction::TransactionOutput;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use log::{info, warn};
@@ -146,9 +147,29 @@ pub trait TransactionGenerator: Sync + Send {
     ) -> Vec<SignedTransaction>;
 }
 
+/// Callback invoked after each block is ledger-updated, with all transaction outputs
+/// (including events). Implementors can inspect events to feed data back into subsequent
+/// transaction generation (e.g., reading UIDs emitted by a register step to use in a
+/// follow-up commit step).
+pub trait TransactionFeedback: Sync + Send {
+    fn on_block_committed(&self, outputs: &[TransactionOutput]);
+
+    /// Called by the block generator in the main thread (outside rayon) before
+    /// each block. Implementations should block here until there is work to
+    /// generate, preventing empty blocks while waiting for on-chain events.
+    /// Default: no-op.
+    fn wait_until_ready(&self) {}
+}
+
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
     fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
+
+    /// Return a feedback handler if this generator needs to observe transaction outputs.
+    /// Default implementation returns None (no feedback needed).
+    fn transaction_feedback(&self) -> Option<Arc<dyn TransactionFeedback>> {
+        None
+    }
 }
 
 pub struct CounterState {

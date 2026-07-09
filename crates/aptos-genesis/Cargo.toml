@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+testing = []
+fuzzing = ["aptos-config/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -34,7 +38,3 @@ serde_yaml = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true }
-
-[features]
-testing = []
-fuzzing = ["aptos-config/fuzzing"]

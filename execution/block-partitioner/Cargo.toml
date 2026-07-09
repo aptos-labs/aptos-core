@@ -13,6 +13,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 aptos-crypto = { workspace = true }
 aptos-logger = { workspace = true }
@@ -28,14 +31,11 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 
-[dev-dependencies]
-criterion = { workspace = true }
-
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
 
-[features]
-default = []
+[dev-dependencies]
+criterion = { workspace = true }
 
 [[bench]]
 name = "v2"

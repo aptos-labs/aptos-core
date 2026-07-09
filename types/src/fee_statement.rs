@@ -40,6 +40,7 @@ pub struct FeeStatement {
     storage_fee_refund_octas: u64,
 }
 
+#[bon::bon]
 impl FeeStatement {
     pub fn zero() -> Self {
         Self {
@@ -51,6 +52,7 @@ impl FeeStatement {
         }
     }
 
+    #[builder(finish_fn = build)]
     pub fn new(
         total_charge_gas_units: u64,
         execution_gas_units: u64,

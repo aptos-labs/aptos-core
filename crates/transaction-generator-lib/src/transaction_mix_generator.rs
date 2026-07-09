@@ -1,12 +1,35 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{TransactionFeedback, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_types::transaction::TransactionOutput;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+
+/// Dispatches feedback events to the handler for the currently active phase.
+struct PhasedFeedback {
+    feedbacks: Vec<Option<Arc<dyn TransactionFeedback>>>,
+    phase: Arc<AtomicUsize>,
+}
+
+impl TransactionFeedback for PhasedFeedback {
+    fn on_block_committed(&self, outputs: &[TransactionOutput]) {
+        let phase = self.phase.load(Ordering::Relaxed);
+        if let Some(Some(fb)) = self.feedbacks.get(phase) {
+            fb.on_block_committed(outputs);
+        }
+    }
+
+    fn wait_until_ready(&self) {
+        let phase = self.phase.load(Ordering::Relaxed);
+        if let Some(Some(fb)) = self.feedbacks.get(phase) {
+            fb.wait_until_ready();
+        }
+    }
+}
 
 pub struct PhasedTxnMixGenerator {
     rng: StdRng,
@@ -95,5 +118,33 @@ impl TransactionGeneratorCreator for PhasedTxnMixGeneratorCreator {
             txn_mix_per_phase,
             self.phase.clone(),
         ))
+    }
+
+    fn transaction_feedback(&self) -> Option<Arc<dyn TransactionFeedback>> {
+        let feedbacks_per_phase: Vec<Option<Arc<dyn TransactionFeedback>>> = self
+            .txn_mix_per_phase_creators
+            .iter()
+            .map(|phase| {
+                let feedbacks: Vec<_> = phase
+                    .iter()
+                    .filter_map(|(creator, _)| creator.transaction_feedback())
+                    .collect();
+                // TODO: support multiple feedbacks per phase via a broadcast wrapper
+                assert!(
+                    feedbacks.len() <= 1,
+                    "At most one creator per phase may provide TransactionFeedback"
+                );
+                feedbacks.into_iter().next()
+            })
+            .collect();
+
+        if feedbacks_per_phase.iter().any(|f| f.is_some()) {
+            Some(Arc::new(PhasedFeedback {
+                feedbacks: feedbacks_per_phase,
+                phase: self.phase.clone(),
+            }))
+        } else {
+            None
+        }
     }
 }

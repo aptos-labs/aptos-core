@@ -390,10 +390,11 @@ impl VerificationAnalysisProcessor {
         if fun_env.is_test_only()
             || fun_env.is_intrinsic()
             || fun_env.is_native()
-            || fun_env.is_inline()
+            || (fun_env.is_inline() && !fun_env.is_inline_verified())
             || fun_env.is_struct_api()
         {
-            // do not verify any of these function types
+            // do not verify any of these function types; inline functions are only
+            // verified if they have an explicitly given spec
             return false;
         }
         let env = fun_env.module_env.env;

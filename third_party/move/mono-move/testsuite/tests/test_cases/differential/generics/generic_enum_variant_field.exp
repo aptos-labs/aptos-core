@@ -1,0 +1,124 @@
+=== micro-ops ===
+// module 0x42::generic_enum_variant_field
+
+fun divergent_u128() {
+  frame_data_size: 96
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @14 [0] != u64 #0 gas_taken=15 gas_fallthrough=10
+    1: StoreImm16 [56] <- #9
+    2: EnumNew [16] desc=2 tag #0
+    3: HeapMoveTo [16]+8 <- [56] (size=16)
+    4: HeapMoveTo8 [16]+24 <- [8]
+    5: SlotBorrow [24] <- &[16]
+    6: EnumTestTag [72] <- (*[24]).tag == #0
+    7: JumpNotZeroByte @12 [72] gas_taken=4 gas_fallthrough=2
+    8: EnumBorrowVariantField [40] <- &(*[24]) by tag [None, Some(8)]
+    9: ReadRef [80] <- *[40] (size=8)
+    10: Move8 [0] <- [80]
+    11: Return
+    12: EnumBorrowVariantField [40] <- &(*[24]) by tag [Some(24), None]
+    13: Jump @9 gas=80
+    14: AddU64Imm [80] <- [8] + #100
+    15: EnumNew [16] desc=2 tag #1
+    16: HeapMoveTo8 [16]+8 <- [80]
+    17: Jump @5 gas=9
+  safe_point_layouts:
+    2: []
+    15: []
+}
+
+fun divergent_u8() {
+  frame_data_size: 80
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @14 [0] != u64 #0 gas_taken=15 gas_fallthrough=10
+    1: StoreImm1 [56] <- #9
+    2: EnumNew [16] desc=3 tag #0
+    3: HeapMoveTo [16]+8 <- [56] (size=1)
+    4: HeapMoveTo8 [16]+16 <- [8]
+    5: SlotBorrow [24] <- &[16]
+    6: EnumTestTag [57] <- (*[24]).tag == #0
+    7: JumpNotZeroByte @12 [57] gas_taken=4 gas_fallthrough=2
+    8: EnumBorrowVariantField [40] <- &(*[24]) by tag [None, Some(8)]
+    9: ReadRef [64] <- *[40] (size=8)
+    10: Move8 [0] <- [64]
+    11: Return
+    12: EnumBorrowVariantField [40] <- &(*[24]) by tag [Some(16), None]
+    13: Jump @9 gas=80
+    14: AddU64Imm [64] <- [8] + #100
+    15: EnumNew [16] desc=3 tag #1
+    16: HeapMoveTo8 [16]+8 <- [64]
+    17: Jump @5 gas=9
+  safe_point_layouts:
+    2: []
+    15: []
+}
+
+fun uniform_u128() {
+  frame_data_size: 88
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @9 [0] != u64 #0 gas_taken=17 gas_fallthrough=10
+    1: StoreImm16 [24] <- #1
+    2: EnumNew [16] desc=4 tag #0
+    3: HeapMoveTo [16]+8 <- [24] (size=16)
+    4: HeapMoveTo8 [16]+24 <- [8]
+    5: SlotBorrow [40] <- &[16]
+    6: EnumReadVariantField(8) [56] <- (*[40]).24
+    7: Move8 [0] <- [56]
+    8: Return
+    9: StoreImm16 [24] <- #2
+    10: AddU64Imm [56] <- [8] + #1
+    11: EnumNew [16] desc=4 tag #1
+    12: HeapMoveTo [16]+8 <- [24] (size=16)
+    13: HeapMoveTo8 [16]+24 <- [56]
+    14: Jump @5 gas=61
+  safe_point_layouts:
+    2: []
+    11: []
+}
+
+fun uniform_u8() {
+  frame_data_size: 80
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @9 [0] != u64 #0 gas_taken=17 gas_fallthrough=10
+    1: StoreImm1 [24] <- #1
+    2: EnumNew [16] desc=5 tag #0
+    3: HeapMoveTo [16]+8 <- [24] (size=1)
+    4: HeapMoveTo8 [16]+16 <- [8]
+    5: SlotBorrow [32] <- &[16]
+    6: EnumReadVariantField(8) [48] <- (*[32]).16
+    7: Move8 [0] <- [48]
+    8: Return
+    9: StoreImm1 [24] <- #2
+    10: AddU64Imm [48] <- [8] + #1
+    11: EnumNew [16] desc=5 tag #1
+    12: HeapMoveTo [16]+8 <- [24] (size=1)
+    13: HeapMoveTo8 [16]+16 <- [48]
+    14: Jump @5 gas=61
+  safe_point_layouts:
+    2: []
+    11: []
+}
+
+fun write_uniform() {
+  frame_data_size: 80
+  entry_gas: 109
+  code:
+    0: StoreImm8 [32] <- #5
+    1: EnumNew [8] desc=6 tag #0
+    2: HeapMoveTo8 [8]+8 <- [32]
+    3: HeapMoveTo8 [8]+16 <- [0]
+    4: SlotBorrow [16] <- &[8]
+    5: EnumReadVariantField(8) [32] <- (*[16]).16
+    6: AddU64Imm [32] <- [32] + #7
+    7: EnumWriteVariantField(8) (*[16]).16 <- [32]
+    8: SlotBorrow [40] <- &[8]
+    9: EnumReadVariantField(8) [32] <- (*[40]).16
+    10: Move8 [0] <- [32]
+    11: Return
+  safe_point_layouts:
+    1: []
+}

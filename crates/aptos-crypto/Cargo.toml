@@ -12,6 +12,14 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+arkworks-upgrade-compat-test = []
+assert-private-keys-not-cloneable = []
+cloneable-private-keys = []
+fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys", "arbitrary"]
+testing = []
+
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
@@ -94,14 +102,6 @@ proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }
 trybuild = { workspace = true }
-
-[features]
-default = []
-arkworks-upgrade-compat-test = []
-assert-private-keys-not-cloneable = []
-cloneable-private-keys = []
-fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys", "arbitrary"]
-testing = []
 
 [[bench]]
 name = "ark_batch_mul"

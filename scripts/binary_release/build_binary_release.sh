@@ -37,7 +37,13 @@ fi
 
 # Determine the cargo path - try common locations
 CARGO_PATH=""
-if [ -f "crates/$CRATE_NAME/Cargo.toml" ]; then
+# Known-path overrides for crates whose directory name doesn't match the crate name.
+case "$CRATE_NAME" in
+  aptos-move-flow) CARGO_PATH="aptos-move/flow/Cargo.toml" ;;
+esac
+if [ -n "$CARGO_PATH" ] && [ -f "$CARGO_PATH" ]; then
+  :
+elif [ -f "crates/$CRATE_NAME/Cargo.toml" ]; then
   CARGO_PATH="crates/$CRATE_NAME/Cargo.toml"
 elif [ -f "$CRATE_NAME/Cargo.toml" ]; then
   CARGO_PATH="$CRATE_NAME/Cargo.toml"

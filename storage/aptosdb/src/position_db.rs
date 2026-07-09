@@ -16,9 +16,12 @@ use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, Cache, Env, DB};
+use aptos_schemadb::{batch::SchemaBatch, Cache, Env, ReadOptions, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
+use aptos_types::{
+    state_store::{state_value::StateValue, NUM_STATE_SHARDS},
+    transaction::Version,
+};
 use rayon::prelude::*;
 use std::{
     ops::Deref,
@@ -233,6 +236,29 @@ impl PositionDb {
             &DbMetadataKey::PositionCommitProgress,
             &DbMetadataValue::Version(version),
         )
+    }
+
+    /// Point lookup for the position-value row referenced by a JMT
+    /// leaf. Returns `Some((version, value))` for the latest version
+    /// at or before `version` for `state_key_hash`, or `None` if no
+    /// such row exists. `prefix_same_as_start` constrains the seek so
+    /// a different `state_key_hash` doesn't bleed in.
+    pub fn get_position_value(
+        &self,
+        state_key_hash: HashValue,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+        let mut iter = self
+            .shard(shard)
+            .iter_with_opts::<PositionValueSchema>(read_opts)?;
+        iter.seek(&(state_key_hash, version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
 
     pub fn find_prior_version(

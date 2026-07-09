@@ -9,6 +9,12 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["strum"]
+
+[lib]
+doctest = false
+
 [dependencies]
 abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive" }
 anyhow = { workspace = true }
@@ -48,13 +54,7 @@ move-prover-test-utils = { workspace = true }
 move-stdlib = { path = "../move-stdlib" }
 walkdir = { workspace = true }
 
-[lib]
-doctest = false
-
 [[test]]
 name = "testsuite"
 harness = false
 doctest = false
-
-[package.metadata.cargo-machete]
-ignored = ["strum"]

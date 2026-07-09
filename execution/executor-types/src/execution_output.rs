@@ -28,7 +28,9 @@ pub struct ExecutionOutput {
     inner: Arc<DropHelper<Inner>>,
 }
 
+#[bon::bon]
 impl ExecutionOutput {
+    #[builder(finish_fn = build)]
     pub fn new(
         is_block: bool,
         first_version: Version,
@@ -43,6 +45,8 @@ impl ExecutionOutput {
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
         transaction_info_v1: bool,
+        hot_state_root_in_txn_info: bool,
+        compute_trading_native_state_roots: bool,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
         assert_eq!(next_version, result_state.latest().next_version());
@@ -69,6 +73,8 @@ impl ExecutionOutput {
             next_epoch_state,
             subscribable_events,
             transaction_info_v1,
+            hot_state_root_in_txn_info,
+            compute_trading_native_state_roots,
         })
     }
 
@@ -87,6 +93,8 @@ impl ExecutionOutput {
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
+            compute_trading_native_state_roots: false,
         })
     }
 
@@ -107,6 +115,8 @@ impl ExecutionOutput {
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: false,
+            hot_state_root_in_txn_info: false,
+            compute_trading_native_state_roots: false,
         })
     }
 
@@ -129,6 +139,8 @@ impl ExecutionOutput {
             next_epoch_state: self.next_epoch_state.clone(),
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: self.transaction_info_v1,
+            hot_state_root_in_txn_info: self.hot_state_root_in_txn_info,
+            compute_trading_native_state_roots: self.compute_trading_native_state_roots,
         })
     }
 
@@ -178,9 +190,16 @@ pub struct Inner {
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
     pub subscribable_events: Planned<Vec<ContractEvent>>,
-    /// Whether to assemble `TransactionInfoV1`, which carries the hot state root hash, in the
+    /// Whether to assemble `TransactionInfoV1` (instead of `TransactionInfoV0`) in the
     /// subsequent state-checkpoint / ledger-update phases.
     pub transaction_info_v1: bool,
+    /// Whether to compute the hot state root hash and commit it to
+    /// `TransactionInfoV1.hot_state_checkpoint_hash`. Implies `transaction_info_v1`.
+    pub hot_state_root_in_txn_info: bool,
+    /// Whether to compute the native-position state root at the checkpoint
+    /// stage and commit it to `TransactionInfoV1.position_state_checkpoint_hash`.
+    /// Implies `transaction_info_v1`.
+    pub compute_trading_native_state_roots: bool,
 }
 
 impl Inner {

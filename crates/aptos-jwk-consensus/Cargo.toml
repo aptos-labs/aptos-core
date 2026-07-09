@@ -11,6 +11,8 @@ license = { workspace = true }
 publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
+[features]
+smoke-test = []
 
 [dependencies]
 anyhow = { workspace = true }
@@ -47,5 +49,3 @@ tokio-retry = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
 aptos-validator-transaction-pool = { workspace = true, features = ["fuzzing"] }
-[features]
-smoke-test = []

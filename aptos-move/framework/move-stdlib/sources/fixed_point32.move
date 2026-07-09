@@ -243,6 +243,8 @@ module std::fixed_point32 {
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(self);
+    } proof {
+        split self.value == (self.value >> 32) << 32;
     }
     spec fun spec_ceil(self: FixedPoint32): u64 {
         // Expressed in terms of floor_val to avoid modulo: the else branch

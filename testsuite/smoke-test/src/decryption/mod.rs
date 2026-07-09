@@ -7,12 +7,13 @@ use crate::{
     smoke_test_environment::SwarmBuilder, txn_emitter::generate_traffic,
     utils::create_and_fund_account,
 };
-use aptos_forge::{EmitJobMode, LocalSwarm, NodeExt, TransactionType};
+use aptos_forge::{EmitJobMode, LocalSwarm, NodeExt, Swarm, SwarmExt, TransactionType};
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_types::on_chain_config::{
-    FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig,
+use aptos_types::{
+    block_metadata_ext::BlockMetadataExt,
+    on_chain_config::{FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig},
 };
 use std::{sync::Arc, time::Duration};
 
@@ -67,6 +68,59 @@ async fn count_encrypted_txns(client: &Client, start_version: u64, end_version: 
         }
     }
     (count, decrypted_count)
+}
+
+/// The `BlockMetadataExt` variant of a committed block-metadata transaction,
+/// paired with the epoch it was emitted in. The variant is what each validator
+/// chose to emit for that block:
+///   - `V1`: decryption disabled.
+///   - `V2`: decryption enabled, `PerBlockDecryptionKeyV2` resource absent
+///     (legacy mode, digest keyed by consensus round).
+///   - `V3`: decryption enabled, resource present (dense decryption round).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BlockMetadataVariant {
+    epoch: u64,
+    version: u8,
+}
+
+/// Scan committed block-metadata transactions in [start_version, end_version)
+/// and return the `(epoch, BlockMetadataExt version)` of each. Used to assert
+/// the V1/V2/V3 transitions by inspecting exactly what was committed.
+async fn scan_block_metadata_variants(
+    client: &Client,
+    start_version: u64,
+    end_version: u64,
+) -> Vec<BlockMetadataVariant> {
+    let mut variants = Vec::new();
+    let page_size = 100u16;
+    let mut cursor = start_version;
+    while cursor < end_version {
+        let limit = std::cmp::min(page_size as u64, end_version - cursor) as u16;
+        let txns = client
+            .get_transactions_bcs(Some(cursor), Some(limit))
+            .await
+            .expect("failed to get transactions")
+            .into_inner();
+        if txns.is_empty() {
+            break;
+        }
+        for txn_data in &txns {
+            if let Some(bme) = txn_data.transaction.try_as_block_metadata_ext() {
+                let version = match bme {
+                    BlockMetadataExt::V0(_) => 0,
+                    BlockMetadataExt::V1(_) => 1,
+                    BlockMetadataExt::V2(_) => 2,
+                    BlockMetadataExt::V3(_) => 3,
+                };
+                variants.push(BlockMetadataVariant {
+                    epoch: bme.epoch(),
+                    version,
+                });
+            }
+        }
+        cursor += txns.len() as u64;
+    }
+    variants
 }
 
 async fn create_swarm_with_encryption(num_validators: usize) -> LocalSwarm {
@@ -363,5 +417,346 @@ async fn test_fee_payer_encrypted_transaction() {
         "Fee payer balance should decrease (gas charged to fee payer): before={}, after={}",
         fee_payer_balance_before,
         fee_payer_balance_after
+    );
+}
+
+/// Smoke test: the V2 -> V3 block-metadata transition.
+///
+/// Production genesis creates the `PerBlockDecryptionKeyV2` resource (vm-genesis
+/// calls `decryption::initialize`), so a fresh decryption-enabled chain emits
+/// `BlockMetadataExt::V3` from epoch 1 and never passes through V2. To exercise
+/// the V2->V3 cutover this test sets `initialize_decryption_at_genesis = false`,
+/// booting in the pre-resource state: the genesis epoch has decryption on but
+/// the resource absent, so it emits the legacy `V2`. The first
+/// `reconfiguration_with_dkg` then lazily creates the resource via
+/// `decryption::on_new_epoch`, flipping the chain to `V3`. This asserts that
+/// exact cutover by inspecting committed block-metadata transactions, and that
+/// encrypted txns commit and decrypt under V3.
+#[tokio::test]
+async fn test_decryption_v2_to_v3_transition() {
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.api.failpoints_enabled = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus.quorum_store.enable_batch_v2_tx = true;
+            config.consensus.quorum_store.enable_batch_v2_rx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config
+                .state_sync
+                .state_sync_driver
+                .enable_auto_bootstrapping = true;
+            config
+                .state_sync
+                .state_sync_driver
+                .max_connection_deadline_secs = 3;
+        }))
+        .with_init_genesis_config(Arc::new(|conf| {
+            conf.epoch_duration_secs = 10;
+            conf.consensus_config.enable_validator_txns();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_enabled());
+            let mut features = Features::default();
+            features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            conf.initial_features_override = Some(features);
+            // Skip creating PerBlockDecryptionKeyV2 at genesis so the chain
+            // boots in the legacy (V2) state and flips to V3 at the first
+            // reconfiguration_with_dkg. See the doc comment above.
+            conf.initialize_decryption_at_genesis = false;
+        }))
+        .build()
+        .await;
+    let client = swarm.validators().last().unwrap().rest_client();
+
+    // Advance past the first DKG reconfig so both the genesis-epoch V2 blocks
+    // and the post-resource V3 blocks exist in history.
+    info!("Waiting for epoch 3 so both V2 (genesis epoch) and V3 (post-resource) blocks exist...");
+    let _ = wait_for_epoch(&client, 3, 120).await;
+
+    let final_version = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+    let variants = scan_block_metadata_variants(&client, 0, final_version).await;
+
+    let v2_epochs: Vec<u64> = variants
+        .iter()
+        .filter(|v| v.version == 2)
+        .map(|v| v.epoch)
+        .collect();
+    let v3_epochs: Vec<u64> = variants
+        .iter()
+        .filter(|v| v.version == 3)
+        .map(|v| v.epoch)
+        .collect();
+    info!("V2 epochs: {:?}, V3 epochs: {:?}", v2_epochs, v3_epochs);
+
+    assert!(
+        !v2_epochs.is_empty(),
+        "expected V2 block metadata before PerBlockDecryptionKeyV2 was created"
+    );
+    assert!(
+        !v3_epochs.is_empty(),
+        "expected V3 block metadata after PerBlockDecryptionKeyV2 was created"
+    );
+    assert!(
+        v2_epochs.iter().max().unwrap() < v3_epochs.iter().min().unwrap(),
+        "V2 -> V3 must be a clean monotonic cutover: all V2 epochs precede all V3 epochs (V2: {:?}, V3: {:?})",
+        v2_epochs,
+        v3_epochs,
+    );
+    // Decryption is on for the whole run, so V1 must never appear.
+    assert!(
+        !variants.iter().any(|v| v.version == 1),
+        "did not expect V1 metadata when decryption is enabled at genesis (got {:?})",
+        variants,
+    );
+
+    // Emit encrypted traffic under V3 and verify it commits + decrypts.
+    let version_before_traffic = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+    let all_validators: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
+    let stats = generate_traffic(
+        &mut swarm,
+        &all_validators,
+        Duration::from_secs(20),
+        200,
+        vec![vec![(TransactionType::default(), 1)]],
+        true,
+        Some(EmitJobMode::MaxLoad {
+            mempool_backlog: 20,
+        }),
+    )
+    .await
+    .unwrap();
+    assert!(
+        stats.committed > 0,
+        "expected some committed transactions from the emitter, got 0"
+    );
+
+    let final_version = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+    let (encrypted_count, decrypted_count) =
+        count_encrypted_txns(&client, version_before_traffic, final_version).await;
+    info!(
+        "Found {} encrypted txns ({} decrypted) under V3",
+        encrypted_count, decrypted_count
+    );
+    assert!(
+        decrypted_count > 0,
+        "expected encrypted txns to be decrypted under V3"
+    );
+    // Everything emitted during the V3 traffic window must be V3.
+    let traffic_variants =
+        scan_block_metadata_variants(&client, version_before_traffic, final_version).await;
+    assert!(
+        traffic_variants.iter().all(|v| v.version == 3),
+        "all block metadata during the V3 traffic window should be V3, got {:?}",
+        traffic_variants,
+    );
+}
+
+/// Smoke test: the V1 -> V3 block-metadata transition.
+///
+/// Chunky DKG (and thus decryption) starts disabled, so the chain emits
+/// `BlockMetadataExt::V1`. Randomness DKG is on from genesis, so the
+/// `PerBlockDecryptionKeyV2` resource is created by the first
+/// `reconfiguration_with_dkg` well before decryption is ever turned on. When
+/// chunky DKG + `ENCRYPTED_TRANSACTIONS` are enabled via governance, the
+/// resource already exists, so the chain jumps straight from V1 to V3 -- it
+/// never passes through V2. This asserts that path and that encrypted txns work
+/// afterwards.
+#[tokio::test]
+async fn test_decryption_v1_to_v3_transition() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.api.failpoints_enabled = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus.quorum_store.enable_batch_v2_tx = true;
+            config.consensus.quorum_store.enable_batch_v2_rx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config
+                .state_sync
+                .state_sync_driver
+                .enable_auto_bootstrapping = true;
+            config
+                .state_sync
+                .state_sync_driver
+                .max_connection_deadline_secs = 3;
+        }))
+        .with_init_genesis_config(Arc::new(|conf| {
+            conf.epoch_duration_secs = 10;
+            conf.consensus_config.enable_validator_txns();
+            // Randomness on (so reconfiguration_with_dkg runs and creates the
+            // PerBlockDecryptionKeyV2 resource early), but chunky DKG and the
+            // ENCRYPTED_TRANSACTIONS feature off -> decryption disabled -> V1.
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
+            let mut features = Features::default();
+            features.disable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            conf.initial_features_override = Some(features);
+        }))
+        .build_with_cli(0)
+        .await;
+
+    let root_addr = swarm.chain_info().root_account().address();
+    let root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
+    let client = swarm.validators().last().unwrap().rest_client();
+
+    // Advance a few epochs with decryption disabled and confirm V1 only.
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(60))
+        .await
+        .expect("waited too long for epoch 3");
+    let version_before_enable = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+    let pre = scan_block_metadata_variants(&client, 0, version_before_enable).await;
+    info!("Pre-enable block metadata variants: {:?}", pre);
+    assert!(
+        pre.iter().any(|v| v.version == 1),
+        "expected V1 block metadata before decryption is enabled"
+    );
+    assert!(
+        !pre.iter().any(|v| v.version == 2 || v.version == 3),
+        "should not see V2/V3 before decryption is enabled (got {:?})",
+        pre,
+    );
+
+    // Enable chunky DKG config + ENCRYPTED_TRANSACTIONS (feature flag 108) via governance.
+    info!("Enabling chunky DKG config and ENCRYPTED_TRANSACTIONS at runtime.");
+    let script = r#"
+script {
+    use aptos_std::fixed_point64;
+    use aptos_framework::aptos_governance;
+    use aptos_framework::chunky_dkg_config;
+    use aptos_framework::features;
+
+    fun main(core_resources: &signer) {
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+
+        let config = chunky_dkg_config::new_v1(
+            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(2, 3)
+        );
+        chunky_dkg_config::set_for_next_epoch(&framework_signer, config);
+
+        features::change_feature_flags_for_next_epoch(&framework_signer, vector[108], vector[]);
+
+        aptos_governance::reconfigure(&framework_signer);
+    }
+}
+"#;
+    cli.run_script(root_idx, script)
+        .await
+        .expect("governance script execution failed");
+
+    // Wait for the encryption key to appear (chunky DKG completed -> decryption live).
+    info!("Waiting for encryption key after enabling decryption...");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(180);
+    let version_after_enable = loop {
+        let state = client.get_ledger_information().await.unwrap().into_inner();
+        if state.encryption_key.is_some() {
+            info!(
+                "Encryption key present at epoch {} version {}",
+                state.epoch, state.version
+            );
+            break state.version;
+        }
+        if tokio::time::Instant::now() > deadline {
+            panic!(
+                "timed out waiting for encryption key after enabling decryption (epoch {})",
+                state.epoch
+            );
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    };
+
+    // Emit encrypted traffic and confirm decryption works under V3.
+    let all_validators: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
+    let stats = generate_traffic(
+        &mut swarm,
+        &all_validators,
+        Duration::from_secs(20),
+        200,
+        vec![vec![(TransactionType::default(), 1)]],
+        true,
+        Some(EmitJobMode::MaxLoad {
+            mempool_backlog: 20,
+        }),
+    )
+    .await
+    .unwrap();
+    assert!(
+        stats.committed > 0,
+        "expected some committed transactions from the emitter, got 0"
+    );
+
+    let final_version = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+
+    // Scan the entire history: V1 then V3, and never V2 (the resource already
+    // existed when decryption turned on, so the cutover skips legacy mode).
+    let all_variants = scan_block_metadata_variants(&client, 0, final_version).await;
+    let v1_epochs: Vec<u64> = all_variants
+        .iter()
+        .filter(|v| v.version == 1)
+        .map(|v| v.epoch)
+        .collect();
+    let v3_epochs: Vec<u64> = all_variants
+        .iter()
+        .filter(|v| v.version == 3)
+        .map(|v| v.epoch)
+        .collect();
+    info!("V1 epochs: {:?}, V3 epochs: {:?}", v1_epochs, v3_epochs);
+    assert!(
+        !v1_epochs.is_empty(),
+        "expected V1 block metadata before decryption is enabled"
+    );
+    assert!(
+        !v3_epochs.is_empty(),
+        "expected V3 block metadata after decryption is enabled"
+    );
+    assert!(
+        !all_variants.iter().any(|v| v.version == 2),
+        "V1 -> V3 must skip V2: the resource already existed when decryption turned on (got {:?})",
+        all_variants,
+    );
+    assert!(
+        v1_epochs.iter().max().unwrap() < v3_epochs.iter().min().unwrap(),
+        "V1 -> V3 must be a clean monotonic cutover (V1: {:?}, V3: {:?})",
+        v1_epochs,
+        v3_epochs,
+    );
+
+    let (encrypted_count, decrypted_count) =
+        count_encrypted_txns(&client, version_after_enable, final_version).await;
+    info!(
+        "Found {} encrypted txns ({} decrypted) after v1->v3",
+        encrypted_count, decrypted_count
+    );
+    assert!(
+        decrypted_count > 0,
+        "expected encrypted txns to be decrypted under V3"
     );
 }

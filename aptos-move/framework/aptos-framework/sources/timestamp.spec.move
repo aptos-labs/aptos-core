@@ -36,11 +36,23 @@ spec aptos_framework::timestamp {
         invariant [suspendable] chain_status::is_operating() ==> exists<CurrentTimeMicroseconds>(@aptos_framework);
     }
 
+    spec set_time_has_started(aptos_framework: &signer) {
+        pragma opaque;
+        modifies global<CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if std::signer::address_of(aptos_framework) != @aptos_framework;
+        aborts_if exists<CurrentTimeMicroseconds>(@aptos_framework);
+        ensures exists<CurrentTimeMicroseconds>(@aptos_framework);
+        ensures spec_now_microseconds() == 0;
+    }
+
     spec update_global_time {
         use aptos_framework::chain_status;
+        pragma opaque;
         requires chain_status::is_operating();
+        modifies global<CurrentTimeMicroseconds>(@aptos_framework);
         include UpdateGlobalTimeAbortsIf;
         ensures (proposer != @vm_reserved) ==> (spec_now_microseconds() == timestamp);
+        ensures (proposer == @vm_reserved) ==> (spec_now_microseconds() == old(spec_now_microseconds()));
     }
 
     spec schema UpdateGlobalTimeAbortsIf {
@@ -52,6 +64,18 @@ spec aptos_framework::timestamp {
         /// [high-level-req-4]
         aborts_if (proposer == @vm_reserved) && (spec_now_microseconds() != timestamp);
         aborts_if (proposer != @vm_reserved) && (spec_now_microseconds() >= timestamp);
+    }
+
+    spec now_microseconds {
+        pragma opaque;
+        aborts_if !exists<CurrentTimeMicroseconds>(@aptos_framework);
+        ensures result == spec_now_microseconds();
+    }
+
+    spec now_seconds {
+        pragma opaque;
+        aborts_if !exists<CurrentTimeMicroseconds>(@aptos_framework);
+        ensures result == spec_now_seconds();
     }
 
     spec fun spec_now_microseconds(): u64 {

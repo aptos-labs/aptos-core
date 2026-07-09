@@ -6,6 +6,9 @@ module std::bcs {
     /// Return the binary representation of `v` in BCS (Binary Canonical Serialization) format
     native public fun to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
 
+    /// Return the size of the binary representation of `v` in BCS format.
+    native public fun serialized_size<MoveValue>(v: &MoveValue): u64;
+
     // ==============================
     // Module Specification
     spec module {} // switch to module documentation context

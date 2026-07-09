@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: [boogie translator] labeled calls bound to the same state variable refer to different `&mut` arguments; each labeled call must use the same `&mut` arguments, or use distinct state variables for the differing calls
+   ┌─ tests/sources/functional/state_labels/labeled_state_arg_mismatch.move:23:21
+   │
+23 │             (S.. |~ progressed(b));
+   │                     ^^^^^^^^^^^^^

@@ -13,7 +13,6 @@ use move_core_types::{
     parser::parse_struct_tag,
     vm_status::{AbortLocation, StatusCode},
 };
-use move_model::metadata::LanguageVersion;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -43,15 +42,10 @@ fn success_generic(
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    // Use language version 2.3 for consistency.
-    let options = BuildOptions {
-        language_version: Some(LanguageVersion::V2_3),
-        ..BuildOptions::move_2()
-    };
     assert_success!(h.publish_package_with_options(
         &acc,
         &common::test_dir_path("constructor_args.data/pack"),
-        options
+        BuildOptions::move_2()
     ));
 
     // Check in initial state, resource does not exist.
@@ -84,15 +78,10 @@ fn success_generic_view(
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    // Use language version 2.3 for consistency.
-    let options = BuildOptions {
-        language_version: Some(LanguageVersion::V2_3),
-        ..BuildOptions::move_2()
-    };
     assert_success!(h.publish_package_with_options(
         &acc,
         &common::test_dir_path("constructor_args.data/pack"),
-        options
+        BuildOptions::move_2()
     ));
 
     // Check in initial state, resource does not exist.
@@ -123,16 +112,11 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    // Use language version 2.3 for consistency. These tests verify runtime validation
-    // of invalid transaction arguments.
-    let options = BuildOptions {
-        language_version: Some(LanguageVersion::V2_3),
-        ..BuildOptions::move_2()
-    };
+    // These tests verify runtime validation of invalid transaction arguments.
     assert_success!(h.publish_package_with_options(
         &acc,
         &common::test_dir_path("constructor_args.data/pack"),
-        options
+        BuildOptions::move_2()
     ));
 
     // Check in initial state, resource does not exist.
@@ -251,7 +235,6 @@ fn view_constructor_args() {
 
 #[test]
 fn constructor_args_option_private_struct_compiles() {
-    // Test that with language version 2.4+, the package compiles successfully.
     // Option<MyPrecious> is allowed in entry function parameters:
     //   - None is a valid value and succeeds at runtime (see constructor_args_good).
     //   - Some(MyPrecious) is rejected at runtime with INVALID_MAIN_FUNCTION_SIGNATURE
@@ -263,14 +246,13 @@ fn constructor_args_option_private_struct_compiles() {
 
     assert!(
         result.is_ok(),
-        "Expected compilation to succeed with language version 2.4+, but it failed: {:?}",
+        "Expected compilation to succeed, but it failed: {:?}",
         result.err()
     );
 }
 
 #[test]
 fn constructor_args_bad_runtime() {
-    // Test runtime validation with language version 2.3
     let good: &[u8] = "a".as_bytes();
     let bad: &[u8] = &[0x80u8; 1];
 

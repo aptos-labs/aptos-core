@@ -251,7 +251,13 @@ pub(crate) fn build_vm_output(
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
             .build(),
         ModuleWriteSet::new(module_write_set.into_iter().collect()),
-        FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
+        FeeStatement::builder()
+            .total_charge_gas_units(GAS_USED)
+            .execution_gas_units(GAS_USED)
+            .io_gas_units(0)
+            .storage_fee_octas(0)
+            .storage_fee_refund_octas(0)
+            .build(),
         STATUS,
     )
 }

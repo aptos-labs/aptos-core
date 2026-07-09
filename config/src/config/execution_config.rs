@@ -104,7 +104,7 @@ impl Default for ExecutionConfig {
             discard_failed_blocks: false,
             processed_transactions_detailed_counters: false,
             genesis_waypoint: None,
-            blockstm_v2_enabled: false,
+            blockstm_v2_enabled: true,
             layout_caches_enabled: true,
             async_runtime_checks: true,
             enable_pre_write: true,

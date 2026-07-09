@@ -9,6 +9,9 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+fuzzing = ["move-binary-format/fuzzing"]
+
 [dev-dependencies]
 fail = { workspace = true, features = ['failpoints'] }
 hex = { workspace = true }
@@ -18,6 +21,3 @@ move-bytecode-verifier-invalid-mutations = { workspace = true }
 move-core-types = { workspace = true }
 petgraph = { workspace = true }
 proptest = { workspace = true }
-
-[features]
-fuzzing = ["move-binary-format/fuzzing"]

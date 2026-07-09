@@ -67,7 +67,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// different block, that block's subst is empty — no stale propagation occurs.
 fn copy_propagation(func: &mut FunctionIR) {
     for block in &mut func.blocks {
-        // [TODO]: `retain` scans all entries to kill by value, making each kill O(|subst|).
+        // TODO(perf): `retain` scans all entries to kill by value, making each kill O(|subst|).
         // For typical small blocks this is fine, but if subst grows large, consider a
         // reverse index (value → keys) for O(1) value-based kills.
         let mut subst: UnorderedMap<Slot, Slot> = UnorderedMap::new();
@@ -79,8 +79,8 @@ fn copy_propagation(func: &mut FunctionIR) {
             // a full def: mut borrows (writes go through the ref) and
             // `WriteLocalField` (partial write).
             if let Instr::MutBorrowLoc(_, src)
-            | Instr::MutBorrowLocField(_, _, src)
-            | Instr::WriteLocalField(_, src, _) = instr
+            | Instr::MutBorrowLocField(_, _, _, src)
+            | Instr::WriteLocalField(_, _, src, _) = instr
             {
                 subst.remove(src);
                 subst.retain(|_, v| v != src);

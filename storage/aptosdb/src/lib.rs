@@ -52,5 +52,6 @@ pub use native_state_committer::{MerkleLeafUpdate, NativeMerkleLeafUpdates, Nati
 mod state_kv_db;
 mod state_merkle_db;
 mod state_store;
+mod state_value_chunk;
 mod transaction_store;
 mod versioned_node_cache;

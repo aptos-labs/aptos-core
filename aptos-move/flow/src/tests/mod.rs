@@ -17,6 +17,7 @@ mod move_package_status;
 mod move_package_test;
 mod move_package_verify;
 mod move_replay_transaction;
+mod update;
 
 use super::*;
 

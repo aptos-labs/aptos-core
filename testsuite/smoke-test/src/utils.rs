@@ -88,6 +88,11 @@ pub async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, Loca
     (account_0, account_1)
 }
 
+/// Returns a REST client for the swarm's first validator.
+pub fn first_validator_client(swarm: &LocalSwarm) -> RestClient {
+    swarm.validators().next().unwrap().rest_client()
+}
+
 /// Executes transactions using the given transaction factory, client and
 /// accounts. If `execute_epoch_changes` is true, also execute transactions to
 /// force reconfigurations.

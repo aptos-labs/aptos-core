@@ -98,6 +98,18 @@ pub enum DecryptionFailureReason {
     ExecuteBlockLimitReached,
 }
 
+impl DecryptionFailureReason {
+    /// Reasons that re-queue the txn for a future block (rather than charging
+    /// gas / discarding it). Such txns are kept out of the executed set entirely
+    /// (see `DecryptionResult::retry_txns`) and re-proposed via the quorum store.
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::BatchLimitReached | Self::ExecuteBlockLimitReached | Self::EpochEndRetry
+        )
+    }
+}
+
 // Mirrors EntryFunction in types/src/transaction/script.rs
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ClaimedEntryFunction {

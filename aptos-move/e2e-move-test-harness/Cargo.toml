@@ -12,6 +12,12 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[lib]
+doctest = false
+
+[features]
+testing = ["aptos-gas-schedule/testing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -31,9 +37,3 @@ once_cell = { workspace = true }
 project-root = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }
-
-[lib]
-doctest = false
-
-[features]
-testing = ["aptos-gas-schedule/testing"]

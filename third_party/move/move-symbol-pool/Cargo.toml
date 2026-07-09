@@ -9,12 +9,12 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-
-[features]
-default = []

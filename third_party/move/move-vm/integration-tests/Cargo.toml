@@ -8,6 +8,10 @@ homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
+
+[features]
+default = []
+table-extension = ["move-vm-test-utils/table-extension"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -29,7 +33,3 @@ move-vm-types = { workspace = true, features = ["testing"] }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
-
-[features]
-default = []
-table-extension = ["move-vm-test-utils/table-extension"]

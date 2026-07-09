@@ -280,15 +280,14 @@ fn test_verify_transaction() {
     let txn1_hash = HashValue::random();
     let state_root1_hash = b"a".test_only_hash();
     let event_root1_hash = b"b".test_only_hash();
-    let txn_info1 = TransactionInfo::new(
-        txn1_hash,
-        HashValue::zero(),
-        event_root1_hash,
-        Some(state_root1_hash),
-        /* gas_used = */ 0,
-        /* major_status = */ ExecutionStatus::Success,
-        None,
-    );
+    let txn_info1 = TransactionInfo::builder_v0()
+        .transaction_hash(txn1_hash)
+        .state_change_hash(HashValue::zero())
+        .event_root_hash(event_root1_hash)
+        .state_checkpoint_hash(state_root1_hash)
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
     let txn_info1_hash = txn_info1.hash();
 
     let internal_a_hash =
@@ -314,15 +313,14 @@ fn test_verify_transaction() {
     // Trying to show that txn1 is at version 2.
     assert!(proof.verify(&ledger_info, 2).is_err());
     // Replacing txn1 with some other txn should cause the verification to fail.
-    let fake_txn_info = TransactionInfo::new(
-        HashValue::random(),
-        HashValue::zero(),
-        event_root1_hash,
-        Some(state_root1_hash),
-        /* gas_used = */ 0,
-        /* major_status = */ ExecutionStatus::Success,
-        None,
-    );
+    let fake_txn_info = TransactionInfo::builder_v0()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::zero())
+        .event_root_hash(event_root1_hash)
+        .state_checkpoint_hash(state_root1_hash)
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
     let proof = TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, fake_txn_info);
     assert!(proof.verify(&ledger_info, 1).is_err());
 }
@@ -609,15 +607,15 @@ fn create_transaction_info(
     state_change_hash: Option<HashValue>,
     auxiliary_info_hash: Option<HashValue>,
 ) -> TransactionInfo {
-    TransactionInfo::new(
-        transaction_hash.unwrap_or_else(HashValue::random),
-        state_change_hash.unwrap_or_else(HashValue::random),
-        event_root_hash.unwrap_or_else(HashValue::random),
-        Some(HashValue::random()),
-        0,
-        ExecutionStatus::MiscellaneousError(None),
-        auxiliary_info_hash,
-    )
+    TransactionInfo::builder_v0()
+        .transaction_hash(transaction_hash.unwrap_or_else(HashValue::random))
+        .state_change_hash(state_change_hash.unwrap_or_else(HashValue::random))
+        .event_root_hash(event_root_hash.unwrap_or_else(HashValue::random))
+        .state_checkpoint_hash(HashValue::random())
+        .gas_used(0)
+        .status(ExecutionStatus::MiscellaneousError(None))
+        .maybe_auxiliary_info_hash(auxiliary_info_hash)
+        .build()
 }
 
 fn create_event() -> ContractEvent {

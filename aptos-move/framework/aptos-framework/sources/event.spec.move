@@ -41,11 +41,19 @@ spec aptos_framework::event {
         pragma aborts_if_is_strict;
     }
 
+    spec new_event_handle {
+        pragma opaque;
+        aborts_if false;
+        ensures result.counter == 0;
+        ensures result.guid == guid;
+    }
+
     spec emit_event {
         pragma opaque;
         aborts_if [abstract] false;
         /// [high-level-req-4]
         ensures [concrete] handle_ref.counter == old(handle_ref.counter) + 1;
+        ensures [concrete] handle_ref.guid == old(handle_ref.guid);
     }
 
     spec emit {
@@ -63,16 +71,21 @@ spec aptos_framework::event {
     }
 
     spec guid {
+        pragma opaque;
         /// [high-level-req-5.1]
         aborts_if false;
+        ensures result == handle_ref.guid;
     }
 
     spec counter {
+        pragma opaque;
         /// [high-level-req-5.2]
         aborts_if false;
+        ensures result == handle_ref.counter;
     }
 
     spec destroy_handle {
+        pragma opaque;
         /// [high-level-req-5.3]
         aborts_if false;
     }

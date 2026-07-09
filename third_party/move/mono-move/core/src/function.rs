@@ -9,6 +9,10 @@ use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
 use std::{fmt, ptr::NonNull};
 
 /// Function's micro-ops.
+// TODO(completeness): when demand-driven re-optimization swaps in new code at
+// runtime, the swap must not be observed by the transaction that triggered it.
+// Only future re-executions may see the new code; the running transaction keeps
+// executing against the code it started with.
 pub struct Code {
     inner: Box<[MicroOp]>,
 }
@@ -162,7 +166,7 @@ pub struct Function {
     /// function uses only per-PC layouts and the specializer ensures
     /// slots are written before becoming visible as pointers.
     //
-    // TODO: derive from `frame_layout` instead of taking as input.
+    // TODO(completeness): derive from `frame_layout` instead of taking as input.
     // `safe_point_layouts` doesn't need zeroing — each entry already
     // pins which slots hold valid pointers at that PC.
     pub zero_frame: bool,

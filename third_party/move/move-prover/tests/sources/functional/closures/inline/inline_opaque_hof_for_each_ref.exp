@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/closures/inline/inline_opaque_hof_for_each_ref.move:25:9
+   │
+25 │         requires forall i in 0..len(v): !aborts_of<f>(v[i]);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/inline_opaque_hof_for_each_ref.move:64: no_zero_unchecked
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/inline_opaque_hof_for_each_ref.move:65: no_zero_unchecked
+   =     at tests/sources/functional/closures/inline/inline_opaque_hof_for_each_ref.move:25: for_each_ref (spec)

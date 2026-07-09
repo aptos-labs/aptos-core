@@ -19,7 +19,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{
-    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, MoveTableInfo, RawMoveStruct,
+    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, MoveTableInfo,
 };
 use std::sync::Arc;
 

@@ -1,0 +1,368 @@
+{
+  "0xcafe::coin": {
+    "file": "<TEMPDIR>/coin.move",
+    "span": [
+      1,
+      45
+    ],
+    "friends": [
+      {
+        "module": "0xcafe::coin_admin"
+      }
+    ],
+    "attributes": [],
+    "functions": [
+      {
+        "name": "balance_of",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          26,
+          28
+        ],
+        "visibility": "public",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": true,
+        "attributes": [
+          {
+            "name": "view"
+          }
+        ],
+        "typeParams": [
+          {
+            "name": "CoinType",
+            "abilities": [],
+            "isPhantom": false
+          }
+        ],
+        "params": [
+          {
+            "name": "addr",
+            "type": "address"
+          }
+        ],
+        "returnType": "u64",
+        "acquiresInferred": [
+          "0xcafe::coin::CoinStore"
+        ],
+        "resourceAccess": {
+          "reads": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ],
+          "writes": []
+        }
+      },
+      {
+        "name": "deposit",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          35,
+          39
+        ],
+        "visibility": "public",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [
+          {
+            "name": "CoinType",
+            "abilities": [],
+            "isPhantom": false
+          }
+        ],
+        "params": [
+          {
+            "name": "addr",
+            "type": "address"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ],
+        "returnType": null,
+        "acquiresInferred": [
+          "0xcafe::coin::CoinStore"
+        ],
+        "resourceAccess": {
+          "reads": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ],
+          "writes": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ]
+        }
+      },
+      {
+        "name": "is_registered",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          31,
+          33
+        ],
+        "visibility": "public",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": true,
+        "attributes": [
+          {
+            "name": "view"
+          }
+        ],
+        "typeParams": [
+          {
+            "name": "CoinType",
+            "abilities": [],
+            "isPhantom": false
+          }
+        ],
+        "params": [
+          {
+            "name": "addr",
+            "type": "address"
+          }
+        ],
+        "returnType": "bool",
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ],
+          "writes": []
+        }
+      },
+      {
+        "name": "register",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          21,
+          23
+        ],
+        "visibility": "public",
+        "isEntry": true,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [
+          {
+            "name": "CoinType",
+            "abilities": [],
+            "isPhantom": false
+          }
+        ],
+        "params": [
+          {
+            "name": "account",
+            "type": "&signer"
+          }
+        ],
+        "returnType": null,
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [],
+          "writes": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ]
+        }
+      },
+      {
+        "name": "unregister",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          41,
+          44
+        ],
+        "visibility": "public",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [
+          {
+            "name": "CoinType",
+            "abilities": [],
+            "isPhantom": false
+          }
+        ],
+        "params": [
+          {
+            "name": "addr",
+            "type": "address"
+          }
+        ],
+        "returnType": "u64",
+        "acquiresInferred": [
+          "0xcafe::coin::CoinStore"
+        ],
+        "resourceAccess": {
+          "reads": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ],
+          "writes": [
+            "0xcafe::coin::CoinStore<CoinType>"
+          ]
+        }
+      }
+    ],
+    "structs": [
+      {
+        "kind": "struct",
+        "name": "CoinStore",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          6,
+          8
+        ],
+        "abilities": [
+          "key"
+        ],
+        "typeParams": [
+          {
+            "name": "CoinType",
+            "abilities": [],
+            "isPhantom": true
+          }
+        ],
+        "fields": [
+          {
+            "name": "balance",
+            "type": "u64",
+            "positional": false
+          }
+        ],
+        "attributes": []
+      },
+      {
+        "kind": "enum",
+        "name": "Status",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          15,
+          19
+        ],
+        "abilities": [
+          "drop",
+          "store"
+        ],
+        "typeParams": [],
+        "variants": [
+          {
+            "name": "Active",
+            "kind": "unit",
+            "fields": [],
+            "attributes": []
+          },
+          {
+            "name": "Frozen",
+            "kind": "named",
+            "fields": [
+              {
+                "name": "reason",
+                "type": "u64",
+                "positional": false
+              }
+            ],
+            "attributes": []
+          },
+          {
+            "name": "Pending",
+            "kind": "positional",
+            "fields": [
+              {
+                "name": "0",
+                "type": "u64",
+                "positional": true
+              },
+              {
+                "name": "1",
+                "type": "u64",
+                "positional": true
+              }
+            ],
+            "attributes": []
+          }
+        ],
+        "attributes": []
+      },
+      {
+        "kind": "struct",
+        "name": "TransferEvent",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          11,
+          13
+        ],
+        "abilities": [
+          "drop",
+          "store"
+        ],
+        "typeParams": [],
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64",
+            "positional": false
+          }
+        ],
+        "attributes": [
+          {
+            "name": "event"
+          }
+        ]
+      }
+    ],
+    "constants": [
+      {
+        "name": "E_NOT_REGISTERED",
+        "type": "u64",
+        "value": "1"
+      }
+    ]
+  },
+  "0xcafe::coin_admin": {
+    "file": "<TEMPDIR>/coin.move",
+    "span": [
+      47,
+      49
+    ],
+    "friends": [],
+    "attributes": [],
+    "functions": [
+      {
+        "name": "freeze_account",
+        "file": "<TEMPDIR>/coin.move",
+        "span": [
+          48,
+          48
+        ],
+        "visibility": "friend",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [],
+        "params": [
+          {
+            "name": "_addr",
+            "type": "address"
+          }
+        ],
+        "returnType": null,
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [],
+          "writes": []
+        }
+      }
+    ],
+    "structs": [],
+    "constants": []
+  }
+}

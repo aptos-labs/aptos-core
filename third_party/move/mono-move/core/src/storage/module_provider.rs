@@ -10,10 +10,10 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 /// Provides modules to the loader on cache miss: fetching bytes, deserializing
 /// and verifying them, and enumerating package membership.
-// TODO: change error type
+// TODO(cleanup): change error type
 pub trait ModuleProvider {
     /// Returns raw module bytes from storage for the given module.
-    // TODO: see if str is fine for state key
+    // TODO(cleanup): see if str is fine for state key
     fn get_module_bytes(&self, address: &AccountAddress, name: &str) -> Result<Option<Bytes>>;
 
     /// Deserializes raw bytes into a [`CompiledModule`].

@@ -7,15 +7,37 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    SortedSafePointEntries,
+    types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
+    FrameOffset as FO, Function, LayoutId, LayoutProvider, MicroOp, SortedSafePointEntries,
+    ValueLayout,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
-fn trivial_descriptors() -> ObjectDescriptorTable {
+/// A descriptor table paired with an empty layout provider, to satisfy the
+/// verifier's `DescriptorProvider + LayoutProvider` bound. These tests do not
+/// exercise value-comparison operands, the only ops that read a layout.
+struct VerifierProvider(ObjectDescriptorTable);
+
+impl DescriptorProvider for VerifierProvider {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.0.descriptor(id)
+    }
+}
+
+impl LayoutProvider for VerifierProvider {
+    fn layout(&self, _id: LayoutId) -> Option<&ValueLayout> {
+        None
+    }
+
+    fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
+        None
+    }
+}
+
+fn trivial_descriptors() -> VerifierProvider {
     let mut t = ObjectDescriptorTable::new();
-    t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
-    t
+    t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
+    VerifierProvider(t)
 }
 
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
@@ -694,10 +716,9 @@ fn multiple_errors_collected() {
 // `ObjectDescriptorTable`; see its unit tests in `runtime/src/types.rs`.
 // ---------------------------------------------------------------------------
 
-#[test]
-fn vec_pushback_must_target_vector_descriptor() {
+fn vec_pushback_func(descriptor_id: DescriptorId) -> Function {
     use MicroOp::*;
-    let func = Function {
+    Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
@@ -714,7 +735,7 @@ fn vec_pushback_must_target_vector_descriptor() {
                 vec_ref: FO(16),
                 elem: FO(8),
                 elem_size: 8,
-                descriptor_id: DescriptorId(0), // Trivial — wrong variant
+                descriptor_id,
             },
             Return,
         ]),
@@ -726,11 +747,26 @@ fn vec_pushback_must_target_vector_descriptor() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    };
+    }
+}
+
+#[test]
+fn vec_pushback_accepts_trivial_descriptor() {
+    // A pointer-free vector canonically uses the Trivial descriptor.
+    let func = vec_pushback_func(DescriptorId(0));
     let errors = verify_function(&func, &trivial_descriptors());
-    assert!(errors
-        .iter()
-        .any(|e| e.message.contains("VecPushBack") && e.message.contains("not a Vector")));
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+#[test]
+fn vec_pushback_rejects_non_vector_descriptor() {
+    // A Struct descriptor is neither Trivial nor a Vector.
+    let mut descriptors = ObjectDescriptorTable::new();
+    let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    let func = vec_pushback_func(struct_desc);
+    let errors = verify_function(&func, &VerifierProvider(descriptors));
+    assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
+        && e.message.contains("not a non-empty Vector or Trivial")));
 }
 
 #[test]

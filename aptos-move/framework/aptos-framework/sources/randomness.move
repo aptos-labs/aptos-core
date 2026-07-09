@@ -312,32 +312,15 @@ module aptos_framework::randomness {
 
         // Initialize into [0, 1, ..., n-1].
         let i = 0;
-        while ({
-            spec {
-                invariant i <= n;
-                invariant len(values) == i;
-            };
-            i < n
-        }) {
+        while (i < n) {
             values.push_back(i);
             i += 1;
-        };
-        spec {
-            assert len(values) == n;
         };
 
         // Shuffle.
         let tail = n - 1;
-        while ({
-            spec {
-                invariant tail >= 0 && tail < len(values);
-            };
-            tail > 0
-        }) {
+        while (tail > 0) {
             let pop_position = u64_range_internal(0, tail + 1);
-            spec {
-                assert pop_position < len(values);
-            };
             values.swap(pop_position, tail);
             tail -= 1;
         };

@@ -529,6 +529,7 @@ impl ConsensusObserver {
                         commit_decision.proof_block_info()
                     ))
                 );
+                increment_ignored_message_counter(&peer_network_id, metrics::COMMIT_DECISION_LABEL);
                 return;
             }
 
@@ -779,6 +780,7 @@ impl ConsensusObserver {
                     ordered_block.proof_block_info()
                 ))
             );
+            increment_ignored_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
             return;
         };
 
@@ -828,6 +830,7 @@ impl ConsensusObserver {
                     ordered_block.proof_block_info()
                 ))
             );
+            increment_ignored_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
         }
     }
 
@@ -1380,6 +1383,15 @@ fn update_metrics_for_ordered_block_with_window_message(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
         ordered_block.proof_block_info().round(),
+    );
+}
+
+/// Increments the ignored message counter for the given peer and message
+fn increment_ignored_message_counter(peer_network_id: &PeerNetworkId, message_label: &str) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_IGNORED_MESSAGES,
+        message_label,
+        peer_network_id,
     );
 }
 

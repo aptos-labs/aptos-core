@@ -76,7 +76,6 @@ use aptos_types::{
             AbstractAuthenticationData, AnySignature, AuthenticationProof, TransactionAuthenticator,
         },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
-        encrypted_payload::DecryptionFailureReason,
         signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
@@ -116,7 +115,7 @@ use aptos_vm_types::{
 use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
@@ -608,13 +607,13 @@ impl AptosVM {
         storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
-        FeeStatement::new(
-            gas_used,
-            u64::from(gas_meter.execution_gas_used()),
-            u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_fee_used()),
-            storage_fee_refund,
-        )
+        FeeStatement::builder()
+            .total_charge_gas_units(gas_used)
+            .execution_gas_units(u64::from(gas_meter.execution_gas_used()))
+            .io_gas_units(u64::from(gas_meter.io_gas_used()))
+            .storage_fee_octas(u64::from(gas_meter.storage_fee_used()))
+            .storage_fee_refund_octas(storage_fee_refund)
+            .build()
     }
 
     pub(crate) fn failed_transaction_cleanup(
@@ -986,6 +985,15 @@ impl AptosVM {
             let script = func.owner_as_script()?;
             self.reject_unstable_bytecode_for_script(script)?;
             event_validation::verify_no_event_emission_in_compiled_script(script)?;
+
+            // Record the script's declared module dependencies as reads. These are a function of
+            // the script bytecode, so recording them here keeps the read set independent of the
+            // verified-script cache: its warmth depends on the execution schedule (parallel
+            // interleaving, aborts), so deriving these reads from cache-gated dependency fetches
+            // would make the hot-state promotion set nondeterministic across nodes.
+            for (address, module_name) in script.immediate_dependencies_iter() {
+                code_storage.record_module_read(address, module_name);
+            }
 
             let args = dispatch_transaction_arg_validation!(
                 session,
@@ -2185,47 +2193,21 @@ impl AptosVM {
             Err(_) => return unwrap_or_discard!(Err(deprecated_module_bundle!())),
         };
 
-        // Re-queue without charging gas or bumping the sequence number when the
-        // decryption pipeline marked this txn for retry: either the per-block
-        // batch limit was reached, or the block carried an epoch-ending vtxn so
-        // decryption was skipped to avoid leaking sender intent.
-        if let Some(reason) = txn.payload().decryption_failure_reason() {
-            let message = match reason {
-                DecryptionFailureReason::BatchLimitReached => {
-                    Some("Encrypted transaction exceeded batch limit; retrying")
-                },
-                DecryptionFailureReason::ExecuteBlockLimitReached => {
-                    Some("Encrypted transaction exceeded execute-block limit; retrying")
-                },
-                DecryptionFailureReason::EpochEndRetry => {
-                    Some("Block contained an epoch-ending vtxn; retrying encrypted txn next epoch")
-                },
-                // TODO(ibalajiarun): TrustedSetupExhausted is an operational
-                // condition (the epoch outlived the trusted setup's num_rounds);
-                // falling through here charges the user gas + bumps their seq#
-                // for a system issue. Alert on the
-                // `aptos_consensus_decryption_pipeline_txns_count{category="trusted_setup_exhausted"}`
-                // counter so ops can extend the setup before users are affected.
-                // Revisit to use a Discard path that does not charge.
-                DecryptionFailureReason::CryptoFailure
-                | DecryptionFailureReason::ConfigUnavailable
-                | DecryptionFailureReason::DecryptionKeyUnavailable
-                | DecryptionFailureReason::ClaimedEntryFunctionMismatch
-                | DecryptionFailureReason::PayloadHashMismatch
-                | DecryptionFailureReason::EpochMismatch
-                | DecryptionFailureReason::TrustedSetupExhausted => None,
-            };
-            if let Some(message) = message {
-                return (
-                    VMStatus::Error {
-                        status_code: StatusCode::UNKNOWN_STATUS,
-                        sub_status: None,
-                        message: Some(message.to_string()),
-                    },
-                    VMOutput::empty_with_status(TransactionStatus::Retry),
-                );
-            }
-        }
+        // Retryable decryption failures (BatchLimitReached / ExecuteBlockLimitReached
+        // / EpochEndRetry) are kept out of the executed block by the consensus
+        // decryption pipeline (see `DecryptionResult::retry_txns`): they stay
+        // uncommitted and are re-proposed via the quorum store. They must never
+        // reach execution — emitting a `TransactionStatus::Retry` output here would
+        // be committed/materialized by Block-STM and violate its materialization
+        // invariant (`check_materialization`). Non-retryable failures (e.g.
+        // CryptoFailure, TrustedSetupExhausted) still execute and discard as usual.
+        debug_assert!(
+            !txn.payload()
+                .decryption_failure_reason()
+                .is_some_and(|reason| reason.is_retryable()),
+            "retryable decryption failure reached the VM; consensus must exclude it \
+             from the executed set"
+        );
 
         let multisig_address = txn.multisig_address();
         let result = if let Some(multisig_address) = multisig_address {
@@ -2723,6 +2705,35 @@ impl AptosVM {
                         .as_move_value(),
                 ];
                 (BLOCK_PROLOGUE_EXT_V2, args)
+            },
+            BlockMetadataExt::V3(v3) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
+                    MoveValue::U64(v3.epoch),
+                    MoveValue::U64(v3.round),
+                    MoveValue::Address(v3.proposer),
+                    v3.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v3.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v3.timestamp_usecs),
+                    v3.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                    v3.decryption_payload
+                        .as_ref()
+                        .map(|p| p.key.decryption_key_cloned())
+                        .as_move_value(),
+                    v3.decryption_payload
+                        .as_ref()
+                        .map(|p| p.decryption_round)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT_V3, args)
             },
         };
 

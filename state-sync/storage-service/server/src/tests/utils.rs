@@ -306,15 +306,13 @@ pub fn create_transaction_list_using_sizes(
     let end_version = start_version + num_transactions - 1;
     for sequence_number in start_version..=end_version {
         // Create a transaction info
-        let transaction_info = TransactionInfo::new(
-            HashValue::zero(),
-            HashValue::zero(),
-            HashValue::zero(),
-            None,
-            0,
-            ExecutionStatus::Success,
-            None,
-        );
+        let transaction_info = TransactionInfo::builder_v0()
+            .transaction_hash(HashValue::zero())
+            .state_change_hash(HashValue::zero())
+            .event_root_hash(HashValue::zero())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .build();
 
         // Save the transaction data
         transactions.push(create_test_transaction(
@@ -362,15 +360,13 @@ pub fn create_transaction_list_with_proof(
     let mut events = vec![];
     for sequence_number in start_version..=end_version {
         // Create a transaction info
-        let transaction_info = TransactionInfo::new(
-            HashValue::zero(),
-            HashValue::zero(),
-            HashValue::zero(),
-            None,
-            0,
-            ExecutionStatus::Success,
-            None,
-        );
+        let transaction_info = TransactionInfo::builder_v0()
+            .transaction_hash(HashValue::zero())
+            .state_change_hash(HashValue::zero())
+            .event_root_hash(HashValue::zero())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .build();
 
         // Save the transaction data
         transactions.push(create_test_transaction(sequence_number, vec![]));

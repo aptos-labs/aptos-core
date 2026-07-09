@@ -47,7 +47,9 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
-    layout_cache::{LayoutCache, LayoutCacheEntry, NoOpLayoutCache, StructKey},
+    layout_cache::{
+        ambassador_impl_LayoutCache, LayoutCache, LayoutCacheEntry, NoOpLayoutCache, StructKey,
+    },
     loader::{
         eager::EagerLoader,
         lazy::LazyLoader,

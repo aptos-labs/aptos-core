@@ -12,8 +12,6 @@ error: post-condition does not hold
    =         f = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/closures/behavioral_predicates.move:19: apply
-   =     at tests/sources/functional/closures/behavioral_predicates.move:35: test_ensures_of_fail
-   =         y = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/closures/behavioral_predicates.move:38: test_ensures_of_fail (spec)
 
@@ -30,8 +28,6 @@ error: post-condition does not hold
     =         f = <redacted>
     =         x = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:19: apply
-    =     at tests/sources/functional/closures/behavioral_predicates.move:234: test_wrong_ensures
-    =         y = <redacted>
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:237: test_wrong_ensures (spec)
 
@@ -48,8 +44,6 @@ error: post-condition does not hold
     =         f = <redacted>
     =         x = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:19: apply
-    =     at tests/sources/functional/closures/behavioral_predicates.move:242: test_postcondition_too_strong
-    =         y = <redacted>
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:245: test_postcondition_too_strong (spec)
     =     at tests/sources/functional/closures/behavioral_predicates.move:246: test_postcondition_too_strong (spec)
@@ -69,9 +63,6 @@ error: post-condition does not hold
     =         x = <redacted>
     =         y = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:47: apply2
-    =     at tests/sources/functional/closures/behavioral_predicates.move:251: test_wrong_binary
-    =         a = <redacted>
-    =         b = <redacted>
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:254: test_wrong_binary (spec)
 

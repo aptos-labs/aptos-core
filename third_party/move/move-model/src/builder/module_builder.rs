@@ -1257,14 +1257,6 @@ impl ModuleBuilder<'_, '_> {
                             {
                                 self.validate_target_signature(&fun_decl, &loc, signature);
                             }
-
-                            // TODO: to be revisited once we have high-order function
-                            if fun_decl.kind == FunctionKind::Inline {
-                                self.parent.error(
-                                    &loc,
-                                    "functional spec blocks for inline functions are not supported yet",
-                                );
-                            }
                         },
                         SpecBlockContext::Struct(..) | SpecBlockContext::Module => (),
                         SpecBlockContext::Schema(..) => {

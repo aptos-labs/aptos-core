@@ -75,7 +75,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
 impl<'ctx> ExecutionGuard<'ctx> {
     pub(super) fn intern_identifier_internal(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
-        // TODO:
+        // TODO(metering):
         //   Consider checking that the identifier size is within bounds. While
         //   CompiledModule / CompiledScript deserializer enforces 256 byte
         //   limit (in new config), when coming from deserialized TypeTag from

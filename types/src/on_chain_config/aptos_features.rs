@@ -187,9 +187,24 @@ pub enum FeatureFlag {
     /// uses the V1 write-set format, which encodes hot-state changes in its serialized
     /// writes.
     HOTNESS_IN_EPILOGUE = 116,
-    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
-    /// state root hash, so it is committed to the ledger accumulator.
+    /// When enabled, execution assembles `TransactionInfoV1` instead of `TransactionInfoV0`.
     TRANSACTION_INFO_V1 = 117,
+    /// Umbrella auth flag for the native-trading subsystem; the per-store
+    /// flags below gate the actual writes. Both must be on to write.
+    TRADING_NATIVE = 118,
+    /// Gates native-position writes.
+    NATIVE_POSITION = 119,
+    /// Gates native-orderbook writes.
+    NATIVE_ORDERBOOK = 120,
+    /// Gates native-collateral writes.
+    NATIVE_COLLATERAL = 121,
+    /// When enabled, execution computes the native-position state root at the
+    /// checkpoint stage and commits it to `TransactionInfoV1`, so it is
+    /// consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    COMPUTE_TRADING_NATIVE_STATE_ROOTS = 122,
+    /// When enabled, execution populates `TransactionInfoV1`'s hot state root hash, so it
+    /// is committed to the ledger accumulator. Requires `TRANSACTION_INFO_V1`.
+    HOT_STATE_ROOT_IN_TXN_INFO = 123,
 }
 
 impl FeatureFlag {
@@ -305,6 +320,7 @@ impl FeatureFlag {
             Self::STORAGE_SLOT_NATIVES,
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
+            Self::ENCRYPTED_TRANSACTIONS,
         ]
     }
 }
@@ -538,6 +554,14 @@ impl Features {
 
     pub fn is_transaction_info_v1_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
+    }
+
+    pub fn is_compute_trading_native_state_roots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS)
+    }
+
+    pub fn is_hot_state_root_in_txn_info_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

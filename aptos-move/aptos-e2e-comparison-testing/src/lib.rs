@@ -376,6 +376,8 @@ struct CompilationCache {
     failed_packages_compared: HashSet<PackageInfo>,
     base_compiled_package_cache: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     compared_compiled_package_cache: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+    /// Packages already dumped to disk; consulted when compilation is skipped.
+    dumped_packages: HashSet<PackageInfo>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -501,7 +503,11 @@ fn dump_and_compile_from_package_metadata(
     execution_mode: Option<ExecutionMode>,
     base_experiments: &[String],
     compared_experiments: &[String],
+    skip_source_compilation: bool,
 ) -> anyhow::Result<()> {
+    if skip_source_compilation && compilation_cache.dumped_packages.contains(&package_info) {
+        return Ok(());
+    }
     let root_package_dir = root_dir.join(format!("{}", package_info,));
     if compilation_cache
         .failed_packages_base
@@ -521,12 +527,12 @@ fn dump_and_compile_from_package_metadata(
             package_info.package_name
         )));
     }
-    if !root_package_dir.exists() {
-        std::fs::create_dir_all(root_package_dir.as_path())?;
-    }
     let root_package_metadata = dep_map
         .get(&(package_info.address, package_info.package_name.clone()))
         .unwrap();
+    if !root_package_dir.exists() {
+        std::fs::create_dir_all(root_package_dir.as_path())?;
+    }
     // step 1: unzip and save the source code into src into corresponding folder
     let sources_dir = root_package_dir.join("sources");
     std::fs::create_dir_all(sources_dir.as_path())?;
@@ -603,6 +609,7 @@ fn dump_and_compile_from_package_metadata(
                         execution_mode,
                         base_experiments,
                         compared_experiments,
+                        skip_source_compilation,
                     )?;
                 }
                 break;
@@ -615,6 +622,12 @@ fn dump_and_compile_from_package_metadata(
     std::fs::write(toml_path, manifest.to_string()).unwrap();
 
     // step 5: test whether the code can be compiled
+    if skip_source_compilation {
+        compilation_cache
+            .dumped_packages
+            .insert(package_info.clone());
+        return Ok(());
+    }
     if !compilation_cache
         .compiled_package_map
         .contains_key(&package_info)

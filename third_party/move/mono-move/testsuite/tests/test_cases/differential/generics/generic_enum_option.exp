@@ -1,0 +1,74 @@
+=== micro-ops ===
+// module 0x42::generic_enum_option
+
+fun none(): skipped (generic function not instantiated)
+
+fun some(): skipped (generic function not instantiated)
+
+fun copy_some() {
+  frame_data_size: 32
+  entry_gas: 301
+  code:
+    0: Move8 [56] <- [0]
+    1: CallIndirect 0x42::generic_enum_option::some<u64>
+    2: Move8 [8] <- [56]
+    3: StoreImm8 [64] <- #0
+    4: Move8 [56] <- [8]
+    5: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
+    6: Move8 [0] <- [56]
+    7: StoreImm8 [64] <- #0
+    8: Move8 [56] <- [8]
+    9: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
+    10: Move8 [16] <- [56]
+    11: AddU64 [24] <- [0] + [16]
+    12: Move8 [0] <- [24]
+    13: Return
+}
+
+fun run_bool() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @13 [0] != u64 #0 gas_taken=45 gas_fallthrough=36
+    1: CallIndirect 0x42::generic_enum_option::none<bool>
+    2: Move8 [8] <- [48]
+    3: StoreImm1 [56] <- #0
+    4: Move8 [48] <- [8]
+    5: CallIndirect 0x42::generic_enum_option::unwrap_or<bool>
+    6: JumpZeroByte @10 [48] gas_taken=56 gas_fallthrough=56
+    7: StoreImm8 [16] <- #1
+    8: Move8 [0] <- [16]
+    9: Return
+    10: StoreImm8 [16] <- #0
+    11: Move8 [0] <- [16]
+    12: Return
+    13: StoreImm1 [48] <- #1
+    14: CallIndirect 0x42::generic_enum_option::some<bool>
+    15: Move8 [8] <- [48]
+    16: Jump @3 gas=46
+}
+
+fun run_none() {
+  frame_data_size: 8
+  entry_gas: 126
+  code:
+    0: CallIndirect 0x42::generic_enum_option::none<u64>
+    1: Move8 [40] <- [0]
+    2: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
+    3: Move8 [0] <- [32]
+    4: Return
+}
+
+fun run_some() {
+  frame_data_size: 8
+  entry_gas: 154
+  code:
+    0: Move8 [32] <- [0]
+    1: CallIndirect 0x42::generic_enum_option::some<u64>
+    2: StoreImm8 [40] <- #0
+    3: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
+    4: Move8 [0] <- [32]
+    5: Return
+}
+
+fun unwrap_or(): skipped (generic function not instantiated)

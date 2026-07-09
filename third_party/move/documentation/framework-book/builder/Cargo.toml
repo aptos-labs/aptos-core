@@ -12,13 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[[bin]]
+name = "aptos-framework-book-builder"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-framework = { workspace = true }
 move-docgen = { workspace = true }
 move-model = { workspace = true }
 tempfile = { workspace = true }
-
-[[bin]]
-name = "aptos-framework-book-builder"
-path = "src/main.rs"

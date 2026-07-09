@@ -7,7 +7,14 @@ use super::super::{
     common::{mcp_err, resolve_function, tool_error, try_call},
     session::{into_call_tool_result, FlowSession},
 };
-use move_model::model::{FunId, GlobalEnv, QualifiedId};
+use move_model::{
+    ast::{Attribute, ExpData, Operation},
+    model::{
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, QualifiedId, StructEnv,
+        TypeParameter, Visibility,
+    },
+    ty::ReferenceKind,
+};
 use rmcp::{
     handler::server::wrapper::Parameters, model::CallToolResult, schemars, tool, tool_router,
 };
@@ -37,6 +44,9 @@ enum QueryType {
     /// Returns direct and transitive calls/uses by a given function.
     /// "called" = direct calls; "used" = direct calls + closure captures.
     FunctionUsage,
+    /// Returns per-module facts: functions, structs, constants, friends,
+    /// attributes, and source locations.
+    Facts,
 }
 
 // ========== MCP Tool ==========
@@ -95,6 +105,11 @@ impl FlowSession {
                 })?;
                 let result = build_function_usage(data.env(), &function)?;
                 log::info!("move_package_query function_usage({})", function);
+                Ok(into_call_tool_result(&result))
+            },
+            QueryType::Facts => {
+                let result = build_facts(data.env());
+                log::info!("move_package_query facts: {} module(s)", result.len());
                 Ok(into_call_tool_result(&result))
             },
         }
@@ -275,4 +290,435 @@ fn qids_to_names(env: &GlobalEnv, qids: &BTreeSet<QualifiedId<FunId>>) -> BTreeS
     qids.iter()
         .map(|qid| env.get_function(*qid).get_full_name_with_address())
         .collect()
+}
+
+// ========== Query: facts ==========
+//
+// Per-module facts read from the compiler's GlobalEnv. Wire keys use camelCase.
+
+/// Source file and 1-indexed `[start_line, end_line]` span for an item.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceLocation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    span: Option<[u32; 2]>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModuleFacts {
+    #[serde(flatten)]
+    location: SourceLocation,
+    friends: Vec<FriendFacts>,
+    attributes: Vec<AttributeFacts>,
+    functions: Vec<FunctionFacts>,
+    structs: Vec<StructFacts>,
+    constants: Vec<ConstantSummary>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FriendFacts {
+    module: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AttributeFacts {
+    name: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TypeParamFacts {
+    name: String,
+    abilities: Vec<String>,
+    is_phantom: bool,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ParamFacts {
+    name: String,
+    #[serde(rename = "type")]
+    type_: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FieldFacts {
+    name: String,
+    #[serde(rename = "type")]
+    type_: String,
+    positional: bool,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VariantFacts {
+    name: String,
+    /// One of `"unit"`, `"positional"`, `"named"`.
+    kind: String,
+    fields: Vec<FieldFacts>,
+    attributes: Vec<AttributeFacts>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResourceAccessFacts {
+    reads: Vec<String>,
+    writes: Vec<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FunctionFacts {
+    name: String,
+    #[serde(flatten)]
+    location: SourceLocation,
+    /// One of `"public"`, `"friend"`, `"package"`, `"internal"`.
+    visibility: String,
+    is_entry: bool,
+    is_inline: bool,
+    is_native: bool,
+    is_view: bool,
+    attributes: Vec<AttributeFacts>,
+    type_params: Vec<TypeParamFacts>,
+    params: Vec<ParamFacts>,
+    return_type: Option<String>,
+    acquires_inferred: Vec<String>,
+    resource_access: ResourceAccessFacts,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StructFacts {
+    /// `"struct"` or `"enum"`.
+    kind: String,
+    name: String,
+    #[serde(flatten)]
+    location: SourceLocation,
+    abilities: Vec<String>,
+    type_params: Vec<TypeParamFacts>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fields: Option<Vec<FieldFacts>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variants: Option<Vec<VariantFacts>>,
+    attributes: Vec<AttributeFacts>,
+}
+
+/// Build per-module facts for every primary target module in `env`.
+fn build_facts(env: &GlobalEnv) -> BTreeMap<String, ModuleFacts> {
+    env.get_primary_target_modules()
+        .iter()
+        .map(|module| {
+            let name = module.get_full_name_str();
+            let facts = build_module_facts(env, module);
+            (name, facts)
+        })
+        .collect()
+}
+
+fn build_module_facts(env: &GlobalEnv, module: &ModuleEnv<'_>) -> ModuleFacts {
+    let location = loc_to_file_span(env, &module.get_loc());
+
+    let friends: Vec<FriendFacts> = module
+        .get_friend_modules()
+        .iter()
+        .map(|id| FriendFacts {
+            module: env.get_module(*id).get_full_name_str(),
+        })
+        .collect();
+
+    let attributes = attrs_to_facts(env, module.get_attributes());
+
+    let functions: Vec<FunctionFacts> = module
+        .get_functions()
+        .map(|f| build_function_facts(env, &f))
+        .collect();
+
+    let structs: Vec<StructFacts> = module
+        .get_structs()
+        .map(|s| build_struct_facts(env, &s))
+        .collect();
+
+    let constants: Vec<ConstantSummary> = module
+        .get_named_constants()
+        .map(|c| build_constant_summary(env, &c))
+        .collect();
+
+    ModuleFacts {
+        location,
+        friends,
+        attributes,
+        functions,
+        structs,
+        constants,
+    }
+}
+
+fn build_constant_summary(env: &GlobalEnv, c: &NamedConstantEnv<'_>) -> ConstantSummary {
+    let ctx = c.get_type_display_ctx();
+    ConstantSummary {
+        name: c.get_name().display(env.symbol_pool()).to_string(),
+        type_: c.get_type().display(&ctx).to_string(),
+        value: env.display(&c.get_value()).to_string(),
+    }
+}
+
+fn build_function_facts(env: &GlobalEnv, func: &FunctionEnv<'_>) -> FunctionFacts {
+    let location = loc_to_file_span(env, &func.get_loc());
+    let type_ctx = func.get_type_display_ctx();
+
+    let symbol_pool = env.symbol_pool();
+    let params: Vec<ParamFacts> = func
+        .get_parameters_ref()
+        .iter()
+        .map(|p| ParamFacts {
+            name: p.0.display(symbol_pool).to_string(),
+            type_: p.1.display(&type_ctx).to_string(),
+        })
+        .collect();
+
+    let return_type = format_return_type(func, &type_ctx);
+
+    let acquires_inferred: Vec<String> = func
+        .get_acquired_structs()
+        .map(|set| {
+            set.iter()
+                .map(|sid| {
+                    func.module_env
+                        .get_struct(*sid)
+                        .get_full_name_with_address()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let resource_access = build_resource_access(env, func, &type_ctx);
+
+    let attributes = attrs_to_facts(env, func.get_attributes());
+    let is_view = func
+        .get_attributes()
+        .iter()
+        .any(|a| symbol_pool.string(a.name()).as_str() == "view");
+
+    FunctionFacts {
+        name: func.get_name_str(),
+        location,
+        visibility: visibility_str(func),
+        is_entry: func.is_entry(),
+        is_inline: func.is_inline(),
+        is_native: func.is_native(),
+        is_view,
+        attributes,
+        type_params: type_params_to_facts(env, &func.get_type_parameters()),
+        params,
+        return_type,
+        acquires_inferred,
+        resource_access,
+    }
+}
+
+fn build_struct_facts(env: &GlobalEnv, s: &StructEnv<'_>) -> StructFacts {
+    let location = loc_to_file_span(env, &s.get_loc());
+    let type_ctx = s.get_type_display_ctx();
+    let symbol_pool = env.symbol_pool();
+
+    let abilities: Vec<String> = s
+        .get_abilities()
+        .into_iter()
+        .map(|a| a.to_string())
+        .collect();
+
+    let type_params = type_params_to_facts(env, s.get_type_parameters());
+
+    let (kind, fields, variants) = if s.has_variants() {
+        let variants: Vec<VariantFacts> = s
+            .get_variants()
+            .map(|v| {
+                let v_fields: Vec<FieldFacts> = s
+                    .get_fields_of_variant(v)
+                    .map(|f| FieldFacts {
+                        name: f.get_name().display(symbol_pool).to_string(),
+                        type_: f.get_type().display(&type_ctx).to_string(),
+                        positional: f.is_positional(),
+                    })
+                    .collect();
+                let v_attrs = attrs_to_facts(env, s.get_variant_attributes(v));
+                let kind = if v_fields.is_empty() {
+                    "unit"
+                } else if v_fields.iter().all(|f| f.positional) {
+                    "positional"
+                } else {
+                    "named"
+                };
+                VariantFacts {
+                    name: v.display(symbol_pool).to_string(),
+                    kind: kind.to_string(),
+                    fields: v_fields,
+                    attributes: v_attrs,
+                }
+            })
+            .collect();
+        ("enum", None, Some(variants))
+    } else {
+        let fields: Vec<FieldFacts> = s
+            .get_fields()
+            .map(|f| FieldFacts {
+                name: f.get_name().display(symbol_pool).to_string(),
+                type_: f.get_type().display(&type_ctx).to_string(),
+                positional: f.is_positional(),
+            })
+            .collect();
+        ("struct", Some(fields), None)
+    };
+
+    let attributes = attrs_to_facts(env, s.get_attributes());
+
+    StructFacts {
+        kind: kind.to_string(),
+        name: s.get_name().display(symbol_pool).to_string(),
+        location,
+        abilities,
+        type_params,
+        fields,
+        variants,
+        attributes,
+    }
+}
+
+fn type_params_to_facts(env: &GlobalEnv, params: &[TypeParameter]) -> Vec<TypeParamFacts> {
+    let symbol_pool = env.symbol_pool();
+    params
+        .iter()
+        .map(|tp| TypeParamFacts {
+            name: tp.0.display(symbol_pool).to_string(),
+            abilities: tp.1.abilities.into_iter().map(|a| a.to_string()).collect(),
+            is_phantom: tp.1.is_phantom,
+        })
+        .collect()
+}
+
+fn attrs_to_facts(env: &GlobalEnv, attrs: &[Attribute]) -> Vec<AttributeFacts> {
+    let symbol_pool = env.symbol_pool();
+    attrs
+        .iter()
+        .map(|a| AttributeFacts {
+            name: symbol_pool.string(a.name()).to_string(),
+        })
+        .collect()
+}
+
+fn visibility_str(func: &FunctionEnv<'_>) -> String {
+    if func.has_package_visibility() {
+        return "package".to_string();
+    }
+    match func.visibility() {
+        Visibility::Public => "public",
+        Visibility::Friend => "friend",
+        Visibility::Private => "internal",
+    }
+    .to_string()
+}
+
+fn format_return_type(
+    func: &FunctionEnv<'_>,
+    type_ctx: &move_model::ty::TypeDisplayContext<'_>,
+) -> Option<String> {
+    use move_model::ty::Type;
+    let result = func.get_result_type();
+    if let Type::Tuple(ts) = &result
+        && ts.is_empty()
+    {
+        return None;
+    }
+    Some(result.display(type_ctx).to_string())
+}
+/// Empty when the function has no AST body.
+fn build_resource_access(
+    env: &GlobalEnv,
+    func: &FunctionEnv<'_>,
+    type_ctx: &move_model::ty::TypeDisplayContext<'_>,
+) -> ResourceAccessFacts {
+    let Some(body) = func.get_def() else {
+        return ResourceAccessFacts {
+            reads: vec![],
+            writes: vec![],
+        };
+    };
+    let mut reads = BTreeSet::new();
+    let mut writes = BTreeSet::new();
+    body.visit_pre_order(&mut |e| {
+        if let ExpData::Call(node_id, op, _) = e {
+            let (does_read, does_write) = match op {
+                Operation::Exists(_) | Operation::BorrowGlobal(ReferenceKind::Immutable) => {
+                    (true, false)
+                },
+                Operation::BorrowGlobal(ReferenceKind::Mutable) | Operation::MoveFrom => {
+                    (true, true)
+                },
+                Operation::MoveTo => (false, true),
+                _ => (false, false),
+            };
+            if does_read || does_write {
+                let insts = env.get_node_instantiation(*node_id);
+                if let Some(ty) = insts.first() {
+                    let ty = qualified_resource_name(env, ty, type_ctx);
+                    if does_read {
+                        reads.insert(ty.clone());
+                    }
+                    if does_write {
+                        writes.insert(ty);
+                    }
+                }
+            }
+        }
+        true
+    });
+    ResourceAccessFacts {
+        reads: reads.into_iter().collect(),
+        writes: writes.into_iter().collect(),
+    }
+}
+
+/// Render the resource type of a global-storage operation as a fully-qualified
+/// `address::module::Struct<TypeArgs>` name, matching the format used by
+/// `acquiresInferred` so consumers can correlate the two. Falls back to the
+/// plain type display for non-struct types, which should not occur for storage
+/// operations.
+fn qualified_resource_name(
+    env: &GlobalEnv,
+    ty: &move_model::ty::Type,
+    type_ctx: &move_model::ty::TypeDisplayContext<'_>,
+) -> String {
+    use move_model::ty::Type;
+    let Type::Struct(mid, sid, type_args) = ty else {
+        return ty.display(type_ctx).to_string();
+    };
+    let base = env
+        .get_struct(mid.qualified(*sid))
+        .get_full_name_with_address();
+    if type_args.is_empty() {
+        base
+    } else {
+        let args = type_args
+            .iter()
+            .map(|t| t.display(type_ctx).to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{base}<{args}>")
+    }
+}
+
+/// Resolve a `Loc` to its source file and 1-indexed `[start_line, end_line]`.
+/// The span is `None` when either endpoint cannot be resolved.
+fn loc_to_file_span(env: &GlobalEnv, loc: &Loc) -> SourceLocation {
+    let file = Some(env.get_file(loc.file_id()).to_string_lossy().into_owned());
+    let start = env.get_location(loc).map(|l| l.line.0 + 1);
+    let end = env.get_location(&loc.at_end()).map(|l| l.line.0 + 1);
+    let span = start.zip(end).map(|(s, e)| [s, e]);
+    SourceLocation { file, span }
 }

@@ -12,6 +12,17 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[lib]
+doctest = false
+
+[features]
+default = []
+fuzzing = ["aptos-types/fuzzing"]
+testing = ["aptos-crypto/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
@@ -60,14 +71,3 @@ triomphe = { workspace = true }
 
 [dev-dependencies]
 claims = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-types/fuzzing"]
-testing = ["aptos-crypto/fuzzing"]
-
-[lib]
-doctest = false
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]

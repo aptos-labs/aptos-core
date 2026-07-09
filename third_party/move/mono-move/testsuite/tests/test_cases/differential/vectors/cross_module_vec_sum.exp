@@ -98,7 +98,7 @@ fun push_and_sum() {
     1: StoreImm8 [16] <- #0
     2: JumpGreaterEqualU64 @7 [16] >= [0] gas_taken=6 gas_fallthrough=37
     3: SlotBorrow [24] <- &[8]
-    4: VecPushBack [24].push([16], size=8, desc=2)
+    4: VecPushBack [24].push([16], size=8, desc=0)
     5: AddU64Imm [16] <- [16] + #1
     6: Jump @2 gas=3
     7: StoreImm8 [0] <- #0

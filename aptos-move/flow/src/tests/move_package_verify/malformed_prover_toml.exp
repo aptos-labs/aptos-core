@@ -1,0 +1,6 @@
+is_error: true
+failed to parse Prover.toml at `<TEMPDIR>/Prover.toml`: TOML parse error at line 2, column 27
+  |
+2 | boogie_exe = "unterminated
+  |                           ^
+invalid basic string

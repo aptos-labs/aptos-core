@@ -209,7 +209,6 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        pragma verify_duration_estimate = 120;
         let gas_payer = sender;
         // TODO(fa_migration)
         pragma verify = false;

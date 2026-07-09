@@ -66,7 +66,7 @@ Descriptor summary:
 
 `emit` and the growth path can each perform multiple allocations in sequence. Any of those allocations can trigger GC, and an in-flight pointer that isn't yet wired into a heap-reachable slot would otherwise be lost.
 
-This is exactly where `PinnedRoots` can be helpful. Alternatively we could reserve enough space upfront for all allocations the operation will make. Tradeoff: pinning costs per-allocation bookkeeping but handles variable-size or branching allocation paths; pre-reserving is simpler at the call site but needs a worst-case footprint estimate.
+This is exactly where `RootPool` can be helpful. Alternatively we could reserve enough space upfront for all allocations the operation will make. Tradeoff: pinning costs per-allocation bookkeeping but handles variable-size or branching allocation paths; pre-reserving is simpler at the call site but needs a worst-case footprint estimate.
 
 ## Key Operations
 

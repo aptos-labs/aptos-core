@@ -23,6 +23,7 @@
 //! `< frame_data_size`), disjoint from the arg region. No cycles, so no
 //! scratch slot needed for arg setup.
 
+use super::lower_utils::ranges_overlap;
 use anyhow::{bail, Result};
 use mono_move_core::{FrameOffset, MicroOp};
 use smallbitvec::SmallBitVec;
@@ -244,11 +245,6 @@ fn emit_one(out: &mut Vec<MicroOp>, c: Copy) {
             size: c.width,
         });
     }
-}
-
-#[inline]
-fn ranges_overlap(a_off: u32, a_w: u32, b_off: u32, b_w: u32) -> bool {
-    a_off < b_off + b_w && b_off < a_off + a_w
 }
 
 /// For every pair `(j_a, j_b)` with `j_a < j_b`, `copies[j_a].src`

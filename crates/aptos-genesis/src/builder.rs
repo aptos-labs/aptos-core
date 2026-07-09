@@ -446,6 +446,8 @@ pub struct GenesisConfiguration {
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
+    /// See `aptos_vm_genesis::GenesisConfiguration::initialize_decryption_at_genesis`.
+    pub initialize_decryption_at_genesis: bool,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut NodeConfig) + Send + Sync>;
@@ -670,6 +672,7 @@ impl Builder {
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
+            initialize_decryption_at_genesis: true,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

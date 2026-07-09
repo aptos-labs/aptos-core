@@ -119,6 +119,9 @@ impl EventsApi {
         /// If unspecified, defaults to default page size
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
+        fail_point_poem("endpoint_get_events_by_event_handle")?;
+        self.context
+            .check_api_output_enabled("Get events by event handle", &accept_type)?;
         event_handle
             .0
             .verify(0)
@@ -131,9 +134,6 @@ impl EventsApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
-        fail_point_poem("endpoint_get_events_by_event_handle")?;
-        self.context
-            .check_api_output_enabled("Get events by event handle", &accept_type)?;
         let page = Page::new(
             start.0.map(|v| v.0),
             limit.0,

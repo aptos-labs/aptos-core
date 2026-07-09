@@ -7,9 +7,26 @@ use crate::parser::{Check, MatchKind};
 use anyhow::bail;
 
 /// Verify that the outputs from both VMs match the expected checks.
-pub fn check_output(checks: &[Check], v1_output: &str, v2_output: &str) -> anyhow::Result<()> {
+/// `v2_gc_count` is the number of garbage collections the MonoMove VM ran for
+/// this step, checked by `CHECK-GC-COUNT`.
+pub fn check_output(
+    checks: &[Check],
+    v1_output: &str,
+    v2_output: &str,
+    v2_gc_count: usize,
+) -> anyhow::Result<()> {
     for check in checks {
         let (label, expected, kind, actual) = match check {
+            Check::GcCount(expected) => {
+                if v2_gc_count != *expected {
+                    bail!(
+                        "CHECK-GC-COUNT mismatch (V2):\n  expected: {}\n  actual:   {}",
+                        expected,
+                        v2_gc_count,
+                    );
+                }
+                continue;
+            },
             Check::V1(expected, kind) => ("V1", expected.as_str(), *kind, v1_output),
             Check::V2(expected, kind) => ("V2", expected.as_str(), *kind, v2_output),
         };

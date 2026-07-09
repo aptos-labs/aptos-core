@@ -351,6 +351,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             maybe_read_write_summary,
             output_wrapper.maybe_approx_output_size,
         );
+        if block_limit_processor.is_hot_state_accumulation_enabled() {
+            block_limit_processor.accumulate_hot_state_rw(
+                output_before_guard.storage_keys_written(),
+                output_before_guard.storage_keys_read(),
+            );
+        }
 
         if txn_idx < num_txns - 1
             && block_limit_processor.should_end_block_parallel()

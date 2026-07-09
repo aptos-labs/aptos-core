@@ -32,7 +32,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
-use rayon::prelude::*;
 use std::{
     ops::Deref,
     path::{Path, PathBuf},
@@ -158,51 +157,69 @@ impl StateMerkleDb {
             is_hot,
         );
 
-        let state_merkle_metadata_db = Arc::new(Self::open_db(
-            state_merkle_metadata_db_path.clone(),
-            metadata_db_name(is_hot),
-            &state_merkle_db_config,
-            env,
-            block_cache,
-            readonly,
-            delete_on_restart,
-        )?);
-
-        info!(
-            state_merkle_metadata_db_path = state_merkle_metadata_db_path,
-            "Opened state merkle metadata db!"
-        );
-
-        let state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS] = (0..NUM_STATE_SHARDS)
-            .into_par_iter()
-            .map(|shard_id| {
-                let shard_root_path = if is_hot {
-                    db_paths.hot_state_merkle_db_shard_root_path(shard_id)
-                } else {
-                    db_paths.state_merkle_db_shard_root_path(shard_id)
-                };
-                let db = Self::open_shard(
-                    shard_root_path,
-                    shard_id,
+        let (metadata_db, shards) = std::thread::scope(|s| {
+            let metadata_handle = s.spawn(|| {
+                let db = Self::open_db(
+                    state_merkle_metadata_db_path.clone(),
+                    metadata_db_name(is_hot),
                     &state_merkle_db_config,
                     env,
                     block_cache,
                     readonly,
-                    is_hot,
                     delete_on_restart,
                 )
-                .unwrap_or_else(|e| {
-                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
-                });
+                .unwrap_or_else(|e| panic!("Failed to open state merkle metadata db: {e:?}."));
                 Arc::new(db)
-            })
-            .collect::<Vec<_>>()
+            });
+
+            let shard_handles: Vec<_> = (0..NUM_STATE_SHARDS)
+                .map(|shard_id| {
+                    s.spawn(move || {
+                        let shard_root_path = if is_hot {
+                            db_paths.hot_state_merkle_db_shard_root_path(shard_id)
+                        } else {
+                            db_paths.state_merkle_db_shard_root_path(shard_id)
+                        };
+                        let db = Self::open_shard(
+                            shard_root_path,
+                            shard_id,
+                            &state_merkle_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                            is_hot,
+                            delete_on_restart,
+                        )
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                        });
+                        Arc::new(db)
+                    })
+                })
+                .collect();
+
+            // Joined in shard-id order so each array index matches its shard id.
+            let shards = shard_handles
+                .into_iter()
+                .map(|handle| {
+                    handle
+                        .join()
+                        .expect("State merkle shard open thread panicked")
+                })
+                .collect::<Vec<_>>();
+            let metadata_db = metadata_handle
+                .join()
+                .expect("State merkle metadata open thread panicked");
+            (metadata_db, shards)
+        });
+
+        let state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS] = shards
             .try_into()
-            .unwrap();
+            .expect("Collected exactly NUM_STATE_SHARDS shards");
 
         let db_tag: &'static str = if is_hot { "hot" } else { "cold" };
         let inner = ShardedJmtMerkleDb::new(
-            state_merkle_metadata_db,
+            metadata_db,
             state_merkle_db_shards,
             max_nodes_per_lru_cache_shard,
             db_tag,

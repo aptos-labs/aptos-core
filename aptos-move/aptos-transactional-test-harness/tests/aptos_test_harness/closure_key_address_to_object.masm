@@ -1,0 +1,31 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+// A closure type can have `key` and thus satisfy `T: key`, so object natives must
+// check that the type argument is a struct: `address_to_object<||u64 has key>` aborts
+// with ENOT_A_RESOURCE_TYPE.
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check
+
+use 0x1::signer as signer
+
+entry public fun closure_type_rejected(sender: signer)
+    local addr: address
+    local obj_ref: 0x1::object::ConstructorRef
+
+    borrow_loc sender
+    call signer::address_of
+    call 0x1::object::create_object
+    st_loc obj_ref
+
+    borrow_loc obj_ref
+    call 0x1::object::address_from_constructor_ref
+    st_loc addr
+
+    move_loc addr
+    call 0x1::object::address_to_object<||u64 has copy+drop+store+key>
+    pop
+    ret
+
+
+//# run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check::closure_type_rejected

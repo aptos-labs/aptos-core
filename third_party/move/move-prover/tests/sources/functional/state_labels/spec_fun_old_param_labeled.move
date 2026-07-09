@@ -1,39 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Companion to `spec_fun_old_param.move`: exercises spec functions that take a
-// `&mut T` parameter and use `old(p)` under a *labeled* state range
-// (`..S |~`, `S.. |~`). Covers two encoder gaps `wrap_mut_ref_spec_fun_inputs`
-// exposed and that are fixed in this PR:
-//
-//   1. `find_value_state_for_label` (boogie-backend/src/spec_translator.rs)
-//      must recognize labeled `SpecFunction` calls with a `&mut` parameter, so
-//      `exists S in *` emits `S_val: T` as the state-domain bound variable.
-//      Without this, Boogie sees `exists  :: (...)` (empty binder list) and
-//      rejects the file with a parse error.
-//
-//   2. `translate_spec_fun_call` (same file) must substitute the bound
-//      `S_val` into the doubled `(Old(arg), arg)` slots whenever `range.pre`
-//      or `range.post` corresponds to a value-typed state variable, mirroring
-//      the substitution path used by behavioral-predicate translation.
-//      Without this, every doubled call would compare function-entry to
-//      function-exit regardless of the label range.
-//
-// Note on test strength: `ensures exists S in *: ...` is encoded as
-// `assume (exists S_val: T :: P(S_val))` in the BPL (same as the pre-existing
-// `followed_by_mut_ref.move` BP test). The existential-in-ensures therefore
-// does not act as a tight verification predicate at the body's exit — that
-// is an orthogonal concern in the state-domain quantifier lowering and is
-// out of scope here. The correctness signal this test carries is twofold:
-// (a) the labeled spec-function call parses cleanly through Boogie, and
-// (b) the emitted call references `S_val` in the correct slot per range.pre /
-// range.post — both verifiable by inspecting the generated `output.bpl`.
+// Spec functions with `&mut` parameters and `old(p)` called under labeled
+// state ranges (`..S |~`, `S.. |~`). Covers single-`&mut`, multi-`&mut` of
+// the same type, and multi-`&mut` of mixed types.
 
 module 0x42::param_old_labeled_repro {
     struct Counter has copy, drop, store { value: u64 }
+    struct Stamp   has copy, drop, store { ticks: u64 }
 
-    /// Returns true when the counter strictly increased between the pre- and
-    /// post-state slots of the call (whichever labels the call binds).
+    // --- 1. Single `&mut`. -----------------------------------------------------
+
     spec fun counter_increased(c: &mut Counter): bool {
         old(c).value < c.value
     }
@@ -48,7 +25,39 @@ module 0x42::param_old_labeled_repro {
     }
     spec inc_twice {
         ensures exists S in *:
-            (..S |~ counter_increased(c)) &&  // entry → S
-            (S.. |~ counter_increased(c));    // S → exit
+            (..S |~ counter_increased(c)) &&
+            (S.. |~ counter_increased(c));
+    }
+
+    // --- 2. Multi-`&mut`, same underlying type. --------------------------------
+
+    spec fun both_increased(a: &mut Counter, b: &mut Counter): bool {
+        old(a).value < a.value && old(b).value < b.value
+    }
+
+    fun inc_both(a: &mut Counter, b: &mut Counter) {
+        a.value = a.value + 1;
+        b.value = b.value + 1;
+    }
+    spec inc_both {
+        ensures exists S in *:
+            (..S |~ both_increased(a, b)) &&
+            (S.. |~ both_increased(a, b));
+    }
+
+    // --- 3. Multi-`&mut`, mixed underlying types. ------------------------------
+
+    spec fun pair_progressed(c: &mut Counter, s: &mut Stamp): bool {
+        old(c).value < c.value && old(s).ticks < s.ticks
+    }
+
+    fun step_both(c: &mut Counter, s: &mut Stamp) {
+        c.value = c.value + 1;
+        s.ticks = s.ticks + 1;
+    }
+    spec step_both {
+        ensures exists S in *:
+            (..S |~ pair_progressed(c, s)) &&
+            (S.. |~ pair_progressed(c, s));
     }
 }

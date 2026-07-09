@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: captured value cannot be a mutable reference, but has type `&mut u64`; in verification, lambdas may capture only immutable references
+   ┌─ tests/inline-opaque/retained_mut_ref_capture.move:17:24
+   │
+17 │         apply(|y| y + *r, 5)
+   │                        ^

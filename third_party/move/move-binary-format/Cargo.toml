@@ -9,6 +9,17 @@ license = "Apache-2.0"
 publish = ["crates-io"]
 edition = { workspace = true }
 
+[features]
+default = []
+fuzzing = [
+    "proptest",
+    "proptest-derive",
+    "arbitrary",
+    "dearbitrary",
+    "move-core-types/fuzzing",
+]
+testing = []
+
 [dependencies]
 anyhow = { workspace = true }
 arbitrary = { workspace = true, optional = true, features = ["derive"] }
@@ -29,8 +40,3 @@ move-core-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["proptest", "proptest-derive", "arbitrary", "dearbitrary", "move-core-types/fuzzing"]
-testing = []

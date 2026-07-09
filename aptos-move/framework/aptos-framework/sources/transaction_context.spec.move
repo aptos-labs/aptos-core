@@ -70,9 +70,17 @@ spec aptos_framework::transaction_context {
         ensures [abstract] result == spec_generate_unique_address();
     }
     spec auid_address(auid: &AUID): address {
+        pragma opaque;
         // property 2: Fetching the unique address should never abort.
         /// [high-level-req-2]
         aborts_if false;
+        ensures result == auid.unique_address;
+    }
+
+    spec generate_auid(): AUID {
+        pragma opaque;
+        aborts_if false;
+        ensures result.unique_address == spec_generate_unique_address();
     }
 
     spec sender_internal(): address {

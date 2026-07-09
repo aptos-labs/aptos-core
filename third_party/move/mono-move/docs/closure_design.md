@@ -53,7 +53,7 @@ With the semantic model established, we now describe the concrete runtime repres
 
 The function stored in a closure may or may not be fully resolved at pack time. There are two forms:
 
-1. **Resolved (local)**: An `ExecutableArenaPtr<Function>` pointing to a fully materialized, monomorphized function in the executable arena. This is the case for intra-module closures where the specializer has already lowered the target function. No type arguments are needed — monomorphization has already substituted all type parameters, so even originally-generic local functions are concrete by the time they have an arena pointer.
+1. **Resolved (local)**: A `Function` pointer pointing to a fully materialized, monomorphized function in the executable arena. This is the case for intra-module closures where the specializer has already lowered the target function. No type arguments are needed — monomorphization has already substituted all type parameters, so even originally-generic local functions are concrete by the time they have an arena pointer.
 2. **Unresolved (cross-module)**: A fully qualified function name (module address + module name + function name) plus type arguments. The target module may not be loaded yet, or the specific monomorphized instantiation may not exist. Resolution happens lazily at `CallClosure` time: the runtime resolves the name, triggers loading/specialization if needed, and caches the result.
 
 At `CallClosure` time, the runtime must have a resolved `Function` pointer. If the closure carries an unresolved reference, it is resolved on first call (and the resolved pointer may be cached for subsequent calls if the closure is copied).
@@ -87,9 +87,11 @@ Conceptually, a closure contains two enums: `ClosureFuncRef` and `ClosureCapture
 `func_ref` is a `ClosureFuncRef`:
 
 ```rust
+use std::ptr::NonNull;
+
 enum ClosureFuncRef {
     /// Local function, already monomorphized and materialized.
-    Resolved(ExecutableArenaPtr<Function>),
+    Resolved(NonNull<Function>),
     /// Cross-module function, resolved lazily at call time.
     /// Exact payload TBD (module id + function name + type args).
     Unresolved { .. },

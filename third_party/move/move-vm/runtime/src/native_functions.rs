@@ -27,6 +27,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
     identifier::{IdentStr, Identifier},
@@ -429,14 +430,21 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
         let Type::Function {
             args,
             results,
-            // Since resolved functions must be public, they always have all possible
-            // abilities (store, copy, and drop), and we don't need to check with
-            // expected abilities.
-            abilities: _,
+            abilities,
         } = expected_ty
         else {
             return Ok(Err(FunctionIncompatibleType));
         };
+
+        // A resolved function is always public (checked above) and captures no arguments, so the
+        // resulting closure value has exactly the abilities of a public function value, i.e.,
+        // `PUBLIC_FUNCTIONS` (copy + drop + store). Reject any expected type whose abilities are
+        // not a subset of these (e.g., one requesting `key`), since no such closure value can
+        // exist and returning it would let the caller treat the closure as a type it is not.
+        if !abilities.is_subset(AbilitySet::PUBLIC_FUNCTIONS) {
+            return Ok(Err(FunctionIncompatibleType));
+        }
+
         let func_ref = func.as_ref();
 
         // Match types, inferring instantiation of function in `subst`.

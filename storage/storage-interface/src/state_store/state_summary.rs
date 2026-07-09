@@ -4,8 +4,10 @@
 use crate::{
     metrics::TIMER,
     state_store::{
+        sharded_jmt_state::PositionStateWithSummary,
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
+        state_with_summary::LedgerWithSummary,
         HotStateShardUpdates, HotStateUpdates,
     },
     DbReader,
@@ -401,6 +403,53 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
             inner
                 .get_proof(key, ver, root_depth, /* use_hot_state = */ false)
                 .expect("Failed to get account state with proof by version.")
+        })
+    }
+}
+
+/// The merklized position snapshot (freeze base + `ProofRead` for
+/// `ShardedJmtState::extend`, read at `version()`), paired with the
+/// pre-committed position tip used to seed the in-memory parent when no
+/// block parent is available. The async merkle committer can lag the tip,
+/// so the two differ and must not be conflated.
+pub struct ProvablePositionStateSummary<'db> {
+    persisted: PositionStateWithSummary,
+    pre_committed: LedgerWithSummary<PositionStateWithSummary>,
+    db: &'db (dyn DbReader + Sync),
+}
+
+impl<'db> ProvablePositionStateSummary<'db> {
+    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_position_state_summary()?,
+            pre_committed: db.get_pre_committed_position_state_summary()?,
+            db,
+        })
+    }
+
+    pub fn summary(&self) -> &StateSummary {
+        self.persisted.summary()
+    }
+
+    /// The pre-committed position tip — seeds the in-memory parent at genesis
+    /// or the first block after the feature is enabled. It includes committed
+    /// writes the merklized snapshot may not yet reflect, so the computed root
+    /// covers all prior position writes.
+    pub fn base(&self) -> &LedgerWithSummary<PositionStateWithSummary> {
+        &self.pre_committed
+    }
+
+    pub fn version(&self) -> Option<Version> {
+        self.persisted.version()
+    }
+}
+
+impl ProofRead for ProvablePositionStateSummary<'_> {
+    fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
+        self.version().map(|version| {
+            self.db
+                .get_position_state_proof_by_version_ext(key, version, root_depth)
+                .expect("Failed to get position state proof by version.")
         })
     }
 }

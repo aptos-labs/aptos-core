@@ -1,0 +1,70 @@
+=== micro-ops ===
+// module 0x42::enum_variant_field_uniform
+
+fun read_value() {
+  frame_data_size: 64
+  entry_gas: 69
+  code:
+    0: EnumNew [8] desc=2 tag #0
+    1: HeapMoveTo8 [8]+8 <- [0]
+    2: SlotBorrow [16] <- &[8]
+    3: EnumReadVariantField(8) [32] <- (*[16]).8
+    4: Move8 [0] <- [32]
+    5: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun run_computed() {
+  frame_data_size: 72
+  entry_gas: 159
+  code:
+    0: StoreImm8 [24] <- #0
+    1: EnumNew [16] desc=2 tag #1
+    2: HeapMoveTo8 [16]+8 <- [0]
+    3: HeapMoveTo8 [16]+16 <- [24]
+    4: SlotBorrow [96] <- &[16]
+    5: Move8 [112] <- [8]
+    6: CallIndirect 0x42::enum_variant_field_uniform::write_computed
+    7: SlotBorrow [32] <- &[16]
+    8: EnumReadVariantField(8) [24] <- (*[32]).8
+    9: Move8 [0] <- [24]
+    10: Return
+  safe_point_layouts:
+    1: []
+}
+
+fun run_simple() {
+  frame_data_size: 72
+  entry_gas: 157
+  code:
+    0: EnumNew [16] desc=2 tag #0
+    1: HeapMoveTo8 [16]+8 <- [0]
+    2: SlotBorrow [96] <- &[16]
+    3: Move8 [112] <- [8]
+    4: CallIndirect 0x42::enum_variant_field_uniform::write_simple
+    5: SlotBorrow [24] <- &[16]
+    6: EnumReadVariantField(8) [40] <- (*[24]).8
+    7: Move8 [0] <- [40]
+    8: Return
+  safe_point_layouts:
+    0: []
+}
+
+fun write_computed() {
+  frame_data_size: 48
+  entry_gas: 33
+  code:
+    0: AddU64Imm [24] <- [16] + #1
+    1: EnumWriteVariantField(8) (*[0]).8 <- [24]
+    2: Return
+}
+
+fun write_simple() {
+  frame_data_size: 40
+  entry_gas: 30
+  code:
+    0: HeapBorrow [24] <- &[0]+8
+    1: WriteRef *[24] <- [16] (size=8)
+    2: Return
+}

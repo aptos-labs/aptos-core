@@ -175,15 +175,15 @@ prop_compose! {
 
                 let auxiliary_info = AuxiliaryInfo::new(PersistedAuxiliaryInfo::V1 { transaction_index: idx as u32 }, None);
 
-                let txn_info = TransactionInfo::new(
-                    txn.transaction().committed_hash(),
-                    txn.write_set().hash(),
-                    event_root_hash,
-                    state_checkpoint_hash,
-                    placeholder_txn_info.gas_used(),
-                    placeholder_txn_info.status().clone(),
-                    auxiliary_info.persisted_info_hash(),
-                );
+                let txn_info = TransactionInfo::builder_v0()
+                    .transaction_hash(txn.transaction().committed_hash())
+                    .state_change_hash(txn.write_set().hash())
+                    .event_root_hash(event_root_hash)
+                    .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                    .gas_used(placeholder_txn_info.gas_used())
+                    .status(placeholder_txn_info.status().clone())
+                    .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
+                    .build();
                 txn_accumulator = txn_accumulator.append(&[txn_info.hash()]);
                 txn.set_transaction_info(txn_info);
             }

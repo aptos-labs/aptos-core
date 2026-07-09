@@ -349,9 +349,9 @@ fun mk_bag() {
   code:
     0: VecNew [24]
     1: SlotBorrow [32] <- &[24]
-    2: VecPushBack [32].push([8], size=8, desc=2)
+    2: VecPushBack [32].push([8], size=8, desc=0)
     3: SlotBorrow [32] <- &[24]
-    4: VecPushBack [32].push([16], size=8, desc=2)
+    4: VecPushBack [32].push([16], size=8, desc=0)
     5: Move8 [56] <- [24]
     6: Move8 [48] <- [0]
     7: Move(16) [0] <- [48]
@@ -367,7 +367,7 @@ fun mk_bag1() {
   code:
     0: VecNew [16]
     1: SlotBorrow [24] <- &[16]
-    2: VecPushBack [24].push([8], size=8, desc=2)
+    2: VecPushBack [24].push([8], size=8, desc=0)
     3: Move8 [48] <- [16]
     4: Move8 [40] <- [0]
     5: Move(16) [0] <- [40]
@@ -384,11 +384,11 @@ fun mk_points() {
     1: SlotBorrow [40] <- &[32]
     2: Move8 [64] <- [8]
     3: Move8 [56] <- [0]
-    4: VecPushBack [40].push([56], size=16, desc=3)
+    4: VecPushBack [40].push([56], size=16, desc=0)
     5: SlotBorrow [40] <- &[32]
     6: Move8 [64] <- [24]
     7: Move8 [56] <- [16]
-    8: VecPushBack [40].push([56], size=16, desc=3)
+    8: VecPushBack [40].push([56], size=16, desc=0)
     9: Move8 [0] <- [32]
     10: Return
   safe_point_layouts:

@@ -14,29 +14,29 @@
 //!   serialization fast-path via memcpy or integer comparison are broken for
 //!   big endian hosts.
 //!
-//! TODO:
+//! TODO(cleanup):
 //!   Unify these value walks (serialize, deserialize, equals, compare) under a
 //!   shared visitor/fold abstraction instead of four parallel recursive
 //!   implementations.
 //!
-//! TODO(test):
+//! TODO(testing):
 //!   Add differential tests for these walks against the existing Move VM.
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
-    heap::{heap_alloc, AllocationResult, Heap},
-    memory::{read_ptr, read_vec_len, write_ptr, write_u64},
+    heap::{heap_alloc, AllocationError, AllocationResult, Heap},
+    memory::{read_enum_tag, read_ptr, read_vec_len, write_enum_tag, write_ptr, write_u64},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
+    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, ENUM_DATA_OFFSET,
+    OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use std::cmp::Ordering;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values, etc.).
-#[allow(dead_code)]
 pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     ty: InternedType,
@@ -57,7 +57,7 @@ pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
     base: *const u8,
     ty: InternedType,
 ) -> RuntimeResult<usize> {
-    // TODO: Implement a more efficient serialized size implementation:
+    // TODO(perf): Implement a more efficient serialized size implementation:
     //   - Use constant serialized size as fast path
     //   - Avoid allocations into buffer when serializing.
     unsafe { serialize(layouts, base, ty).map(|bytes| bytes.len()) }
@@ -99,7 +99,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     layout: &ValueLayout,
     out: &mut Vec<u8>,
 ) -> RuntimeResult<()> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     if layout.has_no_pointers_no_padding() {
         // SAFETY: for values with no padding and pointers, value's in-memory
@@ -173,8 +173,25 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(())
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums and function values is not yet supported");
+        LayoutKind::FrozenEnum { variants, .. } => {
+            // SAFETY: an enum value holds a non-null heap pointer and data
+            // follows the offset.
+            let obj_ptr = unsafe { read_ptr(base, 0usize) };
+            let tag = unsafe { read_enum_tag(obj_ptr) };
+            let variant_id = variants
+                .get(tag as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag, variants.len()))?;
+            write_uleb128_len(out, tag);
+
+            let variant_layout = layouts.layout(*variant_id).ok_or_else(layout_not_found)?;
+            // SAFETY: the variant body lives at the specified offset within
+            // the object.
+            unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
+            Ok(())
+        },
+        LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("References cannot be serialized")),
     }
@@ -220,7 +237,7 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     b: *const u8,
     id: LayoutId,
 ) -> RuntimeResult<bool> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
 
@@ -298,8 +315,40 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(true)
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums or function values are not yet supported");
+        LayoutKind::FrozenEnum { variants, .. } => {
+            // SAFETY: well-typed enum values hold non-null heap pointers and
+            // every enum object stores its data following the offset.
+            let obj_a = unsafe { read_ptr(a, 0usize) };
+            let obj_b = unsafe { read_ptr(b, 0usize) };
+            let tag_a = unsafe { read_enum_tag(obj_a) };
+            let tag_b = unsafe { read_enum_tag(obj_b) };
+
+            // Validate both tags before the equality check. An out-of-range tag
+            // is heap corruption and must fail closed even when the tags differ.
+            let variant_id = *variants
+                .get(tag_a as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
+            if tag_b as usize >= variants.len() {
+                return Err(enum_tag_out_of_range(tag_b, variants.len()));
+            }
+
+            if tag_a != tag_b {
+                return Ok(false);
+            }
+
+            // SAFETY: both variant bodies live at the specified offset.
+            unsafe {
+                equals_impl(
+                    layouts,
+                    obj_a.add(ENUM_DATA_OFFSET),
+                    obj_b.add(ENUM_DATA_OFFSET),
+                    variant_id,
+                )
+            }
+        },
+        LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Equality runs on pointee types only")),
     }
@@ -314,6 +363,8 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
 ///    lexicographically over their bytes.
 /// 3. Vectors compare lexicographically (over smaller prefix)
 /// 4. Structs compare field-by-field.
+/// 5. Enums compare by variant tag first, then field-by-field over the
+///    matching variant's body.
 ///
 /// # Safety
 ///
@@ -354,7 +405,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     b: *const u8,
     id: LayoutId,
 ) -> RuntimeResult<Ordering> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
     match &layout.kind {
@@ -364,7 +415,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // matching width and compare numerically. `from_le_bytes` keeps
             // this correct on any host endianness.
             //
-            // TODO: These are unaligned, little-endian numeric reads, distinct
+            // TODO(cleanup): These are unaligned, little-endian numeric reads, distinct
             // from the aligned native-endian helpers in `memory.rs`. Endianness
             // makes unifying the two non-trivial; revisit whether a shared set
             // of typed read helpers can serve both.
@@ -453,8 +504,41 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             }
             Ok(len_a.cmp(&len_b))
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums and function values are not yet supported");
+        LayoutKind::FrozenEnum { variants, .. } => {
+            // SAFETY: well-typed enum values hold non-null heap pointers and
+            // every enum object stores its tag followed by data payload.
+            let obj_a = unsafe { read_ptr(a, 0usize) };
+            let obj_b = unsafe { read_ptr(b, 0usize) };
+            let tag_a = unsafe { read_enum_tag(obj_a) };
+            let tag_b = unsafe { read_enum_tag(obj_b) };
+
+            // Validate both tags before ordering them. An out-of-range tag is
+            // heap corruption and must fail closed even when the tags differ.
+            let variant_id = *variants
+                .get(tag_a as usize)
+                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
+            if tag_b as usize >= variants.len() {
+                return Err(enum_tag_out_of_range(tag_b, variants.len()));
+            }
+
+            let ord = tag_a.cmp(&tag_b);
+            if ord.is_ne() {
+                return Ok(ord);
+            }
+
+            // SAFETY: both variant bodies live at the specified offset.
+            unsafe {
+                compare_impl(
+                    layouts,
+                    obj_a.add(ENUM_DATA_OFFSET),
+                    obj_b.add(ENUM_DATA_OFFSET),
+                    variant_id,
+                )
+            }
+        },
+        LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("Comparison runs on pointee types only")),
     }
@@ -500,6 +584,26 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     Ok(())
 }
 
+/// Like [`deserialize`], but returns a [`RuntimeError`] instead of the crate-internal
+/// `AllocationError`, so external callers can use it. Does not run GC on heap exhaustion; the caller
+/// must ensure the heap has room.
+///
+/// # Safety
+///
+/// Same as [`deserialize`]: `dst` must be writable for `ty`'s in-memory size and outlive the call,
+/// and `ty` must not be a reference.
+pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+) -> RuntimeResult<()> {
+    // SAFETY: forwarded to the caller.
+    unsafe { deserialize(layouts, heap, ty, bytes, dst) }
+        .map_err(AllocationError::into_runtime_error)
+}
+
 /// # Safety
 ///
 /// `dst` must be writable for `layout.size` bytes.
@@ -511,15 +615,16 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     cursor: &mut usize,
     dst: *mut u8,
 ) -> AllocationResult<()> {
-    // TODO: This walk recurses on struct fields and vector elements; convert it
+    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     //
-    // If no padding or no pointers, value's BCS bytes are exactly its
-    // in-memory image.
+    // If every byte pattern is valid (no padding, no pointers, no `bool`), the
+    // value's BCS bytes are exactly its in-memory image. A `bool` is excluded
+    // because only `0`/`1` are canonical and a raw copy would skip that check.
     // TODO(correctness): breaks on big-endian hosts. This writes the
     // little-endian BCS bytes verbatim, but the in-memory representation is
     // native-endian, so the two only match on little-endian hosts.
-    if layout.has_no_pointers_no_padding() {
+    if layout.all_byte_patterns_valid() {
         let n = layout.size as usize;
         let src = read_slice(bytes, cursor, n)?;
         // SAFETY: caller ensures `n` bytes can be written to `dst` and it is
@@ -529,11 +634,19 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     }
 
     match &layout.kind {
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address => {
-            Err(unreachable("Primitive layouts must be handled by fast-path").into())
+        LayoutKind::Bool => {
+            // BCS encodes a `bool` as a single canonical byte: `0` or `1`. Any
+            // other value is rejected rather than blitted into the slot.
+            let byte = read_slice(bytes, cursor, 1)?[0];
+            if byte > 1 {
+                return Err(RuntimeError::BCSInvalidBool { byte }.into());
+            }
+            // SAFETY: caller ensures one byte can be written to `dst`.
+            unsafe { std::ptr::write(dst, byte) };
+            Ok(())
+        },
+        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => {
+            Err(unreachable("Integer and address layouts must be handled by fast-path").into())
         },
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
@@ -587,9 +700,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // as guaranteed by the allocator.
             unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
 
-            if elem_layout.has_no_pointers_no_padding() {
-                // If elements have no padding and no pointers, element bytes
-                // equal their BCS bytes.
+            if elem_layout.all_byte_patterns_valid() {
+                // If every element byte pattern is valid, element bytes equal
+                // their BCS bytes. A `bool` element is excluded so each byte is
+                // validated by the per-element walk below.
                 // TODO(correctness): breaks on big-endian hosts, for the same
                 // reason as the scalar fast path above: native-endian in-memory
                 // bytes equal the little-endian BCS bytes only on little-endian
@@ -625,8 +739,48 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { write_ptr(dst, 0usize, vec_ptr) };
             Ok(())
         },
-        LayoutKind::OpenEnum { .. } | LayoutKind::Function => {
-            todo!("enums and function values are not yet supported");
+        LayoutKind::FrozenEnum {
+            descriptor_id,
+            variants,
+            max_size_across_variants,
+        } => {
+            // BCS encodes the variant index as a ULEB128 before the fields.
+            let tag = read_uleb128_len(bytes, cursor)?;
+            if tag >= variants.len() as u64 {
+                return Err(enum_tag_out_of_range(tag, variants.len()).into());
+            }
+
+            let variant_layout = layouts
+                .layout(variants[tag as usize])
+                .ok_or_else(layout_not_found)?;
+
+            let total_size = OBJECT_HEADER_SIZE + *max_size_across_variants as usize;
+            let obj_ptr = heap_alloc(heap, total_size, *descriptor_id)?;
+
+            // SAFETY: the allocation has enough size to write the tag.
+            unsafe { write_enum_tag(obj_ptr, tag) };
+
+            // SAFETY: variant body lives at the specified offset. The maximum
+            // size was allocated so there is enough space to deserialize into.
+            unsafe {
+                deserialize_impl(
+                    layouts,
+                    heap,
+                    variant_layout,
+                    bytes,
+                    cursor,
+                    obj_ptr.add(ENUM_DATA_OFFSET),
+                )?
+            };
+
+            // SAFETY: `dst` has space to write the 8-byte enum pointer as
+            // guaranteed by the caller.
+            unsafe { write_ptr(dst, 0usize, obj_ptr) };
+            Ok(())
+        },
+        LayoutKind::Function => {
+            // TODO(completeness): function values are not yet supported.
+            todo!("function values are not yet supported");
         },
         LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
     }
@@ -675,7 +829,7 @@ fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> RuntimeResul
     Ok(slice)
 }
 
-// TODO: See if we can reuse move-binary-format's uleb128 APIs instead of
+// TODO(cleanup): See if we can reuse move-binary-format's uleb128 APIs instead of
 // reimplementing the encode/decode here.
 
 /// Writes ULEB128-encoded length data.
@@ -733,13 +887,25 @@ fn unreachable(message: &str) -> RuntimeError {
     RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(message.to_string()))
 }
 
+/// Invariant violation when an enum tag does not name a variant, whether read
+/// from an in-memory value or decoded from BCS. A well-formed enum's tag is
+/// always in range, so an out-of-range tag signals corruption, not a legitimate
+/// runtime condition.
+fn enum_tag_out_of_range(tag: u64, variant_count: usize) -> RuntimeError {
+    RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
+        tag,
+        variant_count,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::heap::AllocationError;
     use mono_move_core::{
+        align_up_u32,
         types::U64_TY,
-        value_layout::{U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
+        value_layout::{BOOL_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
     };
     use serde::Serialize;
@@ -901,6 +1067,107 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn deserialize_bool_canonical() {
+        let table = ValueLayoutTable::new();
+        let layout = table.layout(BOOL_LAYOUT_ID).unwrap();
+        // A bool reaches the per-byte walk, not the blit fast path.
+        assert!(layout.has_no_pointers_no_padding());
+        assert!(!layout.all_byte_patterns_valid());
+
+        let mut heap = Heap::new(64);
+        for byte in [0u8, 1] {
+            let mut slot = 0xFFu8;
+            let mut cursor = 0;
+            unsafe {
+                deserialize_impl(&table, &mut heap, layout, &[byte], &mut cursor, &mut slot)
+                    .unwrap()
+            };
+            assert_eq!(slot, byte);
+            assert_eq!(cursor, 1);
+        }
+    }
+
+    #[test]
+    fn deserialize_rejects_non_canonical_bool() {
+        let table = ValueLayoutTable::new();
+        let layout = table.layout(BOOL_LAYOUT_ID).unwrap();
+        let mut heap = Heap::new(64);
+        let mut slot = 0u8;
+        let mut cursor = 0;
+        let result =
+            unsafe { deserialize_impl(&table, &mut heap, layout, &[2u8], &mut cursor, &mut slot) };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSInvalidBool { byte: 2 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn deserialize_rejects_non_canonical_bool_in_vector() {
+        let mut table = ValueLayoutTable::new();
+        let vid = table.push(U64_TY, vector_layout(BOOL_LAYOUT_ID));
+        let layout = table.layout(vid).unwrap();
+        let mut heap = Heap::new(4096);
+        // Length 2, then a canonical `1` and a non-canonical `2`.
+        let bytes = [0x02u8, 0x01, 0x02];
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+            )
+        };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSInvalidBool { byte: 2 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn deserialize_rejects_non_canonical_bool_in_struct() {
+        // `{u8, bool}`: no padding (BCS 2 == size 2), so blittable for
+        // serialize/equals, but the bool field keeps it off the deserialize
+        // fast path so the bad byte is caught.
+        let mut table = ValueLayoutTable::new();
+        let layout = build_struct_layout(&table, 2, vec![(0, U8_LAYOUT_ID), (1, BOOL_LAYOUT_ID)]);
+        assert!(layout.has_no_pointers_no_padding());
+        assert!(!layout.all_byte_patterns_valid());
+        let id = table.push(U64_TY, layout);
+        let layout = table.layout(id).unwrap();
+
+        let mut heap = Heap::new(64);
+        // u8 = 5, then a non-canonical bool byte.
+        let bytes = [0x05u8, 0x02];
+        let mut slot = [0u8; 2];
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                slot.as_mut_ptr(),
+            )
+        };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSInvalidBool { byte: 2 }
+            ))
+        ));
+    }
+
     /// Builds a struct layout from field offsets/ids and the in-memory size,
     /// deriving the const BCS size and no-padding flag as the specializer does.
     fn build_struct_layout(
@@ -910,16 +1177,22 @@ mod tests {
     ) -> ValueLayout {
         let mut const_total = 0u64;
         let mut data_dependent = false;
+        let mut all_bytes_valid = true;
         for &(_, id) in &fields {
-            match table.layout(id).unwrap().fixed_serialized_size() {
+            let child = table.layout(id).unwrap();
+            match child.fixed_serialized_size() {
                 Some(n) => const_total += n as u64,
                 None => data_dependent = true,
             }
+            all_bytes_valid &= child.all_byte_patterns_valid();
         }
         let const_bcs = (!data_dependent).then_some(const_total as u32);
         let mut flags = LayoutFlags::empty();
         if const_bcs == Some(size) {
             flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
+            if all_bytes_valid {
+                flags |= LayoutFlags::ALL_BYTE_PATTERNS_VALID;
+            }
         }
         let field_layouts = fields
             .into_iter()
@@ -1329,6 +1602,114 @@ mod tests {
             },
         ];
         unsafe { check_roundtrip(&table, id, 16, &values) };
+    }
+
+    /// Builds and pushes an enum layout into `table`: one struct layout per
+    /// variant (via [`build_struct_layout`]), then the enum layout itself.
+    /// Each variant is `(in_memory_size, fields)`, with `fields` as
+    /// `(data_region_relative_offset, layout_id)` pairs. The heap payload size
+    /// is the 8-byte tag plus the widest variant region, rounded up to 8.
+    fn build_enum_layout(
+        table: &mut ValueLayoutTable,
+        variants: Vec<(u32, Vec<(u32, LayoutId)>)>,
+    ) -> LayoutId {
+        let mut variant_ids = Vec::with_capacity(variants.len());
+        let mut max_data = 0u32;
+        for (size, fields) in variants {
+            max_data = max_data.max(size);
+            let layout = build_struct_layout(table, size, fields);
+            variant_ids.push(table.push(U64_TY, layout));
+        }
+        let max_size_across_variants = align_up_u32(8 + max_data, 8);
+        let layout = ValueLayout::frozen_enum(
+            DescriptorId(3),
+            variant_ids.into_boxed_slice(),
+            max_size_across_variants,
+        );
+        table.push(U64_TY, layout)
+    }
+
+    #[test]
+    fn test_enum_unit_and_tuple_variants() {
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        enum E {
+            A,
+            B(u64),
+            C(u8, u64),
+        }
+
+        let mut table = ValueLayoutTable::new();
+        let eid = build_enum_layout(&mut table, vec![
+            (0, vec![]),
+            (8, vec![(0, U64_LAYOUT_ID)]),
+            (16, vec![(0, U8_LAYOUT_ID), (8, U64_LAYOUT_ID)]),
+        ]);
+        let values = [
+            E::A,
+            E::B(0),
+            E::B(7),
+            E::C(1, 2),
+            E::C(1, 3),
+            E::C(2, 0),
+            E::A,
+        ];
+        unsafe { check_roundtrip(&table, eid, 8, &values) };
+    }
+
+    #[test]
+    fn test_enum_with_vector_variant() {
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        enum E {
+            Empty,
+            Items(Vec<u64>),
+        }
+
+        let mut table = ValueLayoutTable::new();
+        let vec_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
+        let eid = build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, vec_id)])]);
+        let values = [
+            E::Empty,
+            E::Items(vec![]),
+            E::Items(vec![1]),
+            E::Items(vec![1, 2]),
+            E::Items(vec![2]),
+            E::Items(vec![1]),
+        ];
+        unsafe { check_roundtrip(&table, eid, 8, &values) };
+    }
+
+    #[test]
+    fn test_enum_as_struct_field() {
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        enum Inner {
+            X,
+            Y(u64),
+        }
+        #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+        struct Outer {
+            id: u64,
+            e: Inner,
+        }
+
+        let mut table = ValueLayoutTable::new();
+        let inner_eid =
+            build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, U64_LAYOUT_ID)])]);
+        let outer = build_struct_layout(&table, 16, vec![(0, U64_LAYOUT_ID), (8, inner_eid)]);
+        let oid = table.push(U64_TY, outer);
+        let values = [
+            Outer { id: 1, e: Inner::X },
+            Outer {
+                id: 1,
+                e: Inner::Y(0),
+            },
+            Outer {
+                id: 1,
+                e: Inner::Y(5),
+            },
+            Outer { id: 2, e: Inner::X },
+            Outer { id: 1, e: Inner::X },
+        ];
+        unsafe { check_roundtrip(&table, oid, 16, &values) };
     }
 }
 

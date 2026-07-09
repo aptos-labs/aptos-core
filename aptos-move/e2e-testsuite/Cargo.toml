@@ -12,6 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = [
+    "aptos-cached-packages/fuzzing",
+    "move-core-types/fuzzing",
+    "aptos-types/fuzzing",
+]
+
 [dependencies]
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -32,10 +39,3 @@ move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
 test-case = { workspace = true }
-
-[features]
-default = [
-    "aptos-cached-packages/fuzzing",
-    "move-core-types/fuzzing",
-    "aptos-types/fuzzing",
-]

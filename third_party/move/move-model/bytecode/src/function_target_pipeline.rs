@@ -184,8 +184,9 @@ impl FunctionTargetsHolder {
 
     /// Adds a new function target. The target will be initialized from the Move byte code.
     pub fn add_target(&mut self, func_env: &FunctionEnv<'_>) {
-        // Skip inlined functions, they do not have associated bytecode.
-        if func_env.is_inline() {
+        // Skip inlined functions, they do not have associated bytecode. Verified
+        // inline functions are compiled and get a target like regular functions.
+        if func_env.is_inline() && !func_env.is_inline_verified() {
             return;
         }
         let data = if func_env.is_lemma() {
@@ -241,7 +242,7 @@ impl FunctionTargetsHolder {
         func_env: &'env FunctionEnv<'env>,
     ) -> Vec<(FunctionVariant, FunctionTarget<'env>)> {
         assert!(
-            !func_env.is_inline(),
+            !func_env.is_inline() || func_env.is_inline_verified(),
             "attempt to get bytecode function target for inline function"
         );
         self.targets
@@ -482,7 +483,7 @@ impl FunctionTargetPipeline {
                             // check for fixedpoint in summaries
                             for fid in scc {
                                 let func_env = env.get_function(*fid);
-                                if func_env.is_inline() {
+                                if func_env.is_not_prover_target() {
                                     continue;
                                 }
                                 for (_, target) in targets.get_targets(&func_env) {

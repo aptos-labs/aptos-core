@@ -3,8 +3,7 @@
 
 //! Integration tests for the Package loading policy.
 
-use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST};
-use mono_move_gas::{GasMeter, SimpleGasMeter};
+use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, ModuleRead, ModuleReadSet, ModuleState};
 use mono_move_testsuite::InMemoryModuleProvider;
@@ -38,7 +37,7 @@ fn load_package_cache_miss_loads_all_members() {
     let id_a = guard.intern_module_id(&id_a_module);
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
     let exec = loader.load_module(&mut read_set, &mut gas, id_a).unwrap();
 
     // Both package members must be in the read-set.
@@ -93,7 +92,7 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
         .into_global_arena_ptr();
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let mut gas = GasMeter::with_max_budget();
 
     // 1. `a::f` takes `b::S` by value, so lowering it walks `S` and side-loads
     //    `b` as a metered read. `S` is a concrete inline struct, so the
@@ -158,13 +157,13 @@ fn load_package_cache_hit_walks_dependencies() {
 
     // Prime the cache with a full package load.
     let mut rs1 = ModuleReadSet::new();
-    let mut g1 = SimpleGasMeter::new(u64::MAX);
+    let mut g1 = GasMeter::with_max_budget();
     loader.load_module(&mut rs1, &mut g1, id_a).unwrap();
 
     // Second call with a fresh read-set must hit the cache and charge both
     // members without fetching.
     let mut rs2 = ModuleReadSet::new();
-    let mut g2 = SimpleGasMeter::new(u64::MAX);
+    let mut g2 = GasMeter::with_max_budget();
     let before = g2.balance();
     loader.load_module(&mut rs2, &mut g2, id_a).unwrap();
     let charged = before - g2.balance();

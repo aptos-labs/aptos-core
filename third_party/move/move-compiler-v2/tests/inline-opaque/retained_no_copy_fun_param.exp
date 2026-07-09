@@ -1,0 +1,140 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::retained_no_copy_fun_param {
+    private fun caller(x: u64): u64 {
+        Add<u64>({
+          let (x: u64): (u64) = Tuple(x);
+          {
+            let (y: u64): (u64) = Tuple({
+              let (y: u64): (u64) = Tuple(x);
+              Add<u64>(y, 1)
+            });
+            Add<u64>(y, 1)
+          }
+        }, {
+          let (x: u64): (u64) = Tuple(x);
+          {
+            let (y: u64): (u64) = Tuple({
+              let (y: u64): (u64) = Tuple(x);
+              Add<u64>(y, 1)
+            });
+            Add<u64>(y, 1)
+          }
+        })
+    }
+    private inline fun twice(f: |u64|u64,x: u64): u64 {
+        (f)((f)(x))
+    }
+    spec {
+      ensures exists m: u64: TypeDomain<u64>(): And(ensures_of($t0, $t1, m), ensures_of($t0, m, result0()));
+    }
+
+    private inline fun twice_copy(f: |u64|u64 has copy + drop,x: u64): u64 {
+        (f)((f)(x))
+    }
+    spec {
+      ensures exists m: u64: TypeDomain<u64>(): And(ensures_of($t0, $t1, m), ensures_of($t0, m, result0()));
+    }
+
+} // end 0x42::retained_no_copy_fun_param
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::retained_no_copy_fun_param {
+    fun caller(x: u64): u64 {
+        {
+            let x = x;
+            let y = {
+                let y = x;
+                y + 1
+            };
+            y + 1
+        } + {
+            let x = x;
+            let y = {
+                let y = x;
+                y + 1
+            };
+            y + 1
+        }
+    }
+    inline fun twice(f: |u64|u64, x: u64): u64 {
+        f(f(x))
+    }
+
+    spec twice(f: |u64|u64, x: u64): u64 {
+        pragma opaque = true;
+        ensures exists m: u64: ensures_of<f>(x, m) && ensures_of<f>(m, result);
+    }
+
+    inline fun twice_copy(f: |u64|u64 has copy + drop, x: u64): u64 {
+        f(f(x))
+    }
+
+    spec twice_copy(f: |u64|u64 has copy + drop, x: u64): u64 {
+        pragma opaque = true;
+        ensures exists m: u64: ensures_of<f>(x, m) && ensures_of<f>(m, result);
+    }
+
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::retained_no_copy_fun_param {
+    private fun caller(x: u64): u64 {
+        Add<u64>({
+          let (x: u64): (u64) = Tuple(x);
+          {
+            let (y: u64): (u64) = Tuple({
+              let (y: u64): (u64) = Tuple(x);
+              Add<u64>(y, 1)
+            });
+            Add<u64>(y, 1)
+          }
+        }, {
+          let (x: u64): (u64) = Tuple(x);
+          {
+            let (y: u64): (u64) = Tuple({
+              let (y: u64): (u64) = Tuple(x);
+              Add<u64>(y, 1)
+            });
+            Add<u64>(y, 1)
+          }
+        })
+    }
+    private inline fun twice(f: |u64|u64,x: u64): u64 {
+        (f)((f)(x))
+    }
+    spec {
+      ensures exists m: u64: TypeDomain<u64>(): And(ensures_of($t0, $t1, m), ensures_of($t0, m, result0()));
+    }
+
+    private inline fun twice_copy(f: |u64|u64 has copy + drop,x: u64): u64 {
+        (f)((f)(x))
+    }
+    spec {
+      ensures exists m: u64: TypeDomain<u64>(): And(ensures_of($t0, $t1, m), ensures_of($t0, m, result0()));
+    }
+
+} // end 0x42::retained_no_copy_fun_param
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::retained_no_copy_fun_param
+// Function definition at index 0
+fun caller(l0: u64): u64
+    copy_loc l0
+    ld_u64 1
+    add
+    ld_u64 1
+    add
+    // @5
+    move_loc l0
+    ld_u64 1
+    add
+    ld_u64 1
+    add
+    // @10
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

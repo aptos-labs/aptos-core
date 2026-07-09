@@ -117,7 +117,9 @@ use crate::{
     align::{align_up, MAX_ALIGN},
     interner::{view_function_ref, InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{FrameSlot, NativeABI, NativeIdx},
-    types::{display_type, display_type_list, view_name, InternedType, InternedTypeList},
+    types::{
+        display_type, display_type_list, view_name, InternedType, InternedTypeList, VariantTag,
+    },
     FunctionPtr,
 };
 use move_binary_format::file_format::ConstantPoolIndex;
@@ -209,7 +211,7 @@ pub enum ClosureFuncRef {
 impl fmt::Display for ClosureFuncRef {
     // SAFETY: the `Resolved` arm's `as_ref_unchecked` and `Unresolved` arm's
     // `view_*` helpers are sound only because display happens while the guard
-    // keeps the arena and function pointers alive. TODO: have a safe display
+    // keeps the arena and function pointers alive. TODO(completeness): have a safe display
     // impl that takes the guard.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -268,6 +270,31 @@ pub struct CallClosureOp {
     /// in the order that `mask.is_captured(i)` is false — i.e. ascending `i`
     /// through the function's parameter list.
     pub provided_args: Vec<SizedSlot>,
+}
+
+/// Operand data for [`MicroOp::VecPack`].
+#[derive(Clone, Debug)]
+pub struct VecPackOp {
+    /// Frame slot that receives the vector's heap pointer.
+    pub dst: FrameOffset,
+    /// GC trace descriptor for the allocated vector object.
+    pub descriptor_id: DescriptorId,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// Element sources (in the current frame), in element order.
+    pub srcs: Vec<FrameOffset>,
+}
+
+/// Operand data for [`MicroOp::VecUnpack`].
+#[derive(Clone, Debug)]
+pub struct VecUnpackOp {
+    /// Frame slot holding the vector's heap pointer (by value, not a
+    /// reference).
+    pub src: FrameOffset,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// Element destinations (in the current frame), in element order.
+    pub dsts: Vec<FrameOffset>,
 }
 
 #[derive(Clone)]
@@ -502,7 +529,7 @@ pub enum MicroOp {
     // unspecialized vs. promoted to dedicated variants follows the
     // specialization principle described in [`unspecialized`].
     //
-    // TODO: heap-boxing wide imm operands inside [`IntOperand`] costs an
+    // TODO(perf): heap-boxing wide imm operands inside [`IntOperand`] costs an
     // allocation and a pointer-chase per micro-op. A side-table keyed by
     // `pc` would improve cache locality and let the inline op stay
     // pointer-free; revisit once we have profiling data to motivate it.
@@ -588,7 +615,7 @@ pub enum MicroOp {
 
     /// Call a function via direct pointer. Same calling convention as
     /// [`MicroOp::CallIndirect`].
-    // TODO: Currently dead code — the specializer never emits this. A follow-up
+    // TODO(perf): Currently dead code — the specializer never emits this. A follow-up
     // pass should patch same-module `CallIndirect` sites to `CallDirect` once
     // the target is known to live in the same module.
     CallDirect {
@@ -599,10 +626,10 @@ pub enum MicroOp {
     /// meaning that the specializer has already emitted micro-ops to place arguments
     /// into the callee's argument region.
     ///
-    /// TODO: [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
+    /// TODO(perf): [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
     /// and see if we want to move it into a side table instead.
     ///
-    /// TODO: revisit `is_allocating()` for this op when heap allocation
+    /// TODO(correctness): revisit `is_allocating()` for this op when heap allocation
     /// within natives is sorted out.
     CallNative {
         native_idx: NativeIdx,
@@ -632,7 +659,7 @@ pub enum MicroOp {
     /// for the block it transfers into, before updating the pc. (Shared by
     /// all conditional jumps below.)
     ///
-    /// TODO: if instruction size becomes a concern, move these gas costs out
+    /// TODO(perf): if instruction size becomes a concern, move these gas costs out
     /// of the jump variants into a per-pc side table.
     JumpNotZeroU64 {
         target: CodeOffset,
@@ -757,7 +784,6 @@ pub enum MicroOp {
     // `elem_size` is baked into each instruction (statically known).
     //
     // May want:
-    // - VecSwap (native in Move's vector module),
     // - VecMoveRange (bulk move between vectors) — tricky: this is
     //   really a memcpy between two heap-allocated regions, but we
     //   currently have no vector-to-vector addressing mode,
@@ -818,6 +844,32 @@ pub enum MicroOp {
         vec_ref: FrameOffset,
         idx: FrameOffset,
         src: FrameOffset,
+        elem_size: u32,
+    },
+
+    /// Create a vector of exactly [`VecPackOp::srcs`]`.len()` elements: one
+    /// allocation at exact capacity (this part MAY TRIGGER GC), then one
+    /// element copy per source slot, then the heap pointer is written to
+    /// [`VecPackOp::dst`].
+    ///
+    /// Use `VecNew` fast path instead (null pointer, no allocation), when
+    /// [`VecPackOp::srcs`] are empty.
+    VecPack(Box<VecPackOp>),
+
+    /// Destructure a vector into [`VecUnpackOp::dsts`]`.len()` element slots.
+    /// [`VecUnpackOp::src`] holds the vector's heap pointer by value. Errors
+    /// unless the vector's length equals [`VecUnpackOp::dsts`]`.len()` exactly
+    /// (in either direction); a null pointer is the empty vector, so unpack
+    /// with zero [`VecUnpackOp::dsts`] succeeds on it.
+    VecUnpack(Box<VecUnpackOp>),
+
+    /// Swap vector[idx_a] and vector[idx_b]. `vec_ref` is a 16-byte fat pointer
+    /// whose target holds the vector's heap pointer; `idx_a`/`idx_b` are u64
+    /// slots. Errors if either index is out of bounds. Equal indices are valid.
+    VecSwap {
+        vec_ref: FrameOffset,
+        idx_a: FrameOffset,
+        idx_b: FrameOffset,
         elem_size: u32,
     },
 
@@ -1048,9 +1100,9 @@ pub enum MicroOp {
         ty: InternedType,
     },
 
-    /// Move the owned value in the source slot `src` into global storage as a
-    /// resource of type `ty`, published under the address of the signer referenced
-    /// by the `signer_ref`.
+    /// Move the heap-allocated value pointer from the source slot `src` into global
+    /// storage map as a resource of type `ty`, published under the address of the
+    /// signer referenced by the `signer_ref`.
     MoveTo {
         signer_ref: FrameOffset,
         ty: InternedType,
@@ -1069,17 +1121,13 @@ pub enum MicroOp {
     },
 
     /// Unconditionally trigger a garbage collection cycle.
-    /// Useful for testing GC correctness.
+    /// Useful for testing GC correctness. Should not be emitted
+    /// in production code.
     ForceGC,
 
     //======================================================================
     // Missing instructions
     //======================================================================
-    // - **Comparison**: Eq, Neq, Lt, Gt, Le, Ge (standalone, not fused
-    //   with branch — for when the result is used as a value).
-    // - **Casting**: truncation and widening between integer types,
-    //   including signed casts.
-    // - **Boolean**: logical Not, And, Or (distinct from bitwise).
     // - **Runtime instrumentation**: tracing, profiling, coverage hooks.
     //======================================================================
 
@@ -1106,9 +1154,134 @@ pub enum MicroOp {
     /// captured data is `Materialized`. A raw-captured-data path (for
     /// closures loaded from storage) is future work.
     CallClosure(Box<CallClosureOp>),
+
+    //======================================================================
+    // Enums
+    //======================================================================
+    /// Test an enum's variant tag through a reference. `enum_ref` is a 16-byte
+    /// fat pointer to the slot holding the enum's heap pointer; it is
+    /// dereferenced to obtain the heap object. Writes a 1-byte boolean into
+    /// `dst`: whether the u64 tag at `ENUM_TAG_OFFSET` equals `variant`.
+    EnumTestTag {
+        dst: FrameOffset,
+        enum_ref: FrameOffset,
+        variant: VariantTag,
+    },
+
+    /// Borrow a variant field through an enum reference, selecting the field's
+    /// object byte offset by the runtime variant tag. `enum_ref` is a 16-byte
+    /// fat pointer to the slot holding the enum's heap pointer.
+    ///
+    /// Reads the u64 tag at `ENUM_TAG_OFFSET`; if `offsets[tag]` is `Some(off)`,
+    /// writes a field reference (fat pointer to `heap_ptr + off`) into `dst`.
+    /// If `None` (the runtime variant does not declare the field), aborts with
+    /// a variant mismatch (expected Move semantics).
+    ///
+    /// `off` is the full object-relative offset (already includes
+    /// `ENUM_DATA_OFFSET`); indexing by tag handles a field shared across
+    /// variants that sits at different byte offsets in each. An access whose
+    /// handle covers every variant, all placing the field at one fixed offset,
+    /// uses the static `enum_borrow` (`HeapBorrow`) fast path instead.
+    EnumBorrowVariantField {
+        dst: FrameOffset,
+        enum_ref: FrameOffset,
+        // TODO(perf): the boxed slice is a separate allocation and a
+        // pointer-chase + `Option` discriminant test on the hot path. For the
+        // common small variant counts, an inline `[u32; N]` with a sentinel for
+        // absent (offsets are ≪ `u32::MAX`) plus an explicit bounds check would
+        // avoid the indirection. This is the divergent-offset path only (the
+        // uniform case takes the static `enum_borrow`), so it is cold; revisit
+        // if it profiles hot. Must keep `size_of::<MicroOp>() == 48`.
+        offsets: Box<[Option<u32>]>,
+    },
+
+    /// Abort with a variant mismatch unless the enum at `enum_ptr` has variant
+    /// tag `variant`. `enum_ptr` is the heap-pointer **value** (as consumed by
+    /// `UnpackVariant`), not a reference; the tag is read at `ENUM_TAG_OFFSET`.
+    /// Emitted before `UnpackVariant`'s field loads so by-value destructuring
+    /// of the wrong variant aborts instead of reading another variant's bytes.
+    EnumCheckVariant {
+        enum_ptr: FrameOffset,
+        variant: VariantTag,
+    },
+
+    /// Allocate an enum heap object, write its variant `tag` at
+    /// `ENUM_TAG_OFFSET`, and store the heap pointer to `dst`. Fuses
+    /// `PackVariant`'s `HeapNew` + tag store. `descriptor_id` must name an
+    /// `Enum`. **MAY TRIGGER GC.**
+    EnumNew {
+        dst: FrameOffset,
+        descriptor_id: DescriptorId,
+        variant: VariantTag,
+    },
+
+    /// Read a variant field by value through an enum reference at a static
+    /// object-relative `offset`. The uniform-offset fast path: the access's
+    /// handle covers every variant, all placing the field at the same offset,
+    /// so no runtime tag dispatch or mismatch check is needed. Derefs the
+    /// 16-byte `enum_ref` fat pointer to the heap object (a double deref), then
+    /// copies `size` bytes from `obj + offset` into `dst`. Fuses the
+    /// `HeapBorrow` + `ReadRef` (the divergent path still routes through a
+    /// scratch reference).
+    ///
+    // TODO(cleanup): nothing here is enum-specific — this reads any field through a
+    // reference at a static offset. Rename to a non-enum-specific name as part
+    // of a naming-consistency pass.
+    EnumReadVariantField {
+        dst: FrameOffset,
+        enum_ref: FrameOffset,
+        offset: u32,
+        size: u32,
+    },
+
+    /// Write a variant field by value through an enum reference at a static
+    /// object-relative `offset` (uniform-offset fast path; see
+    /// [`MicroOp::EnumReadVariantField`]). Derefs the 16-byte `enum_ref` fat
+    /// pointer to the heap object, then copies `size` bytes from `src` into
+    /// `obj + offset`. Fuses `HeapBorrow` + `WriteRef` (the divergent path
+    /// still routes through a scratch reference).
+    ///
+    // TODO(cleanup): nothing here is enum-specific — this writes any field through a
+    // reference at a static offset, and is reusable when fusing. Rename to a
+    // non-enum-specific name as part of a naming-consistency pass.
+    EnumWriteVariantField {
+        enum_ref: FrameOffset,
+        offset: u32,
+        src: FrameOffset,
+        size: u32,
+    },
+
+    /// Make a freshly byte-copied value at `base` independent: deep-copy each
+    /// owned heap-pointer in it. `base` is both source and destination (the
+    /// pointers are read from, and the fresh copies written back to, `base+off`
+    /// — an in-place fixup). `offsets` are the byte offsets, within the value at
+    /// `base`, of the owned heap pointers (an enum/vector value is one pointer
+    /// at offset 0; an inline aggregate has one per heap-backed field). Emitted
+    /// after any operation that materializes an owned copy of a heap-backed
+    /// value (`Copy`, `ReadRef`, `Read*Field`). **MAY TRIGGER GC.**
+    ///
+    // TODO(perf): add a `DeepCopyHeapPtr { base }` specialization for the common
+    // whole-enum/vector copy (a single pointer at offset 0). It avoids both the
+    // boxed `offsets` slice and the per-op `Vec` allocations the batched path
+    // uses.
+    DeepCopyHeapPtrs {
+        base: FrameOffset,
+        offsets: Box<[u32]>,
+    },
 }
 
-// TODO: make gas costs optional in this output. Most tests don't care about
+/// Write a comma-separated list of frame offsets as `[o0], [o1], ...`.
+fn write_offset_list(f: &mut fmt::Formatter<'_>, offsets: &[FrameOffset]) -> fmt::Result {
+    for (pos, offset) in offsets.iter().enumerate() {
+        if pos > 0 {
+            write!(f, ", ")?;
+        }
+        write!(f, "[{}]", offset.0)?;
+    }
+    Ok(())
+}
+
+// TODO(testing): make gas costs optional in this output. Most tests don't care about
 // costs, but some want to print and assert them.
 impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1282,7 +1455,7 @@ impl fmt::Display for MicroOp {
             } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
-                // TODO: Have a safe display impl that takes guard.
+                // TODO(completeness): Have a safe display impl that takes guard.
                 let module_id = unsafe { module_id.as_ref_unchecked() };
                 let addr = module_id.address().short_str_lossless();
                 let module_name = unsafe { module_id.name().as_ref_unchecked() };
@@ -1298,7 +1471,7 @@ impl fmt::Display for MicroOp {
             MicroOp::CallDirect { ptr } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
-                // TODO: Have a safe display impl that takes guard.
+                // TODO(completeness): Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
                 write!(f, "CallDirect {}", func.name())
             },
@@ -1507,6 +1680,28 @@ impl fmt::Display for MicroOp {
                     f,
                     "VecStoreElem [{}][[{}]] <- [{}] (size={})",
                     vec_ref.0, idx.0, src.0, elem_size
+                )
+            },
+            MicroOp::VecPack(op) => {
+                write!(f, "VecPack [{}] <- [", op.dst.0)?;
+                write_offset_list(f, &op.srcs)?;
+                write!(f, "] (size={}, desc={})", op.elem_size, op.descriptor_id)
+            },
+            MicroOp::VecUnpack(op) => {
+                write!(f, "VecUnpack [")?;
+                write_offset_list(f, &op.dsts)?;
+                write!(f, "] <- [{}] (size={})", op.src.0, op.elem_size)
+            },
+            MicroOp::VecSwap {
+                vec_ref,
+                idx_a,
+                idx_b,
+                elem_size,
+            } => {
+                write!(
+                    f,
+                    "VecSwap [{}][[{}]] <-> [{}][[{}]] (size={})",
+                    vec_ref.0, idx_a.0, vec_ref.0, idx_b.0, elem_size
                 )
             },
             MicroOp::StoreImmVec { dst, idx } => {
@@ -1738,6 +1933,77 @@ impl fmt::Display for MicroOp {
                 display_type(f, *ty)?;
                 write!(f, "> signer=[{}], src=[{}]", signer_ref.0, src.0)
             },
+            MicroOp::EnumTestTag {
+                dst,
+                enum_ref,
+                variant,
+            } => {
+                write!(
+                    f,
+                    "EnumTestTag [{}] <- (*[{}]).tag == #{}",
+                    dst.0, enum_ref.0, variant
+                )
+            },
+            MicroOp::EnumBorrowVariantField {
+                dst,
+                enum_ref,
+                offsets,
+            } => {
+                write!(
+                    f,
+                    "EnumBorrowVariantField [{}] <- &(*[{}]) by tag {:?}",
+                    dst.0, enum_ref.0, offsets
+                )
+            },
+            MicroOp::EnumCheckVariant { enum_ptr, variant } => {
+                write!(
+                    f,
+                    "EnumCheckVariant assert [{}].tag == #{}",
+                    enum_ptr.0, variant
+                )
+            },
+            MicroOp::EnumNew {
+                dst,
+                descriptor_id,
+                variant,
+            } => {
+                write!(
+                    f,
+                    "EnumNew [{}] desc={} tag #{}",
+                    dst.0, descriptor_id, variant
+                )
+            },
+            MicroOp::EnumReadVariantField {
+                dst,
+                enum_ref,
+                offset,
+                size,
+            } => {
+                write!(
+                    f,
+                    "EnumReadVariantField({}) [{}] <- (*[{}]).{}",
+                    size, dst.0, enum_ref.0, offset
+                )
+            },
+            MicroOp::EnumWriteVariantField {
+                enum_ref,
+                offset,
+                src,
+                size,
+            } => {
+                write!(
+                    f,
+                    "EnumWriteVariantField({}) (*[{}]).{} <- [{}]",
+                    size, enum_ref.0, offset, src.0
+                )
+            },
+            MicroOp::DeepCopyHeapPtrs { base, offsets } => {
+                write!(
+                    f,
+                    "DeepCopyHeapPtrs [{}] deep-copy ptrs at {:?}",
+                    base.0, offsets
+                )
+            },
         }
     }
 }
@@ -1776,6 +2042,20 @@ pub const ENUM_TAG_OFFSET: usize = 0;
 
 /// Offset where enum variant field data begins (after the tag).
 pub const ENUM_DATA_OFFSET: usize = 8;
+
+/// Offset of the `length` field within a vector object's data region.
+/// Vectors put the length at the very start of the data region; element 0
+/// begins at [`VEC_DATA_OFFSET`].
+pub const VEC_LENGTH_OFFSET: usize = 0;
+
+/// Offset where vector element data begins (after the `length` field).
+/// Capacity is not stored; it is derived from the header's `size_in_bytes`
+/// field: `capacity = (size_in_bytes - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size`.
+pub const VEC_DATA_OFFSET: usize = 8;
+
+// Element 0 must land on a `MAX_ALIGN`-aligned offset so any element type
+// (whose alignment is ≤ `MAX_ALIGN`) is naturally aligned.
+const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
 
 // ---------------------------------------------------------------------------
 // Closure object layout
@@ -1886,11 +2166,14 @@ impl MicroOp {
         match self {
             // Allocating: may trigger GC.
             MicroOp::HeapNew { .. }
+            | MicroOp::EnumNew { .. }
             | MicroOp::VecPushBack { .. }
+            | MicroOp::VecPack(_)
             | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
+            | MicroOp::DeepCopyHeapPtrs { .. }
             | MicroOp::ForceGC => true,
 
             // Non-allocating.
@@ -1945,6 +2228,8 @@ impl MicroOp {
             | MicroOp::VecPopBack { .. }
             | MicroOp::VecLoadElem { .. }
             | MicroOp::VecStoreElem { .. }
+            | MicroOp::VecUnpack(_)
+            | MicroOp::VecSwap { .. }
             | MicroOp::SlotBorrow { .. }
             | MicroOp::VecBorrow { .. }
             | MicroOp::HeapBorrow { .. }
@@ -1980,7 +2265,12 @@ impl MicroOp {
             | MicroOp::ValueRefCmp(_)
             | MicroOp::BoolNot { .. }
             | MicroOp::BoolAnd { .. }
-            | MicroOp::BoolOr { .. } => false,
+            | MicroOp::BoolOr { .. }
+            | MicroOp::EnumTestTag { .. }
+            | MicroOp::EnumBorrowVariantField { .. }
+            | MicroOp::EnumCheckVariant { .. }
+            | MicroOp::EnumReadVariantField { .. }
+            | MicroOp::EnumWriteVariantField { .. } => false,
         }
     }
 
@@ -1990,76 +2280,8 @@ impl MicroOp {
     // is exactly what each Heap* op's `offset` field already names — the
     // header lives at a negative offset and is invisible to per-type
     // layouts.
-
-    pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
-        MicroOp::HeapMoveFrom8 {
-            dst,
-            heap_ptr,
-            offset: field_offset,
-        }
-    }
-
-    pub fn struct_load(
-        heap_ptr: FrameOffset,
-        field_offset: u32,
-        dst: FrameOffset,
-        size: u32,
-    ) -> Self {
-        MicroOp::HeapMoveFrom {
-            dst,
-            heap_ptr,
-            offset: field_offset,
-            size,
-        }
-    }
-
-    pub fn struct_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
-        MicroOp::HeapMoveTo8 {
-            heap_ptr,
-            offset: field_offset,
-            src,
-        }
-    }
-
-    pub fn struct_store(
-        heap_ptr: FrameOffset,
-        field_offset: u32,
-        src: FrameOffset,
-        size: u32,
-    ) -> Self {
-        MicroOp::HeapMoveTo {
-            heap_ptr,
-            offset: field_offset,
-            src,
-            size,
-        }
-    }
-
-    pub fn struct_borrow(obj_ref: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
-        MicroOp::HeapBorrow {
-            dst,
-            obj_ref,
-            offset: field_offset,
-        }
-    }
-
+    //
     // ----- Enum helpers (variant fields live after the 8-byte tag) -----
-
-    pub fn enum_get_tag(heap_ptr: FrameOffset, dst: FrameOffset) -> Self {
-        MicroOp::HeapMoveFrom8 {
-            dst,
-            heap_ptr,
-            offset: ENUM_TAG_OFFSET as u32,
-        }
-    }
-
-    pub fn enum_set_tag(heap_ptr: FrameOffset, variant: u16) -> Self {
-        MicroOp::HeapMoveToImm8 {
-            heap_ptr,
-            offset: ENUM_TAG_OFFSET as u32,
-            imm: variant as u64,
-        }
-    }
 
     pub fn enum_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
@@ -2112,6 +2334,86 @@ impl MicroOp {
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
         }
     }
+
+    pub fn enum_test_tag(enum_ref: FrameOffset, variant: VariantTag, dst: FrameOffset) -> Self {
+        MicroOp::EnumTestTag {
+            dst,
+            enum_ref,
+            variant,
+        }
+    }
+
+    /// Tag-dispatched variant-field borrow. `data_relative_offsets[tag]` is the
+    /// field's data-region-relative offset in that variant, or `None` if the
+    /// variant does not declare the field (borrowing it aborts). Offsets are
+    /// shifted by `ENUM_DATA_OFFSET` to full object-relative offsets, matching
+    /// `enum_borrow`.
+    pub fn enum_borrow_variant_field(
+        enum_ref: FrameOffset,
+        data_relative_offsets: &[Option<u32>],
+        dst: FrameOffset,
+    ) -> Self {
+        let offsets = data_relative_offsets
+            .iter()
+            .map(|maybe_offset| maybe_offset.map(|offset| ENUM_DATA_OFFSET as u32 + offset))
+            .collect();
+        MicroOp::EnumBorrowVariantField {
+            dst,
+            enum_ref,
+            offsets,
+        }
+    }
+
+    pub fn enum_check_variant(enum_ptr: FrameOffset, variant: VariantTag) -> Self {
+        MicroOp::EnumCheckVariant { enum_ptr, variant }
+    }
+
+    pub fn enum_new(dst: FrameOffset, descriptor_id: DescriptorId, variant: u16) -> Self {
+        MicroOp::EnumNew {
+            dst,
+            descriptor_id,
+            variant: variant as u64,
+        }
+    }
+
+    /// Uniform-offset variant-field read by value. `field_offset` is
+    /// data-region-relative and shifted by `ENUM_DATA_OFFSET` to a full
+    /// object-relative offset, matching [`MicroOp::enum_borrow`].
+    pub fn enum_read_variant_field(
+        enum_ref: FrameOffset,
+        field_offset: u32,
+        dst: FrameOffset,
+        size: u32,
+    ) -> Self {
+        MicroOp::EnumReadVariantField {
+            dst,
+            enum_ref,
+            offset: ENUM_DATA_OFFSET as u32 + field_offset,
+            size,
+        }
+    }
+
+    /// Uniform-offset variant-field write by value; offset handling mirrors
+    /// [`MicroOp::enum_read_variant_field`].
+    pub fn enum_write_variant_field(
+        enum_ref: FrameOffset,
+        field_offset: u32,
+        src: FrameOffset,
+        size: u32,
+    ) -> Self {
+        MicroOp::EnumWriteVariantField {
+            enum_ref,
+            offset: ENUM_DATA_OFFSET as u32 + field_offset,
+            src,
+            size,
+        }
+    }
+
+    /// Deep-copy the owned heap pointers at the given byte offsets within the
+    /// value at `base`, making a freshly byte-copied value independent.
+    pub fn deep_copy_heap_ptrs(base: FrameOffset, offsets: Box<[u32]>) -> Self {
+        MicroOp::DeepCopyHeapPtrs { base, offsets }
+    }
 }
 
 #[cfg(test)]
@@ -2120,7 +2422,7 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // TODO:
+        // TODO(perf):
         //   Size is dominated by indirect call: refactor to keep variant size
         //   small and keep call metadata in a side table.
         assert_eq!(std::mem::size_of::<MicroOp>(), 48);

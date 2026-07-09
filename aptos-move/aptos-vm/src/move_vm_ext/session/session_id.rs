@@ -211,7 +211,7 @@ impl SessionId {
     // This function is used to obtain `session_counter_inside_transaction`.
     // The sessions here are organized in the increasing order in which they are created. Eg: Prologue < Txn < RunOnAbort < Epilogue.
     // When introducing new session types, please check the order in which the sessions are created during a transaction execution and assign a number here accordingly.
-    pub(crate) fn session_counter(&self) -> u8 {
+    pub fn session_counter(&self) -> u8 {
         match self {
             Self::Genesis { .. } => 0,
 

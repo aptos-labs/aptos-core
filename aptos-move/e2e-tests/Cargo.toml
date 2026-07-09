@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-abstract-gas-usage = { workspace = true }
@@ -55,10 +59,6 @@ proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-
-[features]
-default = []
-fuzzing = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

@@ -30,6 +30,8 @@ mod fullnode;
 #[cfg(test)]
 mod genesis;
 #[cfg(test)]
+mod hot_state;
+#[cfg(test)]
 mod inspection_service;
 #[cfg(test)]
 mod jwks;

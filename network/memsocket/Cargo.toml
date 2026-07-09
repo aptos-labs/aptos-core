@@ -12,13 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = []
+testing = []
+
 [dependencies]
 aptos-infallible = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
-
-[features]
-default = []
-fuzzing = []
-testing = []

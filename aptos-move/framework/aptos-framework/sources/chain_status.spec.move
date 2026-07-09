@@ -29,14 +29,29 @@ spec aptos_framework::chain_status {
 
     spec set_genesis_end(aptos_framework: &signer) {
         use std::signer;
+        pragma opaque;
         pragma verify = true;
         pragma delegate_invariants_to_caller;
+        modifies global<GenesisEndMarker>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         /// [high-level-req-3]
         aborts_if exists<GenesisEndMarker>(@aptos_framework);
         /// [high-level-req-1]
+        ensures exists<GenesisEndMarker>(@aptos_framework);
         ensures global<GenesisEndMarker>(@aptos_framework) == GenesisEndMarker {};
+    }
+
+    spec is_genesis {
+        pragma opaque;
+        aborts_if false;
+        ensures result == !exists<GenesisEndMarker>(@aptos_framework);
+    }
+
+    spec is_operating {
+        pragma opaque;
+        aborts_if false;
+        ensures result == exists<GenesisEndMarker>(@aptos_framework);
     }
 
     spec schema RequiresIsOperating {
@@ -44,10 +59,12 @@ spec aptos_framework::chain_status {
     }
 
     spec assert_operating {
+        pragma opaque;
         aborts_if !is_operating();
     }
 
     spec assert_genesis {
+        pragma opaque;
         aborts_if !is_genesis();
     }
 }

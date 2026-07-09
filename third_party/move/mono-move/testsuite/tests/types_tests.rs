@@ -3,9 +3,8 @@
 
 //! Integration tests for type interning and metadata resolution.
 
-use mono_move_core::{native::NoNatives, Interner};
-use mono_move_gas::NoOpGasMeter;
-use mono_move_global_context::{view_type, GlobalContext};
+use mono_move_core::{native::NoNatives, GasMeter, Interner, LayoutKind, LayoutProvider};
+use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
@@ -47,7 +46,7 @@ module 0x1::a {
     );
 
     let mut read_set = ModuleReadSet::new();
-    let mut gas_meter = NoOpGasMeter;
+    let mut gas_meter = GasMeter::with_max_budget();
 
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("a"));
     let ir = loader
@@ -60,15 +59,13 @@ module 0x1::a {
         .interned_nominal_type_def_idx(guard.identifier_of(ident_str!("B")))
         .unwrap();
     let ty = ir.module.interned_nominal_def_type_at(idx);
-    let layout = view_type(ty).layout().unwrap();
+    let layout = guard.layout_by_ty(ty).unwrap();
     assert_eq!(layout.size, 72);
     assert_eq!(layout.align, 8);
-    let offsets = layout
-        .field_layouts()
-        .expect("Struct layout carries per-field offsets")
-        .iter()
-        .map(|f| f.offset)
-        .collect::<Vec<_>>();
+    let LayoutKind::Struct { fields } = &layout.kind else {
+        panic!("B: expected a struct layout");
+    };
+    let offsets = fields.iter().map(|f| f.offset).collect::<Vec<_>>();
     assert_eq!(offsets, vec![0, 32, 40]);
 
     let idx = ir
@@ -76,15 +73,13 @@ module 0x1::a {
         .interned_nominal_type_def_idx(guard.identifier_of(ident_str!("D")))
         .unwrap();
     let ty = ir.module.interned_nominal_def_type_at(idx);
-    let layout = view_type(ty).layout().unwrap();
+    let layout = guard.layout_by_ty(ty).unwrap();
     assert_eq!(layout.size, 128);
     assert_eq!(layout.align, 8);
-    let offsets = layout
-        .field_layouts()
-        .expect("Struct layout carries per-field offsets")
-        .iter()
-        .map(|f| f.offset)
-        .collect::<Vec<_>>();
+    let LayoutKind::Struct { fields } = &layout.kind else {
+        panic!("D: expected a struct layout");
+    };
+    let offsets = fields.iter().map(|f| f.offset).collect::<Vec<_>>();
     assert_eq!(offsets, vec![0, 1, 8, 16, 24, 40, 48, 120]);
 
     let idx = ir
@@ -92,8 +87,8 @@ module 0x1::a {
         .interned_nominal_type_def_idx(guard.identifier_of(ident_str!("C")))
         .unwrap();
     let ty = ir.module.interned_nominal_def_type_at(idx);
-    let layout = view_type(ty).layout().unwrap();
+    let layout = guard.layout_by_ty(ty).unwrap();
     assert_eq!(layout.size, 8);
     assert_eq!(layout.align, 8);
-    assert!(layout.field_layouts().is_none());
+    assert!(matches!(layout.kind, LayoutKind::FrozenEnum { .. }));
 }

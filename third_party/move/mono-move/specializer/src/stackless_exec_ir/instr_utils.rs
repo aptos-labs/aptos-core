@@ -31,7 +31,7 @@
 //!   at each call site.
 
 use super::{BinaryOp, ImmValue, Instr, Slot};
-use mono_move_core::{types::InternedType, PreparedModule};
+use mono_move_core::types::InternedType;
 use smallvec::SmallVec;
 
 /// Most instructions have at most 4 defs or uses.
@@ -117,76 +117,145 @@ pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> 
 // Other instruction utilities
 // =============================================================================
 
-/// Call-like instructions (`Call`, `CallGeneric`, `CallClosure`) that clobber
-/// Xfer slots.
+/// Call-like instructions (`Call`, `CallClosure`) that clobber Xfer slots.
 #[inline]
 pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
-    matches!(
-        instr,
-        Instr::Call(..) | Instr::CallGeneric(..) | Instr::CallClosure(..)
-    )
+    matches!(instr, Instr::Call(..) | Instr::CallClosure(..))
 }
 
-/// Concrete nominal (struct or enum) type whose layout `instr`'s
-/// lowering needs, if any.
-/// TODO: complete the function over all instructions.
-pub(crate) fn nominal_type_in_instr(
-    module: &PreparedModule,
-    instr: &Instr,
-) -> Option<InternedType> {
-    use move_binary_format::access::ModuleAccess;
+/// Resource type carried by a global-storage instruction (`exists`,
+/// `move_from`, `move_to`, `borrow_global[_mut]`), if any. The returned type
+/// is the interned resource nominal embedded in the instruction; it may still
+/// contain type parameters that the caller substitutes with the function's
+/// type arguments.
+pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
     match instr {
-        // Carry the concrete struct type directly.
-        Instr::Pack(_, ty, _) | Instr::Unpack(_, ty, _) => Some(*ty),
+        // Global-storage ops carry the resource nominal directly.
+        Instr::Exists(_, ty, _)
+        | Instr::MoveFrom(_, ty, _)
+        | Instr::MoveTo(ty, _, _)
+        | Instr::ImmBorrowGlobal(_, ty, _)
+        | Instr::MutBorrowGlobal(_, ty, _) => Some(*ty),
 
-        // Carry a field handle resolving to the owning concrete struct.
-        Instr::ImmBorrowField(_, fh, _)
-        | Instr::MutBorrowField(_, fh, _)
-        | Instr::ReadField(_, fh, _)
-        | Instr::WriteField(fh, _, _)
-        | Instr::ImmBorrowLocField(_, fh, _)
-        | Instr::MutBorrowLocField(_, fh, _)
-        | Instr::ReadLocalField(_, fh, _)
-        | Instr::WriteLocalField(fh, _, _) => {
-            let owner = module.field_handle_at(*fh).owner;
-            Some(module.interned_nominal_def_type_at(owner))
-        },
-
-        // Generic struct/field, variant (enum), global-resource, vector,
-        // and closure ops also carry types, but their lowering isn't
-        // supported yet — none reference a concrete inline struct here.
-        Instr::PackGeneric(..)
-        | Instr::UnpackGeneric(..)
+        // Every other instruction: no resource type involved.
+        Instr::Pack(..)
+        | Instr::Unpack(..)
         | Instr::PackVariant(..)
-        | Instr::PackVariantGeneric(..)
         | Instr::UnpackVariant(..)
-        | Instr::UnpackVariantGeneric(..)
         | Instr::TestVariant(..)
-        | Instr::TestVariantGeneric(..)
-        | Instr::ImmBorrowFieldGeneric(..)
-        | Instr::MutBorrowFieldGeneric(..)
+        | Instr::ImmBorrowField(..)
+        | Instr::MutBorrowField(..)
+        | Instr::ReadField(..)
+        | Instr::WriteField(..)
+        | Instr::ImmBorrowLocField(..)
+        | Instr::MutBorrowLocField(..)
+        | Instr::ReadLocalField(..)
+        | Instr::WriteLocalField(..)
         | Instr::ImmBorrowVariantField(..)
         | Instr::MutBorrowVariantField(..)
-        | Instr::ImmBorrowVariantFieldGeneric(..)
-        | Instr::MutBorrowVariantFieldGeneric(..)
-        | Instr::ReadFieldGeneric(..)
-        | Instr::WriteFieldGeneric(..)
         | Instr::ReadVariantField(..)
-        | Instr::ReadVariantFieldGeneric(..)
         | Instr::WriteVariantField(..)
-        | Instr::WriteVariantFieldGeneric(..)
-        | Instr::Exists(..)
-        | Instr::ExistsGeneric(..)
-        | Instr::MoveFrom(..)
-        | Instr::MoveFromGeneric(..)
-        | Instr::MoveTo(..)
-        | Instr::MoveToGeneric(..)
-        | Instr::ImmBorrowGlobal(..)
-        | Instr::ImmBorrowGlobalGeneric(..)
-        | Instr::MutBorrowGlobal(..)
-        | Instr::MutBorrowGlobalGeneric(..)
         | Instr::PackClosure(..)
-        | Instr::PackClosureGeneric(..)
+        | Instr::CallClosure(..)
+        | Instr::VecPack(..)
+        | Instr::VecLen(..)
+        | Instr::VecImmBorrow(..)
+        | Instr::VecMutBorrow(..)
+        | Instr::VecPushBack(..)
+        | Instr::VecPopBack(..)
+        | Instr::VecUnpack(..)
+        | Instr::VecSwap(..)
+        | Instr::LdConst(..)
+        | Instr::LdTrue(..)
+        | Instr::LdFalse(..)
+        | Instr::LdU8(..)
+        | Instr::LdU16(..)
+        | Instr::LdU32(..)
+        | Instr::LdU64(..)
+        | Instr::LdU128(..)
+        | Instr::LdU256(..)
+        | Instr::LdI8(..)
+        | Instr::LdI16(..)
+        | Instr::LdI32(..)
+        | Instr::LdI64(..)
+        | Instr::LdI128(..)
+        | Instr::LdI256(..)
+        | Instr::Copy(..)
+        | Instr::Move(..)
+        | Instr::UnaryOp(..)
+        | Instr::BinaryOp(..)
+        | Instr::BinaryOpImm(..)
+        | Instr::ImmBorrowLoc(..)
+        | Instr::MutBorrowLoc(..)
+        | Instr::ReadRef(..)
+        | Instr::WriteRef(..)
+        | Instr::Call(..)
+        | Instr::Branch(..)
+        | Instr::BrTrue(..)
+        | Instr::BrFalse(..)
+        | Instr::BrCmp(..)
+        | Instr::BrCmpImm(..)
+        | Instr::Ret(..)
+        | Instr::Abort(..)
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
+    }
+}
+
+/// Whether a nominal type is a struct or an enum.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NominalKind {
+    Struct,
+    Enum,
+}
+
+/// Returns the instantiated struct/enum whose field or variant layout `instr`
+/// uses for construction, destruction, or field/variant access, with its kind;
+/// `None` if no such nominal is used. In generic functions, the type may
+/// contain the enclosing function's `TypeParam`s.
+///
+/// `None` also covers global-storage ops (whole-value size only), vector ops
+/// (element stride only), and closure ops (separate capture-object layout);
+/// their nominals are found via `resource_type_in_instr`, the slot-type walk,
+/// and captured-data discovery.
+///
+/// TODO(cleanup): reconcile various type-in-instr discovery methods.
+pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedType, NominalKind)> {
+    match instr {
+        // Carry the instantiated struct type directly.
+        Instr::Pack(_, ty, _) | Instr::Unpack(_, ty, _) => Some((*ty, NominalKind::Struct)),
+
+        // Field ops carry the instantiated owner struct type.
+        Instr::ImmBorrowField(_, owner, _, _)
+        | Instr::MutBorrowField(_, owner, _, _)
+        | Instr::ReadField(_, owner, _, _)
+        | Instr::WriteField(owner, _, _, _)
+        | Instr::ImmBorrowLocField(_, owner, _, _)
+        | Instr::MutBorrowLocField(_, owner, _, _)
+        | Instr::ReadLocalField(_, owner, _, _)
+        | Instr::WriteLocalField(owner, _, _, _) => Some((*owner, NominalKind::Struct)),
+
+        // Variant ops carry the instantiated enum type directly.
+        Instr::PackVariant(_, ty, _, _)
+        | Instr::UnpackVariant(_, ty, _, _)
+        | Instr::TestVariant(_, ty, _, _) => Some((*ty, NominalKind::Enum)),
+
+        // Variant-field ops carry the instantiated owner enum type.
+        Instr::ImmBorrowVariantField(_, owner, _, _)
+        | Instr::MutBorrowVariantField(_, owner, _, _)
+        | Instr::ReadVariantField(_, owner, _, _)
+        | Instr::WriteVariantField(owner, _, _, _) => Some((*owner, NominalKind::Enum)),
+
+        // Global-resource ops surface their type via `resource_type_in_instr`
+        // (they need whole-value size, not field offsets); vector ops need only
+        // element stride and closure ops a capture-object layout, so none has a
+        // field-layout nominal to report here.
+        Instr::Exists(..)
+        | Instr::MoveFrom(..)
+        | Instr::MoveTo(..)
+        | Instr::ImmBorrowGlobal(..)
+        | Instr::MutBorrowGlobal(..)
+        | Instr::PackClosure(..)
         | Instr::CallClosure(..)
         | Instr::VecPack(..)
         | Instr::VecLen(..)
@@ -223,7 +292,6 @@ pub(crate) fn nominal_type_in_instr(
         | Instr::ReadRef(..)
         | Instr::WriteRef(..)
         | Instr::Call(..)
-        | Instr::CallGeneric(..)
         | Instr::Branch(..)
         | Instr::BrTrue(..)
         | Instr::BrFalse(..)
@@ -231,7 +299,8 @@ pub(crate) fn nominal_type_in_instr(
         | Instr::BrCmpImm(..)
         | Instr::Ret(..)
         | Instr::Abort(..)
-        | Instr::AbortMsg(..) => None,
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
     }
 }
 
@@ -266,53 +335,33 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::BinaryOp(..)
         | Instr::BinaryOpImm(..)
         | Instr::Pack(..)
-        | Instr::PackGeneric(..)
         | Instr::Unpack(..)
-        | Instr::UnpackGeneric(..)
         | Instr::PackVariant(..)
-        | Instr::PackVariantGeneric(..)
         | Instr::UnpackVariant(..)
-        | Instr::UnpackVariantGeneric(..)
         | Instr::TestVariant(..)
-        | Instr::TestVariantGeneric(..)
         | Instr::ImmBorrowLoc(..)
         | Instr::MutBorrowLoc(..)
         | Instr::ImmBorrowField(..)
         | Instr::MutBorrowField(..)
-        | Instr::ImmBorrowFieldGeneric(..)
-        | Instr::MutBorrowFieldGeneric(..)
         | Instr::ImmBorrowVariantField(..)
         | Instr::MutBorrowVariantField(..)
-        | Instr::ImmBorrowVariantFieldGeneric(..)
-        | Instr::MutBorrowVariantFieldGeneric(..)
         | Instr::ReadRef(..)
         | Instr::WriteRef(..)
         | Instr::ReadField(..)
-        | Instr::ReadFieldGeneric(..)
         | Instr::WriteField(..)
-        | Instr::WriteFieldGeneric(..)
         | Instr::ReadVariantField(..)
-        | Instr::ReadVariantFieldGeneric(..)
         | Instr::WriteVariantField(..)
-        | Instr::WriteVariantFieldGeneric(..)
         | Instr::ImmBorrowLocField(..)
         | Instr::MutBorrowLocField(..)
         | Instr::ReadLocalField(..)
         | Instr::WriteLocalField(..)
         | Instr::Exists(..)
-        | Instr::ExistsGeneric(..)
         | Instr::MoveFrom(..)
-        | Instr::MoveFromGeneric(..)
         | Instr::MoveTo(..)
-        | Instr::MoveToGeneric(..)
         | Instr::ImmBorrowGlobal(..)
-        | Instr::ImmBorrowGlobalGeneric(..)
         | Instr::MutBorrowGlobal(..)
-        | Instr::MutBorrowGlobalGeneric(..)
         | Instr::Call(..)
-        | Instr::CallGeneric(..)
         | Instr::PackClosure(..)
-        | Instr::PackClosureGeneric(..)
         | Instr::CallClosure(..)
         | Instr::VecPack(..)
         | Instr::VecLen(..)
@@ -321,12 +370,13 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::VecPushBack(..)
         | Instr::VecPopBack(..)
         | Instr::VecUnpack(..)
-        | Instr::VecSwap(..) => false,
+        | Instr::VecSwap(..)
+        | Instr::ForceGC => false,
     }
 }
 
 /// Extract the destination slot and immediate value from a load instruction.
-// TODO: the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
+// TODO(perf): the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
 // a `Box` here, even when `try_fuse_immediate_binop` decides not to fuse.
 // Consider splitting `extract_imm_value` into a cheap "would this fuse?"
 // check + a separate constructor, or otherwise pulling allocation behind
@@ -360,61 +410,41 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::BinaryOp(_, _, _, _)
         | Instr::BinaryOpImm(_, _, _, _)
         | Instr::Pack(_, _, _)
-        | Instr::PackGeneric(_, _, _)
         | Instr::Unpack(_, _, _)
-        | Instr::UnpackGeneric(_, _, _)
         | Instr::PackVariant(_, _, _, _)
-        | Instr::PackVariantGeneric(_, _, _, _)
         | Instr::UnpackVariant(_, _, _, _)
-        | Instr::UnpackVariantGeneric(_, _, _, _)
         | Instr::TestVariant(_, _, _, _)
-        | Instr::TestVariantGeneric(_, _, _, _)
         | Instr::ImmBorrowLoc(_, _)
         | Instr::MutBorrowLoc(_, _)
-        | Instr::ImmBorrowField(_, _, _)
-        | Instr::MutBorrowField(_, _, _)
-        | Instr::ImmBorrowFieldGeneric(_, _, _)
-        | Instr::MutBorrowFieldGeneric(_, _, _)
-        | Instr::ImmBorrowVariantField(_, _, _)
-        | Instr::MutBorrowVariantField(_, _, _)
-        | Instr::ImmBorrowVariantFieldGeneric(_, _, _)
-        | Instr::MutBorrowVariantFieldGeneric(_, _, _)
+        | Instr::ImmBorrowField(_, _, _, _)
+        | Instr::MutBorrowField(_, _, _, _)
+        | Instr::ImmBorrowVariantField(_, _, _, _)
+        | Instr::MutBorrowVariantField(_, _, _, _)
         | Instr::ReadRef(_, _)
         | Instr::WriteRef(_, _)
-        | Instr::ReadField(_, _, _)
-        | Instr::ReadFieldGeneric(_, _, _)
-        | Instr::WriteField(_, _, _)
-        | Instr::WriteFieldGeneric(_, _, _)
-        | Instr::ReadVariantField(_, _, _)
-        | Instr::ReadVariantFieldGeneric(_, _, _)
-        | Instr::WriteVariantField(_, _, _)
-        | Instr::WriteVariantFieldGeneric(_, _, _)
-        | Instr::ImmBorrowLocField(_, _, _)
-        | Instr::MutBorrowLocField(_, _, _)
-        | Instr::ReadLocalField(_, _, _)
-        | Instr::WriteLocalField(_, _, _)
+        | Instr::ReadField(_, _, _, _)
+        | Instr::WriteField(_, _, _, _)
+        | Instr::ReadVariantField(_, _, _, _)
+        | Instr::WriteVariantField(_, _, _, _)
+        | Instr::ImmBorrowLocField(_, _, _, _)
+        | Instr::MutBorrowLocField(_, _, _, _)
+        | Instr::ReadLocalField(_, _, _, _)
+        | Instr::WriteLocalField(_, _, _, _)
         | Instr::Exists(_, _, _)
-        | Instr::ExistsGeneric(_, _, _)
         | Instr::MoveFrom(_, _, _)
-        | Instr::MoveFromGeneric(_, _, _)
         | Instr::MoveTo(_, _, _)
-        | Instr::MoveToGeneric(_, _, _)
         | Instr::ImmBorrowGlobal(_, _, _)
-        | Instr::ImmBorrowGlobalGeneric(_, _, _)
         | Instr::MutBorrowGlobal(_, _, _)
-        | Instr::MutBorrowGlobalGeneric(_, _, _)
-        | Instr::Call(_, _, _)
-        | Instr::CallGeneric(_, _, _)
-        | Instr::PackClosure(_, _, _, _)
-        | Instr::PackClosureGeneric(_, _, _, _)
+        | Instr::Call(_, _, _, _)
+        | Instr::PackClosure(_, _, _, _, _)
         | Instr::CallClosure(_, _, _)
-        | Instr::VecPack(_, _, _, _)
+        | Instr::VecPack(_, _, _)
         | Instr::VecLen(_, _, _)
         | Instr::VecImmBorrow(_, _, _, _)
         | Instr::VecMutBorrow(_, _, _, _)
         | Instr::VecPushBack(_, _, _)
         | Instr::VecPopBack(_, _, _)
-        | Instr::VecUnpack(_, _, _, _)
+        | Instr::VecUnpack(_, _, _)
         | Instr::VecSwap(_, _, _, _)
         | Instr::Branch(_)
         | Instr::BrTrue(_, _)
@@ -423,7 +453,8 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::BrCmpImm(_, _, _, _)
         | Instr::Ret(_)
         | Instr::Abort(_)
-        | Instr::AbortMsg(_, _) => None,
+        | Instr::AbortMsg(_, _)
+        | Instr::ForceGC => None,
     }
 }
 
@@ -431,7 +462,7 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
 /// without changing the result).
 #[inline]
 pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
-    use crate::stackless_exec_ir::CmpOp;
+    use crate::stackless_exec_ir::CmpKind;
     matches!(
         op,
         BinaryOp::Add
@@ -439,8 +470,8 @@ pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
             | BinaryOp::BitOr
             | BinaryOp::BitAnd
             | BinaryOp::BitXor
-            | BinaryOp::Cmp(CmpOp::Eq)
-            | BinaryOp::Cmp(CmpOp::Neq)
+            | BinaryOp::Cmp(CmpKind::Eq)
+            | BinaryOp::Cmp(CmpKind::Neq)
             | BinaryOp::Or
             | BinaryOp::And
     )
@@ -530,35 +561,15 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*lhs, &mut f);
         },
 
-        Instr::Pack(dst, _, fields) => {
+        Instr::Pack(dst, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(fields, &mut f);
         },
-        Instr::PackGeneric(dst, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
-            def::<DEFS>(*dst, &mut f);
-            uses::<USES>(fields, &mut f);
-        },
-        Instr::PackVariantGeneric(dst, _, _, fields) => {
-            def::<DEFS>(*dst, &mut f);
-            uses::<USES>(fields, &mut f);
-        },
-        Instr::Unpack(dsts, _, src) => {
-            defs::<DEFS>(dsts, &mut f);
-            used::<USES>(*src, &mut f);
-        },
-        Instr::UnpackGeneric(dsts, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
-            defs::<DEFS>(dsts, &mut f);
-            used::<USES>(*src, &mut f);
-        },
-        Instr::UnpackVariantGeneric(dsts, _, _, src) => {
+        Instr::Unpack(dsts, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
             defs::<DEFS>(dsts, &mut f);
             used::<USES>(*src, &mut f);
         },
         Instr::TestVariant(dst, _, _, src) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*src, &mut f);
-        },
-        Instr::TestVariantGeneric(dst, _, _, src) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*src, &mut f);
         },
@@ -569,14 +580,10 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             def::<DEFS>(*dst, &mut f);
             storage_use::<USES>(*src, &mut f);
         },
-        Instr::ImmBorrowField(dst, _, src)
-        | Instr::MutBorrowField(dst, _, src)
-        | Instr::ImmBorrowFieldGeneric(dst, _, src)
-        | Instr::MutBorrowFieldGeneric(dst, _, src)
-        | Instr::ImmBorrowVariantField(dst, _, src)
-        | Instr::MutBorrowVariantField(dst, _, src)
-        | Instr::ImmBorrowVariantFieldGeneric(dst, _, src)
-        | Instr::MutBorrowVariantFieldGeneric(dst, _, src)
+        Instr::ImmBorrowField(dst, _, _, src)
+        | Instr::MutBorrowField(dst, _, _, src)
+        | Instr::ImmBorrowVariantField(dst, _, _, src)
+        | Instr::MutBorrowVariantField(dst, _, _, src)
         | Instr::ReadRef(dst, src) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*src, &mut f);
@@ -586,33 +593,27 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*val, &mut f);
         },
 
-        Instr::ReadField(dst, _, src)
-        | Instr::ReadFieldGeneric(dst, _, src)
-        | Instr::ReadVariantField(dst, _, src)
-        | Instr::ReadVariantFieldGeneric(dst, _, src) => {
+        Instr::ReadField(dst, _, _, src) | Instr::ReadVariantField(dst, _, _, src) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*src, &mut f);
         },
-        Instr::WriteField(_, ref_slot, val)
-        | Instr::WriteFieldGeneric(_, ref_slot, val)
-        | Instr::WriteVariantField(_, ref_slot, val)
-        | Instr::WriteVariantFieldGeneric(_, ref_slot, val) => {
+        Instr::WriteField(_, _, ref_slot, val) | Instr::WriteVariantField(_, _, ref_slot, val) => {
             used::<USES>(*ref_slot, &mut f);
             used::<USES>(*val, &mut f);
         },
 
         // `local` names the inline-struct frame slot, not a reference:
         // a place use.
-        Instr::ImmBorrowLocField(dst, _, local)
-        | Instr::MutBorrowLocField(dst, _, local)
-        | Instr::ReadLocalField(dst, _, local) => {
+        Instr::ImmBorrowLocField(dst, _, _, local)
+        | Instr::MutBorrowLocField(dst, _, _, local)
+        | Instr::ReadLocalField(dst, _, _, local) => {
             def::<DEFS>(*dst, &mut f);
             storage_use::<USES>(*local, &mut f);
         },
         // `local` is both a def (a field is written in-place) and a
         // place use (the other fields persist, so the slot
         // stays live with the same type after the write).
-        Instr::WriteLocalField(_, local, val) => {
+        Instr::WriteLocalField(_, _, local, val) => {
             def::<DEFS>(*local, &mut f);
             storage_use::<USES>(*local, &mut f);
             used::<USES>(*val, &mut f);
@@ -622,15 +623,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*addr, &mut f);
         },
-        Instr::ExistsGeneric(dst, _, addr) | Instr::MoveFromGeneric(dst, _, addr) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*addr, &mut f);
-        },
         Instr::MoveTo(_, signer, val) => {
-            used::<USES>(*signer, &mut f);
-            used::<USES>(*val, &mut f);
-        },
-        Instr::MoveToGeneric(_, signer, val) => {
             used::<USES>(*signer, &mut f);
             used::<USES>(*val, &mut f);
         },
@@ -638,25 +631,17 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*addr, &mut f);
         },
-        Instr::ImmBorrowGlobalGeneric(dst, _, addr)
-        | Instr::MutBorrowGlobalGeneric(dst, _, addr) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*addr, &mut f);
-        },
 
-        Instr::Call(rets, _, args)
-        | Instr::CallGeneric(rets, _, args)
-        | Instr::CallClosure(rets, _, args) => {
+        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
             defs::<DEFS>(rets, &mut f);
             uses::<USES>(args, &mut f);
         },
-        Instr::PackClosure(dst, _, _, captured)
-        | Instr::PackClosureGeneric(dst, _, _, captured) => {
+        Instr::PackClosure(dst, _, _, _, captured) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(captured, &mut f);
         },
 
-        Instr::VecPack(dst, _, _, elems) => {
+        Instr::VecPack(dst, _, elems) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(elems, &mut f);
         },
@@ -673,7 +658,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*vec_ref, &mut f);
             used::<USES>(*val, &mut f);
         },
-        Instr::VecUnpack(dsts, _, _, src) => {
+        Instr::VecUnpack(dsts, _, src) => {
             defs::<DEFS>(dsts, &mut f);
             used::<USES>(*src, &mut f);
         },
@@ -696,6 +681,9 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*code, &mut f);
             used::<USES>(*msg, &mut f);
         },
+
+        // No slot operands.
+        Instr::ForceGC => {},
     }
 }
 
@@ -773,7 +761,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Pack(dst, _, fields) => {
+        Instr::Pack(dst, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -781,39 +769,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slots(fields, &mut f);
             }
         },
-        Instr::PackGeneric(dst, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slots(fields, &mut f);
-            }
-        },
-        Instr::PackVariantGeneric(dst, _, _, fields) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slots(fields, &mut f);
-            }
-        },
-        Instr::Unpack(dsts, _, src) => {
-            if DEFS {
-                rewrite_slots(dsts, &mut f);
-            }
-            if USES {
-                rewrite_slot(src, &mut f);
-            }
-        },
-        Instr::UnpackGeneric(dsts, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
-            if DEFS {
-                rewrite_slots(dsts, &mut f);
-            }
-            if USES {
-                rewrite_slot(src, &mut f);
-            }
-        },
-        Instr::UnpackVariantGeneric(dsts, _, _, src) => {
+        Instr::Unpack(dsts, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }
@@ -822,14 +778,6 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
         Instr::TestVariant(dst, _, _, src) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slot(src, &mut f);
-            }
-        },
-        Instr::TestVariantGeneric(dst, _, _, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -847,14 +795,10 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::ImmBorrowField(dst, _, src)
-        | Instr::MutBorrowField(dst, _, src)
-        | Instr::ImmBorrowFieldGeneric(dst, _, src)
-        | Instr::MutBorrowFieldGeneric(dst, _, src)
-        | Instr::ImmBorrowVariantField(dst, _, src)
-        | Instr::MutBorrowVariantField(dst, _, src)
-        | Instr::ImmBorrowVariantFieldGeneric(dst, _, src)
-        | Instr::MutBorrowVariantFieldGeneric(dst, _, src)
+        Instr::ImmBorrowField(dst, _, _, src)
+        | Instr::MutBorrowField(dst, _, _, src)
+        | Instr::ImmBorrowVariantField(dst, _, _, src)
+        | Instr::MutBorrowVariantField(dst, _, _, src)
         | Instr::ReadRef(dst, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
@@ -870,10 +814,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::ReadField(dst, _, src)
-        | Instr::ReadFieldGeneric(dst, _, src)
-        | Instr::ReadVariantField(dst, _, src)
-        | Instr::ReadVariantFieldGeneric(dst, _, src) => {
+        Instr::ReadField(dst, _, _, src) | Instr::ReadVariantField(dst, _, _, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -881,10 +822,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::WriteField(_, ref_slot, val)
-        | Instr::WriteFieldGeneric(_, ref_slot, val)
-        | Instr::WriteVariantField(_, ref_slot, val)
-        | Instr::WriteVariantFieldGeneric(_, ref_slot, val) => {
+        Instr::WriteField(_, _, ref_slot, val) | Instr::WriteVariantField(_, _, ref_slot, val) => {
             if USES {
                 rewrite_slot(ref_slot, &mut f);
                 rewrite_slot(val, &mut f);
@@ -893,9 +831,9 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
 
         // `local` is a place use, so skip it under
         // SKIP_PLACE_USE.
-        Instr::ImmBorrowLocField(dst, _, local)
-        | Instr::MutBorrowLocField(dst, _, local)
-        | Instr::ReadLocalField(dst, _, local) => {
+        Instr::ImmBorrowLocField(dst, _, _, local)
+        | Instr::MutBorrowLocField(dst, _, _, local)
+        | Instr::ReadLocalField(dst, _, _, local) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -903,7 +841,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(local, &mut f);
             }
         },
-        Instr::WriteLocalField(_, local, val) => {
+        Instr::WriteLocalField(_, _, local, val) => {
             // `local` is both a def and a place use of one
             // operand: rewrite once when either role is active. Under
             // SKIP_PLACE_USE only the use side is suppressed.
@@ -923,21 +861,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(addr, &mut f);
             }
         },
-        Instr::ExistsGeneric(dst, _, addr) | Instr::MoveFromGeneric(dst, _, addr) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slot(addr, &mut f);
-            }
-        },
         Instr::MoveTo(_, signer, val) => {
-            if USES {
-                rewrite_slot(signer, &mut f);
-                rewrite_slot(val, &mut f);
-            }
-        },
-        Instr::MoveToGeneric(_, signer, val) => {
             if USES {
                 rewrite_slot(signer, &mut f);
                 rewrite_slot(val, &mut f);
@@ -951,19 +875,8 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(addr, &mut f);
             }
         },
-        Instr::ImmBorrowGlobalGeneric(dst, _, addr)
-        | Instr::MutBorrowGlobalGeneric(dst, _, addr) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slot(addr, &mut f);
-            }
-        },
 
-        Instr::Call(rets, _, args)
-        | Instr::CallGeneric(rets, _, args)
-        | Instr::CallClosure(rets, _, args) => {
+        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
             if DEFS {
                 rewrite_slots(rets, &mut f);
             }
@@ -971,8 +884,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slots(args, &mut f);
             }
         },
-        Instr::PackClosure(dst, _, _, captured)
-        | Instr::PackClosureGeneric(dst, _, _, captured) => {
+        Instr::PackClosure(dst, _, _, _, captured) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -981,7 +893,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::VecPack(dst, _, _, elems) => {
+        Instr::VecPack(dst, _, elems) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -1012,7 +924,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(val, &mut f);
             }
         },
-        Instr::VecUnpack(dsts, _, _, src) => {
+        Instr::VecUnpack(dsts, _, src) => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }
@@ -1061,5 +973,8 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(msg, &mut f);
             }
         },
+
+        // No slot operands.
+        Instr::ForceGC => {},
     }
 }

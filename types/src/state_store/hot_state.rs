@@ -2,14 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    proof::SparseMerkleRangeProof,
     state_store::{
+        state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_value::StateValue,
     },
     transaction::Version,
 };
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher},
+    hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -122,6 +124,36 @@ impl CryptoHash for HotStateValueRef<'_> {
         bcs::serialize_into(&mut state, &self)
             .expect("BCS serialization of HotStateValueRef should not fail");
         state.finish()
+    }
+}
+
+/// A single chunk of the hot state at a specific version, with a range proof against the hot state
+/// Merkle root.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct HotStateValueChunkWithProof {
+    /// The first hot state index in chunk
+    pub first_index: u64,
+    /// The last hot state index in chunk
+    pub last_index: u64,
+    /// The first hot state key hash in chunk
+    pub first_key: HashValue,
+    /// The last hot state key hash in chunk
+    pub last_key: HashValue,
+    /// The state key and its hot state value.
+    pub raw_values: Vec<(StateKey, HotStateValue)>,
+    /// The proof to ensure the chunk is in the hot state tree
+    pub proof: SparseMerkleRangeProof,
+    /// The root hash of the hot state Merkle tree for this chunk
+    pub root_hash: HashValue,
+}
+
+impl HotStateValueChunkWithProof {
+    /// Returns true iff this is the last chunk (i.e. no more hot state values follow it).
+    pub fn is_last_chunk(&self) -> bool {
+        self.proof
+            .right_siblings()
+            .iter()
+            .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
     }
 }
 

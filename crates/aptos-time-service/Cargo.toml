@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+async = ["futures", "pin-project", "tokio"]
+testing = ["async"]
+
 [dependencies]
 aptos-infallible = { workspace = true }
 enum_dispatch = { workspace = true }
@@ -25,8 +30,3 @@ futures = { workspace = true }
 pin-project = { workspace = true }
 tokio = { workspace = true }
 tokio-test = { workspace = true }
-
-[features]
-default = []
-async = ["futures", "pin-project", "tokio"]
-testing = ["async"]

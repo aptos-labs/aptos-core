@@ -97,6 +97,11 @@
               "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
               "type": "string",
               "const": "function_usage"
+            },
+            {
+              "description": "Returns per-module facts: functions, structs, constants, friends,\nattributes, and source locations.",
+              "type": "string",
+              "const": "facts"
             }
           ]
         }

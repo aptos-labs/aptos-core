@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+fuzzing = ["proptest"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-drop-helper = { workspace = true }
@@ -30,6 +33,3 @@ rocksdb = { workspace = true, features = ["jemalloc"] }
 aptos-temppath = { workspace = true }
 byteorder = { workspace = true }
 proptest = { workspace = true }
-
-[features]
-fuzzing = ["proptest"]

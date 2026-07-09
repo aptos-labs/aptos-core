@@ -3,17 +3,26 @@
 
 use super::{
     super::{package_data::DiagnosticSource, session::FlowSession},
-    resolve_filter,
+    load_sanitized_prover_options, resolve_filter,
 };
 use crate::hooks::source_check;
 use codespan_reporting::term::termcolor::NoColor;
+use move_model::model::GlobalEnv;
 use move_prover::inference::InferenceOutput;
 use rmcp::{
     handler::server::wrapper::Parameters,
     model::{CallToolResult, Content},
     schemars, tool, tool_router,
 };
-use std::{fs, path::PathBuf, time::Instant};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Instant,
+};
 
 /// Controls where inferred specs are written.
 #[derive(Debug, Default, Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
@@ -65,6 +74,8 @@ impl FlowSession {
         let spec_output = params.spec_output;
 
         let tool_timeout = self.tool_timeout();
+        let wrote_files = Arc::new(AtomicBool::new(false));
+        let wrote_files_in = Arc::clone(&wrote_files);
         let result = tokio::time::timeout(
             tool_timeout,
             tokio::task::spawn_blocking(move || {
@@ -87,7 +98,12 @@ impl FlowSession {
                         None,
                     )
                 })?;
-                let mut options = move_prover::cli::Options::default();
+                let mut options = match load_sanitized_prover_options(data.path()) {
+                    Ok(o) => o,
+                    Err(msg) => {
+                        return Ok(CallToolResult::error(vec![Content::text(msg)]));
+                    },
+                };
                 options.prover.verify_scope = verification_scope;
                 aptos_framework::prover::configure_aptos_custom_natives(&mut options);
                 options.inference.inference = true;
@@ -102,22 +118,55 @@ impl FlowSession {
                     .to_string_lossy()
                     .into_owned();
 
-                // 5. Clear leftover diagnostics from previous runs, then run inference.
-                data.env().clear_diag();
+                // 5. Run inference.
+                //
+                // When `filter` is set, build a *fresh* env in which only files
+                // matching the filter are primary targets — same rationale as in
+                // `move_package_verify`. Without this, the cached env (all modules
+                // `is_target == true`) forces the prover's bytecode pipeline over
+                // the whole package and can panic on unverified modules whose
+                // intent is to be skipped (e.g. `storage_slot`).
                 let mut error_writer = NoColor::new(Vec::new());
-                let inference_result = move_prover::inference::run_spec_inference_with_model(
-                    data.env_mut(),
-                    &mut error_writer,
-                    options,
-                    Instant::now(),
-                );
+                let mut filtered_env_holder: Option<GlobalEnv> = None;
+                let inference_result = if let Some(filter_str) = filter.as_deref() {
+                    let mut fresh = match data.build_filtered_env(Some(filter_str), &[]) {
+                        Ok(env) => env,
+                        Err(e) => {
+                            return Ok(CallToolResult::error(vec![Content::text(format!(
+                                "failed to rebuild env for filter `{}`: {}",
+                                filter_str, e
+                            ))]))
+                        },
+                    };
+                    let result = move_prover::inference::run_spec_inference_with_model(
+                        &mut fresh,
+                        &mut error_writer,
+                        options,
+                        Instant::now(),
+                    );
+                    filtered_env_holder = Some(fresh);
+                    result
+                } else {
+                    data.env().clear_diag();
+                    move_prover::inference::run_spec_inference_with_model(
+                        data.env_mut(),
+                        &mut error_writer,
+                        options,
+                        Instant::now(),
+                    )
+                };
 
                 match inference_result {
                     Ok(()) => {
                         // 6. Collect output files depending on the output mode.
                         let mut modified_files: Vec<String> = Vec::new();
 
-                        for module in data.env().get_modules() {
+                        // Use the env that actually ran inference (filtered when
+                        // a filter was set, cached otherwise) so module iteration
+                        // matches what was processed.
+                        let modules_env: &GlobalEnv =
+                            filtered_env_holder.as_ref().unwrap_or_else(|| data.env());
+                        for module in modules_env.get_modules() {
                             if !module.is_target() {
                                 continue;
                             }
@@ -192,6 +241,7 @@ impl FlowSession {
                                 "inference completed but no specifications were inferred",
                             )]))
                         } else {
+                            wrote_files_in.store(true, Ordering::Relaxed);
                             log::info!(
                                 "move_package_wp: wrote specs to {} file(s)",
                                 modified_files.len()
@@ -234,21 +284,55 @@ impl FlowSession {
                         }
                     },
                     Err(_) => {
-                        let diag_text =
-                            String::from_utf8(error_writer.into_inner()).unwrap_or_default();
-                        if diag_text.is_empty() {
-                            data.set_diagnostics(DiagnosticSource::Inference, vec![
-                                "spec inference failed".to_string(),
-                            ]);
-                        } else {
-                            data.set_diagnostics(DiagnosticSource::Inference, vec![
-                                diag_text.clone()
-                            ]);
+                        // Inference may have written .enriched.move (Inline) or
+                        // .spec.move (File) artifacts before erroring on a later
+                        // module. Detect any such artifacts so the session-level
+                        // cache is invalidated even on partial-failure paths.
+                        let modules_env: &GlobalEnv =
+                            filtered_env_holder.as_ref().unwrap_or_else(|| data.env());
+                        for module in modules_env.get_modules() {
+                            if !module.is_target() {
+                                continue;
+                            }
+                            let source_path = PathBuf::from(module.get_source_path());
+                            let stem = source_path
+                                .file_stem()
+                                .expect("source file should have a stem");
+                            let source_dir = source_path
+                                .parent()
+                                .expect("source file should have a parent directory");
+                            let artifact = match spec_output {
+                                SpecOutput::Inline => source_dir
+                                    .join(format!("{}.enriched.move", stem.to_string_lossy())),
+                                SpecOutput::File => {
+                                    source_dir.join(format!("{}.spec.move", stem.to_string_lossy()))
+                                },
+                            };
+                            if artifact.exists() {
+                                wrote_files_in.store(true, Ordering::Relaxed);
+                                break;
+                            }
                         }
-                        let msg = if diag_text.is_empty() {
+                        let writer_text =
+                            String::from_utf8(error_writer.into_inner()).unwrap_or_default();
+                        let env_diags = super::super::package_data::render_diagnostics(modules_env);
+                        let combined = if writer_text.is_empty() {
+                            env_diags.join("\n")
+                        } else if env_diags.is_empty() {
+                            writer_text.clone()
+                        } else {
+                            format!("{}\n{}", writer_text, env_diags.join("\n"))
+                        };
+                        let record = if combined.is_empty() {
                             "spec inference failed".to_string()
                         } else {
-                            format!("spec inference failed:\n{}", diag_text)
+                            combined.clone()
+                        };
+                        data.set_diagnostics(DiagnosticSource::Inference, vec![record]);
+                        let msg = if combined.is_empty() {
+                            "spec inference failed".to_string()
+                        } else {
+                            format!("spec inference failed:\n{}", combined)
                         };
                         log::info!("move_package_wp: failed");
                         Ok(CallToolResult::error(vec![Content::text(msg)]))
@@ -267,6 +351,10 @@ impl FlowSession {
         .map_err(|e| {
             rmcp::ErrorData::internal_error(format!("spec infer task panicked: {}", e), None)
         })??;
+
+        if wrote_files.load(Ordering::Relaxed) {
+            self.invalidate_package(&params.package_path);
+        }
 
         Ok(result)
     }

@@ -5,6 +5,7 @@ use crate::pipeline::{CommitBlockMessage, LedgerUpdateMessage};
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_infallible::Mutex;
+use aptos_transaction_generator_lib::TransactionFeedback;
 use aptos_vm::VMBlockExecutor;
 use move_core_types::language_storage::StructTag;
 use std::{
@@ -26,6 +27,7 @@ pub struct LedgerUpdateStage<V> {
     allow_discards: bool,
     allow_retries: bool,
     event_summary: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
+    transaction_feedback: Option<Arc<dyn TransactionFeedback>>,
 }
 
 impl<V> LedgerUpdateStage<V>
@@ -39,6 +41,7 @@ where
         allow_discards: bool,
         allow_retries: bool,
         event_summary: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
+        transaction_feedback: Option<Arc<dyn TransactionFeedback>>,
     ) -> Self {
         Self {
             executor,
@@ -47,6 +50,7 @@ where
             allow_discards,
             allow_retries,
             event_summary,
+            transaction_feedback,
         }
     }
 
@@ -81,14 +85,21 @@ where
             }
         }
 
+        let transaction_outputs = &output.execution_output.to_commit.transaction_outputs;
+
         let mut event_summary = self.event_summary.lock();
-        for output in &output.execution_output.to_commit.transaction_outputs {
-            for event in output.events() {
+        for txn_output in transaction_outputs {
+            for event in txn_output.events() {
                 let count = event_summary
                     .entry((stage, event.type_tag().struct_tag().unwrap().clone()))
                     .or_insert(0);
                 *count += 1;
             }
+        }
+        drop(event_summary);
+
+        if let Some(feedback) = &self.transaction_feedback {
+            feedback.on_block_committed(transaction_outputs);
         }
 
         match &self.commit_processing {

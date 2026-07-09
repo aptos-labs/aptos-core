@@ -55,7 +55,7 @@ pub(crate) fn merklize_position(
         )
         .map_err(|e| AptosDbError::Other(format!("position JMT merklize_snapshot failed: {e}")))?;
 
-    *last_snapshot = new_state;
+    *last_snapshot = new_state.clone();
 
     Ok(PositionMerkleCommit {
         version,
@@ -64,5 +64,6 @@ pub(crate) fn merklize_position(
             top_levels_batch,
             batches_for_shards,
         },
+        snapshot: new_state,
     })
 }

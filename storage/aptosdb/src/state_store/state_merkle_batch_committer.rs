@@ -67,8 +67,6 @@ impl StateMerkleBatchCommitter {
             if let Some(hot) = hot_batch {
                 state_db
                     .hot_state_merkle_db
-                    .as_ref()
-                    .expect("Hot state merkle db must exist.")
                     .commit(
                         current_version,
                         hot.top_levels_batch,
@@ -96,12 +94,14 @@ impl StateMerkleBatchCommitter {
                 "State snapshot committed."
             );
             LATEST_SNAPSHOT_VERSION.set(current_version as i64);
-            if let Some(pruner) = &state_db.state_pruner.hot_state_merkle_pruner {
-                pruner.maybe_set_pruner_target_db_version(current_version);
-            }
-            if let Some(pruner) = &state_db.state_pruner.hot_epoch_snapshot_pruner {
-                pruner.maybe_set_pruner_target_db_version(current_version);
-            }
+            state_db
+                .state_pruner
+                .hot_state_merkle_pruner
+                .maybe_set_pruner_target_db_version(current_version);
+            state_db
+                .state_pruner
+                .hot_epoch_snapshot_pruner
+                .maybe_set_pruner_target_db_version(current_version);
             state_db
                 .state_pruner
                 .state_merkle_pruner

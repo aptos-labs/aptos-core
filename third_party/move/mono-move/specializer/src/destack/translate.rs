@@ -62,7 +62,8 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> Res
             let converter = SsaConverter::new(local_types, interner);
             let ssa = converter
                 .convert_function(&module, &code.code)?
-                .with_fusion_passes();
+                .with_fusion_passes()
+                .with_test_utils_passes(&module)?;
 
             // Pass: Greedy Slot Allocation (consumes SSA, remaps in-place)
             let alloc = super::slot_alloc::allocate_slots(ssa)?;

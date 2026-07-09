@@ -2060,6 +2060,7 @@ module aptos_framework::stake {
         let len = v.length();
         while ({
             spec {
+                invariant i <= len;
                 invariant !(exists j in 0..i: v[j].addr == addr);
             };
             i < len

@@ -497,7 +497,7 @@ impl FunctionTargetProcessor for BorrowAnalysisProcessor {
         writeln!(f, "\n\n==== borrow analysis summaries ====\n")?;
         for ref module in env.get_modules() {
             for ref fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() {
                     continue;
                 }
                 for (_, ref target) in targets.get_targets(fun) {

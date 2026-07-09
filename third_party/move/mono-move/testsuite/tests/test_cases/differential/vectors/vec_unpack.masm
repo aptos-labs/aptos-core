@@ -1,0 +1,93 @@
+// RUN: publish
+module 0x66::vec_unpack
+
+// Combine as a + 10*b + 100*c so result parity proves element order.
+fun pack3_unpack3(): u64
+    local elem_a: u64
+    local elem_b: u64
+    local elem_c: u64
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    vec_pack <u64>, 3
+    vec_unpack <u64>, 3
+    st_loc elem_c
+    st_loc elem_b
+    st_loc elem_a
+    move_loc elem_a
+    ld_u64 10
+    move_loc elem_b
+    mul
+    add
+    ld_u64 100
+    move_loc elem_c
+    mul
+    add
+    ret
+
+fun unpack_too_many(): u64
+    ld_u64 1
+    ld_u64 2
+    vec_pack <u64>, 2
+    vec_unpack <u64>, 3
+    add
+    add
+    ret
+
+fun unpack_too_few(): u64
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    vec_pack <u64>, 3
+    vec_unpack <u64>, 2
+    add
+    ret
+
+fun unpack_empty_nonzero(): u64
+    vec_pack <u64>, 0
+    vec_unpack <u64>, 1
+    ret
+
+fun unpack_zero_on_empty(): u64
+    vec_pack <u64>, 0
+    vec_unpack <u64>, 0
+    ld_u64 77
+    ret
+
+fun pack2_unpack2_u8(): u8
+    local byte_a: u8
+    local byte_b: u8
+    ld_u8 7
+    ld_u8 9
+    vec_pack <u8>, 2
+    vec_unpack <u8>, 2
+    st_loc byte_b
+    st_loc byte_a
+    move_loc byte_a
+    ld_u8 10
+    move_loc byte_b
+    mul
+    add
+    ret
+
+// RUN: execute 0x66::vec_unpack::pack3_unpack3
+// CHECK: results: 321
+
+// RUN: execute 0x66::vec_unpack::unpack_too_many
+// CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
+// CHECK-V2-SUBSTR: VecUnpack: expected 3 elements, vector has 2
+
+// RUN: execute 0x66::vec_unpack::unpack_too_few
+// CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
+// CHECK-V2-SUBSTR: VecUnpack: expected 2 elements, vector has 3
+
+// RUN: execute 0x66::vec_unpack::unpack_empty_nonzero
+// CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
+// CHECK-V2-SUBSTR: VecUnpack: expected 1 elements, vector has 0
+
+// RUN: execute 0x66::vec_unpack::unpack_zero_on_empty
+// CHECK: results: 77
+
+// 7 + 10*9 = 97 proves both u8 elements landed intact.
+// RUN: execute 0x66::vec_unpack::pack2_unpack2_u8
+// CHECK: results: 97
