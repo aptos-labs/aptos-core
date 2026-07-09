@@ -674,24 +674,27 @@ module aptos_framework::fungible_asset {
     ///       Use `dispatchable_fungible_asset::balance` instead if you intend to work with those FAs.
     public fun balance<T: key>(
         store: Object<T>
-    ): u64 acquires FungibleStore, ConcurrentFungibleBalance, DispatchFunctionStore {
-        let fa_store = borrow_store_resource(&store);
-        assert!(
-            !has_balance_dispatch_function(fa_store.metadata),
-            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
-        );
-        balance_impl(store)
+    ): u64 {
+        balance_impl(
+            store,
+            |store| {
+                assert!(
+                    !has_balance_dispatch_function(store.metadata),
+                    error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+                );
+            }
+        )
     }
 
-    fun balance_impl<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    inline fun balance_impl<T: key>(store: Object<T>, check: |&FungibleStore|): u64 {
         let store_addr = store.object_address();
         if (store_exists_inline(store_addr)) {
-            let store_balance = borrow_store_resource(&store).balance;
+            let store = &FungibleStore[store_addr];
+            check(store);
+            let store_balance = store.balance;
             if (store_balance == 0
                 && concurrent_fungible_balance_exists_inline(store_addr)) {
-                let balance_resource =
-                    borrow_global<ConcurrentFungibleBalance>(store_addr);
-                balance_resource.balance.read()
+                ConcurrentFungibleBalance[store_addr].balance.read()
             } else {
                 store_balance
             }
@@ -706,7 +709,7 @@ module aptos_framework::fungible_asset {
     public fun balance_snapshot<T: key>(store: Object<T>): AggregatorSnapshot<u64> {
         let store_addr = object::object_address(&store);
         if (store_exists_inline(store_addr)) {
-            let fa_store = borrow_store_resource(&store);
+            let fa_store = &FungibleStore[store_addr];
             assert!(
                 !has_balance_dispatch_function(fa_store.metadata),
                 error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
@@ -714,7 +717,7 @@ module aptos_framework::fungible_asset {
 
             let store_balance = fa_store.balance;
             if (store_balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
-                aggregator_v2::snapshot(&ConcurrentFungibleBalance[store_addr].balance)
+                ConcurrentFungibleBalance[store_addr].balance.snapshot()
             } else {
                 aggregator_v2::create_snapshot(store_balance)
             }
@@ -1145,11 +1148,15 @@ module aptos_framework::fungible_asset {
     public fun balance_with_ref<T: key>(
         self: &RawBalanceRef, store: Object<T>
     ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
-        assert!(
-            self.metadata == store_metadata(store),
-            error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
-        );
-        balance_impl(store)
+        balance_impl(
+            store,
+            |store| {
+                assert!(
+                    self.metadata == store.metadata,
+                    error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+                );
+            }
+        )
     }
 
     /// Access raw supply of a FA using `RawSupplyRef`
