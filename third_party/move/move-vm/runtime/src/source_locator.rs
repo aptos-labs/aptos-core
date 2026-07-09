@@ -71,6 +71,11 @@ pub fn set_source_locator(loc: Arc<dyn SourceLocator>) {
     LOCATOR.with(|l| *l.borrow_mut() = Some(loc));
 }
 
+/// Return a clone of the current thread's source locator, if any.
+pub fn get_source_locator() -> Option<Arc<dyn SourceLocator>> {
+    LOCATOR.with(|l| l.borrow().clone())
+}
+
 /// Remove the source locator for the current thread.
 pub fn clear_source_locator() {
     LOCATOR.with(|l| *l.borrow_mut() = None);
@@ -131,7 +136,7 @@ pub fn get_enum_variant_info(
 /// blank lines; this function only writes the Parameters / Locals sections.
 ///
 /// `compact` – when `true`, `Invalid` slots (already moved out) are omitted.
-pub(crate) fn print_locals_enriched<B: fmt::Write>(
+pub(crate) fn print_locals_enаriched<B: fmt::Write>(
     buf: &mut B,
     function: &crate::LoadedFunction,
     locals: &Locals,

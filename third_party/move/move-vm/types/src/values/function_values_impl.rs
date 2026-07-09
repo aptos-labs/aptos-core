@@ -235,7 +235,7 @@ where
 /// Value:closure(AbstractFunction, [Value]) requires an AbstractFunction, which is agnostic from runtime implementation.
 /// This mock is used to test the function values system.
 #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
-pub(crate) mod mock {
+pub mod mock {
     use super::*;
     use better_any::{Tid, TidAble, TidExt};
     use move_binary_format::errors::PartialVMResult;
@@ -250,13 +250,13 @@ pub(crate) mod mock {
 
     // Since Abstract functions are `Tid`, we cannot auto-mock them, so need to mock manually.
     #[derive(Clone, Tid)]
-    pub(crate) struct MockAbstractFunction {
-        pub(crate) data: SerializedFunctionData,
+    pub struct MockAbstractFunction {
+        pub data: SerializedFunctionData,
     }
 
     impl MockAbstractFunction {
         #[allow(dead_code)]
-        pub(crate) fn new(
+        pub fn new(
             fun_name: &str,
             ty_args: Vec<TypeTag>,
             mask: ClosureMask,

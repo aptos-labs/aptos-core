@@ -641,7 +641,7 @@ impl LoadedFunction {
         self.function.code.len()
     }
 
-    pub(crate) fn name_as_pretty_string(&self) -> String {
+    pub fn name_as_pretty_string(&self) -> String {
         match &self.owner {
             LoadedFunctionOwner::Script(_) => "script::main".into(),
             LoadedFunctionOwner::Module(m) => format!(
