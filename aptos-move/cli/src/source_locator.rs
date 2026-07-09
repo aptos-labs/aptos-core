@@ -105,6 +105,9 @@ impl AptosSourceLocator {
             line_starts,
         });
 
+        // As we're using the `module_id.name()` here, it's prone to the name collisions.
+        // We're leaving it as-is now, as it only used if named addresses are different from the local ones.
+        // In this case we can't rely on address, so we match against the name-only in best-effort way.
         self.name_to_module_id
             .insert(module_id.name().to_string(), module_id.clone());
         self.source_data
