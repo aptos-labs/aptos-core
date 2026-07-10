@@ -27,13 +27,11 @@ use mono_move_core::{
     Function, GasMeter, Interner, LoaderError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_natives::{
     EventStore, ObjectContextExtension, StorageUsageAtEpochBoundary, TransactionContextExtension,
 };
-use mono_move_runtime::{
-    ExecutionContext, InterpreterContext, RuntimeError, RuntimeStatus, TransactionContext,
-};
+use mono_move_runtime::{InterpreterContext, RuntimeError, RuntimeStatus};
 use mono_move_testsuite::{
     build_natives, finalize_events_v2, InMemoryModuleProvider, InMemoryResourceProvider,
 };
@@ -51,8 +49,6 @@ const GAS_BUDGET: u64 = u64::MAX;
 /// `MIN_ARENA_BYTES` (the flat representation can be larger than BCS).
 const MIN_ARENA_BYTES: usize = 16 * 1024 * 1024;
 const ARENA_BYTES_PER_RESOURCE_BYTE: usize = 8;
-
-type Interp<'i, 'guard, 'ctx> = InterpreterContext<'i, TransactionContext<'guard, 'ctx>>;
 
 /// How an entry-function parameter is filled into the root frame.
 enum ParamKind {
@@ -114,14 +110,6 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     ));
     extensions.add(EventStore::new());
 
-    let mut txn_ctx = TransactionContext::new(
-        loader,
-        GasMeter::new(GAS_BUDGET),
-        &resource_provider,
-        &natives,
-    )
-    .with_extensions(extensions);
-
     // Intern the transaction's type arguments.
     let interned_ty_args = input
         .entry
@@ -139,19 +127,35 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let function = guard
         .intern_identifier(input.entry.function())
         .into_global_arena_ptr();
-    let func = match txn_ctx.load_function(module_id, function, ty_arg_list) {
+    let mut read_set = ModuleReadSet::new();
+    let mut gas_meter = GasMeter::new(GAS_BUDGET);
+    let func = match loader.load_function(
+        &mut read_set,
+        &mut gas_meter,
+        module_id,
+        function,
+        ty_arg_list,
+    ) {
         // SAFETY: the pointer lives in a LoadedModule arena kept alive by `guard`.
         Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
         Err(err) => bail!("failed to load entry function on V2: {}", err),
     };
+
+    let mut interp = InterpreterContext::new(
+        loader,
+        read_set,
+        gas_meter,
+        &resource_provider,
+        &natives,
+        func,
+    )
+    .with_extensions(extensions);
 
     // Classify each parameter as a signer or a value.
     let params = classify_params(&module, input.entry.function(), &guard, ty_arg_list)?;
 
     // Sender bytes backing any `&signer` parameter; must outlive every run.
     let signer_bytes = input.sender.into_bytes();
-
-    let mut interp = InterpreterContext::new(&mut txn_ctx, func);
 
     // Trial run: determine the outcome.
     // TODO(cleanup): need to reset events / extensions?
@@ -248,7 +252,7 @@ fn classify_token(
 }
 
 fn place_args(
-    interp: &mut Interp<'_, '_, '_>,
+    interp: &mut InterpreterContext<'_>,
     func: &Function,
     params: &[ParamKind],
     signer_bytes: &[u8],

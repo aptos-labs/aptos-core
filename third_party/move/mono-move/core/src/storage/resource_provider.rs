@@ -143,8 +143,3 @@ impl ResourceProvider for NoResourceProvider {
         Ok(StorageRead::DoesNotExist)
     }
 }
-
-// TODO(testing):
-//   This is only needed to make current tests work. Remove once specializer can emit
-//   struct / enum operations or when testing framework is unified.
-pub static NO_RESOURCE_PROVIDER: NoResourceProvider = NoResourceProvider;

@@ -41,22 +41,21 @@ pub use instruction::{
 pub use interner::{view_function_ref, FunctionRef, InternedFunctionRef, Interner, ModuleId};
 pub use move_binary_format::file_format::ConstantPoolIndex;
 pub use object_descriptor::{
-    DescriptorProvider, NoDescriptorProvider, ObjectDescriptor, ObjectDescriptorInner,
-    ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID, NO_DESCRIPTOR_PROVIDER,
-    RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
+    CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
     intern_sig_token, FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
-    ModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
-    NO_RESOURCE_PROVIDER,
+    ModuleProvider, NoModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError,
+    StorageRead,
 };
 pub use types::{convert_mut_to_immut_ref, strip_ref};
 pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
-    LayoutProvider, NoLayoutProvider, ValueLayout, ValueLayoutTable, NO_LAYOUT_PROVIDER,
+    LayoutProvider, ValueLayout, ValueLayoutTable,
 };
 pub use vm_error::{
     ArithOp, GlobalStorageOp, LoaderError, LoaderInvariantViolation, LoaderResult, RuntimeError,

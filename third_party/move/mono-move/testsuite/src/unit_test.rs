@@ -13,14 +13,11 @@ use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{
     ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
 };
-use mono_move_core::{
-    types::EMPTY_TYPE_LIST, DescriptorProvider, Function, GasMeter, Interner, LayoutProvider,
-};
+use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
+use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::{
-    ExecutionContext, InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
-    TransactionContext,
+    InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
@@ -154,13 +151,6 @@ fn execute(
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
         natives,
     );
-    let mut txn_ctx = TransactionContext::new(
-        loader,
-        GasMeter::new(GAS_BUDGET),
-        resource_provider,
-        natives,
-    )
-    .with_extensions(seed_extensions());
 
     let module_id = guard
         .intern_address_name(module_id.address(), module_id.name())
@@ -169,14 +159,30 @@ fn execute(
         .intern_identifier(IdentStr::new(&test.test_name).unwrap())
         .into_global_arena_ptr();
 
+    let mut read_set = ModuleReadSet::new();
+    let mut gas_meter = GasMeter::new(GAS_BUDGET);
     // SAFETY: the pointer lives in a `LoadedModule`'s arena; while `guard` is
     // held the executable cache cannot reset that arena.
-    let function = match txn_ctx.load_function(module_id, func, EMPTY_TYPE_LIST) {
+    let function = match loader.load_function(
+        &mut read_set,
+        &mut gas_meter,
+        module_id,
+        func,
+        EMPTY_TYPE_LIST,
+    ) {
         Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
         Err(err) => return classify_loader_error(&err),
     };
 
-    let mut interpreter = InterpreterContext::new(&mut txn_ctx, function);
+    let mut interpreter = InterpreterContext::new(
+        loader,
+        read_set,
+        gas_meter,
+        resource_provider,
+        natives,
+        function,
+    )
+    .with_extensions(seed_extensions());
 
     // Reference arguments point into this storage, so it must outlive `run()`.
     let _ref_args = marshal_args(&mut interpreter, function, &test.arguments);
@@ -202,14 +208,11 @@ const REFERENCE_SIZE: u32 = 16;
 // Each target is boxed for a stable heap address: the fat pointer stores that
 // address, so a `Vec<[u8; 32]>` (whose elements move on reallocation) won't do.
 #[allow(clippy::vec_box)]
-fn marshal_args<T>(
-    interpreter: &mut InterpreterContext<'_, T>,
+fn marshal_args(
+    interpreter: &mut InterpreterContext<'_>,
     function: &Function,
     args: &[MoveValue],
-) -> Vec<Box<[u8; 32]>>
-where
-    T: ExecutionContext + DescriptorProvider + LayoutProvider,
-{
+) -> Vec<Box<[u8; 32]>> {
     assert_eq!(
         args.len(),
         function.param_slots.len(),

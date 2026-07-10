@@ -1,20 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! End-to-end test for cross-module dispatch through [`TransactionContext`].
+//! End-to-end test for cross-module dispatch through [`InterpreterContext`].
 //!
 //! Compiles two Move modules from source, wires an [`InMemoryModuleProvider`]
 //! to a [`Loader`], and runs the entry function in the interpreter. The
 //! callee module is **not** preloaded — the test verifies that hitting
-//! `CallIndirect` at runtime lazily loads it through the transaction
+//! `CallIndirect` at runtime lazily loads it through the interpreter
 //! context.
 
 use mono_move_core::{types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_runtime::{
-    ExecutionContext, InterpreterContext, ProductionNativeRegistry, TransactionContext,
-};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -45,15 +43,6 @@ fn call_indirect_triggers_lazy_module_load() {
         &natives,
     );
 
-    // -- Wrap into a TransactionContext ---------------------------
-    let mut txn_ctx = TransactionContext::new(
-        loader,
-        GasMeter::with_max_budget(),
-        &mono_move_core::NO_RESOURCE_PROVIDER,
-        &natives,
-    );
-
-    // -- Resolve bar::main through the txn_ctx ---------------------------
     // This lazily loads `bar` (via the loader) and returns a pointer to
     // `main`. `foo` is *not* loaded yet — its CallIndirect site inside
     // `bar::main` will trigger the lazy load when the interpreter executes.
@@ -63,25 +52,37 @@ fn call_indirect_triggers_lazy_module_load() {
     let main_name = guard
         .intern_identifier(ident_str!("main"))
         .into_global_arena_ptr();
-    let main_ptr = txn_ctx
-        .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
+    let mut read_set = ModuleReadSet::new();
+    let mut gas_meter = GasMeter::with_max_budget();
+    let main_ptr = loader
+        .load_function(
+            &mut read_set,
+            &mut gas_meter,
+            bar_id,
+            main_name,
+            EMPTY_TYPE_LIST,
+        )
         .expect("bar::main should resolve");
-    assert_eq!(txn_ctx.read_set().len(), 1, "only bar loaded so far");
+    assert_eq!(read_set.len(), 1, "only bar loaded so far");
 
-    // -- Run the interpreter on bar::main --------------------------------
     // SAFETY: `main_ptr` came from the executable cache, which is kept
     // alive by `guard` for the duration of this test.
     let main_fn = unsafe { main_ptr.as_ref_unchecked() };
-    let mut interp = InterpreterContext::new(&mut txn_ctx, main_fn);
+    let mut interp = InterpreterContext::new(
+        loader,
+        read_set,
+        gas_meter,
+        &mono_move_core::NoResourceProvider,
+        &natives,
+        main_fn,
+    );
     interp.set_root_arg(0, &41u64.to_le_bytes());
     interp.run().expect("execution should succeed");
 
     assert_eq!(interp.root_result(), 42, "expected foo::add_one(41) = 42");
 
-    // -- Both modules should now be in the read-set ----------------------
-    drop(interp);
     assert_eq!(
-        txn_ctx.read_set().len(),
+        interp.read_set().len(),
         2,
         "foo should have been lazily loaded during execution"
     );

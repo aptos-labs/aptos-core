@@ -23,6 +23,7 @@ move-core-types = { workspace = true }
 rand = { workspace = true }
 
 [dev-dependencies]
+mono-move-global-context = { workspace = true }
 num-bigint = { workspace = true }
 paste = { workspace = true }
 proptest = { workspace = true }

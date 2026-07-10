@@ -38,11 +38,10 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, MicroOp, ShiftOperand, SortedSafePointEntries,
-    FRAME_METADATA_SIZE,
+    native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp,
+    IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, ShiftOperand,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 use move_core_types::int256::{I256, U256};
 use num_bigint::{BigInt, Sign};
 use proptest::{prelude::*, strategy::BoxedStrategy};
@@ -215,26 +214,26 @@ fn run_wide(
     dst_size: usize,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let func = make_func(op);
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget_no_descriptors();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
-    if !lhs_bytes.is_empty() {
-        ctx.set_root_arg(SLOT_LHS, lhs_bytes);
-    }
-    if !rhs_bytes.is_empty() {
-        ctx.set_root_arg(SLOT_RHS, rhs_bytes);
-    }
-    ctx.run().map_err(|e| anyhow::anyhow!("{}", e))?;
+    common::with_test_interpreter(&func, u64::MAX, NativeExtensions::new(), |ctx| {
+        if !lhs_bytes.is_empty() {
+            ctx.set_root_arg(SLOT_LHS, lhs_bytes);
+        }
+        if !rhs_bytes.is_empty() {
+            ctx.set_root_arg(SLOT_RHS, rhs_bytes);
+        }
+        ctx.run().map_err(|e| anyhow::anyhow!("{}", e))?;
 
-    let mut out = vec![0u8; dst_size];
-    let mut i = 0usize;
-    while i < dst_size {
-        let word = ctx.root_result_at(SLOT_DST + i as u32);
-        let bytes = word.to_ne_bytes();
-        let copy_n = (dst_size - i).min(8);
-        out[i..i + copy_n].copy_from_slice(&bytes[..copy_n]);
-        i += 8;
-    }
-    Ok(out)
+        let mut out = vec![0u8; dst_size];
+        let mut i = 0usize;
+        while i < dst_size {
+            let word = ctx.root_result_at(SLOT_DST + i as u32);
+            let bytes = word.to_ne_bytes();
+            let copy_n = (dst_size - i).min(8);
+            out[i..i + copy_n].copy_from_slice(&bytes[..copy_n]);
+            i += 8;
+        }
+        Ok(out)
+    })
 }
 
 // ---------------------------------------------------------------------------

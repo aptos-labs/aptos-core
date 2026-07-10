@@ -10,10 +10,9 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
-    FRAME_METADATA_SIZE,
+    native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{InterpreterContext, LocalRuntimeContext, ObjectDescriptorTable};
 
 /// `ReadRef`/`WriteRef` whose runtime target aliases the dst/src slot.
 /// Guards the interpreter's overlap-safe copy. Not expressible in Move source:
@@ -51,15 +50,14 @@ fn ref_self_copy() {
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
-    let descriptors = ObjectDescriptorTable::new();
-
-    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &function);
-    ctx.run().unwrap();
+    let result =
+        common::with_test_interpreter(&function, u64::MAX, NativeExtensions::new(), |ctx| {
+            ctx.run().unwrap();
+            ctx.root_result()
+        });
 
     assert_eq!(
-        ctx.root_result(),
-        99,
+        result, 99,
         "self-overlapping ReadRef/WriteRef should preserve the value"
     );
 }
