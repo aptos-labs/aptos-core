@@ -7,6 +7,8 @@ mod call_graph_leaf;
 mod dep_graph;
 mod dep_graph_no_deps;
 mod facts;
+mod facts_closure;
+mod facts_nested;
 mod function_usage;
 mod function_usage_bad_format;
 mod function_usage_bad_function;
