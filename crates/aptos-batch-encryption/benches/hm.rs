@@ -116,28 +116,35 @@ pub fn batch_verify_pieces(c: &mut Criterion) {
     }
 }
 
-pub fn gt_exp(c: &mut Criterion) {
-    let mut group = c.benchmark_group("gt_exp");
+pub fn batch_verify_pieces_schnorr(c: &mut Criterion) {
+    let mut group = c.benchmark_group("batch_verify_pieces_schnorr");
     let mut rng = thread_rng();
 
-    {
-        let f_size = 1;
-        let g1s = vec![G1Affine::rand(&mut rng); f_size];
-        let g2s = vec![G2Affine::rand(&mut rng); f_size];
-        let gt =
-            PairingSetting::final_exponentiation(PairingSetting::multi_miller_loop(&g1s, &g2s))
-                .unwrap();
-        let fr = Fr::rand(&mut rng);
+    for f_size in [1, 3, 128, 256] {
+        let g1s_lhs = vec![G1Affine::rand(&mut rng); f_size];
+        let g1s_rhs = vec![G1Affine::rand(&mut rng); f_size];
+        let rand_exps = vec![Fr::rand(&mut rng); f_size];
 
         group.bench_with_input(
             BenchmarkId::from_parameter(f_size),
-            &(gt, fr),
+            &(g1s_lhs, g1s_rhs, rand_exps),
             |b, input| {
-                b.iter(|| input.0 * input.1);
+                b.iter(|| {
+                    let rand_exps_neg : Vec<Fr> = input.2
+                        .iter()
+                        .map(|r| -*r)
+                        .collect();
+                    let mut exps_combined = input.2.clone();
+                    exps_combined.extend_from_slice(&rand_exps_neg);
+                    let mut bases_combined = input.0.clone();
+                    bases_combined.extend_from_slice(&input.1);
+
+                    G1Projective::msm(&bases_combined, &exps_combined)
+                });
             },
         );
     }
 }
 
-criterion_group!(benches, group_elt_fft, fk_prepare, batch_verify_pieces, combine_pieces);
+criterion_group!(benches, group_elt_fft, fk_prepare, batch_verify_pieces, batch_verify_pieces_schnorr, combine_pieces);
 criterion_main!(benches);
