@@ -22,6 +22,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
+use mono_move_global_context::GlobalContext;
 use move_binary_format::{
     errors::{Location, VMError},
     CompiledModule,
@@ -62,7 +63,6 @@ pub struct ModuleCacheManager<K, D, V, E> {
     /// new batch of transactions is about to be executed, the associated metadata can be checked
     /// to ensure that the execution history is linear.
     transaction_slice_metadata: TransactionSliceMetadata,
-
     /// The execution environment, initially set to [None]. The environment, as long as it does not
     /// change, can be kept for multiple block executions.
     environment: Option<AptosEnvironment>,
@@ -70,6 +70,20 @@ pub struct ModuleCacheManager<K, D, V, E> {
     /// responsibility of [ModuleCacheManager] to ensure it stays in sync with the environment and
     /// the state.
     module_cache: GlobalModuleCache<K, D, V, E>,
+
+    /// The global context of the MonoMove.
+    // TODO:
+    //   For maintenance, we just need to do Arc::get_mut(&mut self.global_ctx)
+    //   and handle case when Some is returned.
+    global_context: Arc<GlobalContext>,
+}
+
+/// Returns a new global context for the mono VM, with one arena shard per possible worker.
+/// Worker IDs are bounded by the concurrency level, which is at most the number of CPUs. The
+/// context requires a power-of-two shard count of at most 128.
+fn new_global_context() -> Arc<GlobalContext> {
+    let num_workers = num_cpus::get().next_power_of_two().min(128);
+    Arc::new(GlobalContext::with_num_execution_workers(num_workers))
 }
 
 impl<K, D, V, E> ModuleCacheManager<K, D, V, E>
@@ -85,6 +99,7 @@ where
             transaction_slice_metadata: TransactionSliceMetadata::unknown(),
             environment: None,
             module_cache: GlobalModuleCache::empty(),
+            global_context: new_global_context(),
         }
     }
 
@@ -216,6 +231,7 @@ impl AptosModuleCacheManager {
                 AptosModuleCacheManagerGuard::None {
                     environment: storage_environment,
                     module_cache: GlobalModuleCache::empty(),
+                    global_context: new_global_context(),
                 }
             },
         })
@@ -259,6 +275,7 @@ pub enum AptosModuleCacheManagerGuard<'a> {
     None {
         environment: AptosEnvironment,
         module_cache: GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        global_context: Arc<GlobalContext>,
     },
 }
 
@@ -272,6 +289,15 @@ impl AptosModuleCacheManagerGuard<'_> {
                 .as_ref()
                 .expect("Guard always has environment set"),
             None { environment, .. } => environment,
+        }
+    }
+
+    /// Returns the reference to the global context of the mono VM.
+    pub fn global_context(&self) -> &Arc<GlobalContext> {
+        use AptosModuleCacheManagerGuard::*;
+        match self {
+            Guard { guard } => &guard.global_context,
+            None { global_context, .. } => global_context,
         }
     }
 
@@ -312,6 +338,7 @@ impl AptosModuleCacheManagerGuard<'_> {
         AptosModuleCacheManagerGuard::None {
             environment: AptosEnvironment::new(state_view),
             module_cache: GlobalModuleCache::empty(),
+            global_context: new_global_context(),
         }
     }
 
@@ -323,6 +350,7 @@ impl AptosModuleCacheManagerGuard<'_> {
         AptosModuleCacheManagerGuard::None {
             environment: AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view),
             module_cache: GlobalModuleCache::empty(),
+            global_context: new_global_context(),
         }
     }
 

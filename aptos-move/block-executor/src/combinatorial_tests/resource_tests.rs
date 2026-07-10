@@ -9,7 +9,6 @@ use crate::{
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams, MAX_GAS_PER_TXN},
     },
     executor::BlockExecutor,
-    task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
@@ -18,7 +17,7 @@ use aptos_types::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::{state_value::StateValue, MockStateView, TStateView},
-    transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction, BlockOutput},
+    transaction::{AuxiliaryInfo, BlockOutput},
     vm::modules::AptosModuleExtension,
 };
 use move_core_types::language_storage::ModuleId;
@@ -32,7 +31,7 @@ use proptest::{
     test_runner::TestRunner,
 };
 use rand::Rng;
-use std::{fmt::Debug, sync::Arc};
+use std::sync::Arc;
 use test_case::test_matrix;
 
 pub(crate) fn get_gas_limit_variants(
@@ -88,18 +87,19 @@ pub(crate) fn populate_guard_with_modules(
     }
 }
 
-pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
+/// The concrete mock transaction type driving the combinatorial tests.
+pub(crate) type MockTxn = MockTransaction<KeyType<[u8; 32]>, MockEvent>;
+
+pub(crate) fn execute_block_parallel<ViewType, Provider>(
     block_gas_limit: Option<u64>,
     txn_provider: &Provider,
     data_view: &ViewType,
     all_module_ids: Option<&[ModuleId]>,
     block_stm_v2: bool,
-) -> Result<BlockOutput<TxnType, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
+) -> Result<BlockOutput<MockTxn, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
 where
-    TxnType: Transaction<Key = KeyType<[u8; 32]>> + Debug + Clone + Send + Sync + 'static,
-    ViewType: TStateView<Key = TxnType::Key> + Sync + 'static,
-    Provider: TxnProvider<TxnType, AuxiliaryInfo> + Sync + 'static,
-    MockTask<KeyType<[u8; 32]>, MockEvent>: ExecutorTask<Txn = TxnType>,
+    ViewType: TStateView<Key = KeyType<[u8; 32]>> + Sync + 'static,
+    Provider: TxnProvider<MockTxn, AuxiliaryInfo> + Sync + 'static,
 {
     let mut guard = AptosModuleCacheManagerGuard::none();
 
@@ -110,12 +110,10 @@ where
 
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), block_gas_limit);
     let block_executor = BlockExecutor::<
-        TxnType,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         ViewType,
         NoOpTransactionCommitHook<usize>,
         Provider,
-        AuxiliaryInfo,
     >::new(config, None);
 
     if block_stm_v2 {
@@ -228,7 +226,6 @@ pub(crate) fn run_transactions_resources(
                 }
                 for block_stm_v2 in [false, true] {
                     let output = execute_block_parallel::<
-                        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                         MockStateView<KeyType<[u8; 32]>>,
                         DefaultTxnProvider<
                             MockTransaction<KeyType<[u8; 32]>, MockEvent>,

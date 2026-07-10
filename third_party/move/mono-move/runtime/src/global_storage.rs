@@ -56,11 +56,10 @@ use crate::{
     error::{GlobalStorageOp, RuntimeError, RuntimeResult},
     heap::RootScanner,
     invariant_violation,
+    resource_provider::{ResourceProvider, StorageRead},
 };
 use hashbrown::{hash_map::EntryRef, HashMap};
-use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey, ResourceProvider, StorageRead,
-};
+use mono_move_core::storage::resource_provider::InMemoryStorageKey;
 use std::ptr::NonNull;
 
 /// Counter incremented by every checkpoint. Used to tell whether a pending
@@ -123,7 +122,7 @@ impl Entry {
     pub(crate) fn exists(&self) -> bool {
         match self.write {
             StorageWrite::NotModified => match self.read {
-                StorageRead::DoesNotExist => false,
+                StorageRead::DoesNotExist { .. } => false,
                 StorageRead::ExternalHeap { .. } => true,
             },
             StorageWrite::Deleted { .. } => false,
@@ -137,7 +136,7 @@ impl Entry {
     pub(crate) fn as_ptr(&self) -> Option<NonNull<u8>> {
         match self.write {
             StorageWrite::NotModified => match self.read {
-                StorageRead::DoesNotExist => None,
+                StorageRead::DoesNotExist { .. } => None,
                 StorageRead::ExternalHeap { ptr, .. } => Some(ptr),
             },
             StorageWrite::Deleted { .. } => None,
@@ -154,7 +153,7 @@ impl Entry {
     pub(crate) fn as_ptr_mut(&self, current_epoch: CheckpointCounter) -> Option<EntryPtr> {
         match self.write {
             StorageWrite::NotModified => match self.read {
-                StorageRead::DoesNotExist => None,
+                StorageRead::DoesNotExist { .. } => None,
                 StorageRead::ExternalHeap { ptr, .. } => Some(EntryPtr::NonWritable(ptr)),
             },
             StorageWrite::Deleted { .. } => None,
@@ -359,6 +358,13 @@ impl ResourceReadWriteSet {
         self.record_write_to_journal(key, old_write);
     }
 
+    /// Iterates every entry of the read-write set: the key with its recorded
+    /// read and pending write. Iteration order is non-deterministic (see the
+    /// `entries` field docs); callers must not depend on it.
+    pub fn entries(&self) -> impl Iterator<Item = (&InMemoryStorageKey, &Entry)> {
+        self.entries.iter()
+    }
+
     /// Returns the current epoch.
     pub fn current_epoch(&self) -> CheckpointCounter {
         self.current_epoch
@@ -516,6 +522,11 @@ mod tests {
     // The map only stores and compares these pointers — it never reads through
     // them (copying a value is the interpreter's job). So any non-null address
     // is a valid stand-in for a heap value.
+    /// A tiny heap for reads whose pointers are never dereferenced.
+    fn test_heap() -> std::sync::Arc<Heap> {
+        std::sync::Arc::new(Heap::new(64))
+    }
+
     fn fake_ptr(n: usize) -> NonNull<u8> {
         NonNull::new(n as *mut u8).expect("non-null")
     }
@@ -545,8 +556,8 @@ mod tests {
             key: &InMemoryStorageKey,
         ) -> Result<StorageRead, ResourceProviderError> {
             Ok(match self.external.get(key) {
-                Some(&ptr) => StorageRead::ExternalHeap { ptr, version: 0 },
-                None => StorageRead::DoesNotExist,
+                Some(&ptr) => StorageRead::external_heap_in_storage(ptr, test_heap()),
+                None => StorageRead::does_not_exist_in_storage(),
             })
         }
     }
@@ -561,21 +572,25 @@ mod tests {
     fn exists_reflects_read_and_write_state() {
         let p = fake_ptr(0x10);
         // An unmodified entry follows its read.
-        assert!(!entry(StorageRead::DoesNotExist, StorageWrite::NotModified).exists());
+        assert!(!entry(
+            StorageRead::does_not_exist_in_storage(),
+            StorageWrite::NotModified
+        )
+        .exists());
         assert!(entry(
-            StorageRead::ExternalHeap { ptr: p, version: 0 },
+            StorageRead::external_heap_in_storage(p, test_heap()),
             StorageWrite::NotModified
         )
         .exists());
         // A local write means present, regardless of the read.
-        assert!(entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
-            ptr: p,
-            epoch: 0
-        })
+        assert!(entry(
+            StorageRead::does_not_exist_in_storage(),
+            StorageWrite::LocalHeap { ptr: p, epoch: 0 }
+        )
         .exists());
         // Deletion shadows any read.
         assert!(!entry(
-            StorageRead::ExternalHeap { ptr: p, version: 0 },
+            StorageRead::external_heap_in_storage(p, test_heap()),
             StorageWrite::Deleted { epoch: 0 }
         )
         .exists());
@@ -589,33 +604,34 @@ mod tests {
         // zero-copy read path.
         assert_eq!(
             entry(
-                StorageRead::ExternalHeap {
-                    ptr: ext,
-                    version: 0
-                },
+                StorageRead::external_heap_in_storage(ext, test_heap()),
                 StorageWrite::NotModified
             )
             .as_ptr(),
             Some(ext)
         );
         assert_eq!(
-            entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
-                ptr: local,
-                epoch: 0
-            })
+            entry(
+                StorageRead::does_not_exist_in_storage(),
+                StorageWrite::LocalHeap {
+                    ptr: local,
+                    epoch: 0
+                }
+            )
             .as_ptr(),
             Some(local)
         );
         assert_eq!(
-            entry(StorageRead::DoesNotExist, StorageWrite::NotModified).as_ptr(),
+            entry(
+                StorageRead::does_not_exist_in_storage(),
+                StorageWrite::NotModified
+            )
+            .as_ptr(),
             None
         );
         assert_eq!(
             entry(
-                StorageRead::ExternalHeap {
-                    ptr: ext,
-                    version: 0
-                },
+                StorageRead::external_heap_in_storage(ext, test_heap()),
                 StorageWrite::Deleted { epoch: 0 }
             )
             .as_ptr(),
@@ -630,7 +646,7 @@ mod tests {
         // An external read is never directly writable — it needs a copy.
         assert!(matches!(
             entry(
-                StorageRead::ExternalHeap { ptr: ext, version: 0 },
+                StorageRead::external_heap_in_storage(ext, test_heap()),
                 StorageWrite::NotModified
             )
             .as_ptr_mut(0),
@@ -639,7 +655,7 @@ mod tests {
         // A local write in the current epoch is writable in place.
         assert!(matches!(
             entry(
-                StorageRead::DoesNotExist,
+                StorageRead::does_not_exist_in_storage(),
                 StorageWrite::LocalHeap { ptr: local, epoch: 5 }
             )
             .as_ptr_mut(5),
@@ -648,21 +664,25 @@ mod tests {
         // A local write from an older epoch needs a copy.
         assert!(matches!(
             entry(
-                StorageRead::DoesNotExist,
+                StorageRead::does_not_exist_in_storage(),
                 StorageWrite::LocalHeap { ptr: local, epoch: 4 }
             )
             .as_ptr_mut(5),
             Some(EntryPtr::NonWritable(p)) if p == local
         ));
         // Deleted / absent have no pointer.
-        assert!(entry(StorageRead::DoesNotExist, StorageWrite::Deleted {
-            epoch: 0
-        })
+        assert!(entry(
+            StorageRead::does_not_exist_in_storage(),
+            StorageWrite::Deleted { epoch: 0 }
+        )
         .as_ptr_mut(0)
         .is_none());
-        assert!(entry(StorageRead::DoesNotExist, StorageWrite::NotModified)
-            .as_ptr_mut(0)
-            .is_none());
+        assert!(entry(
+            StorageRead::does_not_exist_in_storage(),
+            StorageWrite::NotModified
+        )
+        .as_ptr_mut(0)
+        .is_none());
     }
 
     // -- Map operations over the provider ------------------------------------
@@ -996,14 +1016,11 @@ mod tests {
         let ext = fake_ptr(0xDEAD);
         let mut rws = ResourceReadWriteSet::new();
         rws.entries.insert(k_ext.clone(), Entry {
-            read: StorageRead::ExternalHeap {
-                ptr: ext,
-                version: 0,
-            },
+            read: StorageRead::external_heap_in_storage(ext, test_heap()),
             write: StorageWrite::NotModified,
         });
         rws.entries.insert(k_local.clone(), Entry {
-            read: StorageRead::DoesNotExist,
+            read: StorageRead::does_not_exist_in_storage(),
             write: StorageWrite::LocalHeap {
                 ptr: local,
                 epoch: 0,
@@ -1015,7 +1032,7 @@ mod tests {
         // The external read is owned by the provider and must not be relocated.
         match rws.entries[&k_ext].read {
             StorageRead::ExternalHeap { ptr, .. } => assert_eq!(ptr, ext),
-            StorageRead::DoesNotExist => panic!("external read must survive the scan"),
+            StorageRead::DoesNotExist { .. } => panic!("external read must survive the scan"),
         }
         // The local write is relocated into to-space, payload preserved.
         match rws.entries[&k_local].write {

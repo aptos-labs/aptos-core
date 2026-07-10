@@ -10,13 +10,14 @@ use aptos_block_executor::{
     errors::BlockExecutionError,
     executor::BlockExecutor,
     task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutorTask,
+        BeforeMaterializationOutput, ExecutorTask, Materializer,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
     types::InputOutputKey,
 };
+use aptos_mvhashmap::types::ValueWithLayout;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
@@ -38,6 +39,7 @@ use aptos_vm_types::{
     output::{UnorderedReadSet, VMOutput},
     resolver::ResourceGroupSize,
 };
+use mono_move_block_executor::MonoExecutorTask;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -45,7 +47,6 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
@@ -53,12 +54,12 @@ use std::{
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
-/// Output type wrapper used by block executor. VM output is stored first, then
-/// transformed into TransactionOutput type that is returned.
+/// Speculative output type produced during block execution. Holds the VM output
+/// until materialization, which consumes it and produces the final on-chain
+/// [`TransactionOutput`].
 #[derive(Debug)]
 pub struct AptosTransactionOutput {
     vm_output: Option<VMOutput>,
-    committed_output: OnceCell<TransactionOutput>,
     /// State keys read by the VM during the execution (incarnation) that produced this output.
     ///
     /// TODO(HotState): also consider recording the read kind (exists/metadata/value) and the
@@ -74,43 +75,8 @@ impl AptosTransactionOutput {
     pub fn new_with_read_set(output: VMOutput, read_set: UnorderedReadSet) -> Self {
         Self {
             vm_output: Some(output),
-            committed_output: OnceCell::new(),
             read_set,
         }
-    }
-
-    fn take_output(mut self) -> TransactionOutput {
-        match self.committed_output.take() {
-            Some(output) => output,
-            // TODO: revisit whether we should always get it via committed, or o.w. create a
-            // dedicated API without creating empty data structures.
-            // This is currently used because we do not commit skip_output() transactions.
-            None => self
-                .vm_output
-                .take()
-                .expect("Output must be set")
-                .into_transaction_output()
-                .expect("Transaction output is not already materialized"),
-        }
-    }
-}
-
-pub struct AfterMaterializationGuard<'a> {
-    output: &'a TransactionOutput,
-}
-
-impl<'a> AfterMaterializationOutput<SignatureVerifiedTransaction>
-    for AfterMaterializationGuard<'a>
-{
-    fn fee_statement(&self) -> FeeStatement {
-        if let Ok(Some(fee_statement)) = self.output.try_extract_fee_statement() {
-            return fee_statement;
-        }
-        FeeStatement::zero()
-    }
-
-    fn has_new_epoch_event(&self) -> bool {
-        self.output.has_new_epoch_event()
     }
 }
 
@@ -120,7 +86,7 @@ pub struct BeforeMaterializationGuard<'a> {
     read_set: &'a UnorderedReadSet,
 }
 
-impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMaterializationGuard<'_> {
+impl BeforeMaterializationOutput<AptosTransactionOutput> for BeforeMaterializationGuard<'_> {
     fn fee_statement(&self) -> FeeStatement {
         *self.guard.fee_statement()
     }
@@ -189,9 +155,9 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     ) -> HashMap<
         StateKey,
         (
-            WriteOp,
+            ValueWithLayout<WriteOp>,
             ResourceGroupSize,
-            BTreeMap<StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<StructTag, ValueWithLayout<WriteOp>>,
         ),
     > {
         self.guard
@@ -202,7 +168,10 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
                     Some((
                         key.clone(),
                         (
-                            group_write.metadata_op().clone(),
+                            ValueWithLayout::Exchanged(
+                                TriompheArc::new(group_write.metadata_op().clone()),
+                                None,
+                            ),
                             group_write
                                 .maybe_group_op_size()
                                 .unwrap_or(ResourceGroupSize::zero_combined()),
@@ -210,7 +179,13 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
                                 .inner_ops()
                                 .iter()
                                 .map(|(tag, (op, maybe_layout))| {
-                                    (tag.clone(), (op.clone(), maybe_layout.clone()))
+                                    (
+                                        tag.clone(),
+                                        ValueWithLayout::Exchanged(
+                                            TriompheArc::new(op.clone()),
+                                            maybe_layout.clone(),
+                                        ),
+                                    )
                                 })
                                 .collect(),
                         ),
@@ -264,13 +239,19 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     }
 
     /// More efficient implementation to avoid unnecessarily cloning inner_ops.
-    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, ValueWithLayout<WriteOp>)> {
         self.guard
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
                 if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                    Some((key.clone(), group_write.metadata_op().clone()))
+                    Some((
+                        key.clone(),
+                        ValueWithLayout::Exchanged(
+                            TriompheArc::new(group_write.metadata_op().clone()),
+                            None,
+                        ),
+                    ))
                 } else {
                     None
                 }
@@ -278,19 +259,18 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<StateKey, (TriompheArc<WriteOp>, Option<TriompheArc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         self.guard
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
-                AbstractResourceWriteOp::Write(write_op, _) => {
-                    Some((key.clone(), (TriompheArc::new(write_op.clone()), None)))
-                },
+                AbstractResourceWriteOp::Write(write_op, _) => Some((
+                    key.clone(),
+                    ValueWithLayout::Exchanged(TriompheArc::new(write_op.clone()), None),
+                )),
                 AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
                     key.clone(),
-                    (
+                    ValueWithLayout::Exchanged(
                         TriompheArc::new(write.write_op.clone()),
                         Some(write.layout.clone()),
                     ),
@@ -342,11 +322,6 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
-        self.guard.events().to_vec()
-    }
-
     // For legacy interfaces, there are more efficient alternatives in BlockSTMv2.
     // For now we do get the benefits of comparing different implementations.
     // TODO: consider adjusting sequential execution and BlockSTMv1 to use the superior
@@ -372,13 +347,11 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
 }
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
-    type AfterMaterializationGuard<'a> = AfterMaterializationGuard<'a>;
     type BeforeMaterializationGuard<'a> = BeforeMaterializationGuard<'a>;
+    type CommittedOutput = TransactionOutput;
+    type Tag = StructTag;
     type Txn = SignatureVerifiedTransaction;
-
-    fn committed_output(&self) -> &OnceCell<TransactionOutput> {
-        &self.committed_output
-    }
+    type Value = WriteOp;
 
     /// Execution output for transactions that comes after SkipRest signal or when there was a
     /// problem creating the output (e.g. group serialization issue).
@@ -402,52 +375,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         })
     }
 
-    fn after_materialization<'a>(&'a self) -> Result<AfterMaterializationGuard<'a>, PanicError> {
-        Ok(AfterMaterializationGuard {
-            output: self
-                .committed_output
-                .get()
-                .ok_or_else(|| code_invariant_error("Output must be materialized"))?,
-        })
-    }
-
-    fn is_materialized_and_success(&self) -> bool {
-        if let Some(output) = self.committed_output.get() {
-            return output
-                .status()
-                .as_kept_status()
-                .is_ok_and(|status| status.is_success());
-        }
-        false
-    }
-
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        if let Some(output) = self.committed_output.get() {
-            if output.status().is_retry() {
-                return Err(code_invariant_error(
-                    "Committed output must not have is_retry set.",
-                ));
-            }
-            Ok(true)
-        } else {
-            if !self
-                .vm_output
-                .as_ref()
-                .is_some_and(|output| output.status().is_retry())
-            {
-                return Err(code_invariant_error(
-                    "Non-committed output must exist with is_retry set.",
-                ));
-            }
-            Ok(false)
-        }
-    }
-
     fn incorporate_materialized_txn_output(
         &mut self,
-        materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
-        materialized_events: Vec<ContractEvent>,
-    ) -> Result<Trace, PanicError> {
+        materializer: &impl Materializer<Key = StateKey>,
+    ) -> Result<(TransactionOutput, Trace), PanicError> {
         // Before creating the output, extract the trace for replay.
         let mut vm_output = self
             .vm_output
@@ -455,34 +386,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output must be set to incorporate materialized data");
         let trace = vm_output.take_trace();
 
-        self.committed_output
-            .set(
-                vm_output.into_transaction_output_with_materialized_write_set(
-                    materialized_resource_write_set,
-                    materialized_events,
-                )?,
-            )
-            .map_err(|_| {
-                code_invariant_error(
-                    "Could not combine VMOutput with the materialized resource and event data",
-                )
-            })?;
-        Ok(trace)
-    }
-
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .take()
-                        .expect("Output must be set to incorporate materialized data")
-                        .into_transaction_output()
-                        .expect("We should be able to always convert to transaction output"),
-                )
-                .is_ok(),
-            "Could not combine VMOutput with the materialized resource and event data"
-        );
+        let committed_output = vm_output.into_transaction_output_materialized(materializer)?;
+        Ok((committed_output, trace))
     }
 }
 
@@ -507,7 +412,7 @@ impl<
 {
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitHook,
+        L: TransactionCommitHook<TransactionOutput>,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
         signature_verified_block: &TP,
@@ -534,25 +439,37 @@ impl<
             transaction_slice_metadata,
         )?;
 
-        let executor =
-            BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
+        // The mono feature selects a different monomorphization of the block
+        // executor; both produce the same committed output type. The legacy
+        // path is unchanged.
+        let ret = if module_cache_manager_guard
+            .environment()
+            .features()
+            .is_mono_move_enabled()
+        {
+            let executor = BlockExecutor::<MonoExecutorTask, S, L, TP>::new(
                 config,
                 transaction_commit_listener,
             );
-
-        let ret = executor.execute_block(
-            signature_verified_block,
-            state_view,
-            &transaction_slice_metadata,
-            &mut module_cache_manager_guard,
-        );
+            executor.execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        } else {
+            let executor = BlockExecutor::<E, S, L, TP>::new(config, transaction_commit_listener);
+            executor.execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        };
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
-                let output_vec: Vec<_> = transaction_outputs
-                    .into_iter()
-                    .map(|output| output.take_output())
-                    .collect();
+                // The block executor already returns the materialized on-chain outputs.
+                let (output_vec, block_epilogue_txn) = block_output.into_inner();
 
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());

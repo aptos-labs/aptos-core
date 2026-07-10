@@ -76,7 +76,6 @@ fn run_transactions<K, V, E>(
         let mut guard = AptosModuleCacheManagerGuard::none();
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
@@ -276,7 +275,6 @@ fn publishing_fixed_params_with_block_gas_limit(
     // Confirm still no intersection
     let mut guard = AptosModuleCacheManagerGuard::none();
     let output = BlockExecutor::<
-        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         DeltaDataView<KeyType<[u8; 32]>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
@@ -326,7 +324,6 @@ fn publishing_fixed_params_with_block_gas_limit(
         let mut guard = AptosModuleCacheManagerGuard::none();
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
@@ -416,7 +413,6 @@ fn non_empty_group(
         let mut guard = AptosModuleCacheManagerGuard::none();
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
@@ -440,7 +436,6 @@ fn non_empty_group(
         let mut guard = AptosModuleCacheManagerGuard::none();
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,

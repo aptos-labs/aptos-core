@@ -49,7 +49,7 @@ fn call_indirect_triggers_lazy_module_load() {
     let mut txn_ctx = TransactionContext::new(
         loader,
         GasMeter::with_max_budget(),
-        &mono_move_core::NO_RESOURCE_PROVIDER,
+        &mono_move_runtime::NO_RESOURCE_PROVIDER,
         &natives,
     );
 

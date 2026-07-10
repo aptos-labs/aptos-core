@@ -61,7 +61,6 @@ pub use self::block_epilogue::{
 };
 use crate::{
     block_metadata_ext::BlockMetadataExt,
-    contract_event::TransactionEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
@@ -70,7 +69,6 @@ use crate::{
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     validator_txn::ValidatorTransaction,
-    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -86,7 +84,6 @@ pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
-use serde::de::DeserializeOwned;
 use std::{
     collections::BTreeSet,
     hash::Hash,
@@ -2226,6 +2223,76 @@ impl TransactionOutput {
     }
 }
 
+/// The final, materialized transaction output the block executor stores in its
+/// results. Decouples the committed output from the speculative
+/// (pre-materialization) output produced during execution: the on-chain
+/// [`TransactionOutput`] implements it directly, while alternative executors
+/// (e.g. test mocks) provide their own committed-output type.
+pub trait CommittedTransactionOutput: Send + std::fmt::Debug {
+    /// Fee statement of the (kept) transaction.
+    fn fee_statement(&self) -> FeeStatement;
+
+    /// Whether the transaction emitted a new epoch event.
+    fn has_new_epoch_event(&self) -> bool;
+
+    /// Whether this is a placeholder for a not-yet-materialized (retry) slot.
+    /// Placeholders are created via [`Self::retry_placeholder`] and replaced on
+    /// materialization, so a slot that is still a placeholder was skipped.
+    fn is_retry(&self) -> bool;
+
+    /// Whether the transaction was kept and succeeded.
+    fn is_success(&self) -> bool;
+
+    /// Placeholder for a results slot that has not been materialized.
+    fn retry_placeholder() -> Self;
+
+    /// Placeholder for a discarded transaction.
+    fn discard_placeholder(discard_code: StatusCode) -> Self;
+}
+
+impl CommittedTransactionOutput for TransactionOutput {
+    fn fee_statement(&self) -> FeeStatement {
+        self.try_extract_fee_statement()
+            .ok()
+            .flatten()
+            .unwrap_or_else(FeeStatement::zero)
+    }
+
+    fn has_new_epoch_event(&self) -> bool {
+        self.events().iter().any(ContractEvent::is_new_epoch_event)
+    }
+
+    fn is_retry(&self) -> bool {
+        self.status().is_retry()
+    }
+
+    fn is_success(&self) -> bool {
+        self.status()
+            .as_kept_status()
+            .is_ok_and(|status| status.is_success())
+    }
+
+    fn retry_placeholder() -> Self {
+        TransactionOutput::new(
+            WriteSet::default(),
+            vec![],
+            0,
+            TransactionStatus::Retry,
+            TransactionAuxiliaryData::None,
+        )
+    }
+
+    fn discard_placeholder(discard_code: StatusCode) -> Self {
+        TransactionOutput::new(
+            WriteSet::default(),
+            vec![],
+            0,
+            TransactionStatus::Discard(discard_code),
+            TransactionAuxiliaryData::None,
+        )
+    }
+}
+
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
 /// transaction as well as the execution result of this transaction.
 #[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -3520,22 +3587,6 @@ impl TryFrom<Transaction> for SignedTransaction {
 /// transaction will write to a key value storage as their side effect.
 pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
-    /// specifying a tag, and output requires merging all resources together (Note: this may change
-    /// in the future if write-set format changes to be per-resource, could be more performant).
-    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
-    type Tag: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + DeserializeOwned
-        + Serialize;
-    type Value: Send + Sync + Debug + Clone + Eq + PartialEq + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
@@ -3568,10 +3619,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         _to_make_hot: BTreeSet<Self::Key>,
     ) -> Self {
         unimplemented!()
-    }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
-        vec![]
     }
 }
 

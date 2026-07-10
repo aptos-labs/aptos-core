@@ -2198,7 +2198,7 @@ impl AptosVM {
         // uncommitted and are re-proposed via the quorum store. They must never
         // reach execution — emitting a `TransactionStatus::Retry` output here would
         // be committed/materialized by Block-STM and violate its materialization
-        // invariant (`check_materialization`). Non-retryable failures (e.g.
+        // invariant. Non-retryable failures (e.g.
         // CryptoFailure, TrustedSetupExhausted) still execute and discard as usual.
         debug_assert!(
             !txn.payload()

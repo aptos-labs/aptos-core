@@ -6,13 +6,16 @@
 //
 // TODO(cleanup): move out of the runtime once a layer above it exists.
 
-use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext};
+use crate::{
+    error::RuntimeResult, native_context::ProductionNativeRegistry,
+    resource_provider::ResourceProvider, ExecutionContext,
+};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeExtensions,
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
-    LayoutProvider, ObjectDescriptor, ResourceProvider, ValueLayout,
+    LayoutProvider, ObjectDescriptor, ValueLayout,
 };
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
 

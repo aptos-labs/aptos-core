@@ -60,7 +60,6 @@ pub(crate) fn run_tests_with_groups(
                 }
 
                 let output = execute_block_parallel::<
-                    MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                     NonEmptyGroupDataView<KeyType<[u8; 32]>>,
                     DefaultTxnProvider<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
@@ -85,12 +84,10 @@ pub(crate) fn run_tests_with_groups(
         let mut guard = AptosModuleCacheManagerGuard::none();
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>, AuxiliaryInfo>,
-            AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             None,

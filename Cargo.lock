@@ -744,6 +744,7 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-global-context",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -755,6 +756,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "serde",
  "test-case",
  "triomphe",
 ]
@@ -5005,6 +5007,7 @@ dependencies = [
  "crossbeam-utils",
  "dashmap 7.0.0-rc2",
  "derivative",
+ "fail",
  "fixed",
  "fxhash",
  "hashbrown 0.14.3",
@@ -5048,6 +5051,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "triomphe",
  "url",
 ]
 
@@ -5143,6 +5147,7 @@ dependencies = [
  "futures",
  "hex",
  "itertools 0.13.0",
+ "mono-move-block-executor",
  "move-binary-format",
  "move-core-types",
  "move-unit-test",
@@ -12876,6 +12881,31 @@ dependencies = [
  "bumpalo",
  "crossbeam-utils",
  "parking_lot 0.12.5",
+]
+
+[[package]]
+name = "mono-move-block-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-aggregator",
+ "aptos-block-executor",
+ "aptos-mvhashmap",
+ "aptos-types",
+ "aptos-vm-environment",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "bytes",
+ "mono-move-alloc",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-natives",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
 ]
 
 [[package]]

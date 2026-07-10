@@ -189,7 +189,7 @@ impl<I: Copy + Clone> DelayedChange<I> {
 // TODO[agg_v2](cleanup): See if we need these separate/duplicate classes or not
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DelayedApplyEntry<I: Clone> {
+pub enum DelayedApplyEntry<I> {
     AggregatorDelta {
         delta: DeltaOp,
     },

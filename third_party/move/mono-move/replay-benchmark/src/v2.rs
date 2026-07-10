@@ -44,11 +44,6 @@ use std::time::Instant;
 /// Effectively unbounded gas budget.
 const GAS_BUDGET: u64 = u64::MAX;
 
-/// The resource arena is sized as `read-set bytes * ARENA_BYTES_PER_RESOURCE_BYTE`, with a floor of
-/// `MIN_ARENA_BYTES` (the flat representation can be larger than BCS).
-const MIN_ARENA_BYTES: usize = 16 * 1024 * 1024;
-const ARENA_BYTES_PER_RESOURCE_BYTE: usize = 8;
-
 type Interp<'i, 'guard, 'ctx> = InterpreterContext<'i, TransactionContext<'guard, 'ctx>>;
 
 /// How an entry-function parameter is filled into the root frame.
@@ -83,11 +78,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         &natives,
     );
 
-    let total_bytes: usize = input.read_set.data.values().map(|v| v.bytes().len()).sum();
-    let arena_size = total_bytes
-        .saturating_mul(ARENA_BYTES_PER_RESOURCE_BYTE)
-        .max(MIN_ARENA_BYTES);
-    let resource_provider = ReadSetResourceProvider::new(&guard, &input.read_set, arena_size)?;
+    let resource_provider = ReadSetResourceProvider::new(&guard, &input.read_set)?;
 
     let (transaction_index, reserved_byte) = match input.user_context.transaction_index_kind() {
         TransactionIndexKind::BlockExecution { transaction_index } => (transaction_index, 0),

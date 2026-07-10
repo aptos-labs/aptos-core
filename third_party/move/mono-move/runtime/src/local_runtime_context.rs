@@ -5,16 +5,15 @@
 //! and benchmarks that don't go through the full loader stack.
 
 use crate::{
-    error::RuntimeResult, native_context::ProductionNativeRegistry, ExecutionContext,
-    LocalExecutionContext,
+    error::RuntimeResult, native_context::ProductionNativeRegistry,
+    resource_provider::ResourceProvider, ExecutionContext, LocalExecutionContext,
 };
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeExtensions,
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorId, DescriptorProvider, FunctionPtr, GasMeter, LayoutId,
-    LayoutProvider, ObjectDescriptor, ObjectDescriptorTable, ResourceProvider, ValueLayout,
-    ValueLayoutTable,
+    LayoutProvider, ObjectDescriptor, ObjectDescriptorTable, ValueLayout, ValueLayoutTable,
 };
 use mono_move_loader::LoaderResult;
 

@@ -14,6 +14,7 @@ use crate::{
         TopFrame,
     },
     memory::{read_ptr, write_enum_tag, write_u64},
+    resource_provider::ResourceProvider,
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
@@ -25,8 +26,8 @@ use mono_move_core::{
     },
     storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
-    DescriptorId, DescriptorProvider, Function, GasMeter, LayoutProvider, ResourceProvider,
-    ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorId, DescriptorProvider, Function, GasMeter, LayoutProvider, ENUM_DATA_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
 use std::{

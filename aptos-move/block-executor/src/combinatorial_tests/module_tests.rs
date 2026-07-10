@@ -114,7 +114,6 @@ fn execute_module_tests(
                 }
 
                 let output = execute_block_parallel::<
-                    MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                     MockStateView<KeyType<[u8; 32]>>,
                     DefaultTxnProvider<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,

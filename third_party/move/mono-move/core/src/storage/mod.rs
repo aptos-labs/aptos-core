@@ -7,6 +7,4 @@ pub mod module_provider;
 pub mod resource_provider;
 
 pub use module_provider::ModuleProvider;
-pub use resource_provider::{
-    NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead, NO_RESOURCE_PROVIDER,
-};
+pub use resource_provider::{InMemoryStorageKey, ResourceProviderError};

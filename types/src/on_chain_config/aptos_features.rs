@@ -205,6 +205,8 @@ pub enum FeatureFlag {
     /// When enabled, execution populates `TransactionInfoV1`'s hot state root hash, so it
     /// is committed to the ledger accumulator. Requires `TRANSACTION_INFO_V1`.
     HOT_STATE_ROOT_IN_TXN_INFO = 123,
+    /// When enabled, blocks are executed with the mono VM.
+    MONO_MOVE = 124,
 }
 
 impl FeatureFlag {
@@ -562,6 +564,10 @@ impl Features {
 
     pub fn is_hot_state_root_in_txn_info_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO)
+    }
+
+    pub fn is_mono_move_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::MONO_MOVE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

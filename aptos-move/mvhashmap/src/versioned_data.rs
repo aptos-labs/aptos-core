@@ -5,26 +5,21 @@ use crate::{
     registered_dependencies::{
         check_lowest_dependency_idx, take_dependencies, RegisteredReadDependencies,
     },
-    types::{Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDataError, MVDataOutput, MVValue, ShiftedTxnIndex, TxnIndex},
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
-use aptos_types::{
-    error::{code_invariant_error, PanicError},
-    write_set::TransactionWrite,
-};
+use aptos_types::error::{code_invariant_error, PanicError};
 use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use equivalent::Equivalent;
-use move_core_types::value::MoveTypeLayout;
 use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
-use triomphe::Arc;
 
 pub(crate) const FLAG_DONE: bool = false;
 pub(crate) const FLAG_ESTIMATE: bool = true;
@@ -47,7 +42,7 @@ pub(crate) struct Entry<V> {
 /// a shared pointer (to ensure ownership and avoid clones).
 struct EntryCell<V> {
     incarnation: Incarnation,
-    value_with_layout: ValueWithLayout<V>,
+    value_with_layout: V,
     dependencies: Mutex<RegisteredReadDependencies>,
 }
 
@@ -65,7 +60,7 @@ pub struct VersionedData<K, V> {
 
 fn new_write_entry<V>(
     incarnation: Incarnation,
-    value: ValueWithLayout<V>,
+    value: V,
     dependencies: BTreeMap<TxnIndex, Incarnation>,
 ) -> Entry<EntryCell<V>> {
     Entry::new(EntryCell {
@@ -92,7 +87,7 @@ impl<V> Entry<V> {
     }
 }
 
-impl<V: TransactionWrite> Default for VersionedValue<V> {
+impl<V> Default for VersionedValue<V> {
     fn default() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -100,21 +95,15 @@ impl<V: TransactionWrite> Default for VersionedValue<V> {
     }
 }
 
-// TODO(BlockSTMv2): remove TransactionWrite trait requirement from V, even if
-// AggregatorV1 code is not removed by definining a more specialized trait that can
-// runtime assert in other variants. Add other variants to stored cells that allow
-// storing group metadata and group size together at the group key (currently metadata
-// is stored in a fake write entry, and group size is stored in MVGroupData map).
-impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
+impl<V: MVValue> VersionedValue<V> {
     // Extracts read dependencies from the data-structure that are affected by a write
-    // of 'data' at 'txn_idx'. Some of these dependencies that remain valid can be
+    // of 'new_value' at 'txn_idx'. Some of these dependencies that remain valid can be
     // relocated by a caller to a different (new) entry in the data-structure. The
     // boolean flag indicates whether the dependency is still valid after the write.
     fn split_off_affected_read_dependencies<const ONLY_COMPARE_METADATA: bool>(
         &self,
         txn_idx: TxnIndex,
-        new_data: &Arc<V>,
-        new_maybe_layout: &Option<Arc<MoveTypeLayout>>,
+        new_value: &V,
     ) -> (BTreeMap<TxnIndex, Incarnation>, bool) {
         let mut affected_deps = BTreeMap::new();
         let mut still_valid = false;
@@ -129,27 +118,19 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             .next_back()
         {
             let EntryCell {
-                incarnation: _,
                 value_with_layout,
                 dependencies,
+                ..
             } = &entry.value;
 
-            // Take dependencies above txn_idx
+            // Take dependencies above txn_idx.
             affected_deps = dependencies.lock().split_off(txn_idx + 1);
             if !affected_deps.is_empty() {
-                // Non-exchanged format is default validation failure.
-                if let ValueWithLayout::Exchanged(
-                    previous_entry_value,
-                    previous_entry_maybe_layout,
-                ) = value_with_layout
-                {
-                    still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
-                        previous_entry_value,
-                        new_data,
-                        previous_entry_maybe_layout.as_ref(),
-                        new_maybe_layout.as_ref(),
-                    );
-                }
+                still_valid = if ONLY_COMPARE_METADATA {
+                    value_with_layout.eq_metadata(new_value)
+                } else {
+                    value_with_layout.eq_value(new_value)
+                };
             }
         }
         (affected_deps, still_valid)
@@ -164,8 +145,7 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
         &mut self,
         txn_idx: TxnIndex,
         mut dependencies: BTreeMap<TxnIndex, Incarnation>,
-        removed_data: &Arc<V>,
-        removed_maybe_layout: &Option<Arc<MoveTypeLayout>>,
+        removed_value: &V,
     ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
         // If we have dependencies and a next (lower) entry exists, validate against it.
         if !dependencies.is_empty() {
@@ -180,25 +160,22 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                     "Entry at txn_idx must be removed before calling handle_removed_dependencies"
                 );
 
-                // Non-exchanged format is default validation failure.
-                if let EntryCell {
-                    incarnation: _,
-                    value_with_layout: ValueWithLayout::Exchanged(entry_value, entry_maybe_layout),
+                let EntryCell {
+                    value_with_layout,
                     dependencies: next_lower_deps,
-                } = &next_lower_entry.value
-                {
-                    let still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
-                        entry_value,
-                        removed_data,
-                        entry_maybe_layout.as_ref(),
-                        removed_maybe_layout.as_ref(),
-                    );
+                    ..
+                } = &next_lower_entry.value;
 
-                    if still_valid {
-                        next_lower_deps
-                            .lock()
-                            .extend_with_higher_dependencies(std::mem::take(&mut dependencies))?;
-                    }
+                let still_valid = if ONLY_COMPARE_METADATA {
+                    value_with_layout.eq_metadata(removed_value)
+                } else {
+                    value_with_layout.eq_value(removed_value)
+                };
+
+                if still_valid {
+                    next_lower_deps
+                        .lock()
+                        .extend_with_higher_dependencies(std::mem::take(&mut dependencies))?;
                 }
             }
         }
@@ -254,34 +231,7 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
     }
 }
 
-// Helper function to perform push validation whereby a read of an entry containing
-// prev_value with prev_maybe_layout would now be reading an entry containing new_value
-// with new_maybe_layout.
-fn compare_values_and_layouts<
-    const ONLY_COMPARE_METADATA: bool,
-    V: TransactionWrite + PartialEq,
->(
-    prev_value: &V,
-    new_value: &V,
-    prev_maybe_layout: Option<&Arc<MoveTypeLayout>>,
-    new_maybe_layout: Option<&Arc<MoveTypeLayout>>,
-) -> bool {
-    // ONLY_COMPARE_METADATA is a const static flag that indicates that these entries are
-    // versioning metadata only, and not the actual value (Currently, only used for versioning
-    // resource group metadata). Hence, validation is only performed on the metadata.
-    if ONLY_COMPARE_METADATA {
-        prev_value.as_state_value_metadata() == new_value.as_state_value_metadata()
-    } else {
-        // Layouts pass validation only if they are both None. Otherwise, validation pessimistically
-        // fails. This is a simple logic that avoids potentially costly layout comparisons.
-        prev_maybe_layout.is_none() && new_maybe_layout.is_none() && prev_value == new_value
-    }
-    // TODO(BlockSTMv2): optimize layout validation (potentially based on size, or by having
-    // a more efficient representation. Optimizing value validation by having a configurable
-    // size threshold above which validation can automatically pessimistically fail.
-}
-
-impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedData<K, V> {
+impl<K: Hash + Clone + Debug + Eq, V: MVValue> VersionedData<K, V> {
     pub(crate) fn empty() -> Self {
         Self {
             values: DashMap::new(),
@@ -355,24 +305,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             })?;
 
         let EntryCell {
-            incarnation: _,
             value_with_layout,
             dependencies,
+            ..
         } = &removed_entry.value;
-        match value_with_layout {
-            ValueWithLayout::RawFromStorage(_) => {
-                unreachable!("Removed value written by txn {txn_idx} may not be RawFromStorage");
-            },
-            ValueWithLayout::Exchanged(data, layout) => {
-                let removed_deps = take_dependencies(dependencies);
-                v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
-                    txn_idx,
-                    removed_deps,
-                    data,
-                    layout,
-                )
-            },
-        }
+        let removed_deps = take_dependencies(dependencies);
+        v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
+            txn_idx,
+            removed_deps,
+            value_with_layout,
+        )
     }
 
     // Fetches data but does not record a read dependency. This is used for BlockSTMv1
@@ -410,76 +352,28 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
-    // The caller needs to repeat the read after set_base_value (concurrent caller might have
-    // exchanged and stored a different delayed field ID).
-    pub fn set_base_value(&self, key: K, base_value_with_layout: ValueWithLayout<V>) {
+    /// Sets the base value (at index 0) for a key. On a vacant slot the value is inserted and
+    /// its size accounted; on an occupied slot 'on_occupied' runs under the entry lock, receiving
+    /// the stored value by reference and the incoming value, and decides whether to overwrite it
+    /// in place (dependencies and the estimate flag are preserved by construction). The caller
+    /// may need to repeat the read afterwards, as a concurrent caller might have exchanged and
+    /// stored a different delayed field ID.
+    pub fn set_base_value_with(&self, key: K, value: V, on_occupied: impl FnOnce(&mut V, V)) {
         let mut v = self.values.entry(key).or_default();
         // For base value, incarnation is irrelevant, and is always set to 0.
-
         use btree_map::Entry::*;
-        use ValueWithLayout::*;
         match v.versioned_map.entry(ShiftedTxnIndex::zero_idx()) {
             Vacant(vacant_entry) => {
-                if let Some(base_size) = base_value_with_layout.bytes_len() {
+                if let Some(base_size) = value.bytes_len() {
                     self.total_base_value_size
                         .fetch_add(base_size as u64, Ordering::Relaxed);
                 }
-                vacant_entry.insert(CachePadded::new(new_write_entry(
-                    0,
-                    base_value_with_layout,
-                    BTreeMap::new(),
-                )));
+                vacant_entry.insert(CachePadded::new(new_write_entry(0, value, BTreeMap::new())));
             },
             Occupied(mut o) => {
-                let EntryCell {
-                    incarnation,
-                    value_with_layout: existing_value_with_layout,
-                    dependencies,
-                } = &o.get().value;
-                assert_eq!(*incarnation, 0);
-                match (existing_value_with_layout, &base_value_with_layout) {
-                    (RawFromStorage(existing_value), RawFromStorage(base_value)) => {
-                        // Base value from storage needs to be identical
-                        // Assert the length of bytes for efficiency (instead of full equality)
-                        assert_eq!(
-                            base_value.bytes().map(|b| b.len()),
-                            existing_value.bytes().map(|b| b.len())
-                        );
-                    },
-                    (Exchanged(_, _), RawFromStorage(_)) => {
-                        // Stored value contains more info, nothing to do.
-                    },
-                    (RawFromStorage(_), Exchanged(_, _)) => {
-                        // Received more info, update, but keep the same dependencies.
-                        // TODO(BlockSTMv2): Once we support dependency kind, here we could check
-                        // that carried over dependencies can be only size & metadata.
-                        o.insert(CachePadded::new(new_write_entry(
-                            0,
-                            base_value_with_layout,
-                            take_dependencies(dependencies),
-                        )));
-                    },
-                    (
-                        Exchanged(existing_value, existing_layout),
-                        Exchanged(base_value, base_layout),
-                    ) => {
-                        // base value may have already been provided by another transaction
-                        // executed simultaneously and asking for the same resource.
-                        // Value from storage must be identical, but then delayed field
-                        // identifier exchange could've modified it.
-                        //
-                        // If maybe_layout is None, they are required to be identical
-                        // If maybe_layout is Some, there might have been an exchange
-                        // Assert the length of bytes for efficiency (instead of full equality)
-                        assert_eq!(existing_layout.is_some(), base_layout.is_some());
-                        if existing_layout.is_none() {
-                            assert_eq!(
-                                existing_value.bytes().map(|b| b.len()),
-                                base_value.bytes().map(|b| b.len())
-                            );
-                        }
-                    },
-                }
+                let cell = &mut o.get_mut().value;
+                assert_eq!(cell.incarnation, 0);
+                on_occupied(&mut cell.value_with_layout, value);
             },
         };
     }
@@ -488,11 +382,11 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         versioned_values: &mut VersionedValue<V>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        value: ValueWithLayout<V>,
+        value: V,
         dependencies: BTreeMap<TxnIndex, Incarnation>,
     ) -> Result<(), PanicError> {
-        // Clone is cheap here: ValueWithLayout only contains Arc references,
-        // so cloning is just atomic reference count increments (O(1)).
+        // Clone is cheap here: the Aptos value (ValueWithLayout) only contains Arc
+        // references, so cloning is just atomic reference count increments (O(1)).
         let value_clone = value.clone();
         let prev_entry = versioned_values.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
@@ -519,23 +413,15 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 // prev_dependencies is empty: they must have been drained beforehand
                 // (into dependencies) if there was an entry at the same index before.
                 if *prev_incarnation >= incarnation {
-                    // At incarnation 0, allow overwrite if values match and neither has a layout.
-                    // This supports the pre-write optimization where we pre-populate MVHashMap.
-                    if incarnation == 0
-                        && !prev_value.has_layout()
-                        && !value_clone.has_layout()
-                        && prev_value.extract_value() == value_clone.extract_value()
-                    {
+                    // At incarnation 0, allow overwrite if the values are equal. This supports
+                    // the pre-write optimization where we pre-populate MVHashMap.
+                    if incarnation == 0 && prev_value.eq_value(&value_clone) {
                         return Ok(());
                     }
 
                     // Determine the error cause for a more descriptive message.
                     let error_cause = if incarnation == 0 && *prev_incarnation == 0 {
-                        if prev_value.has_layout() || value_clone.has_layout() {
-                            "pre-write mismatch: values have layouts that cannot be compared"
-                        } else {
-                            "pre-write mismatch: values differ"
-                        }
+                        "pre-write mismatch"
                     } else {
                         "incarnation regression"
                     };
@@ -555,17 +441,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        data: Arc<V>,
-        maybe_layout: Option<Arc<MoveTypeLayout>>,
+        value: V,
     ) -> Result<(), PanicError> {
         let mut v = self.values.entry(key).or_default();
-        Self::write_impl(
-            &mut v,
-            txn_idx,
-            incarnation,
-            ValueWithLayout::Exchanged(data, maybe_layout),
-            BTreeMap::new(),
-        )
+        Self::write_impl(&mut v, txn_idx, incarnation, value, BTreeMap::new())
     }
 
     /// Write a value at a given key (and version) for BlockSTMv2.
@@ -575,16 +454,11 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        data: Arc<V>,
-        maybe_layout: Option<Arc<MoveTypeLayout>>,
+        value: V,
     ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
         let mut v = self.values.entry(key).or_default();
-        let (affected_dependencies, validation_passed) = v
-            .split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(
-                txn_idx,
-                &data,
-                &maybe_layout,
-            );
+        let (affected_dependencies, validation_passed) =
+            v.split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &value);
 
         // Asserted (local, easily checkable invariant), since affected dependencies are obtained
         // by calling split_off at txn_idx + 1.
@@ -598,13 +472,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             (BTreeMap::new(), affected_dependencies)
         };
 
-        Self::write_impl(
-            &mut v,
-            txn_idx,
-            incarnation,
-            ValueWithLayout::Exchanged(data, maybe_layout),
-            deps_to_retain,
-        )?;
+        Self::write_impl(&mut v, txn_idx, incarnation, value, deps_to_retain)?;
 
         Ok(deps_to_return)
     }
@@ -617,30 +485,22 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        data: V,
+        value: V,
     ) -> bool {
-        let arc_data = Arc::new(data);
+        let value_clone = value.clone();
 
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(new_write_entry(
-                incarnation,
-                ValueWithLayout::Exchanged(arc_data.clone(), None),
-                BTreeMap::new(),
-            )),
+            CachePadded::new(new_write_entry(incarnation, value, BTreeMap::new())),
         );
 
         // Changes versioned metadata that was stored.
-        prev_entry.is_none_or(|entry| -> bool {
+        prev_entry.is_none_or(|entry| {
             let EntryCell {
-                value_with_layout: existing_value_with_layout,
-                ..
+                value_with_layout, ..
             } = &entry.value;
-            arc_data.as_state_value_metadata()
-                != existing_value_with_layout
-                    .extract_value_no_layout()
-                    .as_state_value_metadata()
+            !value_with_layout.eq_metadata(&value_clone)
         })
     }
 
@@ -666,7 +526,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::StorageVersion;
+    use crate::types::{StorageVersion, ValueWithLayout};
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds,
         state_store::state_value::{StateValue, StateValueMetadata},
@@ -675,7 +535,9 @@ mod tests {
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
     use fail::FailScenario;
+    use move_core_types::value::MoveTypeLayout;
     use test_case::test_case;
+    use triomphe::Arc;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct TestValueWithMetadata {
@@ -720,9 +582,32 @@ mod tests {
         }
     }
 
-    fn get_deps_from_entry(
-        entry: &Entry<EntryCell<TestValueWithMetadata>>,
-    ) -> BTreeMap<TxnIndex, Incarnation> {
+    // Lets the generic tests store TestValueWithMetadata directly (no ValueWithLayout wrapping).
+    impl MVValue for TestValueWithMetadata {
+        fn eq_value(&self, other: &Self) -> bool {
+            self == other
+        }
+
+        fn eq_metadata(&self, other: &Self) -> bool {
+            self.as_state_value_metadata() == other.as_state_value_metadata()
+        }
+
+        fn bytes_len(&self) -> Option<usize> {
+            fail::fail_point!("value_with_layout_bytes_len", |_| { Some(10) });
+            Some(16)
+        }
+
+        fn is_deletion(&self) -> bool {
+            // The tests using this value never store deletions.
+            false
+        }
+
+        fn write_op_kind(&self) -> WriteOpKind {
+            unimplemented!("Irrelevant for the test")
+        }
+    }
+
+    fn get_deps_from_entry<V>(entry: &Entry<EntryCell<V>>) -> BTreeMap<TxnIndex, Incarnation> {
         let EntryCell { dependencies, .. } = &entry.value;
         dependencies.lock().clone_dependencies_for_test()
     }
@@ -749,7 +634,7 @@ mod tests {
             ShiftedTxnIndex::new(0),
             CachePadded::new(new_write_entry(
                 0,
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+                TestValueWithMetadata::new(10, 100),
                 deps_idx0,
             )),
         );
@@ -757,7 +642,7 @@ mod tests {
             ShiftedTxnIndex::new(7),
             CachePadded::new(new_write_entry(
                 0,
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(20, 200)), None),
+                TestValueWithMetadata::new(20, 200),
                 deps_idx7,
             )),
         );
@@ -779,8 +664,7 @@ mod tests {
         // Get the actual dependencies and verify they match expected.
         let (affected_deps, validation_passed) = v.split_off_affected_read_dependencies::<false>(
             idx,
-            &Arc::new(TestValueWithMetadata::new(10, 100)),
-            &None,
+            &TestValueWithMetadata::new(10, 100),
         );
         assert_eq!(
             affected_deps, expected_deps,
@@ -795,8 +679,7 @@ mod tests {
         if idx < 7 {
             let (remaining_deps, _) = v.split_off_affected_read_dependencies::<false>(
                 6,
-                &Arc::new(TestValueWithMetadata::new(10, 100)),
-                &None,
+                &TestValueWithMetadata::new(10, 100),
             );
             assert!(remaining_deps.is_empty());
             recorded_deps_idx0.retain(|txn_idx, _| *txn_idx <= idx);
@@ -828,7 +711,7 @@ mod tests {
             ShiftedTxnIndex::new(2),
             CachePadded::new(new_write_entry(
                 0,
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+                TestValueWithMetadata::new(10, 100),
                 BTreeMap::from([(5, 2)]),
             )),
         );
@@ -844,7 +727,7 @@ mod tests {
                 for same_value in [true, false] {
                     for same_metadata in [true, false] {
                         for no_layouts in [true, false] {
-                            let mut v = VersionedValue::<TestValueWithMetadata>::default();
+                            let mut v = VersionedValue::<ValueWithLayout<TestValueWithMetadata>>::default();
 
                             // Setup: Create a write with value 10, metadata 100 and one dependency
                             let deps = BTreeMap::from([(1, 0)]);
@@ -870,8 +753,7 @@ mod tests {
                             // Test split_off_affected_read_dependencies
                             let (deps, validation_passed) = v.split_off_affected_read_dependencies::<{ $only_compare_metadata }>(
                                 0,
-                                &Arc::new(test_value.clone()),
-                                &None,
+                                &ValueWithLayout::Exchanged(Arc::new(test_value.clone()), None),
                             );
 
                             // Verify results
@@ -892,8 +774,7 @@ mod tests {
                             let remaining_deps = v.handle_removed_dependencies::<{ $only_compare_metadata }>(
                                 1,
                                 BTreeMap::from([(2, 0)]),
-                                &Arc::new(test_value),
-                                &None,
+                                &ValueWithLayout::Exchanged(Arc::new(test_value), None),
                             ).unwrap();
 
                             if expected_validation {
@@ -918,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_same_layout_validation_fails() {
-        let mut v = VersionedValue::<TestValueWithMetadata>::default();
+        let mut v = VersionedValue::<ValueWithLayout<TestValueWithMetadata>>::default();
 
         // Setup: Create a write with value 10, metadata 100 and layout Some(Bool)
         let deps = BTreeMap::from([(1, 0)]);
@@ -941,8 +822,7 @@ mod tests {
         // Test split_off_affected_read_dependencies with ONLY_COMPARE_METADATA = false
         let (deps, validation_passed) = v.split_off_affected_read_dependencies::<false>(
             0,
-            &Arc::new(test_value.clone()),
-            &layout,
+            &ValueWithLayout::Exchanged(Arc::new(test_value.clone()), layout.clone()),
         );
 
         // Validation should fail because both layouts are Some, even though they're identical
@@ -961,8 +841,7 @@ mod tests {
             .handle_removed_dependencies::<false>(
                 1,
                 BTreeMap::from([(2, 0)]),
-                &Arc::new(test_value),
-                &layout,
+                &ValueWithLayout::Exchanged(Arc::new(test_value), layout),
             )
             .unwrap();
 
@@ -983,7 +862,7 @@ mod tests {
     fn test_raw_from_storage_validation() {
         macro_rules! test_raw_from_storage_case {
             ($only_compare_metadata:expr) => {
-                let mut v = VersionedValue::<TestValueWithMetadata>::default();
+                let mut v = VersionedValue::<ValueWithLayout<TestValueWithMetadata>>::default();
 
                 // Setup: Create a write with RawFromStorage value and one dependency
                 let deps = BTreeMap::from([(1, 0)]);
@@ -995,8 +874,7 @@ mod tests {
                 // Test split_off_affected_read_dependencies with Exchanged value
                 let (deps, validation_passed) = v.split_off_affected_read_dependencies::<{ $only_compare_metadata }>(
                     0,
-                    &Arc::new(TestValueWithMetadata::new(10, 100)),
-                    &None,
+                    &ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
                 );
 
                 // Verify results - validation should fail even with same value and metadata
@@ -1007,8 +885,7 @@ mod tests {
                 let remaining_deps = v.handle_removed_dependencies::<{ $only_compare_metadata }>(
                     1,
                     BTreeMap::from([(2, 0)]),
-                    &Arc::new(TestValueWithMetadata::new(10, 100)),
-                    &None,
+                    &ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
                 ).unwrap();
 
                 // Verify that dependencies are not passed and returned
@@ -1044,7 +921,7 @@ mod tests {
             ShiftedTxnIndex::new(0),
             CachePadded::new(new_write_entry(
                 0,
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+                TestValueWithMetadata::new(10, 100),
                 BTreeMap::new(),
             )),
         );
@@ -1052,8 +929,7 @@ mod tests {
         v.handle_removed_dependencies::<false>(
             0,
             BTreeMap::from([(2, 0)]),
-            &Arc::new(TestValueWithMetadata::new(10, 100)),
-            &None,
+            &TestValueWithMetadata::new(10, 100),
         )
         .unwrap();
     }
@@ -1067,7 +943,7 @@ mod tests {
             ShiftedTxnIndex::new(3),
             CachePadded::new(new_write_entry(
                 0,
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+                TestValueWithMetadata::new(10, 100),
                 BTreeMap::new(),
             )),
         );
@@ -1078,8 +954,7 @@ mod tests {
             v.handle_removed_dependencies::<true>(
                 1,
                 dependency_2_0.clone(),
-                &Arc::new(TestValueWithMetadata::new(10, 100)),
-                &None,
+                &TestValueWithMetadata::new(10, 100),
             )
             .unwrap()
         );
@@ -1088,8 +963,7 @@ mod tests {
             v.handle_removed_dependencies::<false>(
                 1,
                 dependency_2_0.clone(),
-                &Arc::new(TestValueWithMetadata::new(10, 100)),
-                &None,
+                &TestValueWithMetadata::new(10, 100),
             )
             .unwrap()
         );
@@ -1099,7 +973,7 @@ mod tests {
             ShiftedTxnIndex::new(0),
             CachePadded::new(new_write_entry(
                 0,
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+                TestValueWithMetadata::new(10, 100),
                 BTreeMap::new(),
             )),
         );
@@ -1107,8 +981,7 @@ mod tests {
             v.handle_removed_dependencies::<true>(
                 1,
                 dependency_2_0.clone(),
-                &Arc::new(TestValueWithMetadata::new(10, 100)),
-                &None,
+                &TestValueWithMetadata::new(10, 100),
             )
             .unwrap()
             .len(),
@@ -1124,23 +997,20 @@ mod tests {
         assert_err!(v.handle_removed_dependencies::<false>(
             1,
             dependency_2_0.clone(),
-            &Arc::new(TestValueWithMetadata::new(10, 100)),
-            &None,
+            &TestValueWithMetadata::new(10, 100),
         ));
         // Error if removed dependencies contain a smaller or equal idx than itself.
         assert_err!(v.handle_removed_dependencies::<false>(
             2,
             dependency_2_0,
-            &Arc::new(TestValueWithMetadata::new(10, 100)),
-            &None,
+            &TestValueWithMetadata::new(10, 100),
         ));
 
         assert_eq!(
             v.handle_removed_dependencies::<false>(
                 2,
                 BTreeMap::from([(3, 1)]),
-                &Arc::new(TestValueWithMetadata::new(10, 100)),
-                &None,
+                &TestValueWithMetadata::new(10, 100),
             )
             .unwrap()
             .len(),
@@ -1181,19 +1051,17 @@ mod tests {
         fail::cfg("value_with_layout_bytes_len", "return").unwrap();
         assert!(!fail::list().is_empty());
 
-        versioned_data.set_base_value(
+        versioned_data.set_base_value_with(
             (),
-            ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+            TestValueWithMetadata::new(10, 100),
+            |_existing, _incoming| {},
         );
         assert_eq!(versioned_data.total_base_value_size(), 10);
         scenario.teardown();
 
         assert_ok_eq!(
             versioned_data.fetch_data_and_record_dependency(&(), 5, 1),
-            MVDataOutput::Versioned(
-                Err(StorageVersion),
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
-            ),
+            MVDataOutput::Versioned(Err(StorageVersion), TestValueWithMetadata::new(10, 100),),
         );
         check_versioned_data_deps(
             &versioned_data,
@@ -1202,13 +1070,7 @@ mod tests {
         );
 
         assert!(versioned_data
-            .write_v2::<true>(
-                (),
-                1,
-                1,
-                Arc::new(TestValueWithMetadata::new(10, 100)),
-                None,
-            )
+            .write_v2::<true>((), 1, 1, TestValueWithMetadata::new(10, 100),)
             .unwrap()
             .is_empty());
         check_versioned_data_deps(
@@ -1223,13 +1085,7 @@ mod tests {
         );
 
         versioned_data
-            .write_v2::<true>(
-                (),
-                3,
-                0,
-                Arc::new(TestValueWithMetadata::new(10, 100)),
-                None,
-            )
+            .write_v2::<true>((), 3, 0, TestValueWithMetadata::new(10, 100))
             .unwrap();
         check_versioned_data_deps(
             &versioned_data,
@@ -1245,10 +1101,7 @@ mod tests {
 
         assert_ok_eq!(
             versioned_data.fetch_data_and_record_dependency(&(), 2, 0),
-            MVDataOutput::Versioned(
-                Ok((1, 1)),
-                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
-            ),
+            MVDataOutput::Versioned(Ok((1, 1)), TestValueWithMetadata::new(10, 100),),
         );
         assert_eq!(
             versioned_data.remove_v2::<_, false>(&(), 3).unwrap().len(),
@@ -1271,13 +1124,7 @@ mod tests {
 
         // Add an entry at index 0
         versioned_data
-            .write(
-                (),
-                0,
-                0,
-                Arc::new(TestValueWithMetadata::new(10, 100)),
-                None,
-            )
+            .write((), 0, 0, TestValueWithMetadata::new(10, 100))
             .unwrap();
 
         // Try to remove a non-existent entry at index 1

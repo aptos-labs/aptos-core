@@ -210,6 +210,7 @@ members = [
     "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/block-executor",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/loader",
@@ -901,6 +902,7 @@ aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-block-executor = { path = "third_party/move/mono-move/block-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }

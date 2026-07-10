@@ -6,13 +6,14 @@ use crate::{
         AbstractResourceWriteOp, GroupWrite, InPlaceDelayedFieldChangeOp,
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
+    materializer::Materializer,
     module_and_script_storage::module_storage::AptosModuleStorage,
     module_write_set::{ModuleWrite, ModuleWriteSet},
     resolver::ExecutorView,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_types::{
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, TransactionEvent},
     error::{code_invariant_error, PanicError},
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
@@ -240,44 +241,76 @@ impl VMChangeSet {
         &self.resource_write_set
     }
 
-    // Called by `into_transaction_output_with_materialized_writes` only.
-    pub(crate) fn extend_resource_write_set(
+    /// Materializes the resource write set in place: replaces delayed-field
+    /// identifiers in writes carrying a layout, sets the serialized group
+    /// bytes on group writes, and turns in-place delayed field changes (reads
+    /// needing exchange) into concrete writes. A deletion carrying a layout
+    /// has no bytes to patch and is left untouched.
+    pub(crate) fn materialize_resource_write_set(
         &mut self,
-        materialized_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        materializer: &impl Materializer<Key = StateKey>,
     ) -> Result<(), PanicError> {
-        for (key, new_write) in materialized_resource_writes {
-            let abstract_write = self.resource_write_set.get_mut(&key).ok_or_else(|| {
-                code_invariant_error(format!(
-                    "Cannot patch a resource which does not exist, for: {:?}.",
-                    key
-                ))
-            })?;
-
-            if let AbstractResourceWriteOp::Write(w, _) = &abstract_write {
-                return Err(code_invariant_error(format!(
-                    "Trying to patch the value that is already materialized: {:?}: {:?} into {:?}.",
-                    key, w, new_write
-                )));
-            }
+        use AbstractResourceWriteOp::*;
+        for (key, abstract_write) in self.resource_write_set.iter_mut() {
+            let expected_length = abstract_write.materialized_size().write_len();
+            let new_write = match &*abstract_write {
+                Write(..) => continue,
+                WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op, layout, ..
+                }) => {
+                    let Some(bytes) = write_op.bytes() else {
+                        continue;
+                    };
+                    let patched_bytes =
+                        materializer.replace_identifiers_with_values(bytes, layout)?;
+                    let mut new_write = write_op.clone();
+                    new_write.set_bytes(patched_bytes);
+                    new_write
+                },
+                WriteResourceGroup(group_write) => {
+                    let mut new_write = group_write.metadata_op().clone();
+                    // A no-op for a deletion, which carries no bytes.
+                    new_write.set_bytes(materializer.serialized_group_bytes(key)?);
+                    new_write
+                },
+                InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp { metadata, .. }) => {
+                    WriteOp::modification(materializer.exchanged_read_bytes(key)?, metadata.clone())
+                },
+                ResourceGroupInPlaceDelayedFieldChange(
+                    ResourceGroupInPlaceDelayedFieldChangeOp { metadata, .. },
+                ) => WriteOp::modification(
+                    materializer.serialized_group_bytes(key)?,
+                    metadata.clone(),
+                ),
+            };
 
             let new_length = new_write.write_op_size().write_len();
-            let old_length = abstract_write.materialized_size().write_len();
-            if new_length != old_length {
+            if new_length != expected_length {
                 return Err(code_invariant_error(format!(
-                    "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}. \nValues {:?} into {:?}.", key, old_length, new_length, abstract_write, new_write,
+                    "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}. \nValues {:?} into {:?}.", key, expected_length, new_length, abstract_write, new_write,
                 )));
             }
 
-            *abstract_write = AbstractResourceWriteOp::Write(new_write, false);
+            *abstract_write = Write(new_write, false);
         }
         Ok(())
     }
 
-    /// The events are set to the input events.
-    pub(crate) fn set_events(&mut self, materialized_events: impl Iterator<Item = ContractEvent>) {
-        self.events = materialized_events
-            .map(|event| (event, None))
-            .collect::<Vec<_>>();
+    /// Materializes the events in place: in events carrying a type layout
+    /// (i.e. containing delayed fields), replaces the identifiers in the event
+    /// data with the committed values.
+    pub(crate) fn materialize_events(
+        &mut self,
+        materializer: &impl Materializer<Key = StateKey>,
+    ) -> Result<(), PanicError> {
+        for (event, maybe_layout) in self.events.iter_mut() {
+            if let Some(layout) = maybe_layout.take() {
+                let bytes = materializer
+                    .replace_identifiers_with_values(event.get_event_data(), &layout)?;
+                event.set_event_data(bytes.to_vec());
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn drain_delayed_field_change_set(

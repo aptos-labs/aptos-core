@@ -1,18 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Resource storage access for the runtime.
+//! Resource storage keys and provider errors. The provider interface itself
+//! lives in the runtime crate (it hands out heap-backed pointers).
 
 use crate::{native::TableHandle, types::InternedType, ExecutionErrorKind, IntoExecutionError};
 use move_core_types::account_address::AccountAddress;
-use std::ptr::NonNull;
+use std::fmt;
 use thiserror::Error;
-
-/// Version of the read value (which can come from storage or from other
-/// transaction write).
-// TODO(completeness):
-//   Replace with Block-STM transaction index and incarnation pair.
-pub type Version = u64;
 
 /// Key into the in-memory global storage of a single transaction.
 ///
@@ -82,8 +77,34 @@ impl From<&InMemoryStorageKey> for InMemoryStorageKey {
     }
 }
 
-/// Errors a [`ResourceProvider`] can surface. Backends classify their
-/// own failure modes into this enum as they grow.
+// Prints interned types as raw pointers: dereferencing them requires a live
+// arena, which a Debug impl cannot guarantee.
+impl fmt::Debug for InMemoryStorageKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InMemoryStorageKey::Resource { address, ty } => f
+                .debug_struct("Resource")
+                .field("address", address)
+                .field("ty", &ty.as_raw_ptr())
+                .finish(),
+            InMemoryStorageKey::TableItem {
+                handle,
+                key,
+                value_ty,
+            } => f
+                .debug_struct("TableItem")
+                .field("handle", &handle.address())
+                .field("key", key)
+                .field("value_ty", &value_ty.as_raw_ptr())
+                .finish(),
+        }
+    }
+}
+
+/// Errors a resource provider can surface. Backends classify their
+/// own failure modes into this enum as they grow. Lives in core (rather than
+/// with the provider interface in the runtime) because [`crate::vm_error`]
+/// embeds it.
 #[derive(Debug, Error)]
 pub enum ResourceProviderError {
     #[error("resource provider invariant violation: {0}")]
@@ -97,54 +118,3 @@ impl IntoExecutionError for ResourceProviderError {
         }
     }
 }
-
-/// Storage read returned to the VM. Every VM execution records reads of any
-/// value coming from global storage.
-#[derive(Clone, Copy, Debug)]
-pub enum StorageRead {
-    /// Value does not exist at this key.
-    DoesNotExist,
-    /// Value is allocated in some other arena or cache. For example, it can be
-    /// a cached DB read or a write from soe transaction at lower version.
-    // TODO(cleanup):
-    //   Figure out how to enforce compile-time guarantees here that owning
-    //   arena is alive.
-    ExternalHeap {
-        /// Just like any other VM value, the pointer points to the start of
-        /// the value allocation. Value's header is at negative offset.
-        // TODO(cleanup): have a Value pointer unified API?
-        ptr: NonNull<u8>,
-        /// Version of this read from Block-STM. Used for read-set validation.
-        version: Version,
-    },
-}
-
-/// Returns resource data from storage. Storage backend is not fixed and can be
-/// implemented for different clients:
-///   - tests,
-///   - Block-STM,
-///   - actual DB.
-pub trait ResourceProvider {
-    /// Returns the resource of a particular type at the specified address.
-    /// Returns [`StorageRead::DoesNotExist`] if the resource does not exist.
-    /// Returns a [`ResourceProviderError`] if the backend cannot satisfy the
-    /// read.
-    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError>;
-}
-
-/// Empty storage with no resources.
-pub struct NoResourceProvider;
-
-impl ResourceProvider for NoResourceProvider {
-    fn get_resource(
-        &self,
-        _key: &InMemoryStorageKey,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        Ok(StorageRead::DoesNotExist)
-    }
-}
-
-// TODO(testing):
-//   This is only needed to make current tests work. Remove once specializer can emit
-//   struct / enum operations or when testing framework is unified.
-pub static NO_RESOURCE_PROVIDER: NoResourceProvider = NoResourceProvider;

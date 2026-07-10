@@ -3,16 +3,16 @@
 
 use crate::{
     executor_utilities::update_transaction_on_abort,
+    record::Record,
+    records::Records,
     scheduler::{DependencyResult, Scheduler, TWaitForDependency},
     scheduler_v2::SchedulerV2,
-    task::ExecutorTask,
-    txn_last_input_output::TxnLastInputOutput,
 };
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
     MVHashMap,
 };
-use aptos_types::{error::PanicError, transaction::BlockExecutableTransaction};
+use aptos_types::error::PanicError;
 use move_core_types::language_storage::ModuleId;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
@@ -103,22 +103,18 @@ impl SchedulerWrapper<'_> {
         }
     }
 
-    pub(crate) fn abort_pre_final_reexecution<T, E>(
+    pub(crate) fn abort_pre_final_reexecution<R: Record>(
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-    ) -> Result<(), PanicError>
-    where
-        T: BlockExecutableTransaction,
-        E: ExecutorTask<Txn = T>,
-    {
+        last_input_output: &Records<R>,
+        versioned_cache: &MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
+    ) -> Result<(), PanicError> {
         match self {
             SchedulerWrapper::V1(_, _) => {
                 // Updating the scheduler state not required as the execute method invoked
                 // in [executor::execute_txn_after_commit] does not take in the scheduler.
-                update_transaction_on_abort::<T, E>(txn_idx, last_input_output, versioned_cache);
+                update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
             },
             SchedulerWrapper::V2(scheduler, _) => {
                 scheduler.direct_abort(txn_idx, incarnation, true)?;
@@ -127,24 +123,16 @@ impl SchedulerWrapper<'_> {
         Ok(())
     }
 
-    pub(crate) fn prepare_for_block_epilogue<T, E>(
+    pub(crate) fn prepare_for_block_epilogue<R: Record>(
         &self,
         block_epilogue_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-    ) -> Result<Incarnation, PanicError>
-    where
-        T: BlockExecutableTransaction,
-        E: ExecutorTask<Txn = T>,
-    {
+        last_input_output: &Records<R>,
+        versioned_cache: &MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
+    ) -> Result<Incarnation, PanicError> {
         match self {
             SchedulerWrapper::V1(scheduler, _) => {
                 let incarnation = scheduler.prepare_for_block_epilogue(block_epilogue_idx)?;
-                update_transaction_on_abort::<T, E>(
-                    block_epilogue_idx,
-                    last_input_output,
-                    versioned_cache,
-                );
+                update_transaction_on_abort(block_epilogue_idx, last_input_output, versioned_cache);
                 Ok(incarnation)
             },
             SchedulerWrapper::V2(scheduler, _) => {

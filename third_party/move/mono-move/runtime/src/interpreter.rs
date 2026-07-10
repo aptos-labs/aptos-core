@@ -160,6 +160,17 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         &self.heap
     }
 
+    /// Consumes the interpreter, returning the heap together with the
+    /// read-write set whose `LocalHeap` pointers point into it. The caller
+    /// must keep the heap alive and unmodified for as long as any of those
+    /// pointers is reachable.
+    // TODO(cleanup):
+    //   Thread a &mut record through the interpreter instead, so inputs and
+    //   outputs are recorded in place and no extraction is needed.
+    pub fn into_storage_effects(self) -> (Heap, ResourceReadWriteSet) {
+        (self.heap, self.read_write_set)
+    }
+
     pub fn extensions(&self) -> &NativeExtensions {
         self.exec_ctx.extensions()
     }

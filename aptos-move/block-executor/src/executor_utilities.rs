@@ -2,19 +2,22 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters, errors::*, task::ExecutorTask, txn_last_input_output::TxnLastInputOutput,
+    counters,
+    errors::*,
+    record::Record,
+    records::Records,
+    task::{TransactionOutput, TxnKey},
+    types::ResourceGroupTag,
     view::LatestView,
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
-    types::{TxnIndex, ValueWithLayout},
+    types::{MVValue, TxnIndex, ValueWithLayout},
     MVHashMap,
 };
 use aptos_types::{
-    contract_event::TransactionEvent,
     error::{code_invariant_error, PanicError},
     state_store::TStateView,
-    transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, prelude::*};
@@ -24,77 +27,24 @@ use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
-use std::collections::BTreeMap;
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Debug,
+    hash::Hash,
+};
 use triomphe::Arc as TriompheArc;
 
-// TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
-// not possible due to type & API mismatch.
-macro_rules! groups_to_finalize {
-    ($outputs:expr, $($txn_idx:expr),*) => {{
-        let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
-
-        group_write_ops.into_iter()
-            .map(|val| (val, false))
-            .chain([()].into_iter().flat_map(|_| {
-                // Lazily evaluated only after iterating over group_write_ops.
-                $outputs.group_reads_needing_delayed_field_exchange($($txn_idx),*)
-                    .into_iter()
-                    .map(|(key, metadata)| {
-                        ((key, TransactionWrite::from_state_value(Some(
-                            StateValue::new_with_metadata(Bytes::new(), metadata)
-                        ))), true)
-                    })
-            }))
-    }};
-}
-
-// Selects and prepares resource writes that require ID replacement for delayed fields.
-// - reads needing replacement: returns the error if data is not in Exchanged format.
-// - normal resource writes: select writes that have layout set and are not a deletion.
-//
-// Since reads needing exchange also do not contain deletions (see 'does_value_need_exchange')
-// logic in value_exchange.rs, it is guaranteed that no returned values is a deletion.
-macro_rules! resource_writes_to_materialize {
-    ($writes:expr, $outputs:expr, $data_source:expr, $($txn_idx:expr),*) => {{
-	$outputs
-        .reads_needing_delayed_field_exchange($($txn_idx),*)
-        .into_iter()
-	    .map(|(key, metadata, layout)| -> Result<_, PanicError> {
-	        let (value, existing_layout) = $data_source.fetch_exchanged_data(&key, $($txn_idx),*)?;
-            randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
-            let new_value = TriompheArc::new(TransactionWrite::from_state_value(Some(
-                StateValue::new_with_metadata(
-                    value.bytes().cloned().unwrap_or_else(Bytes::new),
-                    metadata,
-                ))
-            ));
-            Ok((key, new_value, layout))
-        })
-        .chain(
-	        $writes.into_iter().filter_map(|(key, (value, maybe_layout))| {
-		        maybe_layout.map(|layout| {
-                    (!value.is_deletion()).then_some(Ok((key, value, layout)))
-                }).flatten()
-            })
-        )
-        .collect::<Result<Vec<_>, _>>()
-    }};
-}
-
-pub(crate) use groups_to_finalize;
-pub(crate) use resource_writes_to_materialize;
-
-pub(crate) fn map_finalized_group<T: Transaction>(
-    group_key: T::Key,
-    finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+pub(crate) fn map_finalized_group<K, TG, V: TransactionWrite + Debug + Send + Sync + Clone + Eq>(
+    group_key: K,
+    finalized_group: Vec<(TG, ValueWithLayout<V>)>,
     group_size: ResourceGroupSize,
-    metadata_op: T::Value,
+    metadata_op: ValueWithLayout<V>,
     is_read_needing_exchange: bool,
 ) -> Result<
     (
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        K,
+        ValueWithLayout<V>,
+        Vec<(TG, ValueWithLayout<V>)>,
         ResourceGroupSize,
     ),
     PanicError,
@@ -119,14 +69,13 @@ pub(crate) fn map_finalized_group<T: Transaction>(
     }
 }
 
-pub(crate) fn serialize_groups<T: Transaction>(
-    finalized_groups: Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, TriompheArc<T::Value>)>,
-        ResourceGroupSize,
-    )>,
-) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
+pub(crate) fn serialize_groups<
+    K: Hash + Eq + Debug,
+    TG: ResourceGroupTag,
+    V: TransactionWrite + Debug + Send + Sync + Clone + Eq,
+>(
+    finalized_groups: Vec<(K, V, Vec<(TG, TriompheArc<V>)>, ResourceGroupSize)>,
+) -> Result<HashMap<K, Bytes>, ResourceGroupSerializationError> {
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),
@@ -135,45 +84,42 @@ pub(crate) fn serialize_groups<T: Transaction>(
 
     finalized_groups
         .into_iter()
-        .map(
-            |(group_key, mut metadata_op, finalized_group, group_size)| {
-                let btree: BTreeMap<T::Tag, Bytes> = finalized_group
-                    .into_iter()
-                    .map(|(resource_tag, arc_v)| {
-                        let bytes = arc_v
-                            .extract_raw_bytes()
-                            .expect("Deletions should already be applied");
-                        (resource_tag, bytes)
-                    })
-                    .collect();
+        .map(|(group_key, metadata_op, finalized_group, group_size)| {
+            let btree: BTreeMap<TG, Bytes> = finalized_group
+                .into_iter()
+                .map(|(resource_tag, arc_v)| {
+                    let bytes = arc_v
+                        .extract_raw_bytes()
+                        .expect("Deletions should already be applied");
+                    (resource_tag, bytes)
+                })
+                .collect();
 
-                match bcs::to_bytes(&btree) {
-                    Ok(group_bytes) => {
-                        if (!btree.is_empty() || group_size.get() != 0)
-                            && group_bytes.len() as u64 != group_size.get()
-                        {
-                            alert!(
-                                "Serialized resource group size mismatch key = {:?} num items {}, \
-				 len {} recorded size {}, op {:?}",
-                                group_key,
-                                btree.len(),
-                                group_bytes.len(),
-                                group_size.get(),
-                                metadata_op,
-                            );
-                            Err(ResourceGroupSerializationError)
-                        } else {
-                            metadata_op.set_bytes(group_bytes.into());
-                            Ok((group_key, metadata_op))
-                        }
-                    },
-                    Err(e) => {
-                        alert!("Unexpected resource group error {:?}", e);
+            match bcs::to_bytes(&btree) {
+                Ok(group_bytes) => {
+                    if (!btree.is_empty() || group_size.get() != 0)
+                        && group_bytes.len() as u64 != group_size.get()
+                    {
+                        alert!(
+                            "Serialized resource group size mismatch key = {:?} num items {}, \
+			     len {} recorded size {}, op {:?}",
+                            group_key,
+                            btree.len(),
+                            group_bytes.len(),
+                            group_size.get(),
+                            metadata_op,
+                        );
                         Err(ResourceGroupSerializationError)
-                    },
-                }
-            },
-        )
+                    } else {
+                        Ok((group_key, group_bytes.into()))
+                    }
+                },
+                Err(e) => {
+                    alert!("Unexpected resource group error {:?}", e);
+                    Err(ResourceGroupSerializationError)
+                },
+            }
+        })
         .collect()
 }
 
@@ -188,22 +134,23 @@ pub(crate) fn gen_id_start_value(sequential: bool) -> u32 {
     thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn map_id_to_values_in_group_writes<
-    T: Transaction,
-    S: TStateView<Key = T::Key> + Sync,
+    O: TransactionOutput,
+    S: TStateView<Key = TxnKey<O>> + Sync,
 >(
     finalized_groups: Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        TxnKey<O>,
+        ValueWithLayout<O::Value>,
+        Vec<(O::Tag, ValueWithLayout<O::Value>)>,
         ResourceGroupSize,
     )>,
-    latest_view: &LatestView<T, S>,
+    latest_view: &LatestView<O, S>,
 ) -> Result<
     Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, TriompheArc<T::Value>)>,
+        TxnKey<O>,
+        O::Value,
+        Vec<(O::Tag, TriompheArc<O::Value>)>,
         ResourceGroupSize,
     )>,
     PanicError,
@@ -221,9 +168,11 @@ pub(crate) fn map_id_to_values_in_group_writes<
             };
             patched_resource_vec.push((tag, value));
         }
+        // Group metadata carries no layout, so it needs no id replacement. This is
+        // the single point where group writes leave the multi-version representation.
         patched_finalized_groups.push((
             group_key,
-            group_metadata_op,
+            group_metadata_op.into_value(),
             patched_resource_vec,
             group_size,
         ));
@@ -231,58 +180,12 @@ pub(crate) fn map_id_to_values_in_group_writes<
     Ok(patched_finalized_groups)
 }
 
-// For each delayed field in resource write set, replace the identifiers with values
-// (ignoring other writes). Currently also checks the keys are unique.
-pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    resource_write_set: Vec<(T::Key, TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>)>,
-    latest_view: &LatestView<T, S>,
-) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
-    resource_write_set
-        .into_iter()
-        .map(|(key, write_op, layout)| {
-            Ok::<_, PanicError>((
-                key,
-                replace_ids_with_values(&write_op, &layout, latest_view)?,
-            ))
-        })
-        .collect::<std::result::Result<_, PanicError>>()
-}
-
-// For each delayed field in the event, replace delayed field identifier with value.
-pub(crate) fn map_id_to_values_events<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
-    latest_view: &LatestView<T, S>,
-) -> Result<Vec<T::Event>, PanicError> {
-    events
-        .map(|(event, layout)| {
-            if let Some(layout) = layout {
-                let event_data = event.get_event_data();
-                latest_view
-                    .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
-                    .map(|(bytes, _)| {
-                        let mut patched_event = event;
-                        patched_event.set_event_data(bytes.to_vec());
-                        patched_event
-                    })
-                    .map_err(|_| {
-                        code_invariant_error(format!(
-                            "Failed to replace identifiers with values in an event {:?}",
-                            layout
-                        ))
-                    })
-            } else {
-                Ok(event)
-            }
-        })
-        .collect::<Result<Vec<_>, PanicError>>()
-}
-
 // Parse the input `value` and replace delayed field identifiers with corresponding values
-fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    value: &TriompheArc<T::Value>,
+fn replace_ids_with_values<O: TransactionOutput, S: TStateView<Key = TxnKey<O>> + Sync>(
+    value: &TriompheArc<O::Value>,
     layout: &MoveTypeLayout,
-    latest_view: &LatestView<T, S>,
-) -> Result<T::Value, PanicError> {
+    latest_view: &LatestView<O, S>,
+) -> Result<O::Value, PanicError> {
     let mut value = (**value).clone();
 
     if let Some(value_bytes) = value.bytes() {
@@ -305,14 +208,11 @@ fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
     }
 }
 
-pub(crate) fn update_transaction_on_abort<T, E>(
+pub(crate) fn update_transaction_on_abort<R: Record>(
     txn_idx: TxnIndex,
-    last_input_output: &TxnLastInputOutput<T, E::Output>,
-    versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-) where
-    T: Transaction,
-    E: ExecutorTask<Txn = T>,
-{
+    last_input_output: &Records<R>,
+    versioned_cache: &MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>,
+) {
     counters::SPECULATIVE_ABORT_COUNT.inc();
 
     // Any logs from the aborted execution should be cleared and not reported.
