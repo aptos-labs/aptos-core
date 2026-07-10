@@ -128,8 +128,8 @@ pub enum FeatureFlag {
     /// implementations. If required in the future, we can add a flag
     /// to explicitly disable the instruction cache.
     ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
-    /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
-    PERMISSIONED_SIGNER = 84,
+    /// AIP-103; the permissioned signer feature has been removed.
+    _DEPRECATED_PERMISSIONED_SIGNER = 84,
     ACCOUNT_ABSTRACTION = 85,
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
@@ -293,7 +293,6 @@ impl FeatureFlag {
             Self::_ENABLE_LOADER_V2,
             Self::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             Self::COLLECTION_OWNER,
-            Self::PERMISSIONED_SIGNER,
             Self::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             Self::ACCOUNT_ABSTRACTION,
             Self::BULLETPROOFS_BATCH_NATIVES,

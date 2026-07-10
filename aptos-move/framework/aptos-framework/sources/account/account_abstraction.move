@@ -16,7 +16,6 @@ module aptos_framework::account_abstraction {
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::system_addresses;
-    use aptos_framework::permissioned_signer::is_permissioned_signer;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     #[test_only]
@@ -29,7 +28,6 @@ module aptos_framework::account_abstraction {
     const EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED: u64 = 1;
     const EFUNCTION_INFO_EXISTENCE: u64 = 2;
     const EAUTH_FUNCTION_SIGNATURE_MISMATCH: u64 = 3;
-    const ENOT_MASTER_SIGNER: u64 = 4;
     const EINCONSISTENT_SIGNER_ADDRESS: u64 = 5;
     const EDEPRECATED_FUNCTION: u64 = 6;
     const EDERIVABLE_AA_NOT_INITIALIZED: u64 = 7;
@@ -126,7 +124,6 @@ module aptos_framework::account_abstraction {
         function_name: String,
     ) acquires DispatchableAuthenticator {
         assert!(features::is_account_abstraction_enabled(), error::invalid_state(EACCOUNT_ABSTRACTION_NOT_ENABLED));
-        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -143,7 +140,6 @@ module aptos_framework::account_abstraction {
         module_name: String,
         function_name: String,
     ) acquires DispatchableAuthenticator {
-        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -157,7 +153,6 @@ module aptos_framework::account_abstraction {
     entry fun remove_authenticator(
         account: &signer,
     ) acquires DispatchableAuthenticator {
-        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(account);
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {

@@ -671,14 +671,15 @@ module std::features {
         true
     }
 
-    const PERMISSIONED_SIGNER: u64 = 84;
 
+    #[deprecated]
     public fun get_permissioned_signer_feature(): u64 {
-        PERMISSIONED_SIGNER
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[deprecated]
     public fun is_permissioned_signer_enabled(): bool {
-        is_enabled(PERMISSIONED_SIGNER)
+        false
     }
 
     /// Whether the account abstraction is enabled.

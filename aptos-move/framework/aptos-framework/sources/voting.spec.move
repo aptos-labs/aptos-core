@@ -43,15 +43,7 @@ spec aptos_framework::voting {
         pragma aborts_if_is_partial;
     }
 
-    spec schema AbortsIfPermissionedSigner {
-        use aptos_framework::permissioned_signer;
-        s: signer;
-        let perm = VotePermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
-    }
-
     spec register<ProposalType: store>(account: &signer) {
-        include AbortsIfPermissionedSigner { s: account };
         let addr = signer::address_of(account);
 
         // Will abort if there's already a `VotingForum<ProposalType>` under addr

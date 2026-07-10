@@ -163,7 +163,6 @@ spec aptos_framework::block {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
-        use aptos_framework::permissioned_signer;
 
         vm: signer;
         hash: address;
@@ -176,8 +175,6 @@ spec aptos_framework::block {
 
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
-        // vm must not be a permissioned signer.
-        requires !permissioned_signer::spec_is_permissioned_signer(vm);
         /// [high-level-req-4]
         requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
         // proposer must have a stake pool and validator config.

@@ -403,7 +403,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableCallTreeAndInstructionVMCache => {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
             },
-            FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::PermissionedSigner => AptosFeatureFlag::_DEPRECATED_PERMISSIONED_SIGNER,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
             FeatureFlag::DerivableAccountAbstraction => {
@@ -610,7 +610,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE => {
                 FeatureFlag::EnableCallTreeAndInstructionVMCache
             },
-            AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
+            AptosFeatureFlag::_DEPRECATED_PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
             AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
             AptosFeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION => {

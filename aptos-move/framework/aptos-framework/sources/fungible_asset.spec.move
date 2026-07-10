@@ -318,7 +318,4 @@ spec aptos_framework::fungible_asset {
         modifies global<ConcurrentFungibleBalance>(store_addr);
     }
 
-    spec withdraw_permission_check {
-        modifies global<permissioned_signer::PermissionStorage>(permissioned_signer::spec_permission_address(owner));
-    }
 }

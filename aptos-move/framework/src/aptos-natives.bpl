@@ -51,15 +51,7 @@ procedure {:inline 1} $1_cmp_compare'bool'(s1: bool, s2: bool) returns ($ret0: $
 }
 
 function {:inline} $1_cmp_$compare'signer'(s1: $signer, s2: $signer): $1_cmp_Ordering {
-    if s1 == s2 then $1_cmp_Ordering_Equal()
-    else if s1 is $signer && s2 is $permissioned_signer then $1_cmp_Ordering_Less()
-    else if s1 is $permissioned_signer && s2 is $signer then $1_cmp_Ordering_Greater()
-    else if s1 is $signer then
-        $compare_int(s1 -> $addr, s2 -> $addr)
-    else if s1 -> $addr == s2 -> $addr then
-        $compare_int(s1 -> $permission_addr, s2 -> $permission_addr)
-    else
-        $compare_int(s1 -> $addr, s2 -> $addr)
+    $compare_int(s1 -> $addr, s2 -> $addr)
 }
 
 procedure {:inline 1} $1_cmp_compare'signer'(s1: $signer, s2: $signer) returns ($ret0: $1_cmp_Ordering)  {

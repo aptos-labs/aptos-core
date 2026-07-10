@@ -40,8 +40,6 @@ mod keyless;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
-mod permissioned_delegation;
-#[cfg(test)]
 mod priority_fee;
 #[cfg(test)]
 mod randomness;

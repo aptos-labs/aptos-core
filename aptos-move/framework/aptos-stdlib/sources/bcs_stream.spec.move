@@ -78,7 +78,10 @@ spec aptos_std::bcs_stream {
 
     spec deserialize_u128(stream: &mut BCSStream): u128 {
         pragma opaque;
-        pragma seed = 5;
+        // The bv128 VC is highly seed-sensitive: across 18 sampled seeds the solve
+        // time spans 3s to >40s. Seed 8 is the fastest draw (~3s on both arm64 and
+        // x86-64 z3 4.13.0), leaving the widest margin under CI load.
+        pragma seed = 8;
         pragma aborts_if_is_partial;
         aborts_if stream.cur + (16 as u64) > MAX_U64;
         aborts_if stream.cur + (16 as u64) > len(stream.data);

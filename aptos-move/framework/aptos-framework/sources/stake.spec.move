@@ -146,7 +146,6 @@ spec aptos_framework::stake {
     ) {
         pragma verify = false;
 
-        include AbortsIfSignerPermissionStake { s: account };
         let pubkey_from_pop = bls12381::spec_public_key_from_bytes_with_pop(
             consensus_pubkey,
             proof_of_possession_from_bytes(proof_of_possession)
@@ -192,7 +191,6 @@ spec aptos_framework::stake {
         // This function casue timeout (property proved)
         pragma verify_duration_estimate = 60;
         pragma disable_invariants_in_body;
-        include AbortsIfSignerPermissionStake { s: operator };
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
         aborts_if !exists<StakePool>(pool_address);
         aborts_if !exists<ValidatorConfig>(pool_address);
@@ -263,7 +261,6 @@ spec aptos_framework::stake {
     spec withdraw(owner: &signer, withdraw_amount: u64) {
         // TODO(fa_migration)
         pragma verify = false;
-        include AbortsIfSignerPermissionStake { s: owner };
         aborts_if reconfiguration_state::spec_is_in_progress();
         let addr = signer::address_of(owner);
         let ownership_cap = global<OwnerCapability>(addr);
@@ -323,7 +320,6 @@ spec aptos_framework::stake {
     spec leave_validator_set(operator: &signer, pool_address: address) {
         pragma disable_invariants_in_body;
         requires chain_status::is_operating();
-        include AbortsIfSignerPermissionStake { s: operator };
         aborts_if reconfiguration_state::spec_is_in_progress();
         let config = staking_config::get();
         aborts_if !staking_config::get_allow_validator_set_change(config);
@@ -372,14 +368,12 @@ spec aptos_framework::stake {
     spec extract_owner_cap(owner: &signer): OwnerCapability {
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 300;
-        include AbortsIfSignerPermissionStake { s: owner };
         let owner_address = signer::address_of(owner);
         aborts_if !exists<OwnerCapability>(owner_address);
         ensures !exists<OwnerCapability>(owner_address);
     }
 
     spec deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
-        include AbortsIfSignerPermissionStake { s: owner };
         let owner_address = signer::address_of(owner);
         aborts_if exists<OwnerCapability>(owner_address);
         ensures exists<OwnerCapability>(owner_address);
@@ -427,7 +421,6 @@ spec aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>
     ) {
-        include AbortsIfSignerPermissionStake { s: operator };
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         modifies global<ValidatorConfig>(pool_address);
@@ -477,7 +470,6 @@ spec aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>
     ) {
-        include AbortsIfSignerPermissionStake { s: operator };
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         aborts_if reconfiguration_state::spec_is_in_progress();
@@ -637,13 +629,6 @@ spec aptos_framework::stake {
             post_pending_inactive_value
                 == stake_pool.pending_inactive.value + rewards_amount_2
         };
-    }
-
-    spec schema AbortsIfSignerPermissionStake {
-        use aptos_framework::permissioned_signer;
-        s: signer;
-        let perm = StakeManagementPermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec schema UpdateStakePoolAbortsIf {
@@ -860,7 +845,6 @@ spec aptos_framework::stake {
         pragma verify = false;
         // TODO(fa_migration)
         pragma aborts_if_is_partial;
-        include AbortsIfSignerPermissionStake { s: owner };
         aborts_if reconfiguration_state::spec_is_in_progress();
         include ResourceRequirement;
         include AddStakeAbortsIfAndEnsures;
@@ -873,7 +857,6 @@ spec aptos_framework::stake {
         pragma verify_duration_estimate = 120;
         pragma verify = false;
         pragma aborts_if_is_partial;
-        include AbortsIfSignerPermissionStake { s: owner };
         include ResourceRequirement;
         let addr = signer::address_of(owner);
         ensures global<ValidatorConfig>(addr)

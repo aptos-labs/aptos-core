@@ -42,7 +42,6 @@ spec aptos_framework::create_signer {
         aborts_if [abstract] false;
         ensures [abstract] signer::address_of(result) == addr;
         ensures [abstract] result == spec_create_signer(addr);
-        ensures [abstract] !signer::spec_is_permissioned_signer_impl(result);
     }
 
     spec fun spec_create_signer(addr: address): signer;

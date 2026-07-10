@@ -158,7 +158,6 @@ spec aptos_framework::account {
         ensures signer::address_of(result) == new_address;
         /// [high-level-req-2]
         ensures !feature_on ==> exists<Account>(new_address);
-        ensures !signer::spec_is_permissioned_signer_impl(result);
     }
 
     /// Check if the bytes of the new address is 32.
@@ -170,7 +169,6 @@ spec aptos_framework::account {
         ensures signer::address_of(result) == new_address;
         ensures exists<Account>(new_address);
         ensures global<Account>(new_address).guid_creation_num == 2;
-        ensures !signer::spec_is_permissioned_signer_impl(result);
         ensures global<Account>(new_address).sequence_number == 0;
         ensures global<Account>(new_address).authentication_key == bcs::to_bytes(new_address);
     }
@@ -243,7 +241,6 @@ spec aptos_framework::account {
     /// The length of new_auth_key is 32.
     spec rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         include EnsureResourceExistsAbortsIf;
         aborts_if vector::length(new_auth_key) != 32;
         modifies global<Account>(addr);
@@ -253,7 +250,6 @@ spec aptos_framework::account {
 
     spec rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         include EnsureResourceExistsAbortsIf;
         aborts_if vector::length(new_auth_key) != 32;
         modifies global<Account>(addr);
@@ -263,7 +259,6 @@ spec aptos_framework::account {
 
     spec rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) {
         pragma aborts_if_is_partial;
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         let addr = signer::address_of(account);
         aborts_if !exists<Account>(addr);
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME
@@ -320,7 +315,6 @@ spec aptos_framework::account {
     ) {
         pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         pragma aborts_if_is_partial;
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         let addr = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr };
         /// [high-level-req-5.1]
@@ -387,7 +381,6 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
-        include AccountPermissionAbortsIf<AccountPermission> { account: delegate_signer, perm: AccountPermission::KeyRotation {} };
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
@@ -442,7 +435,6 @@ spec aptos_framework::account {
         recipient_address: address,
     ) {
         pragma aborts_if_is_partial;
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
         let current_auth_key_bytes = spec_get_authentication_key(source_address);
@@ -482,7 +474,6 @@ spec aptos_framework::account {
         recipient_address: address
     ) {
         pragma aborts_if_is_partial;
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::Offering {} };
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
         let current_auth_key_bytes = spec_get_authentication_key(source_address);
@@ -538,7 +529,6 @@ spec aptos_framework::account {
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
     spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::Offering {} };
         aborts_if !spec_exists_at(to_be_revoked_address);
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
@@ -548,7 +538,6 @@ spec aptos_framework::account {
     }
 
     spec revoke_any_signer_capability(account: &signer) {
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::Offering {} };
         modifies global<Account>(signer::address_of(account));
         /// [high-level-req-7.4]
         aborts_if !exists<Account>(signer::address_of(account));
@@ -557,7 +546,6 @@ spec aptos_framework::account {
     }
 
     spec revoke_rotation_capability(account: &signer, to_be_revoked_address: address) {
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         aborts_if !spec_exists_at(to_be_revoked_address);
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
@@ -569,7 +557,6 @@ spec aptos_framework::account {
     }
 
     spec revoke_any_rotation_capability(account: &signer) {
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::KeyRotation {} };
         let addr = signer::address_of(account);
         modifies global<Account>(addr);
         aborts_if !exists<Account>(addr);
@@ -583,7 +570,6 @@ spec aptos_framework::account {
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
     spec create_authorized_signer(account: &signer, offerer_address: address): signer {
-        include AccountPermissionAbortsIf<AccountPermission> { perm: AccountPermission::Offering {} };
         /// [high-level-req-8]
         include AccountContainsAddr{
             account,
@@ -700,15 +686,6 @@ spec aptos_framework::account {
             && (addr == @vm_reserved || addr == @aptos_framework || addr == @aptos_token);
         aborts_if !account_exists_pre && feature_on
             && len(bcs::to_bytes(addr)) != 32;
-    }
-
-    spec schema AccountPermissionAbortsIf<Perm> {
-        use aptos_framework::permissioned_signer;
-        account: &signer;
-        perm: Perm;
-        aborts_if permissioned_signer::spec_is_permissioned_signer(account)
-            && !exists<permissioned_signer::PermissionStorage>(permissioned_signer::spec_permission_address(account));
-        aborts_if !permissioned_signer::spec_check_permission_exists(account, perm);
     }
 
     spec schema NewEventHandleAbortsIf {

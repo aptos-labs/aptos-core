@@ -17,11 +17,12 @@ module aptos_framework::primary_fungible_store {
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::option::Option;
+    use std::error;
     use std::signer;
     use std::string::String;
 
-    #[test_only]
-    use aptos_framework::permissioned_signer;
+    /// The permissioned signer feature has been removed.
+    const EPERMISSIONED_SIGNER_REMOVED: u64 = 1;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
@@ -127,31 +128,23 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::store_exists(primary_store_address_inlined(account, metadata))
     }
 
+    #[deprecated]
     public fun grant_permission<T: key>(
-        master: &signer,
-        permissioned: &signer,
-        metadata: Object<T>,
-        amount: u64
+        _master: &signer,
+        _permissioned: &signer,
+        _metadata: Object<T>,
+        _amount: u64
     ) {
-        fungible_asset::grant_permission_by_address(
-            master,
-            permissioned,
-            primary_store_address_inlined(signer::address_of(permissioned), metadata),
-            amount
-        );
+        abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
     }
 
+    #[deprecated]
     public fun grant_apt_permission(
-        master: &signer,
-        permissioned: &signer,
-        amount: u64
+        _master: &signer,
+        _permissioned: &signer,
+        _amount: u64
     ) {
-        fungible_asset::grant_permission_by_address(
-            master,
-            permissioned,
-            object::create_user_derived_object_address(signer::address_of(permissioned), @aptos_fungible_asset),
-            amount
-        );
+        abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
     }
 
     #[view]
@@ -199,18 +192,7 @@ module aptos_framework::primary_fungible_store {
     }
 
     /// Deposit fungible asset `fa` to the given account's primary store using signer.
-    ///
-    /// If `owner` is a permissioned signer, the signer will be granted with permission to withdraw
-    /// the same amount of fund in the future.
     public fun deposit_with_signer(owner: &signer, fa: FungibleAsset) acquires DeriveRefPod {
-        fungible_asset::refill_permission(
-            owner,
-            fungible_asset::amount(&fa),
-            primary_store_address_inlined(
-                signer::address_of(owner),
-                fa.asset_metadata(),
-            )
-        );
         let metadata = fa.asset_metadata();
         let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
         dispatchable_fungible_asset::deposit(store, fa);
@@ -444,41 +426,4 @@ module aptos_framework::primary_fungible_store {
         deposit(user_2_address, coins);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_permissioned_flow(
-        creator: &signer,
-        aaron: &signer,
-    ) acquires DeriveRefPod {
-        let (creator_ref, metadata) = create_test_token(creator);
-        let (mint_ref, _transfer_ref, _burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
-        assert!(balance(creator_address, metadata) == 0, 1);
-        assert!(balance(aaron_address, metadata) == 0, 2);
-        mint(&mint_ref, creator_address, 100);
-        transfer(creator, metadata, aaron_address, 80);
-
-        let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
-        let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
-        grant_permission(aaron, &aaron_permission_signer, metadata, 10);
-
-        let fa = withdraw(&aaron_permission_signer, metadata, 10);
-        deposit(creator_address, fa);
-
-        assert!(balance(creator_address, metadata) == 30, 3);
-        assert!(balance(aaron_address, metadata) == 70, 4);
-
-        // Withdraw from creator and deposit back to aaron's account with permssioned signer.
-        let fa = withdraw(creator, metadata, 10);
-        deposit_with_signer(&aaron_permission_signer, fa);
-
-        // deposit_with_signer refills the permission, can now withdraw again.
-        let fa = withdraw(&aaron_permission_signer, metadata, 10);
-        deposit(creator_address, fa);
-
-        assert!(balance(creator_address, metadata) == 30, 3);
-        assert!(balance(aaron_address, metadata) == 70, 4);
-
-        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
-    }
 }

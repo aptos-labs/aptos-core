@@ -6,7 +6,6 @@ module aptos_framework::fungible_asset {
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
-    use aptos_framework::permissioned_signer;
     use std::string;
     use std::features;
 
@@ -93,8 +92,8 @@ module aptos_framework::fungible_asset {
     /// The supply ref and the fungible asset do not match.
     const ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 35;
 
-    /// signer don't have the permission to perform withdraw operation
-    const EWITHDRAW_PERMISSION_DENIED: u64 = 36;
+    /// The permissioned signer feature has been removed.
+    const EPERMISSIONED_SIGNER_REMOVED: u64 = 37;
     //
     // Constants
     //
@@ -211,6 +210,7 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>
     }
 
+    #[deprecated]
     enum WithdrawPermission has copy, drop, store {
         ByStore {
             store_address: address
@@ -957,38 +957,7 @@ module aptos_framework::fungible_asset {
         owner: &signer, store: Object<T>, amount: u64
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         withdraw_sanity_check(owner, store, true);
-        withdraw_permission_check(owner, store, amount);
         unchecked_withdraw(store.object_address(), amount)
-    }
-
-    /// Check the permission for withdraw operation.
-    public(friend) fun withdraw_permission_check<T: key>(
-        owner: &signer, store: Object<T>, amount: u64
-    ) {
-        assert!(
-            permissioned_signer::check_permission_consume(
-                owner,
-                amount as u256,
-                WithdrawPermission::ByStore {
-                    store_address: store.object_address()
-                }
-            ),
-            error::permission_denied(EWITHDRAW_PERMISSION_DENIED)
-        );
-    }
-
-    /// Check the permission for withdraw operation.
-    public(friend) fun withdraw_permission_check_by_address(
-        owner: &signer, store_address: address, amount: u64
-    ) {
-        assert!(
-            permissioned_signer::check_permission_consume(
-                owner,
-                amount as u256,
-                WithdrawPermission::ByStore { store_address }
-            ),
-            error::permission_denied(EWITHDRAW_PERMISSION_DENIED)
-        );
     }
 
     /// Check the permission for withdraw operation.
@@ -1469,45 +1438,14 @@ module aptos_framework::fungible_asset {
         move_to(&object_signer, ConcurrentFungibleBalance { balance });
     }
 
-    /// Permission management
-    ///
-    /// Master signer grant permissioned signer ability to withdraw a given amount of fungible asset.
+    #[deprecated]
     public fun grant_permission_by_store<T: key>(
-        master: &signer,
-        permissioned: &signer,
-        store: Object<T>,
-        amount: u64
+        _master: &signer,
+        _permissioned: &signer,
+        _store: Object<T>,
+        _amount: u64
     ) {
-        permissioned_signer::authorize_increase(
-            master,
-            permissioned,
-            amount as u256,
-            WithdrawPermission::ByStore { store_address: store.object_address() }
-        )
-    }
-
-    public(friend) fun grant_permission_by_address(
-        master: &signer,
-        permissioned: &signer,
-        store_address: address,
-        amount: u64
-    ) {
-        permissioned_signer::authorize_increase(
-            master,
-            permissioned,
-            amount as u256,
-            WithdrawPermission::ByStore { store_address }
-        )
-    }
-
-    public(friend) fun refill_permission(
-        permissioned: &signer, amount: u64, store_address: address
-    ) {
-        permissioned_signer::increase_limit(
-            permissioned,
-            amount as u256,
-            WithdrawPermission::ByStore { store_address }
-        )
+        abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
     }
 
     #[deprecated]
@@ -1576,9 +1514,6 @@ module aptos_framework::fungible_asset {
         };
         create_store(&object::create_object_from_account(owner), metadata)
     }
-
-    #[test_only]
-    use aptos_framework::timestamp;
 
     #[test(creator = @0xcafe)]
     fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
@@ -2045,101 +1980,6 @@ module aptos_framework::fungible_asset {
             ).balance.read() == 30,
             12
         );
-    }
-
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_e2e_withdraw_limit(
-        creator: &signer, aaron: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
-        let metadata = mint_ref.metadata;
-        let creator_store = create_test_store(creator, metadata);
-        let aaron_store = create_test_store(aaron, metadata);
-
-        assert!(supply(test_token) == option::some(0), 1);
-        // Mint
-        let fa = mint_ref.mint(100);
-        assert!(supply(test_token) == option::some(100), 2);
-        // Deposit
-        deposit(creator_store, fa);
-        // Withdraw
-        let fa = withdraw(creator, creator_store, 80);
-        assert!(supply(test_token) == option::some(100), 3);
-        deposit(aaron_store, fa);
-
-        // Create a permissioned signer
-        let aaron_permission_handle =
-            permissioned_signer::create_permissioned_handle(aaron);
-        let aaron_permission_signer =
-            permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
-
-        // Grant aaron_permission_signer permission to withdraw 10 FA
-        grant_permission_by_store(
-            aaron,
-            &aaron_permission_signer,
-            aaron_store,
-            10
-        );
-
-        let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
-        deposit(aaron_store, fa);
-
-        let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
-        deposit(aaron_store, fa);
-
-        // aaron signer don't abide to the same limit
-        let fa = withdraw(aaron, aaron_store, 5);
-        deposit(aaron_store, fa);
-
-        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
-    }
-
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 0x50024, location = Self)]
-    fun test_e2e_withdraw_limit_exceeds(
-        creator: &signer, aaron: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
-        let metadata = mint_ref.metadata;
-        let creator_store = create_test_store(creator, metadata);
-        let aaron_store = create_test_store(aaron, metadata);
-
-        assert!(supply(test_token) == option::some(0), 1);
-        // Mint
-        let fa = mint_ref.mint(100);
-        assert!(supply(test_token) == option::some(100), 2);
-        // Deposit
-        deposit(creator_store, fa);
-        // Withdraw
-        let fa = withdraw(creator, creator_store, 80);
-        assert!(supply(test_token) == option::some(100), 3);
-        deposit(aaron_store, fa);
-
-        // Create a permissioned signer
-        let aaron_permission_handle =
-            permissioned_signer::create_permissioned_handle(aaron);
-        let aaron_permission_signer =
-            permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
-
-        // Grant aaron_permission_signer permission to withdraw 10 FA
-        grant_permission_by_store(
-            aaron,
-            &aaron_permission_signer,
-            aaron_store,
-            10
-        );
-
-        // Withdrawing more than 10 FA yield an error.
-        let fa = withdraw(&aaron_permission_signer, aaron_store, 11);
-        deposit(aaron_store, fa);
-
-        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
     }
 
     #[deprecated]
