@@ -7,13 +7,14 @@
 
 use crate::{
     engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
+    resource_provider::InMemoryResourceProvider,
 };
+use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{
     ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
 };
 use mono_move_core::{
-    types::EMPTY_TYPE_LIST, DescriptorProvider, Function, GasMeter, LayoutProvider,
-    NO_RESOURCE_PROVIDER,
+    types::EMPTY_TYPE_LIST, DescriptorProvider, Function, GasMeter, Interner, LayoutProvider,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
@@ -66,10 +67,19 @@ pub fn run_package_unit_tests(
         module_provider.add_module(module_of(info));
     }
 
+    let resource_provider = seed_features(&guard);
+
     let mut summary = RunSummary::default();
     for (module_id, module_plan) in &test_plan.module_tests {
         for (test_name, test) in &module_plan.tests {
-            let outcome = run_test(&guard, &module_provider, &natives, module_id, test);
+            let outcome = run_test(
+                &guard,
+                &module_provider,
+                &resource_provider,
+                &natives,
+                module_id,
+                test,
+            );
             summary.record(module_id, test_name, outcome);
         }
     }
@@ -83,18 +93,46 @@ fn module_of(info: &NamedOrBytecodeModule) -> &CompiledModule {
     }
 }
 
+/// Heap for the seeded `Features` resource. Only that one small resource lives
+/// here, so a modest fixed size is plenty.
+const RESOURCE_HEAP_SIZE: usize = 1 << 20;
+
+/// Builds a resource provider publishing the framework `Features` resource at
+/// `0x1`, initialized to [`Features::default_for_tests`].
+fn seed_features<'guard, 'ctx>(
+    guard: &'guard ExecutionGuard<'ctx>,
+) -> InMemoryResourceProvider<'guard, 'ctx> {
+    let struct_tag = Features::struct_tag();
+    let module_id = guard.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
+    let name = guard.identifier_of(struct_tag.name.as_ident_str());
+    let ty = guard.nominal_of(module_id, name, guard.type_list_of(&[]));
+    let bytes = bcs::to_bytes(&Features::default_for_tests()).expect("Features serializes");
+
+    let mut provider = InMemoryResourceProvider::new(guard, RESOURCE_HEAP_SIZE);
+    provider.add_resource(struct_tag.address, ty, bytes);
+    provider
+}
+
 /// Execute one test function on mono-move and adjudicate it against its
 /// `#[expected_failure]` annotation. A panic on an unimplemented construct is
 /// caught and recorded as unsupported.
 fn run_test(
     guard: &ExecutionGuard<'_>,
     module_provider: &InMemoryModuleProvider,
+    resource_provider: &InMemoryResourceProvider<'_, '_>,
     natives: &ProductionNativeRegistry,
     module_id: &ModuleId,
     test: &TestCase,
 ) -> TestOutcome {
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        execute(guard, natives, module_provider, module_id, test)
+        execute(
+            guard,
+            natives,
+            module_provider,
+            resource_provider,
+            module_id,
+            test,
+        )
     }));
     match result {
         Ok(result) => adjudicate(result, &test.expected_failure),
@@ -106,6 +144,7 @@ fn execute(
     guard: &ExecutionGuard<'_>,
     natives: &ProductionNativeRegistry,
     module_provider: &InMemoryModuleProvider,
+    resource_provider: &InMemoryResourceProvider<'_, '_>,
     module_id: &ModuleId,
     test: &TestCase,
 ) -> TestResult {
@@ -118,7 +157,7 @@ fn execute(
     let mut txn_ctx = TransactionContext::new(
         loader,
         GasMeter::new(GAS_BUDGET),
-        &NO_RESOURCE_PROVIDER,
+        resource_provider,
         natives,
     )
     .with_extensions(seed_extensions());

@@ -11,6 +11,7 @@ pub mod module_provider;
 pub mod parser;
 pub mod print_sections;
 pub mod programs;
+pub mod resource_provider;
 pub mod runner;
 pub mod unit_test;
 pub mod v1_test_natives;
@@ -22,4 +23,5 @@ pub use engine::{
     build_natives, with_loaded_mono_function, with_mono_function, MonoRunner, RunResult,
 };
 pub use module_provider::InMemoryModuleProvider;
+pub use resource_provider::InMemoryResourceProvider;
 pub use runner::{finalize_events_v1, finalize_events_v2};

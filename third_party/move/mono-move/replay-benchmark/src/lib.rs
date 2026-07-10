@@ -9,7 +9,6 @@ pub mod capture;
 pub mod compare;
 pub mod data;
 pub mod report;
-pub mod resource;
 pub mod timing;
 pub mod v1;
 pub mod v2;

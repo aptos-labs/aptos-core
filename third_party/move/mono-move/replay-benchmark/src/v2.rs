@@ -6,14 +6,15 @@
 
 use crate::{
     compare::{ExecOutcome, FailureKind},
-    data::BenchmarkInput,
-    resource::ReadSetResourceProvider,
+    data::{BenchmarkInput, ReadSet},
     timing::{collect_samples, TimingConfig},
     BenchmarkRun,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_types::{
-    state_store::TStateView, transaction::user_transaction_context::TransactionIndexKind,
+    access_path::Path,
+    state_store::{state_key::inner::StateKeyInner, TStateView},
+    transaction::user_transaction_context::TransactionIndexKind,
 };
 use bytes::Bytes;
 use mono_move_core::{
@@ -33,13 +34,15 @@ use mono_move_natives::{
 use mono_move_runtime::{
     ExecutionContext, InterpreterContext, RuntimeError, RuntimeStatus, TransactionContext,
 };
-use mono_move_testsuite::{build_natives, finalize_events_v2, InMemoryModuleProvider};
+use mono_move_testsuite::{
+    build_natives, finalize_events_v2, InMemoryModuleProvider, InMemoryResourceProvider,
+};
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_core_types::{
     identifier::IdentStr,
     language_storage::{StructTag, TypeTag},
 };
-use std::time::Instant;
+use std::{collections::BTreeMap, time::Instant};
 
 /// Effectively unbounded gas budget.
 const GAS_BUDGET: u64 = u64::MAX;
@@ -87,7 +90,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let arena_size = total_bytes
         .saturating_mul(ARENA_BYTES_PER_RESOURCE_BYTE)
         .max(MIN_ARENA_BYTES);
-    let resource_provider = ReadSetResourceProvider::new(&guard, &input.read_set, arena_size)?;
+    let resource_provider = read_set_resource_provider(&guard, &input.read_set, arena_size)?;
 
     let (transaction_index, reserved_byte) = match input.user_context.transaction_index_kind() {
         TransactionIndexKind::BlockExecution { transaction_index } => (transaction_index, 0),
@@ -381,4 +384,39 @@ pub(crate) fn intern_struct_tag(
         .collect::<Result<Vec<_>>>()?;
     let ty_args = guard.type_list_of(&args);
     Ok(guard.nominal_of(module_id, name, ty_args))
+}
+
+/// Builds an [`InMemoryResourceProvider`] backed by the captured read-set.
+fn read_set_resource_provider<'guard, 'ctx>(
+    guard: &'guard ExecutionGuard<'ctx>,
+    read_set: &ReadSet,
+    heap_size: usize,
+) -> Result<InMemoryResourceProvider<'guard, 'ctx>> {
+    let mut provider = InMemoryResourceProvider::new(guard, heap_size);
+    for (state_key, value) in &read_set.data {
+        match state_key.inner() {
+            StateKeyInner::AccessPath(ap) => match ap.get_path() {
+                // Modules are ignored.
+                Path::Code(_) => {},
+                Path::Resource(struct_tag) => {
+                    let ty = intern_struct_tag(guard, &struct_tag)?;
+                    provider.add_resource(ap.address, ty, value.bytes().to_vec());
+                },
+                // A resource group: add each resource in the group individually.
+                Path::ResourceGroup(_) => {
+                    let members: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(value.bytes())?;
+                    for (struct_tag, blob) in members {
+                        let ty = intern_struct_tag(guard, &struct_tag)?;
+                        provider.add_resource(ap.address, ty, blob);
+                    }
+                },
+            },
+            StateKeyInner::TableItem { handle, key } => {
+                provider.add_table_item(handle.0, key.clone(), value.bytes().to_vec());
+            },
+            // Neither resources nor table items.
+            StateKeyInner::Raw(_) | StateKeyInner::TradingNative(_) => {},
+        }
+    }
+    Ok(provider)
 }

@@ -1,14 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! A [`ResourceProvider`] backed by the captured read-set. Each resource is materialized
-//! (BCS → flat) into a long-lived heap arena on first access and served as a pointer thereafter.
-//! Materialization is lazy because a resource type's layout is only published once the function
-//! that accesses it has been lowered.
+//! An in-memory [`ResourceProvider`] shared by the MonoMove test harnesses.
+//!
+//! Resources and table items are held as BCS bytes and materialized (BCS ->
+//! flat) into a long-lived heap on first access, then served as a pointer.
+//! Materialization is lazy because a type's layout is only published once the
+//! function that accesses it has been lowered.
 
-use crate::{data::ReadSet, v2::intern_struct_tag};
-use anyhow::Result;
-use aptos_types::{access_path::Path, state_store::state_key::inner::StateKeyInner};
 use mono_move_core::{
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
@@ -18,15 +17,11 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap};
-use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashMap},
-    ptr::NonNull,
-};
+use move_core_types::account_address::AccountAddress;
+use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
 
-/// Serves the read-set's resources and table items to MonoMove, materializing each on first access.
-pub struct ReadSetResourceProvider<'guard, 'ctx> {
+/// Serves resources and table items to MonoMove, materializing each on first access.
+pub struct InMemoryResourceProvider<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
     /// BCS bytes of each resource, keyed by address and interned type.
     resources: HashMap<(AccountAddress, InternedType), Vec<u8>>,
@@ -42,48 +37,28 @@ struct Materialized {
     cache: HashMap<InMemoryStorageKey, NonNull<u8>>,
 }
 
-impl<'guard, 'ctx> ReadSetResourceProvider<'guard, 'ctx> {
-    pub fn new(
-        guard: &'guard ExecutionGuard<'ctx>,
-        read_set: &ReadSet,
-        heap_size: usize,
-    ) -> Result<Self> {
-        let mut resources = HashMap::new();
-        let mut table_items = HashMap::new();
-        for (state_key, value) in &read_set.data {
-            match state_key.inner() {
-                StateKeyInner::AccessPath(ap) => match ap.get_path() {
-                    // Modules are ignored.
-                    Path::Code(_) => {},
-                    Path::Resource(struct_tag) => {
-                        let ty = intern_struct_tag(guard, &struct_tag)?;
-                        resources.insert((ap.address, ty), value.bytes().to_vec());
-                    },
-                    // A resource group: add each resource in the group individually.
-                    Path::ResourceGroup(_) => {
-                        let members: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(value.bytes())?;
-                        for (struct_tag, blob) in members {
-                            let ty = intern_struct_tag(guard, &struct_tag)?;
-                            resources.insert((ap.address, ty), blob);
-                        }
-                    },
-                },
-                StateKeyInner::TableItem { handle, key } => {
-                    table_items.insert((handle.0, key.clone()), value.bytes().to_vec());
-                },
-                // Neither resources nor table items.
-                StateKeyInner::Raw(_) | StateKeyInner::TradingNative(_) => {},
-            }
-        }
-        Ok(Self {
+impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
+    /// Creates an empty provider whose materialization arena is `heap_size` bytes.
+    pub fn new(guard: &'guard ExecutionGuard<'ctx>, heap_size: usize) -> Self {
+        Self {
             guard,
-            resources,
-            table_items,
+            resources: HashMap::new(),
+            table_items: HashMap::new(),
             materialized: RefCell::new(Materialized {
                 heap: Heap::new(heap_size),
                 cache: HashMap::new(),
             }),
-        })
+        }
+    }
+
+    /// Adds a resource of interned type `ty` published at `address`, given its BCS bytes.
+    pub fn add_resource(&mut self, address: AccountAddress, ty: InternedType, bytes: Vec<u8>) {
+        self.resources.insert((address, ty), bytes);
+    }
+
+    /// Adds a table item at `handle_address` keyed by serialized `key`, given its BCS bytes.
+    pub fn add_table_item(&mut self, handle_address: AccountAddress, key: Vec<u8>, bytes: Vec<u8>) {
+        self.table_items.insert((handle_address, key), bytes);
     }
 
     /// Returns the raw blob and the type to materialize it as, or `None` if the key isn't present.
@@ -104,7 +79,7 @@ impl<'guard, 'ctx> ReadSetResourceProvider<'guard, 'ctx> {
     }
 }
 
-impl ResourceProvider for ReadSetResourceProvider<'_, '_> {
+impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
     fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
         // Cache hit?
         {
