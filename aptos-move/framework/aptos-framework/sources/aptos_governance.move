@@ -287,6 +287,25 @@ module aptos_framework::aptos_governance {
     }
 
     #[view]
+    public fun partial_voting_initialized(): bool {
+        exists<VotingRecordsV2>(@aptos_framework)
+    }
+
+    /// Initializes the state for Aptos Governance partial voting if it has not already been initialized.
+    /// This can only be called with a signer for the aptos_framework (0x1) account.
+    public fun initialize_partial_voting_if_needed(
+        aptos_framework: &signer,
+    ) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        if (!partial_voting_initialized()) {
+            move_to(aptos_framework, VotingRecordsV2 {
+                votes: smart_table::new(),
+            });
+        }
+    }
+
+    #[view]
     public fun get_voting_duration_secs(): u64 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).voting_duration_secs
     }

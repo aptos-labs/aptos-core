@@ -98,6 +98,21 @@ spec aptos_framework::aptos_governance {
         ensures exists<VotingRecordsV2>(@aptos_framework);
     }
 
+    spec partial_voting_initialized {
+        pragma opaque;
+        aborts_if false;
+        ensures result == exists<VotingRecordsV2>(@aptos_framework);
+    }
+
+    /// Signer address must be @aptos_framework.
+    spec initialize_partial_voting_if_needed(
+        aptos_framework: &signer,
+    ) {
+        let addr = signer::address_of(aptos_framework);
+        aborts_if addr != @aptos_framework;
+        ensures exists<VotingRecordsV2>(@aptos_framework);
+    }
+
     spec schema InitializeAbortIf {
         aptos_framework: &signer;
         min_voting_threshold: u128;
