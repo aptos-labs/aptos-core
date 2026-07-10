@@ -1121,6 +1121,45 @@ pub(crate) enum ViewStateArgs<'a, R: Record> {
     },
 }
 
+// Accessors for VM integrations that build their own view from the
+// ingredients (the legacy VM uses `build_view` below instead). They expose
+// only public types; the scheduler plumbing stays crate-private.
+impl<'a, R: Record, S> ViewArgs<'a, R, S> {
+    /// The base state view (the committed storage this block executes over).
+    pub fn base_view(&self) -> &'a S {
+        self.base_view
+    }
+
+    /// The shared multi-version map. [`None`] in sequential execution.
+    pub fn versioned_cache(
+        &self,
+    ) -> Option<&'a MVHashMap<R::Key, R::Tag, R::Value, DelayedFieldID>> {
+        match &self.state {
+            ViewStateArgs::Parallel {
+                versioned_cache, ..
+            } => Some(versioned_cache),
+            ViewStateArgs::Sequential { .. } => None,
+        }
+    }
+
+    /// The incarnation being executed. [`None`] in sequential execution.
+    pub fn incarnation(&self) -> Option<Incarnation> {
+        match &self.state {
+            ViewStateArgs::Parallel { incarnation, .. } => Some(*incarnation),
+            ViewStateArgs::Sequential { .. } => None,
+        }
+    }
+
+    /// Whether the parallel execution runs BlockSTMv2. [`None`] in sequential
+    /// execution.
+    pub fn is_blockstm_v2(&self) -> Option<bool> {
+        match &self.state {
+            ViewStateArgs::Parallel { scheduler, .. } => Some(scheduler.is_v2()),
+            ViewStateArgs::Sequential { .. } => None,
+        }
+    }
+}
+
 impl<'a, O, E, S> ViewArgs<'a, LegacyRecord<O, E>, S>
 where
     O: TransactionOutput + 'static,

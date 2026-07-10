@@ -11,14 +11,14 @@ use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
     native::{NativeExtensions, NativeName},
     types::EMPTY_TYPE_LIST,
-    Function, GasMeter, Interner, NO_RESOURCE_PROVIDER,
+    Function, GasMeter, Interner,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::{make_all_production_natives, make_all_test_natives, Dispatch};
 use mono_move_runtime::{
     ExecutionContext, InterpreterContext, ProductionContextFamily, ProductionNativeRegistry,
-    RuntimeStatus, TransactionContext,
+    RuntimeStatus, TransactionContext, NO_RESOURCE_PROVIDER,
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 

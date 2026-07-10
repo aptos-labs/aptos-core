@@ -13,13 +13,12 @@ use legacy_move_compiler::unit_test::{
 };
 use mono_move_core::{
     types::EMPTY_TYPE_LIST, DescriptorProvider, Function, GasMeter, LayoutProvider,
-    NO_RESOURCE_PROVIDER,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{
     ExecutionContext, InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
-    TransactionContext,
+    TransactionContext, NO_RESOURCE_PROVIDER,
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{

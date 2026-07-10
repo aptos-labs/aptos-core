@@ -49,10 +49,7 @@ pub use prepared_module::{
     intern_sig_token, FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
-pub use storage::{
-    ModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
-    NO_RESOURCE_PROVIDER,
-};
+pub use storage::{InMemoryStorageKey, ModuleProvider, ResourceProviderError};
 pub use types::{convert_mut_to_immut_ref, strip_ref};
 pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,

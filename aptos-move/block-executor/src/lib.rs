@@ -147,7 +147,9 @@ pub mod executor;
 mod executor_utilities;
 pub mod explicit_sync_wrapper;
 pub mod hot_state_op_accumulator;
-mod limit_processor;
+// Public: `Record::accumulate_hot_state` names `BlockGasLimitProcessor`, so
+// external record implementations must be able to spell the type.
+pub mod limit_processor;
 pub mod record;
 pub mod records;
 mod scheduler;

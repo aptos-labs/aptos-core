@@ -39,6 +39,7 @@ use aptos_vm_types::{
     output::{UnorderedReadSet, VMOutput},
     resolver::ResourceGroupSize,
 };
+use mono_move_block_executor::MonoExecutorTask;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -438,14 +439,33 @@ impl<
             transaction_slice_metadata,
         )?;
 
-        let executor = BlockExecutor::<E, S, L, TP>::new(config, transaction_commit_listener);
-
-        let ret = executor.execute_block(
-            signature_verified_block,
-            state_view,
-            &transaction_slice_metadata,
-            &mut module_cache_manager_guard,
-        );
+        // The mono feature selects a different monomorphization of the block
+        // executor; both produce the same committed output type. The legacy
+        // path is unchanged.
+        let ret = if module_cache_manager_guard
+            .environment()
+            .features()
+            .is_mono_move_enabled()
+        {
+            let executor = BlockExecutor::<MonoExecutorTask, S, L, TP>::new(
+                config,
+                transaction_commit_listener,
+            );
+            executor.execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        } else {
+            let executor = BlockExecutor::<E, S, L, TP>::new(config, transaction_commit_listener);
+            executor.execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        };
         match ret {
             Ok(block_output) => {
                 // The block executor already returns the materialized on-chain outputs.

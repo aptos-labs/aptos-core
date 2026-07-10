@@ -89,7 +89,7 @@ fn test_out_of_gas_during_load() {
     let mut txn_ctx = TransactionContext::new(
         loader,
         GasMeter::new(1),
-        &mono_move_core::NO_RESOURCE_PROVIDER,
+        &mono_move_runtime::NO_RESOURCE_PROVIDER,
         &natives,
     );
 

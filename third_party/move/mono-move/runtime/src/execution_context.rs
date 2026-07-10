@@ -4,11 +4,14 @@
 //! Defines the [`ExecutionContext`] trait the interpreter calls into,
 //! and a minimal [`LocalExecutionContext`] impl for tests and benchmarks.
 
-use crate::{error::RuntimeResult, native_context::ProductionNativeRegistry};
+use crate::{
+    error::RuntimeResult,
+    native_context::ProductionNativeRegistry,
+    resource_provider::{ResourceProvider, NO_RESOURCE_PROVIDER},
+};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::{NativeExtensions, NativeRegistry},
-    storage::{ResourceProvider, NO_RESOURCE_PROVIDER},
     types::{InternedType, InternedTypeList},
     ConstantPoolIndex, DescriptorProvider, FunctionPtr, GasMeter, LayoutProvider,
     NO_DESCRIPTOR_PROVIDER, NO_LAYOUT_PROVIDER,

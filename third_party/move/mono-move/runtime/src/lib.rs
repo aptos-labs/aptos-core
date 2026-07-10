@@ -5,12 +5,13 @@
 
 pub mod error;
 mod execution_context;
-pub(crate) mod global_storage;
+pub mod global_storage;
 pub(crate) mod heap;
 mod interpreter;
 mod local_runtime_context;
 pub(crate) mod memory;
 mod native_context;
+pub mod resource_provider;
 mod transaction_context;
 mod types;
 mod value_utils;
@@ -18,6 +19,7 @@ mod verifier;
 
 pub use error::{RuntimeError, RuntimeStatus};
 pub use execution_context::{ExecutionContext, LocalExecutionContext};
+pub use global_storage::{Entry, ResourceReadWriteSet, StorageWrite};
 pub use heap::Heap;
 pub use interpreter::InterpreterContext;
 pub use local_runtime_context::LocalRuntimeContext;
@@ -32,6 +34,9 @@ pub use mono_move_core::{
 pub use native_context::{
     ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
     ProductionNativeRegistry,
+};
+pub use resource_provider::{
+    NoResourceProvider, ResourceProvider, StorageRead, Version, NO_RESOURCE_PROVIDER,
 };
 pub use transaction_context::TransactionContext;
 pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
