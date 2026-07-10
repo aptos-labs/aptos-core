@@ -64,8 +64,12 @@ module dispatching::storage {
         move_from<Storage<T>>(storage_address()).data
     }
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Prepares the dispatch table.
-    fun init_module(publisher: &signer) {
+    public entry fun initialize(publisher: &signer) {
+        assert!(std::signer::address_of(publisher) == @dispatching, ENOT_AUTHORIZED);
         let constructor_ref = object::create_object(@dispatching);
 
         move_to(
@@ -87,6 +91,6 @@ module dispatching::storage {
 
     #[test_only]
     public fun init_module_for_testing(publisher: &signer) {
-        init_module(publisher);
+        initialize(publisher);
     }
 }

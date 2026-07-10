@@ -25,6 +25,8 @@ module guild::guild {
     const ENOT_OWNER: u64 = 2;
     /// The provided signer is not a guild master
     const ENOT_GUILD_MASTER: u64 = 3;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 4;
 
     /// The guild token collection name
     const GUILD_COLLECTION_NAME: vector<u8> = b"Guild Collection Name";
@@ -60,7 +62,8 @@ module guild::guild {
     }
 
     /// Initializes the module, creating the manager object, the guild token collection and the whitelist.
-    fun init_module(sender: &signer) acquires Config {
+    public entry fun initialize(sender: &signer) acquires Config {
+        assert!(signer::address_of(sender) == @guild, ENOT_AUTHORIZED);
         // Create the guild collection manager object to use it to autonomously
         // manage the guild collection (e.g., create the collection and mint tokens).
         let constructor_ref = object::create_object(signer::address_of(sender));
@@ -268,7 +271,7 @@ module guild::guild {
         // -----------------------------------
         // Admin creates the guild collection.
         // -----------------------------------
-        init_module(admin);
+        initialize(admin);
 
         // ---------------------------------------------
         // Admin adds the guild master to the whitelist.

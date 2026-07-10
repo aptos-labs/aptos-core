@@ -38,6 +38,8 @@ module drand::lottery {
     const E_LOTTERY_DRAW_IS_TOO_EARLY: u64 = 3;
     /// Error code for when anyone submits an incorrect randomness for the randomized draw phase of the lottery.
     const E_INCORRECT_RANDOMNESS: u64 = 4;
+    /// Error code for when the signer initializing the lottery is not the module's account.
+    const E_NOT_AUTHORIZED: u64 = 5;
 
     /// The minimum time between when a lottery is 'started' and when it's closed & the randomized drawing can happen.
     /// Currently set to (10 mins * 60 secs / min) seconds.
@@ -64,11 +66,12 @@ module drand::lottery {
         winner: Option<address>,
     }
 
-    // Declare the testing module as a friend, so it can call `init_module` below for testing.
+    // Declare the testing module as a friend, so it can call `initialize` below for testing.
     friend drand::lottery_test;
 
     /// Initializes a so-called "resource" account which will maintain the list of lottery tickets bought by users.
-    fun init_module(deployer: &signer) {
+    public entry fun initialize(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @drand, E_NOT_AUTHORIZED);
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // update the list of purchased lottery tickets.
         let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
@@ -203,6 +206,6 @@ module drand::lottery {
     #[test_only]
     public fun init_module_for_testing(developer: &signer) {
         account::create_account_for_test(signer::address_of(developer));
-        init_module(developer)
+        initialize(developer)
     }
 }

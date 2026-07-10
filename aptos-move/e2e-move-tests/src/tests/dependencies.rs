@@ -142,6 +142,12 @@ fn test_script_with_dependencies() {
     let mut h = MoveHarness::new_with_executor(executor);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p4")));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::a3::initialize").unwrap(),
+        vec![],
+        vec![],
+    ));
 
     // Extract the script from the package to run in multiple times in the block.
     let p3 = BuiltPackage::build(

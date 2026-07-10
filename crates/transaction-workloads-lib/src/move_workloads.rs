@@ -246,6 +246,13 @@ pub enum EntryPoints {
     CoinInitAndMint,
     FungibleAssetMint,
 
+    ObjectsInitialize,
+    AggregatorInitialize,
+    CoinInitialize,
+    FungibleAssetInitialize,
+    AmbassadorInitialize,
+    OrderBookInitialize,
+
     TokenV2AmbassadorMint {
         numbered: bool,
     },
@@ -363,14 +370,20 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::ResourceGroupsSenderMultiChange { .. }
             | EntryPoints::CoinInitAndMint
             | EntryPoints::FungibleAssetMint
+            | EntryPoints::ObjectsInitialize
+            | EntryPoints::AggregatorInitialize
+            | EntryPoints::CoinInitialize
+            | EntryPoints::FungibleAssetInitialize
             | EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner
             | EntryPoints::MonotonicCounter { .. }
             | EntryPoints::DiceRoll => "framework_usecases",
-            EntryPoints::OrderBook { .. } => "experimental_usecases",
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
-                "ambassador_token"
+            EntryPoints::OrderBook { .. } | EntryPoints::OrderBookInitialize => {
+                "experimental_usecases"
             },
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::AmbassadorInitialize => "ambassador_token",
             EntryPoints::LiquidityPoolSwapInit { .. }
             | EntryPoints::LiquidityPoolSwap { .. }
             | EntryPoints::InitializeVectorPicture { .. }
@@ -415,10 +428,11 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::SimpleScript => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
-            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
-            EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
-                "objects"
-            },
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::AggregatorInitialize => "aggregator_example",
+            EntryPoints::CreateObjects { .. }
+            | EntryPoints::CreateObjectsConflict { .. }
+            | EntryPoints::ObjectsInitialize => "objects",
             EntryPoints::VectorTrimAppend { .. }
             | EntryPoints::VectorRemoveInsert { .. }
             | EntryPoints::VectorRangeMove { .. } => "vector_example",
@@ -434,11 +448,13 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
-            EntryPoints::CoinInitAndMint => "coin_example",
-            EntryPoints::FungibleAssetMint => "fungible_asset_example",
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
-                "ambassador"
+            EntryPoints::CoinInitAndMint | EntryPoints::CoinInitialize => "coin_example",
+            EntryPoints::FungibleAssetMint | EntryPoints::FungibleAssetInitialize => {
+                "fungible_asset_example"
             },
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::AmbassadorInitialize => "ambassador",
             EntryPoints::LiquidityPoolSwapInit { .. } | EntryPoints::LiquidityPoolSwap { .. } => {
                 "liquidity_pool_wrapper"
             },
@@ -454,7 +470,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::MonotonicCounter { .. } => "transaction_context_example",
-            EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::OrderBook { .. } | EntryPoints::OrderBookInitialize => {
+                "order_book_example"
+            },
             EntryPoints::DiceRoll => "dice_roll",
             EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
                 MoveVmMicroBenchmark::Locals | MoveVmMicroBenchmark::LocalsGeneric => "locals",
@@ -787,6 +805,14 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&1000u64).unwrap(), // amount
                 ])
             },
+            EntryPoints::ObjectsInitialize
+            | EntryPoints::AggregatorInitialize
+            | EntryPoints::CoinInitialize
+            | EntryPoints::FungibleAssetInitialize
+            | EntryPoints::AmbassadorInitialize
+            | EntryPoints::OrderBookInitialize => {
+                get_payload_void(module_id, ident_str!("initialize").to_owned())
+            },
             EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -989,6 +1015,20 @@ impl EntryPointTrait for EntryPoints {
                     milestone_every: *milestone_every,
                 }))
             },
+            EntryPoints::CreateObjectsConflict { .. } => {
+                Some(Box::new(EntryPoints::ObjectsInitialize))
+            },
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => {
+                Some(Box::new(EntryPoints::AggregatorInitialize))
+            },
+            EntryPoints::CoinInitAndMint => Some(Box::new(EntryPoints::CoinInitialize)),
+            EntryPoints::FungibleAssetMint => Some(Box::new(EntryPoints::FungibleAssetInitialize)),
+            EntryPoints::TokenV2AmbassadorMint { .. } => {
+                Some(Box::new(EntryPoints::AmbassadorInitialize))
+            },
+            EntryPoints::OrderBook { .. } => Some(Box::new(EntryPoints::OrderBookInitialize)),
             _ => None,
         }
     }
@@ -1067,6 +1107,12 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },
+            EntryPoints::ObjectsInitialize
+            | EntryPoints::AggregatorInitialize
+            | EntryPoints::CoinInitialize
+            | EntryPoints::FungibleAssetInitialize
+            | EntryPoints::AmbassadorInitialize
+            | EntryPoints::OrderBookInitialize => AutomaticArgs::Signer,
             EntryPoints::LiquidityPoolSwapInit { .. } => AutomaticArgs::Signer,
             EntryPoints::LiquidityPoolSwap { .. } => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,

@@ -2,6 +2,8 @@
 /// Mock on-chain governance parameters.
 module upgrade_and_govern::parameters {
 
+    use std::signer::address_of;
+
     struct GovernanceParameters has key {
         parameter_1: u64,
         parameter_2: u64
@@ -10,9 +12,13 @@ module upgrade_and_govern::parameters {
     const GENESIS_PARAMETER_1: u64 = 123;
     const GENESIS_PARAMETER_2: u64 = 456;
 
-    fun init_module(
+    /// The signer is not the module's account.
+    const E_INVALID_AUTHORITY: u64 = 0;
+
+    public entry fun initialize(
         upgrade_and_govern: &signer
     ) {
+        assert!(address_of(upgrade_and_govern) == @upgrade_and_govern, E_INVALID_AUTHORITY);
         let governance_parameters = GovernanceParameters{
             parameter_1: GENESIS_PARAMETER_1,
             parameter_2: GENESIS_PARAMETER_2};

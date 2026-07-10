@@ -10,6 +10,9 @@ module 0xABCD::fungible_asset_example {
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
 
+    /// Caller is not the module publisher.
+    const ENOT_AUTHORIZED: u64 = 2;
+
     const ASSET_SYMBOL: vector<u8> = b"FA";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -22,7 +25,8 @@ module 0xABCD::fungible_asset_example {
 
     /// Initialize metadata object and store the refs.
     // :!:>initialize
-    fun init_module(admin: &signer) {
+    public entry fun initialize(admin: &signer) {
+        assert!(signer::address_of(admin) == @publisher_address, ENOT_AUTHORIZED);
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,

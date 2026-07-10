@@ -86,7 +86,8 @@ module staking::commission {
         commission_debt_usd: u64
     }
 
-    fun init_module(commission_signer: &signer) {
+    public entry fun initialize(commission_signer: &signer) {
+        assert!(signer::address_of(commission_signer) == @staking, EUNAUTHORIZED);
         let signer_cap = resource_account::retrieve_resource_account_cap(commission_signer, @manager);
         move_to(commission_signer, CommissionConfig {
             manager: @manager,

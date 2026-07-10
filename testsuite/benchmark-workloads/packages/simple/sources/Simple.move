@@ -20,6 +20,9 @@ module 0xABCD::simple {
     // Resource being modified doesn't exist
     const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;
 
+    // Caller is not the module publisher.
+    const ENOT_AUTHORIZED: u64 = 2;
+
     // Load and return a value from the constant `RANDOM`.
     // No data read or write.
     // Constant load test.
@@ -170,7 +173,11 @@ module 0xABCD::simple {
 
     // Create the global `Counter`.
     // Stored under the module publisher address.
-    fun init_module(publisher: &signer) {
+    public entry fun initialize(publisher: &signer) {
+        assert!(
+            signer::address_of(publisher) == @publisher_address,
+            error::permission_denied(ENOT_AUTHORIZED),
+        );
         move_to<Counter>(
             publisher,
             Counter { count: 0 }

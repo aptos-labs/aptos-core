@@ -79,9 +79,9 @@ module mint_nft::create_nft {
     /// Action not authorized because the signer is not the admin of this module
     const ENOT_AUTHORIZED: u64 = 1;
 
-    /// `init_module` is automatically called when publishing the module.
     /// In this function, we create an example NFT collection and an example token.
-    fun init_module(source_account: &signer) {
+    public entry fun initialize(source_account: &signer) {
+        assert!(signer::address_of(source_account) == @mint_nft, ENOT_AUTHORIZED);
         let collection_name = string::utf8(b"Collection name");
         let description = string::utf8(b"Description");
         let collection_uri = string::utf8(b"Collection uri");

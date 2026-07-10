@@ -9,7 +9,7 @@ module raffle::raffle {
     use std::signer;
     use std::vector;
 
-    // We need this friend declaration so our tests can call `init_module`.
+    // We need this friend declaration so our tests can call `initialize`.
     friend raffle::raffle_test;
 
     /// Error code for when a user tries to initate the drawing but no users bought any tickets.
@@ -17,6 +17,9 @@ module raffle::raffle {
 
     /// Error code for when the somebody tries to draw an already-closed raffle
     const E_RAFFLE_HAS_CLOSED: u64 = 3;
+
+    /// Error code for when the signer initializing the raffle is not the module's account.
+    const E_NOT_AUTHORIZED: u64 = 4;
 
     /// The minimum price of a raffle ticket, in APT.
     const TICKET_PRICE: u64 = 10_000;
@@ -33,7 +36,8 @@ module raffle::raffle {
     }
 
     /// Initializes the `Raffle` resource, which will maintain the list of raffle tickets bought by users.
-    fun init_module(deployer: &signer) {
+    public entry fun initialize(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @raffle, E_NOT_AUTHORIZED);
         move_to(
             deployer,
             Raffle {
@@ -46,7 +50,7 @@ module raffle::raffle {
 
     #[test_only]
     public(friend) fun init_module_for_testing(deployer: &signer) {
-        init_module(deployer)
+        initialize(deployer)
     }
 
     /// The price of buying a raffle ticket.

@@ -108,6 +108,13 @@ pub fn publish_object_token_example(h: &mut MoveHarness, addr: AccountAddress, a
         build_options,
     );
     assert_success!(result);
+
+    assert_success!(h.run_entry_function(
+        account,
+        str::parse(&format!("0x{}::hero::initialize", addr.to_hex())).unwrap(),
+        vec![],
+        vec![],
+    ));
 }
 
 pub fn create_mint_hero_payload(addr: &AccountAddress, description: &str) -> TransactionPayload {

@@ -70,6 +70,19 @@ fn run(data: Vec<(u64, String, Option<u64>)>) -> AggV2TestHarness {
     );
 
     let account = h.account.clone();
+
+    let init_txn = h.harness.create_entry_function(
+        &account,
+        str::parse(&format!(
+            "{}::events_with_aggregators::initialize",
+            account.address()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    );
+    h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, init_txn)]);
+
     let (txns, event_values): (_, Vec<_>) = data
         .into_iter()
         .map(|(status_code, name, event_value)| {

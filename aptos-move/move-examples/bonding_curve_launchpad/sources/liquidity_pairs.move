@@ -30,6 +30,8 @@ module bonding_curve_launchpad::liquidity_pairs {
     const ELIQUIDITY_PAIR_DISABLED: u64 = 102;
     /// Swap results in negligible amount out. Requires increasing amount in.
     const ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT: u64 = 111;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
 
     //---------------------------Events---------------------------
     #[event]
@@ -76,7 +78,8 @@ module bonding_curve_launchpad::liquidity_pairs {
     }
 
     //---------------------------Init---------------------------
-    fun init_module(account: &signer) {
+    public entry fun initialize(account: &signer) {
+        assert!(signer::address_of(account) == @bonding_curve_launchpad, ENOT_AUTHORIZED);
         let signer_extender = object::generate_extend_ref(
             &object::create_sticky_object(@bonding_curve_launchpad)
         );

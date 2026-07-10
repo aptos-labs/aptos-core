@@ -20,8 +20,16 @@ async fn test_signed_ints() {
         TestContext::build_package_with_latest_language(path, named_addresses)
     });
 
-    // Init state: `-1i64`
+    // Init state: `-1i64`.
     context.publish_package(&mut account, txn).await;
+    context
+        .api_execute_entry_function(
+            &mut account,
+            &format!("0x{}::calculator::initialize", account_addr.to_hex()),
+            json!([]),
+            json!([]),
+        )
+        .await;
     let state_resource = format!("{}::{}::{}", account_addr, "calculator", "State");
     let state = &context
         .gen_resource(&account_addr, &state_resource)

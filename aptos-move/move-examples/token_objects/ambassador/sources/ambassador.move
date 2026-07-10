@@ -35,6 +35,8 @@ module ambassador::ambassador {
     const EPROPERTIES_NOT_MUTABLE: u64 = 5;
     // The collection does not exist
     const ECOLLECTION_DOES_NOT_EXIST: u64 = 6;
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 7;
 
     /// The ambassador token collection name
     const COLLECTION_NAME: vector<u8> = b"Ambassador Collection Name";
@@ -78,7 +80,8 @@ module ambassador::ambassador {
     /// Initializes the module, creating the ambassador collection. The creator of the module is the creator of the
     /// ambassador collection. As this init function is called only once when the module is published, there will
     /// be only one ambassador collection.
-    fun init_module(sender: &signer) {
+    public entry fun initialize(sender: &signer) {
+        assert!(signer::address_of(sender) == @ambassador, ENOT_AUTHORIZED);
         create_ambassador_collection(sender);
     }
 

@@ -1,9 +1,13 @@
 module 0xABCD::coin_example {
     use std::signer;
 
+    /// Caller is not the module publisher.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     struct ExampleCoin {}
 
-    fun init_module(sender: &signer) {
+    public entry fun initialize(sender: &signer) {
+        assert!(signer::address_of(sender) == @publisher_address, ENOT_AUTHORIZED);
         aptos_framework::managed_coin::initialize<ExampleCoin>(
             sender,
             b"Example Coin",

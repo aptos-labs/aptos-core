@@ -3,6 +3,9 @@
 module resource_groups_primary::primary {
     use std::signer;
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     #[resource_group(scope = global)]
     struct ResourceGroupContainer { }
 
@@ -32,7 +35,8 @@ module resource_groups_primary::primary {
         exists<Primary>(account)
     }
 
-    fun init_module(owner: &signer) {
+    public entry fun initialize(owner: &signer) {
+        assert!(signer::address_of(owner) == @resource_groups_primary, ENOT_AUTHORIZED);
         move_to(owner, Primary { value: 3 });
     }
 

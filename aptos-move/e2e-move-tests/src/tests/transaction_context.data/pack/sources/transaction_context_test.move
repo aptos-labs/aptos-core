@@ -31,8 +31,8 @@ module admin::transaction_context_test {
         counter_call_count: u64,
     }
 
-    /// Called when the module is first deployed at address `signer`, which is supposed to be @admin (= 0x1).
-    fun init_module(sender: &signer) {
+    /// Explicitly called after the module is deployed at address @admin (= 0x1) to set up the store.
+    public entry fun initialize(sender: &signer) {
         assert!(signer::address_of(sender) == @admin, 1);
         // Initialize the global resource with the default values.
         move_to(sender,

@@ -23,6 +23,8 @@ module publisher_address::liquidity_pool_wrapper {
     public entry fun initialize_liquid_pair(publisher: &signer, is_stable: bool) {
         assert!(signer::address_of(publisher) == @publisher_address, ENOT_PUBLISHER);
 
+        liquidity_pool::initialize(publisher);
+
         let (pool, token_1_mint, token_2_mint) = create_pool(publisher, is_stable);
 
         // Add liquidity to the pool

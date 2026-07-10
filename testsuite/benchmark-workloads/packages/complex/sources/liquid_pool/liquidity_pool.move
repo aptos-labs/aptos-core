@@ -98,7 +98,8 @@ module publisher_address::liquidity_pool {
         amount_in: u64,
     }
 
-    fun init_module(publisher: &signer) {
+    public(friend) fun initialize(publisher: &signer) {
+        assert!(signer::address_of(publisher) == @publisher_address, ENOT_AUTHORIZED);
         move_to(publisher, LiquidityPoolConfigs {
             all_pools: smart_vector::new(),
             is_paused: false,

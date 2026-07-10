@@ -3,6 +3,10 @@ module 0x1::chain_id_test {
     use aptos_framework::aptos_governance;
     use aptos_framework::chain_id;
     use std::features;
+    use std::signer;
+
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
 
     /// Since tests in e2e-move-tests/ can only call entry functions which don't have return values, we must store
     /// the results we are interested in (i.e., the chain ID) inside this (rather-artificial) resource, which we can
@@ -11,8 +15,10 @@ module 0x1::chain_id_test {
         id: u8,
     }
 
-    /// Called when the module is first deployed at address `signer`, which is set to 0x1 (according to the `module 0x1::chain_id_test` line above).
-    fun init_module(sender: &signer) {
+    /// Explicitly called after the module is deployed at address 0x1 to set up the ChainIdStore and enable the
+    /// chain-id feature.
+    public entry fun initialize(sender: &signer) {
+        assert!(signer::address_of(sender) == @0x1, ENOT_AUTHORIZED);
         move_to(sender,
             ChainIdStore {
                 id: 0u8

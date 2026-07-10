@@ -182,7 +182,8 @@ module post_mint_reveal_nft::minting {
     const EDUPLICATE_TOKEN_URI: u64 = 13;
 
     /// Initialize NFTMintConfig for this module.
-    fun init_module(admin: &signer) {
+    public entry fun initialize(admin: &signer) {
+        assert!(signer::address_of(admin) == @post_mint_reveal_nft, error::permission_denied(ENOT_AUTHORIZED));
         // Construct a seed vector that pseudo-randomizes the resource address generated.
         let seed_vec = bcs::to_bytes(&timestamp::now_seconds());
         let (_, resource_signer_cap) = account::create_resource_account(admin, seed_vec);
@@ -656,7 +657,7 @@ module post_mint_reveal_nft::minting {
         timestamp::update_global_time_for_test_secs(timestamp);
 
         create_account_for_test(signer::address_of(admin_account));
-        init_module(admin_account);
+        initialize(admin_account);
 
         create_account_for_test(signer::address_of(wl_nft_claimer));
         create_account_for_test(signer::address_of(public_nft_claimer));

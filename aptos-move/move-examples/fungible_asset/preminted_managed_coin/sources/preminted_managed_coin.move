@@ -14,8 +14,12 @@ module example_addr::preminted_managed_coin {
     const ASSET_SYMBOL: vector<u8> = b"MEME";
     const PRE_MINTED_TOTAL_SUPPLY: u64 = 10000;
 
+    /// The signer is not the module's account.
+    const ENOT_AUTHORIZED: u64 = 1;
+
     /// Initialize metadata object and store the refs.
-    fun init_module(admin: &signer) {
+    public entry fun initialize(admin: &signer) {
+        assert!(signer::address_of(admin) == @example_addr, ENOT_AUTHORIZED);
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         managed_fungible_asset::initialize(
             constructor_ref,
@@ -53,7 +57,7 @@ module example_addr::preminted_managed_coin {
     #[test(creator = @example_addr)]
     #[expected_failure(abort_code = 0x60004, location = example_addr::managed_fungible_asset)]
     fun test_basic_flow(creator: &signer) {
-        init_module(creator);
+        initialize(creator);
         let creator_address = signer::address_of(creator);
         let metadata = get_metadata();
 
