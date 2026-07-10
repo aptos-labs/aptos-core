@@ -1,0 +1,10 @@
+{
+  "prover_messages": ["1p", "2p"],
+  "verifier_messages": ["1v", "2v"],
+  "dependencies": {
+    "1p": [],
+    "2p": ["1p", "1v"],
+    "1v": ["1p"],
+    "2v": ["1p"]
+  }
+}

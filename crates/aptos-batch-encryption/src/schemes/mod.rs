@@ -3,3 +3,4 @@
 pub mod fptx;
 pub mod fptx_succinct;
 pub mod fptx_weighted;
+pub mod hm;
