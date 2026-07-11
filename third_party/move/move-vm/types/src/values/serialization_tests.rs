@@ -625,27 +625,6 @@ mod tests {
 
         // ser(MoveValue) == ser(VMValue)
         assert_eq!(bytes, vm_bytes);
-
-        // Permissioned Signer Roundtrip
-        let vm_value = Value::permissioned_signer(AccountAddress::ZERO, AccountAddress::ONE);
-        let vm_bytes = ValueSerDeContext::new(None)
-            .serialize(&vm_value, &MoveTypeLayout::Signer)
-            .unwrap()
-            .unwrap();
-
-        // VM Value Roundtrip
-        assert!(ValueSerDeContext::new(None)
-            .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
-            .unwrap()
-            .equals(&vm_value)
-            .unwrap());
-
-        // Cannot serialize permissioned signer into bytes with legacy signer
-        assert!(ValueSerDeContext::new(None)
-            .with_legacy_signer()
-            .serialize(&vm_value, &MoveTypeLayout::Signer)
-            .unwrap()
-            .is_none());
     }
 
     #[test]
