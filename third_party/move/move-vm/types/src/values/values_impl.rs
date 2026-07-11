@@ -25,7 +25,6 @@ use move_core_types::{
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
-        PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
     },
     vm_status::{
         sub_status::{
@@ -2509,42 +2508,10 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        // The signer is internally represented as an enum (Master or Permissioned), but both
-        // variants store the account address at index 1. Thus, we can access it without checking
-        // the variant tag.
+        // The signer is internally represented as an enum for layout stability. Only the
+        // master variant remains constructible (permissioned signers have been removed),
+        // and it stores the account address at index 1, after the variant tag.
         self.0.borrow_elem(MASTER_ADDRESS_FIELD_OFFSET, None)
-    }
-
-    pub fn is_permissioned(&self) -> PartialVMResult<bool> {
-        match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => {
-                Ok(*s.borrow()[0].as_value_ref::<u16>()? == PERMISSIONED_SIGNER_VARIANT)
-            },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("unexpected signer value: {:?}", self)),
-            ),
-        }
-    }
-
-    /// Get the permission address associated with a signer.
-    /// Needs to make sure the signer passed in is a permissioned signer.
-    pub fn permission_address(&self) -> PartialVMResult<Value> {
-        match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
-                *s.borrow()
-                    .get(PERMISSION_ADDRESS_FIELD_OFFSET)
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(format!("unexpected signer value: {:?}", self))
-                    })?
-                    .as_value_ref::<AccountAddress>()?,
-            )),
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("unexpected signer value: {:?}", self)),
-            ),
-        }
     }
 }
 
@@ -2726,13 +2693,6 @@ impl Value {
 
     pub fn master_signer(x: AccountAddress) -> Self {
         Value::Container(Container::master_signer(x))
-    }
-
-    pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
-            Value::address(x),
-            Value::address(perm_storage_address),
-        ]))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
