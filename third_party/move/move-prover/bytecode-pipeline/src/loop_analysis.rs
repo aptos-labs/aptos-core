@@ -8,7 +8,7 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{self, TempIndex},
     exp_generator::ExpGenerator,
-    model::FunctionEnv,
+    model::{FunctionEnv, QualifiedInstId, StructId},
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -128,6 +128,60 @@ impl LoopAnalysisProcessor {
         }
     }
 
+    /// Under the prophecy model, collect maps for globally-rooted mutable references.
+    ///
+    /// Returns two maps:
+    /// - `global_roots`: maps a `&mut` temp to the global resource it is rooted in
+    ///   (either directly via `BorrowGlobal` or transitively via `BorrowField`).
+    ///   Value is `(struct_id, addr_temp)`.
+    /// - `field_borrow_lenders`: maps a field-borrow dest temp to its immediate
+    ///   lender source temp (only populated for `BorrowField`/`BorrowVariantField`
+    ///   whose source is itself globally rooted).
+    ///
+    /// # Why two maps?
+    ///
+    /// After a `MutationValue` havoc of a field borrow `$t3` in the loop induction
+    /// case, the prophecy `$t3->f` is preserved but unconstrained by the data
+    /// invariant. `ProphecySyncFinal` sets `$t5->v.preburns = $t3->f`, so emitting
+    /// `WellFormed($t5)` — which `DataInvariantInstrumentationProcessor` expands to
+    /// `forall i: Dereference($t5).preburns[i].value > 0` — directly constrains
+    /// `$t3->f` at that program point without any equality chain through the global.
+    fn globally_rooted_refs(
+        code: &[Bytecode],
+    ) -> (
+        BTreeMap<TempIndex, (QualifiedInstId<StructId>, TempIndex)>,
+        BTreeMap<TempIndex, TempIndex>,
+    ) {
+        use Operation::{BorrowField, BorrowGlobal, BorrowVariantField};
+        let mut roots: BTreeMap<TempIndex, (QualifiedInstId<StructId>, TempIndex)> =
+            BTreeMap::new();
+        let mut lenders: BTreeMap<TempIndex, TempIndex> = BTreeMap::new();
+        for bc in code {
+            if let Bytecode::Call(_, dests, BorrowGlobal(mid, sid, inst), srcs, _) = bc {
+                roots.insert(dests[0], (mid.qualified_inst(*sid, inst.clone()), srcs[0]));
+            }
+        }
+        // Propagate through field borrows; repeat until stable (handles chains).
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for bc in code {
+                if let Bytecode::Call(_, dests, BorrowField(..) | BorrowVariantField(..), srcs, _) =
+                    bc
+                {
+                    if !roots.contains_key(&dests[0]) {
+                        if let Some(info) = roots.get(&srcs[0]).cloned() {
+                            roots.insert(dests[0], info);
+                            lenders.insert(dests[0], srcs[0]);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+        (roots, lenders)
+    }
+
     /// Perform a loop transformation that eliminate back-edges in a loop and flatten the function
     /// CFG into a directed acyclic graph (DAG).
     ///
@@ -157,6 +211,13 @@ impl LoopAnalysisProcessor {
             FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
                 no_fallthrough_jump_removal: true,
             });
+        // Under prophecy, globally-rooted refs need WellFormed re-assumption after
+        // loop-head havocs (see `globally_rooted_refs` for details).
+        let (global_roots, field_borrow_lenders) = if !options.path_refs {
+            Self::globally_rooted_refs(&builder.data.code)
+        } else {
+            (BTreeMap::new(), BTreeMap::new())
+        };
         let mut goto_fixes = vec![];
         let code = std::mem::take(&mut builder.data.code);
         for (offset, bytecode) in code.into_iter().enumerate() {
@@ -239,6 +300,33 @@ impl LoopAnalysisProcessor {
                                 vec![builder.mk_temporary(*idx)],
                             );
                             builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
+                            // Under prophecy, any havoc of a globally-rooted reference
+                            // can break the parent resource's data invariant via the
+                            // eager global update (mem[addr] = ref->f at BorrowGlobal):
+                            // - MutationAll: ref->f is havoced → global content arbitrary.
+                            // - MutationValue: ref->f is preserved, but the induction
+                            //   case treats t->f as unconstrained (no loop invariant
+                            //   bounds it), so PackRefDeep at resolve time fails.
+                            // Re-assume WellFormed on the global resource so that
+                            // DataInvariantInstrumentationProcessor adds the struct data
+                            // invariant as an assumption (e.g. `len(preburns) <= MAX`),
+                            // constraining the prophecy for the PackRefDeep assertion.
+                            if let Some((mem, addr_temp)) = global_roots.get(idx) {
+                                let env = func_env.module_env.env;
+                                let struct_env =
+                                    env.get_module(mem.module_id).into_struct(mem.id);
+                                let addr_exp = builder.mk_temporary(*addr_temp);
+                                let global_exp =
+                                    builder.mk_global(&struct_env, &mem.inst, addr_exp);
+                                let wf_exp = builder.mk_call(
+                                    &Type::Primitive(PrimitiveType::Bool),
+                                    ast::Operation::WellFormed,
+                                    vec![global_exp],
+                                );
+                                builder.emit_with(move |id| {
+                                    Bytecode::Prop(id, PropKind::Assume, wf_exp)
+                                });
+                            }
                         }
 
                         // trace implicitly reassigned variables after havocking
@@ -323,6 +411,29 @@ impl LoopAnalysisProcessor {
                             builder.emit(Bytecode::Prop(*attr_id, PropKind::Assume, exp.clone()));
                         }
                         Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, false);
+
+                        // After ProphecySyncFinal, for each MutationValue-havoced
+                        // field borrow of a globally-rooted ref, emit WellFormed on
+                        // the lender reference.  At this point ProphecySyncFinal has
+                        // set `lender->v.field = field_ref->f`, so WellFormed(lender)
+                        // — expanded by DataInvariantInstrumentationProcessor to the
+                        // struct's data invariant — directly constrains `field_ref->f`
+                        // with no equality chain through the global prophecy.
+                        for (idx, havoc_all) in &loop_info.spec_info().mut_targets {
+                            if !havoc_all {
+                                if let Some(lender) = field_borrow_lenders.get(idx) {
+                                    let lender_exp = builder.mk_temporary(*lender);
+                                    let wf_exp = builder.mk_call(
+                                        &Type::Primitive(PrimitiveType::Bool),
+                                        ast::Operation::WellFormed,
+                                        vec![lender_exp],
+                                    );
+                                    builder.emit_with(move |id| {
+                                        Bytecode::Prop(id, PropKind::Assume, wf_exp)
+                                    });
+                                }
+                            }
+                        }
                     }
                 },
                 Bytecode::Prop(_, PropKind::Assert, _)

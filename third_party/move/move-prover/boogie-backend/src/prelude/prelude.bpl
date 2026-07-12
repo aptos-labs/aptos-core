@@ -484,6 +484,13 @@ datatype $Location {
 {%- if not options.path_refs %}
 // Prophecy (RustHorn/Creusot) model: path-free. `v` is the current value, `f` is the
 // prophesied final value the reference will hold when its borrow is resolved.
+// TODO(#20205): The two-field datatype generates different selector axioms than the
+// three-field path model, which can shift Z3's quantifier-instantiation budget on
+// loop-heavy VCs (e.g. math128::floor_log2, bcs_stream::deserialize_u128) past the
+// timeout threshold. If timeouts recur, profile whether the selector axioms for `v`
+// and `f` participate in an instantiation loop with the loop-invariant quantifiers
+// and consider splitting $Mutation into two separate uninterpreted types or using
+// a function-based encoding instead of a datatype.
 datatype $Mutation<T> {
     $Mutation(v: T, f: T)
 }
