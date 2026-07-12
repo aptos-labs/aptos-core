@@ -6397,7 +6397,7 @@ impl FunctionTranslator<'_> {
                         let memory_name = boogie_resource_memory_name(env, &mem, &None);
                         emitln!(
                             writer,
-                            "{} := $ResourceUpdate({}, {}, {}->f);",
+                            "{} := $ResourceUpdate({}, {}, $Mutation_f({}));",
                             memory_name,
                             memory_name,
                             str_local(srcs[1]),
@@ -6406,12 +6406,11 @@ impl FunctionTranslator<'_> {
                     },
                     ProphecyBorrow(node, edge) => {
                         // Eager lender update: install the child's prophecy (its final
-                        // value `r->f`) into the lender at borrow creation. This is the
-                        // prophecy counterpart of WriteBack, emitted at creation rather
-                        // than at end of scope, and reads `r->f` rather than `r->v`.
-                        // Global roots take no creation-time update here — theirs is
-                        // emitted inline at `BorrowGlobal` — so they never appear.
-                        let value = format!("{}->f", str_local(srcs[0]));
+                        // value `$Mutation_f(r)`) into the lender at borrow creation. This
+                        // is the prophecy counterpart of WriteBack, emitted at creation
+                        // rather than at end of scope. Global roots take no creation-time
+                        // update here — theirs is emitted inline at `BorrowGlobal`.
+                        let value = format!("$Mutation_f({})", str_local(srcs[0]));
                         self.emit_prophecy_lender_update(node, edge, &value, None);
                     },
                     ProphecySyncCurrent(node, edge) => {
@@ -6430,7 +6429,7 @@ impl FunctionTranslator<'_> {
                     ProphecySyncFinal(node, edge) => {
                         // Restore the eager state (the child's final value) after the
                         // observation. Same operands as `ProphecySyncCurrent`.
-                        let value = format!("{}->f", str_local(srcs[0]));
+                        let value = format!("$Mutation_f({})", str_local(srcs[0]));
                         self.emit_prophecy_lender_update(
                             node,
                             edge,
@@ -6443,7 +6442,7 @@ impl FunctionTranslator<'_> {
                         // final value. Combined with the eager lender update at creation,
                         // this flows the mutation back to the lender with no path.
                         let r = str_local(srcs[0]);
-                        emitln!(writer, "assume {}->v == {}->f;", r, r);
+                        emitln!(writer, "assume $Mutation_v({}) == $Mutation_f({});", r, r);
                     },
                     ResolveReturn => {
                         // A returned &mut is derived from a parameter, not committed: leave
@@ -6452,7 +6451,7 @@ impl FunctionTranslator<'_> {
                         // postconditions over `result` hold.
                         if !baseline_flag {
                             let r = str_local(srcs[0]);
-                            emitln!(writer, "assume {}->v == {}->f;", r, r);
+                            emitln!(writer, "assume $Mutation_v({}) == $Mutation_f({});", r, r);
                         }
                     },
                     IsParent(node, edge) => {

@@ -31,11 +31,10 @@ error: unknown assertion failed
    =     at tests/sources/functional/prophecy_observe_sync.move:35: observe_after_join
    =         x = <redacted>
    =     at tests/sources/functional/prophecy_observe_sync.move:37: observe_after_join
-   =     at tests/sources/functional/prophecy_observe_sync.move:38: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:41: observe_after_join
    =         <redacted> = <redacted>
-   =     at tests/sources/functional/prophecy_observe_sync.move:39: observe_after_join
+   =     at tests/sources/functional/prophecy_observe_sync.move:42: observe_after_join
    =         <redacted> = <redacted>
-   =     at tests/sources/functional/prophecy_observe_sync.move:44: observe_after_join
    =     at tests/sources/functional/prophecy_observe_sync.move:45: observe_after_join
    =     at tests/sources/functional/prophecy_observe_sync.move:46: observe_after_join
    =     at tests/sources/functional/prophecy_observe_sync.move:48: observe_after_join
