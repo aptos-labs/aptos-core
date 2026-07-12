@@ -16,7 +16,7 @@ use move_core_types::{
     function::ClosureMask,
     int256,
     language_storage::{TypeTag, OPTION_NONE_TAG},
-    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
     vm_status::StatusCode,
 };
 use move_vm_runtime::native_functions::NativeFunction;
@@ -315,8 +315,8 @@ fn native_format_impl(
             let addr = if fix_enabled {
                 val.value_as::<Struct>()?
                     .unpack()?
-                    // The single field of a signer is the account address.
-                    .next()
+                    // The signer's account address is at field 1, after the variant tag.
+                    .nth(MASTER_ADDRESS_FIELD_OFFSET)
                     .ok_or_else(|| SafeNativeError::abort(EINVALID_FORMAT))?
                     .value_as::<AccountAddress>()?
             } else {
