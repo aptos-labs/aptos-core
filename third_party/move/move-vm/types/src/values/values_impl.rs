@@ -23,9 +23,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
     int256,
-    value::{
-        self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
-    },
+    value::{self, MoveStructLayout, MoveTypeLayout},
     vm_status::{
         sub_status::{
             unknown_invariant_violation::EINDEXED_REF_TAG_MISMATCH, NFE_VECTOR_ERROR_BASE,
@@ -594,11 +592,11 @@ impl Container {
         }
     }
 
-    fn master_signer(x: AccountAddress) -> Self {
-        Container::Struct(NestedValues::new(vec![
-            Value::U16(MASTER_SIGNER_VARIANT),
-            Value::Address(Box::new(x)),
-        ]))
+    fn signer(x: AccountAddress) -> Self {
+        // A signer is a single-field container wrapping the account address. The container
+        // is needed (rather than a bare address) so that `signer::borrow_address` can hand
+        // out a reference into it.
+        Container::Struct(NestedValues::new(vec![Value::Address(Box::new(x))]))
     }
 }
 
@@ -2508,10 +2506,8 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        // The signer is internally represented as an enum for layout stability. Only the
-        // master variant remains constructible (permissioned signers have been removed),
-        // and it stores the account address at index 1, after the variant tag.
-        self.0.borrow_elem(MASTER_ADDRESS_FIELD_OFFSET, None)
+        // A signer stores the account address as its single field.
+        self.0.borrow_elem(0, None)
     }
 }
 
@@ -2691,14 +2687,14 @@ impl Value {
         Value::Address(Box::new(x))
     }
 
-    pub fn master_signer(x: AccountAddress) -> Self {
-        Value::Container(Container::master_signer(x))
+    pub fn signer(x: AccountAddress) -> Self {
+        Value::Container(Container::signer(x))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
     /// execute function
-    pub fn master_signer_reference(x: AccountAddress) -> Self {
-        Value::ContainerRef(ContainerRef::Local(Container::master_signer(x)))
+    pub fn signer_reference(x: AccountAddress) -> Self {
+        Value::ContainerRef(ContainerRef::Local(Container::signer(x)))
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -5317,45 +5313,24 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                 }
             },
 
-            // Signer.
-            (L::Signer, Value::Container(Container::Struct(r))) => {
-                if self.ctx.legacy_signer {
-                    // Only allow serialization of master signer.
-                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
-                        invariant_violation::<S>(format!(
-                            "First field of a signer needs to be an enum descriminator, got {:?}",
-                            self.value
-                        ))
-                    })? != MASTER_SIGNER_VARIANT
-                    {
-                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
-                    }
-                    r.borrow()
-                        .get(MASTER_ADDRESS_FIELD_OFFSET)
-                        .ok_or_else(|| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .as_value_ref::<AccountAddress>()
-                        .map_err(|_| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .serialize(serializer)
-                } else {
-                    (SerializationReadyValue {
-                        ctx: self.ctx,
-                        layout: &MoveStructLayout::signer_serialization_layout(),
-                        value: &*r.borrow(),
-                        depth: self.depth,
-                    })
-                    .serialize(serializer)
-                }
-            },
+            // Signer. Serialized as its single field: the account address.
+            (L::Signer, Value::Container(Container::Struct(r))) => r
+                .borrow()
+                .first()
+                .ok_or_else(|| {
+                    invariant_violation::<S>(format!(
+                        "cannot serialize container {:?} as {:?}",
+                        self.value, self.layout
+                    ))
+                })?
+                .as_value_ref::<AccountAddress>()
+                .map_err(|_| {
+                    invariant_violation::<S>(format!(
+                        "cannot serialize container {:?} as {:?}",
+                        self.value, self.layout
+                    ))
+                })?
+                .serialize(serializer),
 
             // Delayed values. For their serialization, we must have custom
             // serialization available, otherwise an error is returned.
@@ -5531,11 +5506,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                         "Cannot deserialize signer into value".to_string(),
                     ))
                 } else {
-                    let seed = DeserializationSeed {
-                        ctx: self.ctx,
-                        layout: &MoveStructLayout::signer_serialization_layout(),
-                    };
-                    Ok(Value::struct_(seed.deserialize(deserializer)?))
+                    AccountAddress::deserialize(deserializer).map(Value::signer)
                 }
             },
 
@@ -6241,9 +6212,7 @@ pub mod prop {
             L::I256 => any::<int256::I256>().prop_map(Value::i256).boxed(),
             L::Bool => any::<bool>().prop_map(Value::bool).boxed(),
             L::Address => any::<AccountAddress>().prop_map(Value::address).boxed(),
-            L::Signer => any::<AccountAddress>()
-                .prop_map(Value::master_signer)
-                .boxed(),
+            L::Signer => any::<AccountAddress>().prop_map(Value::signer).boxed(),
 
             L::Vector(layout) => match &**layout {
                 L::U8 => vec(any::<u8>(), 0..10)
@@ -6528,7 +6497,7 @@ impl Value {
 
             (L::Signer, Value::Container(Container::Struct(r))) => {
                 let v = r.borrow();
-                match &v[MASTER_ADDRESS_FIELD_OFFSET] {
+                match &v[0] {
                     Value::Address(a) => MoveValue::Signer(**a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
                 }
