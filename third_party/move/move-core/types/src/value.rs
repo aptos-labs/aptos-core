@@ -68,21 +68,6 @@ pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], a
     Ok(&VARIANT_NAME_PLACEHOLDERS[..len])
 }
 
-/// Signer values are represented at runtime as an enum for layout stability:
-/// ```text
-/// enum signer {
-///     Master { account: address },
-///     Permissioned { account: address, permissions_address: address }, // removed
-/// }
-/// ```
-/// The permissioned signer feature has been removed; only the master variant remains
-/// constructible. Variant tag 1 stays reserved in the serialization layout
-/// (see `MoveStructLayout::signer_serialization_layout`).
-/// enum variant tag for a master signer.
-pub const MASTER_SIGNER_VARIANT: u16 = 0;
-/// field offset of a master account address in a enum encoded signer.
-pub const MASTER_ADDRESS_FIELD_OFFSET: usize = 1;
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
@@ -780,11 +765,9 @@ impl MoveStructLayout {
     }
 
     pub fn signer_serialization_layout() -> Self {
-        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address], vec![
-            MoveTypeLayout::Address,
-            MoveTypeLayout::Address,
-        ]])
+        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address]])
     }
+
 }
 
 impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
@@ -1032,15 +1015,8 @@ impl serde::Serialize for MoveValue {
             MoveValue::I128(i) => serializer.serialize_i128(*i),
             MoveValue::I256(i) => i.serialize(serializer),
             MoveValue::Address(a) => a.serialize(serializer),
-            MoveValue::Signer(a) => {
-                // Runtime representation of signer looks following:
-                // enum signer {
-                //     Master { account: address },
-                //     Permissioned { account: address, permissions_address: address },
-                // }
-                MoveStruct::new_variant(MASTER_SIGNER_VARIANT, vec![MoveValue::Address(*a)])
-                    .serialize(serializer)
-            },
+            // A signer is serialized as its account address.
+            MoveValue::Signer(a) => a.serialize(serializer),
             MoveValue::Vector(v) => {
                 let mut t = serializer.serialize_seq(Some(v.len()))?;
                 for val in v {

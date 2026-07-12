@@ -176,8 +176,8 @@ fn test_mem_swap() -> PartialVMResult<()> {
     // -- Container of container
     locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])))?;
     locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])))?;
-    locals.store_loc(10, Value::master_signer(AccountAddress::ZERO))?;
-    locals.store_loc(11, Value::master_signer(AccountAddress::ONE))?;
+    locals.store_loc(10, Value::signer(AccountAddress::ZERO))?;
+    locals.store_loc(11, Value::signer(AccountAddress::ONE))?;
 
     // -- Container of vector
     locals.store_loc(
@@ -194,11 +194,11 @@ fn test_mem_swap() -> PartialVMResult<()> {
     )?;
     locals.store_loc(
         14,
-        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ZERO)]).unwrap(),
+        Value::vector_unchecked(vec![Value::signer(AccountAddress::ZERO)]).unwrap(),
     )?;
     locals.store_loc(
         15,
-        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ONE)]).unwrap(),
+        Value::vector_unchecked(vec![Value::signer(AccountAddress::ONE)]).unwrap(),
     )?;
 
     let mut locals2 = Locals::new(2);
@@ -563,8 +563,8 @@ mod delayed_fields {
         assert_err!(Value::i256(I256::ZERO).equals(&v));
 
         assert_err!(Value::address(AccountAddress::ONE).equals(&v));
-        assert_err!(Value::master_signer(AccountAddress::ONE).equals(&v));
-        assert_err!(Value::master_signer_reference(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::signer(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::signer_reference(AccountAddress::ONE).equals(&v));
 
         assert_err!(Value::vector_bool(vec![true, false]).equals(&v));
 
