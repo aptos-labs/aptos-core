@@ -4,19 +4,13 @@
 //! Natives for the `signer` type.
 //!
 //! MonoMove represents a `signer` as a bare 32-byte account address — the same layout
-//! as `address`. The permissioned signer feature has been removed; its native remains
-//! registered only so historical versions of `0x1::permissioned_signer`, which declare
-//! it, can still be loaded, and it aborts exactly like the legacy VM's flag-disabled
-//! implementation.
+//! as `address`.
 
 use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeStatus},
     VMResult,
 };
-
-/// Abort code of the removed permissioned signer natives (`EPERMISSION_SIGNER_DISABLED`).
-const EPERMISSION_SIGNER_DISABLED: u64 = 9;
 
 /// `0x1::create_signer::create_signer(addr: address): signer`
 ///
