@@ -68,6 +68,19 @@ pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], a
     Ok(&VARIANT_NAME_PLACEHOLDERS[..len])
 }
 
+/// Signer values are represented at runtime as a single-variant enum:
+/// ```text
+/// enum signer {
+///     Master { account: address },
+/// }
+/// ```
+/// The VM has historically represented signer as an enum. Collapsing to a plain address
+/// is not possible because it would change the number of value nodes walked by signer-
+/// shape-dependent operations (e.g. `s == t`), and therefore the gas charged for them.
+pub const MASTER_SIGNER_VARIANT: u16 = 0;
+/// field offset of a master account address in an enum encoded signer.
+pub const MASTER_ADDRESS_FIELD_OFFSET: usize = 1;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
@@ -767,7 +780,6 @@ impl MoveStructLayout {
     pub fn signer_serialization_layout() -> Self {
         MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address]])
     }
-
 }
 
 impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
@@ -1015,8 +1027,12 @@ impl serde::Serialize for MoveValue {
             MoveValue::I128(i) => serializer.serialize_i128(*i),
             MoveValue::I256(i) => i.serialize(serializer),
             MoveValue::Address(a) => a.serialize(serializer),
-            // A signer is serialized as its account address.
-            MoveValue::Signer(a) => a.serialize(serializer),
+            MoveValue::Signer(a) => {
+                // Runtime representation of signer is a single-variant enum wrapping the
+                // account address.
+                MoveStruct::new_variant(MASTER_SIGNER_VARIANT, vec![MoveValue::Address(*a)])
+                    .serialize(serializer)
+            },
             MoveValue::Vector(v) => {
                 let mut t = serializer.serialize_seq(Some(v.len()))?;
                 for val in v {

@@ -5,7 +5,6 @@ module std::signer {
     /// ```
     /// enum signer has drop {
     ///     Master { account: address },
-    ///     Permissioned { account: address, permissions_address: address },
     /// }
     /// ```
     ///
