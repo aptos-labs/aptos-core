@@ -484,16 +484,17 @@ datatype $Location {
 {%- if not options.path_refs %}
 // Prophecy (RustHorn/Creusot) model: path-free. `v` is the current value, `f` is the
 // prophesied final value the reference will hold when its borrow is resolved.
-// TODO(#20205): The two-field datatype generates different selector axioms than the
-// three-field path model, which can shift Z3's quantifier-instantiation budget on
-// loop-heavy VCs (e.g. math128::floor_log2, bcs_stream::deserialize_u128) past the
-// timeout threshold. If timeouts recur, profile whether the selector axioms for `v`
-// and `f` participate in an instantiation loop with the loop-invariant quantifiers
-// and consider splitting $Mutation into two separate uninterpreted types or using
-// a function-based encoding instead of a datatype.
-datatype $Mutation<T> {
-    $Mutation(v: T, f: T)
-}
+// We use an uninterpreted type with hand-written selector axioms rather than a Boogie
+// `datatype`, to avoid the reconstruction axiom `forall m :: m == $Mutation(m->v, m->f)`
+// that a datatype would generate. That axiom triggers on T-typed terms (e.g. `int` when
+// T=u128) and causes Z3 quantifier-instantiation loops with loop-invariant quantifiers in
+// arithmetic-heavy VCs. The axioms below trigger ONLY on explicit constructor applications.
+type $Mutation _;
+function $Mutation<T>(v: T, f: T): $Mutation T;
+function $Mutation_v<T>(m: $Mutation T): T;
+function $Mutation_f<T>(m: $Mutation T): T;
+axiom (forall<T> v: T, f: T :: {$Mutation(v, f)} $Mutation_v($Mutation(v, f)) == v);
+axiom (forall<T> v: T, f: T :: {$Mutation(v, f)} $Mutation_f($Mutation(v, f)) == f);
 {%- else %}
 datatype $Mutation<T> {
     $Mutation(l: $Location, p: Vec int, v: T)
@@ -560,23 +561,28 @@ axiom $ConstMemoryDomain(false) == (lambda i: int :: false);
 axiom $ConstMemoryDomain(true) == (lambda i: int :: true);
 
 
+{%- if not options.path_refs %}
+// Dereferences a mutation.
+function {:inline} $Dereference<T>(ref: $Mutation T): T {
+    $Mutation_v(ref)
+}
+
+// Update the current value of a mutation, preserving the prophecy `f`.
+function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
+    $Mutation(v, $Mutation_f(m))
+}
+
+// Havoc the current value of a mutation, preserving the prophecy `f`.
+procedure {:inline 1} $HavocMutation<T>(m: $Mutation T) returns (r: $Mutation T) {
+    var havoced_v: T;
+    r := $Mutation(havoced_v, $Mutation_f(m));
+}
+{%- else %}
 // Dereferences a mutation.
 function {:inline} $Dereference<T>(ref: $Mutation T): T {
     ref->v
 }
 
-{%- if not options.path_refs %}
-// Update the current value of a mutation, preserving the prophecy `f`.
-function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
-    $Mutation(v, m->f)
-}
-
-// Havoc the current value of a mutation, preserving the prophecy `f`.
-procedure {:inline 1} $HavocMutation<T>(m: $Mutation T) returns (r: $Mutation T) {
-    r->f := m->f;
-    // r->v stays uninitialized, thus havoced
-}
-{%- else %}
 // Update the value of a mutation.
 function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
     $Mutation(m->l, m->p, v)
