@@ -51,6 +51,7 @@ chrono-tz = { workspace = true }
 crossbeam-utils = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
+fail = { workspace = true }
 fixed = { workspace = true }
 fxhash = { workspace = true }
 hashbrown = { workspace = true }
@@ -89,6 +90,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 ahash = { workspace = true }

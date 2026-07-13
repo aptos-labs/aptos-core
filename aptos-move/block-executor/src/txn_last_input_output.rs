@@ -9,12 +9,12 @@ use crate::{
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
     task::{BeforeMaterializationOutput, ExecutionStatus, TransactionOutput},
-    txn_commit_hook::TransactionCommitHook,
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
+    block_executor::value::ValueWithLayout,
     error::{code_invariant_error, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
     state_store::state_value::StateValueMetadata,
@@ -179,14 +179,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
             ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
                 Self::empty_with_status(OutputStatusKind::DelayedFieldsCodeInvariantError)
             },
-        })
-    }
-
-    fn take_output(&mut self) -> Result<O, PanicError> {
-        self.check_success_or_skip_status()?;
-
-        self.output.take().ok_or_else(|| {
-            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
         })
     }
 
@@ -404,39 +396,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         Ok(())
     }
 
-    pub(crate) fn notify_listener<L: TransactionCommitHook>(
-        &self,
-        txn_idx: TxnIndex,
-        txn_listener: &L,
-    ) -> Result<(), PanicError> {
-        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
-        match output_wrapper.output_status_kind {
-            OutputStatusKind::Success | OutputStatusKind::SkipRest => {
-                txn_listener.on_transaction_committed(
-                    txn_idx,
-                    output_wrapper
-                        .output
-                        .as_ref()
-                        .expect("Output must be set when status is success or skip rest")
-                        .committed_output(),
-                );
-            },
-            OutputStatusKind::Abort(_) => {
-                txn_listener.on_execution_aborted(txn_idx);
-            },
-            OutputStatusKind::SpeculativeExecutionAbortError
-            | OutputStatusKind::DelayedFieldsCodeInvariantError
-            | OutputStatusKind::None => {
-                return Err(code_invariant_error(format!(
-                    "Unexpected output status kind {:?}",
-                    output_wrapper.output_status_kind
-                )));
-            },
-        }
-
-        Ok(())
-    }
-
     pub(crate) fn for_each_resource_key_no_aggregator_v1(
         &self,
         txn_idx: TxnIndex,
@@ -503,7 +462,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
         scheduler: &SchedulerWrapper<'_>,
     ) -> Result<bool, PanicError> {
@@ -597,10 +556,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub(crate) fn resource_write_set(
         &self,
         txn_idx: TxnIndex,
-    ) -> Result<
-        HashMap<T::Key, (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>)>,
-        PanicError,
-    > {
+    ) -> Result<HashMap<T::Key, ValueWithLayout<T::Value>>, PanicError> {
         with_success_or_skip_rest!(self, txn_idx, resource_write_set, HashMap::new())
     }
 
@@ -612,18 +568,15 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         txn_idx: TxnIndex,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-    ) -> Result<Trace, PanicError> {
+    ) -> Result<(O::CommittedOutput, Trace), PanicError> {
         with_success_or_skip_rest!(
             self,
             txn_idx,
             |mut t| t
                 .incorporate_materialized_txn_output(patched_resource_write_set, patched_events),
-            Ok(Trace::empty())
+            Err(code_invariant_error(
+                "[BlockSTM]: Output must be recorded after execution"
+            ))
         )
-    }
-
-    // Must be executed after parallel execution is done, grabs outputs.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> Result<O, PanicError> {
-        self.output_wrappers[txn_idx as usize].lock().take_output()
     }
 }

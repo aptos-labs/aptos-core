@@ -14,10 +14,7 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
-        TransactionOutput,
-    },
+    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
@@ -27,6 +24,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+        value::ValueWithLayout,
     },
     contract_event::ContractEvent,
     error::PanicError,
@@ -58,7 +56,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     value::{MoveTypeLayout, MoveValue},
-    vm_status::{StatusCode, VMStatus},
+    vm_status::VMStatus,
 };
 use move_vm_runtime::{
     execution_tracing::Trace,
@@ -157,62 +155,35 @@ impl BlockExecutableTransaction for TestTransaction {
 }
 
 #[derive(Debug)]
-struct TestOutput {
-    committed: OnceCell<aptos_types::transaction::TransactionOutput>,
-}
+struct TestOutput;
 
 impl TransactionOutput for TestOutput {
-    type AfterMaterializationGuard<'a> = &'a Self;
     type BeforeMaterializationGuard<'a> = &'a Self;
+    type CommittedOutput = aptos_types::transaction::TransactionOutput;
     type Txn = TestTransaction;
 
-    fn committed_output(&self) -> &OnceCell<aptos_types::transaction::TransactionOutput> {
-        &self.committed
-    }
-
     fn skip_output() -> Self {
-        Self {
-            committed: OnceCell::new(),
-        }
-    }
-
-    fn discard_output(_discard_code: StatusCode) -> Self {
-        Self {
-            committed: OnceCell::new(),
-        }
+        Self
     }
 
     fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
         Ok(self)
     }
 
-    fn after_materialization(&self) -> Result<Self::AfterMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn is_materialized_and_success(&self) -> bool {
-        true
-    }
-
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        Ok(true)
-    }
-
     fn incorporate_materialized_txn_output(
         &mut self,
         _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         _patched_events: Vec<ContractEvent>,
-    ) -> Result<Trace, PanicError> {
-        Ok(Trace::empty())
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
+        Ok((
+            aptos_types::transaction::TransactionOutput::new_empty_success(),
+            Trace::empty(),
+        ))
     }
-
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {}
 }
 
 impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<StateKey, (TriompheArc<WriteOp>, Option<TriompheArc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         HashMap::new()
     }
 
@@ -244,9 +215,9 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     ) -> HashMap<
         StateKey,
         (
-            WriteOp,
+            ValueWithLayout<WriteOp>,
             ResourceGroupSize,
-            BTreeMap<StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<StructTag, ValueWithLayout<WriteOp>>,
         ),
     > {
         HashMap::new()
@@ -288,16 +259,6 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
 
     fn storage_keys_written(&self) -> impl Iterator<Item = &StateKey> {
         std::iter::empty()
-    }
-}
-
-impl AfterMaterializationOutput<TestTransaction> for &TestOutput {
-    fn fee_statement(&self) -> FeeStatement {
-        FeeStatement::zero()
-    }
-
-    fn has_new_epoch_event(&self) -> bool {
-        false
     }
 }
 
@@ -375,13 +336,7 @@ impl ExecutorTask for TestTask {
         };
         *outcome_cell().lock().unwrap() = Some(outcome);
 
-        ExecutionStatus::Success(TestOutput {
-            committed: OnceCell::new(),
-        })
-    }
-
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        unreachable!("Never used for tests")
+        ExecutionStatus::Success(TestOutput)
     }
 }
 

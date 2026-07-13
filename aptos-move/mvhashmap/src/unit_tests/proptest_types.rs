@@ -5,11 +5,7 @@ use super::{
     types::{test::KeyType, MVDataError, MVDataOutput, MVGroupError, TxnIndex},
     MVHashMap,
 };
-use crate::types::ValueWithLayout;
-use aptos_types::{
-    state_store::state_value::StateValue,
-    write_set::{TransactionWrite, WriteOpKind},
-};
+use aptos_types::{block_executor::value::SpeculativeValue, write_set::WriteOpKind};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
@@ -19,7 +15,6 @@ use std::{
     hash::Hash,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use triomphe::Arc;
 
 const DEFAULT_TIMEOUT: u64 = 30;
 
@@ -57,25 +52,28 @@ impl<V: Into<Vec<u8>> + Clone + Eq + PartialEq> MockValue<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone + Debug + Eq + PartialEq> TransactionWrite for MockValue<V> {
-    fn bytes(&self) -> Option<&Bytes> {
-        self.maybe_bytes.as_ref()
+impl<V: Into<Vec<u8>> + Clone + Debug + Eq + PartialEq + Send + Sync> SpeculativeValue
+    for MockValue<V>
+{
+    fn eq_value(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn eq_metadata(&self, _other: &Self) -> bool {
+        unimplemented!("Irrelevant for the tests")
+    }
+
+    fn bytes_len(&self) -> Option<usize> {
+        self.maybe_value.as_ref().map(|v| v.clone().into().len())
+    }
+
+    fn is_deletion(&self) -> bool {
+        // A missing value represents a deletion.
+        self.maybe_value.is_none()
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn as_state_value(&self) -> Option<StateValue> {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn set_bytes(&mut self, bytes: Bytes) {
-        self.maybe_bytes = Some(bytes);
+        unimplemented!("Irrelevant for the tests")
     }
 }
 
@@ -167,7 +165,7 @@ where
                     key.clone(),
                     idx,
                     0,
-                    vec![(5, (value, None))],
+                    vec![(5, value)],
                     ResourceGroupSize::zero_combined(),
                     HashSet::new(),
                 )
@@ -176,9 +174,7 @@ where
             map.group_data()
                 .mark_estimate(&key, idx, tags_5.iter().collect());
         } else {
-            map.data()
-                .write(key.clone(), idx, 0, Arc::new(value), None)
-                .unwrap();
+            map.data().write(key.clone(), idx, 0, value).unwrap();
             map.data().mark_estimate(&key, idx);
         }
     }
@@ -202,11 +198,7 @@ where
                         use MVDataOutput::*;
 
                         let baseline = baseline.get(key, idx as TxnIndex);
-                        let assert_value = |v: ValueWithLayout<MockValue<V>>| match v
-                            .extract_value_no_layout()
-                            .maybe_value
-                            .as_ref()
-                        {
+                        let assert_value = |v: MockValue<V>| match v.maybe_value.as_ref() {
                             Some(w) => {
                                 assert_eq!(baseline, ExpectedOutput::Value(w.clone()), "{:?}", idx);
                             },
@@ -266,15 +258,13 @@ where
                                     key,
                                     idx as TxnIndex,
                                     1,
-                                    vec![(5, (value, None))],
+                                    vec![(5, value)],
                                     ResourceGroupSize::zero_combined(),
                                     HashSet::new(),
                                 )
                                 .unwrap();
                         } else {
-                            map.data()
-                                .write(key, idx as TxnIndex, 1, Arc::new(value), None)
-                                .unwrap();
+                            map.data().write(key, idx as TxnIndex, 1, value).unwrap();
                         }
                     },
                     Operator::Insert(v) => {
@@ -286,15 +276,13 @@ where
                                     key,
                                     idx as TxnIndex,
                                     1,
-                                    vec![(5, (value, None))],
+                                    vec![(5, value)],
                                     ResourceGroupSize::zero_combined(),
                                     HashSet::new(),
                                 )
                                 .unwrap();
                         } else {
-                            map.data()
-                                .write(key, idx as TxnIndex, 1, Arc::new(value), None)
-                                .unwrap();
+                            map.data().write(key, idx as TxnIndex, 1, value).unwrap();
                         }
                     },
                 }

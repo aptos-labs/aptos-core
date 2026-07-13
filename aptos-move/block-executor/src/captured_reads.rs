@@ -14,13 +14,14 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     types::{
         Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion,
-        TxnIndex, ValueWithLayout, Version,
+        TxnIndex, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
+    block_executor::value::ValueWithLayout,
     error::{code_invariant_error, PanicError, PanicOr},
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
@@ -881,7 +882,7 @@ where
     fn validate_data_reads_impl<'a>(
         &'a self,
         iter: impl Iterator<Item = (&'a T::Key, &'a DataRead<T::Value>)>,
-        data_map: &VersionedData<T::Key, T::Value>,
+        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         use MVDataError::*;
@@ -909,7 +910,7 @@ where
 
     pub(crate) fn validate_data_reads(
         &self,
-        data_map: &VersionedData<T::Key, T::Value>,
+        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
@@ -1003,7 +1004,7 @@ where
 
     pub(crate) fn validate_group_reads(
         &self,
-        group_map: &VersionedGroupData<T::Key, T::Tag, T::Value>,
+        group_map: &VersionedGroupData<T::Key, T::Tag, ValueWithLayout<T::Value>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         use MVGroupError::*;
@@ -2071,7 +2072,7 @@ mod test {
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
 
-        let mvhashmap = MVHashMap::<KeyType<u32>, u32, ValueType, DelayedFieldID>::new();
+        let mvhashmap = MVHashMap::<KeyType<u32>, u32, _, DelayedFieldID>::new();
 
         captured_reads.incorrect_use = false;
         captured_reads.non_delayed_field_speculative_failure = false;

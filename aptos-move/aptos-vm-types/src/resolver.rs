@@ -12,7 +12,6 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    write_set::WriteOp,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -170,7 +169,7 @@ pub trait StateStorageView {
 /// TODO: audit and reconsider the default implementation (e.g. should not
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
-pub trait TExecutorView<K, T, L, V>:
+pub trait TExecutorView<K, T, L>:
     TResourceView<Key = K, Layout = L>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
@@ -178,7 +177,7 @@ pub trait TExecutorView<K, T, L, V>:
 {
 }
 
-impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
+impl<A, K, T, L> TExecutorView<K, T, L> for A where
     A: TResourceView<Key = K, Layout = L>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
@@ -186,9 +185,9 @@ impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
+pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout> {}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout> {}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>

@@ -6,11 +6,9 @@ use crate::{
     view::LatestView,
 };
 use aptos_logger::error;
-use aptos_mvhashmap::{
-    types::{TxnIndex, ValueWithLayout},
-    MVHashMap,
-};
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
+    block_executor::value::ValueWithLayout,
     contract_event::TransactionEvent,
     error::{code_invariant_error, PanicError},
     state_store::TStateView,
@@ -55,12 +53,12 @@ macro_rules! groups_to_finalize {
 // Since reads needing exchange also do not contain deletions (see 'does_value_need_exchange')
 // logic in value_exchange.rs, it is guaranteed that no returned values is a deletion.
 macro_rules! resource_writes_to_materialize {
-    ($writes:expr, $outputs:expr, $data_source:expr, $($txn_idx:expr),*) => {{
+    ($writes:expr, $outputs:expr, $fetch:expr, $($txn_idx:expr),*) => {{
 	$outputs
         .reads_needing_delayed_field_exchange($($txn_idx),*)
         .into_iter()
 	    .map(|(key, metadata, layout)| -> Result<_, PanicError> {
-	        let (value, existing_layout) = $data_source.fetch_exchanged_data(&key, $($txn_idx),*)?;
+	        let (value, existing_layout) = $fetch(&key)?;
             randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
             let new_value = TriompheArc::new(TransactionWrite::from_state_value(Some(
                 StateValue::new_with_metadata(
@@ -68,13 +66,11 @@ macro_rules! resource_writes_to_materialize {
                     metadata,
                 ))
             ));
-            Ok((key, new_value, layout))
+            Ok((key, ValueWithLayout::Exchanged(new_value, Some(layout))))
         })
         .chain(
-	        $writes.into_iter().filter_map(|(key, (value, maybe_layout))| {
-		        maybe_layout.map(|layout| {
-                    (!value.is_deletion()).then_some(Ok((key, value, layout)))
-                }).flatten()
+	        $writes.into_iter().filter_map(|(key, value)| {
+                (value.has_layout() && !value.is_deletion()).then_some(Ok((key, value)))
             })
         )
         .collect::<Result<Vec<_>, _>>()
@@ -83,6 +79,18 @@ macro_rules! resource_writes_to_materialize {
 
 pub(crate) use groups_to_finalize;
 pub(crate) use resource_writes_to_materialize;
+
+pub(crate) fn expect_exchanged_data<V: std::fmt::Debug>(
+    data: Option<ValueWithLayout<V>>,
+) -> Result<(TriompheArc<V>, TriompheArc<MoveTypeLayout>), PanicError> {
+    match data {
+        Some(ValueWithLayout::Exchanged(value, Some(layout))) => Ok((value, layout)),
+        data => Err(code_invariant_error(format!(
+            "Read value needing exchange {:?} does not exist or not in Exchanged format",
+            data
+        ))),
+    }
+}
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
@@ -234,16 +242,19 @@ pub(crate) fn map_id_to_values_in_group_writes<
 // For each delayed field in resource write set, replace the identifiers with values
 // (ignoring other writes). Currently also checks the keys are unique.
 pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    resource_write_set: Vec<(T::Key, TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>)>,
+    resource_write_set: Vec<(T::Key, ValueWithLayout<T::Value>)>,
     latest_view: &LatestView<T, S>,
 ) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
     resource_write_set
         .into_iter()
-        .map(|(key, write_op, layout)| {
-            Ok::<_, PanicError>((
+        .map(|(key, value)| match value {
+            ValueWithLayout::Exchanged(write_op, Some(layout)) => Ok((
                 key,
                 replace_ids_with_values(&write_op, &layout, latest_view)?,
-            ))
+            )),
+            ValueWithLayout::Exchanged(_, None) | ValueWithLayout::RawFromStorage(_) => Err(
+                code_invariant_error("Resource write to materialize must have a layout"),
+            ),
         })
         .collect::<std::result::Result<_, PanicError>>()
 }
@@ -308,7 +319,7 @@ fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
 pub(crate) fn update_transaction_on_abort<T, E>(
     txn_idx: TxnIndex,
     last_input_output: &TxnLastInputOutput<T, E::Output>,
-    versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
 ) where
     T: Transaction,
     E: ExecutorTask<Txn = T>,

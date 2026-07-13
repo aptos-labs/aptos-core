@@ -6,11 +6,14 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    state_store::{StateView, StateViewId},
+    block_executor::value::ValueWithLayout,
+    state_store::{state_key::StateKey, StateView, StateViewId},
+    timestamp::TimestampResource,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, Transaction,
         WriteSetPayload,
     },
+    write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -22,7 +25,10 @@ use aptos_vm_types::{
     resolver::{BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    vm_status::{StatusCode, VMStatus},
+};
 
 pub struct AptosExecutorTask {
     vm: AptosVM,
@@ -135,7 +141,43 @@ impl ExecutorTask for AptosExecutorTask {
         }
     }
 
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
+    fn pre_write_values(txn: &Self::Txn) -> Vec<(StateKey, ValueWithLayout<WriteOp>)> {
+        let timestamp = match txn {
+            SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(metadata_txn)) => {
+                Some(metadata_txn.timestamp_usecs())
+            },
+            SignatureVerifiedTransaction::Valid(Transaction::BlockMetadata(metadata_txn)) => {
+                Some(metadata_txn.timestamp_usecs())
+            },
+            _ => None,
+        };
+
+        match timestamp {
+            Some(ts) => {
+                // Use typed StateKey creation to avoid string parsing.
+                // These unwraps are safe: TimestampResource is a valid MoveResource type,
+                // and u64 serialization via BCS cannot fail.
+                let state_key = StateKey::resource_typed::<TimestampResource>(&AccountAddress::ONE)
+                    .expect("TimestampResource is a valid MoveResource");
+                let value = WriteOp::legacy_modification(
+                    bcs::to_bytes(&ts)
+                        .expect("u64 BCS serialization cannot fail")
+                        .into(),
+                );
+                // The timestamp resource has no delayed fields, so the pre-written value
+                // is already in its exchanged form with no layout.
+                vec![(
+                    state_key,
+                    ValueWithLayout::Exchanged(triomphe::Arc::new(value), None),
+                )]
+            },
+            None => vec![],
+        }
+    }
+}
+
+impl AptosExecutorTask {
+    fn is_transaction_dynamic_change_set_capable(txn: &SignatureVerifiedTransaction) -> bool {
         if txn.is_valid() {
             if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
             {
@@ -145,5 +187,54 @@ impl ExecutorTask for AptosExecutorTask {
             }
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_crypto::HashValue;
+    use aptos_types::block_metadata::BlockMetadata;
+
+    #[test]
+    fn test_pre_write_values_for_block_metadata() {
+        let timestamp_usecs = 1234567890u64;
+        let block_metadata = BlockMetadata::new(
+            HashValue::zero(),
+            1, // epoch
+            1, // round
+            AccountAddress::ONE,
+            vec![], // previous_block_votes_bitvec
+            vec![], // failed_proposer_indices
+            timestamp_usecs,
+        );
+
+        let txn = SignatureVerifiedTransaction::Valid(Transaction::BlockMetadata(block_metadata));
+        let pre_write_values = AptosExecutorTask::pre_write_values(&txn);
+
+        // Should return exactly one pre-write entry for the timestamp
+        assert_eq!(pre_write_values.len(), 1);
+
+        let (state_key, value) = &pre_write_values[0];
+
+        // Verify the state key is for the timestamp resource
+        let expected_state_key =
+            StateKey::resource_typed::<TimestampResource>(&AccountAddress::ONE)
+                .expect("TimestampResource is a valid MoveResource");
+        assert_eq!(state_key, &expected_state_key);
+
+        // Verify the value is the serialized timestamp, in the exchanged form
+        // with no layout.
+        let expected_value = bcs::to_bytes(&timestamp_usecs).unwrap();
+        assert!(matches!(value, ValueWithLayout::Exchanged(_, None)));
+        assert_eq!(value.extract_value().bytes(), Some(&expected_value.into()));
+    }
+
+    #[test]
+    fn test_pre_write_values_for_user_transaction_returns_empty() {
+        // For non-block-metadata transactions, pre_write_values should return empty
+        let state_checkpoint_txn =
+            SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(HashValue::zero()));
+        assert!(AptosExecutorTask::pre_write_values(&state_checkpoint_txn).is_empty());
     }
 }

@@ -500,13 +500,6 @@ impl<
     fn state_checkpoint(_block_id: HashValue) -> Self {
         Self::StateCheckpoint
     }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
-        match self {
-            MockTransaction::Write { pre_writes, .. } => pre_writes.clone(),
-            _ => vec![],
-        }
-    }
 }
 
 // TODO: try and test different strategies.
@@ -944,7 +937,7 @@ pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum GroupSizeOrMetadata {
     Size(u64),
     Metadata(Option<StateValueMetadata>),

@@ -3425,7 +3425,6 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
- "triomphe",
 ]
 
 [[package]]
@@ -5005,6 +5004,7 @@ dependencies = [
  "crossbeam-utils",
  "dashmap 7.0.0-rc2",
  "derivative",
+ "fail",
  "fixed",
  "fxhash",
  "hashbrown 0.14.3",
@@ -5048,6 +5048,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "triomphe",
  "url",
 ]
 
