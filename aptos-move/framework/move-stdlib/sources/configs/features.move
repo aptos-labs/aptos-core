@@ -981,8 +981,9 @@ module std::features {
         FUNCTION_VALUE_DISPATCH
     }
 
+    /// Requires function reflection, without which function-value dispatch stays disabled.
     public fun is_function_value_dispatch_enabled(): bool {
-        is_enabled(FUNCTION_VALUE_DISPATCH)
+        is_enabled(FUNCTION_VALUE_DISPATCH) && is_enabled(FUNCTION_REFLECTION)
     }
 
     // ============================================================================================

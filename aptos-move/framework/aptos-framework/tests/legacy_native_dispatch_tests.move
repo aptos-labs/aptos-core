@@ -85,11 +85,11 @@ module aptos_framework::legacy_native_dispatch_tests {
         creator: &signer,
         aaron: &signer,
     ) {
-        // FUNCTION_VALUE_DISPATCH stays enabled; disabling its prerequisite
-        // FUNCTION_REFLECTION must fall back to the legacy native dispatch path.
+        // Enable FUNCTION_VALUE_DISPATCH then disable its prerequisite FUNCTION_REFLECTION;
+        // the conjunction is false so dispatch must fall back to the legacy native path.
         features::change_feature_flags_for_testing(
             fx,
-            vector[],
+            vector[features::get_function_value_dispatch_feature()],
             vector[features::get_function_reflection_feature()],
         );
 

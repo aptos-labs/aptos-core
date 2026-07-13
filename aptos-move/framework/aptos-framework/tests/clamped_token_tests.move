@@ -3,12 +3,14 @@ module aptos_framework::clamped_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::clamped_token;
+    use std::features;
     use std::option;
 
     #[test(creator = @aptos_framework)]
     fun test_clamped(
         creator: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -34,6 +36,7 @@ module aptos_framework::clamped_token_tests {
     fun test_clamped_aborted(
         creator: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();

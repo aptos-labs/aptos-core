@@ -328,7 +328,6 @@ impl FeatureFlag {
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
-            Self::FUNCTION_VALUE_DISPATCH,
         ]
     }
 }

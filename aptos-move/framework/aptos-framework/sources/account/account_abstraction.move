@@ -286,8 +286,8 @@ module aptos_framework::account_abstraction {
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };
 
-        let returned_signer = if (function_info::function_value_dispatch_enabled()) {
-            dispatch_authenticate_hook(&func_info, account, signing_data)
+        let returned_signer = if (features::is_function_value_dispatch_enabled()) {
+            dispatch_authenticate_hook(account, signing_data, &func_info)
         } else {
             function_info::load_module_from_function(&func_info);
             dispatchable_authenticate(account, signing_data, &func_info)
@@ -304,9 +304,9 @@ module aptos_framework::account_abstraction {
     /// Runs an authentication hook as a function value, replacing the legacy native
     /// dispatch below; `#[module_lock]` preserves its reentrancy semantics.
     fun dispatch_authenticate_hook(
-        function: &FunctionInfo,
         account: signer,
         signing_data: AbstractionAuthData,
+        function: &FunctionInfo,
     ): signer {
         let f = function.load_function_value<
             |signer, AbstractionAuthData|signer has copy + drop>();
@@ -360,8 +360,9 @@ module aptos_framework::account_abstraction {
         authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
     }
 
-    #[test(bob = @0xb0b)]
-    fun test_authenticate_returns_original_signer(bob: signer) {
+    #[test(fx = @aptos_framework, bob = @0xb0b)]
+    fun test_authenticate_returns_original_signer(fx: &signer, bob: signer) {
+        features::change_feature_flags_for_testing(fx, vector[features::get_function_value_dispatch_feature()], vector[]);
         let bob_addr = signer::address_of(&bob);
         create_account_for_test(bob_addr);
         add_authentication_function(
@@ -404,11 +405,12 @@ module aptos_framework::account_abstraction {
         authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
     }
 
-    #[test(bob = @0xb0b)]
+    #[test(fx = @aptos_framework, bob = @0xb0b)]
     #[expected_failure(major_status = 4037, location = aptos_framework::account_abstraction)]
-    fun test_authenticate_reentrancy_blocked(bob: signer) {
+    fun test_authenticate_reentrancy_blocked(fx: &signer, bob: signer) {
         // An authentication hook that calls back into this module must hit the module
         // lock, matching the reentrancy semantics of the legacy native dispatch.
+        features::change_feature_flags_for_testing(fx, vector[features::get_function_value_dispatch_feature()], vector[]);
         let bob_addr = signer::address_of(&bob);
         create_account_for_test(bob_addr);
         add_authentication_function(
