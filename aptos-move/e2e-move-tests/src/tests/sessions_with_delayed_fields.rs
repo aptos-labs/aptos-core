@@ -5,10 +5,10 @@
 //! aptos-core-private #292). Each scenario runs two VM sessions over a test-only `0x1::session`
 //! package — session_1 transforms a delayed-field container, session_2 touches the aggregator —
 //! then squashes their change sets, exactly mirroring the prologue/user/epilogue interaction but
-//! with full control over both sessions. Asserted under the STRICT resource-group squash
-//! (`gas_feature_version >= RELEASE_V1_46`): benign delta+delta flows and disjoint controls
-//! succeed with correct materialized values, while cross-session structural cases fail closed with
-//! the exact expected error (see `session.move` for the scenarios).
+//! with full control over both sessions. Asserted under the STRICT resource-group squash (the
+//! fail-closed window `[RELEASE_V1_46, RELEASE_V1_48)`): benign delta+delta flows and disjoint
+//! controls succeed with correct materialized values, while cross-session structural cases fail
+//! closed with the exact expected error (see `session.move` for the scenarios).
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_aggregator::{
@@ -356,8 +356,9 @@ impl ExecutorTask for TestTask {
         let change_set_2 = self.run(&new_resolver, view, &txn.session_2);
         println!("  [session_2] change set: {:?}", change_set_2);
 
-        // Use the strict (gas_feature_version >= RELEASE_V1_46) resource-group squash, matching
-        // production behavior at the latest gas feature version.
+        // Exercise the strict resource-group squash (the fail-closed window
+        // [RELEASE_V1_46, RELEASE_V1_48)) by passing `true` explicitly, independent of the harness's
+        // gas feature version.
         let outcome = match change_set_1.squash_additional_change_set(change_set_2, true) {
             Ok(()) => {
                 // Resolve every aggregator in the SQUASHED change set to its final, materialized
@@ -483,8 +484,9 @@ fn test_session_with_delayed_fields() {
 
 fn run_all_scenarios() {
     // (label, session_1, session_2, expected), asserted under the STRICT resource-group squash
-    // (gas_feature_version >= RELEASE_V1_46). Cross-session structural cases fail closed with the
-    // exact error; benign delta+delta flows and disjoint controls succeed with correct values.
+    // (fail-closed window [RELEASE_V1_46, RELEASE_V1_48)). Cross-session structural cases fail
+    // closed with the exact error; benign delta+delta flows and disjoint controls succeed with
+    // correct values.
     let scenarios = [
         // NORMAL concurrent-FA flow: same aggregator delta'd in BOTH sessions, NO structural
         // change (user-session transfer delta + epilogue gas delta). Must stay allowed + correct.

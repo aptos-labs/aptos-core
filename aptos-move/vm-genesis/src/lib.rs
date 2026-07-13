@@ -244,8 +244,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         HashValue::new(new_id),
         framework,
     );
-    // Genesis runs at the latest gas feature version, so use the strict resource-group squash.
-    assert_ok!(change_set.squash_additional_change_set(additional_change_set, true));
+    // Genesis runs at the latest gas feature version, which is outside the fail-closed window
+    // [RELEASE_V1_46, RELEASE_V1_48), so it uses the legacy (non-strict) resource-group squash.
+    assert_ok!(change_set.squash_additional_change_set(additional_change_set, false));
 
     let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
     verify_genesis_module_write_set(change_set.write_set());
@@ -421,8 +422,9 @@ pub fn encode_genesis_change_set(
         HashValue::new(new_id),
         framework,
     );
-    // Genesis runs at the latest gas feature version, so use the strict resource-group squash.
-    assert_ok!(change_set.squash_additional_change_set(additional_change_set, true));
+    // Genesis runs at the latest gas feature version, which is outside the fail-closed window
+    // [RELEASE_V1_46, RELEASE_V1_48), so it uses the legacy (non-strict) resource-group squash.
+    assert_ok!(change_set.squash_additional_change_set(additional_change_set, false));
 
     let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
     verify_genesis_module_write_set(change_set.write_set());
