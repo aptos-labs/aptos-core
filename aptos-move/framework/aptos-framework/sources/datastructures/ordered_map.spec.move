@@ -45,6 +45,18 @@ spec aptos_framework::ordered_map {
             map_spec_aborts_trim = spec_aborts_trim,
             map_spec_aborts_upsert_all = spec_aborts_upsert_all,
             map_spec_aborts_replace_key_inplace = spec_aborts_replace_key_inplace,
+            map_internal_new_begin_iter = internal_new_begin_iter,
+            map_internal_new_end_iter = internal_new_end_iter,
+            map_internal_lower_bound = internal_lower_bound,
+            map_internal_find = internal_find,
+            map_iter_is_end = iter_is_end,
+            map_iter_is_begin = iter_is_begin,
+            map_iter_borrow_key = iter_borrow_key,
+            map_iter_borrow = iter_borrow,
+            map_iter_next = iter_next,
+            map_iter_prev = iter_prev,
+            map_spec_iter_key = spec_iter_key,
+            map_spec_iter_is_end = spec_iter_is_end,
             map_is_empty = is_empty;
     }
 
@@ -53,6 +65,11 @@ spec aptos_framework::ordered_map {
     spec native fun spec_set<K, V>(t: OrderedMap<K, V>, k: K, v: V): OrderedMap<K, V>;
     spec native fun spec_remove<K, V>(t: OrderedMap<K, V>, k: K): OrderedMap<K, V>;
     spec native fun spec_get<K, V>(t: OrderedMap<K, V>, k: K): V;
+
+    // Iterator semantics: opaque handles for `IteratorPtr` values. Uninterpreted
+    // at the Boogie level and constrained by iter-role templates via `assume`.
+    spec native fun spec_iter_key<K, V>(iter: IteratorPtr, m: OrderedMap<K, V>): K;
+    spec native fun spec_iter_is_end<K, V>(iter: IteratorPtr): bool;
 
     spec fun spec_aborts_empty<K, V>(t: OrderedMap<K, V>): bool {
         spec_len(t) == 0
@@ -145,13 +162,11 @@ spec aptos_framework::ordered_map {
     }
 
     spec iter_is_end {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec iter_borrow {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec iter_borrow_mut {
@@ -165,8 +180,7 @@ spec aptos_framework::ordered_map {
     }
 
     spec iter_is_begin {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec values {
@@ -181,13 +195,11 @@ spec aptos_framework::ordered_map {
 
 
     spec internal_lower_bound {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec iter_borrow_key {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec keys {
@@ -261,28 +273,23 @@ spec aptos_framework::ordered_map {
 
 
     spec internal_find {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec internal_new_begin_iter {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec internal_new_end_iter {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec iter_next {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec iter_prev {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec get {

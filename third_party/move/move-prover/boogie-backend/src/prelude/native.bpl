@@ -831,6 +831,185 @@ returns (m': $Mutation ({{Self}})) {
 }
 {%- endif %}
 
+// -----------------------------------------------------------------------------
+// Iterator role templates. `IteratorPtr` is opaque at Boogie level (declared in
+// table-theory.bpl). Semantic content is provided by two uninterpreted spec funs
+// per (K, V) — `spec_iter_key` and `spec_iter_is_end` — constrained by
+// `assume`s at each iter-producing site.
+
+{%- if impl.fun_spec_iter_key != "" %}
+function {{impl.fun_spec_iter_key}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}): {{K}};
+{%- endif %}
+
+{%- if impl.fun_spec_iter_is_end != "" %}
+function {{impl.fun_spec_iter_is_end}}{{S}}(iter: $1_ordered_map_IteratorPtr): bool;
+{%- endif %}
+
+{%- if impl.fun_internal_find != "" and impl.fun_spec_has_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" %}
+// Iterator at `k` if `has_key(m, k)`, else end. Never aborts.
+procedure {:inline 2} {{impl.fun_internal_find}}{{S}}(m: {{Self}}, k: {{K}}) returns (result: $1_ordered_map_IteratorPtr) {
+    if ({{impl.fun_spec_has_key}}{{S}}(m, k)) {
+        assume !{{impl.fun_spec_iter_is_end}}{{S}}(result);
+        assume $IsEqual'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), k);
+    } else {
+        assume {{impl.fun_spec_iter_is_end}}{{S}}(result);
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_is_end != "" and impl.fun_spec_iter_is_end != "" %}
+// True iff the iterator is end. Never aborts.
+procedure {:inline 2} {{impl.fun_iter_is_end}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}) returns (result: bool) {
+    result := {{impl.fun_spec_iter_is_end}}{{S}}(iter);
+}
+{%- endif %}
+
+{%- if impl.fun_internal_new_end_iter != "" and impl.fun_spec_iter_is_end != "" %}
+// The end iterator. Never aborts.
+procedure {:inline 2} {{impl.fun_internal_new_end_iter}}{{S}}(m: {{Self}}) returns (result: $1_ordered_map_IteratorPtr) {
+    assume {{impl.fun_spec_iter_is_end}}{{S}}(result);
+}
+{%- endif %}
+
+{%- if impl.fun_internal_new_begin_iter != "" and impl.fun_spec_has_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" and instance.0.cmp_available %}
+// Begin iterator: end when the map is empty, else pointing to the smallest key.
+procedure {:inline 2} {{impl.fun_internal_new_begin_iter}}{{S}}(m: {{Self}}) returns (result: $1_ordered_map_IteratorPtr) {
+    if (LenTable(m) == 0) {
+        assume {{impl.fun_spec_iter_is_end}}{{S}}(result);
+    } else {
+        assume !{{impl.fun_spec_iter_is_end}}{{S}}(result);
+        assume {{impl.fun_spec_has_key}}{{S}}(m, {{impl.fun_spec_iter_key}}{{S}}(result, m));
+        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+            !$IsEqual'{{instance.0.suffix}}'(other, {{impl.fun_spec_iter_key}}{{S}}(result, m)) ==>
+            {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+                $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), other) == $1_cmp_Ordering_Less());
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_internal_lower_bound != "" and impl.fun_spec_has_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" and instance.0.cmp_available %}
+// Iterator at the smallest key `>= k`, or end if no such key. Never aborts.
+procedure {:inline 2} {{impl.fun_internal_lower_bound}}{{S}}(m: {{Self}}, k: {{K}}) returns (result: $1_ordered_map_IteratorPtr) {
+    if ((exists k_p: {{K}} :: $IsValid'{{instance.0.suffix}}'(k_p)
+            && {{impl.fun_spec_has_key}}{{S}}(m, k_p)
+            && ($IsEqual'{{instance.0.suffix}}'(k_p, k)
+                || $1_cmp_$compare'{{instance.0.suffix}}'(k_p, k) == $1_cmp_Ordering_Greater()))) {
+        assume !{{impl.fun_spec_iter_is_end}}{{S}}(result);
+        assume {{impl.fun_spec_has_key}}{{S}}(m, {{impl.fun_spec_iter_key}}{{S}}(result, m));
+        assume $IsEqual'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), k)
+            || $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), k) == $1_cmp_Ordering_Greater();
+        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+            !$IsEqual'{{instance.0.suffix}}'(other, {{impl.fun_spec_iter_key}}{{S}}(result, m)) ==>
+            {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+            ($IsEqual'{{instance.0.suffix}}'(other, k)
+                || $1_cmp_$compare'{{instance.0.suffix}}'(other, k) == $1_cmp_Ordering_Greater()) ==>
+                $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), other) == $1_cmp_Ordering_Less());
+    } else {
+        assume {{impl.fun_spec_iter_is_end}}{{S}}(result);
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_is_begin != "" and impl.fun_spec_has_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" and instance.0.cmp_available %}
+// True iff the iterator is the begin iterator (empty map's end, or smallest-key iter).
+procedure {:inline 2} {{impl.fun_iter_is_begin}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}) returns (result: bool) {
+    if ({{impl.fun_spec_iter_is_end}}{{S}}(iter)) {
+        result := LenTable(m) == 0;
+    } else {
+        result := (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+            !$IsEqual'{{instance.0.suffix}}'(other, {{impl.fun_spec_iter_key}}{{S}}(iter, m)) ==>
+            {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+                $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(iter, m), other) == $1_cmp_Ordering_Less());
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_borrow_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" %}
+// Return the key at the iterator. Aborts on end.
+procedure {:inline 2} {{impl.fun_iter_borrow_key}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}) returns (result: {{K}}) {
+    if ({{impl.fun_spec_iter_is_end}}{{S}}(iter)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    result := {{impl.fun_spec_iter_key}}{{S}}(iter, m);
+}
+{%- endif %}
+
+{%- if impl.fun_iter_borrow != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" %}
+// Return the value at the iterator's key. Aborts on end.
+procedure {:inline 2} {{impl.fun_iter_borrow}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}) returns (result: {{V}}) {
+    if ({{impl.fun_spec_iter_is_end}}{{S}}(iter)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    result := GetTable(m, {{ENC}}({{impl.fun_spec_iter_key}}{{S}}(iter, m)));
+}
+{%- endif %}
+
+{%- if impl.fun_iter_next != "" and impl.fun_spec_has_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" and instance.0.cmp_available %}
+// Iterator at the smallest key strictly greater than the current. Aborts on end.
+procedure {:inline 2} {{impl.fun_iter_next}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}) returns (result: $1_ordered_map_IteratorPtr) {
+    var k: {{K}};
+    if ({{impl.fun_spec_iter_is_end}}{{S}}(iter)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    k := {{impl.fun_spec_iter_key}}{{S}}(iter, m);
+    if ((exists k_p: {{K}} :: $IsValid'{{instance.0.suffix}}'(k_p)
+            && {{impl.fun_spec_has_key}}{{S}}(m, k_p)
+            && $1_cmp_$compare'{{instance.0.suffix}}'(k, k_p) == $1_cmp_Ordering_Less())) {
+        assume !{{impl.fun_spec_iter_is_end}}{{S}}(result);
+        assume {{impl.fun_spec_has_key}}{{S}}(m, {{impl.fun_spec_iter_key}}{{S}}(result, m));
+        assume $1_cmp_$compare'{{instance.0.suffix}}'(k, {{impl.fun_spec_iter_key}}{{S}}(result, m)) == $1_cmp_Ordering_Less();
+        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+            !$IsEqual'{{instance.0.suffix}}'(other, {{impl.fun_spec_iter_key}}{{S}}(result, m)) ==>
+            {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less() ==>
+                $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), other) == $1_cmp_Ordering_Less());
+    } else {
+        assume {{impl.fun_spec_iter_is_end}}{{S}}(result);
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_prev != "" and impl.fun_spec_has_key != "" and impl.fun_spec_iter_key != "" and impl.fun_spec_iter_is_end != "" and instance.0.cmp_available %}
+// Iterator at the largest key strictly less than the current key. When called on
+// the end iterator of a non-empty map, returns iter at the largest key. Aborts if
+// the iterator is begin (empty map, or at smallest key).
+procedure {:inline 2} {{impl.fun_iter_prev}}{{S}}(iter: $1_ordered_map_IteratorPtr, m: {{Self}}) returns (result: $1_ordered_map_IteratorPtr) {
+    var k: {{K}};
+    if ({{impl.fun_spec_iter_is_end}}{{S}}(iter)) {
+        if (LenTable(m) == 0) {
+            call $ExecFailureAbort();
+            return;
+        }
+        assume !{{impl.fun_spec_iter_is_end}}{{S}}(result);
+        assume {{impl.fun_spec_has_key}}{{S}}(m, {{impl.fun_spec_iter_key}}{{S}}(result, m));
+        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+            !$IsEqual'{{instance.0.suffix}}'(other, {{impl.fun_spec_iter_key}}{{S}}(result, m)) ==>
+            {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+                $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), other) == $1_cmp_Ordering_Greater());
+    } else {
+        k := {{impl.fun_spec_iter_key}}{{S}}(iter, m);
+        if ((forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+                !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
+                {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+                    $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less())) {
+            call $ExecFailureAbort();
+            return;
+        }
+        assume !{{impl.fun_spec_iter_is_end}}{{S}}(result);
+        assume {{impl.fun_spec_has_key}}{{S}}(m, {{impl.fun_spec_iter_key}}{{S}}(result, m));
+        assume $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), k) == $1_cmp_Ordering_Less();
+        assume (forall other: {{K}} :: $IsValid'{{instance.0.suffix}}'(other) ==>
+            !$IsEqual'{{instance.0.suffix}}'(other, {{impl.fun_spec_iter_key}}{{S}}(result, m)) ==>
+            {{impl.fun_spec_has_key}}{{S}}(m, other) ==>
+            $1_cmp_$compare'{{instance.0.suffix}}'(other, k) == $1_cmp_Ordering_Less() ==>
+                $1_cmp_$compare'{{instance.0.suffix}}'({{impl.fun_spec_iter_key}}{{S}}(result, m), other) == $1_cmp_Ordering_Greater());
+    }
+}
+{%- endif %}
+
 {%- if impl.fun_add_no_override != "" %}
 procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}}) returns (m': $Mutation({{Self}})) {
     var enc_k: int;

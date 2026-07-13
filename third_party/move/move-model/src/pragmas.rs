@@ -311,6 +311,62 @@ pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL: &str = "map_spec_aborts_upse
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE: &str =
     "map_spec_aborts_replace_key_inplace";
 
+// -------------------------------------------------------------------------------------------
+// Iterator role bindings. The iterator type (`IteratorPtr` in Move source) is treated
+// opaquely — its Move-generated Boogie representation is untouched, and semantic content
+// is read out via the two spec funs `spec_iter_key` and `spec_iter_is_end` below.
+
+/// Construct a begin iterator (smallest key, or end when the map is empty).
+/// `[move] fun map_internal_new_begin_iter<K, V>(m: &Map<K, V>): IteratorPtr`
+pub const INTRINSIC_FUN_MAP_INTERNAL_NEW_BEGIN_ITER: &str = "map_internal_new_begin_iter";
+
+/// Construct an end iterator. Always end.
+/// `[move] fun map_internal_new_end_iter<K, V>(m: &Map<K, V>): IteratorPtr`
+pub const INTRINSIC_FUN_MAP_INTERNAL_NEW_END_ITER: &str = "map_internal_new_end_iter";
+
+/// Iterator at the smallest key `>= k`, or end if none.
+/// `[move] fun map_internal_lower_bound<K, V>(m: &Map<K, V>, k: &K): IteratorPtr`
+pub const INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND: &str = "map_internal_lower_bound";
+
+/// Iterator at `k` if `has_key(m, k)`, otherwise end.
+/// `[move] fun map_internal_find<K, V>(m: &Map<K, V>, k: &K): IteratorPtr`
+pub const INTRINSIC_FUN_MAP_INTERNAL_FIND: &str = "map_internal_find";
+
+/// True iff the iterator is the end iterator.
+/// `[move] fun map_iter_is_end<K, V>(iter: &IteratorPtr, m: &Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_ITER_IS_END: &str = "map_iter_is_end";
+
+/// True iff the iterator is the begin iterator (empty map's end, or pointing to smallest key).
+/// `[move] fun map_iter_is_begin<K, V>(iter: &IteratorPtr, m: &Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_ITER_IS_BEGIN: &str = "map_iter_is_begin";
+
+/// Return the key at the iterator. Aborts if the iterator is end.
+/// `[move] fun map_iter_borrow_key<K, V>(iter: &IteratorPtr, m: &Map<K, V>): &K`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW_KEY: &str = "map_iter_borrow_key";
+
+/// Return the value at the iterator's key. Aborts if the iterator is end.
+/// `[move] fun map_iter_borrow<K, V>(iter: IteratorPtr, m: &Map<K, V>): &V`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW: &str = "map_iter_borrow";
+
+/// Iterator at the smallest key strictly greater than the current key. Aborts if end.
+/// `[move] fun map_iter_next<K, V>(iter: IteratorPtr, m: &Map<K, V>): IteratorPtr`
+pub const INTRINSIC_FUN_MAP_ITER_NEXT: &str = "map_iter_next";
+
+/// Iterator at the largest key strictly less than the current key (or largest key
+/// when called on the end iterator of a non-empty map). Aborts if iterator is begin.
+/// `[move] fun map_iter_prev<K, V>(iter: IteratorPtr, m: &Map<K, V>): IteratorPtr`
+pub const INTRINSIC_FUN_MAP_ITER_PREV: &str = "map_iter_prev";
+
+/// Semantic content: the key at the iterator. Uninterpreted on End; constrained
+/// by iter-producing templates via `assume`.
+/// `[spec] fun map_spec_iter_key<K, V>(iter: IteratorPtr, m: Map<K, V>): K`
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_KEY: &str = "map_spec_iter_key";
+
+/// True iff the iterator is the end iterator. Uninterpreted; constrained by
+/// iter-producing templates via `assume`.
+/// `[spec] fun map_spec_iter_is_end<K, V>(iter: IteratorPtr): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_IS_END: &str = "map_spec_iter_is_end";
+
 /// Definition of an intrinsic function associated with an intrinsic type.
 ///
 /// For Move functions, `spec_fun` and `abort_spec_fun` encode the counterpart spec function names
@@ -496,6 +552,52 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (
                 INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
+            ),
+            // Iterator role bindings (see IteratorPtr type in ordered_map.move).
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_NEW_BEGIN_ITER,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_NEW_END_ITER,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_LOWER_BOUND,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_INTERNAL_FIND,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_IS_END,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_IS_BEGIN,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_BORROW_KEY,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_BORROW,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_NEXT,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_PREV,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (INTRINSIC_FUN_MAP_SPEC_ITER_KEY, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_IS_END,
+                IntrinsicFunDef::spec_fun(),
             ),
             (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,

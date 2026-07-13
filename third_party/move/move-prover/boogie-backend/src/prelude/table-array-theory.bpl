@@ -60,3 +60,11 @@ axiom {:ctor "Table"} (forall<K,V> t: Table K V :: {LenTable(t)}
 // TODO: we might want to encoder a stronger property that the length of table
 // must be more than N given a set of N items. Currently we don't see a need here
 // and the above axiom seems to be sufficient.
+
+// Opaque handle for `aptos_framework::ordered_map::IteratorPtr`. Iterator-role
+// templates constrain its semantic content through `spec_iter_key<K, V>(iter, m)`
+// and `spec_iter_is_end<K, V>(iter)` (declared per-(K, V) instance in native.bpl).
+// No structure exposed — no variant constructors, no field accessors.
+type $1_ordered_map_IteratorPtr;
+function {:inline} $IsValid'$1_ordered_map_IteratorPtr'(x: $1_ordered_map_IteratorPtr): bool { true }
+function {:inline} $IsEqual'$1_ordered_map_IteratorPtr'(x1: $1_ordered_map_IteratorPtr, x2: $1_ordered_map_IteratorPtr): bool { x1 == x2 }
