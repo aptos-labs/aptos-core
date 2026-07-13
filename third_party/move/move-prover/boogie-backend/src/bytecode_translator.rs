@@ -4220,50 +4220,6 @@ impl<'env> BoogieTranslator<'env> {
             self.translate_invariant_body_to_boogie(&args[1], var_map, ctx, mem_args, result_sub)?;
         Some(format!("({} {} {})", a, op, b))
     }
-
-    /// Helper: translate an equality in a data invariant body. Types with native
-    /// Boogie equality use `==`/`!=`; all others must go through
-    /// `$IsEqual'<suffix>'`, whose definition normalizes representation-dependent
-    /// values (e.g. vectors).
-    fn translate_equality(
-        &self,
-        eq: bool,
-        args: &[Exp],
-        var_map: &BTreeMap<Symbol, String>,
-        ctx: &BpAxiomCtx,
-        mem_args: &BpMemArgs,
-        result_sub: Option<&BTreeMap<Symbol, String>>,
-    ) -> Option<String> {
-        if args.len() != 2 {
-            return None;
-        }
-        let ty = self.env.get_node_type(args[0].node_id());
-        let ty = ty.skip_reference();
-        if ty.is_open() {
-            return None;
-        }
-        if has_native_equality(self.env, self.options, ty) {
-            self.translate_binop(
-                if eq { "==" } else { "!=" },
-                args,
-                var_map,
-                ctx,
-                mem_args,
-                result_sub,
-            )
-        } else {
-            let a = self
-                .translate_invariant_body_to_boogie(&args[0], var_map, ctx, mem_args, result_sub)?;
-            let b = self
-                .translate_invariant_body_to_boogie(&args[1], var_map, ctx, mem_args, result_sub)?;
-            Some(format!(
-                "{}({}, {})",
-                boogie_equality_for_type(self.env, eq, ty, false),
-                a,
-                b
-            ))
-        }
-    }
 }
 
 /// Result of lifting a struct data invariant containing behavioral predicates
@@ -7894,8 +7850,8 @@ impl FunctionTranslator<'_> {
         let num_oper = global_state
             .get_temp_index_oper(mid, fid, ref_temp, baseline_flag)
             .unwrap();
-        let bv_flag = self.bv_flag(num_oper);
         let ty = self.get_local_type(ref_temp);
+        let bv_flag = self.bv_flag(num_oper, &ty);
         let temp_str = boogie_temp(env, ty.skip_reference(), idx, bv_flag);
         emitln!(writer, "havoc {};", temp_str);
         temp_str
@@ -8687,7 +8643,7 @@ impl FunctionTranslator<'_> {
                             let num_oper = &global_state
                                 .get_temp_index_oper(mid, fid, r, baseline_flag)
                                 .unwrap();
-                            let bv_flag = self.bv_flag(num_oper);
+                            let bv_flag = self.bv_flag(num_oper, ty);
                             let suffix = boogie_type_suffix(env, ty.skip_reference(), false);
                             need(ty, bv_flag, per_suffix[&suffix]);
                         }
@@ -8705,7 +8661,7 @@ impl FunctionTranslator<'_> {
                     let num_oper = &global_state
                         .get_temp_index_oper(mid, fid, *src, baseline_flag)
                         .unwrap();
-                    let bv_flag = self.bv_flag(num_oper);
+                    let bv_flag = self.bv_flag(num_oper, ty);
                     need(ty, bv_flag, 1);
                 },
                 _ => {},

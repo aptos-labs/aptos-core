@@ -121,6 +121,9 @@ impl FunctionTargetProcessor for ProphecyInstrumentationProcessor {
         for (offset, bytecode) in code.into_iter().enumerate() {
             instr.instrument(offset as CodeOffset, bytecode);
         }
+        // Publish the saved-address temps for downstream processors
+        // (`loop_analysis` addresses globally-rooted refs through them).
+        instr.builder.data.prophecy_saved_addrs = instr.saved_addrs.clone();
         instr.builder.data
     }
 

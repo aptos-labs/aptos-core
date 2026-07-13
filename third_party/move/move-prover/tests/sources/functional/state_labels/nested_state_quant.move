@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
-// Tests nested state quantifiers in data invariants.
+// Tests state-variable binding in data invariants.
 //
-// A `forall S in *:` binder universally quantifies the state variable S. A
-// non-forall state quantifier (`exists T in *:`, `choose T in *:`) nested
-// INSIDE such a binder is bound by it and must be accepted; the same
-// quantifier at the TOP LEVEL (free state) must be rejected.
+// A behavioral predicate is state-dependent only when its range is the free
+// ambient state (`range.is_default()`). Any state quantifier — forall or exists —
+// introduces a bound state variable. After `propagate_state_labels`, `S |~ pred`
+// rewrites the Behavior's range to Some(S) regardless of whether S was introduced
+// by `forall S in *:` or `exists S in *:`. Only a Behavior whose range is never
+// rewritten (i.e., written outside any `S |~` context) is state-dependent.
 
 module 0x42::nested_state_quant {
 
@@ -20,15 +22,21 @@ module 0x42::nested_state_quant {
     }
 
     // =========================================================================
-    // Accepted: `exists T in *:` sibling to `S |~ pred` inside a forall-state
-    //           binder — the state variable T is bound by the exists quantifier,
-    //           so it is NOT a free state reference.
+    // Accepted: `exists T in *: T |~ pred` — T is bound by the exists quantifier,
+    // aborts_of gets range.pre = Some(T) after propagation, not default.
     // =========================================================================
 
-    // Data invariant: "for all states S, at S, read_counter doesn't abort (i.e.,
-    // Counter exists at addr at S), AND there exists a state T where read_counter
-    // doesn't abort at T either." Both clauses are inside a forall-state binder so
-    // no free state reference escapes.
+    struct WithExistsAtTopLevel has key {
+        addr: address
+    }
+    spec WithExistsAtTopLevel {
+        invariant exists T in *: T |~ !aborts_of<read_counter>(addr);
+    }
+
+    // =========================================================================
+    // Accepted: `forall S in *: (S |~ p && exists T in *: T |~ q)` — both bound.
+    // =========================================================================
+
     struct WithNestedExists has key {
         addr: address
     }
@@ -39,19 +47,18 @@ module 0x42::nested_state_quant {
     }
 
     // =========================================================================
-    // Rejected: `exists T in *:` at the top level (free state) — error expected.
+    // Rejected: Behavior at the free ambient state (no enclosing `S |~`).
     // =========================================================================
 
-    struct WithFreeExists has key {
+    struct WithFreeStateBehavior has key {
         addr: address
     }
-    spec WithFreeExists {
-        // error: data invariant must not depend on a free state
-        invariant exists T in *: T |~ !aborts_of<read_counter>(addr);
+    spec WithFreeStateBehavior {
+        invariant !aborts_of<read_counter>(addr); // error: data invariant must not depend on a free state
     }
 
     // =========================================================================
-    // Regression guard: simple forall without nested exists still accepted.
+    // Regression guard: simple forall still accepted.
     // =========================================================================
 
     struct WithSimpleForall has key {

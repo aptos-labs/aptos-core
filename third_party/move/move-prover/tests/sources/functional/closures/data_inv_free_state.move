@@ -32,8 +32,8 @@ module 0x42::data_inv_free_state {
     }
     spec C {
         modifies_of<h>(s: signer) Counter[signer::address_of(s)];
-        // An existential state binder needs only a witness state, so the
-        // invariant stays state-dependent.
-        invariant exists S in *: forall s: signer: (S |~ !aborts_of<h>(s)); // error: exists over states
+        // S is introduced by `exists S in *:` and bound to the aborts_of via `S |~`.
+        // The Behavior range is Some(S) after propagation — not free — so this is accepted.
+        invariant exists S in *: forall s: signer: (S |~ !aborts_of<h>(s));
     }
 }
