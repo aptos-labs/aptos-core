@@ -43,6 +43,7 @@ pub struct ExecutorViewWithChangeSet<'r> {
 
 /// Test-only constructor so cross-session squash PoCs can layer a prior session's change set
 /// over an executor view (mirrors how the respawned epilogue session is built).
+#[cfg(any(test, feature = "testing"))]
 pub fn new_for_executor_view_with_change_set_for_test<'r>(
     base_executor_view: &'r dyn ExecutorView,
     base_resource_group_view: &'r dyn ResourceGroupView,
