@@ -2029,6 +2029,30 @@ impl SpecTranslator<'_> {
         for (memory, labels) in
             evaluator_memory_slot_labels(kind, pre, post, &union_used_memory, &union_old_memory)
         {
+            // In a spec function body, an unlabeled pre slot of a two-state kind
+            // cannot be rendered: unlike concrete closure targets, whose old memory
+            // is folded into the enclosing spec function's signature, the evaluator's
+            // memory union is only known per instantiation, so no pre-state parameter
+            // exists. Both slots would silently resolve to the current state,
+            // evaluating the target contract against the wrong state pair. Reject.
+            // (For one-state kinds both slots legitimately denote the same state.)
+            if labels.len() == 2 && kind.is_two_state() && pre.is_none() && self.in_spec_fun_body {
+                let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    &format!(
+                        "a two-state behavioral predicate over a function value \
+                         cannot be used in a spec function body without explicit \
+                         state labels: the pre-state of resource `{}`, used by a \
+                         possible target, is not available here; inline the \
+                         predicate into the spec condition or use a concrete \
+                         function target",
+                        struct_env.get_full_name_with_address()
+                    ),
+                );
+                emit!(self.writer, "/* unavailable-pre-state */ ");
+                return !first;
+            }
             // Check that the pre-state memory reference of a slot pair will be declared.
             if labels.len() == 2 && !self.check_name_declared(node_id, kind, *pre, memory) {
                 return !first;

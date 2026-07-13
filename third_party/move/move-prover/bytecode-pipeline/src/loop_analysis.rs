@@ -132,19 +132,28 @@ impl LoopAnalysisProcessor {
     ///
     /// Returns a map from a `&mut` temp to the global resource it is rooted in (either
     /// directly via `BorrowGlobal` or transitively via `BorrowField`), as
-    /// `(struct_id, addr_temp)`.
+    /// `(struct_id, addr_temp)`. The address temp is the saved-address copy taken by
+    /// `prophecy_instrumentation` at the borrow site, not the borrow's raw address
+    /// operand: the operand may be a user local reassigned while the reference lives,
+    /// which would point the assumption at the wrong resource slot.
     ///
     /// Used to re-assume `WellFormed(global<T>(addr))` after a `MutationValue` havoc,
     /// constraining the havoced prophecy via the global resource's data invariant.
     fn globally_rooted_refs(
-        code: &[Bytecode],
+        data: &FunctionData,
     ) -> BTreeMap<TempIndex, (QualifiedInstId<StructId>, TempIndex)> {
         use Operation::{BorrowField, BorrowGlobal, BorrowVariantField};
+        let code = &data.code;
         let mut roots: BTreeMap<TempIndex, (QualifiedInstId<StructId>, TempIndex)> =
             BTreeMap::new();
         for bc in code {
-            if let Bytecode::Call(_, dests, BorrowGlobal(mid, sid, inst), srcs, _) = bc {
-                roots.insert(dests[0], (mid.qualified_inst(*sid, inst.clone()), srcs[0]));
+            if let Bytecode::Call(_, dests, BorrowGlobal(mid, sid, inst), _, _) = bc {
+                // A `BorrowGlobal` without a saved address means prophecy
+                // instrumentation did not run on this function; skip — the
+                // assumption is an optional strengthening.
+                if let Some(saved) = data.prophecy_saved_addrs.get(&dests[0]) {
+                    roots.insert(dests[0], (mid.qualified_inst(*sid, inst.clone()), *saved));
+                }
             }
         }
         // Propagate through field borrows; repeat until stable (handles chains).
@@ -199,7 +208,7 @@ impl LoopAnalysisProcessor {
         // Under prophecy, globally-rooted refs need WellFormed re-assumption after
         // loop-head havocs (see `globally_rooted_refs` for details).
         let global_roots = if !options.path_refs {
-            Self::globally_rooted_refs(&builder.data.code)
+            Self::globally_rooted_refs(&builder.data)
         } else {
             BTreeMap::new()
         };
@@ -298,8 +307,7 @@ impl LoopAnalysisProcessor {
                             // constraining the prophecy for the PackRefDeep assertion.
                             if let Some((mem, addr_temp)) = global_roots.get(idx) {
                                 let env = func_env.module_env.env;
-                                let struct_env =
-                                    env.get_module(mem.module_id).into_struct(mem.id);
+                                let struct_env = env.get_module(mem.module_id).into_struct(mem.id);
                                 let addr_exp = builder.mk_temporary(*addr_temp);
                                 let global_exp =
                                     builder.mk_global(&struct_env, &mem.inst, addr_exp);
@@ -396,7 +404,6 @@ impl LoopAnalysisProcessor {
                             builder.emit(Bytecode::Prop(*attr_id, PropKind::Assume, exp.clone()));
                         }
                         Self::emit_prophecy_syncs(&mut builder, &prophecy_syncs, false);
-
                     }
                 },
                 Bytecode::Prop(_, PropKind::Assert, _)
