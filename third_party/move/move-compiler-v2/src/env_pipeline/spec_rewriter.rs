@@ -1915,32 +1915,75 @@ fn check_data_invariants(struct_env: &StructEnv) {
 /// the free/ambient state (a default memory range), or under a state binder that is
 /// not universally quantified (`exists`/`choose` over states needs only a witness
 /// state). Looks through called spec functions.
+///
+/// A non-forall state quantifier or default-state BP nested inside a `forall S in *:`
+/// binder is NOT free — the state variable is bound there — so it is not flagged.
+/// Spec function bodies are checked independently (at forall-depth 0).
 fn has_state_dependent_behavior(
     env: &GlobalEnv,
     exp: &ExpData,
     visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
 ) -> bool {
-    exp.any(&mut |e| match e {
-        ExpData::Call(_, Operation::Behavior(_, range), _) => range.is_default(),
-        ExpData::Quant(_, kind, ranges, ..) if *kind != QuantKind::Forall => {
-            ranges.iter().any(|(_, domain)| {
-                matches!(
-                    env.get_node_type(domain.node_id()).skip_reference(),
-                    Type::StateDomain
-                )
-            })
-        },
-        ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
-            let qid = mid.qualified(*fid);
-            visited.insert(qid)
-                && env
-                    .get_spec_fun(qid)
-                    .body
-                    .as_ref()
-                    .is_some_and(|body| has_state_dependent_behavior(env, body, visited))
-        },
-        _ => false,
-    })
+    // Depth of `forall S in *:` (Forall over StateDomain) quantifiers currently in
+    // scope. Inside such a binder the state variable is universally quantified, so
+    // non-forall state quantifiers and default-state behavioral predicates are bound
+    // there and must not be flagged as free.
+    let mut forall_state_depth: usize = 0;
+    let mut found = false;
+    exp.visit_pre_post(&mut |post, e| {
+        if found {
+            return false;
+        }
+        match e {
+            ExpData::Quant(_, kind, ranges, ..) => {
+                let is_state_domain_range = ranges.iter().any(|(_, domain)| {
+                    matches!(
+                        env.get_node_type(domain.node_id()).skip_reference(),
+                        Type::StateDomain
+                    )
+                });
+                if is_state_domain_range {
+                    if *kind == QuantKind::Forall {
+                        // Track entry/exit of a universally-quantified state binder.
+                        if !post {
+                            forall_state_depth += 1;
+                        } else {
+                            forall_state_depth -= 1;
+                        }
+                    } else if !post && forall_state_depth == 0 {
+                        // Non-forall (exists, choose) over a state domain and not
+                        // inside any enclosing forall-state binder — free state quant.
+                        found = true;
+                        return false;
+                    }
+                    // forall_state_depth > 0 and non-forall: bound by the enclosing
+                    // forall — not a free state reference; do not flag.
+                }
+            },
+            ExpData::Call(_, Operation::Behavior(_, range), _) if !post => {
+                if range.is_default() && forall_state_depth == 0 {
+                    found = true;
+                    return false;
+                }
+            },
+            ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) if !post => {
+                let qid = mid.qualified(*fid);
+                if visited.insert(qid)
+                    && env
+                        .get_spec_fun(qid)
+                        .body
+                        .as_ref()
+                        .is_some_and(|body| has_state_dependent_behavior(env, body, visited))
+                {
+                    found = true;
+                    return false;
+                }
+            },
+            _ => {},
+        }
+        true
+    });
+    found
 }
 
 #[cfg(test)]
