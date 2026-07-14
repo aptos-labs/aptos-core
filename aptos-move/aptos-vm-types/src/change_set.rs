@@ -650,12 +650,13 @@ impl VMChangeSet {
                             }),
                         ) => {
                             if strict_delayed_field_squash {
-                                // SAFETY (gas_feature_version >= RELEASE_V1_46): fail closed, the
+                                // SAFETY (fail-closed window [RELEASE_V1_46, RELEASE_V1_48)): the
                                 // standalone-resource analogue of the resource-group arm below. A
                                 // full resource write squashed with a later in-place delayed-field
                                 // exchange on the same key is rejected; a matching materialized
                                 // size does not prove the later exchange reconciles with what the
-                                // earlier session wrote.
+                                // earlier session wrote. From RELEASE_V1_48 the view-layer fix makes
+                                // this sound again and we fall through to the legacy merge.
                                 return Err(code_invariant_error(format!(
                                     "Refusing to squash a resource write with a later in-place \
                                      delayed-field change on the same key (fail-closed for safety): \
@@ -663,7 +664,7 @@ impl VMChangeSet {
                                     key, additional_entry
                                 )));
                             }
-                            // Legacy behavior (gas_feature_version < RELEASE_V1_46): a read cannot
+                            // Legacy behavior (outside the fail-closed window): a read cannot
                             // change the size (i.e. delayed fields don't modify size), so allow the
                             // merge only when the materialized sizes match.
                             if materialized_size != &Some(*additional_materialized_size) {
@@ -689,7 +690,7 @@ impl VMChangeSet {
                             ),
                         ) => {
                             if strict_delayed_field_squash {
-                                // SAFETY (gas_feature_version >= RELEASE_V1_46): fail closed. We
+                                // SAFETY (fail-closed window [RELEASE_V1_46, RELEASE_V1_48)): we
                                 // deliberately do NOT allow squashing a full resource-group write
                                 // (an earlier session that wrote the group, e.g. structurally
                                 // changed its membership) with a later in-place delayed-field
@@ -701,7 +702,8 @@ impl VMChangeSet {
                                 // abort the transaction. This is asset-safe: no change set is
                                 // applied. Legitimate flows touch the group purely in place
                                 // (ResourceGroupInPlaceDelayedFieldChange on both sides), handled by
-                                // the arm below.
+                                // the arm below. From RELEASE_V1_48 the view-layer fix makes this
+                                // sound again and we fall through to the legacy merge.
                                 return Err(code_invariant_error(format!(
                                     "Refusing to squash a resource-group write with a later \
                                      in-place delayed-field change on the same group (fail-closed \
@@ -709,7 +711,7 @@ impl VMChangeSet {
                                     key, additional_entry
                                 )));
                             }
-                            // Legacy behavior (gas_feature_version < RELEASE_V1_46): a read cannot
+                            // Legacy behavior (outside the fail-closed window): a read cannot
                             // change the size (i.e. delayed fields don't modify size), so allow the
                             // merge only when the materialized sizes match.
                             if materialized_size.map(|v| v.get())
