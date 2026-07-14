@@ -577,8 +577,8 @@ fn test_resource_groups_squashing() {
 
     {
         // WriteResourceGroup ⊕ in-place delayed-field change of *matching* size: permitted under
-        // the legacy rules (the group write is kept), but fail-closed from RELEASE_V1_46. This is
-        // the gas-version-gated behavior change.
+        // the legacy rules (the group write is kept), but fail-closed inside the window
+        // [RELEASE_V1_46, RELEASE_V1_48). This is the gas-version-gated behavior change.
         let matching_inplace = ExpandedVMChangeSetBuilder::new()
             .with_group_reads_needing_delayed_field_exchange(vec![(
                 as_state_key!("1"),
@@ -640,8 +640,8 @@ fn test_write_and_read_discrepancy_caught() {
 
 /// Standalone-resource analogue of the resource-group gate: a `WriteWithDelayedFields` squashed
 /// with a later `InPlaceDelayedFieldChange` on the same key is rejected outright under the strict
-/// (gas_feature_version >= RELEASE_V1_46) squash, regardless of whether the materialized sizes
-/// match. (The group analogue is exercised in `test_resource_groups_squashing`.)
+/// squash (fail-closed window [RELEASE_V1_46, RELEASE_V1_48)), regardless of whether the
+/// materialized sizes match. (The group analogue is exercised in `test_resource_groups_squashing`.)
 #[test]
 fn test_squash_standalone_write_then_inplace_delayed_field_gated() {
     let layout = TriompheArc::new(MoveTypeLayout::U64);
@@ -661,7 +661,7 @@ fn test_squash_standalone_write_then_inplace_delayed_field_gated() {
         )])
         .build();
 
-    // Strict (>= RELEASE_V1_46): rejected outright, fail-closed.
+    // Strict (fail-closed window [RELEASE_V1_46, RELEASE_V1_48)): rejected outright.
     let mut strict = write.clone();
     let err = assert_err!(strict.squash_additional_change_set(inplace.clone(), true));
     assert!(
