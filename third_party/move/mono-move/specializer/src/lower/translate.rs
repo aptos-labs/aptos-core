@@ -13,7 +13,7 @@ use super::{
     parallel_copy,
 };
 use crate::{
-    gas,
+    gas::{self, CostResolver},
     stackless_exec_ir::{
         instr_utils::{clobbers_xfer, for_each_value_use, is_fallthrough_terminator},
         BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
@@ -81,10 +81,10 @@ pub(super) fn lower_function(
         );
         state.xfer_bindings.fill(None);
         state.label_map[block.label.0 as usize] = Some(state.out_buf.len() as u32);
+        // Resolve this block's cost formula to concrete gas for this instantiation.
+        state.block_costs[block.label.0 as usize] =
+            state.resolve_block_cost(&func_ir.block_costs[block.label.0 as usize])?;
         for instr in &block.instrs {
-            // Cost is computed before lowering so Xfer operand bindings are live.
-            let cost = gas::instr_cost(instr, &state)?;
-            state.block_costs[block.label.0 as usize] += cost;
             state.lower_instr(func_ir, instr)?;
             state.commit_xfer_bindings_after(instr);
         }
@@ -170,19 +170,7 @@ struct LoweringState<'a> {
     pending_safe_points: Vec<SafePointEntry>,
 }
 
-impl gas::CostContext for LoweringState<'_> {
-    fn slot_size(&self, slot: Slot) -> Result<u32> {
-        Ok(self.slot(slot)?.size)
-    }
-
-    fn slot_ty(&self, slot: Slot) -> Result<InternedType> {
-        self.slot_interned_type(slot)
-    }
-
-    fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<u32> {
-        Ok(self.resolve_field(struct_ty, fh)?.1)
-    }
-
+impl gas::CostResolver for LoweringState<'_> {
     fn concrete_ty(&self, ty: InternedType) -> Result<InternedType> {
         LoweringState::concrete_ty(self, ty)
     }
