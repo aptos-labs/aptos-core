@@ -454,13 +454,15 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             )),
         },
         WriteSetChange::DeleteTableItem(delete_table_item) => {
-            let data = delete_table_item.data.as_ref().unwrap_or_else(|| {
-                panic!(
-                    "Could not extract data from DeletedTableItem '{:?}' with handle '{:?}'",
-                    delete_table_item,
-                    delete_table_item.handle.to_string()
-                )
-            });
+            // Decoded `data` can be absent if the table was never indexed; emit the change
+            // without it instead of panicking (raw key bytes are still preserved).
+            let data = delete_table_item
+                .data
+                .as_ref()
+                .map(|data| transaction::DeleteTableData {
+                    key: data.key.to_string(),
+                    key_type: data.key_type.clone(),
+                });
 
             transaction::WriteSetChange {
                 r#type: transaction::write_set_change::Type::DeleteTableItem as i32,
@@ -471,10 +473,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                         ),
                         handle: delete_table_item.handle.to_string(),
                         key: delete_table_item.key.to_string(),
-                        data: Some(transaction::DeleteTableData {
-                            key: data.key.to_string(),
-                            key_type: data.key_type.clone(),
-                        }),
+                        data,
                     },
                 )),
             }
@@ -507,13 +506,17 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             )),
         },
         WriteSetChange::WriteTableItem(write_table_item) => {
-            let data = write_table_item.data.as_ref().unwrap_or_else(|| {
-                panic!(
-                    "Could not extract data from DecodedTableData '{:?}' with handle '{:?}'",
-                    write_table_item,
-                    write_table_item.handle.to_string(),
-                )
-            });
+            // Decoded `data` can be absent if the table was never indexed; emit the change
+            // without it instead of panicking (raw key/value bytes are still preserved).
+            let data = write_table_item
+                .data
+                .as_ref()
+                .map(|data| transaction::WriteTableData {
+                    key: data.key.to_string(),
+                    key_type: data.key_type.clone(),
+                    value: data.value.to_string(),
+                    value_type: data.value_type.clone(),
+                });
             transaction::WriteSetChange {
                 r#type: transaction::write_set_change::Type::WriteTableItem as i32,
                 change: Some(transaction::write_set_change::Change::WriteTableItem(
@@ -523,12 +526,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                         ),
                         handle: write_table_item.handle.to_string(),
                         key: write_table_item.key.to_string(),
-                        data: Some(transaction::WriteTableData {
-                            key: data.key.to_string(),
-                            key_type: data.key_type.clone(),
-                            value: data.value.to_string(),
-                            value_type: data.value_type.clone(),
-                        }),
+                        data,
                     },
                 )),
             }
@@ -1110,4 +1108,62 @@ fn convert_validator_transaction(
         },
         events: convert_events(api_validator_txn.events()),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_api_types::{
+        DeleteTableItem as ApiDeleteTableItem, HexEncodedBytes, WriteTableItem as ApiWriteTableItem,
+    };
+
+    // Converting a table item with no decoded `data` must not panic.
+
+    #[test]
+    fn write_table_item_without_decoded_data_does_not_panic() {
+        let change = WriteSetChange::WriteTableItem(ApiWriteTableItem {
+            state_key_hash: "0xdeadbeef".to_string(),
+            handle: HexEncodedBytes::from(vec![0x11, 0x22]),
+            key: HexEncodedBytes::from(vec![0x33]),
+            value: HexEncodedBytes::from(vec![0x44]),
+            data: None,
+        });
+
+        match convert_write_set_change(&change).change.unwrap() {
+            transaction::write_set_change::Change::WriteTableItem(item) => {
+                assert!(
+                    item.data.is_none(),
+                    "decoded data must be omitted, not faked"
+                );
+                assert_eq!(
+                    item.handle,
+                    HexEncodedBytes::from(vec![0x11, 0x22]).to_string()
+                );
+                assert_eq!(item.key, HexEncodedBytes::from(vec![0x33]).to_string());
+            },
+            other => panic!("expected WriteTableItem, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn delete_table_item_without_decoded_data_does_not_panic() {
+        let change = WriteSetChange::DeleteTableItem(ApiDeleteTableItem {
+            state_key_hash: "0xdeadbeef".to_string(),
+            handle: HexEncodedBytes::from(vec![0x55]),
+            key: HexEncodedBytes::from(vec![0x66]),
+            data: None,
+        });
+
+        match convert_write_set_change(&change).change.unwrap() {
+            transaction::write_set_change::Change::DeleteTableItem(item) => {
+                assert!(
+                    item.data.is_none(),
+                    "decoded data must be omitted, not faked"
+                );
+                assert_eq!(item.handle, HexEncodedBytes::from(vec![0x55]).to_string());
+                assert_eq!(item.key, HexEncodedBytes::from(vec![0x66]).to_string());
+            },
+            other => panic!("expected DeleteTableItem, got {:?}", other),
+        }
+    }
 }

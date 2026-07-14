@@ -1082,6 +1082,32 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 }
             },
 
+            (FatType::Function(_), MoveValue::Closure(closure)) => {
+                // Reconstruct a function value's captured argument types from its signature
+                // and recurse into any that can hold tables. If the types can't be resolved,
+                // skip the captures rather than failing the scan.
+                let MoveClosure {
+                    module_id,
+                    fun_id,
+                    ty_args,
+                    mask,
+                    captured,
+                } = *closure;
+                match self.resolve_captured_types(&module_id, &fun_id, &ty_args, mask, limit) {
+                    Ok(Some(captured_tys)) if captured_tys.len() == captured.len() => {
+                        for ((_layout, value), ty) in captured.into_iter().zip(captured_tys.iter())
+                        {
+                            if ty.contains_tables() {
+                                self.collect_table_info_from_value(ty, value, limit, infos)?;
+                            }
+                        }
+                    },
+                    // Nothing captured, an arity mismatch, or types we couldn't resolve: skip.
+                    Ok(_) | Err(_) => {},
+                }
+                Ok(())
+            },
+
             // Every other combo cannot harbor tables.
             (FatType::Bool, _)
             | (FatType::U8, _)
