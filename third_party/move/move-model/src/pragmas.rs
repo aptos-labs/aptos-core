@@ -95,6 +95,12 @@ pub const INTRINSIC_TYPE_MAP: &str = "map";
 /// `[move] fun map_new<K, V>(): Map<K, V>`
 pub const INTRINSIC_FUN_MAP_NEW: &str = "map_new";
 
+/// Create a new empty table with degree configuration (BigOrderedMap-style). Aborts
+/// when a nonzero degree is outside its valid range. Size-validation aborts of the
+/// implementation are assumed not to fire.
+/// `[move] fun map_new_with_config<K, V>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): Map<K, V>`
+pub const INTRINSIC_FUN_MAP_NEW_WITH_CONFIG: &str = "map_new_with_config";
+
 /// Create a new table with an empty content (the spec version)
 /// `[spec] fun map_new<K, V>(): Map<K, V>`
 pub const INTRINSIC_FUN_MAP_SPEC_NEW: &str = "map_spec_new";
@@ -184,6 +190,14 @@ pub const INTRINSIC_FUN_MAP_POP_FRONT: &str = "map_pop_front";
 /// `[move] fun map_pop_back<K, V>(m: &mut Map<K, V>): (K, V)`
 pub const INTRINSIC_FUN_MAP_POP_BACK: &str = "map_pop_back";
 
+/// Return the smallest key under `cmp::compare` ordering. Aborts when the map is empty.
+/// `[move] fun map_front_key<K, V>(m: &Map<K, V>): K`
+pub const INTRINSIC_FUN_MAP_FRONT_KEY: &str = "map_front_key";
+
+/// Return the largest key under `cmp::compare` ordering. Aborts when the map is empty.
+/// `[move] fun map_back_key<K, V>(m: &Map<K, V>): K`
+pub const INTRINSIC_FUN_MAP_BACK_KEY: &str = "map_back_key";
+
 /// Return the largest key strictly less than the given key under `cmp::compare`,
 /// wrapped in `Option<K>` (None when no such key exists). Never aborts.
 /// `[move] fun map_prev_key<K, V>(m: &Map<K, V>, k: &K): Option<K>`
@@ -197,6 +211,12 @@ pub const INTRINSIC_FUN_MAP_NEXT_KEY: &str = "map_next_key";
 /// Return all keys in the map as a `vector<K>`. Never aborts.
 /// `[move] fun map_keys<K, V>(m: &Map<K, V>): vector<K>`
 pub const INTRINSIC_FUN_MAP_KEYS: &str = "map_keys";
+
+/// Convert to another intrinsic-map type with identical contents. Never aborts.
+/// Both map types share the abstract table representation, so this is the identity
+/// at the backend level.
+/// `[move] fun map_to_ordered_map<K, V>(m: &Map<K, V>): OrderedMap<K, V>`
+pub const INTRINSIC_FUN_MAP_TO_ORDERED_MAP: &str = "map_to_ordered_map";
 
 /// Return all values in the map as a `vector<V>`. Never aborts.
 /// `[move] fun map_values<K, V>(m: &Map<K, V>): vector<V>`
@@ -304,6 +324,10 @@ pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM: &str = "map_spec_aborts_trim";
 /// `[spec] fun map_spec_aborts_upsert_all<K, V>(m: Map<K, V>, keys: vector<K>, values: vector<V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL: &str = "map_spec_aborts_upsert_all";
 
+/// Abort condition for `map_new_with_config`: a nonzero degree outside its valid range.
+/// `[spec] fun map_spec_aborts_new_with_config<K, V>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG: &str = "map_spec_aborts_new_with_config";
+
 /// Abort condition for `map_replace_key_inplace`: `old_key` absent, or `old_key`
 /// differs from `new_key` (over-approximates the cmp-order-violation abort path,
 /// which the template models nondeterministically).
@@ -359,6 +383,13 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (
                 INTRINSIC_FUN_MAP_NEW,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_NEW), None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_NEW_WITH_CONFIG,
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG),
+                ),
             ),
             (INTRINSIC_FUN_MAP_SPEC_NEW, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_GET, IntrinsicFunDef::spec_fun()),
@@ -417,6 +448,14 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY)),
             ),
             (
+                INTRINSIC_FUN_MAP_FRONT_KEY,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_BACK_KEY,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY)),
+            ),
+            (
                 INTRINSIC_FUN_MAP_PREV_KEY,
                 IntrinsicFunDef::move_fun(None, None),
             ),
@@ -426,6 +465,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_KEYS,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_TO_ORDERED_MAP,
                 IntrinsicFunDef::move_fun(None, None),
             ),
             (
@@ -539,6 +582,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             ),
             (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG,
                 IntrinsicFunDef::spec_fun(),
             ),
         ])

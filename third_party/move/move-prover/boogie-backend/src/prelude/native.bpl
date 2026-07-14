@@ -417,6 +417,24 @@ procedure {:inline 2} {{impl.fun_new}}{{S}}() returns (v: {{Self}}) {
 }
 {%- endif %}
 
+{%- if impl.fun_new_with_config != "" and not instance.1.is_bv %}
+// Empty map with degree configuration. Aborts when a nonzero degree is outside its
+// valid range (INNER_MIN_DEGREE=4 / LEAF_MIN_DEGREE=3 / MAX_DEGREE=4096, mirroring
+// big_ordered_map constants). ASSUMPTION: the implementation's size-validation abort
+// (key/entry serialized size exceeding node limits) is presumed not to fire.
+procedure {:inline 2} {{impl.fun_new_with_config}}{{S}}(inner_max_degree: int, leaf_max_degree: int, reuse_slots: bool) returns (v: {{Self}}) {
+    if (inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    if (leaf_max_degree != 0 && (leaf_max_degree < 3 || leaf_max_degree > 4096)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    v := EmptyTable();
+}
+{%- endif %}
+
 {%- if impl.fun_destroy_empty != "" %}
 procedure {:inline 2} {{impl.fun_destroy_empty}}{{S}}(t: {{Self}}) {
     if (LenTable(t) != 0) {
@@ -496,6 +514,38 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
     assume $IsValid'{{instance.1.suffix}}'(v);
     assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume v == {{impl.fun_spec_get}}{{S}}(t, k);
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
+        !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
+            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+}
+{%- endif %}
+
+{%- if impl.fun_front_key != "" and impl.fun_spec_has_key != "" and instance.0.cmp_available and not instance.1.is_bv %}
+// Smallest key under `cmp::compare` ordering. Aborts when the map is empty.
+procedure {:inline 2} {{impl.fun_front_key}}{{S}}(t: {{Self}}) returns (k: {{K}}) {
+    if (LenTable(t) == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    assume $IsValid'{{instance.0.suffix}}'(k);
+    assume {{impl.fun_spec_has_key}}{{S}}(t, k);
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
+        !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
+            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+}
+{%- endif %}
+
+{%- if impl.fun_back_key != "" and impl.fun_spec_has_key != "" and instance.0.cmp_available and not instance.1.is_bv %}
+// Largest key under `cmp::compare` ordering. Aborts when the map is empty.
+procedure {:inline 2} {{impl.fun_back_key}}{{S}}(t: {{Self}}) returns (k: {{K}}) {
+    if (LenTable(t) == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    assume $IsValid'{{instance.0.suffix}}'(k);
+    assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
@@ -610,6 +660,15 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
+}
+{%- endif %}
+
+{%- if impl.fun_to_ordered_map != "" and not instance.1.is_bv %}
+// Convert to another intrinsic-map type with identical contents. Never aborts.
+// Both map types share the `Table int V` representation and the per-K `$EncodeKey`,
+// so the conversion is the identity at this level.
+procedure {:inline 2} {{impl.fun_to_ordered_map}}{{S}}(t: ({{Self}})) returns (result: ({{Self}})) {
+    result := t;
 }
 {%- endif %}
 

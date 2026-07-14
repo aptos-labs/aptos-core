@@ -45,6 +45,10 @@ spec aptos_framework::ordered_map {
             map_spec_aborts_trim = spec_aborts_trim,
             map_spec_aborts_upsert_all = spec_aborts_upsert_all,
             map_spec_aborts_replace_key_inplace = spec_aborts_replace_key_inplace,
+            map_spec_aborts_destroy_empty = spec_aborts_destroy_empty,
+            map_spec_aborts_add = spec_aborts_add,
+            map_spec_aborts_del = spec_aborts_del,
+            map_spec_aborts_borrow = spec_aborts_borrow,
             map_is_empty = is_empty;
     }
 
@@ -53,6 +57,10 @@ spec aptos_framework::ordered_map {
     spec native fun spec_set<K, V>(t: OrderedMap<K, V>, k: K, v: V): OrderedMap<K, V>;
     spec native fun spec_remove<K, V>(t: OrderedMap<K, V>, k: K): OrderedMap<K, V>;
     spec native fun spec_get<K, V>(t: OrderedMap<K, V>, k: K): V;
+    spec native fun spec_aborts_destroy_empty<K, V>(t: OrderedMap<K, V>): bool;
+    spec native fun spec_aborts_add<K, V>(t: OrderedMap<K, V>, k: K, v: V): bool;
+    spec native fun spec_aborts_del<K, V>(t: OrderedMap<K, V>, k: K): bool;
+    spec native fun spec_aborts_borrow<K, V>(t: OrderedMap<K, V>, k: K): bool;
 
     spec fun spec_aborts_empty<K, V>(t: OrderedMap<K, V>): bool {
         spec_len(t) == 0
