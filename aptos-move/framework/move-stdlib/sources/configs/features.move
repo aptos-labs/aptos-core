@@ -986,6 +986,19 @@ module std::features {
         is_enabled(FUNCTION_VALUE_DISPATCH) && is_enabled(FUNCTION_REFLECTION)
     }
 
+    /// Whether BCS serialization of values containing function values is disabled.
+    /// Used during the function value storage format migration.
+    /// Lifetime: transient
+    const DISABLE_CLOSURE_BCS_SERIALIZATION: u64 = 126;
+
+    public fun get_disable_closure_bcs_serialization_feature(): u64 {
+        DISABLE_CLOSURE_BCS_SERIALIZATION
+    }
+
+    public fun is_closure_bcs_serialization_disabled(): bool {
+        is_enabled(DISABLE_CLOSURE_BCS_SERIALIZATION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
