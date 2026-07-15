@@ -65,17 +65,24 @@ impl ChangeSetConfigs {
         self.gas_feature_version < 3
     }
 
-    /// From `RELEASE_V1_46`, squashing a full write (an earlier session that wrote a value or a
-    /// resource group) with a later *in-place delayed-field change* on the *same* key (e.g. the gas
-    /// epilogue exchanging an aggregator in that value/group) is rejected outright (fail-closed).
-    /// This covers both the resource-group arm (`WriteResourceGroup ⊕
-    /// ResourceGroupInPlaceDelayedFieldChange`) and the standalone-resource arm
-    /// (`WriteWithDelayedFields ⊕ InPlaceDelayedFieldChange`). Before that version, the merge was
-    /// permitted whenever the materialized sizes happened to match -- a matching size does not
-    /// prove the later session's delayed-field exchange reconciles with what the earlier session
-    /// wrote, so we no longer rely on it. See `VMChangeSet::squash_additional_resource_writes`.
+    /// Fail-closed window `[RELEASE_V1_46, RELEASE_V1_48)`. Within it, squashing a full write (an
+    /// earlier session that wrote a value or a resource group) with a later *in-place delayed-field
+    /// change* on the *same* key (e.g. the gas epilogue exchanging an aggregator in that
+    /// value/group) is rejected outright. This covers both the resource-group arm
+    /// (`WriteResourceGroup ⊕ ResourceGroupInPlaceDelayedFieldChange`) and the standalone-resource
+    /// arm (`WriteWithDelayedFields ⊕ InPlaceDelayedFieldChange`).
+    ///
+    /// Before `RELEASE_V1_46`, the merge was permitted whenever the materialized sizes happened to
+    /// match -- a matching size does not by itself prove the later session's delayed-field exchange
+    /// reconciles with what the earlier session wrote, hence the defensive fail-closed interim.
+    ///
+    /// From `RELEASE_V1_48`, the view-layer reconciliation fix (which layers the earlier change set
+    /// so the later session's in-place exchange reflects the earlier write) is active, so the
+    /// materialized-size match is once again a sound proof and we revert to the legacy squash. See
+    /// `VMChangeSet::squash_additional_resource_writes`.
     pub fn strict_delayed_field_squash(&self) -> bool {
-        self.gas_feature_version >= aptos_gas_schedule::gas_feature_versions::RELEASE_V1_46
+        use aptos_gas_schedule::gas_feature_versions::{RELEASE_V1_46, RELEASE_V1_48};
+        (RELEASE_V1_46..RELEASE_V1_48).contains(&self.gas_feature_version)
     }
 
     fn for_feature_version_3() -> Self {
