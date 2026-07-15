@@ -541,17 +541,19 @@ impl SubscriptionStreamRequests {
         };
 
         // Update the highest known version
-        self.highest_known_version += num_data_items as u64;
+        self.highest_known_version = self
+            .highest_known_version
+            .saturating_add(num_data_items as u64);
 
         // Update the highest known epoch if we've now hit an epoch ending ledger info
         if self.highest_known_version == target_ledger_info.ledger_info().version()
             && target_ledger_info.ledger_info().ends_epoch()
         {
-            self.highest_known_epoch += 1;
+            self.highest_known_epoch = self.highest_known_epoch.saturating_add(1);
         }
 
         // Update the next index to serve
-        self.next_index_to_serve += 1;
+        self.next_index_to_serve = self.next_index_to_serve.saturating_add(1);
 
         // Refresh the last stream update time
         self.refresh_last_stream_update_time();
@@ -1025,18 +1027,22 @@ fn update_active_subscription_metrics(
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
 ) {
     // Calculate the total number of subscriptions for each network
-    let mut num_validator_subscriptions = 0;
-    let mut num_vfn_subscriptions = 0;
-    let mut num_public_subscriptions = 0;
+    let mut num_validator_subscriptions: u64 = 0;
+    let mut num_vfn_subscriptions: u64 = 0;
+    let mut num_public_subscriptions: u64 = 0;
     for subscription in subscriptions.iter() {
         // Get the peer network ID
         let peer_network_id = *subscription.key();
 
         // Increment the number of subscriptions for the peer's network
         match peer_network_id.network_id() {
-            NetworkId::Validator => num_validator_subscriptions += 1,
-            NetworkId::Vfn => num_vfn_subscriptions += 1,
-            NetworkId::Public => num_public_subscriptions += 1,
+            NetworkId::Validator => {
+                num_validator_subscriptions = num_validator_subscriptions.saturating_add(1)
+            },
+            NetworkId::Vfn => num_vfn_subscriptions = num_vfn_subscriptions.saturating_add(1),
+            NetworkId::Public => {
+                num_public_subscriptions = num_public_subscriptions.saturating_add(1)
+            },
         }
     }
 
@@ -1044,16 +1050,16 @@ fn update_active_subscription_metrics(
     metrics::set_gauge(
         &metrics::SUBSCRIPTION_COUNT,
         NetworkId::Validator.as_str(),
-        num_validator_subscriptions as u64,
+        num_validator_subscriptions,
     );
     metrics::set_gauge(
         &metrics::SUBSCRIPTION_COUNT,
         NetworkId::Vfn.as_str(),
-        num_vfn_subscriptions as u64,
+        num_vfn_subscriptions,
     );
     metrics::set_gauge(
         &metrics::SUBSCRIPTION_COUNT,
         NetworkId::Public.as_str(),
-        num_public_subscriptions as u64,
+        num_public_subscriptions,
     );
 }

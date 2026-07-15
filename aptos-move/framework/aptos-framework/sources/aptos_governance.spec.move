@@ -32,13 +32,6 @@ spec aptos_framework::aptos_governance {
         pragma aborts_if_is_partial;
     }
 
-    spec schema AbortsIfPermissionedSigner {
-        use aptos_framework::permissioned_signer;
-        s: signer;
-        let perm = GovernancePermission {};
-        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
-    }
-
     spec store_signer_cap(
         aptos_framework: &signer,
         signer_address: address,
@@ -220,7 +213,6 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::chain_status;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
-        // include AbortsIfPermissionedSigner { s: proposer };
     }
 
     /// `stake_pool` must exist StakePool.

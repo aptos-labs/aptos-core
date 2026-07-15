@@ -21,7 +21,6 @@ use move_core_types::{
 use move_vm_types::{
     instr::Instruction,
     loaded_data::{
-        runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
         struct_name_indexing::StructNameIndexMap,
     },
@@ -143,7 +142,6 @@ impl Script {
             return_tys: vec![],
             local_tys,
             param_tys,
-            access_specifier: AccessSpecifier::Any,
             is_persistent: false,
             has_module_reentrancy_lock: false,
             is_trusted: false,

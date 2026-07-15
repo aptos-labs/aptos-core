@@ -1,10 +1,27 @@
 spec aptos_framework::dispatchable_fungible_asset {
-    use aptos_framework::permissioned_signer;
     spec module {
         pragma verify = false;
     }
 
     spec dispatchable_withdraw {
+        pragma opaque;
+    }
+
+    // Opaque, mirroring the natives they replace.
+
+    spec dispatch_withdraw_hook {
+        pragma opaque;
+    }
+
+    spec dispatch_deposit_hook {
+        pragma opaque;
+    }
+
+    spec dispatch_derived_balance_hook {
+        pragma opaque;
+    }
+
+    spec dispatch_derived_supply_hook {
         pragma opaque;
     }
 
@@ -21,7 +38,6 @@ spec aptos_framework::dispatchable_fungible_asset {
     }
 
     spec withdraw {
-        modifies global<permissioned_signer::PermissionStorage>(permissioned_signer::spec_permission_address(owner));
         modifies global<fungible_asset::FungibleStore>(object::object_address(store));
         modifies global<fungible_asset::ConcurrentFungibleBalance>(object::object_address(store));
     }

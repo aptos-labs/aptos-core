@@ -913,25 +913,15 @@ procedure {:inline 1} $1_Account_create_signer(
 // Native Signer
 
 datatype $signer {
-    $signer($addr: int),
-    $permissioned_signer($addr: int, $permission_addr: int)
+    $signer($addr: int)
 }
 
 function {:inline} $IsValid'signer'(s: $signer): bool {
-    if s is $signer then
-        $IsValid'address'(s->$addr)
-    else
-        $IsValid'address'(s->$addr) &&
-        $IsValid'address'(s->$permission_addr)
+    $IsValid'address'(s->$addr)
 }
 
 function {:inline} $IsEqual'signer'(s1: $signer, s2: $signer): bool {
-    if s1 is $signer && s2 is $signer then
-        s1 == s2
-    else if s1 is $permissioned_signer && s2 is $permissioned_signer then
-        s1 == s2
-    else
-        false
+    s1 == s2
 }
 
 procedure {:inline 1} $1_signer_borrow_address(signer: $signer) returns (res: int) {

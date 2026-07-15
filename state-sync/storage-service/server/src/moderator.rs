@@ -50,7 +50,7 @@ impl UnhealthyPeerState {
     /// Note: we only ignore peers on the public network.
     pub fn increment_invalid_request_count(&mut self, peer_network_id: &PeerNetworkId) {
         // Increment the invalid request count
-        self.invalid_request_count += 1;
+        self.invalid_request_count = self.invalid_request_count.saturating_add(1);
 
         // If the peer is a PFN and has sent too many invalid requests, start ignoring it
         if self.ignore_start_time.is_none()
@@ -88,7 +88,7 @@ impl UnhealthyPeerState {
                 self.ignore_start_time = None;
 
                 // Double the min time to ignore the peer
-                self.min_time_to_ignore_secs *= 2;
+                self.min_time_to_ignore_secs = self.min_time_to_ignore_secs.saturating_mul(2);
 
                 // Log the fact that we're no longer ignoring the peer
                 warn!(LogSchema::new(LogEntry::RequestModeratorIgnoredPeer)
@@ -265,7 +265,7 @@ impl RequestModerator {
             })?;
 
         // Refresh the unhealthy peer states and garbage collect disconnected peers
-        let mut num_ignored_peers = 0;
+        let mut num_ignored_peers: u64 = 0;
         self.unhealthy_peer_states
             .retain(|peer_network_id, unhealthy_peer_state| {
                 if connected_peers_and_metadata.contains_key(peer_network_id) {
@@ -274,7 +274,7 @@ impl RequestModerator {
 
                     // If the peer is ignored, increment the ignored peer count
                     if unhealthy_peer_state.is_ignored() {
-                        num_ignored_peers += 1;
+                        num_ignored_peers = num_ignored_peers.saturating_add(1);
                     }
 
                     true // The peer is still connected, so we should keep it

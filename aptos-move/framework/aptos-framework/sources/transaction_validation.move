@@ -10,7 +10,6 @@ module aptos_framework::transaction_validation {
     use aptos_framework::account_abstraction;
     use aptos_framework::chain_id;
     use aptos_framework::create_signer;
-    use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -48,6 +47,7 @@ module aptos_framework::transaction_validation {
         user_epilogue_name: vector<u8>,
     }
 
+    #[deprecated]
     struct GasPermission has copy, drop, store {}
 
     /// MSB is used to indicate a gas payer tx
@@ -55,6 +55,8 @@ module aptos_framework::transaction_validation {
 
     /// Transaction exceeded its allocated max gas
     const EOUT_OF_GAS: u64 = 6;
+    /// The permissioned signer feature has been removed.
+    const EPERMISSIONED_SIGNER_REMOVED: u64 = 7;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -69,29 +71,21 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
     const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
-    const PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT: u64 = 1011;
     const PROLOGUE_ENONCE_ALREADY_USED: u64 = 1012;
     const PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
 
-    /// Permission management
-    ///
-    /// Master signer grant permissioned signer ability to consume a given amount of gas in octas.
+    #[deprecated]
     public fun grant_gas_permission(
-        master: &signer,
-        permissioned: &signer,
-        gas_amount: u64
+        _master: &signer,
+        _permissioned: &signer,
+        _gas_amount: u64
     ) {
-        permissioned_signer::authorize_increase(
-            master,
-            permissioned,
-            (gas_amount as u256),
-            GasPermission {}
-        )
+        abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
     }
 
-    /// Removing permissions from permissioned signer.
-    public fun revoke_gas_permission(permissioned: &signer) {
-        permissioned_signer::revoke_permission(permissioned, GasPermission {})
+    #[deprecated]
+    public fun revoke_gas_permission(_permissioned: &signer) {
+        abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
     }
 
     /// Only called during genesis to initialize system resources for this module.
@@ -203,14 +197,6 @@ module aptos_framework::transaction_validation {
             is_simulation,
             gas_payer_address
         )) {
-            assert!(
-                permissioned_signer::check_permission_capacity_above(
-                    gas_payer,
-                    (max_transaction_fee as u256),
-                    GasPermission {}
-                ),
-                error::permission_denied(PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT)
-            );
             assert!(
                 aptos_account::is_fungible_balance_at_least(gas_payer_address, max_transaction_fee),
                 error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
@@ -839,19 +825,9 @@ module aptos_framework::transaction_validation {
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
                 transaction_fee::burn_fee(gas_payer_address, burn_amount);
-                permissioned_signer::check_permission_consume(
-                    &gas_payer,
-                    (burn_amount as u256),
-                    GasPermission {}
-                );
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
                 transaction_fee::mint_and_refund(gas_payer_address, mint_amount);
-                permissioned_signer::increase_limit(
-                    &gas_payer,
-                    (mint_amount as u256),
-                    GasPermission {}
-                );
             };
         };
 

@@ -1,0 +1,7 @@
+processed 7 tasks
+task 1 lines 7-34:  publish --private-key Alice [module Alice::emit_bypass {]
+task 2 lines 36-36:  run --signers Alice -- Alice::emit_bypass::emit_non_event_rejected
+task 3 lines 38-38:  run --signers Alice -- Alice::emit_bypass::emit_own_event_rejected
+task 4 lines 40-47:  publish --private-key Alice [module Alice::victim {]
+task 5 lines 49-63:  publish --private-key Alice [module Alice::attacker {]
+task 6 lines 65-65:  run --signers Alice -- Alice::attacker::cross_module_emit_rejected

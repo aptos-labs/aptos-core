@@ -125,6 +125,7 @@ impl OnlineExecutor {
                 execution_mode,
                 base_experiments,
                 compared_experiments,
+                false,
             );
             if let Err(err) = res {
                 eprintln!("{} at:{}", err, version);
@@ -192,6 +193,7 @@ impl OnlineExecutor {
                     .lock()
                     .unwrap()
                     .write_err(&format!("{}:{}:{:?}", cur_version, batch, err));
+                module_registry_map.clear();
                 cur_version += batch;
                 continue;
             }

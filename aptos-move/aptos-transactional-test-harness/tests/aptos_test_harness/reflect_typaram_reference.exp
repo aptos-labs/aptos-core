@@ -1,0 +1,5 @@
+processed 4 tasks
+task 1 lines 3-9:  publish --private-key Alice [module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::target]
+task 2 lines 11-41:  publish --private-key Alice [module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::test_module]
+task 3 lines 44-44:  run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::test_module::typaram_binding_to_reference_rejected
+Error: Failed to execute transaction. ExecutionStatus: MoveAbort { location: 0000000000000000000000000000000000000000000000000000000000000001::result, code: 65536, info: Some(AbortInfo { reason_name: "E_UNWRAP_OK", description: "Attempt to unwrap value but found error" }) }

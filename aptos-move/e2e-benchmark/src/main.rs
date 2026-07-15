@@ -237,14 +237,6 @@ fn main() {
         (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::EmitEvents {
             count: 1000,
         }),
-        (
-            LANDBLOCKING_AND_CONTINUOUS,
-            EntryPoints::APTTransferWithPermissionedSigner,
-        ),
-        (
-            LANDBLOCKING_AND_CONTINUOUS,
-            EntryPoints::APTTransferWithMasterSigner,
-        ),
         // long vectors with small elements
         (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorTrimAppend {
             // baseline, only vector creation

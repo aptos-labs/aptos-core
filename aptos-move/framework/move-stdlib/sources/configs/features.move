@@ -671,14 +671,15 @@ module std::features {
         true
     }
 
-    const PERMISSIONED_SIGNER: u64 = 84;
 
+    #[deprecated]
     public fun get_permissioned_signer_feature(): u64 {
-        PERMISSIONED_SIGNER
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[deprecated]
     public fun is_permissioned_signer_enabled(): bool {
-        is_enabled(PERMISSIONED_SIGNER)
+        false
     }
 
     /// Whether the account abstraction is enabled.
@@ -958,6 +959,32 @@ module std::features {
     /// accumulator. Requires `TRANSACTION_INFO_V1`.
     /// Lifetime: permanent
     const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
+
+    /// When enabled, the gas refund in the epilogue mints APT directly as a fungible asset
+    /// via the paired `MintRef` (stored in `transaction_fee::AptosFAMintCapabilities`), instead
+    /// of minting a coin and converting it. This avoids touching the legacy coin supply
+    /// aggregator (v1), reducing Block-STM contention on refund transactions.
+    /// Lifetime: transient
+    const GAS_REFUND_FA_MINT: u64 = 124;
+
+    public fun gas_refund_fa_mint_enabled(): bool {
+        is_enabled(GAS_REFUND_FA_MINT)
+    }
+
+    /// Whether `FunctionInfo`-based dispatch (dispatchable fungible assets and account
+    /// abstraction) runs via function values from `std::reflect` instead of the legacy
+    /// native dispatch machinery. Requires `FUNCTION_REFLECTION`.
+    /// Lifetime: transient
+    const FUNCTION_VALUE_DISPATCH: u64 = 125;
+
+    public fun get_function_value_dispatch_feature(): u64 {
+        FUNCTION_VALUE_DISPATCH
+    }
+
+    /// Requires function reflection, without which function-value dispatch stays disabled.
+    public fun is_function_value_dispatch_enabled(): bool {
+        is_enabled(FUNCTION_VALUE_DISPATCH) && is_enabled(FUNCTION_REFLECTION)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

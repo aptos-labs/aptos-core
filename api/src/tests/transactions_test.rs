@@ -647,6 +647,66 @@ async fn test_post_batch_entry_function_api_validation(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_post_json_batch_transactions_too_many() {
+    // Create a node config with max batch size of 1
+    let mut node_config = NodeConfig::default();
+    node_config.api.max_submit_transaction_batch_size = 1;
+
+    // Create a test context with test transactions
+    let mut context =
+        new_test_context_with_config(current_function_name!(), node_config, false, false);
+    let account_1 = context.gen_account();
+    let account_2 = context.gen_account();
+    let transaction_1 = context.create_user_account(&account_1).await;
+    let transaction_2 = context.create_user_account(&account_2).await;
+
+    // Submit the batch request with 2 transactions and expect a 400 response
+    let transaction_request_1 =
+        serde_json::to_value(build_submit_transaction_request(&context, &transaction_1)).unwrap();
+    let transaction_request_2 =
+        serde_json::to_value(build_submit_transaction_request(&context, &transaction_2)).unwrap();
+    let response = context
+        .expect_status_code(400)
+        .post(
+            "/transactions/batch",
+            json!([transaction_request_1, transaction_request_2]),
+        )
+        .await;
+
+    // Verify the error message
+    let response_message = response["message"].as_str().unwrap();
+    assert!(response_message.contains("Submitted too many transactions: 2, while limit is 1"),);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_post_bcs_batch_transactions_too_many() {
+    // Create a node config with max batch size of 2
+    let mut node_config = NodeConfig::default();
+    node_config.api.max_submit_transaction_batch_size = 2;
+
+    // Create a test context with test transactions
+    let mut context =
+        new_test_context_with_config(current_function_name!(), node_config, false, false);
+    let account_1 = context.gen_account();
+    let account_2 = context.gen_account();
+    let account_3 = context.gen_account();
+    let transaction_1 = context.create_user_account(&account_1).await;
+    let transaction_2 = context.create_user_account(&account_2).await;
+    let transaction_3 = context.create_user_account(&account_3).await;
+
+    // Submit the batch request with 3 transactions and expect a 400 response
+    let body = bcs::to_bytes(&vec![transaction_1, transaction_2, transaction_3]).unwrap();
+    let response = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions/batch", body)
+        .await;
+
+    // Verify the error message
+    let response_message = response["message"].as_str().unwrap();
+    assert!(response_message.contains("Submitted too many transactions: 3, while limit is 2"),);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[rstest(
     use_txn_payload_v2_format,
     use_orderless_transactions,

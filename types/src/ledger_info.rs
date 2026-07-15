@@ -7,6 +7,7 @@ use crate::{
     account_address::AccountAddress,
     block_info::{BlockInfo, Round},
     epoch_state::EpochState,
+    lazy_bls::LazyBlsSignature,
     on_chain_config::ValidatorSet,
     transaction::Version,
     validator_verifier::{ValidatorVerifier, VerifyError},
@@ -14,6 +15,7 @@ use crate::{
 use aptos_crypto::{
     bls12381,
     hash::{CryptoHash, HashValue},
+    CryptoMaterialError,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use derivative::Derivative;
@@ -381,10 +383,22 @@ impl LedgerInfoWithVerifiedSignatures {
     }
 }
 
+/// A BLS signature plus its (locally-tracked, non-serialized) verification
+/// status.
+///
+/// The signature is stored lazily as compressed bytes ([`LazyBlsSignature`]):
+/// its G2 point is only decompressed when actually needed for verification (via
+/// [`SignatureWithStatus::decompressed_signature`]). This lets callers run cheap
+/// structural checks — e.g. the `signed_infos.len() <= max_num_batches` cap in
+/// `SignedBatchInfoMsg::verify_inner`, or the sender/expiration checks in
+/// `SignedBatchInfo::verify` — before paying the per-signature decompression
+/// cost, bounding the CPU work a peer-supplied payload can force on the
+/// receiver. The on-wire encoding is byte-identical to storing a
+/// `bls12381::Signature` directly.
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq)]
 pub struct SignatureWithStatus {
-    signature: bls12381::Signature,
+    signature: LazyBlsSignature,
     #[derivative(PartialEq = "ignore")]
     // false if the signature not verified.
     // true if the signature is verified.
@@ -396,11 +410,30 @@ impl SignatureWithStatus {
         self.verification_status.store(true, Ordering::SeqCst);
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
+    /// The signature in its lazy, still-compressed form. Callers that only need
+    /// the raw bytes can use this without paying for decompression.
+    pub fn lazy_signature(&self) -> &LazyBlsSignature {
         &self.signature
     }
 
+    /// Decompress the signature into a `bls12381::Signature`, performing the
+    /// deferred G2-point decompression. Call this only after cheaper structural
+    /// checks have passed.
+    pub fn decompressed_signature(&self) -> Result<bls12381::Signature, CryptoMaterialError> {
+        self.signature.decompress()
+    }
+
     pub fn from(signature: bls12381::Signature) -> Self {
+        Self {
+            signature: LazyBlsSignature::from_signature(&signature),
+            verification_status: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Build directly from a (possibly invalid) lazy signature. Used by tests to
+    /// inject a signature whose bytes don't decompress to a valid curve point.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test(signature: LazyBlsSignature) -> Self {
         Self {
             signature,
             verification_status: Arc::new(AtomicBool::new(false)),
@@ -426,8 +459,12 @@ impl<'de> Deserialize<'de> for SignatureWithStatus {
     where
         D: serde::Deserializer<'de>,
     {
-        let signature = bls12381::Signature::deserialize(deserializer)?;
-        Ok(SignatureWithStatus::from(signature))
+        // Decodes the compressed bytes WITHOUT decompressing the G2 point.
+        let signature = LazyBlsSignature::deserialize(deserializer)?;
+        Ok(SignatureWithStatus {
+            signature,
+            verification_status: Arc::new(AtomicBool::new(false)),
+        })
     }
 }
 
@@ -500,11 +537,17 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
     ) -> Result<AggregateSignature, VerifyError> {
         self.check_voting_power(verifier, true)?;
 
+        // Decompress each signature now that voting power has been checked.
         let all_signatures = self
             .signatures
             .iter()
-            .map(|(voter, sig)| (voter, sig.signature()));
-        verifier.aggregate_signatures(all_signatures)
+            .map(|(voter, sig)| {
+                sig.decompressed_signature()
+                    .map(|sig| (*voter, sig))
+                    .map_err(|_| VerifyError::FailedToAggregateSignature)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        verifier.aggregate_signatures(all_signatures.iter().map(|(voter, sig)| (voter, sig)))
     }
 
     fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier) {
@@ -518,14 +561,29 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
         &mut self,
         verifier: &ValidatorVerifier,
     ) -> Result<(T, AggregateSignature), VerifyError> {
-        let aggregated_sig = self.try_aggregate(verifier)?;
+        // Bail early — before the expensive per-signature pass — if we don't
+        // yet have quorum voting power; more votes may still arrive.
+        self.check_voting_power(verifier, true)?;
 
-        match verifier.verify_multi_signatures(&self.data, &aggregated_sig) {
-            Ok(_) => {
-                // We are not marking all the signatures as "verified" here, as two malicious
-                // voters can collude and create a valid aggregated signature.
-                Ok((self.data.clone(), aggregated_sig))
-            },
+        // Optimistically aggregate the collected signatures and verify the
+        // result. Two things can go wrong: aggregation itself can fail if a
+        // signature can't be decompressed (a peer may submit an invalid point,
+        // which — now that decompression is deferred past deserialization — is
+        // only detected here), and verification can fail if any signature is
+        // invalid. In either case, fall back to verifying each signature
+        // individually, drop the invalid ones, and re-aggregate the remaining
+        // valid set. This ensures a single bad signature can't poison the
+        // accumulator and permanently block certificate formation for a digest.
+        let aggregated_sig = self.try_aggregate(verifier).and_then(|aggregated_sig| {
+            verifier
+                .verify_multi_signatures(&self.data, &aggregated_sig)
+                .map(|_| aggregated_sig)
+        });
+
+        match aggregated_sig {
+            // We are not marking all the signatures as "verified" here, as two malicious
+            // voters can collude and create a valid aggregated signature.
+            Ok(aggregated_sig) => Ok((self.data.clone(), aggregated_sig)),
             Err(_) => {
                 self.filter_invalid_signatures(verifier);
 
@@ -590,11 +648,11 @@ mod tests {
     fn test_signature_with_status_bcs() {
         let signature = bls12381::Signature::dummy_signature();
         let signature_with_status_1 = SignatureWithStatus {
-            signature: signature.clone(),
+            signature: LazyBlsSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(true)),
         };
         let signature_with_status_2 = SignatureWithStatus {
-            signature: signature.clone(),
+            signature: LazyBlsSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(false)),
         };
         let serialized_signature_with_status_1 =
@@ -606,7 +664,12 @@ mod tests {
         let deserialized_signature_with_status: SignatureWithStatus =
             bcs::from_bytes(&serialized_signature_with_status_1)
                 .expect("Failed to deserialize signature");
-        assert_eq!(*deserialized_signature_with_status.signature(), signature);
+        assert_eq!(
+            deserialized_signature_with_status
+                .decompressed_signature()
+                .unwrap(),
+            signature
+        );
         assert!(!deserialized_signature_with_status.is_verified());
     }
 
@@ -614,11 +677,11 @@ mod tests {
     fn test_signature_with_status_serde() {
         let signature = bls12381::Signature::dummy_signature();
         let signature_with_status_1 = SignatureWithStatus {
-            signature: signature.clone(),
+            signature: LazyBlsSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(true)),
         };
         let signature_with_status_2 = SignatureWithStatus {
-            signature: signature.clone(),
+            signature: LazyBlsSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(false)),
         };
         let serialized_signature_with_status_1 =
@@ -630,8 +693,30 @@ mod tests {
         let deserialized_signature_with_status: SignatureWithStatus =
             serde_json::from_str(&serialized_signature_with_status_1)
                 .expect("Failed to deserialize signature");
-        assert_eq!(*deserialized_signature_with_status.signature(), signature);
+        assert_eq!(
+            deserialized_signature_with_status
+                .decompressed_signature()
+                .unwrap(),
+            signature
+        );
         assert!(!deserialized_signature_with_status.is_verified());
+    }
+
+    /// Deserializing a `SignatureWithStatus` must NOT decompress the G2 point.
+    /// A well-formed-length but invalid signature payload must decode
+    /// successfully (proving decompression is deferred) and only error when
+    /// `decompressed_signature()` is explicitly called. This is the property
+    /// that lets callers reject oversized/malformed messages on cheap
+    /// structural checks before paying per-signature decompression cost.
+    #[test]
+    fn deserialize_defers_decompression() {
+        // 0xff.. is not a valid compressed G2 point (its flag bits are
+        // inconsistent), so decompression must fail — but decoding must not.
+        let garbage = serde_bytes::ByteBuf::from(vec![0xFFu8; bls12381::Signature::LENGTH]);
+        let bytes = bcs::to_bytes(&garbage).unwrap();
+        let sig_with_status: SignatureWithStatus =
+            bcs::from_bytes(&bytes).expect("lazy deserialization must not decompress");
+        assert!(sig_with_status.decompressed_signature().is_err());
     }
 
     #[test]
@@ -843,5 +928,77 @@ mod tests {
         assert_eq!(signature_aggregator.verified_voters().count(), 5);
         assert_eq!(signature_aggregator.all_voters().count(), 5);
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 2);
+    }
+
+    /// A single signature whose bytes don't decompress to a valid curve point
+    /// must not be able to block certificate formation. Since decompression is
+    /// deferred past deserialization, such a signature passes ingress and lands
+    /// in the accumulator; `aggregate_and_verify` must filter it out (like any
+    /// other invalid signature) and still aggregate the remaining valid quorum.
+    #[test]
+    fn undecompressible_signature_does_not_poison_aggregation() {
+        let ledger_info = LedgerInfo::new(BlockInfo::empty(), HashValue::random());
+
+        const NUM_SIGNERS: u8 = 7;
+        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+            .map(|i| ValidatorSigner::random([i; 32]))
+            .collect();
+        let validator_infos = validator_signers
+            .iter()
+            .map(|v| ValidatorConsensusInfo::new(v.author(), v.public_key(), 1))
+            .collect();
+        // Quorum voting power of 5.
+        let validator_verifier =
+            ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
+                .expect("Incorrect quorum size.");
+
+        let mut signature_aggregator = SignatureAggregator::new(ledger_info.clone());
+        let mut partial_sig = PartialSignatures::empty();
+
+        // Five honest signatures — exactly enough for quorum on their own.
+        for signer in validator_signers.iter().take(5) {
+            let signature = signer.sign(&ledger_info).unwrap();
+            signature_aggregator.add_signature(
+                signer.author(),
+                &SignatureWithStatus::from(signature.clone()),
+            );
+            partial_sig.add_signature(signer.author(), signature);
+        }
+
+        // One Byzantine signature whose 96 bytes are not a valid G2 point.
+        let poison = SignatureWithStatus::new_for_test(LazyBlsSignature::from_raw_bytes_for_test(
+            [0xFFu8; bls12381::Signature::LENGTH],
+        ));
+        assert!(poison.decompressed_signature().is_err());
+        signature_aggregator.add_signature(validator_signers[5].author(), &poison);
+
+        // Voting power (6) clears quorum, so aggregation is attempted.
+        assert_eq!(
+            signature_aggregator
+                .check_voting_power(&validator_verifier, true)
+                .unwrap(),
+            6
+        );
+
+        // The certificate must still form over the five valid signatures.
+        let expected_sig = validator_verifier
+            .aggregate_signatures(partial_sig.signatures_iter())
+            .unwrap();
+        assert_eq!(
+            signature_aggregator
+                .aggregate_and_verify(&validator_verifier)
+                .unwrap(),
+            (ledger_info.clone(), expected_sig.clone())
+        );
+        // Result must be a genuinely valid aggregate signature.
+        validator_verifier
+            .verify_multi_signatures(&ledger_info, &expected_sig)
+            .unwrap();
+
+        // The poisoned signer was dropped and flagged for pessimistic verification.
+        assert_eq!(signature_aggregator.all_voters().count(), 5);
+        assert!(validator_verifier
+            .pessimistic_verify_set()
+            .contains(&validator_signers[5].author()));
     }
 }

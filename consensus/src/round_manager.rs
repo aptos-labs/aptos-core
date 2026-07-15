@@ -75,7 +75,7 @@ use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, SinkExt, StreamExt};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
+    collections::BTreeMap, fmt, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -289,6 +289,85 @@ impl UnverifiedEvent {
             UnverifiedEvent::BatchMsgV2(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfoMsgV2(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsgV2(p) => p.epoch(),
+        }
+    }
+}
+
+impl fmt::Display for UnverifiedEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UnverifiedEvent::ProposalMsg(m) => write!(
+                f,
+                "ProposalMsg(epoch={}, round={}, id={}, author={})",
+                m.proposal().epoch(),
+                m.proposal().round(),
+                m.proposal().id(),
+                m.proposal()
+                    .author()
+                    .map_or_else(|| "NIL".to_string(), |a| a.short_str().to_string()),
+            ),
+            UnverifiedEvent::OptProposalMsg(m) => write!(
+                f,
+                "OptProposalMsg(epoch={}, round={}, author={})",
+                m.epoch(),
+                m.round(),
+                m.proposer().short_str(),
+            ),
+            UnverifiedEvent::VoteMsg(m) => write!(
+                f,
+                "VoteMsg(epoch={}, round={}, block_id={}, author={})",
+                m.epoch(),
+                m.vote().vote_data().proposed().round(),
+                m.proposed_block_id(),
+                m.vote().author().short_str(),
+            ),
+            UnverifiedEvent::OrderVoteMsg(m) => write!(
+                f,
+                "OrderVoteMsg(epoch={}, round={}, author={})",
+                m.epoch(),
+                m.order_vote().ledger_info().commit_info().round(),
+                m.order_vote().author().short_str(),
+            ),
+            UnverifiedEvent::SyncInfo(m) => write!(
+                f,
+                "SyncInfo(epoch={}, certified_round={}, ordered_round={}, commit_round={}, timeout_round={})",
+                m.epoch(),
+                m.highest_certified_round(),
+                m.highest_ordered_round(),
+                m.highest_commit_round(),
+                m.highest_timeout_round(),
+            ),
+            UnverifiedEvent::RoundTimeoutMsg(m) => write!(
+                f,
+                "RoundTimeoutMsg(epoch={}, round={}, author={})",
+                m.epoch(),
+                m.round(),
+                m.author().short_str(),
+            ),
+            UnverifiedEvent::BatchMsg(m) => match m.epoch() {
+                Ok(epoch) => write!(f, "BatchMsg(epoch={}, author={:?})", epoch, m.author()),
+                Err(e) => write!(f, "BatchMsg(epoch_error={})", e),
+            },
+            UnverifiedEvent::BatchMsgV2(m) => match m.epoch() {
+                Ok(epoch) => write!(f, "BatchMsgV2(epoch={}, author={:?})", epoch, m.author()),
+                Err(e) => write!(f, "BatchMsgV2(epoch_error={})", e),
+            },
+            UnverifiedEvent::SignedBatchInfo(m) => match m.epoch() {
+                Ok(epoch) => write!(f, "SignedBatchInfo(epoch={})", epoch),
+                Err(e) => write!(f, "SignedBatchInfo(epoch_error={})", e),
+            },
+            UnverifiedEvent::SignedBatchInfoMsgV2(m) => match m.epoch() {
+                Ok(epoch) => write!(f, "SignedBatchInfoMsgV2(epoch={})", epoch),
+                Err(e) => write!(f, "SignedBatchInfoMsgV2(epoch_error={})", e),
+            },
+            UnverifiedEvent::ProofOfStoreMsg(m) => match m.epoch() {
+                Ok(epoch) => write!(f, "ProofOfStoreMsg(epoch={})", epoch),
+                Err(e) => write!(f, "ProofOfStoreMsg(epoch_error={})", e),
+            },
+            UnverifiedEvent::ProofOfStoreMsgV2(m) => match m.epoch() {
+                Ok(epoch) => write!(f, "ProofOfStoreMsgV2(epoch={})", epoch),
+                Err(e) => write!(f, "ProofOfStoreMsgV2(epoch_error={})", e),
+            },
         }
     }
 }
@@ -932,7 +1011,7 @@ impl RoundManager {
             sync_info.verify(&self.epoch_state.verifier).map_err(|e| {
                 error!(
                     SecurityEvent::InvalidSyncInfoMsg,
-                    sync_info = sync_info,
+                    sync_info = %sync_info,
                     remote_peer = author,
                     error = ?e,
                 );

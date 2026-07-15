@@ -6,7 +6,7 @@
 pub mod module_provider;
 pub mod resource_provider;
 
-pub use module_provider::ModuleProvider;
+pub use module_provider::{ModuleProvider, NoModuleProvider};
 pub use resource_provider::{
-    NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead, NO_RESOURCE_PROVIDER,
+    NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
 };

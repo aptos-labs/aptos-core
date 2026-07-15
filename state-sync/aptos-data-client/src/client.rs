@@ -290,22 +290,25 @@ impl AptosDataClient {
         let multi_fetch_config = self.data_client_config.data_multi_fetch_config;
         let num_peers_for_request = if multi_fetch_config.enable_multi_fetch {
             // Calculate the total number of priority serviceable peers
-            let mut num_serviceable_peers = 0;
+            let mut num_serviceable_peers: usize = 0;
             for (index, peers) in serviceable_peers_by_priorities.iter().enumerate() {
                 // Only include the lowest priority peers if no other peers are
                 // available (the lowest priority peers are generally unreliable).
                 if (num_serviceable_peers == 0)
                     || (index < serviceable_peers_by_priorities.len() - 1)
                 {
-                    num_serviceable_peers += peers.len();
+                    num_serviceable_peers = num_serviceable_peers.saturating_add(peers.len());
                 }
             }
 
             // Calculate the number of peers to select for the request
             let peer_ratio_for_request =
                 num_serviceable_peers / multi_fetch_config.multi_fetch_peer_bucket_size;
-            let mut num_peers_for_request = multi_fetch_config.min_peers_for_multi_fetch
-                + (peer_ratio_for_request * multi_fetch_config.additional_requests_per_peer_bucket);
+            let additional_peers_for_request = peer_ratio_for_request
+                .saturating_mul(multi_fetch_config.additional_requests_per_peer_bucket);
+            let mut num_peers_for_request = multi_fetch_config
+                .min_peers_for_multi_fetch
+                .saturating_add(additional_peers_for_request);
 
             // Bound the number of peers by the number of serviceable peers
             num_peers_for_request = min(num_peers_for_request, num_serviceable_peers);

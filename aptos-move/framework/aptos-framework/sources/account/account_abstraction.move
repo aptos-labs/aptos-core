@@ -16,7 +16,6 @@ module aptos_framework::account_abstraction {
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::system_addresses;
-    use aptos_framework::permissioned_signer::is_permissioned_signer;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     #[test_only]
@@ -29,7 +28,6 @@ module aptos_framework::account_abstraction {
     const EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED: u64 = 1;
     const EFUNCTION_INFO_EXISTENCE: u64 = 2;
     const EAUTH_FUNCTION_SIGNATURE_MISMATCH: u64 = 3;
-    const ENOT_MASTER_SIGNER: u64 = 4;
     const EINCONSISTENT_SIGNER_ADDRESS: u64 = 5;
     const EDEPRECATED_FUNCTION: u64 = 6;
     const EDERIVABLE_AA_NOT_INITIALIZED: u64 = 7;
@@ -126,7 +124,6 @@ module aptos_framework::account_abstraction {
         function_name: String,
     ) acquires DispatchableAuthenticator {
         assert!(features::is_account_abstraction_enabled(), error::invalid_state(EACCOUNT_ABSTRACTION_NOT_ENABLED));
-        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -143,7 +140,6 @@ module aptos_framework::account_abstraction {
         module_name: String,
         function_name: String,
     ) acquires DispatchableAuthenticator {
-        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -157,7 +153,6 @@ module aptos_framework::account_abstraction {
     entry fun remove_authenticator(
         account: &signer,
     ) acquires DispatchableAuthenticator {
-        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(account);
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
@@ -291,14 +286,31 @@ module aptos_framework::account_abstraction {
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };
 
-        function_info::load_module_from_function(&func_info);
-        let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
+        let returned_signer = if (features::is_function_value_dispatch_enabled()) {
+            dispatch_authenticate_hook(account, signing_data, &func_info)
+        } else {
+            function_info::load_module_from_function(&func_info);
+            dispatchable_authenticate(account, signing_data, &func_info)
+        };
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!
         assert!(
             master_signer_addr == signer::address_of(&returned_signer),
             error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS)
         );
         returned_signer
+    }
+
+    #[module_lock]
+    /// Runs an authentication hook as a function value, replacing the legacy native
+    /// dispatch below; `#[module_lock]` preserves its reentrancy semantics.
+    fun dispatch_authenticate_hook(
+        account: signer,
+        signing_data: AbstractionAuthData,
+        function: &FunctionInfo,
+    ): signer {
+        let f = function.load_function_value<
+            |signer, AbstractionAuthData|signer has copy + drop>();
+        f(account, signing_data)
     }
 
     /// The native function to dispatch customized move authentication function.
@@ -344,6 +356,73 @@ module aptos_framework::account_abstraction {
             @aptos_framework,
             string::utf8(b"account_abstraction_tests"),
             string::utf8(b"invalid_authenticate")
+        );
+        authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
+    }
+
+    #[test(fx = @aptos_framework, bob = @0xb0b)]
+    fun test_authenticate_returns_original_signer(fx: &signer, bob: signer) {
+        features::change_feature_flags_for_testing(fx, vector[features::get_function_value_dispatch_feature()], vector[]);
+        let bob_addr = signer::address_of(&bob);
+        create_account_for_test(bob_addr);
+        add_authentication_function(
+            &bob,
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"test_auth")
+        );
+        let function_info = function_info::new_function_info_from_address(
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"test_auth")
+        );
+        // `authenticate` itself asserts that the returned signer represents the account.
+        authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
+    }
+
+    #[test(fx = @aptos_framework, bob = @0xb0b)]
+    fun test_authenticate_legacy_native_dispatch(fx: &signer, bob: signer) {
+        // Exercise the legacy native dispatch path, which networks keep executing until
+        // FUNCTION_VALUE_DISPATCH is enabled by governance.
+        features::change_feature_flags_for_testing(
+            fx,
+            vector[],
+            vector[features::get_function_value_dispatch_feature()],
+        );
+        let bob_addr = signer::address_of(&bob);
+        create_account_for_test(bob_addr);
+        add_authentication_function(
+            &bob,
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"test_auth")
+        );
+        let function_info = function_info::new_function_info_from_address(
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"test_auth")
+        );
+        authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
+    }
+
+    #[test(fx = @aptos_framework, bob = @0xb0b)]
+    #[expected_failure(major_status = 4037, location = aptos_framework::account_abstraction)]
+    fun test_authenticate_reentrancy_blocked(fx: &signer, bob: signer) {
+        // An authentication hook that calls back into this module must hit the module
+        // lock, matching the reentrancy semantics of the legacy native dispatch.
+        features::change_feature_flags_for_testing(fx, vector[features::get_function_value_dispatch_feature()], vector[]);
+        let bob_addr = signer::address_of(&bob);
+        create_account_for_test(bob_addr);
+        add_authentication_function(
+            &bob,
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"reentrant_auth")
+        );
+        let function_info = function_info::new_function_info_from_address(
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"reentrant_auth")
         );
         authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
     }

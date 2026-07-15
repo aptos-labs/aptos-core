@@ -3206,12 +3206,7 @@ impl GlobalEnv {
             emitln!(writer);
             writer.indent();
             for spec in specs {
-                if spec.negated {
-                    emit!(writer, "!")
-                }
                 match &spec.kind {
-                    AccessSpecifierKind::Reads => emit!(writer, "reads "),
-                    AccessSpecifierKind::Writes => emit!(writer, "writes "),
                     AccessSpecifierKind::LegacyAcquires => emit!(writer, "acquires "),
                 }
                 match &spec.resource.1 {
@@ -5737,12 +5732,8 @@ impl<'env> FunctionEnv<'env> {
         }
     }
 
-    /// Returns the access specifiers of this function.
-    /// If this is `None`, all accesses are allowed. If the list is empty,
-    /// no accesses are allowed. Otherwise the list is divided into _inclusions_ and _exclusions_,
-    /// the later being negated specifiers. Access is allowed if (a) any of the inclusion
-    /// specifiers allows it (union of inclusion specifiers) (b) none of the exclusions
-    /// specifiers disallows it (intersection of exclusion specifiers).
+    /// Returns the access specifiers of this function. If this is `None`, the function
+    /// has no `acquires` annotations. Otherwise the list holds the acquired resources.
     pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
         self.data.access_specifiers.as_deref()
     }

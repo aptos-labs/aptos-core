@@ -30,6 +30,61 @@ impl RestDebuggerInterface {
     pub fn new(client: Client) -> Self {
         Self(client)
     }
+
+    /// The txn-fetching part of [`AptosValidatorInterface::get_committed_transactions`],
+    /// without the persisted auxiliary infos.
+    async fn get_committed_transactions_no_aux(
+        &self,
+        start: Version,
+        limit: u64,
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+        let mut txns = Vec::with_capacity(limit as usize);
+        let mut txn_infos = Vec::with_capacity(limit as usize);
+
+        while txns.len() < limit as usize {
+            self.0
+                .get_transactions_bcs(
+                    Some(start + txns.len() as u64),
+                    Some(limit as u16 - txns.len() as u16),
+                )
+                .await?
+                .into_inner()
+                .into_iter()
+                .for_each(|txn| {
+                    txns.push(txn.transaction);
+                    txn_infos.push(txn.info);
+                });
+            println!("Got {}/{} txns from RestApi.", txns.len(), limit);
+        }
+
+        Ok((txns, txn_infos))
+    }
+
+    /// Same as [`Self::get_committed_transactions_no_aux`], but fetches the
+    /// API-page-sized chunks concurrently.
+    async fn get_committed_transactions_no_aux_concurrent(
+        &self,
+        start: Version,
+        limit: u64,
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+        // the API's default max page size (DEFAULT_MAX_PAGE_SIZE)
+        const PAGE_SIZE: u64 = 100;
+        let mut chunk_futures = vec![];
+        let mut cursor = start;
+        while cursor < start + limit {
+            let count = PAGE_SIZE.min(start + limit - cursor);
+            chunk_futures.push(self.get_committed_transactions_no_aux(cursor, count));
+            cursor += count;
+        }
+        let mut txns = Vec::with_capacity(limit as usize);
+        let mut txn_infos = Vec::with_capacity(limit as usize);
+        for chunk in futures::future::join_all(chunk_futures).await {
+            let (t, i) = chunk?;
+            txns.extend(t);
+            txn_infos.extend(i);
+        }
+        Ok((txns, txn_infos))
+    }
 }
 
 #[async_recursion]
@@ -227,27 +282,8 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         Vec<TransactionInfo>,
         Vec<PersistedAuxiliaryInfo>,
     )> {
-        let mut txns = Vec::with_capacity(limit as usize);
-        let mut txn_infos = Vec::with_capacity(limit as usize);
-
-        while txns.len() < limit as usize {
-            self.0
-                .get_transactions_bcs(
-                    Some(start + txns.len() as u64),
-                    Some(limit as u16 - txns.len() as u16),
-                )
-                .await?
-                .into_inner()
-                .into_iter()
-                .for_each(|txn| {
-                    txns.push(txn.transaction);
-                    txn_infos.push(txn.info);
-                });
-            println!("Got {}/{} txns from RestApi.", txns.len(), limit);
-        }
-
+        let (txns, txn_infos) = self.get_committed_transactions_no_aux(start, limit).await?;
         let auxiliary_infos = self.get_persisted_auxiliary_infos(start, limit).await?;
-
         Ok((txns, txn_infos, auxiliary_infos))
     }
 
@@ -276,7 +312,9 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         )>,
     > {
         let mut txns = Vec::with_capacity(limit as usize);
-        let (tns, infos, _auxiliary_infos) = self.get_committed_transactions(start, limit).await?;
+        let (tns, infos) = self
+            .get_committed_transactions_no_aux_concurrent(start, limit)
+            .await?;
         let temp_txns = tns
             .iter()
             .zip(infos)

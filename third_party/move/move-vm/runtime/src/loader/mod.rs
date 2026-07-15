@@ -3,8 +3,6 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-mod access_specifier_loader;
-
 mod function;
 pub use function::{Function, LoadedFunction, LoadedFunctionOwner};
 pub(crate) use function::{

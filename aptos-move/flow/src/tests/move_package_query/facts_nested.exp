@@ -1,0 +1,153 @@
+{
+  "0xcafe::nested": {
+    "file": "<TEMPDIR>/nested.move",
+    "span": [
+      1,
+      7
+    ],
+    "friends": [],
+    "attributes": [],
+    "functions": [
+      {
+        "name": "apply",
+        "file": "<TEMPDIR>/nested.move",
+        "span": [
+          2,
+          2
+        ],
+        "visibility": "internal",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [],
+        "params": [
+          {
+            "name": "f",
+            "type": "|u64|u64"
+          },
+          {
+            "name": "x",
+            "type": "u64"
+          }
+        ],
+        "returnTypes": [
+          "u64"
+        ],
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [],
+          "writes": []
+        },
+        "isLambdaLifted": false
+      },
+      {
+        "name": "outer",
+        "file": "<TEMPDIR>/nested.move",
+        "span": [
+          4,
+          6
+        ],
+        "visibility": "public",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [],
+        "params": [
+          {
+            "name": "c",
+            "type": "u64"
+          }
+        ],
+        "returnTypes": [
+          "u64"
+        ],
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [],
+          "writes": []
+        },
+        "isLambdaLifted": false
+      },
+      {
+        "name": "__lambda__1__outer",
+        "file": "<TEMPDIR>/nested.move",
+        "span": [
+          5,
+          5
+        ],
+        "visibility": "internal",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [],
+        "params": [
+          {
+            "name": "c",
+            "type": "u64"
+          },
+          {
+            "name": "x",
+            "type": "u64"
+          },
+          {
+            "name": "y",
+            "type": "u64"
+          }
+        ],
+        "returnTypes": [
+          "u64"
+        ],
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [],
+          "writes": []
+        },
+        "isLambdaLifted": true,
+        "definedIn": "outer"
+      },
+      {
+        "name": "__lambda__2__outer",
+        "file": "<TEMPDIR>/nested.move",
+        "span": [
+          5,
+          5
+        ],
+        "visibility": "internal",
+        "isEntry": false,
+        "isInline": false,
+        "isNative": false,
+        "isView": false,
+        "attributes": [],
+        "typeParams": [],
+        "params": [
+          {
+            "name": "c",
+            "type": "u64"
+          },
+          {
+            "name": "x",
+            "type": "u64"
+          }
+        ],
+        "returnTypes": [
+          "u64"
+        ],
+        "acquiresInferred": [],
+        "resourceAccess": {
+          "reads": [],
+          "writes": []
+        },
+        "isLambdaLifted": true,
+        "definedIn": "outer"
+      }
+    ],
+    "structs": [],
+    "constants": []
+  }
+}

@@ -1141,6 +1141,10 @@ module aptos_framework::multisig_account {
 
             metadata.add(key, value);
             i += 1;
+        }  spec {
+            invariant i <= num_attributes;
+            invariant forall k in 0..i: simple_map::spec_contains_key(metadata, keys[k]);
+            invariant forall m in 0..i, n in 0..i: m != n ==> keys[m] != keys[n];
         };
 
         if (emit_event) {

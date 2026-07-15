@@ -98,7 +98,7 @@ impl PeerState {
     fn increment_received_response_counter(&mut self, response_label: String) {
         self.received_responses_by_type
             .entry(response_label)
-            .and_modify(|counter| *counter += 1)
+            .and_modify(|counter| *counter = counter.saturating_add(1))
             .or_insert(1);
     }
 
@@ -106,7 +106,7 @@ impl PeerState {
     fn increment_sent_request_counter(&mut self, request_label: String) {
         self.sent_requests_by_type
             .entry(request_label)
-            .and_modify(|counter| *counter += 1)
+            .and_modify(|counter| *counter = counter.saturating_add(1))
             .or_insert(1);
     }
 
@@ -479,7 +479,7 @@ fn update_peer_ignored_metrics(peer_to_state: Arc<DashMap<PeerNetworkId, PeerSta
 
         // If the peer is ignored, increment the count
         if peer_state.is_ignored() {
-            *network_count_entry += 1;
+            *network_count_entry = network_count_entry.saturating_add(1);
         }
     }
 
@@ -539,9 +539,10 @@ fn update_peer_request_metrics(peer_to_state: Arc<DashMap<PeerNetworkId, PeerSta
             .entry(peer_bucket_id)
             .or_default();
         for (request_label, count) in sent_requests_by_type.iter() {
-            *sent_requests_by_bucket
+            let entry = sent_requests_by_bucket
                 .entry(request_label.clone())
-                .or_default() += count;
+                .or_default();
+            *entry = entry.saturating_add(*count);
         }
 
         // Aggregate the received response counts by peer bucket
@@ -549,9 +550,10 @@ fn update_peer_request_metrics(peer_to_state: Arc<DashMap<PeerNetworkId, PeerSta
             .entry(peer_bucket_id)
             .or_default();
         for (response_label, count) in received_responses_by_type.iter() {
-            *received_responses_by_bucket
+            let entry = received_responses_by_bucket
                 .entry(response_label.clone())
-                .or_default() += count;
+                .or_default();
+            *entry = entry.saturating_add(*count);
         }
     }
 

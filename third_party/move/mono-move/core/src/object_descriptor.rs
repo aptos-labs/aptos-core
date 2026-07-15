@@ -225,19 +225,6 @@ pub trait DescriptorProvider {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor>;
 }
 
-/// A [`DescriptorProvider`] with no descriptors; every lookup returns `None`.
-/// For execution contexts that never allocate heap objects.
-pub struct NoDescriptorProvider;
-
-impl DescriptorProvider for NoDescriptorProvider {
-    fn descriptor(&self, _id: DescriptorId) -> Option<&ObjectDescriptor> {
-        None
-    }
-}
-
-/// Shared [`NoDescriptorProvider`] instance.
-pub static NO_DESCRIPTOR_PROVIDER: NoDescriptorProvider = NoDescriptorProvider;
-
 // ---------------------------------------------------------------------------
 // ObjectDescriptorTable — a simple in-memory provider for tests/benches
 // ---------------------------------------------------------------------------

@@ -131,6 +131,16 @@ impl Execution {
         if !check_aptos_packages_availability(aptos_commons_path.clone()) {
             return Err(anyhow::Error::msg("aptos packages are missing"));
         }
+
+        // prepare data; checked before the slow framework compilation to fail fast
+        let data_manager = DataManager::new(&self.input_path);
+        if !data_manager.check_dir_availability() {
+            return Err(anyhow::Error::msg("data is missing"));
+        }
+        if !IndexReader::check_availability(&self.input_path) {
+            return Err(anyhow::Error::msg("index file is missing"));
+        }
+
         let mut compiled_cache = CompilationCache::default();
         if self.execution_mode.is_v1_or_compare() {
             compile_aptos_packages(
@@ -147,15 +157,6 @@ impl Execution {
                 &compared_experiments,
                 "compared",
             )?;
-        }
-
-        // prepare data
-        let data_manager = DataManager::new(&self.input_path);
-        if !data_manager.check_dir_availability() {
-            return Err(anyhow::Error::msg("data is missing"));
-        }
-        if !IndexReader::check_availability(&self.input_path) {
-            return Err(anyhow::Error::msg("index file is missing"));
         }
         let mut index_reader = IndexReader::new(&self.input_path);
 
@@ -290,33 +291,41 @@ impl Execution {
         base_experiments: &[String],
         compared_experiments: &[String],
     ) -> Result<()> {
-        if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
-            // compile the code if the source code is available
-            if txn_idx.package_info.is_compilable()
-                && !is_aptos_package(&txn_idx.package_info.package_name)
-            {
-                let compiled_result = self.compile_code(
-                    &txn_idx,
-                    compiled_cache,
-                    base_experiments,
-                    compared_experiments,
-                );
-                if let Err(err) = compiled_result {
-                    self.output_result_str(format!("{} at version:{}", err, cur_version));
-                    return Err(err);
-                }
-            }
-            // read the state data
-            let state = data_manager.get_state(cur_version);
-            self.execute_and_compare(
-                cur_version,
-                state,
-                &txn_idx,
-                &compiled_cache.base_compiled_package_cache,
-                &compiled_cache.compared_compiled_package_cache,
-                None,
+        let Some(txn_idx) = data_manager.get_txn_index(cur_version) else {
+            // skipping silently would make an incomplete or mixed dump look clean
+            let msg = format!(
+                "version {} is in the version index but has no txn index entry; the dump \
+                 directory is incomplete or mixes source-only and replayable artifacts",
+                cur_version
             );
+            self.output_result_str(msg.clone());
+            return Err(anyhow::Error::msg(msg));
+        };
+        // compile the code if the source code is available
+        if txn_idx.package_info.is_compilable()
+            && !is_aptos_package(&txn_idx.package_info.package_name)
+        {
+            let compiled_result = self.compile_code(
+                &txn_idx,
+                compiled_cache,
+                base_experiments,
+                compared_experiments,
+            );
+            if let Err(err) = compiled_result {
+                self.output_result_str(format!("{} at version:{}", err, cur_version));
+                return Err(err);
+            }
         }
+        // read the state data
+        let state = data_manager.get_state(cur_version);
+        self.execute_and_compare(
+            cur_version,
+            state,
+            &txn_idx,
+            &compiled_cache.base_compiled_package_cache,
+            &compiled_cache.compared_compiled_package_cache,
+            None,
+        );
         Ok(())
     }
 

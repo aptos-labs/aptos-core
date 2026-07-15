@@ -11,7 +11,6 @@ use mono_move_core::{
     native::{NativeExtension, NativeExtensions, VMInternalError},
     Code, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries,
 };
-use mono_move_runtime::{InterpreterContext, LocalRuntimeContext, ObjectDescriptorTable};
 
 /// Test extension that records the checkpoint hooks the interpreter fires, so
 /// the test can confirm extensions move in lockstep with the read-write set.
@@ -55,35 +54,32 @@ fn trivial_program() -> Function {
 
 #[test]
 fn checkpoint_rollback_drives_extensions_in_lockstep() {
-    let descriptors = ObjectDescriptorTable::new();
     let func = trivial_program();
     let mut extensions = NativeExtensions::new();
     extensions.add(CheckpointProbe::default());
-    let mut exec_ctx =
-        LocalRuntimeContext::with_max_budget(descriptors).with_extensions(extensions);
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
+    common::with_test_interpreter(&func, u64::MAX, extensions, |ctx| {
+        ctx.checkpoint().unwrap();
+        ctx.checkpoint().unwrap();
+        assert_eq!(ctx.checkpoint_depth(), 2);
+        {
+            let probe = ctx.extensions().get_mut::<CheckpointProbe>().unwrap();
+            assert_eq!(probe.depth, 2, "extension advanced with the read-write set");
+            assert_eq!(probe.checkpoints, 2);
+        }
 
-    ctx.checkpoint().unwrap();
-    ctx.checkpoint().unwrap();
-    assert_eq!(ctx.checkpoint_depth(), 2);
-    {
-        let probe = ctx.extensions().get_mut::<CheckpointProbe>().unwrap();
-        assert_eq!(probe.depth, 2, "extension advanced with the read-write set");
-        assert_eq!(probe.checkpoints, 2);
-    }
+        // A partial rollback undoes the extension's checkpoints too.
+        ctx.rollback(1).unwrap();
+        assert_eq!(ctx.checkpoint_depth(), 1);
+        {
+            let probe = ctx.extensions().get_mut::<CheckpointProbe>().unwrap();
+            assert_eq!(probe.depth, 1);
+            assert_eq!(probe.rolled_back, 1);
+        }
 
-    // A partial rollback undoes the extension's checkpoints too.
-    ctx.rollback(1).unwrap();
-    assert_eq!(ctx.checkpoint_depth(), 1);
-    {
+        // n == 0 leaves the extensions untouched.
+        ctx.rollback(0).unwrap();
         let probe = ctx.extensions().get_mut::<CheckpointProbe>().unwrap();
         assert_eq!(probe.depth, 1);
         assert_eq!(probe.rolled_back, 1);
-    }
-
-    // n == 0 leaves the extensions untouched.
-    ctx.rollback(0).unwrap();
-    let probe = ctx.extensions().get_mut::<CheckpointProbe>().unwrap();
-    assert_eq!(probe.depth, 1);
-    assert_eq!(probe.rolled_back, 1);
+    });
 }

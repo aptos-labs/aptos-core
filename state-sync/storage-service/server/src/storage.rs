@@ -432,9 +432,9 @@ impl StorageReader {
 
                     // Add the data items to the lists
                     let total_serialized_bytes = num_transaction_bytes
-                        + num_info_bytes
-                        + num_events_bytes
-                        + num_auxiliary_info_bytes;
+                        .saturating_add(num_info_bytes)
+                        .saturating_add(num_events_bytes)
+                        .saturating_add(num_auxiliary_info_bytes);
                     if response_progress_tracker
                         .data_items_fits_in_response(true, total_serialized_bytes)
                     {
@@ -659,9 +659,9 @@ impl StorageReader {
 
                     // Add the data items to the lists
                     let total_serialized_bytes = num_transaction_bytes
-                        + num_info_bytes
-                        + num_output_bytes
-                        + num_auxiliary_info_bytes;
+                        .saturating_add(num_info_bytes)
+                        .saturating_add(num_output_bytes)
+                        .saturating_add(num_auxiliary_info_bytes);
                     if response_progress_tracker.data_items_fits_in_response(
                         !is_transaction_or_output_request,
                         total_serialized_bytes,
@@ -881,7 +881,7 @@ impl StorageReader {
                 debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Current number of data reductions: {:?}",
                     num_outputs_to_fetch, num_bytes, max_response_size, num_output_reductions);
                 num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
-                num_output_reductions += 1;
+                num_output_reductions = num_output_reductions.saturating_add(1);
             }
         }
 
@@ -1387,8 +1387,10 @@ impl ResponseDataProgressTracker {
     /// Adds a data item to the response, updating the number of items
     /// fetched and the cumulative serialized data size.
     pub fn add_data_item(&mut self, serialized_data_size: u64) {
-        self.num_items_fetched += 1;
-        self.serialized_data_size += serialized_data_size;
+        self.num_items_fetched = self.num_items_fetched.saturating_add(1);
+        self.serialized_data_size = self
+            .serialized_data_size
+            .saturating_add(serialized_data_size);
     }
 
     /// Returns true iff the given data item fits in the response

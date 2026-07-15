@@ -31,7 +31,6 @@ module aptos_framework::aptos_governance {
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::chunky_dkg_config;
     use aptos_framework::consensus_config;
-    use aptos_framework::permissioned_signer;
     use aptos_framework::randomness_config;
     use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::timestamp;
@@ -68,8 +67,8 @@ module aptos_framework::aptos_governance {
     const ENOT_PARTIAL_VOTING_PROPOSAL: u64 = 14;
     /// The proposal has expired.
     const EPROPOSAL_EXPIRED: u64 = 15;
-    /// Current permissioned signer cannot perform governance operations.
-    const ENO_GOVERNANCE_PERMISSION: u64 = 16;
+    /// The permissioned signer feature has been removed.
+    const EPERMISSIONED_SIGNER_REMOVED: u64 = 17;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
@@ -174,19 +173,12 @@ module aptos_framework::aptos_governance {
         voting_duration_secs: u64,
     }
 
+    #[deprecated]
     struct GovernancePermission has copy, drop, store {}
 
-    /// Permissions
-    inline fun check_governance_permission(s: &signer) {
-        assert!(
-            permissioned_signer::check_permission_exists(s, GovernancePermission {}),
-            error::permission_denied(ENO_GOVERNANCE_PERMISSION),
-        );
-    }
-
-    /// Grant permission to perform governance operations on behalf of the master signer.
-    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize_unlimited(master, permissioned_signer, GovernancePermission {})
+    #[deprecated]
+    public fun grant_permission(_master: &signer, _permissioned_signer: &signer) {
+        abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
     }
 
     /// Can be called during genesis or by the governance itself.
@@ -416,7 +408,6 @@ module aptos_framework::aptos_governance {
         metadata_hash: vector<u8>,
         is_multi_step_proposal: bool,
     ): u64 acquires GovernanceConfig {
-        check_governance_permission(proposer);
         let proposer_address = signer::address_of(proposer);
         assert!(
             stake::get_delegated_voter(stake_pool) == proposer_address,
@@ -535,7 +526,6 @@ module aptos_framework::aptos_governance {
         voting_power: u64,
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2 {
-        permissioned_signer::assert_master_signer(voter);
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 

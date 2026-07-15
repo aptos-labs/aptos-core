@@ -11,7 +11,7 @@ mod ssa_function;
 mod test_utils;
 mod translate;
 
-use crate::stackless_exec_ir::ModuleIR;
+use crate::{gas, stackless_exec_ir::ModuleIR};
 use anyhow::{bail, Result};
 use mono_move_core::{Interner, PreparedModule};
 use move_binary_format::CompiledModule;
@@ -25,6 +25,12 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> Result<Modul
     let module = PreparedModule::build(module, interner)?;
     let mut module_ir = translate::translate_module(module, interner)?;
     optimize::optimize_module(&mut module_ir);
+
+    // Gas instrumentation: emit a per-block cost formula for each function.
+    // TODO(metering): could be hoisted before optimization, at the cost of
+    // over-approximating (charging for instructions that optimization removes).
+    gas::instrument(&mut module_ir, interner)?;
+
     // Debug-mode failsafe: verify xfer invariants hold after optimization.
     #[cfg(debug_assertions)]
     for func in module_ir.functions.iter().flatten() {

@@ -18,10 +18,7 @@ use crate::{
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
     exp_rewriter::ExpRewriterFunctions,
-    metadata::{
-        lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, LANGUAGE_VERSION_FOR_SINT},
-        LanguageVersion,
-    },
+    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_SINT, LanguageVersion},
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter,
         QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
@@ -1250,7 +1247,6 @@ impl ExpTranslator<'_, '_, '_> {
         let loc = self.to_loc(&specifier.loc);
         let EA::AccessSpecifier_ {
             kind,
-            negated,
             module_address,
             module_name,
             resource_name,
@@ -1259,24 +1255,11 @@ impl ExpTranslator<'_, '_, '_> {
         } = &specifier.value;
         match kind {
             EA::AccessSpecifierKind::LegacyAcquires => {
-                if *negated || type_args.is_some() || address.value != EA::AddressSpecifier_::Empty
-                {
+                if type_args.is_some() || address.value != EA::AddressSpecifier_::Empty {
                     self.error(
                         &loc,
                         "only simple resource names can be used with `acquires`",
                     )
-                }
-            },
-            EA::AccessSpecifierKind::Reads | EA::AccessSpecifierKind::Writes => {
-                // Only gate on language version for function-level access specifiers
-                // (Impl mode). In spec blocks (Spec mode), reads/writes are allowed
-                // at language version 2.4 for access_of and spec function declarations.
-                if self.mode == ExpTranslationMode::Impl {
-                    self.check_language_version(
-                        &loc,
-                        "read/write access specifiers.",
-                        LANGUAGE_VERSION_FOR_RAC,
-                    )?;
                 }
             },
         }
@@ -1375,14 +1358,11 @@ impl ExpTranslator<'_, '_, '_> {
         };
         let address = self.translate_address_specifier(address)?;
         let kind = match kind {
-            EA::AccessSpecifierKind::Reads => AccessSpecifierKind::Reads,
-            EA::AccessSpecifierKind::Writes => AccessSpecifierKind::Writes,
             EA::AccessSpecifierKind::LegacyAcquires => AccessSpecifierKind::LegacyAcquires,
         };
         Some(AccessSpecifier {
             loc: loc.clone(),
             kind,
-            negated: *negated,
             resource: (loc, resource),
             address,
         })

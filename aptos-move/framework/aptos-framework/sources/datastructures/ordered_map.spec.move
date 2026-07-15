@@ -1,5 +1,9 @@
 spec aptos_framework::ordered_map {
 
+    // The ordering bindings below (`map_borrow_front`/`back`, `map_pop_front`/`back`,
+    // `map_prev_key`/`next_key`) presume `cmp::compare<K>` is a strict total order on K.
+    // Built-in K types satisfy this; user-defined K types must too for this spec block
+    // to be sound.
     spec OrderedMap {
         pragma intrinsic = map,
             map_new = new,
@@ -7,6 +11,26 @@ spec aptos_framework::ordered_map {
             map_destroy_empty = destroy_empty,
             map_has_key = contains,
             map_add_no_override = add,
+            map_upsert = upsert,
+            map_del_must_exist = remove,
+            map_remove_or_none = remove_or_none,
+            map_get = get,
+            map_borrow_front = borrow_front,
+            map_borrow_back = borrow_back,
+            map_pop_front = pop_front,
+            map_pop_back = pop_back,
+            map_prev_key = prev_key,
+            map_next_key = next_key,
+            map_keys = keys,
+            map_values = values,
+            map_to_vec_pair = to_vec_pair,
+            map_new_from = new_from,
+            map_add_all = add_all,
+            map_upsert_all = upsert_all,
+            map_append = append,
+            map_append_disjoint = append_disjoint,
+            map_trim = trim,
+            map_replace_key_inplace = replace_key_inplace,
             map_borrow = borrow,
             map_borrow_mut = borrow_mut,
             map_spec_get = spec_get,
@@ -14,6 +38,13 @@ spec aptos_framework::ordered_map {
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
             map_spec_has_key = spec_contains_key,
+            map_spec_aborts_empty = spec_aborts_empty,
+            map_spec_aborts_add_all = spec_aborts_add_all,
+            map_spec_aborts_new_from = spec_aborts_new_from,
+            map_spec_aborts_append_disjoint = spec_aborts_append_disjoint,
+            map_spec_aborts_trim = spec_aborts_trim,
+            map_spec_aborts_upsert_all = spec_aborts_upsert_all,
+            map_spec_aborts_replace_key_inplace = spec_aborts_replace_key_inplace,
             map_is_empty = is_empty;
     }
 
@@ -22,6 +53,40 @@ spec aptos_framework::ordered_map {
     spec native fun spec_set<K, V>(t: OrderedMap<K, V>, k: K, v: V): OrderedMap<K, V>;
     spec native fun spec_remove<K, V>(t: OrderedMap<K, V>, k: K): OrderedMap<K, V>;
     spec native fun spec_get<K, V>(t: OrderedMap<K, V>, k: K): V;
+
+    spec fun spec_aborts_empty<K, V>(t: OrderedMap<K, V>): bool {
+        spec_len(t) == 0
+    }
+
+    spec fun spec_aborts_add_all<K, V>(m: OrderedMap<K, V>, keys: vector<K>, values: vector<V>): bool {
+        len(keys) != len(values)
+            || (exists i in 0..len(keys): spec_contains_key(m, keys[i]))
+            || (exists i in 0..len(keys), j in 0..len(keys) where i != j: keys[i] == keys[j])
+    }
+
+    spec fun spec_aborts_new_from<K, V>(keys: vector<K>, values: vector<V>): bool {
+        len(keys) != len(values)
+            || (exists i in 0..len(keys), j in 0..len(keys) where i != j: keys[i] == keys[j])
+    }
+
+    spec fun spec_aborts_append_disjoint<K, V>(m: OrderedMap<K, V>, other: OrderedMap<K, V>): bool {
+        exists k: K: spec_contains_key(m, k) && spec_contains_key(other, k)
+    }
+
+    spec fun spec_aborts_trim<K, V>(m: OrderedMap<K, V>, at: u64): bool {
+        at > spec_len(m)
+    }
+
+    spec fun spec_aborts_upsert_all<K, V>(_m: OrderedMap<K, V>, keys: vector<K>, values: vector<V>): bool {
+        len(keys) != len(values)
+    }
+
+    // Over-approximates the template's cmp-order-violation abort path (modeled
+    // nondeterministically): when `old_key != new_key`, returns true even though
+    // the actual call may succeed if the order precondition holds.
+    spec fun spec_aborts_replace_key_inplace<K, V>(m: OrderedMap<K, V>, old_key: K, new_key: K): bool {
+        !spec_contains_key(m, old_key) || old_key != new_key
+    }
 
     spec length {
         pragma intrinsic;
@@ -52,27 +117,11 @@ spec aptos_framework::ordered_map {
     }
 
     spec remove {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if [abstract] !spec_contains_key(self, key);
-        ensures [abstract] !spec_contains_key(self, key);
-        ensures [abstract] spec_get(old(self), key) == result;
-        ensures [abstract] spec_len(old(self)) == spec_len(self) + 1;
-        ensures [abstract] forall k: K where k != key: spec_contains_key(self, k) ==> spec_get(self, k) == spec_get(old(self), k);
-        ensures [abstract] forall k: K where k != key: spec_contains_key(old(self), k) == spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
     spec remove_or_none {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if [abstract] false;
-        ensures [abstract] spec_contains_key(old(self), key) ==> result == option::spec_some(spec_get(old(self), key));
-        ensures [abstract] !spec_contains_key(old(self), key) ==> result == option::spec_none();
-        ensures [abstract] !spec_contains_key(self, key);
-        ensures [abstract] option::spec_is_none(result) ==> self == old(self);
-        ensures [abstract] option::spec_is_some(result) ==> spec_len(old(self)) == spec_len(self) + 1;
-        ensures [abstract] forall k: K where k != key: spec_contains_key(self, k) ==> spec_get(self, k) == spec_get(old(self), k);
-        ensures [abstract] forall k: K where k != key: spec_contains_key(old(self), k) == spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
     spec is_empty {
@@ -121,8 +170,7 @@ spec aptos_framework::ordered_map {
     }
 
     spec values {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
 
@@ -143,63 +191,39 @@ spec aptos_framework::ordered_map {
     }
 
     spec keys {
-        pragma verify = false;
-        pragma opaque;
-        ensures [abstract] forall k: K: vector::spec_contains(result, k) <==> spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
     spec to_vec_pair {
-        pragma verify = false;
-        pragma opaque;
+        pragma intrinsic;
     }
 
-    spec new_from<K, V>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if [abstract] exists i in 0..len(keys), j in 0..len(keys) where i != j : keys[i] == keys[j];
-        aborts_if [abstract] len(keys) != len(values);
-        ensures [abstract] forall k: K {spec_contains_key(result, k)} : vector::spec_contains(keys,k) <==> spec_contains_key(result, k);
-        ensures [abstract] forall i in 0..len(keys) : spec_get(result, keys[i]) == values[i];
-        ensures [abstract] spec_len(result) == len(keys);
+    spec new_from {
+        pragma intrinsic;
     }
 
     spec upsert {
-        pragma opaque;
-        pragma verify = false;
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result);
-        ensures [abstract] spec_contains_key(self, key);
-        ensures [abstract] spec_get(self, key) == value;
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result)) && (option::borrow(result) == spec_get(old(
-            self), key)));
-        ensures [abstract] !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
-        ensures [abstract] spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
-        ensures [abstract] forall k: K: spec_contains_key(old(self), k) && k != key ==> spec_get(old(self), k) == spec_get(self, k);
-        ensures [abstract] forall k: K: spec_contains_key(old(self), k) ==> spec_contains_key(self, k);
+        pragma intrinsic;
     }
 
     spec replace_key_inplace {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec add_all {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec append {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec upsert_all {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec append_disjoint {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
     spec append_impl {
@@ -208,65 +232,31 @@ spec aptos_framework::ordered_map {
     }
 
     spec trim {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
-    spec borrow_front<K, V>(self: &OrderedMap<K, V>): (&K, &V) {
-        pragma opaque;
-        pragma verify = false;
-        ensures [abstract] spec_contains_key(self, result_1);
-        ensures [abstract] spec_get(self, result_1) == result_2;
-        ensures [abstract] forall k: K where k != result_1: spec_contains_key(self, k) ==>
-        std::cmp::compare(result_1, k) == std::cmp::Ordering::Less;
+    spec borrow_front {
+        pragma intrinsic;
     }
 
     spec borrow_back {
-        pragma opaque;
-        pragma verify = false;
-        ensures [abstract] spec_contains_key(self, result_1);
-        ensures [abstract] spec_get(self, result_1) == result_2;
-        ensures [abstract] forall k: K where k != result_1: spec_contains_key(self, k) ==>
-        std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
+        pragma intrinsic;
     }
 
-    spec pop_front<K, V>(self: &mut OrderedMap<K, V>): (K, V) {
-        pragma opaque;
-        pragma verify = false;
+    spec pop_front {
+        pragma intrinsic;
     }
 
     spec pop_back {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 
-    spec prev_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
-        pragma opaque;
-        pragma verify = false;
-        ensures [abstract] result == std::option::spec_none() <==>
-        (forall k: K {spec_contains_key(self, k)} where spec_contains_key(self, k)
-        && k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
-        ensures [abstract] result.is_some() <==>
-            spec_contains_key(self, option::borrow(result)) &&
-            (std::cmp::compare(option::borrow(result), key) == std::cmp::Ordering::Less)
-            && (forall k: K {spec_contains_key(self, k), std::cmp::compare(option::borrow(result), k), std::cmp::compare(key, k)} where k != option::borrow(result): ((spec_contains_key(self, k) &&
-            std::cmp::compare(k, key) == std::cmp::Ordering::Less)) ==>
-            std::cmp::compare(option::borrow(result), k) == std::cmp::Ordering::Greater);
+    spec prev_key {
+        pragma intrinsic;
     }
 
-
-    spec next_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K>  {
-        pragma opaque;
-        pragma verify = false;
-        ensures [abstract] result == std::option::spec_none() <==>
-        (forall k: K {spec_contains_key(self, k)} where spec_contains_key(self, k) && k != key:
-        std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
-        ensures [abstract] result.is_some() <==>
-            spec_contains_key(self, option::borrow(result)) &&
-            (std::cmp::compare(option::borrow(result), key) == std::cmp::Ordering::Greater)
-            && (forall k: K {spec_contains_key(self, k)} where k != option::borrow(result): ((spec_contains_key(self, k) &&
-            std::cmp::compare(k, key) == std::cmp::Ordering::Greater)) ==>
-            std::cmp::compare(option::borrow(result), k) == std::cmp::Ordering::Less);
+    spec next_key {
+        pragma intrinsic;
     }
 
 
@@ -296,7 +286,6 @@ spec aptos_framework::ordered_map {
     }
 
     spec get {
-        pragma opaque;
-        pragma verify = false;
+        pragma intrinsic;
     }
 }

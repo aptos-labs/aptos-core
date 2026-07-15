@@ -172,7 +172,8 @@ impl DataSummaryPoller {
             num_peers_to_poll => {
                 // Select half the peers randomly, and the other half weighted by latency
                 let num_peers_to_poll_randomly = num_peers_to_poll / 2;
-                let num_peers_to_poll_by_latency = num_peers_to_poll - num_peers_to_poll_randomly;
+                let num_peers_to_poll_by_latency =
+                    num_peers_to_poll.saturating_sub(num_peers_to_poll_randomly);
 
                 // Select the random peers
                 let random_peers_to_poll =
@@ -357,8 +358,9 @@ pub(crate) fn calculate_num_peers_to_poll(
     let min_polls_per_second = data_poller_config.min_polls_per_second;
     let peer_bucket_sizes = data_poller_config.peer_bucket_size;
     let additional_polls_per_bucket = data_poller_config.additional_polls_per_peer_bucket;
-    let total_polls_per_second = min_polls_per_second
-        + (additional_polls_per_bucket * (potential_peers.len() as u64 / peer_bucket_sizes));
+    let additional_polls_for_peers = additional_polls_per_bucket
+        .saturating_mul(potential_peers.len() as u64 / peer_bucket_sizes);
+    let total_polls_per_second = min_polls_per_second.saturating_add(additional_polls_for_peers);
 
     // Bound the number of polls per second by the maximum configurable value
     let polls_per_second = cmp::min(

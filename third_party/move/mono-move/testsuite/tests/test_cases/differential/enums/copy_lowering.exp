@@ -3,7 +3,7 @@
 
 fun enum_copy() {
   frame_data_size: 72
-  entry_gas: 109
+  entry_gas: 135
   code:
     0: StoreImm8 [16] <- #1
     1: EnumNew [0] desc=2 tag #0
@@ -32,7 +32,7 @@ fun scalar_copy() {
 
 fun struct_copy() {
   frame_data_size: 104
-  entry_gas: 193
+  entry_gas: 245
   code:
     0: StoreImm8 [32] <- #1
     1: EnumNew [40] desc=2 tag #0

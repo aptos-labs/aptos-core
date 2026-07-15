@@ -22,16 +22,17 @@ use crate::{
         write_bool, write_enum_tag, write_fat_ptr, write_ptr, write_u32, write_u64, write_u8,
         MemoryRegion,
     },
-    native_context::ProductionNativeContext,
+    native_context::{ProductionNativeContext, ProductionNativeRegistry},
     types::{
         ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
         META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
         VEC_PUSHBACK_INIT_CAPACITY,
     },
-    value_utils, ExecutionContext,
+    value_utils,
 };
 use mono_move_core::{
     captured_values_size,
+    interner::{InternedIdentifier, InternedModuleId},
     native::{
         NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool,
         VMInternalError,
@@ -40,14 +41,15 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type_list, InternedType, InternedTypeList},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
-    DescriptorProvider, FrameOffset, Function, FunctionRef, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ShiftOperand, VecPackOp,
-    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
+    VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
+use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
@@ -86,17 +88,40 @@ impl VMRegisters {
     }
 }
 
-/// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> {
-    /// Per-transaction context (function resolution, gas counters,
-    /// descriptor table, etc.).
-    pub(crate) exec_ctx: &'a mut T,
+/// Per-transaction interpreter context with a unified call stack and a
+/// GC-managed heap: owns the transaction state (code loader and read-set, gas
+/// meter, native extensions, resource read-write set) and the machine state
+/// (stack, heap, VM registers). Interpreter sessions are [`Self::invoke`] /
+/// [`Self::reset`] calls on the same context, so state like the heap and the
+/// read-write set lives across sessions within one transaction.
+///
+/// Construction wires in the transaction inputs (loader, read-set and gas
+/// meter carried over from loading the entry function, resource provider,
+/// natives) and verifies the entry function; further sessions reuse the
+/// buffers via [`reset`](Self::reset).
+pub struct InterpreterContext<'guard> {
+    /// Per-transaction code loader; also the access point for the execution
+    /// guard (descriptor/layout lookups). The loader's global-context
+    /// lifetime is shrunk to `'guard` (covariance): nothing the interpreter
+    /// exposes outlives the guard.
+    pub(crate) loader: Loader<'guard, 'guard>,
+    /// Read-set of the modules loaded by this transaction.
+    read_set: ModuleReadSet<'guard>,
+    pub(crate) gas_meter: GasMeter,
+    // TODO(cleanup): Move the native registry off the per-transaction context
+    // and onto a long-lived owner (e.g. the global context).
+    //
+    // TODO(correctness): Enforce that `natives` here and the `NativeResolver`
+    // passed to `loader` are the same instance.
+    natives: &'guard ProductionNativeRegistry,
+    /// Per-transaction native extensions, shared across native calls.
+    pub(crate) extensions: NativeExtensions,
+    resource_provider: &'guard dyn ResourceProvider,
 
     /// The VM registers; the dispatch loop works on a local copy and writes it
     /// back here on exit.
     pub(crate) registers: VMRegisters,
-
-    pub(crate) stack: MemoryRegion,
+    stack: MemoryRegion,
     pub(crate) heap: Heap,
     /// Auxiliary GC root set for temporarily-live heap pointers that are
     /// not yet stored in any frame slot (e.g. between two allocations in a
@@ -109,14 +134,41 @@ pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider + Lay
     rng: StdRng,
 }
 
-impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'a, T> {
-    pub fn new(exec_ctx: &'a mut T, entry: &Function) -> Self {
-        Self::with_heap_size(exec_ctx, entry, DEFAULT_HEAP_SIZE)
+impl<'guard> InterpreterContext<'guard> {
+    pub fn new(
+        loader: Loader<'guard, 'guard>,
+        read_set: ModuleReadSet<'guard>,
+        gas_meter: GasMeter,
+        resource_provider: &'guard dyn ResourceProvider,
+        natives: &'guard ProductionNativeRegistry,
+        entry: &Function,
+    ) -> Self {
+        Self::with_heap_size(
+            loader,
+            read_set,
+            gas_meter,
+            resource_provider,
+            natives,
+            entry,
+            DEFAULT_HEAP_SIZE,
+        )
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
-    pub fn with_heap_size(exec_ctx: &'a mut T, entry: &Function, heap_size: usize) -> Self {
-        let verification_errors = crate::verifier::verify_function(entry, exec_ctx);
+    /// Verifies `entry` and installs it, ready for [`run`](Self::run); panics
+    /// if verification fails. `read_set` and `gas_meter` carry over the
+    /// entry-load state (the entry's module must be in the read-set for its
+    /// constants and call targets to resolve).
+    pub fn with_heap_size(
+        loader: Loader<'guard, 'guard>,
+        read_set: ModuleReadSet<'guard>,
+        gas_meter: GasMeter,
+        resource_provider: &'guard dyn ResourceProvider,
+        natives: &'guard ProductionNativeRegistry,
+        entry: &Function,
+        heap_size: usize,
+    ) -> Self {
+        let verification_errors = crate::verifier::verify_function(entry, loader.guard());
         assert!(
             verification_errors.is_empty(),
             "verification failed:\n{}",
@@ -137,7 +189,12 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         }
 
         Self {
-            exec_ctx,
+            loader,
+            read_set,
+            gas_meter,
+            natives,
+            extensions: NativeExtensions::new(),
+            resource_provider,
             registers: VMRegisters::new(base, entry),
             stack,
             heap: Heap::new(heap_size),
@@ -145,6 +202,54 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
         }
+    }
+
+    /// Install the per-transaction native extensions. Replaces any previously
+    /// installed set.
+    pub fn with_extensions(mut self, extensions: NativeExtensions) -> Self {
+        self.extensions = extensions;
+        self
+    }
+
+    /// Resolve a runtime function call: look the target up in the read-set,
+    /// falling back to the [`Loader`] on cache miss. May trigger lazy module
+    /// loading, gas charge on a cache miss, and lowering of the function's
+    /// code.
+    pub fn load_function(
+        &mut self,
+        module_id: InternedModuleId,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> LoaderResult<FunctionPtr> {
+        self.loader.load_function(
+            &mut self.read_set,
+            &mut self.gas_meter,
+            module_id,
+            name,
+            ty_args,
+        )
+    }
+
+    /// Resolve a constant from `module_id`'s constant pool, returning its
+    /// interned type and BCS bytes. The calling function was loaded from
+    /// `module_id`, so the module is always present and loaded in the read
+    /// set; a missing or not-yet-loaded entry is an invariant violation.
+    fn load_constant(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> RuntimeResult<(InternedType, &'guard [u8])> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        Ok((
+            module.interned_constant_type_at(idx),
+            module.constant_data_at(idx),
+        ))
+    }
+
+    /// Returns the transaction's read-set.
+    pub fn read_set(&self) -> &ModuleReadSet<'guard> {
+        &self.read_set
     }
 
     pub fn set_rng_seed(&mut self, seed: u64) {
@@ -161,19 +266,16 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     }
 
     pub fn extensions(&self) -> &NativeExtensions {
-        self.exec_ctx.extensions()
+        &self.extensions
     }
 
     /// Takes a checkpoint (opening a new sub-session): checkpoints the
     /// read-write set and signals every native extension. The two advance in
     /// lockstep, so a single [`Self::rollback`] depth undoes a checkpoint's
     /// effects across both.
-    //
-    // TODO(cleanup): move to execution context
     pub fn checkpoint(&mut self) -> RuntimeResult<()> {
         self.read_write_set.checkpoint();
-        self.exec_ctx
-            .extensions()
+        self.extensions
             .checkpoint()
             .map_err(VMInternalError::into_runtime_error)
     }
@@ -182,27 +284,21 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     /// every native extension. `n == 0` is a no-op; `n` beyond the current
     /// depth is an invariant violation. The read-write set rolls back first, so
     /// an underflow is caught before any extension is touched.
-    //
-    // TODO(cleanup): move to execution context
     pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
         self.read_write_set.rollback(n)?;
-        self.exec_ctx
-            .extensions()
+        self.extensions
             .rollback(n)
             .map_err(VMInternalError::into_runtime_error)
     }
 
-    /// TODO(cleanup): move to execution context
     pub fn checkpoint_depth(&self) -> usize {
         self.read_write_set.checkpoint_depth()
     }
 
-    /// TODO(cleanup): move to execution context
     pub fn current_epoch(&self) -> u64 {
         self.read_write_set.current_epoch()
     }
 
-    /// TODO(cleanup): move to execution context
     pub fn journal_len(&self) -> usize {
         self.read_write_set.journal_len()
     }
@@ -210,9 +306,6 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
     /// Reset the context to call a different function, preserving the heap.
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
-    ///
-    // TODO(cleanup): invoke() is test-only for now. When used with real gas budgets,
-    // decide whether to reset the gas meter here.
     pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
 
@@ -247,7 +340,8 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
         self.heap.reset();
         self.read_write_set = ResourceReadWriteSet::new();
         self.root_pool = RootPool::new();
-        self.exec_ctx.gas_meter().reset(gas_budget);
+        self.gas_meter.reset(gas_budget);
+        self.rng = StdRng::seed_from_u64(0);
     }
 
     /// Read a u64 from the root frame's slot 0 (where the result lands).
@@ -322,8 +416,10 @@ impl<'a, T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterC
                 .add(FRAME_METADATA_SIZE + offset as usize)
         };
         // SAFETY: `dst` is a slot in the root frame (caller guarantees offset/ty match a
-        // parameter); `exec_ctx` is the LayoutProvider and `heap` is where nested data is boxed.
-        unsafe { value_utils::deserialize_into(&*self.exec_ctx, &mut self.heap, ty, bytes, dst) }
+        // parameter); the guard is the LayoutProvider and `heap` is where nested data is boxed.
+        unsafe {
+            value_utils::deserialize_into(self.loader.guard(), &mut self.heap, ty, bytes, dst)
+        }
     }
 
     /// Allocate a vector of `u64` values on the heap and return its address
@@ -862,7 +958,7 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterContext<'_, T> {
+impl InterpreterContext<'_> {
     /// Shared body of the conditional `Jump*` micro-ops: charge the chosen
     /// edge's cost, then jump to `target` or fall through to the next pc.
     #[inline(always)]
@@ -875,10 +971,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         regs: &mut VMRegisters,
     ) -> RuntimeResult<()> {
         if cond {
-            self.exec_ctx.gas_meter().charge(gas_taken)?;
+            self.gas_meter.charge(gas_taken)?;
             regs.pc = target.into();
         } else {
-            self.exec_ctx.gas_meter().charge(gas_fallthrough)?;
+            self.gas_meter.charge(gas_fallthrough)?;
             regs.pc += 1;
         }
         Ok(())
@@ -892,7 +988,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
 
         // Charge the entry function's entry block before any of its instructions run.
         let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
-        self.exec_ctx.gas_meter().charge(entry_gas)?;
+        self.gas_meter.charge(entry_gas)?;
 
         let outcome = loop {
             // SAFETY: Current function is always a valid, non-null pointer because
@@ -937,7 +1033,6 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         //   4. Patching:
                         //      If can patch caller, try it.
                         let target = self
-                            .exec_ctx
                             .load_function(module_id, func_name, ty_args)
                             .map_err(RuntimeError::Loader)?;
                         // SAFETY: `target` points to a `Function`, which is not reclaimed during
@@ -1032,7 +1127,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         // vector slot holds a pointer read through to its heap data.
                         let a = fp.add(op.lhs.into());
                         let b = fp.add(op.rhs.into());
-                        let eq = value_utils::equals(self.exec_ctx, a, b, op.ty)?;
+                        let eq = value_utils::equals(self.loader.guard(), a, b, op.ty)?;
                         self.cond_branch(
                             eq ^ op.negate,
                             op.target,
@@ -1049,7 +1144,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         let (lb, lo) = read_fat_ptr(fp, op.lhs);
                         let (rb, ro) = read_fat_ptr(fp, op.rhs);
                         let eq = value_utils::equals(
-                            self.exec_ctx,
+                            self.loader.guard(),
                             lb.add(lo as usize),
                             rb.add(ro as usize),
                             op.ty,
@@ -1184,7 +1279,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     },
 
                     MicroOp::Jump { target, gas } => {
-                        self.exec_ctx.gas_meter().charge(gas)?;
+                        self.gas_meter.charge(gas)?;
                         regs.pc = target.into();
                         continue;
                     },
@@ -1760,7 +1855,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     MicroOp::Exists { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
                         let exists = self.read_write_set.exists(
-                            self.exec_ctx.resource_provider(),
+                            self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
                         )?;
                         write_bool(fp, dst, exists);
@@ -1769,7 +1864,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                     MicroOp::BorrowGlobal { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
                         let ptr = self.read_write_set.borrow_global(
-                            self.exec_ctx.resource_provider(),
+                            self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
                         )?;
                         // A reference is a 16-byte fat pointer; the borrow points
@@ -1782,7 +1877,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         let key = InMemoryStorageKey::resource(address, ty);
                         let ptr = match self
                             .read_write_set
-                            .try_borrow_global_mut(self.exec_ctx.resource_provider(), &key)?
+                            .try_borrow_global_mut(self.resource_provider, &key)?
                         {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
@@ -1801,7 +1896,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         let key = InMemoryStorageKey::resource(address, ty);
                         let entry_ptr = self
                             .read_write_set
-                            .try_move_from(self.exec_ctx.resource_provider(), &key)?;
+                            .try_move_from(self.resource_provider, &key)?;
                         let ptr = match entry_ptr {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
@@ -1826,7 +1921,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         };
 
                         self.read_write_set.move_to(
-                            self.exec_ctx.resource_provider(),
+                            self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
                             ptr,
                         )?;
@@ -1840,7 +1935,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         // vector slot holds a pointer read through to its heap data.
                         let a = fp.add(op.lhs.into());
                         let b = fp.add(op.rhs.into());
-                        let eq = value_utils::equals(&*self.exec_ctx, a, b, op.ty)?;
+                        let eq = value_utils::equals(self.loader.guard(), a, b, op.ty)?;
                         write_bool(fp, op.dst, eq ^ op.negate);
                     },
                     MicroOp::ValueRefCmp(ref op) => {
@@ -1849,7 +1944,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                         let (lb, lo) = read_fat_ptr(fp, op.lhs);
                         let (rb, ro) = read_fat_ptr(fp, op.rhs);
                         let eq = value_utils::equals(
-                            &*self.exec_ctx,
+                            self.loader.guard(),
                             lb.add(lo as usize),
                             rb.add(ro as usize),
                             op.ty,
@@ -2033,22 +2128,22 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
     ) -> RuntimeResult<()> {
         // SAFETY: `regs.func` points to the live, currently-executing function.
         let module_id = unsafe { regs.func.as_ref() }.module_id;
-        let (ty, bytes) = self.exec_ctx.load_constant(module_id, idx)?;
+        let (ty, bytes) = self.load_constant(module_id, idx)?;
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
         // and is writable (no aliasing to the heap).
         unsafe {
             let dst = regs.fp.add(usize::from(dst));
             deserialize_or_gc(
-                self.exec_ctx,
+                self.loader.guard(),
                 &mut self.heap,
                 ty,
                 bytes,
                 dst,
-                self.exec_ctx,
+                self.loader.guard(),
                 &mut self.read_write_set,
                 &self.root_pool,
-                self.exec_ctx.extensions(),
+                &self.extensions,
                 regs.fp,
                 crate::heap::TopFrame::Function {
                     func: regs.func,
@@ -2150,10 +2245,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         unsafe {
             deep_copy_or_gc(
                 &mut self.heap,
-                self.exec_ctx,
+                self.loader.guard(),
                 &mut self.read_write_set,
                 &self.root_pool,
-                self.exec_ctx.extensions(),
+                &self.extensions,
                 regs.fp,
                 TopFrame::Function {
                     func: regs.func,
@@ -2200,7 +2295,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // valid and relocated.
             match unsafe {
                 self.heap
-                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+                    .try_deep_copy(self.loader.guard(), NonNull::new_unchecked(guard.ptr()))
             } {
                 Ok(ptr) => out.push(ptr),
                 Err(AllocationError::RuntimeError(err)) => return Err(err),
@@ -2219,7 +2314,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // SAFETY: as above, after relocation.
             let ptr = unsafe {
                 self.heap
-                    .try_deep_copy(self.exec_ctx, NonNull::new_unchecked(guard.ptr()))
+                    .try_deep_copy(self.loader.guard(), NonNull::new_unchecked(guard.ptr()))
             }
             .map_err(AllocationError::into_runtime_error)?;
             out.push(ptr);
@@ -2428,7 +2523,6 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
                 FUNC_REF_TAG_UNRESOLVED => {
                     let func_ref = &*(payload as *const FunctionRef);
                     let func_ptr = self
-                        .exec_ctx
                         .load_function(func_ref.module_id, func_ref.func_name, func_ref.ty_args)
                         .map_err(RuntimeError::Loader)?;
                     (func_ptr.as_ref_unchecked(), true)
@@ -2658,7 +2752,7 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         new_fp: *mut u8,
     ) -> RuntimeResult<()> {
         // Charge the callee's entry block before any of its instructions run.
-        self.exec_ctx.gas_meter().charge(callee.entry_gas)?;
+        self.gas_meter.charge(callee.entry_gas)?;
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
@@ -2740,12 +2834,10 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
         let saved_fp = regs.fp;
         self.registers.fp = new_fp;
         let result = {
-            let (registry, provider, layouts, resource_provider, gas_meter, extensions) =
-                self.exec_ctx.native_call_borrows();
-            let func = registry.lookup_by_idx(native_idx).ok_or_else(|| {
+            let func = self.natives.lookup_by_idx(native_idx).ok_or_else(|| {
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::NativeIdxOutOfBounds {
                     idx: native_idx.0,
-                    registry_size: registry.len(),
+                    registry_size: self.natives.len(),
                 })
             })?;
             // TODO(cleanup): eventually pass the interpreter context itself rather than
@@ -2754,17 +2846,18 @@ impl<T: ExecutionContext + DescriptorProvider + LayoutProvider> InterpreterConte
             // whether that's sound under the context's interior-mutability model
             // — clearer once everything (rws → table natives, gas → all) is
             // wired up.
+            let guard = self.loader.guard();
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
                 view_type_list(ty_args),
-                gas_meter,
-                provider,
-                layouts,
-                resource_provider,
+                &mut self.gas_meter,
+                guard,
+                guard,
+                self.resource_provider,
                 &mut self.heap,
                 &mut self.read_write_set,
-                extensions,
+                &self.extensions,
             );
             func(&ctx)
         };

@@ -3,7 +3,7 @@
 
 //! Storage access and module verification for the loader's cache-miss path.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bytes::Bytes;
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
@@ -39,4 +39,29 @@ pub trait ModuleProvider {
         address: &AccountAddress,
         module_name: &str,
     ) -> Result<Vec<Identifier>>;
+}
+
+/// Empty storage with no modules: every fetch reports the module as absent.
+pub struct NoModuleProvider;
+
+impl ModuleProvider for NoModuleProvider {
+    fn get_module_bytes(&self, _address: &AccountAddress, _name: &str) -> Result<Option<Bytes>> {
+        Ok(None)
+    }
+
+    fn deserialize_module(&self, _bytes: &[u8]) -> Result<CompiledModule> {
+        bail!("NoModuleProvider has no modules to deserialize")
+    }
+
+    fn verify_module(&self, _module: &CompiledModule) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_same_package_modules(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &str,
+    ) -> Result<Vec<Identifier>> {
+        Ok(vec![])
+    }
 }

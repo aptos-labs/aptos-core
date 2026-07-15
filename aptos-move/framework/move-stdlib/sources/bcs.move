@@ -5,7 +5,6 @@
 module std::bcs {
     use std::option::Option;
 
-    /// Note: all natives would fail if the MoveValue contains a permissioned signer in it.
 
     /// Returns the binary representation of `v` in BCS (Binary Canonical Serialization) format.
     /// Aborts with `0x1c5` error code if serialization fails.

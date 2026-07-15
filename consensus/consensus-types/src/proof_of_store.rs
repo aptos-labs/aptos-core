@@ -542,10 +542,6 @@ where
         Ok(validator.optimistic_verify(self.signer, &self.info, &self.signature)?)
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
-        self.signature.signature()
-    }
-
     pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
     }

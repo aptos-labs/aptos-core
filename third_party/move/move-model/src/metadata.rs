@@ -40,8 +40,6 @@ pub mod lang_feature_versions {
     /// This version guards match support for primitive types.
     pub const LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH: LanguageVersion = LanguageVersion::V2_4;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_CONST: LanguageVersion = LanguageVersion::V2_4;
-    pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =
-        crate::metadata::LATEST_LANGUAGE_VERSION_VALUE;
 }
 
 // ================================================================================'

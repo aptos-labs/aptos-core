@@ -84,8 +84,11 @@ impl StatelessPipeline for SigningPhase {
             fut.commit_vote_fut
                 .clone()
                 .await
-                .map(|vote| vote.signature().clone())
                 .map_err(|e| Error::InternalError(e.to_string()))
+                .and_then(|vote| {
+                    vote.decompressed_signature()
+                        .map_err(|e| Error::InternalError(e.to_string()))
+                })
         } else {
             self.safety_rule_handle
                 .sign_commit_vote(ordered_ledger_info, commit_ledger_info.clone())

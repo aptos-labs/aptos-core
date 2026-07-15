@@ -959,13 +959,10 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
-    /// Revoke all storable permission handle of the signer immediately.
     PermissionedSignerRevokeAllHandles {},
 
-    /// Revoke a specific storable permission handle immediately. This will disallow owner of
-    /// the storable permission handle to derive signer from it anymore.
     PermissionedSignerRevokePermissionStorageAddress {
-        permissions_storage_addr: AccountAddress,
+        _permissions_storage_addr: AccountAddress,
     },
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -1195,6 +1192,11 @@ pub enum EntryFunctionCall {
     },
 
     TransactionFeeConvertToAptosFaBurnRef {},
+
+    /// Migrate an existing chain from the legacy `AptosCoinMintCapability` (coin `MintCapability`)
+    /// to `AptosFAMintCapabilities` (FA `MintRef`), so gas refunds mint APT FA directly without
+    /// touching the legacy coin supply aggregator. Gated by the aptos_framework signer (governance).
+    TransactionFeeConvertToAptosFaMintRef {},
 
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
@@ -1849,8 +1851,8 @@ impl EntryFunctionCall {
             } => object_code_deployment_publish(metadata_serialized, code),
             PermissionedSignerRevokeAllHandles {} => permissioned_signer_revoke_all_handles(),
             PermissionedSignerRevokePermissionStorageAddress {
-                permissions_storage_addr,
-            } => permissioned_signer_revoke_permission_storage_address(permissions_storage_addr),
+                _permissions_storage_addr,
+            } => permissioned_signer_revoke_permission_storage_address(_permissions_storage_addr),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1997,6 +1999,9 @@ impl EntryFunctionCall {
             } => staking_proxy_set_voter(operator, new_voter),
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
+            },
+            TransactionFeeConvertToAptosFaMintRef {} => {
+                transaction_fee_convert_to_aptos_fa_mint_ref()
             },
             VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
@@ -4546,7 +4551,6 @@ pub fn object_code_deployment_publish(
     ))
 }
 
-/// Revoke all storable permission handle of the signer immediately.
 pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4562,10 +4566,8 @@ pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
     ))
 }
 
-/// Revoke a specific storable permission handle immediately. This will disallow owner of
-/// the storable permission handle to derive signer from it anymore.
 pub fn permissioned_signer_revoke_permission_storage_address(
-    permissions_storage_addr: AccountAddress,
+    _permissions_storage_addr: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4577,7 +4579,7 @@ pub fn permissioned_signer_revoke_permission_storage_address(
         ),
         ident_str!("revoke_permission_storage_address").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&permissions_storage_addr).unwrap()],
+        vec![bcs::to_bytes(&_permissions_storage_addr).unwrap()],
     ))
 }
 
@@ -5332,6 +5334,24 @@ pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
             ident_str!("transaction_fee").to_owned(),
         ),
         ident_str!("convert_to_aptos_fa_burn_ref").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Migrate an existing chain from the legacy `AptosCoinMintCapability` (coin `MintCapability`)
+/// to `AptosFAMintCapabilities` (FA `MintRef`), so gas refunds mint APT FA directly without
+/// touching the legacy coin supply aggregator. Gated by the aptos_framework signer (governance).
+pub fn transaction_fee_convert_to_aptos_fa_mint_ref() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("transaction_fee").to_owned(),
+        ),
+        ident_str!("convert_to_aptos_fa_mint_ref").to_owned(),
         vec![],
         vec![],
     ))
@@ -7102,7 +7122,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::PermissionedSignerRevokePermissionStorageAddress {
-                    permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
         } else {
@@ -7554,6 +7574,16 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::TransactionFeeConvertToAptosFaBurnRef {})
+        } else {
+            None
+        }
+    }
+
+    pub fn transaction_fee_convert_to_aptos_fa_mint_ref(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TransactionFeeConvertToAptosFaMintRef {})
         } else {
             None
         }
@@ -8371,6 +8401,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
             Box::new(decoder::transaction_fee_convert_to_aptos_fa_burn_ref),
+        );
+        map.insert(
+            "transaction_fee_convert_to_aptos_fa_mint_ref".to_string(),
+            Box::new(decoder::transaction_fee_convert_to_aptos_fa_mint_ref),
         );
         map.insert(
             "version_set_for_next_epoch".to_string(),

@@ -278,7 +278,11 @@ impl ValidatorVerifier {
         if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
             && !signature_with_status.is_verified()
         {
-            self.verify(author, message, signature_with_status.signature())?;
+            // Decompress the signature only now, after the cheap author check.
+            let signature = signature_with_status
+                .decompressed_signature()
+                .map_err(|_| VerifyError::InvalidMultiSignature)?;
+            self.verify(author, message, &signature)?;
             signature_with_status.set_verified();
         }
         Ok(())
@@ -296,9 +300,9 @@ impl ValidatorVerifier {
             .with_min_len(4) // At least 4 signatures are verified in each task
             .filter_map(|(account_address, signature)| {
                 if signature.is_verified()
-                    || self
-                        .verify(account_address, message, signature.signature())
-                        .is_ok()
+                    || signature
+                        .decompressed_signature()
+                        .is_ok_and(|sig| self.verify(account_address, message, &sig).is_ok())
                 {
                     signature.set_verified();
                     Some((account_address, signature))
@@ -370,10 +374,11 @@ impl ValidatorVerifier {
                 return Ok(());
             }
         }
-        // Verify empty multi signature
+        // Verify empty multi signature. Decompression of the G2 point is
+        // deferred to here, after the cheap structural checks above.
         let multi_sig = multi_signature
-            .sig()
-            .as_ref()
+            .decompressed_sig()
+            .map_err(|_| VerifyError::InvalidMultiSignature)?
             .ok_or(VerifyError::EmptySignature)?;
         // Verify the optimistically aggregated signature.
         let aggregated_key =
@@ -404,10 +409,11 @@ impl ValidatorVerifier {
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter(), true)?;
-        // Verify empty aggregated signature
+        // Verify empty aggregated signature. Decompression of the G2 point is
+        // deferred to here, after the cheap structural checks above.
         let aggregated_sig = aggregated_signature
-            .sig()
-            .as_ref()
+            .decompressed_sig()
+            .map_err(|_| VerifyError::InvalidAggregatedSignature)?
             .ok_or(VerifyError::EmptySignature)?;
 
         aggregated_sig
@@ -546,14 +552,21 @@ fn sum_voting_power(address_to_validator_info: &[ValidatorConsensusInfo]) -> u12
 
 impl fmt::Display for ValidatorVerifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        // Bound the number of validators to avoid excessive output
+        const MAX_VALIDATORS_TO_DISPLAY: usize = 300;
+
+        // Display the validator set
         write!(f, "ValidatorSet: [")?;
-        for info in &self.validator_infos {
+        for info in self.validator_infos.iter().take(MAX_VALIDATORS_TO_DISPLAY) {
             write!(
                 f,
                 "{}: {}, ",
                 info.address.short_str_lossless(),
                 info.voting_power
             )?;
+        }
+        if self.validator_infos.len() > MAX_VALIDATORS_TO_DISPLAY {
+            write!(f, "... ({} total validators)", self.validator_infos.len())?;
         }
         write!(f, "]")
     }

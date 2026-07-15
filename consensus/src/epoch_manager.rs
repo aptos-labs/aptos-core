@@ -1747,7 +1747,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 SecurityEvent::ConsensusInvalidMessage,
                                 remote_peer = peer_id,
                                 error = ?e,
-                                unverified_event = unverified_event
+                                unverified_event = %unverified_event,
                             );
                         },
                     }

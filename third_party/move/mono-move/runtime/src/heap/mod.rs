@@ -63,10 +63,10 @@ pub(crate) mod macros {
         ($ctx:ident, $fp:expr, $pc:expr, $func:expr, $descriptor_id:expr $(,)?) => {
             $crate::heap::alloc_obj(
                 &mut $ctx.heap,
-                $ctx.exec_ctx,
+                $ctx.loader.guard(),
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
-                $ctx.exec_ctx.extensions(),
+                &$ctx.extensions,
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $func,
@@ -92,10 +92,10 @@ pub(crate) mod macros {
         ) => {
             $crate::heap::alloc_vec(
                 &mut $ctx.heap,
-                $ctx.exec_ctx,
+                $ctx.loader.guard(),
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
-                $ctx.exec_ctx.extensions(),
+                &$ctx.extensions,
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $func,
@@ -122,10 +122,10 @@ pub(crate) mod macros {
         ) => {
             $crate::heap::alloc_captured_data(
                 &mut $ctx.heap,
-                $ctx.exec_ctx,
+                $ctx.loader.guard(),
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
-                $ctx.exec_ctx.extensions(),
+                &$ctx.extensions,
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $func,
@@ -152,10 +152,10 @@ pub(crate) mod macros {
         ) => {
             $crate::heap::grow_vec_ref(
                 &mut $ctx.heap,
-                $ctx.exec_ctx,
+                $ctx.loader.guard(),
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
-                $ctx.exec_ctx.extensions(),
+                &$ctx.extensions,
                 $crate::heap::TopFrame::Function {
                     func: $func,
                     pc: $pc,
@@ -174,10 +174,10 @@ pub(crate) mod macros {
         ($ctx:ident, $fp:expr, $pc:expr, $func:expr $(,)?) => {
             $crate::heap::gc_collect(
                 &mut $ctx.heap,
-                $ctx.exec_ctx,
+                $ctx.loader.guard(),
                 &mut $ctx.read_write_set,
                 &$ctx.root_pool,
-                $ctx.exec_ctx.extensions(),
+                &$ctx.extensions,
                 $fp,
                 $crate::heap::TopFrame::Function {
                     func: $func,

@@ -19,17 +19,23 @@ use move_model::{
     emit, emitln,
     model::{GlobalEnv, QualifiedId, StructId},
     pragmas::{
-        INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
-        INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_MUT,
+        INTRINSIC_FUN_MAP_ADD_ALL, INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
+        INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS, INTRINSIC_FUN_MAP_APPEND,
+        INTRINSIC_FUN_MAP_APPEND_DISJOINT, INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_BACK,
+        INTRINSIC_FUN_MAP_BORROW_FRONT, INTRINSIC_FUN_MAP_BORROW_MUT,
         INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
         INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
-        INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY,
-        INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_DEL,
-        INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_HAS_KEY,
+        INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_LEN,
+        INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY,
+        INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY,
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_REPLACE_KEY_INPLACE,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+        INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW,
-        INTRINSIC_FUN_MAP_SPEC_SET,
+        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_TRIM,
+        INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_FUN_MAP_UPSERT_ALL, INTRINSIC_FUN_MAP_VALUES,
     },
     ty::{PrimitiveType, Type},
 };
@@ -70,6 +76,12 @@ struct TypeInfo {
     name: String,
     suffix: String,
     has_native_equality: bool,
+    is_bv: bool,
+    is_type_param: bool,
+    /// True iff `$1_cmp_$compare'<suffix>'` is emitted in the prelude. Only set on K
+    /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
+    /// avoid undeclared-function errors.
+    cmp_available: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -97,12 +109,31 @@ struct MapImpl {
     fun_has_key: String,
     fun_add_no_override: String,
     fun_add_override_if_exists: String,
+    fun_upsert: String,
     fun_del_must_exist: String,
+    fun_remove_or_none: String,
     fun_del_return_key: String,
     fun_borrow: String,
     fun_borrow_mut: String,
     fun_borrow_mut_with_default: String,
     fun_borrow_with_default: String,
+    fun_get: String,
+    fun_borrow_front: String,
+    fun_borrow_back: String,
+    fun_pop_front: String,
+    fun_pop_back: String,
+    fun_prev_key: String,
+    fun_next_key: String,
+    fun_keys: String,
+    fun_values: String,
+    fun_to_vec_pair: String,
+    fun_new_from: String,
+    fun_add_all: String,
+    fun_upsert_all: String,
+    fun_append: String,
+    fun_append_disjoint: String,
+    fun_trim: String,
+    fun_replace_key_inplace: String,
     // spec functions
     fun_spec_new: String,
     fun_spec_get: String,
@@ -281,7 +312,6 @@ pub fn add_prelude(
         table_instances.append(&mut bv_table_instances);
     }
     context.insert("vec_instances", &vec_instances);
-    context.insert("table_instances", &table_instances);
     let tuple_instances = mono_info
         .tuple_inst
         .iter()
@@ -368,6 +398,20 @@ pub fn add_prelude(
     let mut cmp_instances = filter_native_with_contained_types(CMP_MODULE);
     cmp_instances.sort();
     cmp_instances.dedup();
+    // Mark each MapImpl's K as `cmp_available` when its suffix is in `cmp_instances`,
+    // so ordering-role templates can skip K's without an emitted cmp function.
+    let cmp_k_suffixes: BTreeSet<String> = cmp_instances
+        .iter()
+        .map(|(_, ti)| ti.suffix.clone())
+        .collect();
+    for map_impl in &mut table_instances {
+        for (k_ti, _v_ti) in &mut map_impl.insts {
+            if cmp_k_suffixes.contains(&k_ti.suffix) {
+                k_ti.cmp_available = true;
+            }
+        }
+    }
+    context.insert("table_instances", &table_instances);
     let mut cmp_struct_types = vec![];
     let mut cmp_int_types = all_types
         .clone()
@@ -446,6 +490,9 @@ impl TypeInfo {
             name: boogie_type(env, ty, bv_flag),
             suffix: boogie_type_suffix(env, ty, bv_flag),
             has_native_equality: has_native_equality(env, options, ty),
+            is_bv: bv_flag && ty.is_number(),
+            is_type_param: matches!(ty, Type::TypeParameter(_)),
+            cmp_available: false,
         }
     }
 }
@@ -519,9 +566,17 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS),
             ),
+            fun_upsert: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_UPSERT),
+            ),
             fun_del_must_exist: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_DEL_MUST_EXIST),
+            ),
+            fun_remove_or_none: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_REMOVE_OR_NONE),
             ),
             fun_del_return_key: Self::triple_opt_to_name(
                 env,
@@ -542,6 +597,71 @@ impl MapImpl {
             fun_borrow_with_default: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT),
+            ),
+            fun_get: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_GET)),
+            fun_borrow_front: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_FRONT),
+            ),
+            fun_borrow_back: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_BACK),
+            ),
+            fun_pop_front: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_POP_FRONT),
+            ),
+            fun_pop_back: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_POP_BACK),
+            ),
+            fun_prev_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_PREV_KEY),
+            ),
+            fun_next_key: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEXT_KEY),
+            ),
+            fun_keys: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_KEYS),
+            ),
+            fun_values: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_VALUES),
+            ),
+            fun_to_vec_pair: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_TO_VEC_PAIR),
+            ),
+            fun_new_from: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW_FROM),
+            ),
+            fun_add_all: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ADD_ALL),
+            ),
+            fun_upsert_all: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_UPSERT_ALL),
+            ),
+            fun_append: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_APPEND),
+            ),
+            fun_append_disjoint: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_APPEND_DISJOINT),
+            ),
+            fun_trim: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_TRIM),
+            ),
+            fun_replace_key_inplace: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_REPLACE_KEY_INPLACE),
             ),
             fun_spec_new: Self::triple_opt_to_name(
                 env,

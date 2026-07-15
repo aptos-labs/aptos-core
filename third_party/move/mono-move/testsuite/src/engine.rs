@@ -11,24 +11,18 @@ use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
     native::{NativeExtensions, NativeName},
     types::EMPTY_TYPE_LIST,
-    Function, GasMeter, Interner, NO_RESOURCE_PROVIDER,
+    Function, GasMeter, Interner, NoResourceProvider,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_natives::{make_all_production_natives, make_all_test_natives, Dispatch};
 use mono_move_runtime::{
-    ExecutionContext, InterpreterContext, ProductionContextFamily, ProductionNativeRegistry,
-    RuntimeStatus, TransactionContext,
+    InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeStatus,
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// Gas budget for engine runs. Effectively unbounded.
 const GAS_BUDGET: u64 = u64::MAX;
-
-/// The concrete per-transaction context the engine runs against.
-type TxnCtx<'guard, 'ctx> = TransactionContext<'guard, 'ctx>;
-/// The interpreter context handed to `set`/`read` closures in [`MonoRunner::run`].
-type Interp<'i, 'guard, 'ctx> = InterpreterContext<'i, TxnCtx<'guard, 'ctx>>;
 
 /// Outcome of a single interpreter run.
 pub enum RunResult<R> {
@@ -40,26 +34,18 @@ pub enum RunResult<R> {
     Error(String),
 }
 
-/// A loaded entry function bound to a live [`TransactionContext`], ready to be
-/// run one or more times. Each [`run`](Self::run) builds a fresh
-/// [`InterpreterContext`] over the shared transaction context.
-pub struct MonoRunner<'a, 'guard, 'ctx> {
-    txn_ctx: &'a mut TxnCtx<'guard, 'ctx>,
+/// A loaded entry function bound to a live [`InterpreterContext`], ready to be
+/// run one or more times. Each [`run`](Self::run) resets the context to a
+/// clean state, reusing its stack and heap buffers.
+pub struct MonoRunner<'guard> {
+    interp: InterpreterContext<'guard>,
     function: &'guard Function,
-    /// Initial heap size for each run, or `None` for the interpreter default.
-    /// A small size makes GC-pressure tests trigger collections.
-    heap_size: Option<usize>,
     /// Number of garbage collections the most recent [`run`](Self::run)
     /// performed.
     gc_count: usize,
 }
 
-impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
-    /// Sets the initial heap size used to build the interpreter on each run.
-    pub fn set_heap_size(&mut self, heap_size: Option<usize>) {
-        self.heap_size = heap_size;
-    }
-
+impl<'guard> MonoRunner<'guard> {
     /// Number of garbage collections the most recent [`run`](Self::run) ran.
     pub fn gc_count(&self) -> usize {
         self.gc_count
@@ -70,23 +56,19 @@ impl<'guard, 'ctx> MonoRunner<'_, 'guard, 'ctx> {
     /// it.
     pub fn run<R>(
         &mut self,
-        set_args: impl FnOnce(&mut Interp<'_, 'guard, 'ctx>),
-        extract_returns: impl FnOnce(&Interp<'_, 'guard, 'ctx>) -> R,
+        set_args: impl FnOnce(&mut InterpreterContext<'guard>),
+        extract_returns: impl FnOnce(&InterpreterContext<'guard>) -> R,
     ) -> RunResult<R> {
-        // Each run starts with a full budget; the meter is shared across
-        // repeated runs on this context (e.g. bench iterations).
-        self.txn_ctx.gas_meter().reset(GAS_BUDGET);
-        let mut interp = match self.heap_size {
-            Some(n) => InterpreterContext::with_heap_size(&mut *self.txn_ctx, self.function, n),
-            None => InterpreterContext::new(&mut *self.txn_ctx, self.function),
-        };
-        set_args(&mut interp);
-        let result = match interp.run() {
+        // Each run starts from a clean state with a full budget, reusing the
+        // already-allocated stack and heap buffers.
+        self.interp.reset(self.function, GAS_BUDGET);
+        set_args(&mut self.interp);
+        let result = match self.interp.run() {
             Err(err) => RunResult::Error(format!("{}", err)),
-            Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&interp)),
+            Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&self.interp)),
             Ok(RuntimeStatus::Aborted { code, message }) => RunResult::Aborted { code, message },
         };
-        self.gc_count = interp.gc_count();
+        self.gc_count = self.interp.gc_count();
         result
     }
 
@@ -140,9 +122,11 @@ pub fn build_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistry {
     natives
 }
 
-/// Build the loader/native/transaction stack over an existing guard and module
+/// Build the loader/native/interpreter stack over an existing guard and module
 /// provider, install `extensions`, load `address::module_name::function_name`,
-/// and hand a [`MonoRunner`] to `body`.
+/// and hand a [`MonoRunner`] to `body`. `heap_size` sizes the interpreter heap
+/// (`None` for the default); a small size makes GC-pressure tests trigger
+/// collections.
 pub fn with_mono_function<'guard, 'ctx, R>(
     guard: &'guard ExecutionGuard<'ctx>,
     module_provider: &'guard InMemoryModuleProvider,
@@ -150,7 +134,8 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     module_name: &IdentStr,
     function_name: &IdentStr,
     extensions: NativeExtensions,
-    body: impl FnOnce(&mut MonoRunner<'_, '_, 'ctx>) -> R,
+    heap_size: Option<usize>,
+    body: impl FnOnce(&mut MonoRunner<'_>) -> R,
 ) -> Result<R> {
     let natives = build_natives(guard);
 
@@ -160,13 +145,6 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
         &natives,
     );
-    let mut txn_ctx = TransactionContext::new(
-        loader,
-        GasMeter::new(GAS_BUDGET),
-        &NO_RESOURCE_PROVIDER,
-        &natives,
-    )
-    .with_extensions(extensions);
 
     let id = guard
         .intern_address_name(&address, module_name)
@@ -175,18 +153,41 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         .intern_identifier(function_name)
         .into_global_arena_ptr();
 
+    let mut read_set = ModuleReadSet::new();
+    let mut gas_meter = GasMeter::new(GAS_BUDGET);
     // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard` is
     // held the global executable cache cannot enter maintenance, so no arena
     // reset can happen for the duration of `body`.
-    let function = match txn_ctx.load_function(id, func, EMPTY_TYPE_LIST) {
-        Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-        Err(err) => return Err(anyhow!("failed to load function: {}", err)),
-    };
+    let function =
+        match loader.load_function(&mut read_set, &mut gas_meter, id, func, EMPTY_TYPE_LIST) {
+            Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
+            Err(err) => return Err(anyhow!("failed to load function: {}", err)),
+        };
+
+    let interp = match heap_size {
+        Some(n) => InterpreterContext::with_heap_size(
+            loader,
+            read_set,
+            gas_meter,
+            &NoResourceProvider,
+            &natives,
+            function,
+            n,
+        ),
+        None => InterpreterContext::new(
+            loader,
+            read_set,
+            gas_meter,
+            &NoResourceProvider,
+            &natives,
+            function,
+        ),
+    }
+    .with_extensions(extensions);
 
     let mut runner = MonoRunner {
-        txn_ctx: &mut txn_ctx,
+        interp,
         function,
-        heap_size: None,
         gc_count: 0,
     };
     Ok(body(&mut runner))
@@ -201,7 +202,7 @@ pub fn with_loaded_mono_function<R>(
     address: AccountAddress,
     module_name: &IdentStr,
     function_name: &IdentStr,
-    body: impl FnOnce(&mut MonoRunner<'_, '_, '_>) -> R,
+    body: impl FnOnce(&mut MonoRunner<'_>) -> R,
 ) -> Result<R> {
     let modules = compile(source, kind)?;
     let ctx = GlobalContext::with_num_execution_workers(1);
@@ -217,6 +218,7 @@ pub fn with_loaded_mono_function<R>(
         module_name,
         function_name,
         NativeExtensions::new(),
+        None,
         body,
     )
 }

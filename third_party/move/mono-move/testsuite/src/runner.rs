@@ -549,8 +549,8 @@ fn execute_function_v2(
         module_name,
         function_name,
         extensions,
+        heap_size,
         |runner| {
-            runner.set_heap_size(heap_size);
             let result = runner.run(
                 |interpreter| {
                     let mut offset: u32 = 0;
