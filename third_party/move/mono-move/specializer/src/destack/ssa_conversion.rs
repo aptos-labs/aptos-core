@@ -8,8 +8,11 @@
 //! are mutable across blocks and keep their original slot indices.
 
 use super::ssa_function::SSAFunction;
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpKind, Instr, Label, Slot, UnaryOp};
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use crate::{
+    error::{SpecializerError, SpecializerInvariantViolation, SpecializerResult},
+    invariant_violation,
+    stackless_exec_ir::{BasicBlock, BinaryOp, CmpKind, Instr, Label, Slot, UnaryOp},
+};
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
@@ -38,7 +41,7 @@ use std::ops::Range;
 fn split_bytecode_into_blocks(
     code: &[Bytecode],
     label_map: &UnorderedMap<CodeOffset, Label>,
-) -> Result<Vec<Range<usize>>> {
+) -> SpecializerResult<Vec<Range<usize>>> {
     let mut blocks = Vec::new();
     let mut start = 0;
 
@@ -63,10 +66,9 @@ fn split_bytecode_into_blocks(
     // The bytecode verifier's `verify_fallthrough` rejects code whose last
     // instruction is not an unconditional branch (Ret/Abort/Branch), so every
     // block-ending terminator in the loop above will have consumed all code.
-    ensure!(
-        start >= code.len(),
-        "verified bytecode must end with a terminator"
-    );
+    if start < code.len() {
+        invariant_violation!(MissingTerminator);
+    }
     Ok(blocks)
 }
 
@@ -109,12 +111,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         }
     }
 
-    fn alloc_vid(&mut self, ty: InternedType) -> Result<Slot> {
+    fn alloc_vid(&mut self, ty: InternedType) -> SpecializerResult<Slot> {
         let vid = Slot::Vid(self.next_vid);
         self.next_vid = self
             .next_vid
             .checked_add(1)
-            .context("too many SSA values (Vid overflow)")?;
+            .ok_or(SpecializerError::TooManySsaValues)?;
         self.vid_types.push(ty);
         Ok(vid)
     }
@@ -124,26 +126,33 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         self.stack.push(r);
     }
 
-    fn pop_slot(&mut self) -> Result<Slot> {
-        self.stack.pop().context("stack underflow")
+    fn pop_slot(&mut self) -> SpecializerResult<Slot> {
+        self.stack
+            .pop()
+            .ok_or_else(|| SpecializerInvariantViolation::StackUnderflow.into())
     }
 
-    fn pop_n_reverse(&mut self, n: usize) -> Result<Vec<Slot>> {
-        ensure!(self.stack.len() >= n, "stack underflow");
+    fn pop_n_reverse(&mut self, n: usize) -> SpecializerResult<Vec<Slot>> {
+        if self.stack.len() < n {
+            invariant_violation!(StackUnderflow);
+        }
         let start = self.stack.len() - n;
         Ok(self.stack.drain(start..).collect())
     }
 
     /// Returns the type of a Vid slot by looking it up in `vid_types`.
     /// Invariant: only Vid slots appear on the operand stack.
-    fn vid_type(&self, slot: Slot) -> Result<InternedType> {
+    fn vid_type(&self, slot: Slot) -> SpecializerResult<InternedType> {
         match slot {
             Slot::Vid(id) => self
                 .vid_types
                 .get(id as usize)
                 .copied()
-                .with_context(|| format!("Vid id {} out of range", id)),
-            other => bail!("expected Vid slot on operand stack, got {:?}", other),
+                .ok_or(SpecializerInvariantViolation::VidOutOfRange { vid: id }.into()),
+            other => {
+                let _ = other;
+                invariant_violation!(ExpectedVidOnStack)
+            },
         }
     }
 
@@ -181,13 +190,13 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: StructDefInstantiationIndex,
-    ) -> Result<InternedType> {
+    ) -> SpecializerResult<InternedType> {
         let inst = &module.struct_def_instantiations[idx.0 as usize];
         let generic_ty = module.interned_nominal_def_type_at(inst.def);
         let ty_args = self
             .interner
             .type_list_of(module.interned_types_at(inst.type_parameters));
-        self.interner.subst_type(generic_ty, ty_args)
+        Ok(self.interner.subst_type(generic_ty, ty_args)?)
     }
 
     /// Returns `(enum_ty, variant_ordinal, ty_args_list)` for a generic
@@ -196,7 +205,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: StructVariantInstantiationIndex,
-    ) -> Result<(InternedType, u16, InternedTypeList)> {
+    ) -> SpecializerResult<(InternedType, u16, InternedTypeList)> {
         let inst = &module.struct_variant_instantiations[idx.0 as usize];
         let handle = &module.struct_variant_handles[inst.handle.0 as usize];
         let generic_ty = module.interned_nominal_def_type_at(handle.struct_index);
@@ -215,7 +224,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: FieldInstantiationIndex,
-    ) -> Result<(FieldHandleIndex, InternedType, InternedType)> {
+    ) -> SpecializerResult<(FieldHandleIndex, InternedType, InternedType)> {
         let inst = &module.field_instantiations[idx.0 as usize];
         let ty_args = self
             .interner
@@ -238,7 +247,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: VariantFieldInstantiationIndex,
-    ) -> Result<(VariantFieldHandleIndex, InternedType, InternedType)> {
+    ) -> SpecializerResult<(VariantFieldHandleIndex, InternedType, InternedType)> {
         let inst = &module.variant_field_instantiations[idx.0 as usize];
         let ty_args = self
             .interner
@@ -292,16 +301,15 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         mut self,
         module: &PreparedModule,
         code: &[Bytecode],
-    ) -> Result<SSAFunction> {
+    ) -> SpecializerResult<SSAFunction> {
         self.assign_labels(code);
 
         let block_boundaries = split_bytecode_into_blocks(code, &self.label_map)?;
 
         for block in block_boundaries {
-            ensure!(
-                self.stack.is_empty(),
-                "stack must be empty at block boundary"
-            );
+            if !self.stack.is_empty() {
+                invariant_violation!(StackNotEmptyAtBlockBoundary);
+            }
 
             // Every block gets a label (assigned on-demand if not already a branch target).
             let label = self.get_or_create_label(block.start as CodeOffset);
@@ -326,7 +334,11 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     /// value ID for each result, emits the corresponding slot-based instruction, and
     /// pushes the results back. The stack is only a compile-time simulation — the
     /// emitted IR is purely slot-based.
-    fn convert_bytecode(&mut self, module: &PreparedModule, bc: &Bytecode) -> Result<()> {
+    fn convert_bytecode(
+        &mut self,
+        module: &PreparedModule,
+        bc: &Bytecode,
+    ) -> SpecializerResult<()> {
         use Bytecode as B;
         match bc {
             // --- Loads ---
@@ -470,13 +482,24 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::Not => self.convert_unop(UnaryOp::Not, ty::BOOL_TY)?,
             // --- Unary ops (result type derived from operand) ---
             B::Negate => {
-                let src_ty = self.vid_type(*self.stack.last().context("stack underflow")?)?;
+                let src_ty = self.vid_type(
+                    *self
+                        .stack
+                        .last()
+                        .ok_or(SpecializerInvariantViolation::StackUnderflow)?,
+                )?;
                 self.convert_unop(UnaryOp::Negate, src_ty)?;
             },
             B::FreezeRef => {
-                let src_ty = self.vid_type(*self.stack.last().context("stack underflow")?)?;
+                let src_ty = self.vid_type(
+                    *self
+                        .stack
+                        .last()
+                        .ok_or(SpecializerInvariantViolation::StackUnderflow)?,
+                )?;
                 // The bytecode verifier guarantees the operand is &mut T.
-                let result_ty = convert_mut_to_immut_ref(self.interner, src_ty)?;
+                let result_ty = convert_mut_to_immut_ref(self.interner, src_ty)
+                    .ok_or(SpecializerInvariantViolation::ExpectedMutableReference)?;
                 self.convert_unop(UnaryOp::FreezeRef, result_ty)?;
             },
 
@@ -504,7 +527,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let src = self.pop_slot()?;
                 let ftypes = module
                     .interned_struct_field_types_at(*idx)
-                    .ok_or_else(|| anyhow!("Must be a struct"))?;
+                    .ok_or(SpecializerInvariantViolation::ExpectedStructType)?;
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
@@ -521,7 +544,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let inst = &module.struct_def_instantiations[idx.0 as usize];
                 let fields = module
                     .interned_struct_field_types_at(inst.def)
-                    .ok_or_else(|| anyhow!("Must be a struct"))?;
+                    .ok_or(SpecializerInvariantViolation::ExpectedStructType)?;
                 let inst_ty = self.struct_inst_ty(module, *idx)?;
                 let ty_args = self
                     .interner
@@ -572,7 +595,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let variant = handle.variant;
                 let ftypes = module
                     .interned_variant_field_types_at(handle.struct_index, variant)
-                    .ok_or_else(|| anyhow!("Must be an enum"))?;
+                    .ok_or(SpecializerInvariantViolation::ExpectedEnumType)?;
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
@@ -595,7 +618,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let variant = handle.variant;
                 let fields = module
                     .interned_variant_field_types_at(handle.struct_index, variant)
-                    .ok_or_else(|| anyhow!("Must be an enum"))?;
+                    .ok_or(SpecializerInvariantViolation::ExpectedEnumType)?;
                 let (inst_ty, variant_ord, ty_args) = self.variant_inst_parts(module, *idx)?;
                 let mut dsts = Vec::with_capacity(fields.len());
                 for &fty in fields {
@@ -734,7 +757,8 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let src = self.pop_slot()?;
                 let src_ty = self.vid_type(src)?;
                 // The bytecode verifier guarantees the operand is `&T` or `&mut T`.
-                let ty = strip_ref(src_ty)?;
+                let ty = strip_ref(src_ty)
+                    .ok_or(SpecializerInvariantViolation::ExpectedReferenceType)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs.push(Instr::ReadRef(dst, src));
                 self.push_slot(dst);
@@ -929,7 +953,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let first = sig_types
                     .first()
                     .copied()
-                    .context("CallClosure signature is empty")?;
+                    .ok_or(SpecializerInvariantViolation::ClosureSignatureEmpty)?;
                 let (num_args, ret_types) =
                     if let Type::Function { args, results, .. } = view_type(first) {
                         (
@@ -937,7 +961,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                             view_type_list(*results).to_vec(),
                         )
                     } else {
-                        bail!("CallClosure signature must start with a Function type")
+                        invariant_violation!(ClosureSignatureNotFunction)
                     };
                 let closure = self.pop_slot()?;
                 let mut all_args = self.pop_n_reverse(num_args)?;
@@ -1070,7 +1094,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         Ok(())
     }
 
-    fn convert_binop(&mut self, op: BinaryOp, result_is_bool: bool) -> Result<()> {
+    fn convert_binop(&mut self, op: BinaryOp, result_is_bool: bool) -> SpecializerResult<()> {
         let rhs = self.pop_slot()?;
         let lhs = self.pop_slot()?;
         let result_ty = if result_is_bool {
@@ -1085,7 +1109,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         Ok(())
     }
 
-    fn convert_unop(&mut self, op: UnaryOp, result_ty: InternedType) -> Result<()> {
+    fn convert_unop(&mut self, op: UnaryOp, result_ty: InternedType) -> SpecializerResult<()> {
         let src = self.pop_slot()?;
         let dst = self.alloc_vid(result_ty)?;
         self.current_block_instrs.push(Instr::UnaryOp(dst, op, src));
@@ -1094,7 +1118,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     }
 
     /// Convert a cast op, whose result type is the cast target itself.
-    fn convert_cast(&mut self, to: IntTy) -> Result<()> {
+    fn convert_cast(&mut self, to: IntTy) -> SpecializerResult<()> {
         self.convert_unop(UnaryOp::Cast(to), to.interned_ty())
     }
 }

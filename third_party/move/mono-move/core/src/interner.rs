@@ -6,6 +6,7 @@
 use crate::types::{InternedType, InternedTypeList};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
+use thiserror::Error;
 
 /// Pointer to interned Move identifier allocated in global arena.
 pub type InternedIdentifier = GlobalArenaPtr<str>;
@@ -57,6 +58,13 @@ pub type InternedFunctionRef = GlobalArenaPtr<FunctionRef>;
 pub fn view_function_ref(ptr: InternedFunctionRef) -> &'static FunctionRef {
     // SAFETY: see the safety contract above.
     unsafe { ptr.as_ref_unchecked() }
+}
+
+#[derive(Debug, Clone, Error)]
+#[error("type parameter index {idx} out of bounds: substitution table has {table_len} entries")]
+pub struct TypeSubstitutionError {
+    pub idx: u16,
+    pub table_len: usize,
 }
 
 /// Constructs interned values, turning each into its canonical,
@@ -138,7 +146,7 @@ pub trait Interner {
         &self,
         ty: InternedType,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<InternedType>;
+    ) -> Result<InternedType, TypeSubstitutionError>;
 
     /// Substitutes type parameters in every element of the given type list.
     /// Returns an error if substitution fails.
@@ -154,5 +162,5 @@ pub trait Interner {
         &self,
         tys: InternedTypeList,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<InternedTypeList>;
+    ) -> Result<InternedTypeList, TypeSubstitutionError>;
 }

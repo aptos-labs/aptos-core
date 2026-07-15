@@ -6,8 +6,10 @@
 //! TODO(cleanup): consider moving into a separate crate.
 
 use crate::{
-    ExecutionErrorKind, GasExhaustedError, IntTy, IntoExecutionError, ResourceProviderError,
+    native::NativeABIError, ExecutionErrorKind, GasExhaustedError, IntTy, IntoExecutionError,
+    PreparedModuleError, ResourceProviderError, TypeSubstitutionError,
 };
+use move_binary_format::errors::VMError;
 use move_core_types::account_address::AccountAddress;
 use std::fmt;
 use thiserror::Error;
@@ -383,9 +385,8 @@ pub enum LoaderError {
     #[error(transparent)]
     GlobalContext(anyhow::Error),
 
-    /// TODO(cleanup): replace once the specializer has its own error type.
     #[error(transparent)]
-    Specializer(anyhow::Error),
+    Specializer(#[from] SpecializerError),
 
     #[error(transparent)]
     InvariantViolation(#[from] LoaderInvariantViolation),
@@ -401,12 +402,13 @@ impl IntoExecutionError for LoaderError {
                 ExecutionErrorKind::LinkingError
             },
 
+            Specializer(e) => e.kind(),
+
             // TODO(cleanup): delegate to the inner errors once they have their own types.
             Deserialization(_)
             | Verification(_)
             | ModuleProvider(_)
             | GlobalContext(_)
-            | Specializer(_)
             | LoweringSkipped { .. } => ExecutionErrorKind::Placeholder,
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
@@ -471,4 +473,305 @@ pub enum LoaderInvariantViolation {
 
     #[error("Mandatory dependencies must always be lazy")]
     MandatoryDepsNotLazy,
+}
+
+pub type SpecializerResult<T> = Result<T, SpecializerError>;
+
+/// Typed internal error for the specializer. Its input is already verified,
+/// so almost every failure is a [`SpecializerInvariantViolation`] rather than
+/// a user-facing error.
+#[derive(Debug, Error)]
+pub enum SpecializerError {
+    #[error("too many SSA values (Vid u16 overflow)")]
+    TooManySsaValues,
+
+    /// Boxed to break the `LoaderError` ⇄ `SpecializerError` type cycle.
+    #[error(transparent)]
+    Loader(Box<LoaderError>),
+
+    #[error("bytecode verification failed: {0}")]
+    Verification(VMError),
+
+    #[error(transparent)]
+    ModulePreparation(PreparedModuleError),
+
+    #[error("invariant violation: {0}")]
+    InvariantViolation(#[from] SpecializerInvariantViolation),
+}
+
+impl From<LoaderError> for SpecializerError {
+    fn from(err: LoaderError) -> Self {
+        SpecializerError::Loader(Box::new(err))
+    }
+}
+
+impl From<TypeSubstitutionError> for SpecializerError {
+    fn from(err: TypeSubstitutionError) -> Self {
+        SpecializerError::InvariantViolation(SpecializerInvariantViolation::TypeSubstitutionFailed(
+            err,
+        ))
+    }
+}
+
+impl IntoExecutionError for SpecializerError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use SpecializerError::*;
+        match self {
+            TooManySsaValues => ExecutionErrorKind::RuntimeLimitExceeded,
+            Loader(e) => e.kind(),
+            // TODO(cleanup): map to `VerificationFailed`/`DeserializationFailed`
+            // once those categories exist.
+            Verification(_) | ModulePreparation(_) => ExecutionErrorKind::Placeholder,
+            InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+        }
+    }
+}
+
+/// Conditions that must hold for verified, well-formed bytecode reaching
+/// the specializer. Each is surfaced (rather than panicked) so callers
+/// can produce a clean per-transaction outcome and alert operationally
+/// on [`ExecutionErrorKind::InvariantViolation`].
+///
+/// One variant per real error site; exact-duplicate messages share a
+/// variant, parameterised by an `op` label where the site differs only
+/// by which instruction raised it.
+#[derive(Debug, Error)]
+pub enum SpecializerInvariantViolation {
+    // ---- bytecode → intra-block SSA ----
+    #[error("verified bytecode must end with a terminator")]
+    MissingTerminator,
+
+    #[error("operand stack underflow")]
+    StackUnderflow,
+
+    #[error("Vid id {vid} out of range")]
+    VidOutOfRange { vid: u16 },
+
+    #[error("expected a Vid slot on the operand stack")]
+    ExpectedVidOnStack,
+
+    #[error("operand stack must be empty at a block boundary")]
+    StackNotEmptyAtBlockBoundary,
+
+    #[error("expected a struct type")]
+    ExpectedStructType,
+
+    #[error("expected an enum type")]
+    ExpectedEnumType,
+
+    #[error("CallClosure signature is empty")]
+    ClosureSignatureEmpty,
+
+    #[error("CallClosure signature must start with a Function type")]
+    ClosureSignatureNotFunction,
+
+    #[error("expected a reference type")]
+    ExpectedReferenceType,
+
+    #[error("expected a mutable reference type")]
+    ExpectedMutableReference,
+
+    // ---- type substitution / monomorphization ----
+    #[error(transparent)]
+    TypeSubstitutionFailed(#[from] TypeSubstitutionError),
+
+    // ---- slot allocation ----
+    #[error("VID type not found during SSA allocation")]
+    VidTypeNotFound,
+
+    #[error("vid_type called on a non-Vid slot")]
+    VidTypeOnNonVidSlot,
+
+    // ---- post-allocation IR sanity ----
+    #[error("Vid slot in post-allocation IR")]
+    VidInPostAllocationIr,
+
+    #[error("scratch slot required when emitting 2+ parallel copies")]
+    ScratchSlotRequiredForParallelCopy,
+
+    // ---- GC layout derivation ----
+    #[error("nominal type has no layout populated")]
+    LayoutNotPopulated,
+
+    #[error("type parameter reached gc_layout — try_build_context should have skipped")]
+    TypeParamReachedGcLayout,
+
+    #[error("layout id does not resolve to a layout")]
+    LayoutIdUnresolved,
+
+    #[error("gc_layout: field offset {field_offset} + inner offset {inner_offset} overflows u32")]
+    GcFieldOffsetOverflow {
+        field_offset: u32,
+        inner_offset: u32,
+    },
+
+    // ---- layout / size resolution ----
+    #[error("{label} has no concrete size")]
+    NoConcreteSize { label: &'static str },
+
+    #[error("{op}: struct type has no populated layout")]
+    StructLayoutNotPopulated { op: &'static str },
+
+    #[error("{op}: nominal type is not a struct (no field layouts)")]
+    NominalTypeNotStruct { op: &'static str },
+
+    #[error("{op}: field layout id does not resolve")]
+    FieldLayoutIdUnresolved { op: &'static str },
+
+    #[error("field index {pos} out of range for struct")]
+    FieldIndexOutOfRange { pos: usize },
+
+    // ---- variant field resolution ----
+    #[error("{op}: no derived layout for enum")]
+    EnumLayoutNotDerived { op: &'static str },
+
+    #[error("variant field index out of range")]
+    VariantFieldIndexOutOfRange,
+
+    #[error("variant field handle has no variants")]
+    VariantFieldHandleNoVariants,
+
+    // ---- lowering: constants ----
+    #[error(
+        "LdConst at constant pool index {idx}: expected {expected}-byte constant data, got {got}"
+    )]
+    LdConstBadLength {
+        idx: u16,
+        expected: usize,
+        got: usize,
+    },
+
+    #[error("LdConst at constant pool index {idx}: constant type is not permitted by the bytecode verifier")]
+    LdConstTypeNotPermitted { idx: u16 },
+
+    // ---- lowering: control flow ----
+    #[error("conditional terminator in final block has no fallthrough block")]
+    FinalBlockNoFallthrough,
+
+    #[error("conditional branch at fixup index {idx} has no fallthrough label")]
+    ConditionalBranchNoFallthrough { idx: usize },
+
+    #[error("unexpected non-branch op at fixup index {idx}")]
+    UnexpectedNonBranchOpAtFixup { idx: usize },
+
+    #[error("unresolved label L{label}")]
+    UnresolvedLabel { label: u16 },
+
+    // ---- lowering: arithmetic / casts ----
+    #[error("cast source must be an integer type")]
+    CastSourceNotInteger,
+
+    #[error("bitwise op on a signed value is invalid")]
+    BitwiseOnSignedValue,
+
+    #[error("shift op requires an unsigned non-u64 integer type")]
+    ShiftRequiresUnsignedNonU64,
+
+    #[error("unexpected op in arith/bitwise lowering arm")]
+    UnexpectedOpInArithArm,
+
+    #[error("unexpected op in shift lowering arm")]
+    UnexpectedOpInShiftArm,
+
+    #[error("BinaryOpImm imm must be bool")]
+    ImmMustBeBool,
+
+    #[error("Negate requires a signed integer type")]
+    NegateRequiresSignedInt,
+
+    #[error("u64 fast path received a wide imm — ill-typed IR")]
+    U64FastPathWideImm,
+
+    #[error("shift immediate must be u8")]
+    ShiftImmNotU8,
+
+    #[error("expected an integer type")]
+    ExpectedIntegerType,
+
+    #[error("bool ImmValue cannot be an integer operand")]
+    BoolImmNotInteger,
+
+    // ---- lowering: comparisons ----
+    #[error("equality is not supported for this operand type")]
+    EqualityUnsupportedType,
+
+    #[error("ordering comparison on a non-scalar operand is ill-typed")]
+    OrderingOnNonScalar,
+
+    #[error("operand type has no comparison lowering")]
+    ComparisonNoLowering,
+
+    // ---- lowering: pack / unpack ----
+    #[error("{op}: value count {provided} does not match field count {expected}")]
+    FieldCountMismatch {
+        op: &'static str,
+        provided: usize,
+        expected: usize,
+    },
+
+    #[error("{op}: neither reverse nor forward emit is overlap-safe")]
+    NotOverlapSafe { op: &'static str },
+
+    #[error("CallClosure has no closure operand")]
+    CallClosureNoOperand,
+
+    // ---- lowering: global storage ----
+    #[error("{op}: box-pointer slot not reserved")]
+    BoxPtrSlotNotReserved { op: &'static str },
+
+    #[error("{op}: no descriptor published for the resource type (its layout may be unresolved)")]
+    ResourceTypeNoDescriptor { op: &'static str },
+
+    #[error("{op}: no descriptor published for this vector type (element may be generic or have unresolved layout)")]
+    VectorTypeNoDescriptor { op: &'static str },
+
+    // ---- lowering: enum variants ----
+    #[error("{op}: variant ordinal {ordinal} out of range")]
+    VariantOrdinalOutOfRange { op: &'static str, ordinal: usize },
+
+    #[error("{op}: dst/src aliases but no enum-pointer scratch reserved")]
+    EnumPtrScratchMissing { op: &'static str },
+
+    #[error("{op}: no scratch slot reserved")]
+    VariantFieldScratchMissing { op: &'static str },
+
+    #[error("Xfer({xfer}) read without a prior def in this block")]
+    XferReadWithoutDef { xfer: u16 },
+
+    // ---- debug-only post-optimize xfer verifier ----
+    #[error(
+        "arg positionality: args[{arg_idx}] resolves to Xfer({got}), expected Xfer({arg_idx})"
+    )]
+    XferArgPositionality { arg_idx: usize, got: u16 },
+
+    #[error("return Xfer prefix: rets[{ret_idx}] resolves to Xfer({got}) after a non-Xfer ret")]
+    XferReturnPrefix { ret_idx: usize, got: u16 },
+
+    #[error("return monotonicity: rets[{ret_idx}] = Xfer({got}) <= prev Xfer({prev})")]
+    XferReturnNotMonotonic { ret_idx: usize, got: u16, prev: u16 },
+
+    #[error("post-optimize Xfer verifier: block {block}, instr {instr}: use of Xfer({xfer}) with no live def earlier in this block")]
+    XferUseWithoutLiveDef {
+        block: usize,
+        instr: usize,
+        xfer: u16,
+    },
+
+    #[error("post-optimize Xfer verifier: block {block}, instr {instr}: Xfer({xfer}) bound at call boundary but not consumed as args[{xfer}]")]
+    XferBoundNotConsumed {
+        block: usize,
+        instr: usize,
+        xfer: u16,
+    },
+
+    #[error("post-optimize Xfer verifier: block {block}: Xfer({xfer}) bound at block end (Xfer lifetimes must be block-local)")]
+    XferBoundAtBlockEnd { block: usize, xfer: u16 },
+
+    // ---- native call sites ----
+    #[error("native call-site ABI is malformed: {0}")]
+    NativeAbi(#[from] NativeABIError),
+
+    // ---- test-utils intrinsics ----
+    #[error("0x0::test_utils::force_gc must take no arguments and return nothing")]
+    ForceGcBadSignature,
 }

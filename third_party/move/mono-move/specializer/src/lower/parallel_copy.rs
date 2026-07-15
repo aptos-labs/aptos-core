@@ -24,7 +24,7 @@
 //! scratch slot needed for arg setup.
 
 use super::lower_utils::ranges_overlap;
-use anyhow::{bail, Result};
+use crate::{error::SpecializerResult, invariant_violation};
 use mono_move_core::{FrameOffset, MicroOp};
 use smallbitvec::SmallBitVec;
 use smallvec::SmallVec;
@@ -64,7 +64,7 @@ pub(crate) fn emit_parallel_copy(
     out: &mut Vec<MicroOp>,
     copies: &[Copy],
     scratch: Option<FrameOffset>,
-) -> Result<()> {
+) -> SpecializerResult<()> {
     // Filter trivial copies. Inline-stack-allocated for the common
     // small-N path; spills to heap only for adversarial wide signatures.
     let mut copies: SmallVec<[Copy; STACK_COPY_CAPACITY]> = copies
@@ -81,7 +81,7 @@ pub(crate) fn emit_parallel_copy(
         return Ok(());
     }
     let Some(scratch) = scratch else {
-        bail!("scratch slot required when emitting 2+ parallel copies");
+        invariant_violation!(ScratchSlotRequiredForParallelCopy);
     };
 
     // Invariants:

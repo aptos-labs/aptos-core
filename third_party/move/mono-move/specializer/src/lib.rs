@@ -4,8 +4,10 @@
 pub mod stackless_exec_ir;
 
 pub mod destack;
+pub mod error;
 mod gas;
 pub mod lower;
 
 pub use destack::destack;
+pub use error::{SpecializerError, SpecializerInvariantViolation, SpecializerResult};
 pub use stackless_exec_ir::{FunctionIR, ModuleIR};

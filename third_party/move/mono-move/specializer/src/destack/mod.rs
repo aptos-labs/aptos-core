@@ -11,18 +11,19 @@ mod ssa_function;
 mod test_utils;
 mod translate;
 
-use crate::stackless_exec_ir::ModuleIR;
-use anyhow::{bail, Result};
+use crate::{
+    error::{SpecializerError, SpecializerResult},
+    stackless_exec_ir::ModuleIR,
+};
 use mono_move_core::{Interner, PreparedModule};
 use move_binary_format::CompiledModule;
 
 /// Verify, convert, and optimize a compiled module into stackless execution IR.
-pub fn destack(module: CompiledModule, interner: &impl Interner) -> Result<ModuleIR> {
-    if let Err(e) = move_bytecode_verifier::verify_module(&module) {
-        bail!("bytecode verification failed: {:#}", e);
-    }
+pub fn destack(module: CompiledModule, interner: &impl Interner) -> SpecializerResult<ModuleIR> {
+    move_bytecode_verifier::verify_module(&module).map_err(SpecializerError::Verification)?;
 
-    let module = PreparedModule::build(module, interner)?;
+    let module =
+        PreparedModule::build(module, interner).map_err(SpecializerError::ModulePreparation)?;
     let mut module_ir = translate::translate_module(module, interner)?;
     optimize::optimize_module(&mut module_ir);
     // Debug-mode failsafe: verify xfer invariants hold after optimization.

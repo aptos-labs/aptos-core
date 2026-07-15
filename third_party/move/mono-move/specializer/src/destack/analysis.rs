@@ -78,6 +78,10 @@
 //! coalescing, if ever added, would need to revisit this.)
 
 #[cfg(debug_assertions)]
+use crate::error::SpecializerResult;
+#[cfg(debug_assertions)]
+use crate::invariant_violation;
+#[cfg(debug_assertions)]
 use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
     instr_utils::{clobbers_xfer, for_each_def, for_each_use},
@@ -509,22 +513,15 @@ fn check_call_structural_invariants<F>(
     args: &[Slot],
     rets: &[Slot],
     xfer_pos: F,
-) -> anyhow::Result<()>
+) -> SpecializerResult<()>
 where
     F: Fn(&Slot) -> Option<u16>,
 {
-    use anyhow::bail;
-
     for (j, slot) in args.iter().enumerate() {
         if let Some(i) = xfer_pos(slot)
             && i as usize != j
         {
-            bail!(
-                "arg positionality: args[{}] resolves to Xfer({}), expected Xfer({})",
-                j,
-                i,
-                j,
-            );
+            invariant_violation!(XferArgPositionality { arg_idx: j, got: i });
         }
     }
 
@@ -534,21 +531,16 @@ where
         match xfer_pos(slot) {
             Some(i) => {
                 if seen_non_xfer {
-                    bail!(
-                        "return Xfer prefix: rets[{}] resolves to Xfer({}) after a non-Xfer ret",
-                        k,
-                        i,
-                    );
+                    invariant_violation!(XferReturnPrefix { ret_idx: k, got: i });
                 }
                 if let Some(prev) = last_xfer
                     && i <= prev
                 {
-                    bail!(
-                        "return monotonicity: rets[{}] = Xfer({}) ≤ prev Xfer({})",
-                        k,
-                        i,
-                        prev,
-                    );
+                    invariant_violation!(XferReturnNotMonotonic {
+                        ret_idx: k,
+                        got: i,
+                        prev
+                    });
                 }
                 last_xfer = Some(i);
             },
@@ -799,9 +791,7 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
 #[cfg(debug_assertions)]
 pub(crate) fn assert_xfer_invariants_on_final_ir(
     func: &crate::stackless_exec_ir::FunctionIR,
-) -> anyhow::Result<()> {
-    use anyhow::bail;
-
+) -> SpecializerResult<()> {
     let num_xfer = func.num_xfer_positions as usize;
     let mut bound: Vec<bool> = vec![false; num_xfer];
     for (b_idx, block) in func.blocks.iter().enumerate() {
@@ -819,14 +809,11 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                 }
             });
             if let Some(j) = unbound {
-                bail!(
-                    "post-optimize Xfer verifier: block {}, instr {}: use of Xfer({}) \
-                     with no live def earlier in this block — copy_propagation may have \
-                     rewritten a Home use to an Xfer use across a clobbering call",
-                    b_idx,
-                    i,
-                    j,
-                );
+                invariant_violation!(XferUseWithoutLiveDef {
+                    block: b_idx,
+                    instr: i,
+                    xfer: j
+                });
             }
 
             // (2) at a call boundary, every bound Xfer slot must
@@ -844,14 +831,6 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                 check_call_structural_invariants(args, rets, |s| match s {
                     Slot::Xfer(i) => Some(*i),
                     _ => None,
-                })
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "post-optimize Xfer verifier: block {}, instr {}: {}",
-                        b_idx,
-                        i,
-                        e,
-                    )
                 })?;
                 // Orphan check: every bound slot must be consumed
                 // by this call's args. A bound position not in args
@@ -860,17 +839,11 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                     if b {
                         let consumed_here = j < args.len() && args[j] == Slot::Xfer(j as u16);
                         if !consumed_here {
-                            bail!(
-                                "post-optimize Xfer verifier: block {}, instr {}: \
-                                 Xfer({}) bound at call boundary but not consumed \
-                                 as args[{}] of this call — a dead Xfer def \
-                                 leaked from earlier in the block (likely an \
-                                 upstream destack precoloring regression)",
-                                b_idx,
-                                i,
-                                j,
-                                j,
-                            );
+                            invariant_violation!(XferBoundNotConsumed {
+                                block: b_idx,
+                                instr: i,
+                                xfer: j as u16
+                            });
                         }
                     }
                 }
@@ -898,12 +871,10 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
         // (3) no Xfer binding may survive past the end of a block.
         for (j, &b) in bound.iter().enumerate() {
             if b {
-                bail!(
-                    "post-optimize Xfer verifier: block {}: Xfer({}) bound at block end \
-                     (Xfer lifetimes must be block-local)",
-                    b_idx,
-                    j,
-                );
+                invariant_violation!(XferBoundAtBlockEnd {
+                    block: b_idx,
+                    xfer: j as u16
+                });
             }
         }
     }

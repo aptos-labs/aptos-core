@@ -19,8 +19,8 @@ use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
-    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Interner, LayoutId, LayoutProvider, ValueLayout,
+    types::{InternedType, EMPTY_TYPE_LIST},
+    DescriptorId, FieldTypes, FrameOffset, LayoutId, LayoutProvider, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -31,6 +31,7 @@ use specializer::{
         SpecializerContext,
     },
     stackless_exec_ir::ModuleIR,
+    SpecializerResult,
 };
 
 /// Render the requested sections for all modules into a single string.
@@ -106,7 +107,7 @@ fn push_module_banner(out: &mut String, module: &CompiledModule) {
 fn lower_functions(
     guard: &ExecutionGuard<'_>,
     module_ir: &ModuleIR,
-) -> Vec<(String, Result<LoweringOutcome>)> {
+) -> Vec<(String, SpecializerResult<LoweringOutcome>)> {
     let mut loader_ctx = SnapshotLoaderContext { guard, module_ir };
     module_ir
         .functions
@@ -213,7 +214,7 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> Result<Option<FieldTypes>> {
+    ) -> SpecializerResult<Option<FieldTypes>> {
         if *module_id != self.module_ir.module.id() {
             return Ok(None);
         }
@@ -224,19 +225,14 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .cloned())
     }
 
-    fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType> {
-        self.guard.subst_type(ty, ty_args)
-    }
-
     fn publish_vec_descriptor(
         &self,
         elem_ty: InternedType,
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
-    ) -> Result<DescriptorId> {
-        Ok(self
-            .guard
-            .publish_vec_descriptor(elem_ty, elem_size, elem_ptr_offsets))
+    ) -> DescriptorId {
+        self.guard
+            .publish_vec_descriptor(elem_ty, elem_size, elem_ptr_offsets)
     }
 
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
@@ -248,20 +244,18 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         enum_ty: InternedType,
         size: u32,
         variant_pointer_offsets: Vec<Vec<u32>>,
-    ) -> Result<DescriptorId> {
-        Ok(self
-            .guard
-            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets))
+    ) -> DescriptorId {
+        self.guard
+            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets)
     }
 
     fn publish_captured_data_descriptor(
         &self,
         values_size: u32,
         pointer_offsets: &[FrameOffset],
-    ) -> Result<DescriptorId> {
-        Ok(self
-            .guard
-            .publish_captured_data_descriptor(values_size, pointer_offsets))
+    ) -> DescriptorId {
+        self.guard
+            .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
@@ -281,9 +275,8 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         struct_ty: InternedType,
         size: u32,
         ptr_offsets: &[FrameOffset],
-    ) -> Result<DescriptorId> {
-        Ok(self
-            .guard
-            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
+    ) -> DescriptorId {
+        self.guard
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets)
     }
 }

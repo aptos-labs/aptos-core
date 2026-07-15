@@ -18,7 +18,7 @@
 //! then inserted into cache.
 
 use crate::{
-    error::{LoaderError, LoaderResult},
+    error::{LoaderError, LoaderInvariantViolation, LoaderResult},
     invariant_violation,
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
@@ -26,7 +26,7 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, LayoutId,
     LayoutProvider, ModuleId, ModuleProvider, ValueLayout,
 };
 use mono_move_global_context::{
@@ -39,7 +39,7 @@ use specializer::{
         try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
         try_lower_function, LoweringOutcome, SpecializerContext,
     },
-    ModuleIR,
+    ModuleIR, SpecializerResult,
 };
 use std::sync::Arc;
 
@@ -273,8 +273,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             module.ir(),
             func_ir,
             ty_args,
-        )
-        .map_err(LoaderError::Specializer)?;
+        )?;
 
         let parent_ms_ids = module
             .mandatory_dependencies()
@@ -299,9 +298,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             self.guard,
             descriptors,
             self.natives,
-        )
-        .map_err(LoaderError::Specializer)?
-        {
+        )? {
             LoweringOutcome::Built(f) => f,
             // TODO(cleanup): drop this arm — together with the `LoweringOutcome`
             // enum and the corresponding `BuildContextOutcome::Skipped`
@@ -550,8 +547,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // Per-function lowering re-walks types and rebuilds its own
         // descriptor map; only the side-effecting publish-to-guard
         // matters here.
-        let _ = try_discover_types_for_lowering_in_module(&mut walker, self.guard, module.ir())
-            .map_err(LoaderError::Specializer)?;
+        let _ = try_discover_types_for_lowering_in_module(&mut walker, self.guard, module.ir())?;
 
         // Set the mandatory set for the module. Because of concurrency, it is
         // possible that other thread sets it at before, so we need to reload
@@ -600,8 +596,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // TODO(cleanup):
         //   This can run verification twice because destack runs it and we verified before.
         //   Destack should take a hook so we can add more things to verify.
-        let module_ir =
-            specializer::destack(compiled_module, self.guard).map_err(LoaderError::Specializer)?;
+        let module_ir = specializer::destack(compiled_module, self.guard)?;
         Ok((module_ir, cost))
     }
 
@@ -725,17 +720,17 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> anyhow::Result<Option<FieldTypes>> {
+    ) -> SpecializerResult<Option<FieldTypes>> {
         let id = self.loader.guard.arena_ref_for_module_id(*module_id);
 
         // Every module needs to be in the read-set.
         let module = match self.read_set.get(id) {
             Some(ModuleRead::Loaded { module, .. }) => module,
             Some(ModuleRead::Pending) => {
-                // TODO(correctness): should be `invariant_violation!(ReadSetEntryNotLoaded)`.
-                // The specializer needs a typed error first, without creating
-                // a circular dependency with `LoaderError`.
-                anyhow::bail!("All modules have to be loaded or not present")
+                return Err(LoaderError::InvariantViolation(
+                    LoaderInvariantViolation::ReadSetEntryNotLoaded,
+                )
+                .into());
             },
             None => {
                 self.read_set.record_pending_loading(id)?;
@@ -765,24 +760,15 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .cloned())
     }
 
-    fn subst_type(
-        &self,
-        ty: InternedType,
-        ty_args: InternedTypeList,
-    ) -> anyhow::Result<InternedType> {
-        self.loader.guard.subst_type(ty, ty_args)
-    }
-
     fn publish_vec_descriptor(
         &self,
         elem_ty: InternedType,
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
-    ) -> anyhow::Result<DescriptorId> {
-        Ok(self
-            .loader
+    ) -> DescriptorId {
+        self.loader
             .guard
-            .publish_vec_descriptor(elem_ty, elem_size, elem_ptr_offsets))
+            .publish_vec_descriptor(elem_ty, elem_size, elem_ptr_offsets)
     }
 
     fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
@@ -794,22 +780,20 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         enum_ty: InternedType,
         size: u32,
         variant_pointer_offsets: Vec<Vec<u32>>,
-    ) -> anyhow::Result<DescriptorId> {
-        Ok(self
-            .loader
+    ) -> DescriptorId {
+        self.loader
             .guard
-            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets))
+            .publish_enum_descriptor(enum_ty, size, variant_pointer_offsets)
     }
 
     fn publish_captured_data_descriptor(
         &self,
         values_size: u32,
         pointer_offsets: &[FrameOffset],
-    ) -> anyhow::Result<DescriptorId> {
-        Ok(self
-            .loader
+    ) -> DescriptorId {
+        self.loader
             .guard
-            .publish_captured_data_descriptor(values_size, pointer_offsets))
+            .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
@@ -829,10 +813,9 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         struct_ty: InternedType,
         size: u32,
         ptr_offsets: &[FrameOffset],
-    ) -> anyhow::Result<DescriptorId> {
-        Ok(self
-            .loader
+    ) -> DescriptorId {
+        self.loader
             .guard
-            .publish_struct_descriptor(struct_ty, size, ptr_offsets))
+            .publish_struct_descriptor(struct_ty, size, ptr_offsets)
     }
 }

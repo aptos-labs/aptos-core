@@ -7,11 +7,14 @@
 //! real `Home`/`Xfer` slots using liveness-driven type-keyed reuse.
 
 use super::{analysis::BlockAnalysis, ssa_function::SSAFunction};
-use crate::stackless_exec_ir::{
-    instr_utils::{collect_defs_and_uses, remap_all_slots_with},
-    BasicBlock, Instr, Slot,
+use crate::{
+    error::{SpecializerInvariantViolation, SpecializerResult},
+    invariant_violation,
+    stackless_exec_ir::{
+        instr_utils::{collect_defs_and_uses, remap_all_slots_with},
+        BasicBlock, Instr, Slot,
+    },
 };
-use anyhow::{bail, Context, Result};
 use mono_move_core::types::InternedType;
 use shared_dsa::UnorderedMap;
 
@@ -128,7 +131,7 @@ impl SlotTable {
 /// Pre: SSA blocks after fusion passes; vid_types maps each `Vid(i)`
 ///      to its type at index `i`.
 /// Post: all `Vid`s replaced with real `Home`/`Xfer` slots.
-pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
+pub(crate) fn allocate_slots(ssa: SSAFunction) -> SpecializerResult<AllocatedFunction> {
     let mut table = SlotTable::new(&ssa.local_types);
     let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
     let mut global_num_xfer_positions: u16 = 0;
@@ -161,13 +164,13 @@ pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
     })
 }
 
-fn vid_type(vid: Slot, vid_types: &[InternedType]) -> Result<InternedType> {
+fn vid_type(vid: Slot, vid_types: &[InternedType]) -> SpecializerResult<InternedType> {
     match vid {
         Slot::Vid(i) => vid_types
             .get(i as usize)
             .copied()
-            .context("VID type not found during SSA allocation"),
-        _ => bail!("vid_type called on non-Vid slot {:?}", vid),
+            .ok_or_else(|| SpecializerInvariantViolation::VidTypeNotFound.into()),
+        _ => invariant_violation!(VidTypeOnNonVidSlot),
     }
 }
 
@@ -183,7 +186,7 @@ fn allocate_block_in_place(
     carry_pool: UnorderedMap<InternedType, Vec<Slot>>,
     vid_types: &[InternedType],
     analysis: &BlockAnalysis,
-) -> Result<(u16, UnorderedMap<InternedType, Vec<Slot>>)> {
+) -> SpecializerResult<(u16, UnorderedMap<InternedType, Vec<Slot>>)> {
     if instrs.is_empty() {
         return Ok((0, carry_pool));
     }

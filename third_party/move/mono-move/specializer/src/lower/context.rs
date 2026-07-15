@@ -7,6 +7,8 @@
 //! All lookups are O(1) via indexed Vecs — no maps.
 
 use crate::{
+    error::{SpecializerInvariantViolation, SpecializerResult},
+    invariant_violation,
     lower::{
         gc_layout::{
             derive_frame_layout, gc_layout_supports, shifted_field_pointer_offsets,
@@ -19,7 +21,6 @@ use crate::{
         FunctionIR, Instr, ModuleIR,
     },
 };
-use anyhow::{bail, Result};
 use mono_move_core::{
     align_up_u32, checked_align_up_u32,
     interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId},
@@ -58,18 +59,22 @@ fn reserve_slot(frame_data_size: &mut u32, size: u32) -> FrameOffset {
 pub fn concrete_type_size(
     layouts: &dyn LayoutProvider,
     ty: InternedType,
-    label: &str,
-) -> Result<u32> {
+    label: &'static str,
+) -> SpecializerResult<u32> {
     let (size, _) = layouts
         .size_and_align(ty)
-        .ok_or_else(|| anyhow::anyhow!("{} has no concrete size", label))?;
+        .ok_or(SpecializerInvariantViolation::NoConcreteSize { label })?;
     Ok(size)
 }
 
 /// Byte width of the pointee of reference type `ref_ty`. Errors when `ref_ty`
 /// is not a reference, or when its pointee isn't concrete.
-pub fn ref_pointee_size(layouts: &dyn LayoutProvider, ref_ty: InternedType) -> Result<u32> {
-    concrete_type_size(layouts, strip_ref(ref_ty)?, "ref pointee type")
+pub fn ref_pointee_size(
+    layouts: &dyn LayoutProvider,
+    ref_ty: InternedType,
+) -> SpecializerResult<u32> {
+    let pointee = strip_ref(ref_ty).ok_or(SpecializerInvariantViolation::ExpectedReferenceType)?;
+    concrete_type_size(layouts, pointee, "ref pointee type")
 }
 
 /// A frame slot paired with the type of its value.
@@ -145,12 +150,12 @@ fn publish_struct_descriptor_for(
     ctx: &impl SpecializerContext,
     ty: InternedType,
     descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
-) -> Result<()> {
+) -> SpecializerResult<()> {
     if let Some((size, _)) = ctx.size_and_align(ty)
         && let Ok(ptr_offsets) = type_pointer_offsets(ctx, ty)
     {
         let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
-        let id = ctx.publish_struct_descriptor(ty, size, &ptr_offsets)?;
+        let id = ctx.publish_struct_descriptor(ty, size, &ptr_offsets);
         descriptors.insert(ty, id);
     }
     Ok(())
@@ -233,12 +238,15 @@ pub(crate) fn resolve_variant_field_access(
     enum_layouts: &UnorderedMap<InternedType, EnumLayout>,
     enum_ty: InternedType,
     vfh: VariantFieldHandleIndex,
-) -> Result<VariantFieldAccess> {
+) -> SpecializerResult<VariantFieldAccess> {
     let handle = module.variant_field_handle_at(vfh);
     let field_pos = handle.field as usize;
-    let layout = enum_layouts
-        .get(&enum_ty)
-        .ok_or_else(|| anyhow::anyhow!("variant field: no derived layout for enum"))?;
+    let layout =
+        enum_layouts
+            .get(&enum_ty)
+            .ok_or(SpecializerInvariantViolation::EnumLayoutNotDerived {
+                op: "variant field",
+            })?;
     let mut offsets = vec![None; layout.variants.len()];
     let mut field_size = None;
     for &variant in &handle.variants {
@@ -246,14 +254,14 @@ pub(crate) fn resolve_variant_field_access(
             .variants
             .get(variant as usize)
             .and_then(|fields| fields.get(field_pos))
-            .ok_or_else(|| anyhow::anyhow!("variant field index out of range"))?;
+            .ok_or(SpecializerInvariantViolation::VariantFieldIndexOutOfRange)?;
         offsets[variant as usize] = Some(field.offset);
         // The field type is identical across the handle's variants
         // (verifier-enforced), so its size is uniform.
         field_size = Some(field.size);
     }
     let field_size =
-        field_size.ok_or_else(|| anyhow::anyhow!("variant field handle has no variants"))?;
+        field_size.ok_or(SpecializerInvariantViolation::VariantFieldHandleNoVariants)?;
     // Fast path: field present in every variant at the same offset -> no runtime
     // tag dispatch or membership check needed. A `None` hole (a variant that
     // lacks the field) correctly rejects the fast path.
@@ -433,7 +441,7 @@ fn instantiate_callee_signature(
     interner: &impl Interner,
     handle_idx: FunctionHandleIndex,
     ty_args: InternedTypeList,
-) -> Result<(InternedTypeList, InternedTypeList)> {
+) -> SpecializerResult<(InternedTypeList, InternedTypeList)> {
     let sig = module.function_signature_at(handle_idx);
     Ok((
         interner.subst_type_list(sig.params, ty_args)?,
@@ -457,7 +465,7 @@ pub fn try_build_context<'a>(
     layouts: &'a dyn LayoutProvider,
     descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
-) -> Result<BuildContextOutcome<'a>> {
+) -> SpecializerResult<BuildContextOutcome<'a>> {
     // 1. Reject `ty_args` whose length doesn't match the declared type
     // parameter count.
     // TODO(correctness): this should not be reachable from valid execution, but the current
@@ -694,9 +702,9 @@ pub fn try_build_context<'a>(
                 let first = view_type_list(*sig_types)
                     .first()
                     .copied()
-                    .ok_or_else(|| anyhow::anyhow!("CallClosure signature is empty"))?;
+                    .ok_or(SpecializerInvariantViolation::ClosureSignatureEmpty)?;
                 let Type::Function { results, .. } = view_type(first) else {
-                    anyhow::bail!("CallClosure signature must start with a Function type");
+                    invariant_violation!(ClosureSignatureNotFunction);
                 };
                 let ret_list = interner.subst_type_list(*results, ty_args)?;
                 let ret_slots =
@@ -860,20 +868,7 @@ pub trait SpecializerContext: LayoutProvider {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> Result<Option<FieldTypes>>;
-
-    /// Substitutes type parameters in the given type using type arguments as
-    /// the substitution (indexed by indices in type param nodes). Returns an
-    /// error if substitution fails.
-    ///
-    /// # Invariants
-    ///
-    /// 1. Every type as index `i` in type argument list corresponds to type
-    ///    parameter `i` in the generic type.
-    /// 2. Size of the type argument list can be greater than the largest type
-    ///    parameter `i` in the generic type. It should never be smaller. If
-    ///    so, then substitution fails.
-    fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType>;
+    ) -> SpecializerResult<Option<FieldTypes>>;
 
     /// Publishes a vector descriptor for `elem_ty` (with byte width
     /// `elem_size` and intra-element heap-pointer offsets
@@ -885,7 +880,7 @@ pub trait SpecializerContext: LayoutProvider {
         elem_ty: InternedType,
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
-    ) -> Result<DescriptorId>;
+    ) -> DescriptorId;
 
     /// Returns the already-published vector-descriptor id for `elem_ty`,
     /// or `None` if no descriptor has been published yet.
@@ -900,7 +895,7 @@ pub trait SpecializerContext: LayoutProvider {
         enum_ty: InternedType,
         size: u32,
         variant_pointer_offsets: Vec<Vec<u32>>,
-    ) -> Result<DescriptorId>;
+    ) -> DescriptorId;
 
     /// GC trace descriptor for a captured-data object with values-region size
     /// `values_size` and intra-values heap-pointer offsets `pointer_offsets`.
@@ -910,7 +905,7 @@ pub trait SpecializerContext: LayoutProvider {
         &self,
         values_size: u32,
         pointer_offsets: &[FrameOffset],
-    ) -> Result<DescriptorId>;
+    ) -> DescriptorId;
 
     /// Publishes `layout` for `ty` and returns its assigned id. Idempotent.
     fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId;
@@ -935,7 +930,7 @@ pub trait SpecializerContext: LayoutProvider {
         struct_ty: InternedType,
         size: u32,
         ptr_offsets: &[FrameOffset],
-    ) -> Result<DescriptorId>;
+    ) -> DescriptorId;
 }
 
 /// Interned type list of a closure target's captured parameters (the mask-set
@@ -950,7 +945,7 @@ fn captured_types_of(
     function_handle_idx: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
-) -> Result<Option<InternedTypeList>> {
+) -> SpecializerResult<Option<InternedTypeList>> {
     if mask.captured_count() == 0 {
         return Ok(None);
     }
@@ -989,7 +984,7 @@ pub fn try_lower_function(
     layouts: &dyn LayoutProvider,
     descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
-) -> Result<LoweringOutcome> {
+) -> SpecializerResult<LoweringOutcome> {
     let ctx = match try_build_context(
         module_ir,
         func_ir,
@@ -1064,7 +1059,7 @@ pub fn try_discover_types_for_lowering_in_module(
     ctx: &mut impl SpecializerContext,
     interner: &impl Interner,
     module_ir: &ModuleIR,
-) -> Result<LoweringDescriptors> {
+) -> SpecializerResult<LoweringDescriptors> {
     let mut visited = UnorderedSet::new();
     let mut descriptors = LoweringDescriptors::default();
     for func_ir in module_ir.functions.iter().filter_map(|f| f.as_ref()) {
@@ -1089,7 +1084,7 @@ pub fn try_discover_types_for_lowering_in_function(
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
-) -> Result<LoweringDescriptors> {
+) -> SpecializerResult<LoweringDescriptors> {
     let mut visited = UnorderedSet::new();
     let mut descriptors = LoweringDescriptors::default();
     try_discover_types_for_lowering_in_function_impl(
@@ -1112,13 +1107,13 @@ fn try_discover_types_for_lowering_in_function_impl(
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
     descriptors: &mut LoweringDescriptors,
-) -> Result<()> {
+) -> SpecializerResult<()> {
     for &ty in func_ir.home_slot_types.iter() {
-        discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+        discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
     }
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     for &ty in module_ir.module.interned_types_at(own_handle.return_) {
-        discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+        discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
     }
     for instr in func_ir.instrs() {
         // Calls: walk param + return signature lists.
@@ -1148,12 +1143,12 @@ fn try_discover_types_for_lowering_in_function_impl(
         };
         if let Some(params) = params {
             for &ty in view_type_list(params) {
-                discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+                discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
             }
         }
         if let Some(returns) = returns {
             for &ty in view_type_list(returns) {
-                discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+                discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
             }
         }
 
@@ -1171,8 +1166,8 @@ fn try_discover_types_for_lowering_in_function_impl(
                 arg_types,
                 view_type_list(callee_ty_args),
             ) {
-                discover_type_metadata(ctx, resource_ty, ty_args, visited, descriptors)?;
-                let resource_ty = ctx.subst_type(resource_ty, ty_args)?;
+                discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
+                let resource_ty = interner.subst_type(resource_ty, ty_args)?;
                 publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
             }
         }
@@ -1180,7 +1175,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // Catch the field-layout nominal an instruction references directly
         // that isn't reached by the home/call walks above.
         if let Some((ty, _kind)) = field_layout_nominal_in_instr(instr) {
-            discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+            discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
 
         // `PackClosure`: resolve the captured-data layout and record it
@@ -1203,8 +1198,8 @@ fn try_discover_types_for_lowering_in_function_impl(
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
-            discover_type_metadata(ctx, resource_ty, ty_args, visited, descriptors)?;
-            let resource_ty = ctx.subst_type(resource_ty, ty_args)?;
+            discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
+            let resource_ty = interner.subst_type(resource_ty, ty_args)?;
             publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
         }
 
@@ -1214,7 +1209,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // constant's type here.
         if let Instr::LdConst(_, idx) = instr {
             let ty = module_ir.module.interned_constant_type_at(*idx);
-            discover_type_metadata(ctx, ty, ty_args, visited, descriptors)?;
+            discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
     }
 
@@ -1236,7 +1231,7 @@ fn discover_captured_data_descriptor(
     fhi: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
-) -> Result<CapturedDataLayout> {
+) -> SpecializerResult<CapturedDataLayout> {
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
@@ -1256,7 +1251,7 @@ fn discover_captured_data_descriptor(
         cursor = next;
     }
     let values_size = cursor as u32;
-    let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets)?;
+    let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets);
     Ok(CapturedDataLayout::Capturing(ClosureCapturedInfo {
         descriptor_id,
         values_size,
@@ -1299,7 +1294,7 @@ fn try_build_inline_value_layout(
     field_ids: &[Option<LayoutId>],
     total: u32,
     align: u32,
-) -> Result<Option<ValueLayout>> {
+) -> SpecializerResult<Option<ValueLayout>> {
     let mut layout_fields = Vec::with_capacity(field_layouts.len());
     let mut fixed_bcs_total: u64 = 0;
     let mut data_dependent = false;
@@ -1311,7 +1306,7 @@ fn try_build_inline_value_layout(
             return Ok(None);
         };
         let Some(child) = ctx.layout(id) else {
-            bail!("published layout id does not resolve to a layout");
+            invariant_violation!(LayoutIdUnresolved);
         };
         layout_fields.push(FieldValueLayout {
             offset: field.offset,
@@ -1364,12 +1359,13 @@ fn try_build_inline_value_layout(
 /// TODO(metering): Make this not recursive.
 fn discover_type_metadata(
     ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
     ty: InternedType,
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
     descriptors: &mut LoweringDescriptors,
-) -> Result<Option<LayoutId>> {
-    let ty = ctx.subst_type(ty, ty_args)?;
+) -> SpecializerResult<Option<LayoutId>> {
+    let ty = interner.subst_type(ty, ty_args)?;
     if !visited.insert(ty) {
         return Ok(ctx.layout_id(ty));
     }
@@ -1402,12 +1398,18 @@ fn discover_type_metadata(
             // types still need discovery. `ty` was already substituted above,
             // so any  type params in `inner` are concrete, not type arguments
             // to pass here.
-            discover_type_metadata(ctx, *inner, EMPTY_TYPE_LIST, visited, descriptors)?;
+            discover_type_metadata(ctx, interner, *inner, EMPTY_TYPE_LIST, visited, descriptors)?;
             Ok(Some(REF_LAYOUT_ID))
         },
         Type::Vector { elem } => {
-            let elem_id =
-                discover_type_metadata(ctx, *elem, EMPTY_TYPE_LIST, visited, descriptors)?;
+            let elem_id = discover_type_metadata(
+                ctx,
+                interner,
+                *elem,
+                EMPTY_TYPE_LIST,
+                visited,
+                descriptors,
+            )?;
             // Get or publish the GC descriptor for the element.
             let descriptor_id = if let Some(id) = ctx.vec_descriptor_for(*elem) {
                 Some(id)
@@ -1415,7 +1417,7 @@ fn discover_type_metadata(
                 && let Ok(ptr_offsets) = type_pointer_offsets(&*ctx, *elem)
             {
                 let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
-                Some(ctx.publish_vec_descriptor(*elem, elem_size, &ptr_offsets)?)
+                Some(ctx.publish_vec_descriptor(*elem, elem_size, &ptr_offsets))
             } else {
                 None
             };
@@ -1456,8 +1458,8 @@ fn discover_type_metadata(
                 Some(FieldTypes::Struct(fields)) => {
                     let fields = fields
                         .iter()
-                        .map(|f| ctx.subst_type(*f, *nominal_ty_args))
-                        .collect::<Result<Vec<_>>>()?;
+                        .map(|f| interner.subst_type(*f, *nominal_ty_args))
+                        .collect::<Result<Vec<_>, _>>()?;
 
                     // Recurse on every field unconditionally (a deferred or
                     // unsized field must not stop discovery of later fields'
@@ -1466,6 +1468,7 @@ fn discover_type_metadata(
                     for &ft in &fields {
                         field_ids.push(discover_type_metadata(
                             ctx,
+                            interner,
                             ft,
                             EMPTY_TYPE_LIST,
                             visited,
@@ -1522,12 +1525,13 @@ fn discover_type_metadata(
                         // capturing each field's layout id.
                         let fields = variant_fields
                             .iter()
-                            .map(|field_ty| ctx.subst_type(*field_ty, *nominal_ty_args))
-                            .collect::<Result<Vec<_>>>()?;
+                            .map(|field_ty| interner.subst_type(*field_ty, *nominal_ty_args))
+                            .collect::<Result<Vec<_>, _>>()?;
                         let mut field_ids = Vec::with_capacity(fields.len());
                         for &field_ty in &fields {
                             field_ids.push(discover_type_metadata(
                                 ctx,
+                                interner,
                                 field_ty,
                                 EMPTY_TYPE_LIST,
                                 visited,
@@ -1587,7 +1591,7 @@ fn discover_type_metadata(
                             .and_then(|data_end| checked_align_up_u32(data_end, 8))
                     {
                         let descriptor_id =
-                            ctx.publish_enum_descriptor(ty, size, variant_ptr_offsets)?;
+                            ctx.publish_enum_descriptor(ty, size, variant_ptr_offsets);
                         descriptors.enum_layouts.insert(ty, EnumLayout {
                             descriptor_id,
                             variants: variant_layouts,

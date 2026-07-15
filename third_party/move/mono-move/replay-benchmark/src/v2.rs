@@ -246,7 +246,7 @@ fn classify_token(
             ParamKind::Signer { by_ref: true }
         },
         other => ParamKind::Value {
-            ty: guard.subst_type(intern_sig_token(other, module, guard)?, ty_args)?,
+            ty: guard.subst_type(intern_sig_token(other, module, guard), ty_args)?,
         },
     })
 }

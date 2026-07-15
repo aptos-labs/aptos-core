@@ -12916,7 +12916,6 @@ dependencies = [
 name = "mono-move-loader"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "mono-move-core",
  "mono-move-global-context",
  "mono-move-testsuite",
@@ -18574,7 +18573,6 @@ dependencies = [
 name = "specializer"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "mono-move-core",
  "move-binary-format",
  "move-bytecode-verifier",
