@@ -881,6 +881,9 @@ fn compile_source_unit_v2(
     if options.experiment_on(Experiment::COMPILE_FOR_TESTING) {
         options.compile_test_code = true
     }
+    if options.experiment_on(Experiment::COMPILE_DEBUG_ASSERT) {
+        options.compile_debug_assert = true
+    }
     let mut error_writer = termcolor::Buffer::no_color();
     let result = {
         let mut emitter = options.error_emitter(&mut error_writer);

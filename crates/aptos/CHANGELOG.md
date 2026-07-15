@@ -7,6 +7,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [9.5.0]
 - Compiler now uses receiver style calls for macro-generated code.
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.
+- Added `debug_assert!`, `debug_assert_eq!`, and `debug_assert_ne!` macros to the Move v2 compiler (require Move 2.5). Same forms as their non-`debug_` counterparts. On by default under `aptos move test`; `aptos move test --no-debug-assert` disables them.
 
 ## [9.4.0]
 - Set language version 2.4 and bytecode version v10 as default.

@@ -43,7 +43,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Debug, Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default)]
+#[derive(Debug, Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd)]
 #[clap(author, version, about)]
 pub struct BuildConfig {
     /// Compile in 'dev' mode. The 'dev-addresses' and 'dev-dependencies' fields will be used if
@@ -60,6 +60,17 @@ pub struct BuildConfig {
     /// Compile in 'verify' mode. The '#[verify_only]' code will be included.
     #[clap(name = "verify-mode", long = "verify", global = true)]
     pub verify_mode: bool,
+
+    /// Whether `debug_assert!` macros are active. On by default; `--no-debug-assert`
+    /// disables them while still compiling #[test] code.
+    #[clap(
+        name = "no-debug-assert",
+        long = "no-debug-assert",
+        action = clap::ArgAction::SetFalse,
+        global = true
+    )]
+    #[serde(default = "default_debug_assert")]
+    pub debug_assert: bool,
 
     /// Whether to override the standard library with the given version.
     #[clap(long = "override-std", global = true, value_parser)]
@@ -109,6 +120,34 @@ pub struct BuildConfig {
 
     #[clap(flatten)]
     pub compiler_config: CompilerConfig,
+}
+
+/// `debug_assert` defaults to on (matching `aptos move test`).
+fn default_debug_assert() -> bool {
+    true
+}
+
+impl Default for BuildConfig {
+    fn default() -> Self {
+        Self {
+            dev_mode: false,
+            test_mode: false,
+            verify_mode: false,
+            debug_assert: default_debug_assert(),
+            override_std: None,
+            generate_docs: false,
+            generate_abis: false,
+            generate_move_model: false,
+            full_model_generation: false,
+            install_dir: None,
+            force_recompilation: false,
+            additional_named_addresses: BTreeMap::new(),
+            forced_named_addresses: BTreeMap::new(),
+            fetch_deps_only: false,
+            skip_fetch_latest_git_deps: false,
+            compiler_config: CompilerConfig::default(),
+        }
+    }
 }
 
 #[derive(Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default, Debug)]

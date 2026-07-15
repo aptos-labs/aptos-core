@@ -658,6 +658,8 @@ impl CompiledPackage {
                     language_version: Some(effective_language_version),
                     compiler_version: Some(version),
                     compile_test_code: flags.keep_testing_functions(),
+                    compile_debug_assert: flags.keep_testing_functions()
+                        && resolution_graph.build_options.debug_assert,
                     experiments: config.experiments.clone(),
                     external_checks,
                     print_errors: config.print_errors.unwrap_or(true),

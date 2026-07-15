@@ -104,6 +104,13 @@ impl TestConfig {
         }
     }
 
+    fn compile_debug_assert(self, on: bool) -> Self {
+        Self {
+            options: self.options.clone().set_compile_debug_assert(on),
+            ..self
+        }
+    }
+
     fn skip_attribute_checks(self, on: bool) -> Self {
         Self {
             options: self.options.clone().set_skip_attribute_checks(on),
@@ -209,10 +216,60 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
-            exclude: vec!["/inlining/", "/more-v1/"],
+            // `debug_assert` has its own dedicated configs below.
+            exclude: vec!["/inlining/", "/more-v1/", "/debug_assert/"],
             stop_after: StopAfter::FirstBytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
             ..config().lang(LanguageVersion::V2_1)
+        },
+        // `debug_assert!` macro. Gated at V2_5.
+        // Test mode ON emits the same shape as `assert!`
+        // test mode OFF produces a no-op `()`
+        TestConfig {
+            name: "debug_assert_test_mode",
+            runner: |p| run_test(p, get_config_by_name("debug_assert_test_mode")),
+            include: vec!["/checking/debug_assert/"],
+            exclude: vec!["version_gate.move"],
+            stop_after: StopAfter::FirstBytecodeGen,
+            dump_ast: DumpLevel::EndStage,
+            ..config()
+                .lang(LanguageVersion::V2_5)
+                .compile_test_code(true)
+                .compile_debug_assert(true)
+        },
+        TestConfig {
+            name: "debug_assert_no_test_mode",
+            runner: |p| run_test(p, get_config_by_name("debug_assert_no_test_mode")),
+            include: vec!["/checking/debug_assert/"],
+            exclude: vec!["version_gate.move"],
+            exp_suffix: Some("no_test.exp"),
+            stop_after: StopAfter::FirstBytecodeGen,
+            dump_ast: DumpLevel::EndStage,
+            ..config()
+                .lang(LanguageVersion::V2_5)
+                .compile_test_code(false)
+        },
+        // Decoupled state: #[test] code compiled, debug asserts stripped.
+        // Scoped to decoupled.move (other fixtures would match their `*.no_test.exp`).
+        TestConfig {
+            name: "debug_assert_test_no_debug",
+            runner: |p| run_test(p, get_config_by_name("debug_assert_test_no_debug")),
+            include: vec!["/checking/debug_assert/decoupled.move"],
+            exp_suffix: Some("test_no_debug.exp"),
+            stop_after: StopAfter::FirstBytecodeGen,
+            dump_ast: DumpLevel::EndStage,
+            ..config()
+                .lang(LanguageVersion::V2_5)
+                .compile_test_code(true)
+                .compile_debug_assert(false)
+        },
+        TestConfig {
+            name: "debug_assert_version_gate",
+            runner: |p| run_test(p, get_config_by_name("debug_assert_version_gate")),
+            include: vec!["/checking/debug_assert/version_gate.move"],
+            stop_after: StopAfter::FirstBytecodeGen,
+            dump_ast: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_4)
         },
         TestConfig {
             name: "macros",

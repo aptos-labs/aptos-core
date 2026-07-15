@@ -296,6 +296,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         options.language_version.unwrap_or_default(),
         options.compile_test_code,
         options.compile_verify_code,
+        options.compile_debug_assert,
     )?;
     // Store address aliases
     let map = addrs
