@@ -8,7 +8,10 @@ use aptos_types::{
     block_executor::{output::CommittedTransactionOutput, value::ValueWithLayout},
     error::PanicError,
     fee_statement::FeeStatement,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::{
         AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction, BlockExecutableTransaction,
     },
@@ -16,12 +19,11 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
-    module_write_set::ModuleWrite,
     resolver::{
         BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
     },
 };
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
@@ -109,8 +111,6 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
     /// and modules. Aggregator V1 writes are ordinary entries of the resource write set.
     fn resource_write_set(&self) -> HashMap<Txn::Key, ValueWithLayout<Txn::Value>>;
 
-    fn module_write_set(&self) -> &BTreeMap<Txn::Key, ModuleWrite<Txn::Value>>;
-
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 
@@ -144,6 +144,13 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
         // This is &mut dyn and not Impl to sidestep an internal compiler error:
         // https://github.com/rust-lang/rust/issues/145188.
         callback: &mut dyn FnMut(&Txn::Key, HashSet<&Txn::Tag>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError>;
+
+    /// Invokes the callback for each module published by this transaction.
+    /// Modules cannot be deleted, so all writes are concrete state values.
+    fn for_each_module_write(
+        &self,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     // For now, the below interfaces for keys and metada and keys and tags are provided

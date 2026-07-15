@@ -29,7 +29,11 @@ use aptos_types::{
     contract_event::ContractEvent,
     error::PanicError,
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::{AuxiliaryInfo, BlockExecutableTransaction},
     write_set::WriteOp,
 };
@@ -44,7 +48,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     change_set::VMChangeSet,
     module_and_script_storage::code_storage::AptosCodeStorage,
-    module_write_set::ModuleWrite,
     resolver::{
         BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupSize, ResourceGroupView,
     },
@@ -64,7 +67,6 @@ use move_vm_runtime::{
     ModuleStorage,
 };
 use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, gas::UnmeteredGasMeter};
-use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     str::FromStr,
@@ -187,9 +189,11 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
         HashMap::new()
     }
 
-    fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
-        static EMPTY: OnceCell<BTreeMap<StateKey, ModuleWrite<WriteOp>>> = OnceCell::new();
-        EMPTY.get_or_init(BTreeMap::new)
+    fn for_each_module_write(
+        &self,
+        _callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        Ok(())
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {

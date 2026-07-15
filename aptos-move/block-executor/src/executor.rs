@@ -2097,15 +2097,16 @@ where
             unsync_map.write(group_key, metadata_op);
         }
 
-        for write in output_before_guard.module_write_set().values() {
-            add_module_write_to_module_cache::<T>(
-                write,
+        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
+            add_module_write_to_module_cache(
+                module_id,
+                state_value,
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
                 unsync_map.module_cache(),
-            )?;
-        }
+            )
+        })?;
 
         let mut second_phase = Vec::new();
         let mut updates = HashMap::new();

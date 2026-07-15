@@ -25,22 +25,25 @@ use aptos_types::{
     contract_event::ContractEvent,
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
+    },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
-    write_set::WriteOp,
+    write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
-    module_write_set::ModuleWrite,
     output::{UnorderedReadSet, VMOutput},
     resolver::ResourceGroupSize,
 };
 use move_core_types::{
-    language_storage::StructTag,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
@@ -273,8 +276,18 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
-        self.guard.module_write_set()
+    fn for_each_module_write(
+        &self,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        for write in self.guard.module_write_set().values() {
+            let state_value = write
+                .write_op()
+                .as_state_value()
+                .ok_or_else(|| code_invariant_error("Modules cannot be deleted"))?;
+            callback(write.module_id(), state_value)?;
+        }
+        Ok(())
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.

@@ -473,19 +473,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
 
         let mut published = false;
         let mut module_ids_for_v2 = BTreeSet::new();
-        for write in output_before_guard.module_write_set().values() {
+        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
             published = true;
             if scheduler.is_v2() {
-                module_ids_for_v2.insert(write.module_id().clone());
+                module_ids_for_v2.insert(module_id.clone());
             }
-            add_module_write_to_module_cache::<T>(
-                write,
+            add_module_write_to_module_cache(
+                module_id,
+                state_value,
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
                 versioned_cache.module_cache(),
-            )?;
-        }
+            )
+        })?;
         if published {
             // Record validation requirements after the modules are published.
             scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;

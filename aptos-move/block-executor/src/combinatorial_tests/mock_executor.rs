@@ -20,10 +20,13 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{output::CommittedTransactionOutput, value::ValueWithLayout},
     contract_event::TransactionEvent,
-    error::PanicError,
+    error::{code_invariant_error, PanicError},
     executable::ModulePath,
     fee_statement::FeeStatement,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::AuxiliaryInfo,
     write_set::{TransactionWrite, WriteOpKind},
 };
@@ -735,8 +738,18 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> &BTreeMap<K, ModuleWrite<ValueType>> {
-        &self.module_writes
+    fn for_each_module_write(
+        &self,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        for write in self.module_writes.values() {
+            let state_value = write
+                .write_op()
+                .as_state_value()
+                .ok_or_else(|| code_invariant_error("Modules cannot be deleted"))?;
+            callback(write.module_id(), state_value)?;
+        }
+        Ok(())
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
