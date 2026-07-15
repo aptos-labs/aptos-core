@@ -6,9 +6,10 @@ use crate::{
     account::key_rotation::lookup_address,
     common::{
         types::{
-            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
-            ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
+            account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
+            CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
+            PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
+            DEFAULT_PROFILE,
         },
         utils::{
             explorer_account_link, fund_account, prompt_yes_with_override, read_line,
@@ -333,13 +334,21 @@ impl CliCommand<()> for InitTool {
             .unwrap_or(DEFAULT_PROFILE);
 
         eprintln!(
-            "\n---\nMovement CLI is now set up for account {} as profile {}!\n See the account here: {}\n 
-            Run `movement --help` for more information about commands. \n 
-            Visit https://faucet.movementlabs.xyz to use the testnet faucet.",
+            "\n---\nMovement CLI is now set up for account {} as profile {}!\n \
+             See the account here: {}\n \
+             Run `movement --help` for more information about commands.",
             address,
             profile_name,
-            explorer_account_link(address, Some(network))
+            explorer_account_link(address, Some(network)),
         );
+
+        // Faucet hint is testnet-only.
+        if network == Network::Testnet {
+            eprintln!(
+                " Visit {} to use the testnet faucet.",
+                get_mint_site_url(None)
+            );
+        }
 
         Ok(())
     }

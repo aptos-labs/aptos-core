@@ -1668,7 +1668,7 @@ impl FaucetOptions {
                     Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile".to_string()))
                 },
                 Some(Network::Testnet) => {
-                    Err(CliError::CommandArgumentError(format!("To get testnet APT you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile", get_mint_site_url(None))))
+                    Err(CliError::CommandArgumentError(format!("To get testnet MOVE you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile", get_mint_site_url(None))))
                 },
                 _ => {
                     Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile".to_string()))
@@ -2547,7 +2547,7 @@ pub struct ChunkedPublishOption {
     pub(crate) chunk_size: usize,
 }
 
-/// For minting testnet APT.
+/// For minting testnet MOVE.
 pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
     let params = match address {
         Some(address) => format!("?address={}", address.to_standard_string()),
