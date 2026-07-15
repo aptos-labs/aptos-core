@@ -10,7 +10,10 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{function_values_impl::mock::MockAbstractFunction, values_impl, Struct, Value},
+        values::{
+            function_values_impl::{closure_captured_depth, mock::MockAbstractFunction},
+            values_impl, Struct, Value,
+        },
     };
     use better_any::TidExt;
     use claims::{assert_err, assert_none, assert_ok, assert_some};
@@ -18,7 +21,7 @@ mod tests {
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{ClosureMask, MoveClosure},
+        function::{ClosureMask, MoveClosure, MoveClosureCapturedArgs},
         identifier::Identifier,
         int256,
         language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
@@ -267,7 +270,7 @@ mod tests {
             fun_id: Identifier::new(fun_name).unwrap(),
             ty_args,
             mask,
-            captured,
+            captured: MoveClosureCapturedArgs::Deserialized(captured),
         })
     }
 
@@ -361,11 +364,17 @@ mod tests {
     // VM Values
 
     fn round_trip_vm_closure_value(
-        fun: MockAbstractFunction,
+        mut fun: MockAbstractFunction,
         captured: Vec<Value>,
     ) -> (Value, PartialVMResult<Value>) {
+        // A freshly packed closure carries the true depth of its captured values, so
+        // it matches the depth a reader recomputes on the way back.
+        fun.data.captured_depth = closure_captured_depth(&captured, u64::MAX).unwrap();
         let fun_layout = make_fun_layout();
         let mut ext_mock = MockFunctionValueExtension::new();
+        ext_mock
+            .expect_is_function_data_format_v2_enabled()
+            .returning(|| false);
         ext_mock
             .expect_get_serialization_data()
             .returning(move |af| {
@@ -455,26 +464,241 @@ mod tests {
             })
             .expect_err("bad size value deserialization fails");
 
-        let (_, de_value) = round_trip_vm_closure_value(
-            MockAbstractFunction::new("f", vec![], ClosureMask::new(0b1), vec![
-                MoveTypeLayout::Bool,
-            ]),
+        // A closure whose captured value count does not match its layouts fails
+        // already at serialization time.
+        let mut ext_mock = MockFunctionValueExtension::new();
+        ext_mock
+            .expect_is_function_data_format_v2_enabled()
+            .returning(|| false);
+        ext_mock
+            .expect_get_serialization_data()
+            .returning(move |af| {
+                Ok(af
+                    .downcast_ref::<MockAbstractFunction>()
+                    .expect("cast")
+                    .data
+                    .clone())
+            });
+        let value = Value::closure(
+            Box::new(MockAbstractFunction::new(
+                "f",
+                vec![],
+                ClosureMask::new(0b1),
+                vec![MoveTypeLayout::Bool],
+            )),
             vec![],
         );
-        de_value
-            .inspect_err(|e| {
-                assert!(
-                    e.to_string().contains("expected more"),
-                    "unexpected error message: {}",
-                    e
-                )
-            })
-            .expect_err("bad size value deserialization fails");
+        let result = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .serialize(&value, &make_fun_layout()));
+        assert_none!(result);
+    }
+
+    fn make_v2_ext_mock(v2_enabled: bool) -> MockFunctionValueExtension {
+        let mut ext_mock = MockFunctionValueExtension::new();
+        ext_mock
+            .expect_is_function_data_format_v2_enabled()
+            .returning(move || v2_enabled);
+        ext_mock
+            .expect_get_serialization_data()
+            .returning(move |af| {
+                Ok(af
+                    .downcast_ref::<MockAbstractFunction>()
+                    .expect("cast")
+                    .data
+                    .clone())
+            });
+        ext_mock
+            .expect_create_from_serialization_data()
+            .returning(move |data| Ok(Box::new(MockAbstractFunction::new_from_data(data))));
+        ext_mock
+    }
+
+    fn make_captured_closure() -> Value {
+        let captured = vec![Value::bool(true), Value::u64(22)];
+        let mut fun =
+            MockAbstractFunction::new("f", vec![TypeTag::Bool], ClosureMask::new(0b101), vec![
+                MoveTypeLayout::Bool,
+                MoveTypeLayout::U64,
+            ]);
+        // Captured bool and u64 are leaves, so the closure's captured depth is 1.
+        fun.data.captured_depth = closure_captured_depth(&captured, u64::MAX).unwrap();
+        Value::closure(Box::new(fun), captured)
+    }
+
+    #[test]
+    fn closure_v2_round_trip_vm_value() {
+        let fun_layout = make_fun_layout();
+        let ext_mock = make_v2_ext_mock(true);
+
+        for (value, expected_depth, expected_blob) in [
+            // The blob is the concatenation of the BCS encodings of the captured
+            // values: bool(true) and u64(22), length-prefixed. Both are leaves, so
+            // the cached depth is 1.
+            (make_captured_closure(), 1u16, vec![
+                9u8, 1, 22, 0, 0, 0, 0, 0, 0, 0,
+            ]),
+            // Empty captures serialize as an empty blob with cached depth 0.
+            (
+                Value::closure(
+                    Box::new(MockAbstractFunction::new(
+                        "f",
+                        vec![],
+                        ClosureMask::new(0),
+                        vec![],
+                    )),
+                    vec![],
+                ),
+                0u16,
+                vec![0u8],
+            ),
+        ] {
+            let bytes = assert_ok!(ValueSerDeContext::new(None)
+                .with_func_args_deserialization(&ext_mock)
+                .serialize(&value, &fun_layout))
+            .expect("serialization result not None");
+            // Version 2 right after the seq length byte, little-endian u16.
+            assert_eq!(&bytes[1..3], &[2, 0]);
+            // The blob (length-prefixed) is the last element.
+            assert!(bytes.ends_with(&expected_blob));
+            // The cached depth is the u16 element right before the blob.
+            let depth_end = bytes.len() - expected_blob.len();
+            assert_eq!(
+                &bytes[depth_end - 2..depth_end],
+                &expected_depth.to_le_bytes()
+            );
+
+            // Deserialization keeps the captured arguments serialized; re-serialization
+            // writes them back verbatim.
+            let de_value = assert_ok!(ValueSerDeContext::new(None)
+                .with_func_args_deserialization(&ext_mock)
+                .deserialize_or_err(&bytes, &fun_layout));
+            let re_bytes = assert_ok!(ValueSerDeContext::new(None)
+                .with_func_args_deserialization(&ext_mock)
+                .serialize(&de_value, &fun_layout))
+            .expect("serialization result not None");
+            assert_eq!(bytes, re_bytes);
+
+            // Two closures deserialized from the same bytes are equal without
+            // materialization (equal identity and equal blobs).
+            let de_value_2 = assert_ok!(ValueSerDeContext::new(None)
+                .with_func_args_deserialization(&ext_mock)
+                .deserialize_or_err(&bytes, &fun_layout));
+            assert!(assert_ok!(de_value.equals(&de_value_2)));
+        }
+    }
+
+    #[test]
+    fn closure_v1_converts_to_v2_on_read() {
+        let fun_layout = make_fun_layout();
+        let v1_ext_mock = make_v2_ext_mock(false);
+        let v2_ext_mock = make_v2_ext_mock(true);
+
+        // Written as V1 (flag off).
+        let v1_bytes = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&v1_ext_mock)
+            .serialize(&make_captured_closure(), &fun_layout))
+        .expect("serialization result not None");
+        assert_eq!(&v1_bytes[1..3], &[1, 0]);
+
+        // Read with the flag on: converted to V2, and re-serializes exactly as a
+        // directly written V2 closure.
+        let de_value = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&v2_ext_mock)
+            .deserialize_or_err(&v1_bytes, &fun_layout));
+        let re_bytes = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&v2_ext_mock)
+            .serialize(&de_value, &fun_layout))
+        .expect("serialization result not None");
+        let v2_bytes = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&v2_ext_mock)
+            .serialize(&make_captured_closure(), &fun_layout))
+        .expect("serialization result not None");
+        assert_eq!(re_bytes, v2_bytes);
+
+        // Read with the flag off: unchanged legacy behavior, byte-stable V1.
+        let de_value = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&v1_ext_mock)
+            .deserialize_or_err(&v1_bytes, &fun_layout));
+        let re_bytes = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&v1_ext_mock)
+            .serialize(&de_value, &fun_layout))
+        .expect("serialization result not None");
+        assert_eq!(re_bytes, v1_bytes);
+    }
+
+    #[test]
+    fn closure_v2_reads_can_be_disallowed() {
+        let fun_layout = make_fun_layout();
+        let ext_mock = make_v2_ext_mock(true);
+        let v2_bytes = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .serialize(&make_captured_closure(), &fun_layout))
+        .expect("serialization result not None");
+
+        assert_err!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .with_function_values_v2_reads(false)
+            .deserialize_or_err(&v2_bytes, &fun_layout));
+        assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .with_function_values_v2_reads(true)
+            .deserialize_or_err(&v2_bytes, &fun_layout));
+    }
+
+    #[test]
+    fn closure_serialized_cmp_requires_materializer() {
+        let fun_layout = make_fun_layout();
+        let ext_mock = make_v2_ext_mock(true);
+
+        // Two closures with equal identity but different captured arguments.
+        let a = Value::closure(
+            Box::new(MockAbstractFunction::new(
+                "f",
+                vec![],
+                ClosureMask::new(0b1),
+                vec![MoveTypeLayout::U64],
+            )),
+            vec![Value::u64(1)],
+        );
+        let b = Value::closure(
+            Box::new(MockAbstractFunction::new(
+                "f",
+                vec![],
+                ClosureMask::new(0b1),
+                vec![MoveTypeLayout::U64],
+            )),
+            vec![Value::u64(2)],
+        );
+        let serialize = |v: &Value| {
+            assert_ok!(ValueSerDeContext::new(None)
+                .with_func_args_deserialization(&ext_mock)
+                .serialize(v, &fun_layout))
+            .expect("serialization result not None")
+        };
+        let deserialize = |bytes: &[u8]| {
+            assert_ok!(ValueSerDeContext::new(None)
+                .with_func_args_deserialization(&ext_mock)
+                .deserialize_or_err(bytes, &fun_layout))
+        };
+        let a = deserialize(&serialize(&a));
+        let b = deserialize(&serialize(&b));
+
+        // Unequal blobs with equal identity need materialization, which requires a
+        // materializer.
+        let err = a.equals(&b).expect_err("materializer is required");
+        assert_eq!(
+            err.major_status(),
+            move_core_types::vm_status::StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+        );
     }
 
     #[test]
     fn closure_serialization_disabled() {
         let mut ext_mock = MockFunctionValueExtension::new();
+        ext_mock
+            .expect_is_function_data_format_v2_enabled()
+            .returning(|| false);
         ext_mock
             .expect_get_serialization_data()
             .returning(move |af| {

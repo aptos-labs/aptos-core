@@ -36,6 +36,9 @@ pub trait FunctionValueExtension {
 
     /// Returns the maximum allowed nesting depth of a VM value.
     fn max_value_nest_depth(&self) -> Option<u64>;
+
+    /// If true, function values are serialized with storage format V2.
+    fn is_function_data_format_v2_enabled(&self) -> bool;
 }
 
 /// An extension to (de)serializer to lookup information about delayed fields.
@@ -89,6 +92,11 @@ impl<'a> FunctionValueExtensionWithContext<'a> {
     ) -> PartialVMResult<Box<dyn AbstractFunction>> {
         self.extension.create_from_serialization_data(data)
     }
+
+    /// If true, function values are serialized with storage format V2.
+    pub(crate) fn is_function_data_format_v2_enabled(&self) -> bool {
+        self.extension.is_function_data_format_v2_enabled()
+    }
 }
 
 /// A (de)serializer context for a single Move [Value], containing optional extensions. If
@@ -101,6 +109,10 @@ pub struct ValueSerDeContext<'a> {
     pub(crate) max_value_nested_depth: Option<u64>,
     /// If true, serialization of any value containing a closure fails.
     pub(crate) closure_serialization_disabled: bool,
+    /// If false, deserialization rejects function values in storage format V2. Only
+    /// set to false for untrusted user bytes while V2 is not yet enabled; trusted
+    /// storage reads accept V2 unconditionally.
+    pub(crate) allow_function_values_v2_reads: bool,
 }
 
 impl<'a> ValueSerDeContext<'a> {
@@ -112,7 +124,15 @@ impl<'a> ValueSerDeContext<'a> {
             legacy_signer: false,
             max_value_nested_depth,
             closure_serialization_disabled: false,
+            allow_function_values_v2_reads: true,
         }
+    }
+
+    /// If `allow` is false, deserialization rejects function values in storage
+    /// format V2.
+    pub fn with_function_values_v2_reads(mut self, allow: bool) -> Self {
+        self.allow_function_values_v2_reads = allow;
+        self
     }
 
     /// Serialize signer with legacy format to maintain backwards compatibility.
@@ -155,6 +175,7 @@ impl<'a> ValueSerDeContext<'a> {
             legacy_signer: self.legacy_signer,
             max_value_nested_depth: self.max_value_nested_depth,
             closure_serialization_disabled: self.closure_serialization_disabled,
+            allow_function_values_v2_reads: self.allow_function_values_v2_reads,
         }
     }
 
@@ -263,6 +284,66 @@ impl<'a> ValueSerDeContext<'a> {
         bcs::from_bytes_seed(seed, bytes).map_err(|e| {
             PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
                 .with_message(format!("deserializer error: {}", e))
+        })
+    }
+
+    /// Decodes a V2 captured blob into values, one per layout. Fails if the values do
+    /// not match the layouts or the blob has trailing bytes.
+    pub fn deserialize_captured_values(
+        self,
+        blob: &[u8],
+        layouts: &[MoveTypeLayout],
+    ) -> PartialVMResult<Vec<Value>> {
+        struct CapturedValuesSeed<'c, 'l> {
+            ctx: &'c ValueSerDeContext<'c>,
+            layouts: &'l [MoveTypeLayout],
+        }
+
+        impl<'d> serde::de::DeserializeSeed<'d> for CapturedValuesSeed<'_, '_> {
+            type Value = Vec<Value>;
+
+            fn deserialize<D: serde::Deserializer<'d>>(
+                self,
+                deserializer: D,
+            ) -> Result<Self::Value, D::Error> {
+                // A concatenation of BCS values is exactly the BCS encoding of a tuple
+                // of those values.
+                deserializer.deserialize_tuple(self.layouts.len(), self)
+            }
+        }
+
+        impl<'d> serde::de::Visitor<'d> for CapturedValuesSeed<'_, '_> {
+            type Value = Vec<Value>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("captured values of a closure")
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'d>>(
+                self,
+                mut seq: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut values = Vec::with_capacity(self.layouts.len());
+                for layout in self.layouts {
+                    match seq.next_element_seed(DeserializationSeed {
+                        ctx: self.ctx,
+                        layout,
+                    })? {
+                        Some(value) => values.push(value),
+                        None => return Err(serde::de::Error::invalid_length(values.len(), &self)),
+                    }
+                }
+                Ok(values)
+            }
+        }
+
+        let seed = CapturedValuesSeed {
+            ctx: &self,
+            layouts,
+        };
+        bcs::from_bytes_seed(seed, blob).map_err(|e| {
+            PartialVMError::new(StatusCode::VALUE_DESERIALIZATION_ERROR)
+                .with_message(format!("failed to decode captured arguments: {}", e))
         })
     }
 }

@@ -218,13 +218,14 @@ pub enum FeatureFlag {
     /// When enabled, BCS serialization of values containing function values fails:
     /// `bcs::to_bytes` and `bcs::serialized_size` abort, and table operations with keys
     /// containing function values fail. Storage writes and events are unaffected.
-    /// Transient: active while the function value storage format migration is in
-    /// progress, so no on-chain state can depend on the old bytes.
     DISABLE_CLOSURE_BCS_SERIALIZATION = 126,
     /// Enables lazy module initialization via `aptos_framework::init::internal_maybe_initialize`
     /// (a module self-initializes on first use rather than via a genesis-time `init_module`).
     /// While disabled, that entry point aborts.
     LAZY_MODULE_INITIALIZATION = 127,
+    /// When enabled, function values are serialized using storage format V2: captured
+    /// arguments are stored as a single blob, without layouts. V1 data remains readable.
+    ENABLE_FUNCTION_DATA_FORMAT_V2 = 128,
 }
 
 impl FeatureFlag {
@@ -339,6 +340,8 @@ impl FeatureFlag {
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
+            Self::DISABLE_CLOSURE_BCS_SERIALIZATION,
+            Self::ENABLE_FUNCTION_DATA_FORMAT_V2,
         ]
     }
 }
@@ -588,6 +591,10 @@ impl Features {
 
     pub fn is_closure_bcs_serialization_disabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION)
+    }
+
+    pub fn is_function_data_format_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_FUNCTION_DATA_FORMAT_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

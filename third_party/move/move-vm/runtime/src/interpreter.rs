@@ -10,7 +10,7 @@ use crate::{
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter_caches::InterpreterFunctionCaches,
-    loader::LazyLoadedFunction,
+    loader::{LazyLoadedFunction, RuntimeClosureMaterializer},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -52,8 +52,8 @@ use move_vm_types::{
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
     values::{
-        self, AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct,
-        StructRef, VMValueCast, Value, Vector, VectorRef,
+        self, closure_captured_depth, AbstractFunction, Closure, GlobalValue, Locals, Reference,
+        SignerRef, Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
@@ -662,13 +662,12 @@ where
                 },
                 ExitCode::CallClosure(sig_idx) => {
                     // Notice the closure is type-checked in runtime_type_checker
-                    let (fun, captured) = self
+                    let closure = self
                         .operand_stack
                         .pop_as::<Closure>()
-                        .map_err(|e| set_err_info!(current_frame, e))?
-                        .unpack();
+                        .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    let lazy_function = LazyLoadedFunction::expect_this_impl(fun.as_ref())
+                    let lazy_function = LazyLoadedFunction::expect_this_impl(closure.function())
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
 
@@ -693,6 +692,16 @@ where
                     let callee = lazy_function
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    // Decode the captured arguments if they are still serialized.
+                    LazyLoadedFunction::materialize_captured_values(
+                        &closure,
+                        self.loader,
+                        gas_meter,
+                        traversal_context,
+                    )
+                    .map_err(|e| set_err_info!(current_frame, e))?;
+
                     let num_actual_params = callee.param_tys().len().checked_sub(mask.captured_count() as usize).ok_or_else(|| {
                         let err = PartialVMError::new_invariant_violation(format!(
                             "Number of parameters ({}) for function {} is smaller than the number of captured arguments ({})",
@@ -747,7 +756,9 @@ where
                     // some acrobatics is needed (sigh).
                     // TODO: perhaps refactor and just pass count of arguments, because
                     //   that is the only thing used for now.
-                    let captured_vec = captured.collect::<Vec<_>>();
+                    let (_fun, captured_vec) = closure
+                        .unpack_decoded()
+                        .map_err(|e| set_err_info!(current_frame, e))?;
                     let arguments: Vec<&Value> = self
                         .operand_stack
                         .last_n(num_actual_params)
@@ -1781,26 +1792,29 @@ where
         self.get_stack_frames(usize::MAX)
     }
 
-    /// Check that the depth of captured closure values does not exceed the configured maximum.
+    /// Computes the nesting depth of a closure being packed from its captured values, and
+    /// enforces the configured maximum when the check is enabled.
     ///
     /// Closures can capture other closures, creating arbitrary nesting depth that is not visible
     /// in the type system (all closures have the same function type regardless of what they capture).
-    /// This check ensures that deeply nested closure chains cannot be created, preventing potential
-    /// stack overflows or excessive resource consumption when operating on such values.
+    /// The depth is cached on the closure so later depth checks can see through opaque serialized
+    /// captured blobs; enforcing it here prevents deeply nested closure chains that could cause
+    /// stack overflows or excessive resource consumption.
     ///
-    /// The check uses `max_depth - 1` because the closure being packed adds one additional level
-    /// of nesting on top of its captured values.
-    fn check_depth_of_closure_captured_values(&self, captured: &[Value]) -> PartialVMResult<()> {
-        if !self.vm_config.enable_closure_depth_check {
-            return Ok(());
-        }
-        if let Some(max_depth) = self.vm_config.max_value_nest_depth {
-            let limit = max_depth.saturating_sub(1);
-            for v in captured.iter() {
-                v.check_depth_of_value(limit)?;
-            }
-        }
-        Ok(())
+    /// The per-captured limit is `max_depth - 1` because the closure being packed adds one
+    /// additional level of nesting on top of its captured values. When the check is disabled the
+    /// depth is still computed (it must be persisted whenever V2 serialization is enabled), but no
+    /// limit is enforced.
+    fn compute_and_check_closure_depth(&self, captured: &[Value]) -> PartialVMResult<u16> {
+        let per_captured_limit = if self.vm_config.enable_closure_depth_check {
+            self.vm_config
+                .max_value_nest_depth
+                .map(|max_depth| max_depth.saturating_sub(1))
+                .unwrap_or(u64::MAX)
+        } else {
+            u64::MAX
+        };
+        closure_captured_depth(captured, per_captured_limit)
     }
 }
 
@@ -2663,13 +2677,15 @@ impl Frame {
                         }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        let captured_depth =
+                            interpreter.compute_and_check_closure_depth(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
                             traversal_context,
                             function.clone(),
                             *mask,
+                            captured_depth,
                         )?;
                         interpreter
                             .operand_stack
@@ -2718,13 +2734,15 @@ impl Frame {
                         }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        let captured_depth =
+                            interpreter.compute_and_check_closure_depth(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
                             traversal_context,
                             function.clone(),
                             *mask,
+                            captured_depth,
                         )?;
                         interpreter
                             .operand_stack
@@ -2964,6 +2982,11 @@ impl Frame {
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_eq(&lhs, &rhs)?;
                         let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
+                        let mut materializer = RuntimeClosureMaterializer::new(
+                            interpreter.loader,
+                            gas_meter,
+                            traversal_context,
+                        );
                         interpreter
                             .operand_stack
                             .push(Value::bool(lhs.equals_with_depth(
@@ -2971,6 +2994,7 @@ impl Frame {
                                 1,
                                 interpreter.vm_config.max_value_nest_depth,
                                 check_mask,
+                                Some(&mut materializer),
                             )?))?;
                     },
                     Instruction::Neq => {
@@ -2978,6 +3002,11 @@ impl Frame {
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_neq(&lhs, &rhs)?;
                         let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
+                        let mut materializer = RuntimeClosureMaterializer::new(
+                            interpreter.loader,
+                            gas_meter,
+                            traversal_context,
+                        );
                         interpreter
                             .operand_stack
                             .push(Value::bool(!lhs.equals_with_depth(
@@ -2985,6 +3014,7 @@ impl Frame {
                                 1,
                                 interpreter.vm_config.max_value_nest_depth,
                                 check_mask,
+                                Some(&mut materializer),
                             )?))?;
                     },
                     Instruction::MutBorrowGlobal(sd_idx) | Instruction::ImmBorrowGlobal(sd_idx) => {

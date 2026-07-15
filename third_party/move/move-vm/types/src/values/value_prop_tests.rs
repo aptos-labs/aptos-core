@@ -19,6 +19,9 @@ proptest! {
         // Set up mock function extension for function value serialization
         let mut ext_mock = MockFunctionValueExtension::new();
         ext_mock
+            .expect_is_function_data_format_v2_enabled()
+            .returning(|| false);
+        ext_mock
             .expect_get_serialization_data()
             .returning(move |af| {
                 Ok(af

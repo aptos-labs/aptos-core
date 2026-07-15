@@ -3,7 +3,10 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::views::{TypeView, ValueView};
+use crate::{
+    values::Value,
+    views::{TypeView, ValueView},
+};
 use ambassador::delegatable_trait;
 use move_binary_format::{
     errors::PartialVMResult, file_format::CodeOffset, file_format_common::Opcodes,
@@ -205,6 +208,14 @@ pub trait NativeGasMeter: DependencyGasMeter {
 
     /// Tracks heap memory usage.
     fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()>;
+
+    /// Charges for materialization of the serialized captured arguments of a closure.
+    /// Also tracks heap-memory quota for the deserialized values.
+    fn charge_closure_materialization(
+        &mut self,
+        num_bytes: NumBytes,
+        values: &[Value],
+    ) -> PartialVMResult<()>;
 }
 
 /// Trait that defines a generic gas meter interface, allowing clients of the Move VM to implement
@@ -419,6 +430,14 @@ impl NativeGasMeter for UnmeteredGasMeter {
     }
 
     fn use_heap_memory_in_native_context(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_closure_materialization(
+        &mut self,
+        _num_bytes: NumBytes,
+        _values: &[Value],
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ mod function;
 pub use function::{Function, LoadedFunction, LoadedFunctionOwner};
 pub(crate) use function::{
     FunctionHandle, FunctionInstantiation, FunctionPtr, GenericFunctionPtr, LazyLoadedFunction,
-    LazyLoadedFunctionState,
+    LazyLoadedFunctionState, RuntimeClosureMaterializer,
 };
 
 mod modules;

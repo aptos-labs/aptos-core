@@ -22,7 +22,9 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Closure, Reference, Struct, Value, Vector, VectorRef},
+    values::{
+        Closure, Reference, Struct, Value, Vector, VectorRef, DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+    },
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref};
@@ -41,6 +43,22 @@ struct FormatContext<'a, 'b, 'c, 'd, 'e> {
     canonicalize: bool,
     single_line: bool,
     include_int_type: bool,
+}
+
+/// Bounds how deep the formatter recurses into a value. Used as a
+/// defense-in-depth to ensure deeply nested values are never formatted.
+fn format_max_depth(context: &SafeNativeContext) -> usize {
+    if context
+        .get_feature_flags()
+        .is_function_data_format_v2_enabled()
+    {
+        let max_value_nest_depth = context
+            .max_value_nest_depth()
+            .unwrap_or(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH);
+        max_value_nest_depth.saturating_mul(2) as usize
+    } else {
+        usize::MAX
+    }
 }
 
 /// Converts a `MoveValue::Vector` of `u8`'s to a `String` by wrapping it in double quotes and
@@ -491,12 +509,16 @@ fn native_format_impl(
             // Notice that we print the undecorated value representation,
             // avoiding potential loading of the function to get full
             // decorated type information.
-            let (fun, args) = val.value_as::<Closure>()?.unpack();
+            let closure = val.value_as::<Closure>()?;
+            // Decode the captured arguments if they are still serialized: this loads
+            // the function and charges gas.
+            context.context.materialize_closure(&closure)?;
             let captured_layouts = context
                 .context
                 .loader_context()
-                .get_captured_layouts_for_string_utils(fun.as_ref())?
+                .get_captured_layouts_for_string_utils(closure.function())?
                 .ok_or_else(|| SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))?;
+            let (fun, args) = closure.unpack_decoded()?;
             out.push_str(&fun.to_canonical_string());
             out.push('(');
             if !captured_layouts.is_empty() {
@@ -504,7 +526,7 @@ fn native_format_impl(
                     context,
                     fun.closure_mask(),
                     captured_layouts.into_iter(),
-                    args,
+                    args.into_iter(),
                     depth,
                     !context.single_line,
                     out,
@@ -537,6 +559,8 @@ pub(crate) fn native_format_debug(
     let mut format_context = FormatContext {
         context,
         should_charge_gas: false,
+        // Keeping this as maximum value because this is a legacy function used
+        // for replay only.
         max_depth: usize::MAX,
         max_len: usize::MAX,
         type_tag: true,
@@ -566,10 +590,11 @@ fn native_format(
     let x = safely_pop_arg!(arguments, Reference);
     let v = x.read_ref().map_err(SafeNativeError::InvariantViolation)?;
     let mut out = String::new();
+    let max_depth = format_max_depth(context);
     let mut format_context = FormatContext {
         context,
         should_charge_gas: true,
-        max_depth: usize::MAX,
+        max_depth,
         max_len: usize::MAX,
         type_tag,
         canonicalize,
@@ -642,10 +667,11 @@ fn native_format_list(
                     .type_to_fully_annotated_layout(&ty_args[0])?
                     .ok_or_else(|| SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))?;
 
+                let max_depth = format_max_depth(context);
                 let mut format_context = FormatContext {
                     context,
                     should_charge_gas: true,
-                    max_depth: usize::MAX,
+                    max_depth,
                     max_len: usize::MAX,
                     type_tag: true,
                     canonicalize: false,

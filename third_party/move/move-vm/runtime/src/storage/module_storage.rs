@@ -18,8 +18,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-    identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
@@ -584,21 +583,15 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                 mask,
                 ty_args,
                 captured_layouts,
+                captured_depth,
                 // Serialization stays name-based: the resolved module version is not stored.
                 module_hash: _,
             } => {
-                // If there are no captured layouts, then this closure is non-storable, i.e., the
-                // function is not persistent (not public or not private with #[persistent]
-                // attribute). This means that anonymous lambda-lifted functions are cannot be
-                // serialized as well.
-                let captured_layouts = captured_layouts.as_ref().cloned().ok_or_else(|| {
-                    let msg = "Captured layouts must always be computed for storable closures";
-                    PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
-                        .with_message(msg.to_string())
-                })?;
-
+                // Note: `None` layouts mean the closure is non-storable (the function
+                // is not persistent) or its captured arguments are still serialized.
+                // The serializer fails on the former and never needs layouts for the
+                // latter.
                 Ok(SerializedFunctionData {
-                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun
                         .module_id()
                         .ok_or_else(|| {
@@ -610,7 +603,8 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                     fun_id: fun.function.name.clone(),
                     ty_args: ty_args.clone(),
                     mask: *mask,
-                    captured_layouts,
+                    captured_depth: *captured_depth,
+                    captured_layouts: captured_layouts.clone(),
                 })
             },
         }
@@ -622,5 +616,12 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
             .enable_depth_checks
             .then_some(vm_config.max_value_nest_depth)
             .flatten()
+    }
+
+    fn is_function_data_format_v2_enabled(&self) -> bool {
+        self.module_storage
+            .runtime_environment()
+            .vm_config()
+            .enable_function_data_format_v2
     }
 }

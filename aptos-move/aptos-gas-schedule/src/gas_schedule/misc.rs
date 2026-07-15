@@ -161,6 +161,15 @@ where
     fn visit_closure(&mut self, depth: u64, len: usize) -> PartialVMResult<bool> {
         self.inner.visit_closure(depth, len)
     }
+
+    fn visit_closure_captured_serialized_args(
+        &mut self,
+        depth: u64,
+        num_bytes: usize,
+    ) -> PartialVMResult<()> {
+        self.inner
+            .visit_closure_captured_serialized_args(depth, num_bytes)
+    }
 }
 
 /// Checks that the provided depth is not too deep. Used to bound recursion, preventing stack from
@@ -322,6 +331,17 @@ impl ValueVisitor for AbstractValueSizeVisitor<'_> {
         self.check_depth(depth)?;
         self.size += self.params.closure;
         Ok(true)
+    }
+
+    #[inline]
+    fn visit_closure_captured_serialized_args(
+        &mut self,
+        depth: u64,
+        num_bytes: usize,
+    ) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.size += self.params.per_u8_packed * NumArgs::new(num_bytes as u64);
+        Ok(())
     }
 
     #[inline]
@@ -629,6 +649,16 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_closure_captured_serialized_args(
+                &mut self,
+                depth: u64,
+                _num_bytes: usize,
+            ) -> PartialVMResult<()> {
+                // Unreachable: visit_closure never descends into captured arguments.
+                self.check_depth(depth)
+            }
+
+            #[inline]
             fn visit_vec(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
                 self.check_depth(depth)?;
                 self.res = Some(self.params.vector);
@@ -857,7 +887,19 @@ impl AbstractValueSizeGasParameters {
             fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
                 self.check_depth(depth)?;
                 self.res = Some(self.params.closure);
+                // Do not traverse into captured arguments.
                 Ok(false)
+            }
+
+            #[inline]
+            fn visit_closure_captured_serialized_args(
+                &mut self,
+                _depth: u64,
+                _num_bytes: usize,
+            ) -> PartialVMResult<()> {
+                Err(PartialVMError::new_invariant_violation(
+                    "Closure captured arguments are not visited",
+                ))
             }
 
             #[inline]

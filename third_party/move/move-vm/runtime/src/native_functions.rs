@@ -39,7 +39,7 @@ use move_vm_types::{
     gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
     loaded_data::runtime_types::{Type, TypeParamMap},
     natives::function::NativeResult,
-    values::{AbstractFunction, Value},
+    values::{AbstractFunction, Closure, ClosureCapturedArgsMaterializer, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -293,6 +293,27 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.traversal_context
     }
 
+    /// Ensures the captured arguments of the closure are decoded: resolves (loads)
+    /// the function if needed, derives the layouts of the captured arguments from its
+    /// signature, decodes them, and charges gas for all of it. No-op if the arguments
+    /// are already decoded.
+    pub fn materialize_closure(&mut self, closure: &Closure) -> PartialVMResult<()> {
+        let module_storage = ModuleStorageWrapper {
+            module_storage: self.module_storage,
+        };
+        let mut gas_meter = NativeGasMeterWrapper {
+            gas_meter: &mut *self.gas_meter,
+        };
+        dispatch_loader!(&module_storage, loader, {
+            LazyLoadedFunction::materialize_captured_values(
+                closure,
+                &loader,
+                &mut gas_meter,
+                self.traversal_context,
+            )
+        })
+    }
+
     pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
@@ -328,7 +349,15 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
         Ok(
             match &*LazyLoadedFunction::expect_this_impl(fun)?.state.borrow() {
                 LazyLoadedFunctionState::Unresolved { data, .. } => {
-                    Some(data.captured_layouts.clone())
+                    match data.captured_layouts.as_ref() {
+                        Some(captured_layouts) => Some(captured_layouts.clone()),
+                        None => {
+                            return Err(PartialVMError::new_invariant_violation(
+                                "captured arguments must be materialized before their layouts \
+                                 can be accessed",
+                            ))
+                        },
+                    }
                 },
                 LazyLoadedFunctionState::Resolved {
                     fun,
@@ -554,6 +583,54 @@ impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
 impl<'a> ModuleStorageWrapper<'a> {
     fn inner(&self) -> &dyn ModuleStorage {
         self.module_storage
+    }
+}
+
+/// Natives can pass the context into value equality and comparison to materialize
+/// closures on the way.
+impl ClosureCapturedArgsMaterializer for NativeContext<'_, '_, '_> {
+    fn materialize_captured_args(&mut self, closure: &Closure) -> PartialVMResult<()> {
+        self.materialize_closure(closure)
+    }
+}
+
+/// Sized [NativeGasMeter] over a trait object, so it can be passed to generic APIs.
+struct NativeGasMeterWrapper<'a> {
+    gas_meter: &'a mut dyn NativeGasMeter,
+}
+
+impl DependencyGasMeter for NativeGasMeterWrapper<'_> {
+    fn charge_dependency(
+        &mut self,
+        kind: DependencyKind,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.gas_meter.charge_dependency(kind, addr, name, size)
+    }
+}
+
+impl NativeGasMeter for NativeGasMeterWrapper<'_> {
+    fn legacy_gas_budget_in_native_context(&self) -> InternalGas {
+        self.gas_meter.legacy_gas_budget_in_native_context()
+    }
+
+    fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        self.gas_meter.charge_native_execution(amount)
+    }
+
+    fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.gas_meter.use_heap_memory_in_native_context(amount)
+    }
+
+    fn charge_closure_materialization(
+        &mut self,
+        num_bytes: NumBytes,
+        values: &[Value],
+    ) -> PartialVMResult<()> {
+        self.gas_meter
+            .charge_closure_materialization(num_bytes, values)
     }
 }
 

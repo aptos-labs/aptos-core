@@ -23,14 +23,14 @@ use move_bytecode_utils::{compiled_module_viewer::CompiledModuleView, layout::Ty
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
-    function::{ClosureMask, MoveClosure},
+    function::{ClosureMask, MoveClosure, MoveClosureCapturedArgs},
     identifier::{IdentStr, Identifier},
     int256,
     language_storage::{
         FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag, TABLE_MODULE_ID, TABLE_STRUCT_NAME,
     },
     transaction_argument::{convert_txn_args, TransactionArgument},
-    value::{MoveStruct, MoveTypeLayout, MoveValue},
+    value::{MoveStruct, MoveTypeLayout, MoveValue, DEFAULT_MAX_VM_VALUE_NESTED_DEPTH},
     vm_status::VMStatus,
 };
 use serde::ser::{SerializeMap, SerializeSeq};
@@ -92,6 +92,17 @@ pub enum AnnotatedMoveValue {
     I128(i128),
     I256(int256::I256),
 }
+
+/// Upper bound on how deeply annotation recurses into a value. This is a
+/// defense-in-depth mechanism ensuring that annotation of deeply nested values
+/// (if they ended up being in storage) is not possible and will not cause such
+/// problems as stack overflow (due to recursive implementation). It is twice
+/// the VM's value nesting bound, so a valid value never reaches it.
+const MAX_ANNOTATION_DEPTH: usize = 2 * DEFAULT_MAX_VM_VALUE_NESTED_DEPTH as usize;
+
+/// Upper bound on how deeply table-info collection recurses into a value. Same
+/// defense-in-depth role as [`MAX_ANNOTATION_DEPTH`].
+const MAX_TABLE_INFO_DEPTH: usize = 2 * DEFAULT_MAX_VM_VALUE_NESTED_DEPTH as usize;
 
 /// Represents information about a table contained in a value.
 pub struct MoveTableInfo {
@@ -347,7 +358,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let ty = self.resolve_struct_tag(tag, &mut Limiter::default())?;
         let struct_def = (ty.as_ref()).try_into().map_err(into_vm_status)?;
         let move_struct = MoveStruct::simple_deserialize(blob, &struct_def)?;
-        self.annotate_struct(&move_struct, &ty, limit)
+        self.annotate_struct(&move_struct, &ty, limit, 0)
     }
 
     pub fn move_struct_fields(
@@ -699,7 +710,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let fat_ty = self.resolve_type_impl(ty_tag, &mut limit)?;
         let layout = (&fat_ty).try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.collect_table_info_from_value(&fat_ty, move_value, &mut limit, infos)
+        self.collect_table_info_from_value(&fat_ty, move_value, &mut limit, infos, 0)
     }
 
     fn contains_tables(&self, ty_tag: &TypeTag, limit: &mut Limiter) -> anyhow::Result<bool> {
@@ -722,7 +733,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     ) -> anyhow::Result<AnnotatedMoveValue> {
         let layout = ty.try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.annotate_value(&move_value, ty, limit)
+        self.annotate_value(&move_value, ty, limit, 0)
     }
 
     fn annotate_struct(
@@ -730,6 +741,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         move_struct: &MoveStruct,
         ty: &FatStructType,
         limit: &mut Limiter,
+        depth: usize,
     ) -> anyhow::Result<AnnotatedMoveStruct> {
         let struct_tag = ty
             .struct_tag(limit)
@@ -755,7 +767,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 .iter()
                 .zip(tys)
                 .zip(field_names)
-                .map(|((v, ty), n)| self.annotate_value(v, ty, limit).map(|v| (n, v)))
+                .map(|((v, ty), n)| self.annotate_value(v, ty, limit, depth + 1).map(|v| (n, v)))
                 .collect::<anyhow::Result<Vec<_>>>()
         };
 
@@ -824,6 +836,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         move_closure: &MoveClosure,
         _ty: &FatFunctionType,
         limit: &mut Limiter,
+        depth: usize,
     ) -> anyhow::Result<AnnotatedMoveClosure> {
         let MoveClosure {
             module_id,
@@ -833,23 +846,51 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             captured,
         } = move_closure;
 
-        // Resolve the captured argument types on-demand from the function signature.
-        // This gives fully named annotations (real struct and field names) instead of
-        // the raw, nameless layouts stored with the closure, at the cost of requiring
-        // the defining module to be loadable at the read version.
+        limit.charge(module_id.address.len())?;
+        limit.charge(module_id.name.as_bytes().len())?;
+        limit.charge(fun_id.as_bytes().len())?;
+
+        // Resolve the captured argument types on-demand from the function
+        // signature. This gives fully named annotations (real struct and field
+        // names). Even if the closure captured arguments store layouts - those
+        // are ignored because they are not annotated and do not care any name
+        // related information.
         let captured_tys = self.resolve_captured_types(module_id, fun_id, ty_args, *mask, limit)?;
-        let captured_tys = captured_tys.as_deref().map_or(&[][..], Vec::as_slice);
-        anyhow::ensure!(
-            captured.len() == captured_tys.len(),
-            "captured value/type count mismatch: {} values, {} types",
-            captured.len(),
-            captured_tys.len(),
-        );
-        let captured = captured
-            .iter()
-            .zip(captured_tys)
-            .map(|((_layout, value), ty)| self.annotate_value(value, ty, limit))
-            .collect::<anyhow::Result<Vec<_>>>()?;
+        let captured = match captured_tys {
+            None => vec![],
+            Some(captured_tys) => match captured {
+                MoveClosureCapturedArgs::Deserialized(captured) => {
+                    anyhow::ensure!(
+                        captured.len() == captured_tys.len(),
+                        "captured value/type count mismatch: {} values, {} types",
+                        captured.len(),
+                        captured_tys.len(),
+                    );
+                    captured
+                        .iter()
+                        .zip(captured_tys.iter())
+                        .map(|((_layout, value), ty)| {
+                            self.annotate_value(value, ty, limit, depth + 1)
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()?
+                },
+                MoveClosureCapturedArgs::Serialized { blob, .. } => {
+                    let mut layouts = Vec::with_capacity(captured_tys.len());
+                    for ty in captured_tys.iter() {
+                        layouts.push(ty.try_into().map_err(into_vm_status)?);
+                    }
+
+                    limit.charge(blob.len())?;
+                    let values = MoveClosure::deserialize_captured(blob, layouts)?;
+
+                    values
+                        .iter()
+                        .zip(captured_tys.iter())
+                        .map(|(value, ty)| self.annotate_value(value, ty, limit, depth + 1))
+                        .collect::<anyhow::Result<Vec<_>>>()?
+                },
+            },
+        };
         Ok(AnnotatedMoveClosure {
             module_id: module_id.clone(),
             fun_id: fun_id.clone(),
@@ -959,7 +1000,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         value: &MoveValue,
         ty: &FatType,
         limit: &mut Limiter,
+        depth: usize,
     ) -> anyhow::Result<AnnotatedMoveValue> {
+        anyhow::ensure!(
+            depth <= MAX_ANNOTATION_DEPTH,
+            "value depth exceeds maximum allowed limit of {}",
+            MAX_ANNOTATION_DEPTH,
+        );
         Ok(match (value, ty) {
             (MoveValue::Bool(b), FatType::Bool) => AnnotatedMoveValue::Bool(*b),
             (MoveValue::U8(i), FatType::U8) => AnnotatedMoveValue::U8(*i),
@@ -987,15 +1034,15 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 _ => AnnotatedMoveValue::Vector(
                     ty.type_tag(limit).unwrap(),
                     a.iter()
-                        .map(|v| self.annotate_value(v, ty.as_ref(), limit))
+                        .map(|v| self.annotate_value(v, ty.as_ref(), limit, depth + 1))
                         .collect::<anyhow::Result<_>>()?,
                 ),
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
-                AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit)?)
+                AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit, depth)?)
             },
             (MoveValue::Closure(c), FatType::Function(ty)) => {
-                AnnotatedMoveValue::Closure(self.annotate_closure(c, ty, limit)?)
+                AnnotatedMoveValue::Closure(self.annotate_closure(c, ty, limit, depth)?)
             },
             (MoveValue::U8(_), _)
             | (MoveValue::U64(_), _)
@@ -1031,12 +1078,18 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         val: MoveValue,
         limit: &mut Limiter,
         infos: &mut Vec<MoveTableInfo>,
+        depth: usize,
     ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            depth <= MAX_TABLE_INFO_DEPTH,
+            "unable to collect table info because value depth exceeds the limit of {}",
+            MAX_TABLE_INFO_DEPTH,
+        );
         match (ty, val) {
             (FatType::Vector(elem_ty), MoveValue::Vector(elem_vals)) => {
                 if elem_ty.contains_tables() {
                     for val in elem_vals {
-                        self.collect_table_info_from_value(elem_ty, val, limit, infos)?
+                        self.collect_table_info_from_value(elem_ty, val, limit, infos, depth + 1)?
                     }
                 }
                 Ok(())
@@ -1060,7 +1113,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             MoveStruct::Runtime(field_vals),
                         ) => {
                             for (ty, val) in field_tys.iter().zip(field_vals) {
-                                self.collect_table_info_from_value(ty, val, limit, infos)?
+                                self.collect_table_info_from_value(
+                                    ty,
+                                    val,
+                                    limit,
+                                    infos,
+                                    depth + 1,
+                                )?
                             }
                             Ok(())
                         },
@@ -1069,7 +1128,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             MoveStruct::RuntimeVariant(tag, field_vals),
                         ) if (tag as usize) < variants.len() => {
                             for (ty, val) in variants[tag as usize].iter().zip(field_vals) {
-                                self.collect_table_info_from_value(ty, val, limit, infos)?
+                                self.collect_table_info_from_value(
+                                    ty,
+                                    val,
+                                    limit,
+                                    infos,
+                                    depth + 1,
+                                )?
                             }
                             Ok(())
                         },
@@ -1093,18 +1158,48 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     mask,
                     captured,
                 } = *closure;
-                match self.resolve_captured_types(&module_id, &fun_id, &ty_args, mask, limit) {
-                    Ok(Some(captured_tys)) if captured_tys.len() == captured.len() => {
-                        for ((_layout, value), ty) in captured.into_iter().zip(captured_tys.iter())
-                        {
-                            if ty.contains_tables() {
-                                self.collect_table_info_from_value(ty, value, limit, infos)?;
-                            }
-                        }
+
+                let captured_tys = match self
+                    .resolve_captured_types(&module_id, &fun_id, &ty_args, mask, limit)?
+                {
+                    Some(captured_tys) => captured_tys,
+                    None => {
+                        // Nothing captured: continue.
+                        return Ok(());
                     },
-                    // Nothing captured, an arity mismatch, or types we couldn't resolve: skip.
-                    Ok(_) | Err(_) => {},
+                };
+
+                let values = match captured {
+                    MoveClosureCapturedArgs::Deserialized(captured) => {
+                        captured.into_iter().map(|(_layout, value)| value).collect()
+                    },
+                    MoveClosureCapturedArgs::Serialized { blob, .. } => {
+                        let mut layouts = Vec::with_capacity(captured_tys.len());
+                        for ty in captured_tys.iter() {
+                            // We should be able to convert all types to layouts:
+                            // failures mean something was stored to storage that
+                            // what not supposed to, e.g., a reference.
+                            layouts.push(ty.try_into().map_err(into_vm_status)?);
+                        }
+                        MoveClosure::deserialize_captured(&blob, layouts)?
+                    },
+                };
+
+                // This invariant should never be violated, so failing is fine.
+                if values.len() != captured_tys.len() {
+                    bail!(
+                        "invariant violated: there are {} captured values but expected {}",
+                        values.len(),
+                        captured_tys.len()
+                    );
                 }
+
+                for (value, ty) in values.into_iter().zip(captured_tys.iter()) {
+                    if ty.contains_tables() {
+                        self.collect_table_info_from_value(ty, value, limit, infos, depth + 1)?;
+                    }
+                }
+
                 Ok(())
             },
 

@@ -34,6 +34,15 @@ use std::{
 /// the configuration in the binary format, so the bytecode verifier checks its validness.
 pub const VARIANT_COUNT_MAX: u64 = 127;
 
+/// Values can be recursive, and so it is important that we do not use recursive algorithms over
+/// deeply nested values as it can cause stack overflow. Since it is not always possible to avoid
+/// recursion, we opt for a reasonable limit on VM value depth. It is defined in Move VM config,
+/// but since it is difficult to propagate config context everywhere, we use this constant.
+///
+/// IMPORTANT: When changing this constant, make sure it is in-sync with one in VM config (it is
+/// used there now).
+pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
+
 /// In the `WithTypes` configuration, a Move struct gets serialized into a Serde struct with this name
 pub const MOVE_STRUCT_NAME: &str = "struct";
 
