@@ -10,7 +10,10 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{function_values_impl::mock::MockAbstractFunction, values_impl, Struct, Value},
+        values::{
+            function_values_impl::mock::MockAbstractFunction, values_impl, Locals, Reference,
+            Struct, StructRef, Value, VectorRef,
+        },
     };
     use better_any::TidExt;
     use claims::{assert_err, assert_ok, assert_some};
@@ -595,5 +598,371 @@ mod tests {
 
         // ser(MoveValue) == ser(VMValue)
         assert_eq!(bytes, vm_bytes);
+    }
+
+    // ======================================================================================
+    // Zero-copy reference serialization (serialize_ref / serialized_size_ref)
+    //
+    // These tests guarantee that serializing through a `&Reference` (the zero-copy path used by
+    // the `bcs` natives) produces byte-for-byte identical output and identical sizes to the
+    // copy-based path that serializes an owned `Value`.
+
+    fn nested_struct_layout() -> MoveTypeLayout {
+        use MoveStructLayout::*;
+        use MoveTypeLayout::*;
+        MoveTypeLayout::new_struct(Runtime(vec![
+            Bool,
+            Vector(Box::new(U32)),
+            MoveTypeLayout::new_struct(Runtime(vec![U64, Vector(Box::new(U8)), Address])),
+            Vector(Box::new(MoveTypeLayout::new_struct(Runtime(vec![
+                U16, Bool,
+            ])))),
+        ]))
+    }
+
+    fn nested_struct_value() -> Value {
+        Value::struct_(Struct::pack(vec![
+            Value::bool(true),
+            Value::vector_u32(vec![1, 2, 3]),
+            Value::struct_(Struct::pack(vec![
+                Value::u64(42),
+                Value::vector_u8(vec![7, 8, 9]),
+                Value::address(AccountAddress::TWO),
+            ])),
+            Value::vector_unchecked(vec![
+                Value::struct_(Struct::pack(vec![Value::u16(1), Value::bool(false)])),
+                Value::struct_(Struct::pack(vec![Value::u16(2), Value::bool(true)])),
+            ])
+            .unwrap(),
+        ]))
+    }
+
+    /// Serializes `value` both as an owned value and through a whole-value reference obtained via
+    /// `Locals::borrow_loc`, asserting the encodings and sizes match.
+    fn assert_ref_matches_value(value: Value, layout: &MoveTypeLayout, legacy_signer: bool) {
+        let mk_ctx = || {
+            let ctx = ValueSerDeContext::new(None).with_delayed_fields_serde();
+            if legacy_signer {
+                ctx.with_legacy_signer()
+            } else {
+                ctx
+            }
+        };
+
+        let owned_bytes = mk_ctx()
+            .serialize(&value, layout)
+            .expect("owned serialization must not error");
+        let owned_size = mk_ctx().serialized_size(&value, layout);
+
+        // `borrow_loc` yields a `ContainerRef` for containers and an `IndexedRef` (into the locals
+        // container) for primitives, so this exercises both `Reference` serialization arms.
+        let mut locals = Locals::new(1);
+        locals.store_loc(0, value).unwrap();
+        let get_ref = || {
+            locals
+                .borrow_loc(0)
+                .unwrap()
+                .value_as::<Reference>()
+                .unwrap()
+        };
+
+        let ref_bytes = mk_ctx()
+            .serialize_ref(&get_ref(), layout)
+            .expect("reference serialization must not error");
+        assert_eq!(
+            owned_bytes, ref_bytes,
+            "serialize_ref output differs from serialize for layout {:?}",
+            layout
+        );
+
+        let ref_size = mk_ctx().serialized_size_ref(&get_ref(), layout);
+        match (&owned_size, &ref_size) {
+            (Ok(a), Ok(b)) => assert_eq!(
+                a, b,
+                "serialized_size_ref differs from serialized_size for layout {:?}",
+                layout
+            ),
+            (Err(_), Err(_)) => {},
+            _ => panic!(
+                "serialized_size / serialized_size_ref disagree on success for layout {:?}: {:?} vs {:?}",
+                layout, owned_size, ref_size
+            ),
+        }
+
+        if let (Some(bytes), Ok(size)) = (&owned_bytes, &owned_size) {
+            assert_eq!(*size, bytes.len(), "size must equal serialized length");
+        }
+    }
+
+    #[test]
+    fn serialize_ref_matches_serialize_scalars_and_containers() {
+        use MoveStructLayout::*;
+        use MoveTypeLayout::*;
+
+        let cases: Vec<(Value, MoveTypeLayout)> = vec![
+            (Value::u8(10), U8),
+            (Value::u16(1000), U16),
+            (Value::u32(100000), U32),
+            (Value::u64(10), U64),
+            (Value::u128(10), U128),
+            (Value::u256(int256::U256::ONE), U256),
+            (Value::bool(true), Bool),
+            (Value::address(AccountAddress::ONE), Address),
+            (Value::vector_u8(vec![1, 2, 3, 4]), Vector(Box::new(U8))),
+            (Value::vector_u64(vec![7, 8, 9]), Vector(Box::new(U64))),
+            (
+                Value::vector_address(vec![AccountAddress::ONE, AccountAddress::TWO]),
+                Vector(Box::new(Address)),
+            ),
+            (
+                Value::vector_unchecked(vec![
+                    Value::vector_u8(vec![1, 2]),
+                    Value::vector_u8(vec![3]),
+                ])
+                .unwrap(),
+                Vector(Box::new(Vector(Box::new(U8)))),
+            ),
+            (
+                Value::struct_(values_impl::Struct::pack(vec![
+                    Value::bool(true),
+                    Value::vector_u32(vec![1, 2, 3, 4, 5]),
+                ])),
+                MoveTypeLayout::new_struct(Runtime(vec![Bool, Vector(Box::new(U32))])),
+            ),
+            (nested_struct_value(), nested_struct_layout()),
+        ];
+
+        for (value, layout) in cases {
+            assert_ref_matches_value(value, &layout, false);
+        }
+    }
+
+    #[test]
+    fn serialize_ref_matches_serialize_enum_variants() {
+        let layout = enum_layout();
+        let values = vec![
+            Value::struct_(Struct::pack_variant(0, iter::once(Value::u64(42)))),
+            Value::struct_(Struct::pack_variant(1, iter::empty())),
+            Value::struct_(Struct::pack_variant(
+                2,
+                [Value::bool(true), Value::u32(13)].into_iter(),
+            )),
+        ];
+        for value in values {
+            assert_ref_matches_value(value, &layout, false);
+        }
+    }
+
+    #[test]
+    fn serialize_ref_matches_serialize_signer() {
+        // Non-legacy master and permissioned signers.
+        assert_ref_matches_value(
+            Value::master_signer(AccountAddress::ONE),
+            &MoveTypeLayout::Signer,
+            false,
+        );
+        assert_ref_matches_value(
+            Value::permissioned_signer(AccountAddress::ONE, AccountAddress::TWO),
+            &MoveTypeLayout::Signer,
+            false,
+        );
+        // Legacy master signer.
+        assert_ref_matches_value(
+            Value::master_signer(AccountAddress::ONE),
+            &MoveTypeLayout::Signer,
+            true,
+        );
+    }
+
+    #[test]
+    fn serialize_ref_matches_serialize_delayed_fields() {
+        use IdentifierMappingKind::*;
+        use MoveTypeLayout::*;
+
+        let cases: Vec<(Value, MoveTypeLayout)> = vec![
+            (
+                Value::delayed_value(DelayedFieldID::new_with_width(12, 8)),
+                Native(Aggregator, Box::new(U64)),
+            ),
+            (
+                Value::delayed_value(DelayedFieldID::new_with_width(123, 16)),
+                Native(Snapshot, Box::new(U128)),
+            ),
+        ];
+        for (value, layout) in cases {
+            assert_ref_matches_value(value, &layout, false);
+        }
+    }
+
+    #[test]
+    fn serialize_ref_matches_serialize_indexed_field_refs() {
+        use MoveTypeLayout::*;
+
+        // Borrow a primitive field of a struct: yields an `IndexedRef` into `Container::Struct`.
+        let field_layouts = [U64, Bool, Address];
+        let field_values = [
+            Value::u64(777),
+            Value::bool(true),
+            Value::address(AccountAddress::TWO),
+        ];
+
+        let mut locals = Locals::new(1);
+        locals
+            .store_loc(
+                0,
+                Value::struct_(values_impl::Struct::pack(vec![
+                    Value::u64(777),
+                    Value::bool(true),
+                    Value::address(AccountAddress::TWO),
+                ])),
+            )
+            .unwrap();
+        let struct_ref = locals
+            .borrow_loc(0)
+            .unwrap()
+            .value_as::<StructRef>()
+            .unwrap();
+
+        for (idx, field_layout) in field_layouts.iter().enumerate() {
+            let field_ref = struct_ref
+                .borrow_field(idx)
+                .unwrap()
+                .value_as::<Reference>()
+                .unwrap();
+            let ref_bytes = ValueSerDeContext::new(None)
+                .serialize_ref(&field_ref, field_layout)
+                .unwrap();
+            let expected = ValueSerDeContext::new(None)
+                .serialize(&field_values[idx], field_layout)
+                .unwrap();
+            assert_eq!(ref_bytes, expected, "field {} mismatch", idx);
+        }
+
+        // Borrow an element of a specialized primitive vector: yields an `IndexedRef` into a
+        // specialized container (e.g. `Container::VecU64`).
+        let mut vec_locals = Locals::new(1);
+        vec_locals
+            .store_loc(0, Value::vector_u64(vec![10, 20, 30]))
+            .unwrap();
+        let vector_ref = vec_locals
+            .borrow_loc(0)
+            .unwrap()
+            .value_as::<VectorRef>()
+            .unwrap();
+        let elem_ref = vector_ref
+            .borrow_elem(1)
+            .unwrap()
+            .value_as::<Reference>()
+            .unwrap();
+        let ref_bytes = ValueSerDeContext::new(None)
+            .serialize_ref(&elem_ref, &U64)
+            .unwrap();
+        let expected = ValueSerDeContext::new(None)
+            .serialize(&Value::u64(20), &U64)
+            .unwrap();
+        assert_eq!(ref_bytes, expected, "specialized vec element mismatch");
+    }
+
+    #[test]
+    fn serialize_ref_respects_depth_limit() {
+        // A reference must enforce the same nesting-depth limit as the owned path.
+        let value = nested_struct_value();
+        let layout = nested_struct_layout();
+
+        let mut locals = Locals::new(1);
+        locals.store_loc(0, value).unwrap();
+        let reference = locals
+            .borrow_loc(0)
+            .unwrap()
+            .value_as::<Reference>()
+            .unwrap();
+
+        // A tiny depth limit must cause serialization to fail (return None), matching `serialize`.
+        let shallow = ValueSerDeContext::new(Some(1))
+            .serialize_ref(&reference, &layout)
+            .unwrap();
+        assert!(
+            shallow.is_none(),
+            "shallow depth limit must reject nested value"
+        );
+
+        // A generous limit must succeed.
+        let deep = ValueSerDeContext::new(Some(64))
+            .serialize_ref(&reference, &layout)
+            .unwrap();
+        assert!(
+            deep.is_some(),
+            "generous depth limit must allow nested value"
+        );
+    }
+
+    #[test]
+    fn serialize_ref_indexed_closure_enforces_depth_one_level_deeper() {
+        use move_core_types::function::ClosureMask;
+
+        let mut ext = MockFunctionValueExtension::new();
+        ext.expect_get_serialization_data().returning(|af| {
+            Ok(af
+                .downcast_ref::<MockAbstractFunction>()
+                .expect("cast")
+                .data
+                .clone())
+        });
+
+        // A closure capturing one argument. Captured arguments add a nesting level. Closures are
+        // stored as primitives, so `borrow_loc` yields an `IndexedRef` -- the path whose depth
+        // accounting must mirror `IndexedRef::read_ref`, which copies the element at `depth + 1`.
+        let make_closure = || {
+            Value::closure(
+                Box::new(MockAbstractFunction::new(
+                    "f",
+                    vec![],
+                    ClosureMask::new(0b1),
+                    vec![MoveTypeLayout::U64],
+                )),
+                vec![Value::u64(7)],
+            )
+        };
+        let layout = MoveTypeLayout::Function;
+
+        let mut locals = Locals::new(1);
+        locals.store_loc(0, make_closure()).unwrap();
+        let get_ref = || {
+            locals
+                .borrow_loc(0)
+                .unwrap()
+                .value_as::<Reference>()
+                .unwrap()
+        };
+
+        let owned = make_closure();
+
+        // Smallest depth limit at which each path succeeds.
+        let owned_min = (1..=8u64)
+            .find(|&m| {
+                ValueSerDeContext::new(Some(m))
+                    .with_func_args_deserialization(&ext)
+                    .serialize(&owned, &layout)
+                    .unwrap()
+                    .is_some()
+            })
+            .expect("owned closure serializes within depth 8");
+        let ref_min = (1..=8u64)
+            .find(|&m| {
+                ValueSerDeContext::new(Some(m))
+                    .with_func_args_deserialization(&ext)
+                    .serialize_ref(&get_ref(), &layout)
+                    .unwrap()
+                    .is_some()
+            })
+            .expect("closure reference serializes within depth 8");
+
+        // Serializing through an indexed reference visits the element one level deeper than
+        // serializing the owned value, matching `IndexedRef::read_ref`'s `copy_value(depth + 1)`.
+        assert_eq!(
+            ref_min,
+            owned_min + 1,
+            "indexed reference must enforce the depth limit one level deeper than the owned value"
+        );
     }
 }
