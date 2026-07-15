@@ -136,7 +136,7 @@ pub fn get_enum_variant_info(
 /// blank lines; this function only writes the Parameters / Locals sections.
 ///
 /// `compact` – when `true`, `Invalid` slots (already moved out) are omitted.
-pub(crate) fn print_locals_enаriched<B: fmt::Write>(
+pub(crate) fn print_locals_enriched<B: fmt::Write>(
     buf: &mut B,
     function: &crate::LoadedFunction,
     locals: &Locals,
