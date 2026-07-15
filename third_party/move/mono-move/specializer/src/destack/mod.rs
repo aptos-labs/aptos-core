@@ -29,16 +29,7 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> Result<Modul
     // Gas instrumentation: emit a per-block cost formula for each function.
     // TODO(metering): could be hoisted before optimization, at the cost of
     // over-approximating (charging for instructions that optimization removes).
-    let ModuleIR { module, functions } = &mut module_ir;
-    for func in functions.iter_mut().flatten() {
-        func.block_costs = gas::function_block_costs(
-            module,
-            interner,
-            &func.blocks,
-            &func.home_slot_types,
-            func.num_xfer_positions,
-        )?;
-    }
+    gas::instrument(&mut module_ir, interner)?;
 
     // Debug-mode failsafe: verify xfer invariants hold after optimization.
     #[cfg(debug_assertions)]

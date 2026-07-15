@@ -3,7 +3,7 @@
 
 fun read_value() {
   frame_data_size: 64
-  entry_gas: 69
+  entry_gas: 95
   code:
     0: EnumNew [8] desc=2 tag #0
     1: HeapMoveTo8 [8]+8 <- [0]
@@ -17,7 +17,7 @@ fun read_value() {
 
 fun run_computed() {
   frame_data_size: 72
-  entry_gas: 159
+  entry_gas: 211
   code:
     0: StoreImm8 [24] <- #0
     1: EnumNew [16] desc=2 tag #1
@@ -36,7 +36,7 @@ fun run_computed() {
 
 fun run_simple() {
   frame_data_size: 72
-  entry_gas: 157
+  entry_gas: 183
   code:
     0: EnumNew [16] desc=2 tag #0
     1: HeapMoveTo8 [16]+8 <- [0]

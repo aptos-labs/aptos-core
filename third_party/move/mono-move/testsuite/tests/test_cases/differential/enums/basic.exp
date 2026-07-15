@@ -3,19 +3,19 @@
 
 fun circle_value() {
   frame_data_size: 64
-  entry_gas: 17
+  entry_gas: 43
   code:
     0: EnumNew [8] desc=2 tag #0
     1: HeapMoveTo8 [8]+8 <- [0]
     2: SlotBorrow [16] <- &[8]
     3: EnumTestTag [32] <- (*[16]).tag == #0
-    4: JumpZeroByte @9 [32] gas_taken=7 gas_fallthrough=62
+    4: JumpZeroByte @9 [32] gas_taken=7 gas_fallthrough=88
     5: EnumCheckVariant assert [8].tag == #0
     6: HeapMoveFrom8 [40] <- [8]+8
     7: Move8 [0] <- [40]
     8: Return
     9: EnumTestTag [32] <- (*[16]).tag == #1
-    10: JumpZeroByte @17 [32] gas_taken=4 gas_fallthrough=67
+    10: JumpZeroByte @17 [32] gas_taken=4 gas_fallthrough=119
     11: EnumCheckVariant assert [8].tag == #1
     12: HeapMoveFrom8 [40] <- [8]+8
     13: HeapMoveFrom8 [48] <- [8]+16
@@ -30,7 +30,7 @@ fun circle_value() {
 
 fun is_circle() {
   frame_data_size: 56
-  entry_gas: 17
+  entry_gas: 43
   code:
     0: EnumNew [8] desc=2 tag #0
     1: HeapMoveTo8 [8]+8 <- [0]
@@ -49,7 +49,7 @@ fun is_circle() {
 
 fun is_rect() {
   frame_data_size: 64
-  entry_gas: 17
+  entry_gas: 69
   code:
     0: EnumNew [16] desc=2 tag #1
     1: HeapMoveTo8 [16]+8 <- [0]
@@ -69,20 +69,20 @@ fun is_rect() {
 
 fun rect_sum() {
   frame_data_size: 72
-  entry_gas: 17
+  entry_gas: 69
   code:
     0: EnumNew [16] desc=2 tag #1
     1: HeapMoveTo8 [16]+8 <- [0]
     2: HeapMoveTo8 [16]+16 <- [8]
     3: SlotBorrow [24] <- &[16]
     4: EnumTestTag [40] <- (*[24]).tag == #0
-    5: JumpZeroByte @10 [40] gas_taken=7 gas_fallthrough=62
+    5: JumpZeroByte @10 [40] gas_taken=7 gas_fallthrough=88
     6: EnumCheckVariant assert [16].tag == #0
     7: HeapMoveFrom8 [48] <- [16]+8
     8: Move8 [0] <- [48]
     9: Return
     10: EnumTestTag [40] <- (*[24]).tag == #1
-    11: JumpZeroByte @18 [40] gas_taken=4 gas_fallthrough=67
+    11: JumpZeroByte @18 [40] gas_taken=4 gas_fallthrough=119
     12: EnumCheckVariant assert [16].tag == #1
     13: HeapMoveFrom8 [48] <- [16]+8
     14: HeapMoveFrom8 [56] <- [16]+16

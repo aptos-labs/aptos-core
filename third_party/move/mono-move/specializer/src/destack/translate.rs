@@ -77,7 +77,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> Res
                 num_xfer_positions: alloc.num_xfer_positions,
                 blocks: alloc.blocks,
                 home_slot_types: alloc.home_slot_types,
-                // Emitted by a later pass, after optimization.
+                // Populated by the gas instrumentation pass.
                 block_costs: Vec::new(),
             }))
         })

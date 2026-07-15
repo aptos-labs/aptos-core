@@ -8,8 +8,8 @@
 //! reads/writes). Every cost is affine in type sizes — `base + Σ coeff * size(T)`
 //! — which lets costing split in two:
 //!
-//! - [`function_block_costs`] sums each block into a [`BlockCost`] formula. The
-//!   size terms stay symbolic (types may be polymorphic).
+//! - [`instrument`] sums each block into a [`BlockCost`] formula. The size
+//!   terms stay symbolic (types may be polymorphic).
 //! - [`CostResolver::resolve_block_cost`] evaluates a formula for a concrete
 //!   instantiation.
 //!
@@ -25,7 +25,7 @@
 
 use crate::{
     lower::context::concrete_type_size,
-    stackless_exec_ir::{instr_utils::for_each_value_use, BasicBlock, Instr, Slot},
+    stackless_exec_ir::{instr_utils::for_each_value_use, BasicBlock, Instr, ModuleIR, Slot},
 };
 use anyhow::{bail, Result};
 use mono_move_core::{
@@ -33,6 +33,7 @@ use mono_move_core::{
     Interner, LayoutProvider, PreparedModule,
 };
 use move_binary_format::file_format::FieldHandleIndex;
+use smallvec::SmallVec;
 
 // --- Loads ---
 const LD: u64 = 2;
@@ -87,13 +88,22 @@ const FORCE_GC: u64 = 100;
 
 /// A block's cost as an affine formula `base + Σ coeff * size(ty)`, left
 /// unresolved until the instantiation's type sizes are known.
-#[derive(Clone, Default)]
+/// TODO(metering): consider merging terms, or canonicalizing.
+#[derive(Clone)]
 pub(crate) struct BlockCost {
     base: u64,
-    terms: Vec<(u64, InternedType)>,
+    terms: SmallVec<[(u64, InternedType); 2]>,
 }
 
 impl BlockCost {
+    /// An empty formula (cost zero).
+    fn zero() -> Self {
+        Self {
+            base: 0,
+            terms: SmallVec::new(),
+        }
+    }
+
     /// Add a fixed cost.
     fn add_constant(&mut self, c: u64) {
         self.base += c;
@@ -110,26 +120,24 @@ impl BlockCost {
 // Emission: polymorphic IR -> per-block cost formulas
 // =============================================================================
 
-/// Emit one [`BlockCost`] formula per block, indexed by block label.
-pub(crate) fn function_block_costs<I: Interner>(
-    module: &PreparedModule,
-    interner: &I,
-    blocks: &[BasicBlock],
-    home_slot_types: &[InternedType],
-    num_xfer_positions: u16,
-) -> Result<Vec<BlockCost>> {
-    let mut emitter = Emitter {
-        module,
-        interner,
-        home_slot_types,
-        xfer_ret_types: vec![None; num_xfer_positions as usize],
-    };
-    // Indexed by block label (dense `0..blocks.len()`).
-    let mut costs = vec![BlockCost::default(); blocks.len()];
-    for block in blocks {
-        costs[block.label.0 as usize] = emitter.block_cost(block)?;
+/// Emit a per-block [`BlockCost`] formula for every function in `module_ir`.
+pub(crate) fn instrument<I: Interner>(module_ir: &mut ModuleIR, interner: &I) -> Result<()> {
+    let ModuleIR { module, functions } = module_ir;
+    for func in functions.iter_mut().flatten() {
+        let mut emitter = Emitter {
+            module,
+            interner,
+            home_slot_types: &func.home_slot_types,
+            xfer_ret_types: vec![None; func.num_xfer_positions as usize],
+        };
+        // Indexed by block label (dense `0..blocks.len()`).
+        let mut costs = vec![BlockCost::zero(); func.blocks.len()];
+        for block in &func.blocks {
+            costs[block.label.0 as usize] = emitter.block_cost(block)?;
+        }
+        func.block_costs = costs;
     }
-    Ok(costs)
+    Ok(())
 }
 
 /// Builds cost formulas by walking the IR. Xfer slots carry no type in the IR,
@@ -171,11 +179,31 @@ impl<I: Interner> Emitter<'_, I> {
             .subst_type(self.module.interned_field_type_at(fh), *ty_args)
     }
 
+    /// Field types of enum `enum_ty`'s variant `variant`, with the enum's type
+    /// arguments applied.
+    fn variant_field_tys(&self, enum_ty: InternedType, variant: u16) -> Result<Vec<InternedType>> {
+        let Type::Nominal { name, ty_args, .. } = view_type(enum_ty) else {
+            bail!("variant owner is not an enum type");
+        };
+        let def_idx = self
+            .module
+            .interned_nominal_type_def_idx(*name)
+            .ok_or_else(|| anyhow::anyhow!("enum definition not found"))?;
+        let fields = self
+            .module
+            .interned_variant_field_types_at(def_idx, variant)
+            .ok_or_else(|| anyhow::anyhow!("type is not an enum"))?;
+        fields
+            .iter()
+            .map(|&f| self.interner.subst_type(f, *ty_args))
+            .collect()
+    }
+
     /// Cost of the formula for one block, resetting Xfer tracking at its start.
     fn block_cost(&mut self, block: &BasicBlock) -> Result<BlockCost> {
         // Xfer slots are block-local.
-        self.xfer_ret_types.iter_mut().for_each(|t| *t = None);
-        let mut b = BlockCost::default();
+        self.xfer_ret_types.fill(None);
+        let mut b = BlockCost::zero();
         for instr in &block.instrs {
             self.instr_cost(&mut b, instr)?;
             self.advance_xfer_tracking(instr);
@@ -230,7 +258,13 @@ impl<I: Interner> Emitter<'_, I> {
             },
 
             // --- Enums ---
-            Instr::PackVariant(..) | Instr::UnpackVariant(..) => b.add_constant(PACK_UNPACK),
+            Instr::PackVariant(_, enum_ty, variant, _)
+            | Instr::UnpackVariant(_, enum_ty, variant, _) => {
+                b.add_constant(PACK_UNPACK);
+                for field_ty in self.variant_field_tys(*enum_ty, *variant)? {
+                    b.add_sized(MOVE_BASE, MOVE_PER_BYTE, field_ty);
+                }
+            },
             Instr::TestVariant(..) => b.add_constant(TEST_VARIANT),
 
             // --- References ---
@@ -370,7 +404,7 @@ impl<I: Interner> Emitter<'_, I> {
 
     /// Clobber all Xfer slots, then bind each Xfer return to its callee type.
     fn bind_call_returns(&mut self, ret_slots: &[Slot], ret_types: InternedTypeList) -> Result<()> {
-        self.xfer_ret_types.iter_mut().for_each(|t| *t = None);
+        self.xfer_ret_types.fill(None);
         let ret_types = view_type_list(ret_types);
         for (k, ret) in ret_slots.iter().enumerate() {
             if let Slot::Xfer(j) = *ret {
