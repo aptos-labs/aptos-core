@@ -9,7 +9,7 @@ use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
-use aptos_logger::{info, sample, sample::SampleRate};
+use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_resource_viewer::{AptosValueAnnotator, MoveTableInfo};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
@@ -121,6 +121,20 @@ impl IndexerAsyncV2 {
         )?;
         self.next_version.store(end_version, Ordering::Relaxed);
         Ok(())
+    }
+
+    /// Advances past a processed batch. Any table handles we couldn't resolve are dropped
+    /// (their items are left undecoded) instead of blocking progress, so the indexer never
+    /// gets stuck on a transaction it can't fully parse.
+    pub fn finalize_batch(&self, end_version: Version) -> Result<()> {
+        if !self.is_indexer_async_v2_pending_on_empty() {
+            warn!(
+                end_version = end_version,
+                "[DB] Dropping unresolved table handles and advancing past this batch."
+            );
+            self.clear_pending_on();
+        }
+        self.update_next_version(end_version + 1)
     }
 
     /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
@@ -338,5 +352,48 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
             Some(table_info) => Ok(Some(table_info.clone())),
             None => self.indexer_async_v2.get_table_info(handle),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db_ops::open_db;
+    use aptos_config::config::RocksdbConfig;
+    use aptos_temppath::TempPath;
+    use move_core_types::account_address::AccountAddress;
+
+    fn new_test_indexer(tmp: &TempPath) -> IndexerAsyncV2 {
+        tmp.create_as_dir().unwrap();
+        let db = open_db(
+            tmp.path(),
+            &RocksdbConfig::default(),
+            /*readonly=*/ false,
+        )
+        .unwrap();
+        IndexerAsyncV2::new(db).unwrap()
+    }
+
+    /// An unresolvable handle must not wedge the indexer: `finalize_batch` drops it and
+    /// advances the processed version instead of panicking.
+    #[test]
+    fn finalize_batch_advances_past_unresolvable_handle() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+
+        // Park an item under a handle with no known type mapping.
+        let handle = TableHandle(AccountAddress::ONE);
+        indexer
+            .pending_on
+            .entry(handle)
+            .or_default()
+            .insert(Bytes::from_static(b"orphan-table-item"));
+        assert!(!indexer.is_indexer_async_v2_pending_on_empty());
+
+        let end_version: Version = 41;
+        indexer.finalize_batch(end_version).unwrap();
+
+        assert!(indexer.is_indexer_async_v2_pending_on_empty());
+        assert_eq!(indexer.next_version(), end_version);
     }
 }
