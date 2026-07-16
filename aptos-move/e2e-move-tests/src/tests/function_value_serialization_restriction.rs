@@ -128,6 +128,8 @@ fn run(
 #[test]
 fn closure_serialization_works_while_flag_off() {
     let mut h = MoveHarness::new();
+    // Disable explicitly, so the test does not depend on the default feature set.
+    h.enable_features(vec![], vec![FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x66").unwrap());
     assert_success!(publish(&mut h, &acc));
 
