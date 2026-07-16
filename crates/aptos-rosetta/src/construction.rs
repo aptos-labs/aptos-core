@@ -1505,6 +1505,8 @@ async fn construction_preprocess(
 
     // Simulation can be skipped only when both max gas and gas price are provided.
     // Otherwise public keys are required so metadata can simulate/estimate.
+    // TODO: Support simulation without public keys so callers can omit them when only
+    // estimating gas (Aptos REST simulation currently requires a public key).
     if !(has_max_gas && has_gas_price) && !has_public_keys {
         return Err(ApiError::InvalidInput(Some(
             "Must provide either both max gas amount and gas price, or public keys for simulation"

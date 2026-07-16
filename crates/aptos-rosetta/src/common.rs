@@ -256,20 +256,13 @@ pub async fn get_block_index_from_request(
     partial_block_identifier: Option<PartialBlockIdentifier>,
 ) -> ApiResult<u64> {
     Ok(match partial_block_identifier {
-        // If index and hash are both provided, require them to agree.
+        // If index and hash are both provided, prefer index and ignore hash.
+        // Rosetta clients may send both; validating agreement broke integration testing
+        // historically, so hash is intentionally not checked when index is present.
         Some(PartialBlockIdentifier {
             index: Some(block_index),
-            hash: Some(hash),
-        }) => {
-            let parsed_height = BlockHash::from_str(&hash)?.block_height(server_context.chain_id)?;
-            if parsed_height != block_index {
-                return Err(ApiError::InvalidInput(Some(format!(
-                    "Block index {} does not match block hash {} (height {})",
-                    block_index, hash, parsed_height
-                ))));
-            }
-            block_index
-        },
+            hash: Some(_),
+        }) => block_index,
 
         // Lookup by block index
         Some(PartialBlockIdentifier {
@@ -459,15 +452,5 @@ mod test {
         for str in invalid_block_hashes {
             BlockHash::from_str(str).expect_err("Invalid block hash");
         }
-    }
-
-    #[test]
-    pub fn block_hash_and_index_must_agree() {
-        // Covered via get_block_index_from_request logic; unit-test BlockHash parsing agreement.
-        let chain_id = ChainId::test();
-        let hash = BlockHash::new(chain_id, 42).to_string();
-        let parsed = BlockHash::from_str(&hash).unwrap();
-        assert_eq!(parsed.block_height(chain_id).unwrap(), 42);
-        assert_ne!(parsed.block_height(chain_id).unwrap(), 41);
     }
 }

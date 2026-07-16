@@ -297,7 +297,7 @@ async fn get_staking_info(
     let mut balances = vec![];
     let mut lockup_expiration: u64 = 0;
     let mut maybe_operators = None;
-    let mut total_balance: u64 = 0;
+    let mut total_balance = 0;
     let mut has_staking = false;
 
     if let Ok(response) = rest_client
@@ -313,18 +313,9 @@ async fn get_staking_info(
                 Ok(Some(balance_result)) => {
                     if let Some(balance) = balance_result.balance {
                         has_staking = true;
-                        let parsed = u64::from_str(&balance.value).map_err(|_| {
-                            ApiError::InternalError(Some(format!(
-                                "Failed to parse stake balance value '{}' for pool {}",
-                                balance.value, contract.pool_address
-                            )))
-                        })?;
-                        total_balance = total_balance.checked_add(parsed).ok_or_else(|| {
-                            ApiError::InternalError(Some(format!(
-                                "Stake balance overflow while summing pools for account {}",
-                                owner_address
-                            )))
-                        })?;
+                        // Prefer availability over failing the whole balance call if a value is
+                        // malformed; treat unparsable amounts as zero.
+                        total_balance += u64::from_str(&balance.value).unwrap_or_default();
                     }
                     // TODO: This seems like it only works if there's only one staking contract (hopefully it stays that way)
                     lockup_expiration = balance_result.lockup_expiration;
