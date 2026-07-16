@@ -297,7 +297,7 @@ async fn get_staking_info(
     let mut balances = vec![];
     let mut lockup_expiration: u64 = 0;
     let mut maybe_operators = None;
-    let mut total_balance = 0;
+    let mut total_balance: u64 = 0;
     let mut has_staking = false;
 
     if let Ok(response) = rest_client
@@ -313,7 +313,18 @@ async fn get_staking_info(
                 Ok(Some(balance_result)) => {
                     if let Some(balance) = balance_result.balance {
                         has_staking = true;
-                        total_balance += u64::from_str(&balance.value).unwrap_or_default();
+                        let parsed = u64::from_str(&balance.value).map_err(|_| {
+                            ApiError::InternalError(Some(format!(
+                                "Failed to parse stake balance value '{}' for pool {}",
+                                balance.value, contract.pool_address
+                            )))
+                        })?;
+                        total_balance = total_balance.checked_add(parsed).ok_or_else(|| {
+                            ApiError::InternalError(Some(format!(
+                                "Stake balance overflow while summing pools for account {}",
+                                owner_address
+                            )))
+                        })?;
                     }
                     // TODO: This seems like it only works if there's only one staking contract (hopefully it stays that way)
                     lockup_expiration = balance_result.lockup_expiration;
@@ -403,6 +414,13 @@ async fn get_base_balances(
                     }),
                 ..
             } => {
+                let fa_metadata_address =
+                    AccountAddress::from_str(fa_address).map_err(|err| {
+                        ApiError::InvalidInput(Some(format!(
+                            "Invalid fungible asset address in currency {}: {}",
+                            currency.symbol, err
+                        )))
+                    })?;
                 let response = view::<Vec<u64>>(
                     rest_client,
                     version,
@@ -416,8 +434,8 @@ async fn get_base_balances(
                         type_args: vec![],
                     }))],
                     vec![
-                        bcs::to_bytes(&owner_address).unwrap(),
-                        bcs::to_bytes(&AccountAddress::from_str(fa_address).unwrap()).unwrap(),
+                        bcs::to_bytes(&owner_address)?,
+                        bcs::to_bytes(&fa_metadata_address)?,
                     ],
                 )
                 .await?;
