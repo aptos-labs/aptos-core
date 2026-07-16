@@ -242,6 +242,16 @@ pub fn add_prelude(
         bv_instances = vec![];
     }
 
+    // Signed integers are always Boogie `int`; they have no bv rendering. A bv
+    // rendering recurses into contained types (vector elements, type arguments),
+    // so a type is bv-renderable only when its whole containment closure is free
+    // of signed ints.
+    let contains_signed_int = |ty: &Type| {
+        ty.get_all_contained_types_with_skip_reference(env)
+            .iter()
+            .any(|t| t.is_signed_int())
+    };
+
     let mut all_types = mono_info
         .all_types
         .iter()
@@ -253,7 +263,7 @@ pub fn add_prelude(
     let mut bv_all_types = mono_info
         .all_types
         .iter()
-        .filter(|ty| ty.can_be_type_argument() && !ty.is_signed_int())
+        .filter(|ty| ty.can_be_type_argument() && !contains_signed_int(ty))
         .map(|ty| TypeInfo::new(env, options, ty, true))
         .filter(|ty_info| !all_types.contains(ty_info))
         .collect::<BTreeSet<_>>()
@@ -297,9 +307,12 @@ pub fn add_prelude(
         .collect_vec();
     // If not using cvc5, generate vector functions for bv types
     if !options.use_cvc5 {
+        // Exclude signed-containing element/value types from bv twins (same
+        // guard as `bv_all_types` above).
         let mut bv_vec_instances = mono_info
             .vec_inst
             .iter()
+            .filter(|ty| !contains_signed_int(ty))
             .map(|ty| TypeInfo::new(env, options, ty, true))
             .filter(|ty_info| !vec_instances.contains(ty_info))
             .collect::<BTreeSet<_>>()
@@ -310,7 +323,9 @@ pub fn add_prelude(
             .iter()
             .map(|(qid, ty_args)| {
                 let v_ty = ty_args.iter().map(|(_, vty)| vty).collect_vec();
-                let bv_flag = v_ty.iter().all(|ty| ty.skip_reference().is_number());
+                let bv_flag = v_ty.iter().all(|ty| {
+                    ty.skip_reference().is_number() && !ty.skip_reference().is_signed_int()
+                });
                 MapImpl::new(env, options, *qid, ty_args, bv_flag)
             })
             .filter(|map_impl| !table_instances.contains(map_impl))
@@ -389,6 +404,9 @@ pub fn add_prelude(
                 insts.iter().map(|inst| {
                     inst.iter()
                         .flat_map(|i| i.get_all_contained_types_with_skip_reference(env))
+                        // Skip signed-containing types in the bv pass (same guard
+                        // as `bv_all_types` above).
+                        .filter(|i| !bv_flag || !contains_signed_int(i))
                         .map(|i| (i.clone(), TypeInfo::new(env, options, &i, bv_flag)))
                         .collect::<Vec<_>>()
                 })

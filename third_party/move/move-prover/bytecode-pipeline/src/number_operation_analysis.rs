@@ -806,12 +806,27 @@ impl NumberOperationAnalysis<'_> {
                                                 | move_model::ast::Operation::Shr
                                         );
                                         // For shift operation, we don't need to check compatibility between the two operands
-                                        let concrete_num_ty = if if_shift {
+                                        let mut concrete_num_ty = if if_shift {
                                             Some(concrete_num_ty_oper_0.clone())
                                         } else {
                                             concrete_num_ty_oper_0
                                                 .is_compatible_num_type(&concrete_num_ty_oper_1)
                                         };
+                                        if concrete_num_ty.is_none() {
+                                            // Unsuffixed integer literals in spec mode default
+                                            // to u256/i256 (exp_builder::translate_number) when
+                                            // no context type is available. Such a literal is
+                                            // semantically a `num` wildcard: adopt the sibling
+                                            // operand's concrete type when the value fits,
+                                            // instead of reporting a width mismatch.
+                                            concrete_num_ty = adopt_spec_defaulted_literal_type(
+                                                self.func_target.global_env(),
+                                                &args[0],
+                                                &concrete_num_ty_oper_0,
+                                                &args[1],
+                                                &concrete_num_ty_oper_1,
+                                            );
+                                        }
                                         if concrete_num_ty.is_none() {
                                             self.func_target.global_env().error(
                                                     &self.func_target.global_env().get_node_loc(exp.node_id()),
@@ -1258,4 +1273,75 @@ impl AbstractDomain for NumberOperationState {
         }
         result
     }
+}
+
+/// If exactly one of two Bitwise-classified operands is an integer literal
+/// carrying the spec-mode default type (u256/i256, assigned by
+/// `exp_builder::translate_number` when no context type was available) and the
+/// other has a different concrete integer type, retype the literal to the
+/// sibling's type — provided the value fits — and return the adopted type.
+/// The sibling's type is guaranteed to be covered by mono analysis since the
+/// sibling node itself was collected there.
+fn adopt_spec_defaulted_literal_type(
+    env: &GlobalEnv,
+    arg0: &Exp,
+    ty0: &Type,
+    arg1: &Exp,
+    ty1: &Type,
+) -> Option<Type> {
+    use move_model::ast::Value as AstValue;
+    let is_defaulted_literal = |e: &Exp, ty: &Type| {
+        matches!(
+            ty.skip_reference(),
+            Type::Primitive(PrimitiveType::U256) | Type::Primitive(PrimitiveType::I256)
+        ) && matches!(e.as_ref(), ExpData::Value(_, AstValue::Number(_)))
+    };
+    let fits = |v: &num::BigInt, ty: &Type| -> bool {
+        use num::bigint::Sign;
+        let Type::Primitive(p) = ty.skip_reference() else {
+            return false;
+        };
+        let (bits, signed) = match p {
+            PrimitiveType::U8 => (8u64, false),
+            PrimitiveType::U16 => (16, false),
+            PrimitiveType::U32 => (32, false),
+            PrimitiveType::U64 => (64, false),
+            PrimitiveType::U128 => (128, false),
+            PrimitiveType::U256 => (256, false),
+            PrimitiveType::I8 => (8, true),
+            PrimitiveType::I16 => (16, true),
+            PrimitiveType::I32 => (32, true),
+            PrimitiveType::I64 => (64, true),
+            PrimitiveType::I128 => (128, true),
+            PrimitiveType::I256 => (256, true),
+            _ => return false,
+        };
+        if signed {
+            let bound = num::BigInt::from(1u8) << (bits - 1);
+            v >= &(-bound.clone()) && v < &bound
+        } else {
+            v.sign() != Sign::Minus && v.bits() <= bits
+        }
+    };
+    let try_adopt = |lit: &Exp, lit_ty: &Type, other_ty: &Type| -> Option<Type> {
+        let other = other_ty.skip_reference();
+        // Only unsigned siblings: signed integers have no bv rendering, so a
+        // Bitwise-classified signed operand must keep surfacing a diagnostic
+        // rather than proceed into the backend.
+        if !is_defaulted_literal(lit, lit_ty)
+            || !other.is_unsigned_int()
+            || lit_ty.skip_reference() == other
+        {
+            return None;
+        }
+        let ExpData::Value(id, AstValue::Number(v)) = lit.as_ref() else {
+            return None;
+        };
+        if !fits(v, other) {
+            return None;
+        }
+        env.update_node_type(*id, other.clone());
+        Some(other.clone())
+    };
+    try_adopt(arg0, ty0, ty1).or_else(|| try_adopt(arg1, ty1, ty0))
 }

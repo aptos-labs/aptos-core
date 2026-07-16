@@ -780,7 +780,7 @@ impl<'env> BoogieTranslator<'env> {
             // Emit a dummy constructor to avoid an empty Boogie datatype, which
             // can happen when a function type is referenced but no closures or
             // function parameters are constructed for it.
-            emitln!(self.writer, "$dummy'{}()'()", fun_ty_boogie_name);
+            emitln!(self.writer, "$dummy'{}'()", fun_ty_boogie_name);
         }
         self.writer.unindent();
         emitln!(self.writer, "}");
@@ -2573,6 +2573,7 @@ impl<'env> BoogieTranslator<'env> {
                 // Translate with old-aware memory context
                 let temp_writer = CodeWriter::new(self.env.internal_loc());
                 let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
+                temp_trans.share_collected_declarations(&self.spec_translator);
                 temp_trans.set_current_fun_qid(
                     fun_env.get_qualified_id().instantiate(type_inst.to_vec()),
                 );
@@ -2705,6 +2706,7 @@ impl<'env> BoogieTranslator<'env> {
                             );
                             let fw = CodeWriter::new(self.env.internal_loc());
                             let mut ft = SpecTranslator::new(&fw, self.env, self.options);
+                            ft.share_collected_declarations(&self.spec_translator);
                             ft.set_current_fun_qid(
                                 fun_env.get_qualified_id().instantiate(type_inst.to_vec()),
                             );

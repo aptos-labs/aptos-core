@@ -179,17 +179,25 @@ spec aptos_framework::big_ordered_map {
         ensures result == spec_get(map, self.key);
     }
 
+    // Spec-level mirror of `iter_is_begin`. The Move body reads intrinsic map
+    // internals, so the function itself cannot appear in spec expressions.
+    // self is End: begin iff map is empty (End acts as both begin and end on []).
+    // self is Some: begin iff self.key is the smallest key currently in map.
+    spec fun spec_iter_is_begin<K, V>(self: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool {
+        if (self is IteratorPtr::End<K>) {
+            spec_len(map) == 0
+        } else {
+            spec_contains_key(map, self.key)
+                && (forall k: K where spec_contains_key(map, k) && k != self.key:
+                    std::cmp::compare(self.key, k) == std::cmp::Ordering::Less)
+        }
+    }
+
     spec iter_is_begin {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
-        // self is End: returns true iff map is empty (End acts as both begin and end on []).
-        ensures (self is IteratorPtr::End<K>) ==> (result <==> spec_len(map) == 0);
-        // self is Some: returns true iff self.key is the smallest key currently in map.
-        ensures !(self is IteratorPtr::End<K>) ==> (result <==>
-            (spec_contains_key(map, self.key)
-                && (forall k: K where spec_contains_key(map, k) && k != self.key:
-                    std::cmp::compare(self.key, k) == std::cmp::Ordering::Less)));
+        ensures result <==> spec_iter_is_begin(self, map);
     }
 
     // Returns the iterator pointing to the smallest key K in self with K >= input
@@ -327,7 +335,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_prev {
         pragma opaque;
         pragma verify = false;
-        aborts_if iter_is_begin(self, map);
+        aborts_if spec_iter_is_begin(self, map);
     }
 
     spec compute_length {

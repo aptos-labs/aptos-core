@@ -1589,10 +1589,19 @@ fn extract_result_of_clause(exp: &Exp) -> Option<(Exp, usize, Exp, Vec<Exp>, Mem
     None
 }
 
-/// Match `ensures_of<f>(args, …)` at the clause top; return `(fun_exp, args_after_fun, range)`.
-fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange)> {
+/// Match `ensures_of<f>(args, …)` at the clause top, possibly under a single
+/// `c ==> …` guard (per-branch WP output); return
+/// `(fun_exp, args_after_fun, range, guard)`.
+fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange, Option<Exp>)> {
     use move_model::ast::BehaviorKind;
-    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::EnsuresOf, range), bp_args) = exp.as_ref()
+    let (target, guard) = match exp.as_ref() {
+        ExpData::Call(_, AstOp::Implies, impl_args) if impl_args.len() == 2 => {
+            (&impl_args[1], Some(impl_args[0].clone()))
+        },
+        _ => (exp, None),
+    };
+    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::EnsuresOf, range), bp_args) =
+        target.as_ref()
     else {
         return None;
     };
@@ -1601,7 +1610,7 @@ fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRang
     }
     let fun_exp = bp_args[0].clone();
     let args = bp_args[1..].to_vec();
-    Some((fun_exp, args, range.clone()))
+    Some((fun_exp, args, range.clone(), guard))
 }
 
 /// Structural equality of the (function, args) pair identifying a call site.
@@ -4399,19 +4408,20 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             // *after* we have decided to build a replacement canonical —
             // never leave an anchor removed without a replacement.
             let mut dests_by_idx: BTreeMap<usize, Exp> = BTreeMap::new();
-            let mut anchors_for_site: Vec<usize> = Vec::new();
+            let mut anchors_for_site: Vec<(usize, Option<Exp>)> = Vec::new();
             for (idx, clause) in state.ensures.iter().enumerate() {
                 if let Some((dest, output_idx, fun2, args2, _)) = extract_result_of_clause(clause) {
                     let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
                     if calls_match(fun_exp, args_natural, &fun2, &args2_natural) {
                         dests_by_idx.insert(output_idx, dest);
                     }
-                } else if let Some((fun2, args2, _)) = extract_top_ensures_of_clause(clause) {
+                } else if let Some((fun2, args2, _, guard2)) = extract_top_ensures_of_clause(clause)
+                {
                     let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
                     if calls_match(fun_exp, args_natural, &fun2, &args2_natural)
                         && args2.len() == num_inputs
                     {
-                        anchors_for_site.push(idx);
+                        anchors_for_site.push((idx, guard2));
                     }
                 }
             }
@@ -4450,15 +4460,42 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             canonical_args.extend(dests);
             canonical_args.extend(post_state_slots);
             let bool_ty = Type::Primitive(PrimitiveType::Bool);
-            let new_id = self.new_node(bool_ty, None);
+            let new_id = self.new_node(bool_ty.clone(), None);
             let canonical = ExpData::Call(
                 new_id,
                 AstOp::Behavior(move_model::ast::BehaviorKind::EnsuresOf, range.clone()),
                 canonical_args,
             )
             .into_exp();
-            to_add.push(canonical);
-            to_remove.extend(anchors_for_site);
+            // A guarded anchor (`c ==> ensures_of(...)`, per-branch WP output)
+            // must stay guarded: replace it with the canonical wrapped in the
+            // same guard. An unguarded canonical for a guarded call site would
+            // claim the callee's ensures on paths that never make the call.
+            let mut emitted_unguarded = false;
+            for (idx, guard) in &anchors_for_site {
+                match guard {
+                    Some(c) => {
+                        let imp_id = self.new_node(bool_ty.clone(), None);
+                        to_add.push(
+                            ExpData::Call(imp_id, AstOp::Implies, vec![
+                                c.clone(),
+                                canonical.clone(),
+                            ])
+                            .into_exp(),
+                        );
+                    },
+                    None => {
+                        if !emitted_unguarded {
+                            to_add.push(canonical.clone());
+                            emitted_unguarded = true;
+                        }
+                    },
+                }
+                to_remove.insert(*idx);
+            }
+            if anchors_for_site.is_empty() {
+                to_add.push(canonical);
+            }
         }
 
         let mut new_ensures: Vec<Exp> = Vec::new();

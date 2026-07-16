@@ -884,6 +884,14 @@ impl SpecTranslator<'_> {
         self.translate_arbitrary_value_functions();
     }
 
+    /// Shares `parent`'s lifted-choice and arbitrary-value collections, so
+    /// declarations for artifacts collected while rendering to a temporary
+    /// writer are still emitted by the parent's `finalize`.
+    pub(crate) fn share_collected_declarations(&mut self, parent: &Self) {
+        self.lifted_choice_infos = parent.lifted_choice_infos.clone();
+        self.arbitrary_values = parent.arbitrary_values.clone();
+    }
+
     /// Translate lifted functions for choice expressions.
     #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_choice_functions(&self) {
