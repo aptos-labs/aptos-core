@@ -115,6 +115,67 @@ export class BytecodeMetadata {
 if (Symbol.dispose) BytecodeMetadata.prototype[Symbol.dispose] = BytecodeMetadata.prototype.free;
 
 /**
+ * Compile Move module source code to bytecode (bytecode v10).
+ *
+ * # Arguments
+ * * `source` - Move source text defining exactly one module
+ * * `named_addresses_json` - JSON object mapping named addresses to hex
+ *   addresses, e.g. `{"my_addr":"0x42"}`. May be empty (`""`) if the source
+ *   only uses numeric addresses.
+ *
+ * # Returns
+ * Serialized module bytecode (a `.mv` byte array) at bytecode version 10.
+ *
+ * # Errors
+ * Returns an error (with compiler diagnostics) if compilation fails or the
+ * source does not define a module.
+ * @param {string} source
+ * @param {string} named_addresses_json
+ * @returns {Uint8Array}
+ */
+export function compile_module(source, named_addresses_json) {
+    const ptr0 = passStringToWasm0(source, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(named_addresses_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.compile_module(ptr0, len0, ptr1, len1);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v3;
+}
+
+/**
+ * Compile Move script source code to bytecode (bytecode v10).
+ *
+ * # Arguments
+ * * `source` - Move source text defining a script (a `script { ... }` block)
+ * * `named_addresses_json` - JSON object mapping named addresses to hex
+ *   addresses. May be empty (`""`).
+ *
+ * # Returns
+ * Serialized script bytecode at bytecode version 10.
+ * @param {string} source
+ * @param {string} named_addresses_json
+ * @returns {Uint8Array}
+ */
+export function compile_script(source, named_addresses_json) {
+    const ptr0 = passStringToWasm0(source, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(named_addresses_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.compile_script(ptr0, len0, ptr1, len1);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v3;
+}
+
+/**
  * Decompile Move module bytecode to Move source code
  *
  * Takes raw bytecode bytes and returns decompiled Move source code.
@@ -443,6 +504,11 @@ function __wbg_get_imports() {
 const BytecodeMetadataFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_bytecodemetadata_free(ptr, 1));
+
+function getArrayU8FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
 
 let cachedDataViewMemory0 = null;
 function getDataViewMemory0() {

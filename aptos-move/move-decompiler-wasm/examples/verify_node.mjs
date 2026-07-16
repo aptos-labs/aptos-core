@@ -28,6 +28,8 @@ const {
   disassemble_script,
   decompile_script,
   verify_script,
+  compile_module,
+  compile_script,
 } = wasm;
 
 const info = JSON.parse(get_version_info());
@@ -55,4 +57,36 @@ if (scriptAsm.length === 0) throw new Error("empty script disassembly");
 const scriptSrc = decompile_script(scriptBytes);
 console.log("decompile ok, length:", scriptSrc.length);
 
-console.log("\nAll v10 module + script checks passed.");
+console.log("\n=== COMPILE v10 MODULE FROM SOURCE ===");
+const moduleSource = `
+  module 0x42::example {
+      public fun add(x: u64, y: u64): u64 {
+          x + y
+      }
+  }
+`;
+const compiledModule = compile_module(moduleSource, "");
+console.log("compiled module bytes:", compiledModule.length);
+if (!verify_module(compiledModule)) throw new Error("compiled module failed verification");
+const compiledMeta = get_module_metadata(compiledModule);
+console.log("compiled module version:", compiledMeta.version, "| functions:", compiledMeta.functionCount);
+if (compiledMeta.version !== 10) throw new Error(`expected compiled module version 10, got ${compiledMeta.version}`);
+// Round-trip: compile -> disassemble.
+const compiledAsm = disassemble_module(compiledModule);
+if (!/add|example/.test(compiledAsm)) throw new Error("compiled module disassembly missing expected symbols");
+console.log("round-trip disassembly ok");
+
+console.log("\n=== COMPILE v10 SCRIPT FROM SOURCE ===");
+const scriptSource = `
+  script {
+      fun main() { }
+  }
+`;
+const compiledScript = compile_script(scriptSource, "");
+console.log("compiled script bytes:", compiledScript.length);
+if (!verify_script(compiledScript)) throw new Error("compiled script failed verification");
+const compiledScriptAsm = disassemble_script(compiledScript);
+if (compiledScriptAsm.length === 0) throw new Error("empty compiled script disassembly");
+console.log("round-trip disassembly ok");
+
+console.log("\nAll v10 module + script checks passed (decompile/disassemble + compile).");

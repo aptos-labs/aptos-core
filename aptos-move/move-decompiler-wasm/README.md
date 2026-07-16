@@ -3,6 +3,7 @@
 **WebAssembly bindings for Move bytecode decompilation and analysis.**
 
 This standalone library provides browser and Node.js compatible tools for working with Move bytecode:
+- 🛠️ **Compile** Move source code to bytecode (bytecode v10)
 - 🔍 **Decompile** bytecode back to Move source code
 - 📋 **Disassemble** bytecode to human-readable assembly
 - 📊 **Extract metadata** (functions, structs, dependencies)
@@ -192,6 +193,19 @@ async function analyzeModule(bytecode: Uint8Array): Promise<void> {
 
 ### Functions
 
+#### `compile_module(source: string, named_addresses_json: string): Uint8Array`
+Compile Move **module** source code to bytecode, serialized at bytecode
+version 10. `named_addresses_json` is a JSON object mapping named addresses to
+hex addresses (e.g. `{"my_addr":"0x42"}`), or `""` if the source only uses
+numeric addresses. All source is read from memory — no filesystem is required,
+which is what allows the Move compiler front-end to run under WASM.
+
+**Throws:** compiler diagnostics if compilation fails or no module is produced.
+
+#### `compile_script(source: string, named_addresses_json: string): Uint8Array`
+Compile Move **script** source code (a `script { ... }` block) to bytecode at
+bytecode version 10.
+
 #### `decompile_module(bytecode: Uint8Array): string`
 Decompile Move module bytecode to Move source code.
 
@@ -240,8 +254,13 @@ through `get_version_info()`.
 
 ## Scope
 
-This is a **read-only** tool: it only decompiles and disassembles existing
-bytecode. It deliberately does **not** bundle a Move compiler.
+In addition to read-only tooling (decompile/disassemble/verify/metadata), this
+crate now also bundles the Move **compiler** front-end, exposed via
+`compile_module`/`compile_script`. The compiler reads all source from memory,
+so it runs under `wasm32-unknown-unknown` without a filesystem. Because it
+embeds the compiler pipeline, the WASM binary is substantially larger than the
+decompiler-only build (tens of MB unoptimized; run `wasm-opt -Oz` and serve
+compressed to reduce it).
 
 ## Testing
 
@@ -328,10 +347,13 @@ See [examples/web-decompiler](./examples/web-decompiler/) for a complete example
 
 ## Dependencies
 
-This crate has **minimal dependencies**:
+Core dependencies:
 - `move-binary-format` - Bytecode format definitions
 - `move-core-types` - Core Move types
 - `move-decompiler` - Decompilation logic
+- `move-asm` - Disassembler
+- `move-compiler-v2` / `legacy-move-compiler` - Move compiler front-end (for
+  `compile_module`/`compile_script`)
 - `wasm-bindgen` - Rust ↔ JavaScript bindings
 - `getrandom` (with "js" feature) - Random number generation for WASM
 
@@ -339,9 +361,11 @@ This crate has **minimal dependencies**:
 - ❌ `aptos-crypto` (native crypto)
 - ❌ `aptos-rest-client` (networking)
 - ❌ `tokio` (async runtime)
-- ❌ `tempfile` (filesystem)
 
-This means it **will build successfully** for WASM!
+All of the above build for `wasm32-unknown-unknown`. The Move compiler
+front-end normally reads sources from disk; this crate feeds it source text
+in-memory (see the `sources_content` / VFS plumbing in `move-compiler-v2`,
+`move-model`, and `legacy-move-compiler`) so it works without a filesystem.
 
 ## Troubleshooting
 
