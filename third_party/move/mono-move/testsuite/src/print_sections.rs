@@ -31,7 +31,7 @@ use specializer::{
         SpecializerContext,
     },
     stackless_exec_ir::ModuleIR,
-    SpecializerResult,
+    LoweringResult,
 };
 
 /// Render the requested sections for all modules into a single string.
@@ -107,7 +107,7 @@ fn push_module_banner(out: &mut String, module: &CompiledModule) {
 fn lower_functions(
     guard: &ExecutionGuard<'_>,
     module_ir: &ModuleIR,
-) -> Vec<(String, SpecializerResult<LoweringOutcome>)> {
+) -> Vec<(String, LoweringResult<LoweringOutcome>)> {
     let mut loader_ctx = SnapshotLoaderContext { guard, module_ir };
     module_ir
         .functions
@@ -214,7 +214,7 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> SpecializerResult<Option<FieldTypes>> {
+    ) -> LoweringResult<Option<FieldTypes>> {
         if *module_id != self.module_ir.module.id() {
             return Ok(None);
         }

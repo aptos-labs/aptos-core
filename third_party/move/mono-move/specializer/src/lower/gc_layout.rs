@@ -5,8 +5,7 @@
 
 use super::context::LoweringContext;
 use crate::{
-    error::{SpecializerInvariantViolation, SpecializerResult},
-    invariant_violation,
+    error::{LoweringError, LoweringResult},
     stackless_exec_ir::FunctionIR,
 };
 use mono_move_core::{
@@ -30,7 +29,7 @@ pub fn derive_frame_layout(
     ctx: &LoweringContext<'_>,
     func_ir: &FunctionIR,
     home_slot_types: &[InternedType],
-) -> SpecializerResult<DerivedFrameLayout> {
+) -> LoweringResult<DerivedFrameLayout> {
     let mut heap_ptr_offsets = vec![];
     // TODO(cleanup): consider whether `LoweringContext::home_slots` should carry
     // each slot's type directly, so we wouldn't need to zip with a
@@ -105,7 +104,7 @@ pub fn gc_layout_supports(layouts: &dyn LayoutProvider, ty: InternedType) -> boo
 pub fn type_pointer_offsets(
     layouts: &dyn LayoutProvider,
     ty: InternedType,
-) -> SpecializerResult<Vec<u32>> {
+) -> LoweringResult<Vec<u32>> {
     let offsets = match view_type(ty) {
         // Scalars: no pointer offsets.
         Type::Bool
@@ -138,12 +137,12 @@ pub fn type_pointer_offsets(
         Type::Nominal { .. } => {
             let id = layouts
                 .layout_id(ty)
-                .ok_or(SpecializerInvariantViolation::LayoutNotPopulated)?;
+                .ok_or(LoweringError::LayoutNotPopulated)?;
             layout_pointer_offsets(layouts, id)?
         },
 
         Type::TypeParam { .. } => {
-            invariant_violation!(TypeParamReachedGcLayout);
+            return Err(LoweringError::TypeParamReachedGcLayout);
         },
     };
     Ok(offsets)
@@ -156,13 +155,10 @@ pub fn type_pointer_offsets(
 /// scalars hold none.
 ///
 /// TODO(metering): rewrite without recursion or add a depth/visited bound.
-fn layout_pointer_offsets(
-    layouts: &dyn LayoutProvider,
-    id: LayoutId,
-) -> SpecializerResult<Vec<u32>> {
+fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> LoweringResult<Vec<u32>> {
     let layout = layouts
         .layout(id)
-        .ok_or(SpecializerInvariantViolation::LayoutIdUnresolved)?;
+        .ok_or(LoweringError::LayoutIdUnresolved)?;
     let offsets = match &layout.kind {
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
@@ -177,7 +173,7 @@ fn layout_pointer_offsets(
             for field in fields.iter() {
                 for rel in layout_pointer_offsets(layouts, field.id)? {
                     let abs = field.offset.checked_add(rel).ok_or(
-                        SpecializerInvariantViolation::GcFieldOffsetOverflow {
+                        LoweringError::GcFieldOffsetOverflow {
                             field_offset: field.offset,
                             inner_offset: rel,
                         },
@@ -198,16 +194,17 @@ fn layout_pointer_offsets(
 pub fn shifted_field_pointer_offsets(
     layouts: &dyn LayoutProvider,
     fields: impl IntoIterator<Item = (u32, InternedType)>,
-) -> SpecializerResult<Vec<u32>> {
+) -> LoweringResult<Vec<u32>> {
     let mut out = vec![];
     for (field_offset, field_ty) in fields {
         for rel in type_pointer_offsets(layouts, field_ty)? {
-            let abs = field_offset.checked_add(rel).ok_or(
-                SpecializerInvariantViolation::GcFieldOffsetOverflow {
-                    field_offset,
-                    inner_offset: rel,
-                },
-            )?;
+            let abs =
+                field_offset
+                    .checked_add(rel)
+                    .ok_or(LoweringError::GcFieldOffsetOverflow {
+                        field_offset,
+                        inner_offset: rel,
+                    })?;
             out.push(abs);
         }
     }

@@ -8,8 +8,7 @@
 
 use super::{analysis::BlockAnalysis, ssa_function::SSAFunction};
 use crate::{
-    error::{SpecializerInvariantViolation, SpecializerResult},
-    invariant_violation,
+    error::{SlotAllocError, SlotAllocResult},
     stackless_exec_ir::{
         instr_utils::{collect_defs_and_uses, remap_all_slots_with},
         BasicBlock, Instr, Slot,
@@ -131,7 +130,7 @@ impl SlotTable {
 /// Pre: SSA blocks after fusion passes; vid_types maps each `Vid(i)`
 ///      to its type at index `i`.
 /// Post: all `Vid`s replaced with real `Home`/`Xfer` slots.
-pub(crate) fn allocate_slots(ssa: SSAFunction) -> SpecializerResult<AllocatedFunction> {
+pub(crate) fn allocate_slots(ssa: SSAFunction) -> SlotAllocResult<AllocatedFunction> {
     let mut table = SlotTable::new(&ssa.local_types);
     let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
     let mut global_num_xfer_positions: u16 = 0;
@@ -164,13 +163,13 @@ pub(crate) fn allocate_slots(ssa: SSAFunction) -> SpecializerResult<AllocatedFun
     })
 }
 
-fn vid_type(vid: Slot, vid_types: &[InternedType]) -> SpecializerResult<InternedType> {
+fn vid_type(vid: Slot, vid_types: &[InternedType]) -> SlotAllocResult<InternedType> {
     match vid {
         Slot::Vid(i) => vid_types
             .get(i as usize)
             .copied()
-            .ok_or_else(|| SpecializerInvariantViolation::VidTypeNotFound.into()),
-        _ => invariant_violation!(VidTypeOnNonVidSlot),
+            .ok_or(SlotAllocError::VidTypeNotFound),
+        _ => Err(SlotAllocError::VidTypeOnNonVidSlot),
     }
 }
 
@@ -186,7 +185,7 @@ fn allocate_block_in_place(
     carry_pool: UnorderedMap<InternedType, Vec<Slot>>,
     vid_types: &[InternedType],
     analysis: &BlockAnalysis,
-) -> SpecializerResult<(u16, UnorderedMap<InternedType, Vec<Slot>>)> {
+) -> SlotAllocResult<(u16, UnorderedMap<InternedType, Vec<Slot>>)> {
     if instrs.is_empty() {
         return Ok((0, carry_pool));
     }

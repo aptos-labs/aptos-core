@@ -6,7 +6,10 @@
 //! other side effects.
 
 use super::ssa_function::SSAFunction;
-use crate::{error::SpecializerResult, invariant_violation, stackless_exec_ir::Instr};
+use crate::{
+    error::{SpecializerError, SpecializerResult},
+    stackless_exec_ir::Instr,
+};
 use mono_move_core::PreparedModule;
 use move_binary_format::{access::ModuleAccess, file_format::FunctionHandleIndex};
 use move_core_types::account_address::AccountAddress;
@@ -31,7 +34,7 @@ impl SSAFunction {
                     && is_force_gc(module, *handle)
                 {
                     if !rets.is_empty() || !args.is_empty() {
-                        invariant_violation!(ForceGcBadSignature);
+                        return Err(SpecializerError::ForceGcBadSignature);
                     }
                     *instr = Instr::ForceGC;
                 }

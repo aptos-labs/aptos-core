@@ -9,5 +9,9 @@ mod gas;
 pub mod lower;
 
 pub use destack::destack;
-pub use error::{SpecializerError, SpecializerInvariantViolation, SpecializerResult};
+pub use error::{
+    LoweringError, LoweringResult, SlotAllocError, SlotAllocResult, SpecializerError,
+    SpecializerResult, SsaConversionError, SsaConversionResult, XferVerifierError,
+    XferVerifierResult,
+};
 pub use stackless_exec_ir::{FunctionIR, ModuleIR};

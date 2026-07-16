@@ -13,8 +13,8 @@ use super::{
     parallel_copy,
 };
 use crate::{
-    error::{SpecializerInvariantViolation, SpecializerResult},
-    gas, invariant_violation,
+    error::{LoweringError, LoweringResult},
+    gas,
     stackless_exec_ir::{
         instr_utils::{clobbers_xfer, for_each_value_use, is_fallthrough_terminator},
         BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
@@ -37,15 +37,14 @@ use move_binary_format::file_format::{
 /// returns them as a fixed array. Fixed-width integers and `address` encode
 /// with no length prefix, so these bytes are already the in-memory
 /// representation the matching `StoreImm` expects.
-fn const_imm<const N: usize>(idx: ConstantPoolIndex, bytes: &[u8]) -> SpecializerResult<[u8; N]> {
-    bytes.try_into().map_err(|_| {
-        SpecializerInvariantViolation::LdConstBadLength {
+fn const_imm<const N: usize>(idx: ConstantPoolIndex, bytes: &[u8]) -> LoweringResult<[u8; N]> {
+    bytes
+        .try_into()
+        .map_err(|_| LoweringError::LdConstBadLength {
             idx: idx.0,
             expected: N,
             got: bytes.len(),
-        }
-        .into()
-    })
+        })
 }
 
 /// Temporary result of lowering a function to micro-ops.
@@ -67,7 +66,7 @@ const ENUM_PTR_SIZE: u32 = 8;
 pub(super) fn lower_function(
     func_ir: &FunctionIR,
     ctx: &LoweringContext,
-) -> SpecializerResult<LoweredFunction> {
+) -> LoweringResult<LoweredFunction> {
     let mut state = LoweringState::new(func_ir, ctx);
     for (block_idx, block) in func_ir.blocks.iter().enumerate() {
         // Xfer slots are block-local.
@@ -95,7 +94,7 @@ pub(super) fn lower_function(
             let fallthrough = func_ir
                 .blocks
                 .get(block_idx + 1)
-                .ok_or(SpecializerInvariantViolation::FinalBlockNoFallthrough)?;
+                .ok_or(LoweringError::FinalBlockNoFallthrough)?;
             let fixup = state
                 .branch_fixups
                 .last_mut()
@@ -172,19 +171,19 @@ struct LoweringState<'a> {
 }
 
 impl gas::CostContext for LoweringState<'_> {
-    fn slot_size(&self, slot: Slot) -> SpecializerResult<u32> {
+    fn slot_size(&self, slot: Slot) -> LoweringResult<u32> {
         Ok(self.slot(slot)?.size)
     }
 
-    fn slot_ty(&self, slot: Slot) -> SpecializerResult<InternedType> {
+    fn slot_ty(&self, slot: Slot) -> LoweringResult<InternedType> {
         self.slot_interned_type(slot)
     }
 
-    fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> SpecializerResult<u32> {
+    fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> LoweringResult<u32> {
         Ok(self.resolve_field(struct_ty, fh)?.1)
     }
 
-    fn concrete_ty(&self, ty: InternedType) -> SpecializerResult<InternedType> {
+    fn concrete_ty(&self, ty: InternedType) -> LoweringResult<InternedType> {
         LoweringState::concrete_ty(self, ty)
     }
 
@@ -214,7 +213,7 @@ impl<'a> LoweringState<'a> {
 
     /// Substitutes the instantiation's type arguments into `ty`, producing a
     /// closed type; identity when `ty_args` is empty.
-    fn concrete_ty(&self, ty: InternedType) -> SpecializerResult<InternedType> {
+    fn concrete_ty(&self, ty: InternedType) -> LoweringResult<InternedType> {
         let ty = self.ctx.interner.subst_type(ty, self.ctx.ty_args)?;
         debug_assert!(
             is_closed_type(ty),
@@ -231,14 +230,14 @@ impl<'a> LoweringState<'a> {
         &self,
         struct_ty: InternedType,
         op: &'static str,
-    ) -> SpecializerResult<Vec<(u32, u32, u32)>> {
+    ) -> LoweringResult<Vec<(u32, u32, u32)>> {
         let layout = self
             .ctx
             .layouts
             .layout_by_ty(struct_ty)
-            .ok_or(SpecializerInvariantViolation::StructLayoutNotPopulated { op })?;
+            .ok_or(LoweringError::StructLayoutNotPopulated { op })?;
         let LayoutKind::Struct { fields } = &layout.kind else {
-            invariant_violation!(NominalTypeNotStruct { op });
+            return Err(LoweringError::NominalTypeNotStruct { op });
         };
         fields
             .iter()
@@ -247,7 +246,7 @@ impl<'a> LoweringState<'a> {
                     .ctx
                     .layouts
                     .layout(f.id)
-                    .ok_or(SpecializerInvariantViolation::FieldLayoutIdUnresolved { op })?;
+                    .ok_or(LoweringError::FieldLayoutIdUnresolved { op })?;
                 Ok((f.offset, child.size, child.align))
             })
             .collect()
@@ -259,12 +258,12 @@ impl<'a> LoweringState<'a> {
         &self,
         struct_ty: InternedType,
         fh: FieldHandleIndex,
-    ) -> SpecializerResult<(u32, u32)> {
+    ) -> LoweringResult<(u32, u32)> {
         let fields = self.struct_field_layouts(struct_ty, "field access")?;
         let pos = self.ctx.module.field_position_at(fh) as usize;
         let (offset, size, _align) = *fields
             .get(pos)
-            .ok_or(SpecializerInvariantViolation::FieldIndexOutOfRange { pos })?;
+            .ok_or(LoweringError::FieldIndexOutOfRange { pos })?;
         Ok((offset, size))
     }
 
@@ -274,7 +273,7 @@ impl<'a> LoweringState<'a> {
         &self,
         enum_ty: InternedType,
         vfh: VariantFieldHandleIndex,
-    ) -> SpecializerResult<VariantFieldAccess> {
+    ) -> LoweringResult<VariantFieldAccess> {
         resolve_variant_field_access(self.ctx.module, &self.ctx.enum_layouts, enum_ty, vfh)
     }
 
@@ -287,7 +286,7 @@ impl<'a> LoweringState<'a> {
         access: &VariantFieldAccess,
         enum_ref: FrameOffset,
         dst_ref: FrameOffset,
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         match access.uniform_offset {
             Some(offset) => self.emit(MicroOp::enum_borrow(enum_ref, offset, dst_ref))?,
             None => self.emit(MicroOp::enum_borrow_variant_field(
@@ -299,28 +298,27 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
-    fn xfer_binding(&self, j: u16) -> SpecializerResult<TypedSlot> {
-        self.xfer_bindings[j as usize]
-            .ok_or(SpecializerInvariantViolation::XferReadWithoutDef { xfer: j }.into())
+    fn xfer_binding(&self, j: u16) -> LoweringResult<TypedSlot> {
+        self.xfer_bindings[j as usize].ok_or(LoweringError::XferReadWithoutDef { xfer: j })
     }
 
-    fn slot(&self, slot: Slot) -> SpecializerResult<SizedSlot> {
+    fn slot(&self, slot: Slot) -> LoweringResult<SizedSlot> {
         Ok(match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => self.xfer_binding(j)?.slot,
-            Slot::Vid(_) => invariant_violation!(VidInPostAllocationIr),
+            Slot::Vid(_) => return Err(LoweringError::VidInPostAllocationIr),
         })
     }
 
     /// Returns sized layout info for a destination slot.
-    fn def_slot(&mut self, slot: Slot) -> SpecializerResult<SizedSlot> {
+    fn def_slot(&mut self, slot: Slot) -> LoweringResult<SizedSlot> {
         Ok(self.def_typed_slot(slot)?.slot)
     }
 
     /// Resolves a destination slot to its sized layout and value type. For
     /// `Slot::Xfer(j)`, stages a pending binding to arg position `j` of the
     /// upcoming call. Errors for `Slot::Vid`.
-    fn def_typed_slot(&mut self, slot: Slot) -> SpecializerResult<TypedSlot> {
+    fn def_typed_slot(&mut self, slot: Slot) -> LoweringResult<TypedSlot> {
         Ok(match slot {
             Slot::Home(i) => TypedSlot {
                 slot: self.ctx.home_slots[i as usize],
@@ -332,23 +330,19 @@ impl<'a> LoweringState<'a> {
                 self.pending_def_binds.push((j, typed_slot));
                 typed_slot
             },
-            Slot::Vid(_) => invariant_violation!(VidInPostAllocationIr),
+            Slot::Vid(_) => return Err(LoweringError::VidInPostAllocationIr),
         })
     }
 
     /// Resolves each `slot` to its [`SizedSlot`] frame layout.
-    fn slots_to_sized_slots(&self, slots: &[Slot]) -> SpecializerResult<Vec<SizedSlot>> {
+    fn slots_to_sized_slots(&self, slots: &[Slot]) -> LoweringResult<Vec<SizedSlot>> {
         slots.iter().map(|slot| self.slot(*slot)).collect()
     }
 
     /// Place a call's return values; `ret_slots` are their caller-frame
     /// locations. The call clobbers the whole callee region, so clear all Xfer
     /// bindings, then re-bind each `Xfer` ret (for GC) and copy each `Home` in.
-    fn bind_call_returns(
-        &mut self,
-        rets: &[Slot],
-        ret_slots: &[TypedSlot],
-    ) -> SpecializerResult<()> {
+    fn bind_call_returns(&mut self, rets: &[Slot], ret_slots: &[TypedSlot]) -> LoweringResult<()> {
         self.xfer_bindings.fill(None);
         for (k, ret_slot) in rets.iter().enumerate() {
             match *ret_slot {
@@ -360,7 +354,7 @@ impl<'a> LoweringState<'a> {
                     let dst = self.ctx.home_slots[i as usize];
                     self.emit_single_move(dst.offset, src)?;
                 },
-                Slot::Vid(_) => invariant_violation!(VidInPostAllocationIr),
+                Slot::Vid(_) => return Err(LoweringError::VidInPostAllocationIr),
             }
         }
         Ok(())
@@ -370,7 +364,7 @@ impl<'a> LoweringState<'a> {
     /// also emit a paired `SafePointEntry` whose `code_offset` is
     /// `op`'s index in the buffer and whose `heap_ptr_offsets`
     /// are derived from the current `xfer_bindings`.
-    fn emit(&mut self, op: MicroOp) -> SpecializerResult<()> {
+    fn emit(&mut self, op: MicroOp) -> LoweringResult<()> {
         if op.is_allocating() {
             let code_offset = CodeOffset(self.out_buf.len() as u32);
             let mut heap_ptr_offsets = Vec::with_capacity(self.xfer_bindings.len());
@@ -408,7 +402,7 @@ impl<'a> LoweringState<'a> {
         heap_ptr: FrameOffset,
         src: FrameOffset,
         size: u32,
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         if size == 8 {
             self.emit(MicroOp::HeapMoveTo8 {
                 heap_ptr,
@@ -433,7 +427,7 @@ impl<'a> LoweringState<'a> {
         dst: FrameOffset,
         heap_ptr: FrameOffset,
         size: u32,
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         if size == 8 {
             self.emit(MicroOp::HeapMoveFrom8 {
                 dst,
@@ -457,24 +451,24 @@ impl<'a> LoweringState<'a> {
         &self,
         op_name: &'static str,
         vec_ty: InternedType,
-    ) -> SpecializerResult<DescriptorId> {
+    ) -> LoweringResult<DescriptorId> {
         self.ctx
             .descriptor_id(vec_ty)
-            .ok_or(SpecializerInvariantViolation::VectorTypeNoDescriptor { op: op_name }.into())
+            .ok_or(LoweringError::VectorTypeNoDescriptor { op: op_name })
     }
 
     /// Interned-type corresponding to `slot`.
-    fn slot_interned_type(&self, slot: Slot) -> SpecializerResult<InternedType> {
+    fn slot_interned_type(&self, slot: Slot) -> LoweringResult<InternedType> {
         Ok(match slot {
             Slot::Home(i) => self.home_slot_types[i as usize],
             Slot::Xfer(j) => self.xfer_binding(j)?.ty,
-            Slot::Vid(_) => invariant_violation!(VidInPostAllocationIr),
+            Slot::Vid(_) => return Err(LoweringError::VidInPostAllocationIr),
         })
     }
 
     /// Canonical [`Type`] variant of `slot`. Use [`Self::slot_interned_type`]
     /// when an interned pointer is needed instead.
-    fn slot_type(&self, slot: Slot) -> SpecializerResult<&'static Type> {
+    fn slot_type(&self, slot: Slot) -> LoweringResult<&'static Type> {
         Ok(view_type(self.slot_interned_type(slot)?))
     }
 
@@ -490,7 +484,7 @@ impl<'a> LoweringState<'a> {
         &mut self,
         dst_ty: InternedType,
         dst_off: FrameOffset,
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         if matches!(
             view_type(dst_ty),
             Type::ImmutRef { .. } | Type::MutRef { .. }
@@ -509,9 +503,9 @@ impl<'a> LoweringState<'a> {
 
     /// Emit an `IntCast` to `to` from `src` into `dst`. The source type comes
     /// from `src`'s slot type and the `to` type is supplied by the caller.
-    fn lower_cast(&mut self, dst: Slot, src: Slot, to: IntTy) -> SpecializerResult<()> {
-        let from = IntTy::from_type(self.slot_type(src)?)
-            .ok_or(SpecializerInvariantViolation::CastSourceNotInteger)?;
+    fn lower_cast(&mut self, dst: Slot, src: Slot, to: IntTy) -> LoweringResult<()> {
+        let from =
+            IntTy::from_type(self.slot_type(src)?).ok_or(LoweringError::CastSourceNotInteger)?;
         let src_info = self.slot(src)?;
         let dst_info = self.def_slot(dst)?;
         self.emit(MicroOp::IntCast(IntCastOp {
@@ -523,18 +517,14 @@ impl<'a> LoweringState<'a> {
     }
 
     /// Size in bytes of `ref_slot`'s pointee.
-    fn ref_pointee_size(&self, ref_slot: Slot) -> SpecializerResult<u32> {
+    fn ref_pointee_size(&self, ref_slot: Slot) -> LoweringResult<u32> {
         super::context::ref_pointee_size(self.ctx.layouts, self.slot_interned_type(ref_slot)?)
     }
 
     /// Emit one byte-copy from `src` to `dst_offset`. Caller is
     /// responsible for ensuring no other concurrent move clobbers the
     /// source bytes.
-    fn emit_single_move(
-        &mut self,
-        dst_offset: FrameOffset,
-        src: SizedSlot,
-    ) -> SpecializerResult<()> {
+    fn emit_single_move(&mut self, dst_offset: FrameOffset, src: SizedSlot) -> LoweringResult<()> {
         if dst_offset == src.offset {
             return Ok(());
         }
@@ -560,7 +550,7 @@ impl<'a> LoweringState<'a> {
         dst: FrameOffset,
         lhs: FrameOffset,
         rhs: IntOperand,
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         self.emit(MicroOp::IntCmp(IntCmpOp {
             op: cmp,
             dst,
@@ -577,7 +567,7 @@ impl<'a> LoweringState<'a> {
         cmp: CmpKind,
         lhs: FrameOffset,
         rhs: IntOperand,
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         self.emit(MicroOp::JumpIntCmp(JumpIntCmpOp {
             target,
             op: cmp,
@@ -589,7 +579,7 @@ impl<'a> LoweringState<'a> {
     }
 
     /// Lower one IR instruction.
-    fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> SpecializerResult<()> {
+    fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> LoweringResult<()> {
         match instr {
             // --- Loads ---
             Instr::LdU64(dst, v) => {
@@ -762,7 +752,7 @@ impl<'a> LoweringState<'a> {
                     | Type::Nominal { .. }
                     | Type::Function { .. }
                     | Type::TypeParam { .. } => {
-                        invariant_violation!(LdConstTypeNotPermitted { idx: idx.0 })
+                        return Err(LoweringError::LdConstTypeNotPermitted { idx: idx.0 })
                     },
                 }
             },
@@ -835,7 +825,7 @@ impl<'a> LoweringState<'a> {
                             if matches!(op, BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor)
                                 && rhs.is_signed()
                             {
-                                invariant_violation!(BitwiseOnSignedValue);
+                                return Err(LoweringError::BitwiseOnSignedValue);
                             }
                             let binop = IntBinaryOp { dst, lhs, rhs };
                             self.emit(match op {
@@ -852,14 +842,14 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::Cmp(_)
                                 | BinaryOp::Or
                                 | BinaryOp::And => {
-                                    invariant_violation!(UnexpectedOpInArithArm)
+                                    return Err(LoweringError::UnexpectedOpInArithArm)
                                 },
                             })?;
                         },
                         BinaryOp::Shl | BinaryOp::Shr => {
-                            let ty = IntTy::from_type(lhs_ty).filter(|t| !t.is_signed()).ok_or(
-                                SpecializerInvariantViolation::ShiftRequiresUnsignedNonU64,
-                            )?;
+                            let ty = IntTy::from_type(lhs_ty)
+                                .filter(|t| !t.is_signed())
+                                .ok_or(LoweringError::ShiftRequiresUnsignedNonU64)?;
                             let shift_op = IntShiftOp {
                                 ty,
                                 dst,
@@ -879,7 +869,9 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::BitXor
                                 | BinaryOp::Cmp(_)
                                 | BinaryOp::Or
-                                | BinaryOp::And => invariant_violation!(UnexpectedOpInShiftArm),
+                                | BinaryOp::And => {
+                                    return Err(LoweringError::UnexpectedOpInShiftArm)
+                                },
                             })?;
                         },
                         // Comparison produces a 1-byte boolean.
@@ -903,9 +895,8 @@ impl<'a> LoweringState<'a> {
                                     dst,
                                     lhs,
                                     rhs,
-                                    ty: strip_ref(lhs_interned).ok_or(
-                                        SpecializerInvariantViolation::ExpectedReferenceType,
-                                    )?,
+                                    ty: strip_ref(lhs_interned)
+                                        .ok_or(LoweringError::ExpectedReferenceType)?,
                                 }))?;
                             },
                         },
@@ -994,7 +985,7 @@ impl<'a> LoweringState<'a> {
                             if matches!(op, BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor)
                                 && rhs.is_signed()
                             {
-                                invariant_violation!(BitwiseOnSignedValue);
+                                return Err(LoweringError::BitwiseOnSignedValue);
                             }
                             let binop = IntBinaryOp { dst, lhs, rhs };
                             self.emit(match op {
@@ -1011,14 +1002,14 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::Cmp(_)
                                 | BinaryOp::Or
                                 | BinaryOp::And => {
-                                    invariant_violation!(UnexpectedOpInArithArm)
+                                    return Err(LoweringError::UnexpectedOpInArithArm)
                                 },
                             })?;
                         },
                         BinaryOp::Shl | BinaryOp::Shr => {
-                            let ty = IntTy::from_type(src_ty).filter(|t| !t.is_signed()).ok_or(
-                                SpecializerInvariantViolation::ShiftRequiresUnsignedNonU64,
-                            )?;
+                            let ty = IntTy::from_type(src_ty)
+                                .filter(|t| !t.is_signed())
+                                .ok_or(LoweringError::ShiftRequiresUnsignedNonU64)?;
                             let shift_op = IntShiftOp {
                                 ty,
                                 dst,
@@ -1038,7 +1029,9 @@ impl<'a> LoweringState<'a> {
                                 | BinaryOp::BitXor
                                 | BinaryOp::Cmp(_)
                                 | BinaryOp::Or
-                                | BinaryOp::And => invariant_violation!(UnexpectedOpInShiftArm),
+                                | BinaryOp::And => {
+                                    return Err(LoweringError::UnexpectedOpInShiftArm)
+                                },
                             })?;
                         },
                         // Comparison against an immediate producing a 1-byte boolean.
@@ -1051,7 +1044,7 @@ impl<'a> LoweringState<'a> {
                         // yields `src`, the other value yields the constant `!identity`.
                         BinaryOp::And | BinaryOp::Or => {
                             let ImmValue::Bool(b) = imm else {
-                                invariant_violation!(ImmMustBeBool);
+                                return Err(LoweringError::ImmMustBeBool);
                             };
                             let identity = matches!(op, BinaryOp::And);
                             if *b == identity {
@@ -1074,7 +1067,7 @@ impl<'a> LoweringState<'a> {
                     let src_ty = self.slot_type(*src)?;
                     let signed_ty = IntTy::from_type(src_ty)
                         .filter(|t| t.is_signed())
-                        .ok_or(SpecializerInvariantViolation::NegateRequiresSignedInt)?;
+                        .ok_or(LoweringError::NegateRequiresSignedInt)?;
                     let src_info = self.slot(*src)?;
                     let dst_info = self.def_slot(*dst)?;
                     self.emit(MicroOp::IntNegate(IntNegateOp {
@@ -1243,7 +1236,7 @@ impl<'a> LoweringState<'a> {
                                 lhs: lhs_off,
                                 rhs: rhs_off,
                                 ty: strip_ref(lhs_interned)
-                                    .ok_or(SpecializerInvariantViolation::ExpectedReferenceType)?,
+                                    .ok_or(LoweringError::ExpectedReferenceType)?,
                                 gas_taken: 0,
                                 gas_fallthrough: 0,
                             }))?;
@@ -1399,7 +1392,7 @@ impl<'a> LoweringState<'a> {
                     let srcs = elems
                         .iter()
                         .map(|elem| Ok(self.slot(*elem)?.offset))
-                        .collect::<SpecializerResult<Vec<_>>>()?;
+                        .collect::<LoweringResult<Vec<_>>>()?;
                     self.emit(MicroOp::VecPack(Box::new(VecPackOp {
                         dst: dst_typed.slot.offset,
                         descriptor_id,
@@ -1421,7 +1414,7 @@ impl<'a> LoweringState<'a> {
                 let dst_offsets = dsts
                     .iter()
                     .map(|dst| Ok(self.def_slot(*dst)?.offset))
-                    .collect::<SpecializerResult<Vec<_>>>()?;
+                    .collect::<LoweringResult<Vec<_>>>()?;
                 self.emit(MicroOp::VecUnpack(Box::new(VecUnpackOp {
                     src: src_info.offset,
                     elem_size,
@@ -1451,7 +1444,7 @@ impl<'a> LoweringState<'a> {
                     "vector elem type",
                 )?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)
-                    .ok_or(SpecializerInvariantViolation::ExpectedReferenceType)?;
+                    .ok_or(LoweringError::ExpectedReferenceType)?;
                 let descriptor_id = self.vector_descriptor_id("VecPushBack", vec_ty)?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let val_info = self.slot(*val)?;
@@ -1561,7 +1554,7 @@ impl<'a> LoweringState<'a> {
                 // (offset, size, align) per field.
                 let field_layouts = self.struct_field_layouts(struct_ty, "Pack")?;
                 if field_layouts.len() != args.len() {
-                    invariant_violation!(FieldCountMismatch {
+                    return Err(LoweringError::FieldCountMismatch {
                         op: "Pack",
                         provided: args.len(),
                         expected: field_layouts.len(),
@@ -1571,7 +1564,7 @@ impl<'a> LoweringState<'a> {
                 let arg_infos = args
                     .iter()
                     .map(|s| self.slot(*s))
-                    .collect::<SpecializerResult<Vec<_>>>()?;
+                    .collect::<LoweringResult<Vec<_>>>()?;
                 let copies: Vec<_> = field_layouts
                     .iter()
                     .zip(arg_infos.iter())
@@ -1587,7 +1580,7 @@ impl<'a> LoweringState<'a> {
                 if parallel_copy::reverse_emit_is_safe(&copies) {
                     indices.reverse();
                 } else if !parallel_copy::forward_emit_is_safe(&copies) {
-                    invariant_violation!(NotOverlapSafe { op: "Pack" });
+                    return Err(LoweringError::NotOverlapSafe { op: "Pack" });
                 }
                 for i in indices {
                     let (offset, size, align) = field_layouts[i];
@@ -1603,7 +1596,7 @@ impl<'a> LoweringState<'a> {
                 let struct_ty = self.concrete_ty(*struct_ty)?;
                 let field_layouts = self.struct_field_layouts(struct_ty, "Unpack")?;
                 if field_layouts.len() != dsts.len() {
-                    invariant_violation!(FieldCountMismatch {
+                    return Err(LoweringError::FieldCountMismatch {
                         op: "Unpack",
                         provided: dsts.len(),
                         expected: field_layouts.len(),
@@ -1629,7 +1622,7 @@ impl<'a> LoweringState<'a> {
                 if parallel_copy::reverse_emit_is_safe(&copies) {
                     indices.reverse();
                 } else if !parallel_copy::forward_emit_is_safe(&copies) {
-                    invariant_violation!(NotOverlapSafe { op: "Unpack" });
+                    return Err(LoweringError::NotOverlapSafe { op: "Unpack" });
                 }
                 for i in indices {
                     let (offset, size, align) = field_layouts[i];
@@ -1667,7 +1660,7 @@ impl<'a> LoweringState<'a> {
                 // The destacker pushes the closure as the last operand;
                 // everything before it is a provided (non-captured) argument.
                 let Some((closure_slot, provided)) = all_args.split_last() else {
-                    invariant_violation!(CallClosureNoOperand);
+                    return Err(LoweringError::CallClosureNoOperand);
                 };
                 let closure_src = self.slot(*closure_slot)?.offset;
                 let provided_args = self.slots_to_sized_slots(provided)?;
@@ -1715,9 +1708,10 @@ impl<'a> LoweringState<'a> {
                 // may GC (deep-copy) before it writes `box_ptr`; the unbox copy
                 // that follows does not allocate.
                 let concrete_ty = self.concrete_ty(*ty)?;
-                let box_ptr = self.ctx.resource_box_slot.ok_or(
-                    SpecializerInvariantViolation::BoxPtrSlotNotReserved { op: "MoveFrom" },
-                )?;
+                let box_ptr = self
+                    .ctx
+                    .resource_box_slot
+                    .ok_or(LoweringError::BoxPtrSlotNotReserved { op: "MoveFrom" })?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::MoveFrom {
@@ -1748,13 +1742,14 @@ impl<'a> LoweringState<'a> {
                 // `frame_layout` being a whole-function root set; it would break
                 // if safe points became per-PC / liveness-based.
                 let concrete_ty = self.concrete_ty(*ty)?;
-                let descriptor_id = self.ctx.descriptor_id(concrete_ty).ok_or(
-                    SpecializerInvariantViolation::ResourceTypeNoDescriptor { op: "MoveTo" },
-                )?;
+                let descriptor_id = self
+                    .ctx
+                    .descriptor_id(concrete_ty)
+                    .ok_or(LoweringError::ResourceTypeNoDescriptor { op: "MoveTo" })?;
                 let box_ptr = self
                     .ctx
                     .resource_box_slot
-                    .ok_or(SpecializerInvariantViolation::BoxPtrSlotNotReserved { op: "MoveTo" })?;
+                    .ok_or(LoweringError::BoxPtrSlotNotReserved { op: "MoveTo" })?;
                 let signer_info = self.slot(*signer)?;
                 let val_info = self.slot(*val)?;
                 self.emit(MicroOp::HeapNew {
@@ -1785,17 +1780,17 @@ impl<'a> LoweringState<'a> {
             Instr::PackVariant(dst, enum_ty, variant_ord, args) => {
                 let enum_ty = self.concrete_ty(*enum_ty)?;
                 let ctx = self.ctx;
-                let layout = ctx.enum_layout(enum_ty).ok_or(
-                    SpecializerInvariantViolation::EnumLayoutNotDerived { op: "PackVariant" },
-                )?;
+                let layout = ctx
+                    .enum_layout(enum_ty)
+                    .ok_or(LoweringError::EnumLayoutNotDerived { op: "PackVariant" })?;
                 let variant_fields = layout.variants.get(*variant_ord as usize).ok_or(
-                    SpecializerInvariantViolation::VariantOrdinalOutOfRange {
+                    LoweringError::VariantOrdinalOutOfRange {
                         op: "PackVariant",
                         ordinal: *variant_ord as usize,
                     },
                 )?;
                 if variant_fields.len() != args.len() {
-                    invariant_violation!(FieldCountMismatch {
+                    return Err(LoweringError::FieldCountMismatch {
                         op: "PackVariant",
                         provided: args.len(),
                         expected: variant_fields.len(),
@@ -1827,9 +1822,9 @@ impl<'a> LoweringState<'a> {
                             ranges_overlap(dst_off.0, ENUM_PTR_SIZE, arg.offset.0, field.size)
                         });
                 let pack_ptr = if aliases_arg {
-                    self.ctx.enum_ptr_scratch.ok_or(
-                        SpecializerInvariantViolation::EnumPtrScratchMissing { op: "PackVariant" },
-                    )?
+                    self.ctx
+                        .enum_ptr_scratch
+                        .ok_or(LoweringError::EnumPtrScratchMissing { op: "PackVariant" })?
                 } else {
                     dst_off
                 };
@@ -1855,19 +1850,19 @@ impl<'a> LoweringState<'a> {
             Instr::UnpackVariant(dsts, enum_ty, variant_ord, src) => {
                 let enum_ty = self.concrete_ty(*enum_ty)?;
                 let ctx = self.ctx;
-                let layout = ctx.enum_layout(enum_ty).ok_or(
-                    SpecializerInvariantViolation::EnumLayoutNotDerived {
-                        op: "UnpackVariant",
-                    },
-                )?;
+                let layout =
+                    ctx.enum_layout(enum_ty)
+                        .ok_or(LoweringError::EnumLayoutNotDerived {
+                            op: "UnpackVariant",
+                        })?;
                 let variant_fields = layout.variants.get(*variant_ord as usize).ok_or(
-                    SpecializerInvariantViolation::VariantOrdinalOutOfRange {
+                    LoweringError::VariantOrdinalOutOfRange {
                         op: "UnpackVariant",
                         ordinal: *variant_ord as usize,
                     },
                 )?;
                 if variant_fields.len() != dsts.len() {
-                    invariant_violation!(FieldCountMismatch {
+                    return Err(LoweringError::FieldCountMismatch {
                         op: "UnpackVariant",
                         provided: dsts.len(),
                         expected: variant_fields.len(),
@@ -1896,11 +1891,12 @@ impl<'a> LoweringState<'a> {
                             ranges_overlap(src_off.0, ENUM_PTR_SIZE, dst_off.0, field.size)
                         });
                 let load_ptr = if aliases_dst {
-                    let scratch = self.ctx.enum_ptr_scratch.ok_or(
-                        SpecializerInvariantViolation::EnumPtrScratchMissing {
-                            op: "UnpackVariant",
-                        },
-                    )?;
+                    let scratch =
+                        self.ctx
+                            .enum_ptr_scratch
+                            .ok_or(LoweringError::EnumPtrScratchMissing {
+                                op: "UnpackVariant",
+                            })?;
                     self.emit(MicroOp::Move8 {
                         dst: scratch,
                         src: src_off,
@@ -1971,7 +1967,7 @@ impl<'a> LoweringState<'a> {
                     ))?,
                     None => {
                         let scratch = self.ctx.variant_field_scratch.ok_or(
-                            SpecializerInvariantViolation::VariantFieldScratchMissing {
+                            LoweringError::VariantFieldScratchMissing {
                                 op: "ReadVariantField",
                             },
                         )?;
@@ -2000,7 +1996,7 @@ impl<'a> LoweringState<'a> {
                     ))?,
                     None => {
                         let scratch = self.ctx.variant_field_scratch.ok_or(
-                            SpecializerInvariantViolation::VariantFieldScratchMissing {
+                            LoweringError::VariantFieldScratchMissing {
                                 op: "WriteVariantField",
                             },
                         )?;
@@ -2071,7 +2067,7 @@ impl<'a> LoweringState<'a> {
 
     /// Derive a [`NativeABI`] for a native call site from its arg/ret
     /// slots.
-    fn derive_native_abi(&self, cs: &CallSiteInfo) -> SpecializerResult<NativeABI> {
+    fn derive_native_abi(&self, cs: &CallSiteInfo) -> LoweringResult<NativeABI> {
         let callee_base = self.ctx.frame_data_size + FRAME_METADATA_SIZE as u32;
         let to_slot = |s: &TypedSlot| FrameSlot {
             offset: s.slot.offset.0 - callee_base,
@@ -2096,7 +2092,7 @@ impl<'a> LoweringState<'a> {
             heap_ptr_offsets,
             cs.required_descriptors.clone(),
         )
-        .map_err(|e| SpecializerInvariantViolation::NativeAbi(e).into())
+        .map_err(LoweringError::NativeAbi)
     }
 
     /// Lower one call. Args are written by reverse iteration over the
@@ -2117,7 +2113,7 @@ impl<'a> LoweringState<'a> {
         _func_ir: &FunctionIR,
         args: &[Slot],
         rets: &[Slot],
-    ) -> SpecializerResult<()> {
+    ) -> LoweringResult<()> {
         let cs = &self.ctx.call_sites[self.call_site_cursor];
 
         // Debug: assert the byte-overlap precondition that makes
@@ -2205,7 +2201,7 @@ impl<'a> LoweringState<'a> {
     /// An unconditional jump stores its target block's cost; a conditional jump
     /// stores both the taken block's cost (`gas_taken`) and the fallthrough
     /// block's cost (`gas_fallthrough`).
-    fn fixup_branches(&mut self) -> SpecializerResult<()> {
+    fn fixup_branches(&mut self) -> LoweringResult<()> {
         for fixup in &self.branch_fixups {
             let idx = fixup.idx;
             // Extract the encoded label from the op, resolve it, then patch.
@@ -2226,7 +2222,7 @@ impl<'a> LoweringState<'a> {
                 MicroOp::JumpValueRefCmp(op) => op.target.0,
                 other => {
                     let _ = other;
-                    invariant_violation!(UnexpectedNonBranchOpAtFixup { idx })
+                    return Err(LoweringError::UnexpectedNonBranchOpAtFixup { idx });
                 },
             };
             let label = decode_label(encoded);
@@ -2304,46 +2300,42 @@ impl<'a> LoweringState<'a> {
                 } => {
                     target.0 = resolved;
                     *gas_taken = taken;
-                    *gas_fallthrough = fallthrough.ok_or(
-                        SpecializerInvariantViolation::ConditionalBranchNoFallthrough { idx },
-                    )?;
+                    *gas_fallthrough =
+                        fallthrough.ok_or(LoweringError::ConditionalBranchNoFallthrough { idx })?;
                 },
                 MicroOp::JumpIntCmp(op) => {
                     op.target.0 = resolved;
                     op.gas_taken = taken;
-                    op.gas_fallthrough = fallthrough.ok_or(
-                        SpecializerInvariantViolation::ConditionalBranchNoFallthrough { idx },
-                    )?;
+                    op.gas_fallthrough =
+                        fallthrough.ok_or(LoweringError::ConditionalBranchNoFallthrough { idx })?;
                 },
                 MicroOp::JumpValueCmp(op) => {
                     op.target.0 = resolved;
                     op.gas_taken = taken;
-                    op.gas_fallthrough = fallthrough.ok_or(
-                        SpecializerInvariantViolation::ConditionalBranchNoFallthrough { idx },
-                    )?;
+                    op.gas_fallthrough =
+                        fallthrough.ok_or(LoweringError::ConditionalBranchNoFallthrough { idx })?;
                 },
                 MicroOp::JumpValueRefCmp(op) => {
                     op.target.0 = resolved;
                     op.gas_taken = taken;
-                    op.gas_fallthrough = fallthrough.ok_or(
-                        SpecializerInvariantViolation::ConditionalBranchNoFallthrough { idx },
-                    )?;
+                    op.gas_fallthrough =
+                        fallthrough.ok_or(LoweringError::ConditionalBranchNoFallthrough { idx })?;
                 },
                 other => {
                     let _ = other;
-                    invariant_violation!(UnexpectedNonBranchOpAtFixup { idx })
+                    return Err(LoweringError::UnexpectedNonBranchOpAtFixup { idx });
                 },
             }
         }
         Ok(())
     }
 
-    fn resolve_label(&self, label: u16) -> SpecializerResult<u32> {
+    fn resolve_label(&self, label: u16) -> LoweringResult<u32> {
         self.label_map
             .get(label as usize)
             .copied()
             .flatten()
-            .ok_or(SpecializerInvariantViolation::UnresolvedLabel { label }.into())
+            .ok_or(LoweringError::UnresolvedLabel { label })
     }
 }
 
@@ -2358,7 +2350,7 @@ fn decode_label(encoded: u32) -> u16 {
     (encoded & 0x7FFF_FFFF) as u16
 }
 
-fn imm_to_u64(imm: &ImmValue) -> SpecializerResult<u64> {
+fn imm_to_u64(imm: &ImmValue) -> LoweringResult<u64> {
     Ok(match imm {
         ImmValue::Bool(true) => 1,
         ImmValue::Bool(false) => 0,
@@ -2371,27 +2363,27 @@ fn imm_to_u64(imm: &ImmValue) -> SpecializerResult<u64> {
         ImmValue::I32(v) => *v as u64,
         ImmValue::I64(v) => *v as u64,
         ImmValue::U128(_) | ImmValue::U256(_) | ImmValue::I128(_) | ImmValue::I256(_) => {
-            invariant_violation!(U64FastPathWideImm)
+            return Err(LoweringError::U64FastPathWideImm)
         },
     })
 }
 
 /// Extract a u8 shift amount. The rhs of a Move `Shl`/`Shr` is always u8
 /// by language spec; anything else is an upstream invariant violation.
-fn shift_imm_u8(imm: &ImmValue) -> SpecializerResult<u8> {
+fn shift_imm_u8(imm: &ImmValue) -> LoweringResult<u8> {
     match imm {
         ImmValue::U8(v) => Ok(*v),
         other => {
             let _ = other;
-            invariant_violation!(ShiftImmNotU8)
+            Err(LoweringError::ShiftImmNotU8)
         },
     }
 }
 
 /// Build an [`IntOperand`] slot arm from a Move integer type and frame
 /// offset.
-fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> SpecializerResult<IntOperand> {
-    let int_ty = IntTy::from_type(ty).ok_or(SpecializerInvariantViolation::ExpectedIntegerType)?;
+fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> LoweringResult<IntOperand> {
+    let int_ty = IntTy::from_type(ty).ok_or(LoweringError::ExpectedIntegerType)?;
     Ok(IntOperand::slot(int_ty, off))
 }
 
@@ -2405,7 +2397,7 @@ enum EqKind {
 }
 
 /// Classify how an equality operand of the given type is lowered.
-fn eq_kind(ty: &Type) -> SpecializerResult<EqKind> {
+fn eq_kind(ty: &Type) -> LoweringResult<EqKind> {
     Ok(match ty {
         Type::Bool
         | Type::Address
@@ -2426,19 +2418,19 @@ fn eq_kind(ty: &Type) -> SpecializerResult<EqKind> {
         Type::Vector { .. } | Type::Nominal { .. } => EqKind::NonIntValue,
         Type::ImmutRef { .. } | Type::MutRef { .. } => EqKind::Ref,
         Type::Function { .. } | Type::TypeParam { .. } => {
-            invariant_violation!(EqualityUnsupportedType)
+            return Err(LoweringError::EqualityUnsupportedType)
         },
     })
 }
 
 /// Map an equality [`CmpKind`] to the `negate` flag of the structural-equality
 /// ops (`false` for `Eq`, `true` for `Neq`).
-fn eq_negate(op: CmpKind) -> SpecializerResult<bool> {
+fn eq_negate(op: CmpKind) -> LoweringResult<bool> {
     match op {
         CmpKind::Eq => Ok(false),
         CmpKind::Neq => Ok(true),
         CmpKind::Lt | CmpKind::Le | CmpKind::Gt | CmpKind::Ge => {
-            invariant_violation!(OrderingOnNonScalar)
+            Err(LoweringError::OrderingOnNonScalar)
         },
     }
 }
@@ -2448,7 +2440,7 @@ fn eq_negate(op: CmpKind) -> SpecializerResult<bool> {
 /// bytes) are flat values with only `==`/`!=` (no ordering), and comparing
 /// their bit patterns is exactly value equality, so they reuse the integer
 /// compare ops at the matching width.
-fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> SpecializerResult<IntOperand> {
+fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> LoweringResult<IntOperand> {
     match ty {
         Type::Bool => Ok(IntOperand::SlotU8(off)),
         // A signer holds an address, so it compares as a 32-byte value.
@@ -2470,13 +2462,13 @@ fn cmp_operand_from_slot(ty: &Type, off: FrameOffset) -> SpecializerResult<IntOp
         | Type::Vector { .. }
         | Type::Nominal { .. }
         | Type::Function { .. }
-        | Type::TypeParam { .. } => invariant_violation!(ComparisonNoLowering),
+        | Type::TypeParam { .. } => Err(LoweringError::ComparisonNoLowering),
     }
 }
 
 /// Immediate counterpart of [`cmp_operand_from_slot`]: a bool immediate
 /// compares as the 1-byte value `0`/`1`.
-fn cmp_operand_from_imm(imm: &ImmValue) -> SpecializerResult<IntOperand> {
+fn cmp_operand_from_imm(imm: &ImmValue) -> LoweringResult<IntOperand> {
     match imm {
         ImmValue::Bool(b) => Ok(IntOperand::ImmU8(*b as u8)),
         ImmValue::U8(_)
@@ -2497,7 +2489,7 @@ fn cmp_operand_from_imm(imm: &ImmValue) -> SpecializerResult<IntOperand> {
 /// Build an [`IntOperand`] imm arm matching `imm`. The destacker emits an
 /// `ImmValue` variant whose type matches the typed slot's `Ld*` source,
 /// so a 1:1 map is enough here.
-fn int_operand_from_imm(imm: &ImmValue) -> SpecializerResult<IntOperand> {
+fn int_operand_from_imm(imm: &ImmValue) -> LoweringResult<IntOperand> {
     Ok(match imm {
         ImmValue::U8(v) => IntOperand::ImmU8(*v),
         ImmValue::U16(v) => IntOperand::ImmU16(*v),
@@ -2511,6 +2503,6 @@ fn int_operand_from_imm(imm: &ImmValue) -> SpecializerResult<IntOperand> {
         ImmValue::I64(v) => IntOperand::ImmI64(*v),
         ImmValue::I128(v) => IntOperand::ImmI128(v.clone()),
         ImmValue::I256(v) => IntOperand::ImmI256(v.clone()),
-        ImmValue::Bool(_) => invariant_violation!(BoolImmNotInteger),
+        ImmValue::Bool(_) => return Err(LoweringError::BoolImmNotInteger),
     })
 }

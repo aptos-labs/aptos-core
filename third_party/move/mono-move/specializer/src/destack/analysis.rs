@@ -78,9 +78,7 @@
 //! coalescing, if ever added, would need to revisit this.)
 
 #[cfg(debug_assertions)]
-use crate::error::SpecializerResult;
-#[cfg(debug_assertions)]
-use crate::invariant_violation;
+use crate::error::{XferVerifierError, XferVerifierResult};
 #[cfg(debug_assertions)]
 use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
@@ -513,7 +511,7 @@ fn check_call_structural_invariants<F>(
     args: &[Slot],
     rets: &[Slot],
     xfer_pos: F,
-) -> SpecializerResult<()>
+) -> XferVerifierResult<()>
 where
     F: Fn(&Slot) -> Option<u16>,
 {
@@ -521,7 +519,7 @@ where
         if let Some(i) = xfer_pos(slot)
             && i as usize != j
         {
-            invariant_violation!(XferArgPositionality { arg_idx: j, got: i });
+            return Err(XferVerifierError::XferArgPositionality { arg_idx: j, got: i });
         }
     }
 
@@ -531,15 +529,15 @@ where
         match xfer_pos(slot) {
             Some(i) => {
                 if seen_non_xfer {
-                    invariant_violation!(XferReturnPrefix { ret_idx: k, got: i });
+                    return Err(XferVerifierError::XferReturnPrefix { ret_idx: k, got: i });
                 }
                 if let Some(prev) = last_xfer
                     && i <= prev
                 {
-                    invariant_violation!(XferReturnNotMonotonic {
+                    return Err(XferVerifierError::XferReturnNotMonotonic {
                         ret_idx: k,
                         got: i,
-                        prev
+                        prev,
                     });
                 }
                 last_xfer = Some(i);
@@ -791,7 +789,7 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
 #[cfg(debug_assertions)]
 pub(crate) fn assert_xfer_invariants_on_final_ir(
     func: &crate::stackless_exec_ir::FunctionIR,
-) -> SpecializerResult<()> {
+) -> XferVerifierResult<()> {
     let num_xfer = func.num_xfer_positions as usize;
     let mut bound: Vec<bool> = vec![false; num_xfer];
     for (b_idx, block) in func.blocks.iter().enumerate() {
@@ -809,10 +807,10 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                 }
             });
             if let Some(j) = unbound {
-                invariant_violation!(XferUseWithoutLiveDef {
+                return Err(XferVerifierError::XferUseWithoutLiveDef {
                     block: b_idx,
                     instr: i,
-                    xfer: j
+                    xfer: j,
                 });
             }
 
@@ -831,6 +829,11 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                 check_call_structural_invariants(args, rets, |s| match s {
                     Slot::Xfer(i) => Some(*i),
                     _ => None,
+                })
+                .map_err(|e| XferVerifierError::XferCallStructural {
+                    block: b_idx,
+                    instr: i,
+                    inner: Box::new(e),
                 })?;
                 // Orphan check: every bound slot must be consumed
                 // by this call's args. A bound position not in args
@@ -839,10 +842,10 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                     if b {
                         let consumed_here = j < args.len() && args[j] == Slot::Xfer(j as u16);
                         if !consumed_here {
-                            invariant_violation!(XferBoundNotConsumed {
+                            return Err(XferVerifierError::XferBoundNotConsumed {
                                 block: b_idx,
                                 instr: i,
-                                xfer: j as u16
+                                xfer: j as u16,
                             });
                         }
                     }
@@ -871,9 +874,9 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
         // (3) no Xfer binding may survive past the end of a block.
         for (j, &b) in bound.iter().enumerate() {
             if b {
-                invariant_violation!(XferBoundAtBlockEnd {
+                return Err(XferVerifierError::XferBoundAtBlockEnd {
                     block: b_idx,
-                    xfer: j as u16
+                    xfer: j as u16,
                 });
             }
         }

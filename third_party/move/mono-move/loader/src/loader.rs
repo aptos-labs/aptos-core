@@ -39,7 +39,7 @@ use specializer::{
         try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
         try_lower_function, LoweringOutcome, SpecializerContext,
     },
-    ModuleIR, SpecializerResult,
+    LoweringResult, ModuleIR,
 };
 use std::sync::Arc;
 
@@ -720,7 +720,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> SpecializerResult<Option<FieldTypes>> {
+    ) -> LoweringResult<Option<FieldTypes>> {
         let id = self.loader.guard.arena_ref_for_module_id(*module_id);
 
         // Every module needs to be in the read-set.

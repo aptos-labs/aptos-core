@@ -23,8 +23,7 @@
 //! resolving each as it is computed.
 
 use crate::{
-    error::SpecializerResult,
-    invariant_violation,
+    error::{LoweringError, LoweringResult},
     lower::context::{concrete_type_size, ref_pointee_size},
     stackless_exec_ir::{Instr, Slot},
 };
@@ -85,27 +84,27 @@ const FORCE_GC: u64 = 100;
 /// from the resolved layout, not its type, which may be polymorphic.
 pub(crate) trait CostContext {
     /// Monomorphised byte size of the type bound to `slot`.
-    fn slot_size(&self, slot: Slot) -> SpecializerResult<u32>;
+    fn slot_size(&self, slot: Slot) -> LoweringResult<u32>;
 
     /// Interned type bound to `slot` (may be polymorphic).
-    fn slot_ty(&self, slot: Slot) -> SpecializerResult<InternedType>;
+    fn slot_ty(&self, slot: Slot) -> LoweringResult<InternedType>;
 
     /// Byte size of field `fh` of struct type `struct_ty`.
-    fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> SpecializerResult<u32>;
+    fn field_size(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> LoweringResult<u32>;
 
     /// Substitutes the instantiation's type arguments into an
     /// instruction-embedded type.
     /// TODO(metering): reconsider whether this is the right abstraction. Charging
     /// substitutes types here only to read monomorphized sizes,
     /// duplicating the substitution lowering already performs.
-    fn concrete_ty(&self, ty: InternedType) -> SpecializerResult<InternedType>;
+    fn concrete_ty(&self, ty: InternedType) -> LoweringResult<InternedType>;
 
     /// Published value layouts, used to resolve concrete type sizes.
     fn layouts(&self) -> &dyn LayoutProvider;
 }
 
 /// Total move cost over a list of source slots.
-fn sum_move(cx: &impl CostContext, slots: &[Slot]) -> SpecializerResult<u64> {
+fn sum_move(cx: &impl CostContext, slots: &[Slot]) -> LoweringResult<u64> {
     let mut total = 0;
     for slot in slots {
         total += move_bytes(cx.slot_size(*slot)?);
@@ -114,7 +113,7 @@ fn sum_move(cx: &impl CostContext, slots: &[Slot]) -> SpecializerResult<u64> {
 }
 
 /// Gas cost of `instr` at the IR level.
-pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> SpecializerResult<u64> {
+pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> LoweringResult<u64> {
     Ok(match instr {
         // --- Loads ---
         Instr::LdConst(..)
@@ -232,7 +231,7 @@ pub(crate) fn instr_cost(instr: &Instr, cx: &impl CostContext) -> SpecializerRes
 
 /// Cost of a call: the dispatch, a move per argument, and a move per
 /// Home-slot return.
-fn call_cost(cx: &impl CostContext, args: &[Slot], rets: &[Slot]) -> SpecializerResult<u64> {
+fn call_cost(cx: &impl CostContext, args: &[Slot], rets: &[Slot]) -> LoweringResult<u64> {
     let mut cost = CALL + sum_move(cx, args)?;
     for ret in rets {
         match *ret {
@@ -240,7 +239,7 @@ fn call_cost(cx: &impl CostContext, args: &[Slot], rets: &[Slot]) -> Specializer
                 // Placed without a copy.
             },
             Slot::Home(_) => cost += move_bytes(cx.slot_size(*ret)?),
-            Slot::Vid(_) => invariant_violation!(VidInPostAllocationIr),
+            Slot::Vid(_) => return Err(LoweringError::VidInPostAllocationIr),
         }
     }
     Ok(cost)
