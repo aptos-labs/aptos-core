@@ -2,9 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::{CapturedReads, DataRead, ReadKind},
+    captured_reads::CapturedReads,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
-    errors::ParallelBlockExecutionError,
+    errors::{ParallelBlockExecutionError, ResourceGroupSerializationError},
+    executor_utilities::{materialize_output, Materializer},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
@@ -17,27 +18,24 @@ use aptos_types::{
     block_executor::value::ValueWithLayout,
     error::{code_invariant_error, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
-    state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
 };
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{execution_tracing::Trace, Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use parking_lot::Mutex;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashSet},
     fmt::Debug,
-    iter::{empty, Iterator},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
-use triomphe::Arc as TriompheArc;
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
@@ -251,26 +249,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
 
     pub(crate) fn record_speculative_failure(&self, txn_idx: TxnIndex) {
         self.speculative_failures[txn_idx as usize].store(true, Ordering::Relaxed);
-    }
-
-    pub fn fetch_exchanged_data(
-        &self,
-        key: &T::Key,
-        txn_idx: TxnIndex,
-    ) -> Result<(TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>), PanicError> {
-        let guard = self.inputs[txn_idx as usize].lock();
-        let input = guard.as_ref().ok_or_else(|| {
-            code_invariant_error("Read must be recorded before fetching exchanged data".to_string())
-        })?;
-        let data_read = input.get_by_kind(key, None, ReadKind::Value);
-        if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
-            Ok((value, layout))
-        } else {
-            Err(code_invariant_error(format!(
-                "Read value needing exchange {:?} not in Exchanged format",
-                data_read
-            )))
-        }
     }
 
     pub(crate) fn is_speculative_failure(&self, txn_idx: TxnIndex) -> bool {
@@ -511,73 +489,23 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         )
     }
 
-    pub(crate) fn reads_needing_delayed_field_exchange(
+    // Called when a transaction is committed to materialize its recorded output:
+    // resource group updates are finalized and serialized, and delayed field
+    // identifiers are replaced with committed values in resource writes and events.
+    //
+    // !!! [CAUTION] !!!: This finalizes the output and may not be concurrent with
+    // any other accesses to the output (e.g. querying the write-set, events, etc),
+    // as these read accesses are not synchronized and assumed to have terminated.
+    pub(crate) fn materialize<M: Materializer<T>>(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
-        with_success_or_skip_rest!(self, txn_idx, reads_needing_delayed_field_exchange, vec![])
-            .expect("Output must be set")
-    }
-
-    pub(crate) fn group_reads_needing_delayed_field_exchange(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, StateValueMetadata)> {
+        materializer: &M,
+    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>> {
         with_success_or_skip_rest!(
             self,
             txn_idx,
-            group_reads_needing_delayed_field_exchange,
-            vec![]
-        )
-        .expect("Output must be set")
-    }
-
-    pub(crate) fn resource_group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {
-        with_success_or_skip_rest!(self, txn_idx, resource_group_metadata_ops, vec![])
-            .expect("Output must be set")
-    }
-
-    pub(crate) fn events(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| Box::new(
-                t.before_materialization()
-                    .expect("Output must be set")
-                    .get_events()
-                    .into_iter()
-            ),
-            Box::new(empty())
-        )
-    }
-
-    pub(crate) fn resource_write_set(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Result<HashMap<T::Key, ValueWithLayout<T::Value>>, PanicError> {
-        with_success_or_skip_rest!(self, txn_idx, resource_write_set, HashMap::new())
-    }
-
-    // Called when a transaction is committed to record WriteOps for materialized aggregator values
-    // corresponding to the (deltas) in the recorded final output of the transaction, as well as
-    // finalized group updates.
-    pub(crate) fn record_materialized_txn_output(
-        &self,
-        txn_idx: TxnIndex,
-        patched_resource_write_set: Vec<(T::Key, T::Value)>,
-        patched_events: Vec<T::Event>,
-    ) -> Result<(O::CommittedOutput, Trace), PanicError> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |mut t| t
-                .incorporate_materialized_txn_output(patched_resource_write_set, patched_events),
-            Err(code_invariant_error(
-                "[BlockSTM]: Output must be recorded after execution"
-            ))
+            |mut t| materialize_output(t, materializer),
+            Err(code_invariant_error("[BlockSTM]: Output must be recorded after execution").into())
         )
     }
 }

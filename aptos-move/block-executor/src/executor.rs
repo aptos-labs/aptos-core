@@ -45,7 +45,7 @@ use aptos_types::{
     },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     on_chain_config::Features,
-    state_store::{state_value::StateValue, TStateView},
+    state_store::TStateView,
     transaction::{
         block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
         BlockOutput, FeeDistribution,
@@ -55,8 +55,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
-use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
-use bytes::Bytes;
+use aptos_vm_types::resolver::ResourceGroupSize;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
@@ -72,7 +71,6 @@ use std::{
     marker::{PhantomData, Sync},
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
-use triomphe::Arc as TriompheArc;
 
 type CommittedOutput<E> = <<E as ExecutorTask>::Output as TransactionOutput>::CommittedOutput;
 
@@ -1098,53 +1096,22 @@ where
             txn_idx,
         );
 
-        let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
-            .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                let (finalized_group, group_size) = shared_sync_params
-                    .versioned_cache
-                    .group_data()
-                    .finalize_group(&group_key, txn_idx)?;
+        let read_set = last_input_output
+            .read_set(txn_idx)
+            .ok_or_else(|| code_invariant_error("Read set must be recorded for materialization"))?;
+        let materializer = ParallelMaterializer::new(&latest_view, read_set);
 
-                map_finalized_group::<T>(
-                    group_key,
-                    finalized_group,
-                    group_size,
-                    metadata_op,
-                    is_read_needing_exchange,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let materialized_finalized_groups =
-            map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-
-        let serialized_groups =
-            serialize_groups::<T>(materialized_finalized_groups).map_err(|e| {
-                code_invariant_error(format!("Panic error in serializing groups {e:?}"))
-            })?;
-
-        let resource_write_set = last_input_output.resource_write_set(txn_idx)?;
-        let resource_writes_to_materialize = resource_writes_to_materialize!(
-            resource_write_set,
-            last_input_output,
-            |key| last_input_output.fetch_exchanged_data(key, txn_idx),
-            txn_idx
-        )?;
-        let materialized_resource_write_set =
-            map_id_to_values_in_write_set(resource_writes_to_materialize, &latest_view)?;
-
-        let events = last_input_output.events(txn_idx);
-        let materialized_events = map_id_to_values_events(events, &latest_view)?;
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        let (committed_output, trace) = last_input_output.record_materialized_txn_output(
-            txn_idx,
-            materialized_resource_write_set
-                .into_iter()
-                .chain(serialized_groups)
-                .collect(),
-            materialized_events,
-        )?;
+        let (committed_output, trace) = last_input_output
+            .materialize(txn_idx, &materializer)
+            .map_err(|e| match e {
+                PanicOr::CodeInvariantError(msg) => PanicError::CodeInvariantError(msg),
+                PanicOr::Or(e) => {
+                    code_invariant_error(format!("Panic error in serializing groups {e:?}"))
+                },
+            })?;
 
         if environment.async_runtime_checks_enabled() && !trace.is_empty() {
             // Note that the trace may be empty (if block was small and executor decides not to
@@ -2385,66 +2352,36 @@ where
                     }
 
                     // Apply the writes.
-                    let resource_write_set = output_before_guard.resource_write_set();
                     Self::apply_output_sequential(
                         idx as TxnIndex,
                         runtime_environment,
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
                         &output_before_guard,
-                        resource_write_set.clone(),
+                        output_before_guard.resource_write_set(),
                     )?;
+
+                    // The guard borrows the output immutably; drop it before
+                    // materialization, which needs the output mutably.
+                    drop(output_before_guard);
 
                     // If dynamic change set materialization part (indented for clarity/variable scope):
                     let committed_output = {
-                        let finalized_groups = groups_to_finalize!(output_before_guard,)
-                            .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                                let (group_ops_iter, group_size) =
-                                    unsync_map.finalize_group(&group_key);
-                                map_finalized_group::<T>(
-                                    group_key,
-                                    group_ops_iter.collect(),
-                                    group_size,
-                                    metadata_op,
-                                    is_read_needing_exchange,
-                                )
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        let materialized_finalized_groups =
-                            map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-                        let serialized_groups =
-                            serialize_groups::<T>(materialized_finalized_groups).map_err(|_| {
+                        let materializer = SequentialMaterializer::new(&latest_view);
+                        let (committed_output, trace) = materialize_output(
+                            &mut output,
+                            &materializer,
+                        )
+                        .map_err(|e| match e {
+                            PanicOr::CodeInvariantError(msg) => {
+                                SequentialBlockExecutionError::from(PanicError::CodeInvariantError(
+                                    msg,
+                                ))
+                            },
+                            PanicOr::Or(ResourceGroupSerializationError) => {
                                 SequentialBlockExecutionError::ResourceGroupSerializationError
-                            })?;
-
-                        let resource_writes_to_materialize = resource_writes_to_materialize!(
-                            resource_write_set,
-                            output_before_guard,
-                            |key| expect_exchanged_data(unsync_map.fetch_data(key)),
-                        )?;
-                        // Replace delayed field id with values in resource write set and read set.
-                        let materialized_resource_write_set = map_id_to_values_in_write_set(
-                            resource_writes_to_materialize,
-                            &latest_view,
-                        )?;
-
-                        // Replace delayed field id with values in events
-                        let materialized_events = map_id_to_values_events(
-                            Box::new(output_before_guard.get_events().into_iter()),
-                            &latest_view,
-                        )?;
-                        // Output before guard holds a read lock, drop before incorporating materialized
-                        // output which needs a write lock.
-                        drop(output_before_guard);
-
-                        let (committed_output, trace) = output
-                            .incorporate_materialized_txn_output(
-                                materialized_resource_write_set
-                                    .into_iter()
-                                    .chain(serialized_groups.into_iter())
-                                    .collect(),
-                                materialized_events,
-                            )?;
+                            },
+                        })?;
 
                         // Sequential execution never collects any traces.
                         if !trace.is_empty() {
