@@ -4,7 +4,7 @@
 //! This module defines the gas parameters for Move Stdlib.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_24},
+    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_24, RELEASE_V1_50},
     gas_schedule::NativeGasParameters,
 };
 use aptos_gas_algebra::{
@@ -32,9 +32,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [string_check_utf8_base: InternalGas, "string.check_utf8.base", 11020],
         [string_check_utf8_per_byte: InternalGasPerByte, "string.check_utf8.per_byte", 290],
         [string_is_char_boundary_base: InternalGas, "string.is_char_boundary.base", 11020],
+        [string_is_char_boundary_per_byte: InternalGasPerByte, { RELEASE_V1_50.. => "string.is_char_boundary.per_byte" }, 290],
         [string_sub_string_base: InternalGas, "string.sub_string.base", 14700],
         [string_sub_string_per_byte: InternalGasPerByte, "string.sub_string.per_byte", 110],
         [string_index_of_base: InternalGas, "string.index_of.base", 14700],
+        [string_index_of_per_byte: InternalGasPerByte, { RELEASE_V1_50.. => "string.index_of.per_byte" }, 360],
         [string_index_of_per_byte_pattern: InternalGasPerByte, "string.index_of.per_byte_pattern", 730],
         [string_index_of_per_byte_searched: InternalGasPerByte, "string.index_of.per_byte_searched", 360],
 

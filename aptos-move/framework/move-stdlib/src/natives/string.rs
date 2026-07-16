@@ -7,7 +7,9 @@
 
 //! Implementation of native functions for utf8 strings.
 
-use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_50, gas_params::natives::move_stdlib::*,
+};
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
@@ -63,7 +65,7 @@ fn native_check_utf8(
 /***************************************************************************************************
  * native fun internal_is_char_boundary
  *
- *   gas cost: base_cost
+ *   gas cost: base_cost + unit_cost * length_in_bytes
  *
  **************************************************************************************************/
 fn native_is_char_boundary(
@@ -78,6 +80,9 @@ fn native_is_char_boundary(
     let i = safely_pop_arg!(args, u64);
     let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref()?;
+
+    context.charge(STRING_IS_CHAR_BOUNDARY_PER_BYTE * NumBytes::new(s_ref.len() as u64))?;
+
     let ok = from_utf8_checked(s_ref.as_slice())?.is_char_boundary(i as usize);
 
     Ok(smallvec![Value::bool(ok)])
@@ -110,6 +115,11 @@ fn native_sub_string(
 
     let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref()?;
+
+    if context.gas_feature_version() >= RELEASE_V1_50 {
+        context.charge(STRING_SUB_STRING_PER_BYTE * NumBytes::new(s_ref.len() as u64))?;
+    }
+
     let s_str = from_utf8_checked(s_ref.as_slice())?;
     let v = Value::vector_u8(s_str[i..j].as_bytes().iter().cloned());
 
@@ -139,6 +149,9 @@ fn native_index_of(
 
     let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref()?;
+
+    context.charge(STRING_INDEX_OF_PER_BYTE * NumBytes::new(s_ref.len() as u64))?;
+
     let s_str = from_utf8_checked(s_ref.as_slice())?;
     let pos = match s_str.find(r_str) {
         Some(size) => size,
