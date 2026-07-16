@@ -173,11 +173,7 @@ pub enum FeatureFlag {
     NativeOrderbook,
     NativeCollateral,
     ComputeTradingNativeStateRoots,
-<<<<<<< HEAD
-=======
-    HotStateRootInTxnInfo,
     GasRefundFaMint,
->>>>>>> c514c562d0 ([framework] Mint gas refund as APT FA via MintRef (#20132))
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -456,11 +452,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ComputeTradingNativeStateRoots => {
                 AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS
             },
-<<<<<<< HEAD
-=======
-            FeatureFlag::HotStateRootInTxnInfo => AptosFeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO,
             FeatureFlag::GasRefundFaMint => AptosFeatureFlag::GAS_REFUND_FA_MINT,
->>>>>>> c514c562d0 ([framework] Mint gas refund as APT FA via MintRef (#20132))
         }
     }
 }
@@ -666,11 +658,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS => {
                 FeatureFlag::ComputeTradingNativeStateRoots
             },
-<<<<<<< HEAD
-=======
-            AptosFeatureFlag::HOT_STATE_ROOT_IN_TXN_INFO => FeatureFlag::HotStateRootInTxnInfo,
             AptosFeatureFlag::GAS_REFUND_FA_MINT => FeatureFlag::GasRefundFaMint,
->>>>>>> c514c562d0 ([framework] Mint gas refund as APT FA via MintRef (#20132))
         }
     }
 }
