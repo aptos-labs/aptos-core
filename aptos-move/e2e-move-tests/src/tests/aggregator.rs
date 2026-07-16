@@ -6,10 +6,14 @@ use crate::{
         add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
         materialize_and_sub, new, sub, sub_add, sub_and_materialize,
     },
+    assert_success,
     tests::common,
     BlockSplit, MoveHarness, SUCCESS,
 };
+use aptos_cached_packages::aptos_stdlib;
 use aptos_language_e2e_tests::account::Account;
+use aptos_types::{account_config::CoinInfoResource, AptosCoinType};
+use move_core_types::account_address::AccountAddress;
 use proptest::prelude::*;
 use test_case::test_case;
 
@@ -18,6 +22,121 @@ const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 fn setup() -> (MoveHarness, Account) {
     initialize(common::test_dir_path("aggregator.data/pack"))
+}
+
+/// Abort code for `error::permission_denied(ENOT_APTOS_FRAMEWORK_ADDRESS)`
+/// raised by `system_addresses::assert_aptos_framework`.
+const ENOT_APTOS_FRAMEWORK_ADDRESS: u64 = 0x5_0003;
+
+/// Reads APT supply tracked by `CoinInfo<AptosCoin>` (excluding the supply of
+/// the paired fungible asset).
+fn coin_supply(h: &mut MoveHarness) -> u128 {
+    let bytes = h
+        .execute_view_function(
+            str::parse("0x1::coin::coin_supply").unwrap(),
+            vec![str::parse("0x1::aptos_coin::AptosCoin").unwrap()],
+            vec![],
+        )
+        .values
+        .unwrap()
+        .pop()
+        .unwrap();
+    bcs::from_bytes::<Option<u128>>(&bytes)
+        .unwrap()
+        .expect("APT supply is tracked")
+}
+
+#[test_case(BlockSplit::Whole)]
+#[test_case(BlockSplit::SingleTxnPerBlock)]
+#[test_case(BlockSplit::SplitIntoThree { first_len: 10, second_len: 12 })]
+fn test_aggregator_supply_switch(block_split: BlockSplit) {
+    const MINT_AMOUNT: u64 = 100_000;
+    const NUM_MINTS_BEFORE_SWITCH: usize = 15;
+    const NUM_MINTS_AFTER_SWITCH: usize = 15;
+    // Balance used by `MoveHarness::new_account_at`.
+    const FUNDED_BALANCE: u64 = 1_000_000_000_000_000;
+
+    let mut h = MoveHarness::new();
+    let framework = h.aptos_framework_account();
+    // Core resources account holds the mint capability in test genesis.
+    let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let attacker = h.new_account_at(AccountAddress::random());
+    let dsts = (0..NUM_MINTS_BEFORE_SWITCH + NUM_MINTS_AFTER_SWITCH)
+        .map(|_| h.new_account_at(AccountAddress::random()))
+        .collect::<Vec<_>>();
+
+    // Test genesis tracks APT supply with a plain integer, while mainnet
+    // still uses a parallelizable aggregator. Patch CoinInfo<AptosCoin> and
+    // the aggregator table item to recreate the mainnet state.
+    let initial_supply = coin_supply(&mut h);
+    let coin_info = CoinInfoResource::<AptosCoinType>::random(u128::MAX);
+    h.executor
+        .apply_write_set(&coin_info.to_writeset(initial_supply).unwrap());
+    let aggregator_key = coin_info.supply_aggregator_state_key();
+
+    assert_eq!(coin_supply(&mut h), initial_supply);
+    let coin_info = h.executor.read_apt_coin_info_resource().unwrap();
+    let supply = coin_info.supply().as_ref().unwrap();
+    assert!(supply.aggregator.is_some());
+    assert!(supply.integer.is_none());
+
+    // Each mint adds the amount to the supply aggregator, and subtracts it
+    // back when the minted coin is converted to FA on deposit. This
+    // exercises the aggregator in both directions, keeping the coin supply
+    // constant.
+    let mint = |h: &mut MoveHarness, dst: &Account| {
+        (
+            SUCCESS,
+            h.create_transaction_payload(
+                &core_resources,
+                aptos_stdlib::aptos_coin_mint(*dst.address(), MINT_AMOUNT),
+            ),
+        )
+    };
+
+    let mut txns = vec![];
+    for dst in &dsts[..NUM_MINTS_BEFORE_SWITCH] {
+        txns.push(mint(&mut h, dst));
+    }
+    // Only the framework account can switch the supply to an integer.
+    txns.push((
+        ENOT_APTOS_FRAMEWORK_ADDRESS,
+        h.create_transaction_payload(&attacker, aptos_stdlib::aptos_coin_upgrade_supply()),
+    ));
+    txns.push((
+        SUCCESS,
+        h.create_transaction_payload(&framework, aptos_stdlib::aptos_coin_upgrade_supply()),
+    ));
+    for dst in &dsts[NUM_MINTS_BEFORE_SWITCH..] {
+        txns.push(mint(&mut h, dst));
+    }
+    h.run_block_in_parts_and_check(block_split, txns);
+
+    // The supply is now a plain integer with the value preserved, and the
+    // aggregator table item has been removed.
+    let coin_info = h.executor.read_apt_coin_info_resource().unwrap();
+    let supply = coin_info.supply().as_ref().unwrap();
+    assert!(supply.aggregator.is_none());
+    assert_eq!(supply.integer.as_ref().unwrap().value, initial_supply);
+    assert!(h.read_state_value(&aggregator_key).is_none());
+    assert_eq!(coin_supply(&mut h), initial_supply);
+
+    // All mints landed (destination accounts do not pay gas).
+    for dst in &dsts {
+        assert_eq!(
+            h.read_aptos_balance(dst.address()),
+            FUNDED_BALANCE + MINT_AMOUNT
+        );
+    }
+
+    // Upgrading again is a no-op.
+    assert_success!(
+        h.run_transaction_payload(&framework, aptos_stdlib::aptos_coin_upgrade_supply())
+    );
+    let coin_info = h.executor.read_apt_coin_info_resource().unwrap();
+    let supply = coin_info.supply().as_ref().unwrap();
+    assert!(supply.aggregator.is_none());
+    assert_eq!(supply.integer.as_ref().unwrap().value, initial_supply);
 }
 
 #[test_case(BlockSplit::Whole, false)]
