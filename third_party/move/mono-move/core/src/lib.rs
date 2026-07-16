@@ -61,8 +61,9 @@ pub use value_layout::{
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
 pub use vm_error::{
-    ArithOp, GlobalStorageOp, LoaderError, LoaderInvariantViolation, LoaderResult, LoweringError,
-    LoweringResult, RuntimeError, RuntimeInvariantViolation, RuntimeResult, Signedness,
-    SlotAllocError, SlotAllocResult, SpecializerError, SpecializerResult, SsaConversionError,
-    SsaConversionResult, VecOp, XferVerifierError, XferVerifierResult,
+    ArithOp, GasInstrumentationError, GasInstrumentationResult, GlobalStorageOp, LoaderError,
+    LoaderInvariantViolation, LoaderResult, LoweringError, LoweringResult, RuntimeError,
+    RuntimeInvariantViolation, RuntimeResult, Signedness, SlotAllocError, SlotAllocResult,
+    SpecializerError, SpecializerResult, SsaConversionError, SsaConversionResult, VecOp,
+    XferVerifierError, XferVerifierResult,
 };

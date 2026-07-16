@@ -10,8 +10,8 @@ pub mod lower;
 
 pub use destack::destack;
 pub use error::{
-    LoweringError, LoweringResult, SlotAllocError, SlotAllocResult, SpecializerError,
-    SpecializerResult, SsaConversionError, SsaConversionResult, XferVerifierError,
-    XferVerifierResult,
+    GasInstrumentationError, GasInstrumentationResult, LoweringError, LoweringResult,
+    SlotAllocError, SlotAllocResult, SpecializerError, SpecializerResult, SsaConversionError,
+    SsaConversionResult, XferVerifierError, XferVerifierResult,
 };
 pub use stackless_exec_ir::{FunctionIR, ModuleIR};

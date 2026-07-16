@@ -9,6 +9,7 @@
 mod display;
 pub(crate) mod instr_utils;
 
+use crate::gas::BlockCost;
 pub use mono_move_core::CmpKind;
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
@@ -365,6 +366,8 @@ pub struct FunctionIR {
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).
     /// Xfer slots have no entry here — their types are inferred from call signatures.
     pub home_slot_types: Vec<InternedType>,
+    /// Gas cost of each block as an unresolved formula, indexed by block label.
+    pub(crate) block_costs: Vec<BlockCost>,
 }
 
 impl FunctionIR {

@@ -13,7 +13,7 @@ mod tests {
         values::{function_values_impl::mock::MockAbstractFunction, values_impl, Struct, Value},
     };
     use better_any::TidExt;
-    use claims::{assert_err, assert_ok, assert_some};
+    use claims::{assert_err, assert_none, assert_ok, assert_some};
     use move_binary_format::errors::PartialVMResult;
     use move_core_types::{
         ability::AbilitySet,
@@ -448,6 +448,57 @@ mod tests {
                 )
             })
             .expect_err("bad size value deserialization fails");
+    }
+
+    #[test]
+    fn closure_serialization_disabled() {
+        let mut ext_mock = MockFunctionValueExtension::new();
+        ext_mock
+            .expect_get_serialization_data()
+            .returning(move |af| {
+                Ok(af
+                    .downcast_ref::<MockAbstractFunction>()
+                    .expect("cast")
+                    .data
+                    .clone())
+            });
+
+        let make_closure = || {
+            let fun = MockAbstractFunction::new("f", vec![], ClosureMask::new(0b1), vec![
+                MoveTypeLayout::U64,
+            ]);
+            Value::closure(Box::new(fun), vec![Value::u64(22)])
+        };
+
+        // Closure serialization fails when disabled.
+        let result = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .with_closure_serialization_disabled(true)
+            .serialize(&make_closure(), &make_fun_layout()));
+        assert_none!(result);
+        assert_err!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .with_closure_serialization_disabled(true)
+            .serialized_size(&make_closure(), &make_fun_layout()));
+
+        // Values containing a closure fail as well.
+        let struct_layout = MoveTypeLayout::new_struct(MoveStructLayout::Runtime(vec![
+            make_fun_layout(),
+            MoveTypeLayout::U64,
+        ]));
+        let struct_value = Value::struct_(Struct::pack(vec![make_closure(), Value::u64(7)]));
+        let result = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .with_closure_serialization_disabled(true)
+            .serialize(&struct_value, &struct_layout));
+        assert_none!(result);
+
+        // Values without closures are unaffected.
+        let result = assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&ext_mock)
+            .with_closure_serialization_disabled(true)
+            .serialize(&Value::u64(7), &MoveTypeLayout::U64));
+        assert_some!(result);
     }
 
     // ======================================================================================

@@ -13,6 +13,7 @@ mod translate;
 
 use crate::{
     error::{SpecializerError, SpecializerResult},
+    gas,
     stackless_exec_ir::ModuleIR,
 };
 use mono_move_core::{Interner, PreparedModule};
@@ -26,6 +27,12 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> SpecializerR
         PreparedModule::build(module, interner).map_err(SpecializerError::ModulePreparation)?;
     let mut module_ir = translate::translate_module(module, interner)?;
     optimize::optimize_module(&mut module_ir);
+
+    // Gas instrumentation: emit a per-block cost formula for each function.
+    // TODO(metering): could be hoisted before optimization, at the cost of
+    // over-approximating (charging for instructions that optimization removes).
+    gas::instrument(&mut module_ir, interner)?;
+
     // Debug-mode failsafe: verify xfer invariants hold after optimization.
     #[cfg(debug_assertions)]
     for func in module_ir.functions.iter().flatten() {

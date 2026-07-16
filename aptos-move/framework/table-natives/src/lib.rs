@@ -394,6 +394,9 @@ fn native_add_box(
     context.charge(ADD_BOX_BASE)?;
     let fix_memory_double_counting =
         context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
+    let closure_serialization_disabled = context
+        .get_feature_flags()
+        .is_closure_bcs_serialization_disabled();
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -408,7 +411,12 @@ fn native_add_box(
         table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        &table.key_layout,
+        &key,
+        closure_serialization_disabled,
+    )?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
@@ -453,6 +461,9 @@ fn native_borrow_box(
     context.charge(BORROW_BOX_BASE)?;
     let fix_memory_double_counting =
         context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
+    let closure_serialization_disabled = context
+        .get_feature_flags()
+        .is_closure_bcs_serialization_disabled();
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -466,7 +477,12 @@ fn native_borrow_box(
         table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        &table.key_layout,
+        &key,
+        closure_serialization_disabled,
+    )?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
@@ -511,6 +527,9 @@ fn native_contains_box(
     context.charge(CONTAINS_BOX_BASE)?;
     let fix_memory_double_counting =
         context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
+    let closure_serialization_disabled = context
+        .get_feature_flags()
+        .is_closure_bcs_serialization_disabled();
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -524,7 +543,12 @@ fn native_contains_box(
         table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        &table.key_layout,
+        &key,
+        closure_serialization_disabled,
+    )?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
@@ -565,6 +589,9 @@ fn native_remove_box(
     context.charge(REMOVE_BOX_BASE)?;
     let fix_memory_double_counting =
         context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
+    let closure_serialization_disabled = context
+        .get_feature_flags()
+        .is_closure_bcs_serialization_disabled();
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -578,7 +605,12 @@ fn native_remove_box(
         table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        &table.key_layout,
+        &key,
+        closure_serialization_disabled,
+    )?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
@@ -664,9 +696,11 @@ fn serialize_key(
     function_value_extension: &dyn FunctionValueExtension,
     layout: &MoveTypeLayout,
     key: &Value,
+    closure_serialization_disabled: bool,
 ) -> PartialVMResult<Vec<u8>> {
     ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
         .with_func_args_deserialization(function_value_extension)
+        .with_closure_serialization_disabled(closure_serialization_disabled)
         .serialize(key, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key"))
 }

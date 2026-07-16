@@ -5,7 +5,7 @@ fun divergent_u128() {
   frame_data_size: 96
   entry_gas: 3
   code:
-    0: JumpIntCmp @14 [0] != u64 #0 gas_taken=15 gas_fallthrough=10
+    0: JumpIntCmp @14 [0] != u64 #0 gas_taken=41 gas_fallthrough=86
     1: StoreImm16 [56] <- #9
     2: EnumNew [16] desc=2 tag #0
     3: HeapMoveTo [16]+8 <- [56] (size=16)
@@ -32,7 +32,7 @@ fun divergent_u8() {
   frame_data_size: 80
   entry_gas: 3
   code:
-    0: JumpIntCmp @14 [0] != u64 #0 gas_taken=15 gas_fallthrough=10
+    0: JumpIntCmp @14 [0] != u64 #0 gas_taken=41 gas_fallthrough=41
     1: StoreImm1 [56] <- #9
     2: EnumNew [16] desc=3 tag #0
     3: HeapMoveTo [16]+8 <- [56] (size=1)
@@ -59,7 +59,7 @@ fun uniform_u128() {
   frame_data_size: 88
   entry_gas: 3
   code:
-    0: JumpIntCmp @9 [0] != u64 #0 gas_taken=17 gas_fallthrough=10
+    0: JumpIntCmp @9 [0] != u64 #0 gas_taken=93 gas_fallthrough=86
     1: StoreImm16 [24] <- #1
     2: EnumNew [16] desc=4 tag #0
     3: HeapMoveTo [16]+8 <- [24] (size=16)
@@ -83,7 +83,7 @@ fun uniform_u8() {
   frame_data_size: 80
   entry_gas: 3
   code:
-    0: JumpIntCmp @9 [0] != u64 #0 gas_taken=17 gas_fallthrough=10
+    0: JumpIntCmp @9 [0] != u64 #0 gas_taken=48 gas_fallthrough=41
     1: StoreImm1 [24] <- #1
     2: EnumNew [16] desc=5 tag #0
     3: HeapMoveTo [16]+8 <- [24] (size=1)
@@ -105,7 +105,7 @@ fun uniform_u8() {
 
 fun write_uniform() {
   frame_data_size: 80
-  entry_gas: 109
+  entry_gas: 161
   code:
     0: StoreImm8 [32] <- #5
     1: EnumNew [8] desc=6 tag #0

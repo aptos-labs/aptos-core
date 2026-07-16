@@ -82,6 +82,8 @@ pub fn translate_module(
                 num_xfer_positions: alloc.num_xfer_positions,
                 blocks: alloc.blocks,
                 home_slot_types: alloc.home_slot_types,
+                // Populated by the gas instrumentation pass.
+                block_costs: Vec::new(),
             }))
         })
         .collect::<SpecializerResult<Vec<_>>>()?;

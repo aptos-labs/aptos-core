@@ -13,7 +13,7 @@ fun read_x() {
 
 fun read_x_a() {
   frame_data_size: 24
-  entry_gas: 86
+  entry_gas: 96
   code:
     0: StoreImm1 [8] <- #0
     1: StoreImm1 [9] <- #7
@@ -30,7 +30,7 @@ fun read_x_a() {
 
 fun read_x_b() {
   frame_data_size: 32
-  entry_gas: 86
+  entry_gas: 117
   code:
     0: StoreImm8 [8] <- #256
     1: StoreImm1 [16] <- #9

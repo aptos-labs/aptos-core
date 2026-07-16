@@ -19,7 +19,7 @@
 //! error surface.
 
 pub use mono_move_core::{
-    LoweringError, LoweringResult, SlotAllocError, SlotAllocResult, SpecializerError,
-    SpecializerResult, SsaConversionError, SsaConversionResult, XferVerifierError,
-    XferVerifierResult,
+    GasInstrumentationError, GasInstrumentationResult, LoweringError, LoweringResult,
+    SlotAllocError, SlotAllocResult, SpecializerError, SpecializerResult, SsaConversionError,
+    SsaConversionResult, XferVerifierError, XferVerifierResult,
 };

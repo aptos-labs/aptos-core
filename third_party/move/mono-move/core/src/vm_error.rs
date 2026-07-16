@@ -502,6 +502,9 @@ pub enum SpecializerError {
     XferVerifier(#[from] XferVerifierError),
 
     #[error(transparent)]
+    GasInstrumentation(#[from] GasInstrumentationError),
+
+    #[error(transparent)]
     Lowering(#[from] LoweringError),
 }
 
@@ -516,6 +519,7 @@ impl IntoExecutionError for SpecializerError {
             SsaConversion(e) => e.kind(),
             SlotAlloc(e) => e.kind(),
             XferVerifier(e) => e.kind(),
+            GasInstrumentation(e) => e.kind(),
             Lowering(e) => e.kind(),
         }
     }
@@ -664,6 +668,63 @@ impl IntoExecutionError for XferVerifierError {
             | XferUseWithoutLiveDef { .. }
             | XferBoundNotConsumed { .. }
             | XferBoundAtBlockEnd { .. } => ExecutionErrorKind::InvariantViolation,
+        }
+    }
+}
+
+pub type GasInstrumentationResult<T> = Result<T, GasInstrumentationError>;
+
+#[derive(Debug, Error)]
+pub enum GasInstrumentationError {
+    #[error(transparent)]
+    TypeSubstitutionFailed(#[from] TypeSubstitutionError),
+
+    #[error("expected a reference type")]
+    ExpectedReferenceType,
+
+    #[error("Xfer({xfer}) read without a prior call-return binding")]
+    XferReadWithoutBinding { xfer: u16 },
+
+    #[error("Vid slot in post-allocation IR")]
+    VidInPostAllocationIr,
+
+    #[error("field owner is not a struct type")]
+    FieldOwnerNotStruct,
+
+    #[error("variant owner is not an enum type")]
+    VariantOwnerNotEnum,
+
+    #[error("enum definition not found")]
+    EnumDefinitionNotFound,
+
+    #[error("type is not an enum")]
+    NotAnEnum,
+
+    #[error("call return {ret_idx} has no matching signature type")]
+    CallReturnNoSignatureType { ret_idx: usize },
+
+    #[error("CallClosure signature is empty")]
+    ClosureSignatureEmpty,
+
+    #[error("CallClosure signature must start with a Function type")]
+    ClosureSignatureNotFunction,
+}
+
+impl IntoExecutionError for GasInstrumentationError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use GasInstrumentationError::*;
+        match self {
+            TypeSubstitutionFailed(_)
+            | ExpectedReferenceType
+            | XferReadWithoutBinding { .. }
+            | VidInPostAllocationIr
+            | FieldOwnerNotStruct
+            | VariantOwnerNotEnum
+            | EnumDefinitionNotFound
+            | NotAnEnum
+            | CallReturnNoSignatureType { .. }
+            | ClosureSignatureEmpty
+            | ClosureSignatureNotFunction => ExecutionErrorKind::InvariantViolation,
         }
     }
 }
