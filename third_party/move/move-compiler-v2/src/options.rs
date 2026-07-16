@@ -89,6 +89,15 @@ pub struct Options {
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 
+    /// In-memory source contents, keyed by the (virtual) file name used in
+    /// `sources` and `sources_deps`. When non-empty, the compiler reads source
+    /// text from this map instead of the filesystem. This enables compilation
+    /// in environments without a filesystem, such as the
+    /// `wasm32-unknown-unknown` target. Entries are only meaningful for `.move`
+    /// source files (not compiled `.mv` dependencies).
+    #[clap(skip)]
+    pub sources_content: BTreeMap<String, String>,
+
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,

@@ -270,29 +270,51 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     info!("type checking");
     // Run the model builder, which performs context checking.
     let addrs = move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
-    let mut env = move_model::run_model_builder_in_compiler_mode(
-        PackageInfo {
-            sources: options.sources.clone(),
-            address_map: addrs.clone(),
-        },
-        PackageInfo {
-            sources: options.sources_deps.clone(),
-            address_map: addrs.clone(),
-        },
-        vec![PackageInfo {
-            sources: options.dependencies.clone(),
-            address_map: addrs.clone(),
-        }],
-        options.skip_attribute_checks,
+    let source = PackageInfo {
+        sources: options.sources.clone(),
+        address_map: addrs.clone(),
+    };
+    let source_deps = PackageInfo {
+        sources: options.sources_deps.clone(),
+        address_map: addrs.clone(),
+    };
+    let deps = vec![PackageInfo {
+        sources: options.dependencies.clone(),
+        address_map: addrs.clone(),
+    }];
+    let known_attributes =
         if !options.skip_attribute_checks && options.known_attributes.is_empty() {
             KnownAttribute::get_all_attribute_names()
         } else {
             &options.known_attributes
-        },
-        options.language_version.unwrap_or_default(),
-        options.compile_test_code,
-        options.compile_verify_code,
-    )?;
+        };
+    let language_version = options.language_version.unwrap_or_default();
+    // When in-memory source contents are provided, read source from that store
+    // instead of the filesystem (e.g. to support wasm32-unknown-unknown).
+    let mut env = if options.sources_content.is_empty() {
+        move_model::run_model_builder_in_compiler_mode(
+            source,
+            source_deps,
+            deps,
+            options.skip_attribute_checks,
+            known_attributes,
+            language_version,
+            options.compile_test_code,
+            options.compile_verify_code,
+        )?
+    } else {
+        move_model::run_model_builder_in_compiler_mode_with_sources(
+            source,
+            source_deps,
+            deps,
+            &options.sources_content,
+            options.skip_attribute_checks,
+            known_attributes,
+            language_version,
+            options.compile_test_code,
+            options.compile_verify_code,
+        )?
+    };
     // Store address aliases
     let map = addrs
         .into_iter()

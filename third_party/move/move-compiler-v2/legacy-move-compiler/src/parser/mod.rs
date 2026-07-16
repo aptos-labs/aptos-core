@@ -21,7 +21,7 @@ use comments::*;
 use move_command_line_common::files::{find_move_filenames, FileHash};
 use move_symbol_pool::Symbol;
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs::File,
     io::Read,
 };
@@ -35,12 +35,14 @@ pub(crate) fn parse_program(
     named_address_maps: NamedAddressMaps,
     targets: Vec<IndexedPackagePath>,
     deps: Vec<IndexedPackagePath>,
+    vfs: Option<&BTreeMap<Symbol, String>>,
 ) -> anyhow::Result<(
     FilesSourceText,
     Result<(parser::ast::Program, CommentMap), Diagnostics>,
 )> {
     fn find_move_filenames_with_address_mapping(
         paths_with_mapping: Vec<IndexedPackagePath>,
+        vfs: Option<&BTreeMap<Symbol, String>>,
     ) -> anyhow::Result<Vec<IndexedPackagePath>> {
         let mut res = vec![];
         for IndexedPackagePath {
@@ -49,6 +51,16 @@ pub(crate) fn parse_program(
             named_address_map: named_address_mapping,
         } in paths_with_mapping
         {
+            if vfs.is_some() {
+                // In-memory mode: paths are virtual file names, not directories
+                // to be globbed on disk. Pass them through unchanged.
+                res.push(IndexedPackagePath {
+                    package,
+                    path,
+                    named_address_map: named_address_mapping,
+                });
+                continue;
+            }
             res.extend(
                 find_move_filenames(&[path.as_str()], true)?
                     .into_iter()
@@ -65,8 +77,8 @@ pub(crate) fn parse_program(
         Ok(res)
     }
 
-    let targets = find_move_filenames_with_address_mapping(targets)?;
-    let mut deps = find_move_filenames_with_address_mapping(deps)?;
+    let targets = find_move_filenames_with_address_mapping(targets, vfs)?;
+    let mut deps = find_move_filenames_with_address_mapping(deps, vfs)?;
     ensure_targets_deps_dont_intersect(compilation_env, &targets, &mut deps)?;
     let mut files: FilesSourceText = HashMap::new();
     let mut source_definitions = Vec::new();
@@ -80,7 +92,7 @@ pub(crate) fn parse_program(
         named_address_map,
     } in targets
     {
-        let (defs, comments, ds, file_hash) = parse_file(compilation_env, &mut files, path)?;
+        let (defs, comments, ds, file_hash) = parse_file(compilation_env, &mut files, path, vfs)?;
         source_definitions.extend(defs.into_iter().map(|def| PackageDefinition {
             package,
             named_address_map,
@@ -96,7 +108,7 @@ pub(crate) fn parse_program(
         named_address_map,
     } in deps
     {
-        let (defs, _, ds, _) = parse_file(compilation_env, &mut files, path)?;
+        let (defs, _, ds, _) = parse_file(compilation_env, &mut files, path, vfs)?;
         lib_definitions.extend(defs.into_iter().map(|def| PackageDefinition {
             package,
             named_address_map,
@@ -169,6 +181,7 @@ fn parse_file(
     compilation_env: &mut CompilationEnv,
     files: &mut FilesSourceText,
     fname: Symbol,
+    vfs: Option<&BTreeMap<Symbol, String>>,
 ) -> anyhow::Result<(
     Vec<parser::ast::Definition>,
     MatchedFileCommentMap,
@@ -176,10 +189,20 @@ fn parse_file(
     FileHash,
 )> {
     let mut diags = Diagnostics::new();
-    let mut f = File::open(fname.as_str())
-        .map_err(|err| std::io::Error::new(err.kind(), format!("{}: {}", err, fname)))?;
-    let mut source_buffer = String::new();
-    f.read_to_string(&mut source_buffer)?;
+    let source_buffer = match vfs {
+        // In-memory mode: read source text from the provided store.
+        Some(store) => store.get(&fname).cloned().ok_or_else(|| {
+            anyhow!("no in-memory source provided for '{}'", fname)
+        })?,
+        // Filesystem mode: read the source from disk.
+        None => {
+            let mut f = File::open(fname.as_str())
+                .map_err(|err| std::io::Error::new(err.kind(), format!("{}: {}", err, fname)))?;
+            let mut source_buffer = String::new();
+            f.read_to_string(&mut source_buffer)?;
+            source_buffer
+        },
+    };
     let file_hash = FileHash::new(&source_buffer);
     let (defs, comments) = match parse_file_string(compilation_env, file_hash, &source_buffer) {
         Ok(defs_and_comments) => defs_and_comments,

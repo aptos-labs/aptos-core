@@ -44,6 +44,12 @@ pub struct Compiler<'a> {
     compiled_module_named_address_mapping: BTreeMap<CompiledModuleId, String>,
     flags: Flags,
     known_attributes: BTreeSet<String>,
+    /// Optional in-memory source store, mapping a (virtual) file name to its
+    /// source text. When set, target/dependency paths are treated as keys into
+    /// this map and no filesystem access is performed for reading sources. This
+    /// enables compilation in environments without a filesystem (e.g. the
+    /// `wasm32-unknown-unknown` target).
+    vfs: Option<BTreeMap<Symbol, String>>,
 }
 
 pub struct SteppedCompiler<'a, const P: Pass> {
@@ -120,6 +126,7 @@ impl<'a> Compiler<'a> {
             compiled_module_named_address_mapping: BTreeMap::new(),
             flags,
             known_attributes: known_attributes.clone(),
+            vfs: None,
         }
     }
 
@@ -141,6 +148,16 @@ impl<'a> Compiler<'a> {
             named_address_map,
         }];
         Self::from_package_paths(targets, deps, flags, known_attributes)
+    }
+
+    /// Supply an in-memory source store. When set, all target/dependency paths
+    /// are resolved against this map (keyed by file name) instead of the
+    /// filesystem, and no interface files are generated. This is what allows the
+    /// compiler front-end to run without a filesystem (e.g. on wasm).
+    pub fn set_vfs(mut self, vfs: BTreeMap<Symbol, String>) -> Self {
+        assert!(self.vfs.is_none());
+        self.vfs = Some(vfs);
+        self
     }
 
     pub fn set_interface_files_dir(mut self, dir: String) -> Self {
@@ -194,15 +211,21 @@ impl<'a> Compiler<'a> {
             compiled_module_named_address_mapping,
             flags,
             known_attributes,
+            vfs,
         } = self;
-        generate_interface_files_for_deps(
-            &mut deps,
-            interface_files_dir_opt,
-            &compiled_module_named_address_mapping,
-        )?;
+        // Interface files are generated from compiled (`.mv`) dependencies on
+        // the filesystem. In-memory (vfs) mode only deals with source
+        // dependencies, so skip interface generation entirely.
+        if vfs.is_none() {
+            generate_interface_files_for_deps(
+                &mut deps,
+                interface_files_dir_opt,
+                &compiled_module_named_address_mapping,
+            )?;
+        }
         let mut compilation_env = CompilationEnv::new(flags, known_attributes);
         let (source_text, pprog_and_comments_res) =
-            parse_program(&mut compilation_env, maps, targets, deps)?;
+            parse_program(&mut compilation_env, maps, targets, deps, vfs.as_ref())?;
         let res: Result<_, Diagnostics> = pprog_and_comments_res.and_then(|(pprog, comments)| {
             SteppedCompiler::new_at_parser(compilation_env, pre_compiled_lib, pprog)
                 .run::<TARGET>()
