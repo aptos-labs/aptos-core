@@ -39,6 +39,37 @@ export class BytecodeMetadata {
 }
 
 /**
+ * Compile Move module source code to bytecode (bytecode v10).
+ *
+ * # Arguments
+ * * `source` - Move source text defining exactly one module
+ * * `named_addresses_json` - JSON object mapping named addresses to hex
+ *   addresses, e.g. `{"my_addr":"0x42"}`. May be empty (`""`) if the source
+ *   only uses numeric addresses.
+ *
+ * # Returns
+ * Serialized module bytecode (a `.mv` byte array) at bytecode version 10.
+ *
+ * # Errors
+ * Returns an error (with compiler diagnostics) if compilation fails or the
+ * source does not define a module.
+ */
+export function compile_module(source: string, named_addresses_json: string): Uint8Array;
+
+/**
+ * Compile Move script source code to bytecode (bytecode v10).
+ *
+ * # Arguments
+ * * `source` - Move source text defining a script (a `script { ... }` block)
+ * * `named_addresses_json` - JSON object mapping named addresses to hex
+ *   addresses. May be empty (`""`).
+ *
+ * # Returns
+ * Serialized script bytecode at bytecode version 10.
+ */
+export function compile_script(source: string, named_addresses_json: string): Uint8Array;
+
+/**
  * Decompile Move module bytecode to Move source code
  *
  * Takes raw bytecode bytes and returns decompiled Move source code.
@@ -200,6 +231,8 @@ export interface InitOutput {
     readonly bytecodemetadata_structCount: (a: number) => number;
     readonly bytecodemetadata_toJSON: (a: number) => [number, number, number, number];
     readonly bytecodemetadata_version: (a: number) => number;
+    readonly compile_module: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly compile_script: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly decompile_module: (a: number, b: number) => [number, number, number, number];
     readonly decompile_script: (a: number, b: number) => [number, number, number, number];
     readonly disassemble_module: (a: number, b: number) => [number, number, number, number];

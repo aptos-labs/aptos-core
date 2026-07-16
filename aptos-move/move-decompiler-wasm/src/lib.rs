@@ -37,6 +37,7 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 
 /// Result type for the WASM-facing API.
@@ -338,6 +339,8 @@ pub fn get_version_info() -> String {
         "version": env!("CARGO_PKG_VERSION"),
         "description": env!("CARGO_PKG_DESCRIPTION"),
         "features": [
+            "compile_module",
+            "compile_script",
             "decompile_module",
             "decompile_script",
             "disassemble_module",
@@ -370,6 +373,161 @@ pub fn get_version_info() -> String {
 pub fn init_panic_hook() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
+
+/// A single compiled unit produced from Move source: its serialized bytecode
+/// and whether it is a script (as opposed to a module).
+struct CompiledArtifact {
+    is_script: bool,
+    bytecode: Vec<u8>,
+}
+
+/// Core (target-independent) implementation for compiling Move source to
+/// bytecode.
+///
+/// All source is read from memory (the `source`/`deps` arguments), so no
+/// filesystem access is performed. This is what allows the Move compiler
+/// front-end to run on the `wasm32-unknown-unknown` target. `deps` maps
+/// dependency file names to their source text; `named_addresses` maps named
+/// address aliases (e.g. `std`) to hex addresses (e.g. `0x1`).
+fn compile_impl(
+    file_name: &str,
+    source: &str,
+    named_addresses: &BTreeMap<String, String>,
+    deps: &BTreeMap<String, String>,
+    bytecode_version: u32,
+) -> anyhow::Result<Vec<CompiledArtifact>> {
+    use codespan_reporting::term::termcolor::Buffer;
+    use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
+    use move_compiler_v2::{options::Options, run_move_compiler};
+
+    // Build the in-memory source store (targets + source dependencies).
+    let mut sources_content: BTreeMap<String, String> = BTreeMap::new();
+    sources_content.insert(file_name.to_string(), source.to_string());
+    let mut sources_deps = Vec::new();
+    for (dep_name, dep_source) in deps {
+        sources_content.insert(dep_name.clone(), dep_source.clone());
+        sources_deps.push(dep_name.clone());
+    }
+
+    let named_address_mapping = named_addresses
+        .iter()
+        .map(|(name, addr)| format!("{name}={addr}"))
+        .collect::<Vec<_>>();
+
+    let options = Options {
+        sources: vec![file_name.to_string()],
+        sources_deps,
+        dependencies: vec![],
+        named_address_mapping,
+        sources_content,
+        skip_attribute_checks: true,
+        print_errors: false,
+        ..Options::default()
+    };
+
+    // Capture diagnostics into a buffer instead of writing to stderr.
+    let mut buffer = Buffer::no_color();
+    let result = {
+        let mut emitter = options.error_emitter(&mut buffer);
+        run_move_compiler(emitter.as_mut(), options.clone())
+    };
+    let (_env, units) = match result {
+        Ok(ok) => ok,
+        Err(err) => {
+            let diags = String::from_utf8_lossy(&buffer.into_inner()).into_owned();
+            if diags.trim().is_empty() {
+                anyhow::bail!("{err}");
+            }
+            anyhow::bail!("{err}\n{diags}");
+        },
+    };
+
+    Ok(units
+        .into_iter()
+        .map(|unit| {
+            let is_script = matches!(unit, CompiledUnitEnum::Script(_));
+            let bytecode = unit.into_compiled_unit().serialize(Some(bytecode_version));
+            CompiledArtifact {
+                is_script,
+                bytecode,
+            }
+        })
+        .collect())
+}
+
+/// Parse the JSON named-address mapping argument shared by the compile bindings.
+///
+/// Accepts an empty string or a JSON object of `{ "name": "0xADDR", ... }`.
+fn parse_named_addresses(json: &str) -> anyhow::Result<BTreeMap<String, String>> {
+    let json = json.trim();
+    if json.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    serde_json::from_str(json)
+        .map_err(|e| anyhow::anyhow!("failed to parse named addresses JSON: {e}"))
+}
+
+/// Compile a single self-contained source string, returning the bytecode of the
+/// module or script it defines (serialized at bytecode v10).
+fn compile_single(
+    source: &str,
+    named_addresses_json: &str,
+    want_script: bool,
+) -> anyhow::Result<Vec<u8>> {
+    let named_addresses = parse_named_addresses(named_addresses_json)?;
+    let file_name = if want_script {
+        "script.move"
+    } else {
+        "module.move"
+    };
+    let artifacts = compile_impl(
+        file_name,
+        source,
+        &named_addresses,
+        &BTreeMap::new(),
+        move_binary_format::file_format_common::VERSION_10,
+    )?;
+    match artifacts.into_iter().find(|a| a.is_script == want_script) {
+        Some(artifact) => Ok(artifact.bytecode),
+        None => anyhow::bail!(
+            "source did not produce a {}",
+            if want_script { "script" } else { "module" }
+        ),
+    }
+}
+
+/// Compile Move module source code to bytecode (bytecode v10).
+///
+/// # Arguments
+/// * `source` - Move source text defining exactly one module
+/// * `named_addresses_json` - JSON object mapping named addresses to hex
+///   addresses, e.g. `{"my_addr":"0x42"}`. May be empty (`""`) if the source
+///   only uses numeric addresses.
+///
+/// # Returns
+/// Serialized module bytecode (a `.mv` byte array) at bytecode version 10.
+///
+/// # Errors
+/// Returns an error (with compiler diagnostics) if compilation fails or the
+/// source does not define a module.
+#[wasm_bindgen]
+pub fn compile_module(source: &str, named_addresses_json: &str) -> Result<Vec<u8>> {
+    compile_single(source, named_addresses_json, false).map_err(to_js_error)
+}
+
+/// Compile Move script source code to bytecode (bytecode v10).
+///
+/// # Arguments
+/// * `source` - Move source text defining a script (a `script { ... }` block)
+/// * `named_addresses_json` - JSON object mapping named addresses to hex
+///   addresses. May be empty (`""`).
+///
+/// # Returns
+/// Serialized script bytecode at bytecode version 10.
+#[wasm_bindgen]
+pub fn compile_script(source: &str, named_addresses_json: &str) -> Result<Vec<u8>> {
+    compile_single(source, named_addresses_json, true).map_err(to_js_error)
 }
 
 #[cfg(test)]
@@ -524,6 +682,63 @@ mod tests {
                 "v{version} script should disassemble"
             );
         }
+    }
+
+    /// Compiling module source (in-memory, no filesystem) should yield bytecode
+    /// that round-trips through the v10 deserializer/disassembler.
+    #[test]
+    fn test_compile_module_v10() {
+        let source = r#"
+            module 0x42::example {
+                public fun add(x: u64, y: u64): u64 {
+                    x + y
+                }
+            }
+        "#;
+        let bytes = compile_single(source, "", false).expect("module should compile");
+
+        // Deserializes and reports v10.
+        let metadata = module_metadata_impl(&bytes).expect("metadata for compiled module");
+        assert_eq!(metadata.version(), VERSION_10);
+        assert!(metadata.function_count() >= 1);
+
+        // The freshly compiled module round-trips through the disassembler.
+        let asm = disassemble_module_impl(&bytes).expect("disassemble compiled module");
+        assert!(
+            asm.contains("add") || asm.contains("example"),
+            "disassembly should mention the compiled code: {asm}"
+        );
+    }
+
+    /// Compiling with a named-address mapping should resolve the address.
+    #[test]
+    fn test_compile_module_with_named_address() {
+        let source = "module addr::m { public fun f(): u64 { 1 } }";
+        let bytes =
+            compile_single(source, "{\"addr\":\"0x99\"}", false).expect("module should compile");
+        let metadata = module_metadata_impl(&bytes).expect("metadata for compiled module");
+        assert_eq!(metadata.version(), VERSION_10);
+        assert!(metadata.function_count() >= 1);
+    }
+
+    /// Compiling script source should yield a v10 script.
+    #[test]
+    fn test_compile_script_v10() {
+        let source = r#"
+            script {
+                fun main() { }
+            }
+        "#;
+        let bytes = compile_single(source, "", true).expect("script should compile");
+        let script = deserialize_script(&bytes).expect("compiled script deserializes");
+        assert_eq!(script.version, VERSION_10);
+        assert!(disassemble_script_impl(&bytes).is_ok());
+    }
+
+    #[test]
+    fn test_compile_rejects_invalid_source() {
+        let bad = "module 0x1::m { this is not valid move }";
+        assert!(compile_single(bad, "", false).is_err());
     }
 
     #[test]

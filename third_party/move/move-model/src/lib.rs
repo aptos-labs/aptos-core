@@ -108,6 +108,54 @@ pub fn run_model_builder_in_compiler_mode(
     )
 }
 
+/// Same as [`run_model_builder_in_compiler_mode`], but reads all source text
+/// from the provided in-memory store (`sources_content`, keyed by the virtual
+/// file name used in the `PackageInfo::sources`) instead of the filesystem.
+///
+/// This enables running the compiler front-end without a filesystem, e.g. on
+/// the `wasm32-unknown-unknown` target.
+#[allow(clippy::too_many_arguments)]
+pub fn run_model_builder_in_compiler_mode_with_sources(
+    source: PackageInfo,
+    source_deps: PackageInfo,
+    deps: Vec<PackageInfo>,
+    sources_content: &BTreeMap<String, String>,
+    skip_attribute_checks: bool,
+    known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
+    compile_test_code: bool,
+    compile_verify_code: bool,
+) -> anyhow::Result<GlobalEnv> {
+    let to_package_paths = |PackageInfo {
+                                sources,
+                                address_map,
+                            }| PackagePaths {
+        name: None,
+        paths: sources,
+        named_address_map: address_map,
+    };
+    let vfs: BTreeMap<MoveSymbol, String> = sources_content
+        .iter()
+        .map(|(name, content)| (MoveSymbol::from(name.as_str()), content.clone()))
+        .collect();
+    run_model_builder_with_options_and_compilation_flags_and_vfs(
+        vec![to_package_paths(source)],
+        vec![to_package_paths(source_deps)],
+        deps.into_iter().map(to_package_paths).collect(),
+        ModelBuilderOptions {
+            language_version,
+            compile_for_testing: compile_test_code,
+        },
+        Flags::model_compilation()
+            .set_skip_attribute_checks(skip_attribute_checks)
+            .set_verify(compile_verify_code)
+            .set_keep_testing_functions(compile_test_code)
+            .set_language_version(language_version.into()),
+        known_attributes,
+        Some(vfs),
+    )
+}
+
 /// Build the move model with custom compilation flags and custom options
 pub fn run_model_builder_with_options_and_compilation_flags<
     Paths: Into<MoveSymbol> + Clone + Debug,
@@ -119,6 +167,37 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     options: ModelBuilderOptions,
     flags: Flags,
     known_attributes: &BTreeSet<String>,
+) -> anyhow::Result<GlobalEnv> {
+    run_model_builder_with_options_and_compilation_flags_and_vfs(
+        move_sources_targets,
+        move_sources_deps,
+        deps,
+        options,
+        flags,
+        known_attributes,
+        None,
+    )
+}
+
+/// Build the move model, optionally reading all source text from an in-memory
+/// store (`vfs`) instead of the filesystem.
+///
+/// When `vfs` is `Some`, every path in `move_sources_targets` /
+/// `move_sources_deps` / `deps` is treated as a key into the store rather than
+/// a filesystem path, so no disk access is performed for reading sources. This
+/// makes it possible to run the compiler front-end in environments without a
+/// filesystem, such as the `wasm32-unknown-unknown` target.
+pub fn run_model_builder_with_options_and_compilation_flags_and_vfs<
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
+>(
+    move_sources_targets: Vec<PackagePaths<Paths, NamedAddress>>,
+    move_sources_deps: Vec<PackagePaths<Paths, NamedAddress>>,
+    deps: Vec<PackagePaths<Paths, NamedAddress>>,
+    options: ModelBuilderOptions,
+    flags: Flags,
+    known_attributes: &BTreeSet<String>,
+    vfs: Option<BTreeMap<MoveSymbol, String>>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
     env.set_language_version(options.language_version);
@@ -140,9 +219,12 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         .collect();
 
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
-    let (files, comments_and_compiler_res) =
-        Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
-            .run::<PASS_PARSER>()?;
+    let compiler = Compiler::from_package_paths(move_sources, deps, flags, known_attributes);
+    let compiler = match vfs {
+        Some(vfs) => compiler.set_vfs(vfs),
+        None => compiler,
+    };
+    let (files, comments_and_compiler_res) = compiler.run::<PASS_PARSER>()?;
     let (comment_map, compiler) = match comments_and_compiler_res {
         Err(diags) => {
             // Add source files so that the env knows how to translate locations of parse errors

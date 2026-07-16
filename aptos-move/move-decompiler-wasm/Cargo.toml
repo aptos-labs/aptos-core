@@ -14,10 +14,13 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1.0"
+codespan-reporting = "0.11"
 console_error_panic_hook = { version = "0.1", optional = true }
 getrandom = { version = "0.2", features = ["js"] }
+legacy-move-compiler = { path = "../../third_party/move/move-compiler-v2/legacy-move-compiler" }
 move-asm = { path = "../../third_party/move/tools/move-asm" }
 move-binary-format = { path = "../../third_party/move/move-binary-format" }
+move-compiler-v2 = { path = "../../third_party/move/move-compiler-v2" }
 move-core-types = { path = "../../third_party/move/move-core/types" }
 move-decompiler = { path = "../../third_party/move/tools/move-decompiler" }
 serde = { version = "1.0", features = ["derive"] }
