@@ -25,6 +25,20 @@ Perfect for:
 
 ## Quick Start
 
+### Prebuilt WASM (bytecode v10)
+
+A ready-to-download build lives in [`dist/`](./dist/) — grab
+`dist/move_decompiler_wasm_bg.wasm` (plus the `.js`/`.d.ts` glue) directly. It is
+verified end-to-end against real bytecode-v10 module **and** script artifacts
+(`dist/samples/*.mv`). See [`dist/README.md`](./dist/README.md).
+
+### One-command build (recommended)
+
+```bash
+cd aptos-move/move-decompiler-wasm
+./build_wasm.sh          # builds pkg/ + pkg-node/, generates samples, refreshes dist/, verifies in node
+```
+
 ### Build
 
 ```bash

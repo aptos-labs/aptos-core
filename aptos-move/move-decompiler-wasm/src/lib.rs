@@ -375,7 +375,9 @@ pub fn init_panic_hook() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_binary_format::file_format::{basic_test_module, empty_module};
+    use move_binary_format::file_format::{
+        basic_test_module, basic_test_script, empty_module,
+    };
     use move_binary_format::file_format_common::{
         VERSION_10, VERSION_5, VERSION_DEFAULT, VERSION_MAX,
     };
@@ -393,6 +395,16 @@ mod tests {
         module
             .serialize_for_version(Some(version), &mut bytes)
             .expect("module should serialize");
+        bytes
+    }
+
+    /// Serialize a known-good script at the requested bytecode version.
+    fn script_bytes_at_version(version: u32) -> Vec<u8> {
+        let script = basic_test_script();
+        let mut bytes = Vec::new();
+        script
+            .serialize_for_version(Some(version), &mut bytes)
+            .expect("script should serialize");
         bytes
     }
 
@@ -477,6 +489,43 @@ mod tests {
         assert_eq!(metadata.version(), VERSION_10);
     }
 
+    /// The disassembler/decompiler must accept the latest bytecode format (v10)
+    /// for scripts as well as modules.
+    #[test]
+    fn test_supports_bytecode_v10_script() {
+        let bytes = script_bytes_at_version(VERSION_10);
+
+        // Deserialization accepts a v10 script and reports the v10 version.
+        let script = deserialize_script(&bytes).expect("v10 script should deserialize");
+        assert_eq!(script.version, VERSION_10);
+
+        // The script disassembles and decompiles without error.
+        let asm = disassemble_script_impl(&bytes).expect("disassembly of v10 script");
+        assert!(!asm.is_empty(), "v10 script disassembly should be non-empty");
+
+        let source = decompile_script_impl(&bytes).expect("decompilation of v10 script");
+        assert!(
+            !source.is_empty(),
+            "v10 script decompilation should be non-empty"
+        );
+    }
+
+    /// Script disassembly should work across the full range of supported
+    /// bytecode versions, including v10.
+    #[test]
+    fn test_all_supported_script_versions_roundtrip() {
+        for version in VERSION_5..=VERSION_10 {
+            let bytes = script_bytes_at_version(version);
+            let script = deserialize_script(&bytes)
+                .unwrap_or_else(|_| panic!("v{version} script should deserialize"));
+            assert_eq!(script.version, version);
+            assert!(
+                disassemble_script_impl(&bytes).is_ok(),
+                "v{version} script should disassemble"
+            );
+        }
+    }
+
     #[test]
     fn test_rejects_invalid_bytecode() {
         let garbage = [0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x02];
@@ -484,5 +533,8 @@ mod tests {
         assert!(disassemble_module_impl(&garbage).is_err());
         assert!(decompile_module_impl(&garbage).is_err());
         assert!(module_metadata_impl(&garbage).is_err());
+        assert!(deserialize_script(&garbage).is_err());
+        assert!(disassemble_script_impl(&garbage).is_err());
+        assert!(decompile_script_impl(&garbage).is_err());
     }
 }
