@@ -4,7 +4,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit};
-    use aptos_framework::fungible_asset::{Self, Metadata, BurnRef, FungibleAsset};
+    use aptos_framework::fungible_asset::{Self, Metadata, BurnRef, MintRef, FungibleAsset};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
 
@@ -277,6 +277,18 @@ module aptos_framework::aptos_account {
         if (amount != 0) {
             let store_addr = primary_fungible_store_address(account);
             ref.address_burn_from_for_gas(store_addr, amount);
+        };
+    }
+
+    /// Mint into APT Primary FungibleStore for gas refund
+    public(friend) fun mint_to_fungible_store_for_gas(
+        ref: &MintRef, account: address, amount: u64
+    ) {
+        // Skip minting if amount is zero. This shouldn't error out as it's called as part of gas refund.
+        if (amount != 0) {
+            let store_addr = ensure_primary_fungible_store_exists(account);
+            let fa = fungible_asset::mint(ref, amount);
+            fungible_asset::unchecked_deposit_with_no_events(store_addr, fa);
         };
     }
 

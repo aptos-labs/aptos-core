@@ -203,6 +203,10 @@ pub enum FeatureFlag {
     /// checkpoint stage and commits it to `TransactionInfoV1`, so it is
     /// consensus-verified. Requires `TRANSACTION_INFO_V1`.
     COMPUTE_TRADING_NATIVE_STATE_ROOTS = 122,
+    /// When enabled, the gas refund in the epilogue mints APT directly as a fungible asset
+    /// via the paired `MintRef`, instead of minting a coin and converting it. This avoids
+    /// touching the legacy coin supply aggregator (v1), reducing Block-STM contention.
+    GAS_REFUND_FA_MINT = 124,
 }
 
 impl FeatureFlag {
@@ -556,6 +560,10 @@ impl Features {
 
     pub fn is_compute_trading_native_state_roots_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS)
+    }
+
+    pub fn is_gas_refund_fa_mint_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::GAS_REFUND_FA_MINT)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

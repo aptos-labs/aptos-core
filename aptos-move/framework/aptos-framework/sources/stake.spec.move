@@ -506,6 +506,11 @@ spec aptos_framework::stake {
         ensures post_stake_pool.delegated_voter == new_voter;
     }
 
+    spec initialize_pending_transaction_fee {
+        pragma verify = false; // TODO: set because of timeout.
+        modifies global<PendingTransactionFee>(@aptos_framework);
+    }
+
     spec on_new_epoch {
         pragma verify = false; // TODO: set because of timeout (property proved).
         pragma disable_invariants_in_body;

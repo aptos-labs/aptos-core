@@ -173,6 +173,7 @@ pub enum FeatureFlag {
     NativeOrderbook,
     NativeCollateral,
     ComputeTradingNativeStateRoots,
+    GasRefundFaMint,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -451,6 +452,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ComputeTradingNativeStateRoots => {
                 AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS
             },
+            FeatureFlag::GasRefundFaMint => AptosFeatureFlag::GAS_REFUND_FA_MINT,
         }
     }
 }
@@ -656,6 +658,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COMPUTE_TRADING_NATIVE_STATE_ROOTS => {
                 FeatureFlag::ComputeTradingNativeStateRoots
             },
+            AptosFeatureFlag::GAS_REFUND_FA_MINT => FeatureFlag::GasRefundFaMint,
         }
     }
 }
