@@ -989,9 +989,17 @@ impl<'env> BoogieTranslator<'env> {
             }
             let fun_env = &self.env.get_function(info.fun.to_qualified_id());
             let fun_name = boogie_function_name(fun_env, &info.fun.inst, &[]);
-            let args = (0..info.mask.captured_count())
+            // Captured slots are not necessarily a prefix of the callee's
+            // parameters.
+            let captured_args: Vec<String> = (0..info.mask.captured_count())
                 .map(|pos| format!("fun->p{}_v{}", pos, idx))
-                .chain((0..params.len()).map(|pos| format!("p{}", pos)))
+                .collect();
+            let non_captured_args: Vec<String> =
+                (0..params.len()).map(|pos| format!("p{}", pos)).collect();
+            let args = info
+                .mask
+                .compose(captured_args, non_captured_args)
+                .expect("closure mask compose failed")
                 .join(", ");
             let call_prefix = if result_str.is_empty() {
                 String::new()

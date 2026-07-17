@@ -3365,7 +3365,15 @@ impl ExpTranslator<'_, '_, '_> {
                 _ => unreachable!("not primitive"),
             }
         } else if self.is_spec_mode() {
-            // In specification mode, use I256 or U256.
+            // In specification mode, use I256 or U256. Record the location so
+            // the prover can distinguish this default from an explicit suffix.
+            let mut defaulted = self
+                .env()
+                .get_extension::<crate::model::SpecDefaultedNumLocs>()
+                .map(|x| (*x).clone())
+                .unwrap_or_default();
+            defaulted.0.insert(loc.clone());
+            self.env().set_extension(defaulted);
             if value < BigInt::zero() {
                 vec![PrimitiveType::I256]
             } else {

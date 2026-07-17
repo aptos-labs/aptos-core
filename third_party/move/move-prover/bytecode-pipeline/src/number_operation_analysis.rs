@@ -813,12 +813,9 @@ impl NumberOperationAnalysis<'_> {
                                                 .is_compatible_num_type(&concrete_num_ty_oper_1)
                                         };
                                         if concrete_num_ty.is_none() {
-                                            // Unsuffixed integer literals in spec mode default
-                                            // to u256/i256 (exp_builder::translate_number) when
-                                            // no context type is available. Such a literal is
-                                            // semantically a `num` wildcard: adopt the sibling
-                                            // operand's concrete type when the value fits,
-                                            // instead of reporting a width mismatch.
+                                            // Unsuffixed spec-mode literals default to
+                                            // u256/i256; treat them as `num` wildcards
+                                            // before erroring.
                                             concrete_num_ty = adopt_spec_defaulted_literal_type(
                                                 self.func_target.global_env(),
                                                 &args[0],
@@ -1275,13 +1272,9 @@ impl AbstractDomain for NumberOperationState {
     }
 }
 
-/// If exactly one of two Bitwise-classified operands is an integer literal
-/// carrying the spec-mode default type (u256/i256, assigned by
-/// `exp_builder::translate_number` when no context type was available) and the
-/// other has a different concrete integer type, retype the literal to the
-/// sibling's type — provided the value fits — and return the adopted type.
-/// The sibling's type is guaranteed to be covered by mono analysis since the
-/// sibling node itself was collected there.
+/// Retype an integer literal carrying the spec-mode default type (u256/i256)
+/// to its sibling operand's unsigned type when the value fits; returns the
+/// adopted type. Sibling types are always covered by mono analysis.
 fn adopt_spec_defaulted_literal_type(
     env: &GlobalEnv,
     arg0: &Exp,
@@ -1295,6 +1288,11 @@ fn adopt_spec_defaulted_literal_type(
             ty.skip_reference(),
             Type::Primitive(PrimitiveType::U256) | Type::Primitive(PrimitiveType::I256)
         ) && matches!(e.as_ref(), ExpData::Value(_, AstValue::Number(_)))
+            // Explicitly suffixed literals (e.g. `1u256`) must keep the
+            // mismatch diagnostic; only builder-defaulted ones adapt.
+            && env
+                .get_extension::<move_model::model::SpecDefaultedNumLocs>()
+                .is_some_and(|s| s.0.contains(&env.get_node_loc(e.node_id())))
     };
     let fits = |v: &num::BigInt, ty: &Type| -> bool {
         use num::bigint::Sign;
@@ -1325,9 +1323,8 @@ fn adopt_spec_defaulted_literal_type(
     };
     let try_adopt = |lit: &Exp, lit_ty: &Type, other_ty: &Type| -> Option<Type> {
         let other = other_ty.skip_reference();
-        // Only unsigned siblings: signed integers have no bv rendering, so a
-        // Bitwise-classified signed operand must keep surfacing a diagnostic
-        // rather than proceed into the backend.
+        // Unsigned siblings only: signed has no bv rendering and must keep
+        // surfacing a diagnostic.
         if !is_defaulted_literal(lit, lit_ty)
             || !other.is_unsigned_int()
             || lit_ty.skip_reference() == other

@@ -102,6 +102,13 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 // =================================================================================================
 /// # Locations
 
+/// Environment extension recording source locations of integer literals that
+/// received the spec-mode default type (u256/i256) because no context type was
+/// available. Lets the prover distinguish defaulted literals from explicitly
+/// suffixed ones (locations survive expression cloning, node ids do not).
+#[derive(Debug, Default, Clone)]
+pub struct SpecDefaultedNumLocs(pub std::collections::BTreeSet<Loc>);
+
 /// A location, consisting of a FileId and a span in this file.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Loc {

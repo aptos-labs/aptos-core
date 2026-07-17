@@ -158,8 +158,7 @@ pub fn run_move_prover(
         language_version,
         with_bytecode: true, // prover needs FileFormat bytecode
     })?;
-    // Render stored diagnostics before bailing, otherwise model-building errors
-    // are counted but never shown to the user.
+    // Report diagnostics before bailing, or model-build errors are never shown.
     if model.has_errors() {
         model.report_diag(
             &mut error_writer,

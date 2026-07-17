@@ -404,8 +404,6 @@ pub fn add_prelude(
                 insts.iter().map(|inst| {
                     inst.iter()
                         .flat_map(|i| i.get_all_contained_types_with_skip_reference(env))
-                        // Skip signed-containing types in the bv pass (same guard
-                        // as `bv_all_types` above).
                         .filter(|i| !bv_flag || !contains_signed_int(i))
                         .map(|i| (i.clone(), TypeInfo::new(env, options, &i, bv_flag)))
                         .collect::<Vec<_>>()

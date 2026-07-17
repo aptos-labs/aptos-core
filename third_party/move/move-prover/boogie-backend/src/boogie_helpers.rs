@@ -360,8 +360,7 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             U256 => uint_bv_type(256, bv_flag),
             I8 | I16 | I32 | I64 | I128 | I256 => {
                 if bv_flag {
-                    // Signed integers have no bv rendering; report instead of
-                    // panicking (mirrors the arm in `boogie_num_type_base`).
+                    // Signed integers have no bv rendering.
                     env.error(&env.unknown_loc(), BV_TYPE_NOT_ENABLED_ERROR);
                 }
                 "int".to_string()
