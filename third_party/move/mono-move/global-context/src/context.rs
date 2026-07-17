@@ -924,10 +924,12 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
             },
             Type::TypeParam { idx } => {
                 let table = view_type_list(ty_args);
-                *table.get(*idx as usize).ok_or(TypeSubstitutionError {
-                    idx: *idx,
-                    table_len: table.len(),
-                })?
+                *table
+                    .get(*idx as usize)
+                    .ok_or(TypeSubstitutionError::IndexOutOfBounds {
+                        idx: *idx,
+                        table_len: table.len(),
+                    })?
             },
         })
     }

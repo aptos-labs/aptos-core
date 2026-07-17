@@ -540,7 +540,7 @@ pub enum SsaConversionError {
     TooManySsaValues,
 
     #[error(transparent)]
-    TypeSubstitutionFailed(#[from] TypeSubstitutionError),
+    TypeSubstitution(#[from] TypeSubstitutionError),
 
     #[error("verified bytecode must end with a terminator")]
     MissingTerminator,
@@ -581,8 +581,8 @@ impl IntoExecutionError for SsaConversionError {
         use SsaConversionError::*;
         match self {
             TooManySsaValues => ExecutionErrorKind::RuntimeLimitExceeded,
-            TypeSubstitutionFailed(_)
-            | MissingTerminator
+            TypeSubstitution(e) => e.kind(),
+            MissingTerminator
             | StackUnderflow
             | VidOutOfRange { .. }
             | ExpectedVidOnStack
@@ -677,7 +677,7 @@ pub type GasInstrumentationResult<T> = Result<T, GasInstrumentationError>;
 #[derive(Debug, Error)]
 pub enum GasInstrumentationError {
     #[error(transparent)]
-    TypeSubstitutionFailed(#[from] TypeSubstitutionError),
+    TypeSubstitution(#[from] TypeSubstitutionError),
 
     #[error("expected a reference type")]
     ExpectedReferenceType,
@@ -714,8 +714,8 @@ impl IntoExecutionError for GasInstrumentationError {
     fn kind(&self) -> ExecutionErrorKind {
         use GasInstrumentationError::*;
         match self {
-            TypeSubstitutionFailed(_)
-            | ExpectedReferenceType
+            TypeSubstitution(e) => e.kind(),
+            ExpectedReferenceType
             | XferReadWithoutBinding { .. }
             | VidInPostAllocationIr
             | FieldOwnerNotStruct
@@ -738,7 +738,7 @@ pub enum LoweringError {
     Loader(Box<LoaderError>),
 
     #[error(transparent)]
-    TypeSubstitutionFailed(#[from] TypeSubstitutionError),
+    TypeSubstitution(#[from] TypeSubstitutionError),
 
     #[error("native call-site ABI is malformed: {0}")]
     NativeAbi(#[from] NativeABIError),
@@ -921,9 +921,9 @@ impl IntoExecutionError for LoweringError {
         use LoweringError::*;
         match self {
             Loader(e) => e.kind(),
-            TypeSubstitutionFailed(_)
-            | NativeAbi(_)
-            | ExpectedReferenceType
+            TypeSubstitution(e) => e.kind(),
+            NativeAbi(e) => e.kind(),
+            ExpectedReferenceType
             | ClosureSignatureEmpty
             | ClosureSignatureNotFunction
             | VidInPostAllocationIr

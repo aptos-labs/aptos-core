@@ -3,7 +3,10 @@
 
 //! Interning APIs.
 
-use crate::types::{InternedType, InternedTypeList};
+use crate::{
+    types::{InternedType, InternedTypeList},
+    ExecutionErrorKind, IntoExecutionError,
+};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
 use thiserror::Error;
@@ -61,10 +64,20 @@ pub fn view_function_ref(ptr: InternedFunctionRef) -> &'static FunctionRef {
 }
 
 #[derive(Debug, Clone, Error)]
-#[error("type parameter index {idx} out of bounds: substitution table has {table_len} entries")]
-pub struct TypeSubstitutionError {
-    pub idx: u16,
-    pub table_len: usize,
+pub enum TypeSubstitutionError {
+    #[error(
+        "type parameter index {idx} out of bounds: substitution table has {table_len} entries"
+    )]
+    IndexOutOfBounds { idx: u16, table_len: usize },
+}
+
+impl IntoExecutionError for TypeSubstitutionError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use TypeSubstitutionError::*;
+        match self {
+            IndexOutOfBounds { .. } => ExecutionErrorKind::InvariantViolation,
+        }
+    }
 }
 
 /// Constructs interned values, turning each into its canonical,
