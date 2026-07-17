@@ -672,6 +672,68 @@ fn test_squash_standalone_write_then_inplace_delayed_field_gated() {
     );
 }
 
+fn position_key(exchange: &str, account: &str, market: &str) -> StateKey {
+    StateKey::position(
+        AccountAddress::from_hex_literal(exchange).unwrap(),
+        AccountAddress::from_hex_literal(account).unwrap(),
+        AccountAddress::from_hex_literal(market).unwrap(),
+    )
+}
+
+#[test]
+fn test_position_bucket_rejects_non_position_key() {
+    let mut change_set = VMChangeSet::empty();
+    let bad = BTreeMap::from([(StateKey::raw(b"not-a-position"), WriteOp::legacy_deletion())]);
+    assert_err!(change_set.set_position_bucket(bad));
+}
+
+#[test]
+fn test_position_bucket_accepts_position_keys() {
+    let mut change_set = VMChangeSet::empty();
+    let key = position_key("0x5", "0x1", "0x2");
+    let writes = BTreeMap::from([(
+        key.clone(),
+        WriteOp::legacy_creation(Bytes::from_static(b"payload")),
+    )]);
+    assert_ok!(change_set.set_position_bucket(writes));
+    assert_some_eq!(
+        change_set.position_write_set().get(&key),
+        &WriteOp::legacy_creation(Bytes::from_static(b"payload"))
+    );
+}
+
+#[test]
+fn test_squash_position_bucket_last_wins() {
+    let key = position_key("0x1", "0x2", "0x3");
+
+    // creation then deletion -> deletion (last wins, no collapse).
+    let mut cs1 = VMChangeSet::empty();
+    cs1.set_position_bucket(BTreeMap::from([(
+        key.clone(),
+        WriteOp::legacy_creation(Bytes::from_static(b"v")),
+    )]))
+    .unwrap();
+    let mut cs2 = VMChangeSet::empty();
+    cs2.set_position_bucket(BTreeMap::from([(key.clone(), WriteOp::legacy_deletion())]))
+        .unwrap();
+    assert_ok!(cs1.squash_additional_change_set(cs2, true));
+    assert_some_eq!(
+        cs1.position_write_set().get(&key),
+        &WriteOp::legacy_deletion()
+    );
+
+    // deletion then creation -> creation.
+    let creation = WriteOp::legacy_creation(Bytes::from_static(b"w"));
+    let mut cs3 = VMChangeSet::empty();
+    cs3.set_position_bucket(BTreeMap::from([(key.clone(), WriteOp::legacy_deletion())]))
+        .unwrap();
+    let mut cs4 = VMChangeSet::empty();
+    cs4.set_position_bucket(BTreeMap::from([(key.clone(), creation.clone())]))
+        .unwrap();
+    assert_ok!(cs3.squash_additional_change_set(cs4, true));
+    assert_some_eq!(cs3.position_write_set().get(&key), &creation);
+}
+
 // TODO[agg_v2](cleanup) combine utilities with above utilities, and see if tests need cleanup.
 // below are moved from change_set.rs, to consolidate.
 

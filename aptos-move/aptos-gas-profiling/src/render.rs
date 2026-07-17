@@ -118,7 +118,16 @@ impl Display for Render<'_, StateKey> {
                 },)
             },
             Raw(..) => panic!("not supported"),
-            TradingNative(..) => panic!("not supported"),
+            TradingNative(key) => {
+                use aptos_types::state_store::state_key::inner::TradingNativeKey;
+                match key {
+                    TradingNativeKey::Position {
+                        exchange,
+                        account,
+                        market,
+                    } => write!(f, "position<{},{},{}>", exchange, account, market),
+                }
+            },
         }
     }
 }
