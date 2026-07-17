@@ -27,10 +27,10 @@ use move_model::{
         INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT, INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
         INTRINSIC_FUN_MAP_DEL_RETURN_KEY, INTRINSIC_FUN_MAP_DESTROY_EMPTY,
         INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_HAS_KEY,
-        INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_LEN,
-        INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEW_WITH_CONFIG,
-        INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT,
-        INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
+        INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_ITER_BORROW_MUT, INTRINSIC_FUN_MAP_KEYS,
+        INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_NEW_FROM,
+        INTRINSIC_FUN_MAP_NEW_WITH_CONFIG, INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK,
+        INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
         INTRINSIC_FUN_MAP_REPLACE_KEY_INPLACE, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_DEL,
@@ -121,6 +121,17 @@ struct MapImpl {
     fun_borrow_mut: String,
     fun_borrow_mut_with_default: String,
     fun_borrow_with_default: String,
+    fun_iter_borrow_mut: String,
+    // Iterator enum parts for the iter_borrow_mut template: uninstantiated Boogie
+    // name prefix, the key-carrying variant, and the key field selector.
+    iter_ptr_prefix: String,
+    iter_variant: String,
+    iter_key_sel: String,
+    // Whether the map has iterator support (an iterator role is bound); controls
+    // iterator-validity ghost state (epoch bumps in mutating templates).
+    has_iterators: bool,
+    // Unique key-type suffixes of `insts`, for declaring per-K iterator ghost state.
+    iter_ghost_ks: Vec<String>,
     fun_get: String,
     fun_borrow_front: String,
     fun_borrow_back: String,
@@ -543,7 +554,7 @@ impl MapImpl {
         ty_args: &BTreeSet<(Type, Type)>,
         bv_flag: bool,
     ) -> Self {
-        let insts = ty_args
+        let insts: Vec<(TypeInfo, TypeInfo)> = ty_args
             .iter()
             .map(|(kty, vty)| {
                 (
@@ -563,6 +574,24 @@ impl MapImpl {
             .get_intrinsics()
             .get_decl_for_struct(&struct_qid)
             .expect("intrinsic decl");
+        let iter_parts = Self::iter_ptr_parts(env, decl);
+        let fun_iter_borrow_mut = Self::triple_opt_to_name(
+            env,
+            decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT),
+        );
+        let has_iterators = !fun_iter_borrow_mut.is_empty();
+        // Ghost state is keyed by (map struct, K) and shared with bv twins; only
+        // the plain impl declares it (twins would re-declare the same names).
+        let iter_ghost_ks: Vec<String> = if has_iterators && !bv_flag {
+            insts
+                .iter()
+                .map(|(k, _): &(TypeInfo, TypeInfo)| k.suffix.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect()
+        } else {
+            vec![]
+        };
 
         MapImpl {
             struct_name,
@@ -625,6 +654,12 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT),
             ),
+            fun_iter_borrow_mut,
+            iter_ptr_prefix: iter_parts.0,
+            iter_variant: iter_parts.1,
+            iter_key_sel: iter_parts.2,
+            has_iterators,
+            iter_ghost_ks,
             fun_get: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_GET)),
             fun_borrow_front: Self::triple_opt_to_name(
                 env,
@@ -747,6 +782,67 @@ impl MapImpl {
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW),
             ),
         }
+    }
+
+    /// Resolves the iterator enum parts for a bound `map_iter_borrow_mut` role:
+    /// the enum's uninstantiated Boogie name prefix, its unique key-carrying
+    /// variant (the variant with a field of the enum's first type parameter),
+    /// and that field's Boogie selector. Returns empty strings when the role is
+    /// not bound or the iterator enum does not have the expected shape.
+    fn iter_ptr_parts(
+        env: &GlobalEnv,
+        decl: &move_model::intrinsics::IntrinsicDecl,
+    ) -> (String, String, String) {
+        let empty = (String::new(), String::new(), String::new());
+        let Some(fun_qid) = decl.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT) else {
+            return empty;
+        };
+        let fun_env = env.get_function(fun_qid);
+        let param_tys = fun_env.get_parameter_types();
+        let Some(Type::Struct(mid, sid, _)) = param_tys.first().map(|ty| ty.skip_reference())
+        else {
+            env.error(
+                &fun_env.get_loc(),
+                "the first parameter of a `map_iter_borrow_mut` function must be an \
+                 enum carrying the key",
+            );
+            return empty;
+        };
+        let iter_env = env.get_struct(mid.qualified(*sid));
+        let mut found = None;
+        for variant in iter_env.get_variants() {
+            for field in iter_env.get_fields_of_variant(variant) {
+                if field.get_type() == Type::TypeParameter(0) {
+                    if found.is_some() {
+                        env.error(
+                            &fun_env.get_loc(),
+                            "the iterator enum of a `map_iter_borrow_mut` function must \
+                             have exactly one field of the key type",
+                        );
+                        return empty;
+                    }
+                    found = Some((variant, boogie_helpers::boogie_field_sel(&field)));
+                }
+            }
+        }
+        let Some((variant, key_sel)) = found else {
+            env.error(
+                &fun_env.get_loc(),
+                "the iterator enum of a `map_iter_borrow_mut` function must have a \
+                 variant carrying a field of the key type",
+            );
+            return empty;
+        };
+        let prefix = format!(
+            "${}_{}",
+            boogie_module_name(&iter_env.module_env),
+            iter_env.get_name().display(iter_env.symbol_pool())
+        );
+        (
+            prefix,
+            variant.display(iter_env.symbol_pool()).to_string(),
+            key_sel,
+        )
     }
 
     fn triple_opt_to_name(

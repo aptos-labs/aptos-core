@@ -810,6 +810,22 @@ function {:inline} $SliceVecByRange<T>(v: Vec T, r: $Range): Vec T {
 {%- endfor %}
 
 {%- for impl in table_instances %}
+{%- if impl.iter_ghost_ks %}
+
+// Key-independent iterator-validity epoch for `{{impl.struct_name}}`, bumped
+// by structural mutations of any instantiation; tracks unkeyed (e.g. leaf)
+// iterators, which carry no key type.
+var {{impl.struct_name}}_iter_epoch$all: int;
+{%- endif %}
+{%- for g in impl.iter_ghost_ks %}
+
+// Iterator-validity epoch for `{{impl.struct_name}}` with key `{{g}}`, bumped
+// by structural mutations. Each iterator-carrying temp records the epoch at
+// which its iterator was created in a per-temp shadow local; consuming an
+// iterator requires that recorded epoch to be current. See the `iterator_*`
+// pragmas.
+var {{impl.struct_name}}_iter_epoch'{{g}}': int;
+{%- endfor %}
 {%- for instance in impl.insts %}
 
 // ----------------------------------------------------------------------------------

@@ -15,9 +15,10 @@ use move_core_types::{
 };
 use move_model::{
     ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
+    intrinsics::{find_iterator_map_decl, find_iterator_target, IteratorKind},
     model::{
-        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
-        SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
+        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId,
+        QualifiedInstId, SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -1527,4 +1528,82 @@ pub fn compute_evaluator_memory_union(
     }
 
     (union_used_memory, union_old_memory)
+}
+
+/// Ghost state for iterator-validity tracking of an intrinsic map: the
+/// per-(map, key type) epoch counter declared in the prelude, plus the
+/// key-carrying variant of the iterator enum (variants without a key,
+/// e.g. `End`, are exempt from validity).
+pub struct IterGhostState {
+    pub epoch: String,
+    pub key_variant: Option<String>,
+}
+
+/// Resolves the validity ghost state for an iterator type. Returns `None` if
+/// the type is not an iterator of an intrinsic map with validity tracking.
+/// Open key types resolve to the ghost state of the skolemized instantiation.
+pub fn boogie_iter_ghost_state(env: &GlobalEnv, iter_ty: &Type) -> Option<IterGhostState> {
+    let iter_ty = iter_ty.skip_reference();
+    let (map_qid, kind) = find_iterator_map_decl(env, iter_ty)?;
+    let Type::Struct(mid, sid, targs) = iter_ty else {
+        return None;
+    };
+    match kind {
+        IteratorKind::Keyed => {
+            let epoch = boogie_iter_epoch_name(env, map_qid, &targs[0]);
+            let iter_env = env.get_struct(mid.qualified(*sid));
+            let key_variant = iter_env.get_variants().find_map(|variant| {
+                iter_env
+                    .get_fields_of_variant(variant)
+                    .any(|f| f.get_type() == Type::TypeParameter(0))
+                    .then(|| boogie_struct_variant_name(&iter_env, targs, variant))
+            });
+            Some(IterGhostState { epoch, key_variant })
+        },
+        IteratorKind::Unkeyed => Some(IterGhostState {
+            epoch: boogie_iter_epoch_all_name(env, map_qid),
+            key_variant: None,
+        }),
+    }
+}
+
+/// Epoch ghost variable name for a tracked intrinsic map and a concrete key
+/// type. Must agree with the prelude declaration.
+pub fn boogie_iter_epoch_name(
+    env: &GlobalEnv,
+    map_qid: QualifiedId<StructId>,
+    key_ty: &Type,
+) -> String {
+    let map_env = env.get_struct(map_qid);
+    format!(
+        "${}_{}_iter_epoch'{}'",
+        boogie_module_name(&map_env.module_env),
+        map_env.get_name().display(map_env.symbol_pool()),
+        boogie_type_suffix(env, key_ty, false)
+    )
+}
+
+/// Key-independent epoch ghost variable name for a tracked intrinsic map,
+/// used by unkeyed (e.g. leaf) iterators. Bumped by structural mutations of
+/// any instantiation of the map. Must agree with the prelude declaration.
+pub fn boogie_iter_epoch_all_name(env: &GlobalEnv, map_qid: QualifiedId<StructId>) -> String {
+    let map_env = env.get_struct(map_qid);
+    format!(
+        "${}_{}_iter_epoch$all",
+        boogie_module_name(&map_env.module_env),
+        map_env.get_name().display(map_env.symbol_pool())
+    )
+}
+
+/// Whether temps of this type carry an iterator-validity shadow local
+/// recording the creation epoch of the iterator they hold: tracked iterator
+/// enums, plain structs with a direct tracked-iterator field (e.g. the
+/// `IteratorPtrWithPath` companion), and references to either.
+pub fn boogie_iter_shadow_carrying(env: &GlobalEnv, ty: &Type) -> bool {
+    find_iterator_target(env, ty).is_some()
+}
+
+/// Name of the iterator-validity shadow local paired with a temp.
+pub fn boogie_iter_shadow_name(temp_str: &str) -> String {
+    format!("{}$iter_epoch", temp_str)
 }

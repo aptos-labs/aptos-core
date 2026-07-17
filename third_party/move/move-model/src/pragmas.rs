@@ -278,6 +278,17 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT: &str = "map_borrow_mut";
 /// `[move] fun map_borrow_mut<K, V>(m: &mut Map<K, V>, k: K, default: V): &mut V`
 pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with_default";
 
+/// Mutable borrow of the value at an iterator's position. The first parameter must be
+/// an enum with exactly one variant carrying a field of the key type (the iterator's
+/// key); the map is the second parameter. Aborts if the iterator is the end iterator
+/// or its key is not in the map.
+/// `[move] fun map_iter_borrow_mut<K, V>(self: Iter<K>, m: &mut Map<K, V>): &mut V`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW_MUT: &str = "map_iter_borrow_mut";
+
+/// Abort condition for map_iter_borrow_mut
+/// `[spec] fun map_spec_aborts_iter_borrow_mut<K, V>(self: Iter<K>, m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT: &str = "map_spec_aborts_iter_borrow_mut";
+
 /// Mutable borrow of a value from the map, return deafult if the key does not exist
 /// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
 pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
@@ -541,6 +552,17 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
             ),
             (
+                INTRINSIC_FUN_MAP_ITER_BORROW_MUT,
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT),
+                ),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
                 IntrinsicFunDef::spec_fun(),
             ),
@@ -635,6 +657,9 @@ pub fn is_pragma_valid_for_block(
                 | BV_RET_PROP
                 | UNROLL_PRAGMA
                 | INFERENCE_PRAGMA
+                | ITERATOR_CREATE_PRAGMA
+                | ITERATOR_USE_PRAGMA
+                | ITERATOR_INVALIDATE_PRAGMA
         ),
         Struct(..) => match pragma {
             INTRINSIC_PRAGMA | BV_PARAM_PROP => true,
@@ -651,6 +676,23 @@ pub fn is_pragma_valid_for_block(
         _ => false,
     }
 }
+
+/// Pragma on an (opaque) function spec stating that the function returns a fresh
+/// map iterator. The backend records the iterator's creation epoch at call sites.
+/// An optional symbol value names a field of the result holding the iterator.
+pub const ITERATOR_CREATE_PRAGMA: &str = "iterator_create";
+
+/// Pragma on an (opaque) function spec stating that the function consumes a map
+/// iterator (its first parameter). The backend asserts at call sites that the
+/// iterator's creation epoch is current, so using an iterator after a structural
+/// map mutation fails verification. An optional symbol value names a field of
+/// the first parameter holding the iterator.
+pub const ITERATOR_USE_PRAGMA: &str = "iterator_use";
+
+/// Pragma on an (opaque) function spec stating that the function structurally
+/// mutates the map, invalidating all outstanding iterators; the backend bumps
+/// the iterator epoch at call sites.
+pub const ITERATOR_INVALIDATE_PRAGMA: &str = "iterator_invalidate";
 
 /// Internal property attached to conditions if they are injected via an apply or a module
 /// invariant.

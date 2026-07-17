@@ -2390,6 +2390,8 @@ impl AssignTransformer<'_> {
                 | Operation::AbortFlag
                 | Operation::AbortCode
                 | Operation::WellFormed
+                | Operation::IterValid
+                | Operation::IterEpochHavoc
                 | Operation::BoxValue
                 | Operation::UnboxValue
                 | Operation::EmptyEventStore

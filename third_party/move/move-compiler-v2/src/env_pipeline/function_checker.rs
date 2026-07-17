@@ -524,6 +524,8 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::AbortFlag
             | Operation::AbortCode
             | Operation::WellFormed
+            | Operation::IterValid
+            | Operation::IterEpochHavoc
             | Operation::BoxValue
             | Operation::UnboxValue
             | Operation::EmptyEventStore

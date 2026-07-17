@@ -13,16 +13,18 @@ use crate::{
         boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
         boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
-        boogie_function_name, boogie_int_suffix, boogie_make_vec_from_strings,
-        boogie_modifies_memory_name, boogie_native_spec_fun_name, boogie_num_literal,
-        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
-        boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
-        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
-        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
-        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
-        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
+        boogie_function_name, boogie_int_suffix, boogie_iter_epoch_all_name,
+        boogie_iter_epoch_name, boogie_iter_ghost_state, boogie_iter_shadow_carrying,
+        boogie_iter_shadow_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
+        boogie_native_spec_fun_name, boogie_num_literal, boogie_num_type_base,
+        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
+        boogie_spec_fun_name, boogie_struct_field_name, boogie_struct_field_result_fun_name,
+        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
+        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
+        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
+        boogie_well_formed_check, boogie_well_formed_expr, compute_evaluator_memory_union,
+        field_bv_flag_global_state, IterGhostState, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -37,16 +39,19 @@ use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use move_model::{
     ast::{
         Attribute, BehaviorKind, ConditionKind, Exp, ExpData, FrameAccessKind, FunParamAccessOf,
-        MemoryLabel, Operation as AstOperation, Pattern, QuantKind, TempIndex, TraceKind, Value,
+        MemoryLabel, Operation as AstOperation, Pattern, PropertyValue, QuantKind, TempIndex,
+        TraceKind, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
+    intrinsics::{find_iterator_target, map_has_iterator_tracking},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedInstId,
         StructEnv, StructId,
     },
     pragmas::{
-        ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
+        ADDITION_OVERFLOW_UNCHECKED_PRAGMA, INTRINSIC_TYPE_MAP, ITERATOR_CREATE_PRAGMA,
+        ITERATOR_INVALIDATE_PRAGMA, ITERATOR_USE_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
     },
     symbol::Symbol,
@@ -5161,6 +5166,18 @@ impl FunctionTranslator<'_> {
                 self.boogie_type_for_fun(env, &ty.instantiate(self.type_inst), num_oper)
             );
         }
+        // Generate iterator-validity shadow locals: for each temp carrying a
+        // tracked map iterator (directly, via a field, or by reference), the
+        // shadow records the creation epoch of the iterator it holds.
+        for i in 0..fun_target.get_local_count() {
+            if boogie_iter_shadow_carrying(env, &self.get_local_type(i)) {
+                emitln!(
+                    writer,
+                    "var {}: int;",
+                    boogie_iter_shadow_name(&format!("$t{}", i))
+                );
+            }
+        }
         // Generate declarations for modifies condition.
         let mut mem_inst_seen = BTreeSet::new();
         for qid in fun_target.get_modify_ids() {
@@ -5711,6 +5728,39 @@ impl FunctionTranslator<'_> {
                     emitln!(writer, ";");
                 },
                 PropKind::Assume => {
+                    // The IterEpochHavoc marker lowers to a havoc of the epoch
+                    // ghost variable of the argument's map/key type (which the
+                    // loop body may modify), not to an assumption.
+                    if let ExpData::Call(_, AstOperation::IterEpochHavoc, args) = exp.as_ref() {
+                        let ty = self.inst(&env.get_node_type(args[0].node_id()));
+                        if let Some(ghost) = find_iterator_target(env, &ty)
+                            .and_then(|(iter_ty, _)| boogie_iter_ghost_state(env, &iter_ty))
+                        {
+                            emitln!(writer, "havoc {};", ghost.epoch);
+                        }
+                        emitln!(writer);
+                        return;
+                    }
+                    // Assuming IterValid re-establishes a havocked iterator's
+                    // creation-epoch shadow, justified by the base and induction
+                    // case asserts of the implicit loop invariant.
+                    if let ExpData::Call(_, AstOperation::IterValid, args) = exp.as_ref() {
+                        if let ExpData::Temporary(node_id, idx) = args[0].as_ref() {
+                            let ty = self.inst(&env.get_node_type(*node_id));
+                            if let Some(ghost) = find_iterator_target(env, &ty)
+                                .and_then(|(iter_ty, _)| boogie_iter_ghost_state(env, &iter_ty))
+                            {
+                                emitln!(
+                                    writer,
+                                    "{} := {};",
+                                    boogie_iter_shadow_name(&format!("$t{}", idx)),
+                                    ghost.epoch
+                                );
+                            }
+                        }
+                        emitln!(writer);
+                        return;
+                    }
                     emit!(writer, "assume ");
                     spec_translator.translate(exp, self.type_inst);
                     emitln!(writer, ";");
@@ -5763,6 +5813,7 @@ impl FunctionTranslator<'_> {
             ),
             Assign(_, dest, src, _) => {
                 emitln!(writer, "{} := {};", str_local(*dest), str_local(*src));
+                self.emit_iter_shadow_copy(writer, *dest, *src);
             },
             Ret(_, rets) => {
                 for (i, r) in rets.iter().enumerate() {
@@ -5840,11 +5891,42 @@ impl FunctionTranslator<'_> {
                     UnpackRef | UnpackRefDeep | PackRef | PackRefDeep => {
                         // No effect
                     },
-                    OpaqueCallBegin(..) | OpaqueCallEnd(..) => {
-                        // These are just markers.  There is no generated code.
+                    OpaqueCallBegin(mid, fid, inst) | OpaqueCallEnd(mid, fid, inst) => {
+                        // These are just markers with no generated code, except for
+                        // iterator-validity ghost operations when the callee carries
+                        // an `iterator_*` pragma: the use-assert goes before the
+                        // opaque call's effects (Begin), recording/bumping after (End).
+                        let callee_module_env = env.get_module(*mid);
+                        let callee_env = callee_module_env.get_function(*fid);
+                        let inst = &self.inst_slice(inst);
+                        let (iter_use_assert, iter_post_ops) = self.iter_ghost_call_ops(
+                            &callee_env,
+                            inst,
+                            &loc,
+                            srcs.first()
+                                .map(|i| (str_local(*i), self.get_local_type(*i).clone())),
+                            &dests
+                                .iter()
+                                .map(|i| (str_local(*i), self.get_local_type(*i)))
+                                .collect::<Vec<_>>(),
+                        );
+                        if matches!(oper, OpaqueCallBegin(..)) {
+                            if let Some(a) = &iter_use_assert {
+                                emitln!(writer, "{}", a);
+                            }
+                        } else {
+                            self.emit_iter_shadow_mut_arg_havocs(writer, srcs);
+                            self.emit_iter_shadow_dest_havocs(writer, dests);
+                            for op in &iter_post_ops {
+                                emitln!(writer, "{}", op);
+                            }
+                        }
                     },
                     WriteBack(node, edge) => {
                         self.translate_write_back(node, edge, srcs[0]);
+                        if let BorrowNode::LocalRoot(idx) | BorrowNode::Reference(idx) = node {
+                            self.emit_iter_shadow_write_back(writer, *idx, srcs[0]);
+                        }
                     },
                     IsParent(node, edge) => {
                         if let BorrowNode::Reference(parent) = node {
@@ -5900,6 +5982,7 @@ impl FunctionTranslator<'_> {
                             src,
                             str_local(src)
                         );
+                        self.emit_iter_shadow_copy(writer, dest, src);
                     },
                     ReadRef => {
                         let src = srcs[0];
@@ -5910,6 +5993,7 @@ impl FunctionTranslator<'_> {
                             str_local(dest),
                             str_local(src)
                         );
+                        self.emit_iter_shadow_copy(writer, dest, src);
                     },
                     WriteRef => {
                         let reference = srcs[0];
@@ -5921,11 +6005,29 @@ impl FunctionTranslator<'_> {
                             str_local(reference),
                             str_local(value),
                         );
+                        self.emit_iter_shadow_copy(writer, reference, value);
                     },
                     Function(mid, fid, inst) | Closure(mid, fid, inst, _) => {
                         let inst = &self.inst_slice(inst);
                         let module_env = env.get_module(*mid);
                         let callee_env = module_env.get_function(*fid);
+
+                        // Iterator-validity ghost operations for callees carrying
+                        // `iterator_*` pragmas (assert before, record/bump after).
+                        let (iter_use_assert, iter_post_ops) = self.iter_ghost_call_ops(
+                            &callee_env,
+                            inst,
+                            &loc,
+                            srcs.first()
+                                .map(|i| (str_local(*i), self.get_local_type(*i).clone())),
+                            &dests
+                                .iter()
+                                .map(|i| (str_local(*i), self.get_local_type(*i)))
+                                .collect::<Vec<_>>(),
+                        );
+                        if let Some(a) = &iter_use_assert {
+                            emitln!(writer, "{}", a);
+                        }
 
                         let mut args_str = srcs.iter().cloned().map(str_local).join(", ");
                         let dest_str = dests
@@ -6136,6 +6238,12 @@ impl FunctionTranslator<'_> {
                             }
                         }
 
+                        self.emit_iter_shadow_mut_arg_havocs(writer, srcs);
+                        self.emit_iter_shadow_dest_havocs(writer, dests);
+                        for op in &iter_post_ops {
+                            emitln!(writer, "{}", op);
+                        }
+
                         // Clear the last track location after function call, as the call inserted
                         // location tracks before it returns.
                         *last_tracked_loc = None;
@@ -6164,6 +6272,8 @@ impl FunctionTranslator<'_> {
                             format!("{dest_str} := ")
                         };
                         emitln!(writer, "call {}{}({});", call_prefix, apply_fun, args_str);
+                        self.emit_iter_shadow_mut_arg_havocs(writer, srcs);
+                        self.emit_iter_shadow_dest_havocs(writer, dests);
                     },
                     Pack(mid, sid, inst) => {
                         let inst = &self.inst_slice(inst);
@@ -6177,6 +6287,15 @@ impl FunctionTranslator<'_> {
                             boogie_struct_name(&struct_env, inst, false),
                             args
                         );
+                        // A packed iterator wrapper inherits the shadow of its
+                        // iterator field argument.
+                        if let Some(src) = srcs
+                            .iter()
+                            .copied()
+                            .find(|s| boogie_iter_shadow_carrying(env, &self.get_local_type(*s)))
+                        {
+                            self.emit_iter_shadow_copy(writer, dests[0], src);
+                        }
                     },
                     PackVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
@@ -6197,6 +6316,8 @@ impl FunctionTranslator<'_> {
                             let field_sel =
                                 format!("{}->{}", str_local(srcs[0]), boogie_field_sel(field_env),);
                             emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
+                            // An unpacked iterator inherits the wrapper's shadow.
+                            self.emit_iter_shadow_write_back(writer, dests[i], srcs[0]);
                         }
                     },
                     UnpackVariant(mid, sid, variant, inst) => {
@@ -6231,6 +6352,7 @@ impl FunctionTranslator<'_> {
                             src_str,
                             field_sel,
                         );
+                        self.emit_iter_shadow_copy(writer, dests[0], srcs[0]);
                     },
                     BorrowVariantField(mid, sid, variants, inst, field_offset) => {
                         let inst = &self.inst_slice(inst);
@@ -6279,6 +6401,7 @@ impl FunctionTranslator<'_> {
                             src_str = format!("$Dereference({})", src_str);
                         };
                         emitln!(writer, "{} := {}->{};", dest_str, src_str, field_sel);
+                        self.emit_iter_shadow_copy(writer, dests[0], src);
                     },
                     GetVariantField(mid, sid, variants, inst, field_offset) => {
                         let inst = &self.inst_slice(inst);
@@ -7222,6 +7345,216 @@ impl FunctionTranslator<'_> {
                 &self.fun_target.get_bytecode_loc(attr_id),
                 "cannot select field of intrinsic struct",
             )
+        }
+    }
+
+    /// Iterator-validity ghost operations to emit around a call whose callee
+    /// carries one of the `iterator_*` pragmas: a pre-call assert (the consumed
+    /// temp's creation-epoch shadow is current) and post-call assignments
+    /// (stamping a created iterator's shadow, or bumping the epoch for
+    /// structural mutations). The epoch is declared per intrinsic-map key
+    /// instance in the prelude (see `iter_ghost_ks`); shadows are per-temp
+    /// locals.
+    fn iter_ghost_call_ops(
+        &self,
+        callee_env: &FunctionEnv,
+        inst: &[Type],
+        loc: &Loc,
+        it_src: Option<(String, Type)>,
+        it_dests: &[(String, Type)],
+    ) -> (Option<String>, Vec<String>) {
+        let env = self.parent.env;
+        let pool = env.symbol_pool();
+        let props = &callee_env.get_spec().properties;
+        let get_pragma = |name: &str| -> Option<Option<Symbol>> {
+            props.get(&pool.make(name)).map(|v| match v {
+                PropertyValue::Symbol(s) => Some(*s),
+                _ => None,
+            })
+        };
+        let use_p = get_pragma(ITERATOR_USE_PRAGMA);
+        let create_p = get_pragma(ITERATOR_CREATE_PRAGMA);
+        let invalidate = get_pragma(ITERATOR_INVALIDATE_PRAGMA).is_some();
+        if use_p.is_none() && create_p.is_none() && !invalidate {
+            return (None, vec![]);
+        }
+        // Resolve the iterator expression (dereferenced if the value is a
+        // reference, optionally a field of it per the pragma's symbol value)
+        // and its instantiated type.
+        let resolve = |val: &(String, Type), field: Option<Symbol>| -> Option<(String, Type)> {
+            let (expr0, ty0) = val;
+            let expr0 = if ty0.is_reference() {
+                format!("$Dereference({})", expr0)
+            } else {
+                expr0.clone()
+            };
+            let ty0 = ty0.skip_reference();
+            if let Some(f) = field {
+                let Type::Struct(mid, sid, targs) = ty0 else {
+                    return None;
+                };
+                let se = env.get_struct(mid.qualified(*sid));
+                let fe = se.find_field(f)?;
+                let field_ty = fe.get_type().instantiate(targs);
+                Some((format!("{}->{}", expr0, boogie_field_sel(&fe)), field_ty))
+            } else {
+                Some((expr0, ty0.clone()))
+            }
+        };
+        // Ghost state resolution from the iterator type. `None` with a closed
+        // type is a misapplied pragma; open key types have no ghost state
+        // (declared per concrete key type only), so tracking is skipped.
+        let ghost_for =
+            |val: &(String, Type), field: Option<Symbol>| -> Option<(String, IterGhostState)> {
+                let (expr, ty) = resolve(val, field)?;
+                match boogie_iter_ghost_state(env, &ty) {
+                    Some(ghost) => Some((expr, ghost)),
+                    None => {
+                        if !ty.is_open() {
+                            env.error(
+                                &callee_env.get_loc(),
+                                "an `iterator_*` pragma requires an iterator of an intrinsic map \
+                             with the `map_iter_borrow_mut` role",
+                            );
+                        }
+                        None
+                    },
+                }
+            };
+        let mut pre = None;
+        let mut post = vec![];
+        if let Some(field) = use_p {
+            if let Some(src) = &it_src {
+                if let Some((expr, ghost)) = ghost_for(src, field) {
+                    // The creation epoch comes from the consumed temp's shadow
+                    // (lineage), never from the iterator's value: distinct
+                    // iterators may coincide as values.
+                    let guard = ghost
+                        .key_variant
+                        .map(|v| format!("!({} is {}) || ", expr, v))
+                        .unwrap_or_default();
+                    pre = Some(format!(
+                        "assert {{:msg \"assert_failed{}: iterator may be invalidated by an intervening map mutation\"}}\n  {}{} == {};",
+                        self.loc_str(loc),
+                        guard,
+                        boogie_iter_shadow_name(&src.0),
+                        ghost.epoch
+                    ));
+                }
+            }
+        }
+        if let Some(field) = create_p {
+            // The created iterator is the first result which resolves as one
+            // (functions may return it alongside other values).
+            let created = it_dests.iter().find_map(|dest| {
+                let (_, ty) = resolve(dest, field)?;
+                boogie_iter_ghost_state(env, &ty).map(|ghost| (&dest.0, ghost))
+            });
+            if let Some((root, ghost)) = created {
+                post.push(format!(
+                    "{} := {};",
+                    boogie_iter_shadow_name(root),
+                    ghost.epoch
+                ));
+            }
+        }
+        if invalidate {
+            // A structural mutation invalidates the keyed iterators of the
+            // mutated instantiation and all unkeyed iterators of the map,
+            // derived from the callee's intrinsic map parameter.
+            let map = callee_env.get_parameter_types().iter().find_map(|ty| {
+                let ty = ty.skip_reference().instantiate(inst);
+                let Type::Struct(mid, sid, targs) = &ty else {
+                    return None;
+                };
+                let map_qid = mid.qualified(*sid);
+                (env.get_struct(map_qid).is_intrinsic_of(INTRINSIC_TYPE_MAP)
+                    && map_has_iterator_tracking(env, map_qid))
+                .then(|| (map_qid, targs.first().cloned()))
+            });
+            if let Some((map_qid, Some(key_ty))) = map {
+                let epoch = boogie_iter_epoch_name(env, map_qid, &key_ty);
+                post.push(format!("{} := {} + 1;", epoch, epoch));
+                let all = boogie_iter_epoch_all_name(env, map_qid);
+                post.push(format!("{} := {} + 1;", all, all));
+            }
+        }
+        (pre, post)
+    }
+
+    /// Copies the iterator-validity shadow along a value or reference move
+    /// (including field projections and borrows) when both sides carry one.
+    fn emit_iter_shadow_copy(&self, writer: &CodeWriter, dest: TempIndex, src: TempIndex) {
+        let env = self.parent.env;
+        if boogie_iter_shadow_carrying(env, &self.get_local_type(dest))
+            && boogie_iter_shadow_carrying(env, &self.get_local_type(src))
+        {
+            emitln!(
+                writer,
+                "{} := {};",
+                boogie_iter_shadow_name(&format!("$t{}", dest)),
+                boogie_iter_shadow_name(&format!("$t{}", src))
+            );
+        }
+    }
+
+    /// Havocs the shadows of iterator-carrying call destinations: the callee
+    /// returned an iterator of unknown lineage — possibly into a reused local
+    /// temp whose shadow would otherwise be retained — so validity must not be
+    /// provable (fail-closed) unless an `iterator_create` stamp, emitted after
+    /// this, re-establishes it.
+    fn emit_iter_shadow_dest_havocs(&self, writer: &CodeWriter, dests: &[TempIndex]) {
+        let env = self.parent.env;
+        for dest in dests {
+            if boogie_iter_shadow_carrying(env, &self.get_local_type(*dest)) {
+                emitln!(
+                    writer,
+                    "havoc {};",
+                    boogie_iter_shadow_name(&format!("$t{}", dest))
+                );
+            }
+        }
+    }
+
+    /// Havocs the shadows of `&mut` iterator-carrying arguments after a call:
+    /// the callee may replace the contained iterator, and shadows do not cross
+    /// procedure boundaries, so validity must not be retained (fail-closed).
+    fn emit_iter_shadow_mut_arg_havocs(&self, writer: &CodeWriter, srcs: &[TempIndex]) {
+        let env = self.parent.env;
+        for src in srcs {
+            let ty = self.get_local_type(*src);
+            if ty.is_mutable_reference() && boogie_iter_shadow_carrying(env, &ty) {
+                emitln!(
+                    writer,
+                    "havoc {};",
+                    boogie_iter_shadow_name(&format!("$t{}", src))
+                );
+            }
+        }
+    }
+
+    /// Refreshes the destination's iterator-validity shadow when a borrow is
+    /// written back into it: from the source reference's shadow when that
+    /// tracks an iterator, otherwise havocked — a mutation of unknown lineage
+    /// must not retain provable validity.
+    fn emit_iter_shadow_write_back(&self, writer: &CodeWriter, dest: TempIndex, src: TempIndex) {
+        let env = self.parent.env;
+        if !boogie_iter_shadow_carrying(env, &self.get_local_type(dest)) {
+            return;
+        }
+        if boogie_iter_shadow_carrying(env, &self.get_local_type(src)) {
+            emitln!(
+                writer,
+                "{} := {};",
+                boogie_iter_shadow_name(&format!("$t{}", dest)),
+                boogie_iter_shadow_name(&format!("$t{}", src))
+            );
+        } else {
+            emitln!(
+                writer,
+                "havoc {};",
+                boogie_iter_shadow_name(&format!("$t{}", dest))
+            );
         }
     }
 

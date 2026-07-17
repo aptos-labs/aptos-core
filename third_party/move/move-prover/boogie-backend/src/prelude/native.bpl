@@ -572,6 +572,10 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
     m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -594,6 +598,10 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
     m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -652,6 +660,7 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 // is split into two implications so each direction gets a legal trigger
 // ($ContainsVec cannot be a pattern: its inline body is an `exists`).
 procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec ({{K}})) {
+    assume $IsValid'vec'{{instance.0.suffix}}''(result);
     assume LenVec(result) == LenTable(t);
     assume (forall i: int :: {ReadVec(result, i)} InRangeVec(result, i) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(result, i)));
@@ -660,6 +669,12 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
+{%- if instance.0.cmp_available %}
+    // Keys are returned in ascending `cmp::compare` order.
+    assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
+        InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
 }
 {%- endif %}
 
@@ -685,6 +700,8 @@ procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: V
 // Key-vector membership mirrors `fun_keys` (split biconditional, see there);
 // value-vector is length-only.
 procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (result_keys: Vec ({{K}}), result_values: Vec ({{V}})) {
+    assume $IsValid'vec'{{instance.0.suffix}}''(result_keys);
+    assume $IsValid'vec'{{instance.1.suffix}}''(result_values);
     assume LenVec(result_keys) == LenTable(t);
     assume LenVec(result_values) == LenTable(t);
     assume (forall i: int :: {ReadVec(result_keys, i)} InRangeVec(result_keys, i) ==>
@@ -694,6 +711,12 @@ procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (resu
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)));
+{%- if instance.0.cmp_available %}
+    // Keys are returned in ascending `cmp::compare` order.
+    assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
+        InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i < j ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
 }
 {%- endif %}
 
@@ -755,6 +778,10 @@ returns (m': $Mutation ({{Self}})) {
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
         {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -791,6 +818,10 @@ returns (m': $Mutation ({{Self}})) {
             !$IsEqual'{{instance.0.suffix}}'(ReadVec(keys_arg, j), ReadVec(keys_arg, i))) ==>
         {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -810,6 +841,10 @@ returns (m': $Mutation ({{Self}})) {
         ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -831,6 +866,10 @@ returns (m': $Mutation ({{Self}})) {
         ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -861,6 +900,10 @@ returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
         !({{impl.fun_spec_has_key}}{{S}}(t_new, k) && {{impl.fun_spec_has_key}}{{S}}(result, k)));
 {%- endif %}
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -897,6 +940,10 @@ returns (m': $Mutation ({{Self}})) {
         !$IsEqual'{{instance.0.suffix}}'(k, new_key) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k) == {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -910,6 +957,10 @@ procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}),
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 100/*EALREADY_EXISTS*/));
     } else {
         m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -924,6 +975,10 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
         m' := $UpdateMutation(m, UpdateTable(t, enc_k, v));
     } else {
         m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -943,6 +998,10 @@ returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     } else {
         prev_v := $1_option_Option{{SV}}_None();
         m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -959,6 +1018,10 @@ returns (v: {{V}}, m': $Mutation({{Self}})) {
     } else {
         v := GetTable(t, enc_k);
         m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -975,6 +1038,10 @@ returns (result: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     if (ContainsTable(t, enc_k)) {
         result := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
         m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     } else {
         result := $1_option_Option{{SV}}_None();
         m' := m;
@@ -995,6 +1062,10 @@ returns (k': {{K}}, v: {{V}}, m': $Mutation({{Self}})) {
         k' := k;
         v := GetTable(t, enc_k);
         m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -1037,6 +1108,10 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     t := $Dereference(m);
     if (!ContainsTable(t, enc_k)) {
         m' := $UpdateMutation(m, AddTable(t, enc_k, default));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
         t' := $Dereference(m');
         dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t', enc_k));
     } else {
@@ -1054,6 +1129,32 @@ procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}
         v := default;
     } else {
         v := GetTable(t, {{ENC}}(k));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_borrow_mut != "" %}
+// Mutable borrow of the value at the iterator's key. The returned mutation's
+// path extends the map's path with the encoded key (a Table index edge), so
+// caller write-back goes through UpdateTable instead of concrete map internals.
+// Aborts when the iterator is the end iterator or its key is absent (stale
+// iterator); the constant-value-size requirement is presumed not to fire (see
+// the size presumption in the map's spec).
+procedure {:inline 2} {{impl.fun_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', m: $Mutation ({{Self}}))
+returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};
+    t := $Dereference(m);
+    if (!(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})) {
+        call $ExecFailureAbort();
+    } else {
+        enc_k := {{ENC}}(self->{{impl.iter_key_sel}});
+        if (!ContainsTable(t, enc_k)) {
+            call $ExecFailureAbort();
+        } else {
+            dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
+            m' := m;
+        }
     }
 }
 {%- endif %}

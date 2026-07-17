@@ -2443,8 +2443,9 @@ impl ExpData {
                         | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
                         | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
                         | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
-                        | AbortCode | WellFormed | BoxValue | UnboxValue | EmptyEventStore
-                        | ExtendEventStore | EventStoreIncludes | EventStoreIncludedIn | NoOp => {},
+                        | AbortCode | WellFormed | IterValid | IterEpochHavoc | BoxValue
+                        | UnboxValue | EmptyEventStore | ExtendEventStore | EventStoreIncludes
+                        | EventStoreIncludedIn | NoOp => {},
                     }
                     // Collect struct types from type instantiations (e.g., borrow_global<MyStruct>)
                     if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
@@ -2716,6 +2717,15 @@ pub enum Operation {
     AbortFlag,
     AbortCode,
     WellFormed,
+    /// Internal (never source-written): the argument, an iterator of an
+    /// intrinsic map with validity tracking, was created in the current
+    /// iterator epoch. Emitted by loop analysis as an implicit invariant.
+    IterValid,
+    /// Internal (never source-written): marker lowered by the backend to a
+    /// havoc of the iterator-validity ghost state for the argument's map and
+    /// key type. Emitted by loop analysis at loop headers, since the ghost
+    /// state may be modified by the loop body.
+    IterEpochHavoc,
     BoxValue,
     UnboxValue,
     EmptyEventStore,
@@ -3689,6 +3699,8 @@ impl Operation {
             AbortFlag => false,            // Spec
             AbortCode => false,            // Spec
             WellFormed => false,           // Spec
+            IterValid => false,            // Spec
+            IterEpochHavoc => false,       // Spec
             BoxValue => false,             // Spec
             UnboxValue => false,           // Spec
             EmptyEventStore => false,      // Spec
