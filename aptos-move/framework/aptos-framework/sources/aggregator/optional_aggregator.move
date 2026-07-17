@@ -74,7 +74,7 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Creates a new optional aggregator.
-    public(friend) fun new(parallelizable: bool): OptionalAggregator {
+    friend fun new(parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
                 aggregator: option::some(aggregator_factory::create_aggregator_internal()),
@@ -88,8 +88,20 @@ module aptos_framework::optional_aggregator {
         }
     }
 
-    /// Switches between parallelizable and non-parallelizable implementations.
-    public fun switch(_optional_aggregator: &mut OptionalAggregator) {
+    /// Switches from parallelizable to non-parallelizable implementation.
+    public fun switch(optional_aggregator: &mut OptionalAggregator) {
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.extract();
+            let limit = aggregator::limit(&aggregator);
+            let value = aggregator::read(&aggregator);
+            aggregator::destroy(aggregator);
+            optional_aggregator.integer.fill(Integer {
+                value, limit
+            });
+            return;
+        }
+
+        // Do not allow upgrades to parallelizable.
         abort error::invalid_state(ESWITCH_DEPRECATED)
     }
 
@@ -159,10 +171,21 @@ module aptos_framework::optional_aggregator {
     }
 
     #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x030003, location = Self)]
-    fun optional_aggregator_swith_fail_test(account: signer) {
+    fun optional_aggregator_switch_to_integer_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
         let aggregator = new(true);
+        add(&mut aggregator, 100);
+        switch(&mut aggregator);
+        assert!(!is_parallelizable(&aggregator), 0);
+        assert!(read(&aggregator) == 100, 0);
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x030003, location = Self)]
+    fun optional_aggregator_switch_to_aggregator_fail_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(false);
         switch(&mut aggregator);
         destroy(aggregator);
     }
