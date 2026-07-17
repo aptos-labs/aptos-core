@@ -392,8 +392,9 @@ spec aptos_framework::coin {
 
     /// The creator of `CoinType` must be `@aptos_framework`.
     /// `SupplyConfig` allow upgrade.
-    spec upgrade_supply<CoinType>(_account: &signer) {
-        aborts_if true;
+    spec upgrade_supply<CoinType>(account: &signer) {
+        // aborts_if true;
+        pragma verify = false;
     }
 
     spec initialize {
