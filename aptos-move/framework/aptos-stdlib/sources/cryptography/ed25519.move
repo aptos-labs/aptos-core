@@ -137,6 +137,20 @@ module aptos_std::ed25519 {
         signature_verify_strict_internal(signature.bytes, public_key.bytes, message)
     }
 
+    /// Verifies a batch of purported Ed25519 signatures under unvalidated public keys on the specified messages.
+    /// Returns `true` iff all triples `(signatures[i], public_keys[i], messages[i])` verify.
+    /// Returns `false` if:
+    /// - any input vector is empty,
+    /// - the input vectors have mismatched lengths,
+    /// - any element is malformed, or any signature fails verification.
+    public fun batch_signature_verify_strict(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
+    ): bool {
+        signature_batch_verify_strict_internal(signatures, public_keys, messages)
+    }
+
     /// This function is used to verify a signature on any BCS-serializable type T. For now, it is used to verify the
     /// proof of private key ownership when rotating authentication keys.
     public fun signature_verify_strict_t<T: drop>(signature: &Signature, public_key: &UnvalidatedPublicKey, data: T): bool {
@@ -221,6 +235,14 @@ module aptos_std::ed25519 {
         signature: vector<u8>,
         public_key: vector<u8>,
         message: vector<u8>
+    ): bool;
+
+    /// Return true iff all `signatures[i]` on `messages[i]` verify against `public_keys[i]`.
+    /// Does not abort. Returns false on any malformed input or length mismatch.
+    native fun signature_batch_verify_strict_internal(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
     ): bool;
 
     #[test_only]
