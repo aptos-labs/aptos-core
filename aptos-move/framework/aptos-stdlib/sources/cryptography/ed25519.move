@@ -257,6 +257,56 @@ module aptos_std::ed25519 {
     // Tests
     //
 
+    #[test]
+    fun test_batch_signature_verify_strict_happy_path() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        // Prepare a batch of messages and signatures
+        let messages: vector<vector<u8>> = vector[];
+        let signatures = vector[];
+        let public_keys = vector[];
+
+        let i = 0;
+        while (i < 12) {
+            let msg: vector<u8> = vector[104, 101, 108, 108, 111, 32, 97, 112, 116, 111, 115, 32, 48 + (i as u8)]; // "hello aptos 0.."
+            let sig = sign_arbitrary_bytes(&sk, *&msg);
+            messages.push_back(msg);
+            signatures.push_back(sig);
+            public_keys.push_back(pk);
+            i = i + 1;
+        };
+
+        assert!(batch_signature_verify_strict(signatures, public_keys, messages), std::error::invalid_state(1));
+    }
+
+    #[test]
+    fun test_batch_signature_verify_strict_mismatched_lengths() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        let messages: vector<vector<u8>> = vector[b"m1", b"m2"];
+        let signatures = vector[sign_arbitrary_bytes(&sk, b"m1"), sign_arbitrary_bytes(&sk, b"m2")];
+        let public_keys = vector[pk];
+
+        assert!(!batch_signature_verify_strict(signatures, public_keys, messages), std::error::invalid_state(2));
+    }
+
+    #[test]
+    fun test_batch_signature_verify_strict_detects_invalid_sig() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        // two messages, but second signature is for a different message
+        let messages: vector<vector<u8>> = vector[b"hello", b"world"];
+        let sig1 = sign_arbitrary_bytes(&sk, b"hello");
+        let sig2 = sign_arbitrary_bytes(&sk, b"mismatch");
+        let signatures = vector[ sig1, sig2 ];
+        let public_keys = vector[ pk, pk ];
+
+        assert!(!batch_signature_verify_strict(signatures, public_keys, messages), std::error::invalid_state(3));
+    }
+
     #[test_only]
     struct TestMessage has copy, drop {
         title: vector<u8>,
