@@ -539,6 +539,14 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             exp(context, e1);
             exp(context, e2)
         },
+        E::For(_, elb, eub, ebody, espec) => {
+            exp(context, elb);
+            exp(context, eub);
+            exp(context, ebody);
+            if let Some(espec) = espec {
+                exp(context, espec)
+            }
+        },
         E::Block(seq) => sequence(context, seq),
         E::Assign(al, e) => {
             lvalues(context, &al.value);

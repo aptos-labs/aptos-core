@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-23:  run [script {]
+warning: loop upper bound refers to `i`, which is shadowed by the loop iterator `i`
+   ┌─ TEMPFILE:15:22
+   │
+15 │         for (i in 0..i) {
+   │                      ^
+   │
+   = the meaning of `i` here depends on the language version: before 2.5 the upper bound is evaluated with the iterator `i` in scope, while from 2.5 on it is evaluated outside the iterator's scope. Recompiling this loop across 2.5 changes its behavior; consider renaming the iterator to avoid ambiguity.
+
+

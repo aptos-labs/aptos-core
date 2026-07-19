@@ -2370,6 +2370,13 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::While(label, pb, ploop) => EE::While(label, exp(context, *pb), exp(context, *ploop)),
         PE::Loop(label, ploop) => EE::Loop(label, exp(context, *ploop)),
+        PE::For(iter, plb, pub_, pbody, pspec) => EE::For(
+            iter,
+            exp(context, *plb),
+            exp(context, *pub_),
+            exp(context, *pbody),
+            pspec.map(|spec| exp(context, *spec)),
+        ),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
         PE::Lambda(pbs, pe, capture_kind, spec_opt) => {
             let tbs_opt = typed_bind_list(context, pbs);
@@ -3270,6 +3277,16 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound_names_exp(unbound, econd)
         },
         EE::Loop(_, eloop) => unbound_names_exp(unbound, eloop),
+        EE::For(iter, elb, eub, ebody, espec) => {
+            if let Some(espec) = espec {
+                unbound_names_exp(unbound, espec);
+            }
+            unbound_names_exp(unbound, ebody);
+            // The iterator is bound in the body and the spec, but not in the bounds.
+            unbound.vars.remove(&iter.0);
+            unbound_names_exp(unbound, eub);
+            unbound_names_exp(unbound, elb)
+        },
 
         EE::Block(seq) => unbound_names_sequence(unbound, seq),
         EE::Lambda(ls, er, _capture_kind, spec_opt) => {

@@ -370,7 +370,11 @@ script {
 }
 ```
 
-The loop iterator variable (`i` in the above example) currently must be a numeric type (inferred from the bounds), and the bounds `0` and `n` here can be replaced by arbitrary numeric expressions. Each is only evaluated once at the start of the loop. The iterator variable `i` is assigned the `lower_bound` (in this case `0`) and incremented after each loop iteration; the loop exits when the iterator `i` reaches or exceeds `upper_bound` (in this case `n`).
+The loop iterator variable (`i` in the above example) must be a numeric type, inferred from the bounds. The bounds (`0` and `n` here) can be arbitrary numeric expressions; each is evaluated exactly once, in source order, before the loop starts. The lower bound is always evaluated before the iterator is introduced, so it never refers to the iterator. The iterator is set to the lower bound (`0` here) and incremented after each iteration; the loop exits once it reaches or exceeds the upper bound (`n` here).
+
+An iterator name of `_` may be used when the loop body does not need the index, as in `for (_ in 0..n) { ... }`.
+
+> **Version-dependent behavior:** the scope in which the *upper* bound is evaluated depends on the language version. Since language version 2.5, it is evaluated outside the iterator's scope, so a mention of the iterator's name refers to an *enclosing* binding — given `let i = 5; for (i in 0..i) { ... }`, the upper bound `i` reads the enclosing `5` and the loop runs 5 times. Before language version 2.5, the upper bound was evaluated with the iterator in scope, so it read the iterator (bound to the lower bound) and the same loop ran zero times. The compiler warns whenever the upper bound refers to a name the iterator shadows, since recompiling such a loop across the 2.5 boundary changes its behavior.
 
 #### `break` and `continue` in `for` loops
 

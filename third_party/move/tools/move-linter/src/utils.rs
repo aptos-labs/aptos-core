@@ -2,15 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module holds utility functions for the Move linter.
-use legacy_move_compiler::parser::syntax::FOR_LOOP_UPDATE_ITER_FLAG;
 use move_model::{
-    ast::{
-        ExpData,
-        ExpData::{IfElse, LocalVar, Loop, Sequence},
-        Operation,
-    },
-    model::FunctionEnv,
+    ast::{ExpData, ExpData::Loop, Operation, Pattern, Value},
+    symbol::Symbol,
 };
+use num::BigInt;
 
 /// Returns `true` if two expressions represent the same simple access pattern.
 /// This compares nested `Select`, `Borrow`, and local variable references for structural equality.
@@ -64,45 +60,109 @@ pub(crate) fn detect_while_loop(expr: &ExpData) -> bool {
     }
 }
 
-/// Detects if the Loop expression matches the pattern of an expanded for loop.
-///
-/// The expanded for loop has this structure:
+/// Detects whether `expr` is a lowered `for` loop *with a `continue`*, which is
+/// wrapped in an inner single-pass loop:
 /// ```ignore
-/// loop {
-///     if (true) {
-///         if (flag) {
-///             increment;
-///         } else {
-///             flag = true;
-///         }
-///         if (i < limit) {
-///             body;
-///         } else {
-///             break;
-///         }
-///     } else {
-///         break;
-///     }
+/// loop {                          // <- expr (the outer loop)
+///     if (i < $ub) {
+///         loop { body; break };   // inner, single-pass loop
+///         i = i + 1;
+///     } else break
 /// }
 /// ```
-pub(crate) fn detect_for_loop(expr: &ExpData, function: &FunctionEnv) -> bool {
-    let Loop(_, body) = expr else { return false };
-
-    let IfElse(_, _, then, _) = body.as_ref() else {
+/// This is the model shape produced by the first-class `for` lowering in
+/// `move-model`'s `ExpTranslator::translate_for_loop` (the iterator is advanced
+/// at the bottom of the loop, and a `continue` becomes a `break` of the inner
+/// loop so it falls through to the increment). It is not the pre-lowering
+/// desugaring: the model AST has no `for` node, so this matches on structure.
+///
+/// A `for` loop *without* a `continue` has no inner loop and is shaped exactly
+/// like a `while` loop (see [`detect_while_loop`]). Recognizing this shape lets
+/// consumers (e.g. the cyclomatic complexity lint) treat such a `for` loop as a
+/// single loop, rather than counting the inner loop and breaks introduced by
+/// lowering as separate decisions.
+pub(crate) fn detect_for_loop(expr: &ExpData) -> bool {
+    use ExpData::{IfElse, LoopCont, Sequence};
+    let Loop(_, body) = expr else {
         return false;
     };
-
+    let IfElse(_, cond, then, else_) = body.as_ref() else {
+        return false;
+    };
+    // The else-branch breaks the outer loop.
+    if !matches!(else_.as_ref(), LoopCont(_, 0, false)) {
+        return false;
+    }
+    // The then-branch is *exactly* `{ loop { body; break }; i = i + 1 }`: an
+    // inner single-pass loop followed by the iterator increment, and nothing
+    // else. Matching only the leading inner loop would misclassify an ordinary
+    // `while`/`for` loop whose body merely happens to begin with a
+    // `loop { ...; break }`.
     let Sequence(_, stmts) = then.as_ref() else {
         return false;
     };
-    let Some(stmt) = stmts.first() else {
+    let [inner, incr] = stmts.as_slice() else {
         return false;
     };
-    let IfElse(_, cond, _, _) = stmt.as_ref() else {
+    // The inner loop runs once and ends by breaking itself.
+    let Loop(_, inner_body) = inner.as_ref() else {
         return false;
     };
-    let LocalVar(_, name) = cond.as_ref() else {
+    let Sequence(_, inner_stmts) = inner_body.as_ref() else {
         return false;
     };
-    name.display(function.symbol_pool()).to_string() == FOR_LOOP_UPDATE_ITER_FLAG
+    if !matches!(
+        inner_stmts.last().map(|e| e.as_ref()),
+        Some(LoopCont(_, 0, false))
+    ) {
+        return false;
+    }
+    // The increment must advance the very variable the loop condition tests,
+    // i.e. `i = i + 1` guarded by `i < $ub` — the exact shape produced when
+    // lowering a `for` loop that contains a `continue`.
+    match (for_iter_increment_var(incr), for_loop_cond_var(cond)) {
+        (Some(incr_var), Some(cond_var)) => incr_var == cond_var,
+        _ => false,
+    }
+}
+
+/// Returns the variable advanced by a lowered `for`-loop iterator increment of
+/// the form `i = i + 1`, or `None` if `expr` is not such an increment.
+fn for_iter_increment_var(expr: &ExpData) -> Option<Symbol> {
+    use ExpData::{Assign, Call, LocalVar, Value as ExpValue};
+    let Assign(_, Pattern::Var(_, target), rhs) = expr else {
+        return None;
+    };
+    let Call(_, Operation::Add, args) = rhs.as_ref() else {
+        return None;
+    };
+    let [lhs, one] = args.as_slice() else {
+        return None;
+    };
+    let LocalVar(_, var) = lhs.as_ref() else {
+        return None;
+    };
+    if var != target {
+        return None;
+    }
+    matches!(one.as_ref(), ExpValue(_, Value::Number(n)) if *n == BigInt::from(1))
+        .then_some(*target)
+}
+
+/// Returns the iterator variable compared in a lowered `for`-loop condition
+/// `i < $ub`. The comparison may be preceded by a loop-invariant spec block
+/// (`{ spec; i < $ub }`), in which case it is the sequence's final element.
+fn for_loop_cond_var(cond: &ExpData) -> Option<Symbol> {
+    use ExpData::{Call, LocalVar, Sequence};
+    let cmp = match cond {
+        Sequence(_, exps) => exps.last()?.as_ref(),
+        other => other,
+    };
+    let Call(_, Operation::Lt, args) = cmp else {
+        return None;
+    };
+    match args.first()?.as_ref() {
+        LocalVar(_, sym) => Some(*sym),
+        _ => None,
+    }
 }
