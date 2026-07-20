@@ -466,7 +466,7 @@ fn test_module_publishing_does_not_fallback() {
     for (output, maybe_abort_code) in h
         .run_block_get_output(txns)
         .into_iter()
-        .zip(expected_abort_codes.into_iter())
+        .zip(expected_abort_codes)
     {
         let status = output.status().clone();
         match maybe_abort_code {
@@ -568,7 +568,7 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     for (output, maybe_abort_code) in h
         .run_block_get_output(txns)
         .into_iter()
-        .zip(expected_abort_codes.into_iter())
+        .zip(expected_abort_codes)
     {
         let status = output.status().clone();
         match maybe_abort_code {

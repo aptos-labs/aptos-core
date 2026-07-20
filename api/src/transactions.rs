@@ -717,11 +717,7 @@ impl TransactionsApi {
                     estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
                 // With 0 gas price, we set it to max gas units, since we can't divide by 0
-                let max_account_gas_units = if gas_unit_price == 0 {
-                    balance
-                } else {
-                    balance / gas_unit_price
-                };
+                let max_account_gas_units = balance.checked_div(gas_unit_price).unwrap_or(balance);
 
                 // To give better error messaging, we should not go below the minimum number of gas units
                 let max_account_gas_units =

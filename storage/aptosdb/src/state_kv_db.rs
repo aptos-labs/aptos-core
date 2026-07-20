@@ -629,7 +629,7 @@ impl StateKvDb {
         mut entries: Vec<(HashValue, Version, StateSlotKind)>,
     ) -> LoadedHotStateShard {
         // Index 0 = oldest (LRU tail), last = newest (MRU head).
-        entries.sort_by(|a, b| (a.1, a.0).cmp(&(b.1, b.0)));
+        entries.sort_by_key(|a| (a.1, a.0));
 
         let num_items = entries.len();
         let map = DashMap::with_capacity(num_items);

@@ -581,9 +581,8 @@ pub fn verify_committed_transactions(
         ledger_info.transaction_accumulator_hash()
     );
 
-    let mut cur_ver = first_version;
     let mut updates = HashMap::new();
-    for txn_to_commit in txns_to_commit {
+    for (cur_ver, txn_to_commit) in (first_version..).zip(txns_to_commit.iter()) {
         let txn_info = db
             .ledger_db
             .transaction_info_db()
@@ -647,7 +646,6 @@ pub fn verify_committed_transactions(
                 .unwrap();
             assert_eq!(txn_output_list_with_proof.get_num_outputs(), 1);
         }
-        cur_ver += 1;
     }
 
     // Fetch and verify batch transactions by account

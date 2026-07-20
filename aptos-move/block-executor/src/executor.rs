@@ -292,7 +292,7 @@ where
                                 group_key,
                                 idx_to_execute,
                                 incarnation,
-                                group_ops.into_iter(),
+                                group_ops,
                                 group_size,
                                 prev_tags,
                             )?,
@@ -336,7 +336,7 @@ where
                 group_key,
                 idx_to_execute,
                 incarnation,
-                group_ops.into_iter(),
+                group_ops,
                 group_size,
                 HashSet::new(), // No previous tags since this is a new group write
             )?)?;
@@ -649,7 +649,7 @@ where
                     group_key,
                     idx_to_execute,
                     incarnation,
-                    group_ops.into_iter(),
+                    group_ops,
                     group_size,
                     prev_tags,
                 )? {
@@ -2461,7 +2461,7 @@ where
                         let trace = output.incorporate_materialized_txn_output(
                             materialized_resource_write_set
                                 .into_iter()
-                                .chain(serialized_groups.into_iter())
+                                .chain(serialized_groups)
                                 .collect(),
                             materialized_events,
                         )?;

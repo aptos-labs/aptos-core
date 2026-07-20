@@ -211,15 +211,13 @@ impl EventDb {
     ) -> Result<Vec<usize>> {
         let mut ret = Vec::new();
 
-        let mut current_version = start;
-
         let mut read_opts = ReadOptions::default();
         read_opts.fill_cache(false);
         let mut iter = self.db.iter_with_opts::<EventSchema>(read_opts)?;
         iter.seek(&start)?;
         let events_iter = EventsByVersionIter::new(iter, start, end);
 
-        for events in events_iter {
+        for (current_version, events) in (start..).zip(events_iter) {
             let events = events?;
             ret.push(events.len());
 
@@ -235,7 +233,6 @@ impl EventDb {
                     }
                 }
             }
-            current_version += 1;
         }
 
         Ok(ret)
@@ -249,13 +246,10 @@ impl EventDb {
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> Result<()> {
-        let mut current_version = start;
-
-        for num_events in num_events_per_version {
+        for (current_version, num_events) in (start..).zip(num_events_per_version) {
             for idx in 0..num_events {
                 db_batch.delete::<EventSchema>(&(current_version, idx as u64))?;
             }
-            current_version += 1;
         }
         self.event_store
             .prune_event_accumulator(start, end, db_batch)?;

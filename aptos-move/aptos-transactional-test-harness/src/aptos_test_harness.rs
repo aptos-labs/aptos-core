@@ -474,15 +474,13 @@ impl AptosTestAdapter<'_> {
             TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1000);
         let max_gas_amount = max_gas_amount.unwrap_or_else(|| {
-            if gas_unit_price == 0 {
-                u64::from(max_number_of_gas_units)
-            } else {
-                let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                std::cmp::min(
-                    u64::from(max_number_of_gas_units),
-                    account_balance / gas_unit_price,
-                )
-            }
+            let account_balance = self.fetch_account_balance(signer_addr).unwrap();
+            std::cmp::min(
+                u64::from(max_number_of_gas_units),
+                account_balance
+                    .checked_div(gas_unit_price)
+                    .unwrap_or(u64::from(max_number_of_gas_units)),
+            )
         });
         let expiration_timestamp_secs = expiration_time.unwrap_or(40000);
 

@@ -100,15 +100,14 @@ impl Inner {
             transaction_infos.len(),
         );
 
-        let mut version = self.first_version();
-        for (txn_info, expected_txn_info) in
-            zip_eq(self.transaction_infos.iter(), transaction_infos.iter())
-        {
+        for (version, (txn_info, expected_txn_info)) in (self.first_version()..).zip(zip_eq(
+            self.transaction_infos.iter(),
+            transaction_infos.iter(),
+        )) {
             ensure!(
                 txn_info == expected_txn_info,
                 "Transaction infos don't match. version:{version}, txn_info:{txn_info}, expected_txn_info:{expected_txn_info}",
             );
-            version += 1;
         }
         Ok(())
     }

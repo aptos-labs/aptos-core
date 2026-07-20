@@ -187,11 +187,12 @@ where
         .into_inner();
 
     let max_gas = options.gas_options.max_gas.unwrap_or_else(|| {
-        if gas_unit_price == 0 {
-            DEFAULT_MAX_GAS
-        } else {
-            std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
-        }
+        std::cmp::min(
+            balance
+                .checked_div(gas_unit_price)
+                .unwrap_or(DEFAULT_MAX_GAS),
+            DEFAULT_MAX_GAS,
+        )
     });
 
     let transaction_factory = TransactionFactory::new(chain_id)
@@ -264,11 +265,12 @@ async fn simulate_using_session(
         .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
     let balance = state_store.get_apt_balance(sender_address)?;
     let max_gas = options.gas_options.max_gas.unwrap_or_else(|| {
-        if gas_unit_price == 0 {
-            DEFAULT_MAX_GAS
-        } else {
-            std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
-        }
+        std::cmp::min(
+            balance
+                .checked_div(gas_unit_price)
+                .unwrap_or(DEFAULT_MAX_GAS),
+            DEFAULT_MAX_GAS,
+        )
     });
 
     let transaction_factory = TransactionFactory::new(state_store.get_chain_id()?)

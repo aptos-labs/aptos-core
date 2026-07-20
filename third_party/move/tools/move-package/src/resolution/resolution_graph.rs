@@ -278,7 +278,7 @@ impl ResolvingGraph {
             .dependencies
             .clone()
             .into_iter()
-            .chain(additional_deps.into_iter())
+            .chain(additional_deps)
         {
             if let Some(std_version) = &override_std {
                 if let Some(std_lib) = StdLib::from_package_name(dep_name) {
@@ -768,8 +768,8 @@ impl ResolvedGraph {
 
     pub fn file_sources(&self) -> BTreeMap<FileHash, (Symbol, String)> {
         self.package_table
-            .iter()
-            .flat_map(|(_, rpkg)| {
+            .values()
+            .flat_map(|rpkg| {
                 rpkg.get_sources(&self.build_options)
                     .unwrap()
                     .iter()

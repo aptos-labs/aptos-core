@@ -596,7 +596,7 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
     }
 
     // Sort by the first version per batch, ascending
-    batches.sort_by(|a, b| a.first().unwrap().version.cmp(&b.first().unwrap().version));
+    batches.sort_by_key(|a| a.first().unwrap().version);
     let first_version = batches.first().unwrap().first().unwrap().version;
     let last_version = batches.last().unwrap().last().unwrap().version;
     let mut transactions: Vec<Transaction> = vec![];
