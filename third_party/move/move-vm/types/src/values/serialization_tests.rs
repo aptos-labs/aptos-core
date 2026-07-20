@@ -132,6 +132,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn enum_out_of_range_zero_field_tag_fails_to_serialize() {
+        let layout = enum_layout();
+
+        let bad_zero_field_tag = Value::struct_(Struct::pack_variant(3, iter::empty()));
+        assert!(
+            ValueSerDeContext::new(None)
+                .serialize(&bad_zero_field_tag, &layout)
+                .unwrap()
+                .is_none(),
+            "serializing an out-of-range zero-field variant tag must fail"
+        );
+
+        let variants_layout = MoveStructLayout::RuntimeVariants(vec![
+            vec![MoveTypeLayout::U64],
+            vec![],
+            vec![MoveTypeLayout::Bool, MoveTypeLayout::U32],
+        ]);
+        assert!(variants_layout.fields(Some(3)).is_none());
+        assert!(variants_layout.fields(Some(1)).is_some());
+    }
+
     // ---------------------------------------------------------------------------
     // Rust cross-serialization tests
 
