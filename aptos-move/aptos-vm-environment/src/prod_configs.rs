@@ -309,6 +309,8 @@ pub fn aptos_prod_vm_config(
         check_depth_on_type_counts: gas_feature_version >= RELEASE_V1_41,
         enable_public_struct_args: features.is_enabled(FeatureFlag::PUBLIC_STRUCT_ENUM_ARGS),
         include_closure_mask_in_cmp: gas_feature_version >= RELEASE_V1_45,
+        revalidate_resolved_closures: timed_features
+            .is_enabled(TimedFeatureFlag::RevalidateResolvedClosures),
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
