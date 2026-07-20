@@ -12953,12 +12953,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-output"
+version = "0.1.0"
+dependencies = [
+ "aptos-types",
+ "bcs 0.1.4",
+ "mono-move-core",
+ "mono-move-natives",
+ "mono-move-runtime",
+ "move-core-types",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "mono-move-replay-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-block-executor",
  "aptos-cached-packages",
+ "aptos-framework-natives",
  "aptos-move-debugger",
  "aptos-rest-client",
  "aptos-types",
@@ -12972,6 +12986,7 @@ dependencies = [
  "mono-move-global-context",
  "mono-move-loader",
  "mono-move-natives",
+ "mono-move-output",
  "mono-move-runtime",
  "mono-move-testsuite",
  "move-binary-format",
@@ -12988,6 +13003,7 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
  "bcs 0.1.4",
  "hashbrown 0.14.3",
  "mono-move-alloc",

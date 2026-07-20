@@ -104,6 +104,18 @@ pub struct Entry {
     pub write: StorageWrite,
 }
 
+/// The write an [`Entry`] contributes to the write set, by its `(read, write)`
+/// pair.
+pub(crate) enum WriteClass {
+    /// Did not exist before, now does. Carries the value pointer to serialize.
+    Creation(NonNull<u8>),
+    /// Existed before, now (possibly) modified — any mutable borrow counts,
+    /// even if the value is unchanged. Carries the value pointer to serialize.
+    Modification(NonNull<u8>),
+    /// Existed before, now moved out.
+    Deletion,
+}
+
 /// Represents the state of data pointer in the map: owned by local allocation
 /// with up-to-date epoch - writable and can be directly used for mutation or
 /// needing a copy (if it is read-only or has an outdated epoch).
@@ -128,6 +140,27 @@ impl Entry {
             },
             StorageWrite::Deleted { .. } => false,
             StorageWrite::LocalHeap { .. } => true,
+        }
+    }
+
+    /// Classifies this entry's `(read, write)` into a [`WriteClass`], or
+    /// [`None`] if it is not a write.
+    pub(crate) fn write_class(&self) -> Option<WriteClass> {
+        match self.write {
+            StorageWrite::NotModified => None,
+            StorageWrite::LocalHeap { ptr, .. } => Some(match self.read {
+                StorageRead::DoesNotExist => WriteClass::Creation(ptr),
+                // TODO(correctness, perf): over-approximation — a `borrow_global_mut` copies to the
+                // local heap even if nothing changed. Compare against the read value to drop no-op
+                // modifications here rather than downstream.
+                StorageRead::ExternalHeap { .. } => WriteClass::Modification(ptr),
+            }),
+            StorageWrite::Deleted { .. } => match self.read {
+                // Published and then removed in the same transaction: the
+                // on-chain slot never existed, so this is not a write.
+                StorageRead::DoesNotExist => None,
+                StorageRead::ExternalHeap { .. } => Some(WriteClass::Deletion),
+            },
         }
     }
 
@@ -372,6 +405,14 @@ impl ResourceReadWriteSet {
     /// Returns the number of entries in the journal (undo log).
     pub fn journal_len(&self) -> usize {
         self.journal.len()
+    }
+
+    /// Yields each entry that is a write, with its [`WriteClass`]. Order is
+    /// unspecified (backing hash map); callers must sort before emitting.
+    pub(crate) fn writes(&self) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass)> {
+        self.entries
+            .iter()
+            .filter_map(|(key, entry)| entry.write_class().map(|class| (key, class)))
     }
 
     /// Save the current state and advance the epoch. A subsequent roll back
@@ -965,6 +1006,46 @@ mod tests {
         let _ = rws.try_borrow_global_mut(&provider, &k).unwrap();
         rws.commit_borrow_global_mut(&k, fake_ptr(0xD2));
         assert_eq!(rws.journal_len(), 1);
+    }
+
+    // -- Write classification -------------------------------------------------
+
+    fn class_of(read: StorageRead, write: StorageWrite) -> Option<WriteClass> {
+        entry(read, write).write_class()
+    }
+
+    #[test]
+    fn write_class_covers_the_read_write_matrix() {
+        let ext = || StorageRead::ExternalHeap {
+            ptr: fake_ptr(0x10),
+            version: 0,
+        };
+        let local = || StorageWrite::LocalHeap {
+            ptr: fake_ptr(0x11),
+            epoch: 0,
+        };
+        let deleted = || StorageWrite::Deleted { epoch: 0 };
+
+        // Untouched / read-only: no write.
+        assert!(class_of(StorageRead::DoesNotExist, StorageWrite::NotModified).is_none());
+        assert!(class_of(ext(), StorageWrite::NotModified).is_none());
+        // Published this txn -> Creation.
+        assert!(matches!(
+            class_of(StorageRead::DoesNotExist, local()),
+            Some(WriteClass::Creation(_))
+        ));
+        // Pre-existing + local write -> Modification.
+        assert!(matches!(
+            class_of(ext(), local()),
+            Some(WriteClass::Modification(_))
+        ));
+        // Pre-existing + deleted -> Deletion.
+        assert!(matches!(
+            class_of(ext(), deleted()),
+            Some(WriteClass::Deletion)
+        ));
+        // Published then removed within the txn: net no-op, not a write.
+        assert!(class_of(StorageRead::DoesNotExist, deleted()).is_none());
     }
 
     // -- GC scan --------------------------------------------------------------

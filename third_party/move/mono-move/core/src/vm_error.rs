@@ -93,6 +93,9 @@ pub enum RuntimeError {
     #[error("AbortMsg: message size {len} exceeds maximum {max}")]
     AbortMessageTooLong { len: usize, max: usize },
 
+    #[error("resource type is too deeply nested to encode as a state key")]
+    StateKeyTypeTooDeep,
+
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
 
@@ -143,7 +146,8 @@ impl IntoExecutionError for RuntimeError {
             | OutOfHeapMemory { .. }
             | AllocationTooLarge { .. }
             | VecAllocSizeOverflow
-            | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
+            | AbortMessageTooLong { .. }
+            | StateKeyTypeTooDeep => ExecutionErrorKind::RuntimeLimitExceeded,
 
             BCSEof
             | BCSInvalidUleb

@@ -39,7 +39,8 @@ pub use instruction::{
     VEC_LENGTH_OFFSET,
 };
 pub use interner::{
-    view_function_ref, FunctionRef, InternedFunctionRef, Interner, ModuleId, TypeSubstitutionError,
+    struct_tag_of, type_tag_of, view_function_ref, view_module_id, FunctionRef,
+    InternedFunctionRef, Interner, ModuleId, TypeSubstitutionError,
 };
 pub use move_binary_format::file_format::ConstantPoolIndex;
 pub use object_descriptor::{

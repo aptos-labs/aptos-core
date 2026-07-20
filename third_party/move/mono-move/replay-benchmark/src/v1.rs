@@ -9,14 +9,16 @@
 //! checks and gas metering are off; only argument deserialization + execution are timed.
 
 use crate::{
-    compare::{ExecOutcome, FailureKind},
+    compare::{prune_unchanged_modifications, ExecOutcome, FailureKind, WriteSet},
     data::BenchmarkInput,
     timing::{collect_samples, TimingConfig},
     BenchmarkRun,
 };
 use anyhow::anyhow;
+use aptos_framework_natives::event::NativeEventContext;
 use aptos_types::{
-    chain_id::ChainId, transaction::user_transaction_context::UserTransactionContext,
+    chain_id::ChainId, state_store::state_key::StateKey,
+    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -24,9 +26,9 @@ use aptos_vm::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
-use mono_move_testsuite::finalize_events_v1;
 use move_binary_format::errors::{VMError, VMResult};
 use move_core_types::{
+    effects::{Changes, Op},
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
@@ -65,9 +67,9 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> anyhow::Result<Benc
             build_args(&func, input)?
         };
 
-        // Trial run: determine the outcome. Also warms the hot module cache (lazily loading the
-        // modules the execution touches) so the measured runs are warm.
-        let outcome = trial(
+        // Trial run: determine the outcome (and extract the write set). Also warms the hot module
+        // cache (lazily loading the modules the execution touches) so the measured runs are warm.
+        let mut outcome = trial(
             &loader,
             &resolver,
             &module_id,
@@ -79,6 +81,18 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> anyhow::Result<Benc
             &input.session_id,
             env.vm_config(),
         )?;
+
+        // Drop no-op modifications, matching the V2 side, so both write sets reflect real state
+        // changes (the legacy VM usually filters these already, so this is typically a no-op here).
+        if let ExecOutcome::Success { writes, .. } = &mut outcome {
+            prune_unchanged_modifications(writes, |key| {
+                input
+                    .read_set
+                    .data
+                    .get(key)
+                    .map(|value| value.bytes().to_vec())
+            });
+        }
 
         // Timing: measure only "deserialize args + execute" across many samples.
         let samples = collect_samples(timing, || {
@@ -181,12 +195,45 @@ fn trial<L: Loader + InstantiatedFunctionLoader, R: AptosMoveResolver>(
     );
 
     let outcome = match result {
-        Ok(_) => ExecOutcome::Success {
-            events: finalize_events_v1(&extensions),
+        Ok(_) => {
+            let events = extensions
+                .get::<NativeEventContext>()
+                .events_iter()
+                .cloned()
+                .collect();
+            // The data cache still owns the transaction's resource changes (the adapter only
+            // borrowed it for the call). Turn them into a normalized write set. This is on the
+            // untimed path, so it does not affect timing.
+            let changes = data_cache
+                .into_effects(loader.unmetered_module_storage())
+                .map_err(|e| anyhow!("failed to extract V1 write set: {:?}", e))?;
+            ExecOutcome::Success {
+                events,
+                writes: change_set_to_write_set(changes)?,
+            }
         },
         Err(err) => classify_error(err),
     };
     Ok(outcome)
+}
+
+/// Converts the legacy Move VM's resource change set into a [`StateKey`]-keyed
+/// write set (resources only), matching V2's format for comparison.
+fn change_set_to_write_set(changes: Changes<bytes::Bytes>) -> anyhow::Result<WriteSet> {
+    let mut writes = WriteSet::new();
+    for (address, account_changes) in changes.into_inner() {
+        for (struct_tag, op) in account_changes.into_resources() {
+            let state_key = StateKey::resource(&address, &struct_tag)
+                .map_err(|e| anyhow!("failed to build resource state key: {:?}", e))?;
+            let write_op = match op {
+                Op::New(bytes) => WriteOp::legacy_creation(bytes),
+                Op::Modify(bytes) => WriteOp::legacy_modification(bytes),
+                Op::Delete => WriteOp::legacy_deletion(),
+            };
+            writes.insert(state_key, write_op);
+        }
+    }
+    Ok(writes)
 }
 
 /// Times a single "deserialize args + execute" region. Per-run state (the empty data cache, fresh

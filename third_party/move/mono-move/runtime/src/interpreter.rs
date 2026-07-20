@@ -30,6 +30,7 @@ use crate::{
     },
     value_utils,
 };
+use aptos_types::write_set::WriteSet;
 use mono_move_core::{
     captured_values_size,
     interner::{InternedIdentifier, InternedModuleId},
@@ -40,6 +41,7 @@ use mono_move_core::{
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type_list, InternedType, InternedTypeList},
+    value_layout::LayoutProvider,
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
@@ -85,6 +87,28 @@ impl VMRegisters {
             fp: unsafe { stack_base.add(FRAME_METADATA_SIZE) },
             func: NonNull::from(func),
         }
+    }
+}
+
+/// What a finished transaction leaves behind: the frozen heap, the
+/// global-storage read-write set, and the native extensions (event store and
+/// friends). Read-write-set and extension entries point into `heap`, so the
+/// parts are only valid together; external read pointers remain owned by the
+/// resource provider.
+///
+// TODO(correctness): the effects hold interned types but carry no lifetime, so
+// they can outlive the guard and dereference freed arenas after a maintenance
+// reset. Tie them to the guard lifetime (`SessionEffects<'guard>`).
+pub struct SessionEffects {
+    pub heap: Heap,
+    pub read_write_set: ResourceReadWriteSet,
+    pub extensions: NativeExtensions,
+}
+
+impl SessionEffects {
+    /// The transaction's write set.
+    pub fn write_set(&self, layouts: &impl LayoutProvider) -> RuntimeResult<WriteSet> {
+        crate::write_set::build_write_set(&self.read_write_set, layouts)
     }
 }
 
@@ -301,6 +325,30 @@ impl<'guard> InterpreterContext<'guard> {
 
     pub fn journal_len(&self) -> usize {
         self.read_write_set.journal_len()
+    }
+
+    /// Remaining gas balance.
+    pub fn gas_balance(&self) -> u64 {
+        self.gas_meter.balance()
+    }
+
+    /// Consumes the context, returning the transaction's side effects for
+    /// publication. No execution can follow, so the heap is frozen and every
+    /// heap pointer inside the read-write set and extensions stays valid for
+    /// as long as the returned effects live.
+    pub fn finish(self) -> SessionEffects {
+        SessionEffects {
+            heap: self.heap,
+            read_write_set: self.read_write_set,
+            extensions: self.extensions,
+        }
+    }
+
+    /// The transaction's write set, read out of the still-live context.
+    ///
+    /// Used for testing and benchmarking.
+    pub fn write_set(&self) -> RuntimeResult<WriteSet> {
+        crate::write_set::build_write_set(&self.read_write_set, self.loader.guard())
     }
 
     /// Reset the context to call a different function, preserving the heap.

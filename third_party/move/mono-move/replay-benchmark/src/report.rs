@@ -122,7 +122,13 @@ fn print_vm(label: &str, run: &Option<Result<BenchmarkRun, String>>) {
 
 fn describe_outcome(outcome: &ExecOutcome) -> String {
     match outcome {
-        ExecOutcome::Success { .. } => "success".to_string(),
+        ExecOutcome::Success { events, writes } => {
+            format!(
+                "success ({} event(s), {} write(s))",
+                events.len(),
+                writes.len()
+            )
+        },
         ExecOutcome::Aborted { code, message } => match message {
             Some(m) => format!("Move abort (code {}: {})", code, m),
             None => format!("Move abort (code {})", code),

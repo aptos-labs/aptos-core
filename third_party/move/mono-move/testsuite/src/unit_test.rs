@@ -343,7 +343,8 @@ fn classify_runtime_error(err: &RuntimeError) -> TestResult {
         | RuntimeError::OutOfHeapMemory { .. }
         | RuntimeError::AllocationTooLarge { .. }
         | RuntimeError::VecAllocSizeOverflow
-        | RuntimeError::AbortMessageTooLong { .. } => TestResult::RuntimeFailure(err.to_string()),
+        | RuntimeError::AbortMessageTooLong { .. }
+        | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
 
         // Genuine problems: runaway gas, infrastructure failure, or a VM bug.
         RuntimeError::GasExhausted(_)

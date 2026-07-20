@@ -4,11 +4,16 @@
 //! Interning APIs.
 
 use crate::{
-    types::{InternedType, InternedTypeList},
+    types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
     ExecutionErrorKind, IntoExecutionError,
 };
 use mono_move_alloc::GlobalArenaPtr;
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::{StructTag, TypeTag},
+};
 use thiserror::Error;
 
 /// Pointer to interned Move identifier allocated in global arena.
@@ -39,6 +44,17 @@ impl ModuleId {
 
 /// Pointer to interned module ID allocated in global arena.
 pub type InternedModuleId = GlobalArenaPtr<ModuleId>;
+
+/// Dereferences an interned module ID.
+///
+/// # Safety contract
+///
+/// Same as the other `view_*` helpers: the arena must be alive for as long as
+/// the returned reference is used (holds during the execution phase).
+pub fn view_module_id(ptr: InternedModuleId) -> &'static ModuleId {
+    // SAFETY: see the safety contract above.
+    unsafe { ptr.as_ref_unchecked() }
+}
 
 /// Symbolic identity of a function: the same `(module, name, type arguments)`
 /// triple the loader keys function code on, bundled so a single thin arena
@@ -176,4 +192,62 @@ pub trait Interner {
         tys: InternedTypeList,
         ty_args: InternedTypeList,
     ) -> Result<InternedTypeList, TypeSubstitutionError>;
+}
+
+/// The [`TypeTag`] for an interned type, or [`None`] for types that have no tag
+/// representation (references, functions, and unsubstituted type parameters).
+///
+/// TODO(perf): cache the tag per interned type (e.g. in the global context)
+/// instead of re-walking the type graph on every call.
+///
+/// TODO(correctness): add runtime bounds here, or ensure the transaction already
+/// charges gas for the tag and guarantees this conversion is infallible.
+pub fn type_tag_of(ty: InternedType) -> Option<TypeTag> {
+    Some(match view_type(ty) {
+        Type::Bool => TypeTag::Bool,
+        Type::U8 => TypeTag::U8,
+        Type::U16 => TypeTag::U16,
+        Type::U32 => TypeTag::U32,
+        Type::U64 => TypeTag::U64,
+        Type::U128 => TypeTag::U128,
+        Type::U256 => TypeTag::U256,
+        Type::I8 => TypeTag::I8,
+        Type::I16 => TypeTag::I16,
+        Type::I32 => TypeTag::I32,
+        Type::I64 => TypeTag::I64,
+        Type::I128 => TypeTag::I128,
+        Type::I256 => TypeTag::I256,
+        Type::Address => TypeTag::Address,
+        Type::Signer => TypeTag::Signer,
+        Type::Vector { elem } => TypeTag::Vector(Box::new(type_tag_of(*elem)?)),
+        Type::Nominal { .. } => TypeTag::Struct(Box::new(struct_tag_of(ty)?)),
+        Type::ImmutRef { .. }
+        | Type::MutRef { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => return None,
+    })
+}
+
+/// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if
+/// `ty` is not nominal.
+pub fn struct_tag_of(ty: InternedType) -> Option<StructTag> {
+    let Type::Nominal {
+        module_id,
+        name,
+        ty_args,
+    } = view_type(ty)
+    else {
+        return None;
+    };
+    let module_id = view_module_id(*module_id);
+    let type_args = view_type_list(*ty_args)
+        .iter()
+        .map(|arg| type_tag_of(*arg))
+        .collect::<Option<Vec<_>>>()?;
+    Some(StructTag {
+        address: *module_id.address(),
+        module: Identifier::new(view_name(module_id.name())).ok()?,
+        name: Identifier::new(view_name(*name)).ok()?,
+        type_args,
+    })
 }
