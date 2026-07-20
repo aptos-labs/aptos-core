@@ -4,7 +4,6 @@
 use crate::{
     metrics::{record_cluster_spinup_phase, ClusterPhase},
     Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version,
-    INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
 };
 use anyhow::bail;
 use futures::{future, FutureExt};
@@ -28,8 +27,7 @@ mod stateful_set;
 mod swarm;
 
 use super::{
-    ForgeDeployerManager, FORGE_GENESIS_SHARED_BUCKET, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO,
-    FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO,
+    ForgeDeployerManager, FORGE_GENESIS_SHARED_BUCKET, FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO,
 };
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
@@ -50,7 +48,6 @@ pub struct K8sFactory {
     reuse: bool,
     keep: bool,
     enable_haproxy: bool,
-    enable_indexer: bool,
     /// Resolved PFN deployment entries for the pfn-deployments JSON array.
     /// Each entry is a JSON object with helmReleaseName and optional per-PFN values.
     pfn_deployment_configs: Vec<serde_json::Value>,
@@ -68,7 +65,6 @@ impl K8sFactory {
         reuse: bool,
         keep: bool,
         enable_haproxy: bool,
-        enable_indexer: bool,
         pfn_deployment_configs: Vec<serde_json::Value>,
         pfn_base_node_config: Option<serde_json::Value>,
         deployer_profile: String,
@@ -100,7 +96,6 @@ impl K8sFactory {
             reuse,
             keep,
             enable_haproxy,
-            enable_indexer,
             pfn_deployment_configs,
             pfn_base_node_config,
             deployer_profile,
@@ -214,7 +209,6 @@ impl Factory for K8sFactory {
                     genesis_modules_path,
                     self.use_port_forward,
                     self.enable_haproxy,
-                    self.enable_indexer,
                     self.deployer_profile.clone(),
                     genesis_config_fn,
                     node_config_fn,
@@ -228,51 +222,6 @@ impl Factory for K8sFactory {
                     result.is_ok(),
                 );
                 result
-            }
-            .boxed();
-
-            // Indexer deploy phase (if enabled)
-            let indexer_deploy_start = Instant::now();
-            let indexer_namespace = self.kube_namespace.clone();
-            let enable_indexer = self.enable_indexer;
-            let indexer_era = new_era.clone();
-            let indexer_profile = self.deployer_profile.clone();
-            let indexer_kube_namespace = self.kube_namespace.clone();
-            let indexer_init_version = format!("{}", init_version);
-            let indexer_kube_client = kube_client.clone();
-            let deploy_indexer_fut = async move {
-                if enable_indexer {
-                    // NOTE: by default, use a deploy profile and no additional configuration values
-                    let config = serde_json::from_value(json!({
-                        "profile": indexer_profile,
-                        "era": indexer_era,
-                        "namespace": indexer_kube_namespace,
-                        "indexer-grpc-values": {
-                            "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, indexer_init_version),
-                            "fullnodeConfig": {
-                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, indexer_init_version),
-                            }
-                        },
-                    }))?;
-
-                    let indexer_deployer = ForgeDeployerManager::new(
-                        indexer_kube_client,
-                        indexer_kube_namespace.clone(),
-                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                        None,
-                    );
-                    indexer_deployer.start(config).await?;
-                    let result = indexer_deployer.wait_completed().await;
-                    record_cluster_spinup_phase(
-                        &indexer_namespace,
-                        ClusterPhase::IndexerDeploy,
-                        indexer_deploy_start,
-                        result.is_ok(),
-                    );
-                    result
-                } else {
-                    Ok(())
-                }
             }
             .boxed();
 
@@ -332,13 +281,11 @@ impl Factory for K8sFactory {
             }
             .boxed();
 
-            // Join on testnet, indexer, and PFN deployment futures in parallel.
-            // try_join3 ensures fail-fast: if any deployer fails, the others are cancelled.
+            // Join on testnet and PFN deployment futures in parallel.
+            // try_join ensures fail-fast: if any deployer fails, the others are cancelled.
             let (validators, fullnodes) =
-                match future::try_join3(deploy_testnet_fut, deploy_indexer_fut, deploy_pfn_fut)
-                    .await
-                {
-                    Ok((deploy_testnet_ret, _, _)) => deploy_testnet_ret,
+                match future::try_join(deploy_testnet_fut, deploy_pfn_fut).await {
+                    Ok((deploy_testnet_ret, _)) => deploy_testnet_ret,
                     Err(e) => {
                         uninstall_testnet_resources(self.kube_namespace.clone()).await?;
                         bail!(e);
@@ -360,7 +307,6 @@ impl Factory for K8sFactory {
             self.keep,
             new_era,
             self.use_port_forward,
-            self.enable_indexer,
         )
         .await;
         record_cluster_spinup_phase(

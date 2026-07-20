@@ -12,6 +12,7 @@ CLI_PROFILE=cli
 cargo build --locked --profile=$CLI_PROFILE \
     -p aptos \
     -p aptos-faucet-service \
+    -p aptos-nft-metadata-crawler \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-keyless-pepper-service \
@@ -23,6 +24,7 @@ cargo build --locked --profile=$CLI_PROFILE \
 BINS=(
     aptos
     aptos-faucet-service
+    aptos-nft-metadata-crawler
     aptos-openapi-spec-generator
     aptos-telemetry-service
     aptos-keyless-pepper-service

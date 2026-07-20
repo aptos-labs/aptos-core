@@ -1,19 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::indexer_api::confirm_metadata_applied;
 use anyhow::{anyhow, Context, Result};
-use aptos_indexer_processor_sdk::{
-    aptos_indexer_transaction_stream::{transaction_stream::get_chain_id, TransactionStreamConfig},
-    postgres::processor_metadata_schema::processor_metadata::processor_status,
-};
-use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
-use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
 use reqwest::Url;
 use serde::Serialize;
 use std::time::Duration;
 use tokio::time::Instant;
-use tracing::info;
 
 const MAX_WAIT_S: u64 = 120;
 const WAIT_INTERVAL_MS: u64 = 200;
@@ -28,17 +20,6 @@ pub enum HealthChecker {
     /// Check that the node API is up. This is just a specific case of Http for extra
     /// guarantees around liveliness.
     NodeApi(Url),
-    /// Check that a data service GRPC stream is up.
-    DataServiceGrpc(Url),
-    /// Check that a postgres instance is up.
-    Postgres(String),
-    /// Check that a processor is successfully processing txns. The first value is the
-    /// postgres connection string. The second is the name of the processor. We check
-    /// the that last_success_version in the processor_status table is present and > 0.
-    Processor(String, String),
-    /// Check that the indexer API is up and the metadata has been applied. We only use
-    /// this one in the ready server.
-    IndexerApiMetadata(Url),
 }
 
 impl HealthChecker {
@@ -54,78 +35,6 @@ impl HealthChecker {
                 aptos_rest_client::Client::new(Url::clone(url))
                     .get_index()
                     .await?;
-                Ok(())
-            },
-            HealthChecker::DataServiceGrpc(url) => {
-                let backoff = backoff::ExponentialBackoff {
-                    max_elapsed_time: Some(Duration::from_secs(5)),
-                    ..Default::default()
-                };
-                backoff::future::retry(backoff, || async {
-                    let transaction_stream_config = TransactionStreamConfig {
-                        indexer_grpc_data_service_address: url.clone(),
-                        auth_token: Some("notused".to_string()),
-                        starting_version: Some(0),
-                        request_ending_version: None,
-                        request_name_header: "notused".to_string(),
-                        additional_headers: Default::default(),
-                        indexer_grpc_http2_ping_interval_secs: Default::default(),
-                        indexer_grpc_http2_ping_timeout_secs: 60,
-                        indexer_grpc_response_item_timeout_secs: 60,
-                        reconnection_config: Default::default(),
-                        transaction_filter: None,
-                        backup_endpoints: Default::default(),
-                    };
-                    get_chain_id(transaction_stream_config)
-                        .await
-                        .context("Failed to get chain id")?;
-                    Ok(())
-                })
-                .await
-                .context("Failed to get a response from gRPC")?;
-                Ok(())
-            },
-            HealthChecker::Postgres(connection_string) => {
-                AsyncPgConnection::establish(connection_string)
-                    .await
-                    .context("Failed to connect to postgres to check DB liveness")?;
-                Ok(())
-            },
-            HealthChecker::Processor(connection_string, processor_name) => {
-                let mut connection = AsyncPgConnection::establish(connection_string)
-                    .await
-                    .context("Failed to connect to postgres to check processor status")?;
-                let result = processor_status::table
-                    .select((processor_status::last_success_version,))
-                    .filter(processor_status::processor.eq(processor_name))
-                    .first::<(i64,)>(&mut connection)
-                    .await
-                    .optional()
-                    .context("Failed to look up processor status")?;
-                match result {
-                    Some(result) => {
-                        // This is last_success_version.
-                        if result.0 > 0 {
-                            info!(
-                                "Processor {} started processing successfully (currently at version {})",
-                                processor_name, result.0
-                            );
-                            Ok(())
-                        } else {
-                            Err(anyhow!(
-                                "Processor {} found in DB but last_success_version is zero",
-                                processor_name
-                            ))
-                        }
-                    },
-                    None => Err(anyhow!(
-                        "Processor {} has not processed any transactions",
-                        processor_name
-                    )),
-                }
-            },
-            HealthChecker::IndexerApiMetadata(url) => {
-                confirm_metadata_applied(url.clone()).await?;
                 Ok(())
             },
         }
@@ -158,10 +67,6 @@ impl HealthChecker {
         match self {
             HealthChecker::Http(url, _) => url.as_str(),
             HealthChecker::NodeApi(url) => url.as_str(),
-            HealthChecker::DataServiceGrpc(url) => url.as_str(),
-            HealthChecker::Postgres(url) => url.as_str(),
-            HealthChecker::Processor(_, processor_name) => processor_name.as_str(),
-            HealthChecker::IndexerApiMetadata(url) => url.as_str(),
         }
     }
 
@@ -179,10 +84,6 @@ impl std::fmt::Display for HealthChecker {
         match self {
             HealthChecker::Http(_, name) => write!(f, "{}", name),
             HealthChecker::NodeApi(_) => write!(f, "Node API"),
-            HealthChecker::DataServiceGrpc(_) => write!(f, "Transaction stream"),
-            HealthChecker::Postgres(_) => write!(f, "Postgres"),
-            HealthChecker::Processor(_, processor_name) => write!(f, "{}", processor_name),
-            HealthChecker::IndexerApiMetadata(_) => write!(f, "Indexer API with metadata applied"),
         }
     }
 }

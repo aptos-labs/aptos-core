@@ -2,26 +2,19 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod logging;
-mod postgres;
 mod ready_server;
 mod utils;
 
 // This is to allow external crates to use the localnode.
-pub mod docker;
 pub mod faucet;
 pub mod health_checker;
-pub mod indexer_api;
 pub mod node;
-pub mod processors;
 pub mod traits;
 
 use self::{
     faucet::FaucetArgs,
-    indexer_api::IndexerApiArgs,
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
-    postgres::PostgresArgs,
-    processors::ProcessorArgs,
     ready_server::ReadyServerArgs,
     traits::{PostHealthyStep, ServiceManager},
 };
@@ -32,12 +25,12 @@ use crate::{
     },
     config::GlobalConfig,
     node::local_testnet::{
-        faucet::FaucetManager, indexer_api::IndexerApiManager, node::NodeManager,
-        processors::ProcessorManager, ready_server::ReadyServerManager, traits::ShutdownStep,
+        faucet::FaucetManager, node::NodeManager, ready_server::ReadyServerManager,
+        traits::ShutdownStep,
     },
 };
 use anyhow::{Context, Result};
-use aptos_indexer_grpc_server_framework::setup_logging;
+use aptos_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
 pub use health_checker::HealthChecker;
@@ -57,8 +50,8 @@ const TESTNET_FOLDER: &str = "testnet";
 /// Run a localnet
 ///
 /// This localnet will run it's own genesis and run as a single node network
-/// locally. A faucet and grpc transaction stream will run alongside the node unless
-/// you specify otherwise with --no-faucet and --no-txn-stream respectively.
+/// locally. A faucet will run alongside the node unless you specify otherwise
+/// with --no-faucet.
 #[derive(Parser)]
 pub struct RunLocalnet {
     /// The directory to save all files for the node
@@ -81,14 +74,12 @@ pub struct RunLocalnet {
     #[clap(flatten)]
     faucet_args: FaucetArgs,
 
-    #[clap(flatten)]
-    postgres_args: PostgresArgs,
-
-    #[clap(flatten)]
-    processor_args: ProcessorArgs,
-
-    #[clap(flatten)]
-    indexer_api_args: IndexerApiArgs,
+    /// This feature has been removed.
+    ///
+    /// The localnet no longer supports running the indexer API and its transaction
+    /// stream. Use an older version of the CLI or the hosted indexer API instead.
+    #[clap(long)]
+    with_indexer_api: bool,
 
     #[clap(flatten)]
     ready_server_args: ReadyServerArgs,
@@ -105,26 +96,9 @@ pub struct RunLocalnet {
     /// By default, tracing output goes to files. With this set, it goes to stdout.
     #[clap(long, hide = true)]
     log_to_stdout: bool,
-
-    /// If set, use an existing Docker network instead of creating a new one.
-    ///
-    /// When specified, the CLI will verify that this network exists and use it for all
-    /// Docker containers in the localnet. If not specified, a network named
-    /// "aptos-local-testnet-network" will be created automatically.
-    #[clap(long)]
-    docker_network: Option<String>,
 }
 
 impl RunLocalnet {
-    /// Get the Docker network name to use for containers and whether it already exists.
-    /// We assume if the user provided a network name that it exists.
-    pub fn get_docker_network(&self) -> (&str, bool) {
-        match self.docker_network {
-            Some(ref network_name) => (network_name, true),
-            None => (docker::CONTAINER_NETWORK_NAME, false),
-        }
-    }
-
     /// Wait for many services to start up. This prints a message like "X is starting,
     /// please wait..." for each service and then "X is ready. Endpoint: <url>"
     /// when it's ready.
@@ -137,40 +111,14 @@ impl RunLocalnet {
             Vec::new();
 
         for health_checker in health_checkers {
-            let silent = match health_checker {
-                HealthChecker::NodeApi(_) => false,
-                HealthChecker::Http(_, _) => false,
-                HealthChecker::DataServiceGrpc(_) => false,
-                HealthChecker::Postgres(_) => false,
-                // We don't want to print anything for the processors, it'd be too spammy.
-                HealthChecker::Processor(_, _) => true,
-                // We don't want to actually wait on this health checker here because
-                // it will never return true since we apply the metadata in a post
-                // healthy step (which comes after we call this function). So we move
-                // on. This is a bit of a leaky abstraction that we can solve with more
-                // lifecycle hooks down the line.
-                HealthChecker::IndexerApiMetadata(_) => continue,
-            };
-            if !silent {
-                println!("{} is starting, please wait...", health_checker);
-            } else {
-                info!("[silent] {} is starting, please wait...", health_checker);
-            }
+            println!("{} is starting, please wait...", health_checker);
             let fut = async move {
                 health_checker.wait(None).await?;
-                if !silent {
-                    println!(
-                        "{} is ready. Endpoint: {}",
-                        health_checker,
-                        health_checker.address_str()
-                    );
-                } else {
-                    info!(
-                        "[silent] {} is ready. Endpoint: {}",
-                        health_checker,
-                        health_checker.address_str()
-                    );
-                }
+                println!(
+                    "{} is ready. Endpoint: {}",
+                    health_checker,
+                    health_checker.address_str()
+                );
                 Ok(())
             };
             futures.push(Box::pin(fut));
@@ -205,31 +153,17 @@ impl CliCommand<()> for RunLocalnet {
     }
 
     async fn execute(mut self) -> CliTypedResult<()> {
-        if self.log_to_stdout {
-            setup_logging(None);
-        }
-
-        if !self.indexer_api_args.with_indexer_api && self.docker_network.is_some() {
+        if self.with_indexer_api {
             return Err(CliError::UnexpectedError(
-                "You cannot specify --docker-network without --with-indexer-api, Docker is only used when --with-indexer-api is set.".to_string(),
+                "The localnet indexer API has been removed from the Aptos CLI. \
+                To test against the indexer API, use the hosted indexer API on \
+                devnet / testnet, or use an older version of the CLI."
+                    .to_string(),
             ));
         }
 
-        // If a custom Docker network is specified, verify that it exists. We only need
-        // to do this if the indexer API is being run, otherwise we don't use Docker.
-        if let Some(ref network_name) = self.docker_network {
-            if !docker::network_exists(network_name).await.map_err(|e| {
-                CliError::UnexpectedError(format!(
-                    "Failed to check if Docker network exists: {}",
-                    e
-                ))
-            })? {
-                return Err(CliError::UnexpectedError(format!(
-                "Docker network '{}' does not exist. Please create it first or omit --docker-network to use the default network.",
-                network_name
-            )));
-            }
-            info!("Using existing Docker network: {}", network_name);
+        if self.log_to_stdout {
+            setup_logging(None);
         }
 
         // Based on the input and global config, get the test directory.
@@ -301,46 +235,6 @@ impl CliCommand<()> for RunLocalnet {
             )
             .context("Failed to build faucet service manager")?;
             managers.push(Box::new(faucet_manager));
-        }
-
-        if self.indexer_api_args.with_indexer_api {
-            let postgres_manager = postgres::PostgresManager::new(&self, test_dir.clone())
-                .context("Failed to build postgres service manager")?;
-            let postgres_health_checkers = postgres_manager.get_health_checkers();
-            managers.push(Box::new(postgres_manager));
-
-            let processor_preqrequisite_healthcheckers =
-                [node_health_checkers, postgres_health_checkers]
-                    .into_iter()
-                    .flatten()
-                    .collect();
-            let processor_managers = ProcessorManager::many_new(
-                &self,
-                processor_preqrequisite_healthcheckers,
-                node_manager.get_data_service_url(),
-                self.postgres_args.get_connection_string(None, true),
-            )
-            .context("Failed to build processor service managers")?;
-
-            let processor_health_checkers = processor_managers
-                .iter()
-                .flat_map(|m| m.get_health_checkers())
-                .collect();
-
-            let mut processor_managers = processor_managers
-                .into_iter()
-                .map(|m| Box::new(m) as Box<dyn ServiceManager>)
-                .collect();
-            managers.append(&mut processor_managers);
-
-            let indexer_api_manager = IndexerApiManager::new(
-                &self,
-                processor_health_checkers,
-                test_dir.clone(),
-                self.postgres_args.get_connection_string(None, false),
-            )
-            .context("Failed to build indexer API service manager")?;
-            managers.push(Box::new(indexer_api_manager));
         }
 
         // We put the node manager into managers at the end just so we have access to

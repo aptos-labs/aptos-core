@@ -1,10 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-/// This file is a copy of the file storage/indexer/src/lib.rs.
-/// At the end of the migration to migrate table info mapping
-/// from storage critical path to indexer, the other file will be removed
-/// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
@@ -31,8 +27,6 @@ use dashmap::{DashMap, DashSet};
 use move_core_types::language_storage::{StructTag, TypeTag};
 use std::{
     collections::{BTreeMap, HashMap},
-    fs,
-    path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -188,11 +182,6 @@ impl IndexerAsyncV2 {
 
     pub fn clear_pending_on(&self) {
         self.pending_on.clear()
-    }
-
-    pub fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {
-        fs::remove_dir_all(path).unwrap_or(());
-        self.db.create_checkpoint(path)
     }
 }
 

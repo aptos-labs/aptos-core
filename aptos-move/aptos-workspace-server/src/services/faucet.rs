@@ -16,7 +16,6 @@ use url::Url;
 ///
 /// Prerequisites
 /// - Node API
-/// - Node indexer grpc
 ///
 /// This function returns two futures
 /// - One that resolves to the port the faucet service is running on, once it has fully started.
@@ -25,7 +24,6 @@ use url::Url;
 pub fn start_faucet(
     test_dir: PathBuf,
     fut_node_api: impl Future<Output = Result<u16, ArcError>> + Send + 'static,
-    fut_indexer_grpc: impl Future<Output = Result<u16, ArcError>> + Send + 'static,
 ) -> (
     impl Future<Output = Result<u16>>,
     impl Future<Output = Result<()>> + 'static,
@@ -36,10 +34,6 @@ pub fn start_faucet(
         let api_port = fut_node_api
             .await
             .context("failed to start faucet: node api did not start successfully")?;
-
-        fut_indexer_grpc
-            .await
-            .context("failed to start faucet: indexer grpc did not start successfully")?;
 
         no_panic_println!("Starting faucet..");
 

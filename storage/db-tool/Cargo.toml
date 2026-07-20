@@ -37,4 +37,3 @@ tokio = { workspace = true }
 aptos-backup-cli = { workspace = true, features = ["testing"] }
 aptos-backup-service = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
-aptos-indexer-grpc-table-info = { workspace = true }

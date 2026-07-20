@@ -9,13 +9,8 @@ on:
       # preview branches
       - preview
       - preview-networking
-      # aptos-indexer-grpc network-specific release branches
-      - aptos-indexer-grpc-devnet
-      - aptos-indexer-grpc-testnet
-      - aptos-indexer-grpc-mainnet
     tags:
       - aptos-node-v*
-      - aptos-indexer-grpc-v*
 
 permissions:
   contents: read

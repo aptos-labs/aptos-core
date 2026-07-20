@@ -50,7 +50,7 @@ FROM rust-base as builder-base
 # See https://github.com/aptos-labs/aptos-core/pull/2472
 ARG BUILT_VIA_BUILDKIT
 ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
-RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
 
 # cargo profile and features
 ARG PROFILE
@@ -95,10 +95,3 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache-trixie \
     docker/builder/build-tools-with-cli-profile.sh
 
-FROM builder-base as indexer-builder
-
-RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
-    --mount=type=cache,target=/usr/local/cargo/git,id=indexer-builder-cargo-git-cache \
-    --mount=type=cache,target=/usr/local/cargo/registry,id=indexer-builder-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=indexer-builder-target-cache-trixie \
-    docker/builder/build-indexer.sh

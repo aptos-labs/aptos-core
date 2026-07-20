@@ -3,12 +3,13 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_db::AptosDB;
-use aptos_db_indexer::db_indexer::DBIndexer;
+use aptos_db_indexer::{
+    db_indexer::DBIndexer, internal_indexer_db_service::InternalIndexerDBService,
+};
 use aptos_executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, integration_test_impl::create_db_and_executor,
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},

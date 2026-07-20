@@ -1,5 +1,0 @@
-transactions:
-  - output_name: fa_mint_transfer_burn
-    script_path: fa_mint_transfer_burn
-    sender_address: d857c1f1dc5303ffcdc47205ebddc02d485c9dce619fd4d00055d86b58143363
-    

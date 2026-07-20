@@ -510,7 +510,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
 
     let mut table = Vec::new();
     table.push(format!(
-        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <14} | {: <12} | {: <13} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <14} | {: <12} | {: <13} | {: <12}",
         type_name,
         "submitted/s",
         "committed/s",
@@ -525,17 +525,13 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         "prop->order",
         "order->commit",
         "actual dur",
-        // optional indexer metrics
-        "idx_fn",
-        "idx_cache",
-        "idx_data",
     ));
 
     for run_results in results {
         for result in run_results {
             let rate = result.stats.rate();
             table.push(format!(
-                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <14.3} | {: <12.3} | {: <13.3} | {: <12.3} | {: <12} | {: <12.3} | {: <12.3}",
+                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <14.3} | {: <12.3} | {: <13.3} | {: <12}",
                 result.name,
                 rate.submitted,
                 rate.committed,
@@ -550,10 +546,6 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.actual_duration.as_secs(),
-                // optional indexer metrics
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::IndexerFullnodeProcessedBatch).unwrap_or(&MetricSamples::default()).max_sample(),
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::IndexerCacheWorkerProcessedBatch).unwrap_or(&MetricSamples::default()).max_sample(),
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::IndexerDataServiceAllChunksSent).unwrap_or(&MetricSamples::default()).max_sample(),
             ));
         }
     }

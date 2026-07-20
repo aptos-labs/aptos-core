@@ -205,7 +205,6 @@ pub struct AptosHandle {
     _consensus_publisher_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
-    _indexer_grpc_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
     _inspection_service_runtime: Runtime,
     _jwk_consensus_runtime: Option<Runtime>,
@@ -222,7 +221,7 @@ pub fn start(
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
 ) -> anyhow::Result<()> {
-    start_and_report_ports(config, log_file, create_global_rayon_pool, None, None)
+    start_and_report_ports(config, log_file, create_global_rayon_pool, None)
 }
 
 /// Start an Aptos node
@@ -231,7 +230,6 @@ pub fn start_and_report_ports(
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
     api_port_tx: Option<oneshot::Sender<u16>>,
-    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<()> {
     // Setup panic handler
     aptos_crash_handler::setup_panic_handler();
@@ -276,7 +274,6 @@ pub fn start_and_report_ports(
         remote_log_receiver,
         Some(logger_filter_update),
         api_port_tx,
-        indexer_grpc_port_tx,
     )?;
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
@@ -362,12 +359,6 @@ pub fn start_test_environment_node(
         "\tAptosnet fullnode network endpoint: {}",
         &config.full_node_networks[0].listen_address
     );
-    if config.indexer_grpc.enabled {
-        println!(
-            "\tIndexer gRPC node stream endpoint: {}",
-            config.indexer_grpc.address
-        );
-    }
     if config.admin_service.enabled.unwrap_or(false) {
         println!(
             "\tAdmin service: http://{}:{}/",
@@ -690,7 +681,6 @@ pub fn setup_environment_and_start_node(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
     api_port_tx: Option<oneshot::Sender<u16>>,
-    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
     node_config.log_all_configs();
@@ -818,22 +808,20 @@ pub fn setup_environment_and_start_node(
     // This unblocks /peer_information (and any other endpoints that need these values).
     inspection_components.set(aptos_data_client, peers_and_metadata.clone());
 
-    // Bootstrap the API and transaction streaming services
+    // Bootstrap the API and the indexer services
     let (
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_grpc_runtime,
         internal_indexer_db_runtime,
         mempool_client_sender,
-    ) = services::bootstrap_api_and_streaming(
+    ) = services::bootstrap_api_and_indexer(
         &node_config,
         db_rw.clone(),
         chain_id,
         indexer_db_opt,
         update_receiver,
         api_port_tx,
-        indexer_grpc_port_tx,
     )?;
 
     // Set mempool client sender in order to enable the Mempool API in the admin service
@@ -900,7 +888,6 @@ pub fn setup_environment_and_start_node(
         _consensus_publisher_runtime: consensus_publisher_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
-        _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
         _inspection_service_runtime: inspection_service_runtime,
         _jwk_consensus_runtime: jwk_consensus_runtime,

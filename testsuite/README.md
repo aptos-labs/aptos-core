@@ -12,8 +12,5 @@ If you run into an issue like this:
 no match for platform in manifest: not found
 ```
 
-It is likely because you're on an ARM machine. Try running your command with `DOCKER_DEFAULT_PLATFORM=linux/amd64`, e.g.
-```
-DOCKER_DEFAULT_PLATFORM=linux/amd64 poetry run python indexer_grpc_local.py start
-```
+It is likely because you're on an ARM machine. Try running your command with `DOCKER_DEFAULT_PLATFORM=linux/amd64`.
 

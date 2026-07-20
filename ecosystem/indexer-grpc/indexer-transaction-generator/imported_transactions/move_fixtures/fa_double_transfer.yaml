@@ -1,5 +1,0 @@
-transactions:
-  - output_name: fa_double_transfer
-    script_path: fa_double_transfer
-    sender_address: 7a2e070df14c96d0808ffab6b735591221241c34f6c4b4a9fa34051f945b5197
-    

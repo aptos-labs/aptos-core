@@ -116,14 +116,14 @@ struct StorageOpt {
     pruner_opt: PrunerOpt,
 
     #[clap(long)]
-    enable_indexer_grpc: bool,
+    enable_table_info: bool,
 }
 
 impl StorageOpt {
     fn storage_test_config(&self) -> StorageTestConfig {
         StorageTestConfig {
             pruner_config: self.pruner_opt.pruner_config(),
-            enable_indexer_grpc: self.enable_indexer_grpc,
+            enable_table_info: self.enable_table_info,
         }
     }
 }
@@ -172,7 +172,7 @@ pub struct PipelineOpt {
 }
 
 impl PipelineOpt {
-    fn pipeline_config(&self, enable_indexer_grpc: bool) -> PipelineConfig {
+    fn pipeline_config(&self, enable_table_info: bool) -> PipelineConfig {
         PipelineConfig {
             generate_then_execute: self.generate_then_execute,
             split_stages: self.split_stages,
@@ -185,7 +185,7 @@ impl PipelineOpt {
             partitioner_config: self.sharding_opt.partitioner_config(),
             num_sig_verify_threads: self.num_sig_verify_threads,
             print_transactions: false,
-            wait_for_indexer_grpc: enable_indexer_grpc,
+            wait_for_table_info: enable_table_info,
         }
     }
 }
@@ -493,7 +493,7 @@ where
                 opt.storage_opt.storage_test_config(),
                 opt.verify_sequence_numbers,
                 opt.pipeline_opt
-                    .pipeline_config(opt.storage_opt.enable_indexer_grpc),
+                    .pipeline_config(opt.storage_opt.enable_table_info),
                 get_init_features(enable_feature, disable_feature),
                 opt.use_keyless_accounts,
             );
@@ -555,7 +555,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.storage_opt.storage_test_config(),
                 opt.pipeline_opt
-                    .pipeline_config(opt.storage_opt.enable_indexer_grpc),
+                    .pipeline_config(opt.storage_opt.enable_table_info),
                 get_init_features(enable_feature, disable_feature),
                 opt.use_keyless_accounts,
             );
@@ -575,7 +575,7 @@ where
                 opt.storage_opt.storage_test_config(),
                 opt.verify_sequence_numbers,
                 opt.pipeline_opt
-                    .pipeline_config(opt.storage_opt.enable_indexer_grpc),
+                    .pipeline_config(opt.storage_opt.enable_table_info),
                 Features::default(),
                 opt.use_keyless_accounts,
             );

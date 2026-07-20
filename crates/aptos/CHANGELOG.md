@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- [**Breaking Change**] Removed the localnet indexer API and transaction stream. `aptos node run-local-testnet` no longer supports `--with-indexer-api` (the flag now produces an error), `--no-txn-stream`, `--txn-stream-port`, `--use-internal-fullnode-data-interface`, `--docker-network`, and the postgres/processor related flags. The localnet itself (node, faucet, REST API) is unaffected. To test against the indexer API, use the hosted indexer API on devnet/testnet or an older CLI version.
 
 ## [9.5.0]
 - Compiler now uses receiver style calls for macro-generated code.

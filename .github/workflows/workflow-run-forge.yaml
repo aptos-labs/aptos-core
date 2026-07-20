@@ -84,10 +84,6 @@ on:
         required: false
         type: string
         description: Number of validator fullnodes to use for the forge test
-      FORGE_ENABLE_INDEXER:
-        required: false
-        type: boolean
-        description: Whether to use indexer
       FORGE_NUM_PFNS:
         required: false
         type: string
@@ -127,7 +123,6 @@ env:
   FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}
-  FORGE_ENABLE_INDEXER: ${{ inputs.FORGE_ENABLE_INDEXER }}
   FORGE_NUM_PFNS: ${{ inputs.FORGE_NUM_PFNS }}
   FORGE_DEPLOYER_PROFILE: ${{ inputs.FORGE_DEPLOYER_PROFILE }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}

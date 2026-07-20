@@ -1,10 +1,3 @@
-indexer_grpc:
-  enabled: true
-  address: 0.0.0.0:50051
-  processor_task_count: 10
-  processor_batch_size: 100
-  output_batch_size: 100
-
 indexer_table_info:
   table_info_service_mode: IndexingOnly
 

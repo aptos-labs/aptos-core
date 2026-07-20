@@ -1,15 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-pub const FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO: &str =
-    "us-docker.pkg.dev/aptos-registry/docker/forge-indexer-deployer";
 pub const FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/forge-testnet-deployer";
 pub const FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/forge-pfn-deployer";
 pub const VALIDATOR_DOCKER_IMAGE_REPO: &str = "us-docker.pkg.dev/aptos-registry/docker/validator";
-pub const INDEXER_GRPC_DOCKER_IMAGE_REPO: &str =
-    "us-docker.pkg.dev/aptos-registry/docker/indexer-grpc";
 
 /// The version of the forge deployer image to use.
 pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str =

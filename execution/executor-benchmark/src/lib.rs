@@ -6,12 +6,12 @@ pub mod block_preparation;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
-mod indexer_grpc_waiter;
 mod ledger_update_stage;
 pub mod measurements;
 mod metrics;
 pub mod native;
 pub mod pipeline;
+mod table_info_waiter;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
@@ -23,24 +23,16 @@ use crate::{
     transaction_executor::TransactionExecutor,
     transaction_generator::{BenchmarkTimestamp, TransactionGenerator},
 };
-use aptos_api::context::Context;
-use aptos_config::config::{
-    get_default_processor_task_count, HotStateConfig, NodeConfig, PrunerConfig,
-    NO_OP_STORAGE_PRUNER_CONFIG,
-};
+use aptos_config::config::{HotStateConfig, NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
-use aptos_db_indexer::{db_ops::open_db, db_v2::IndexerAsyncV2, indexer_reader::IndexerReaders};
+use aptos_db_indexer::{
+    db_ops::open_db, db_v2::IndexerAsyncV2, table_info_service::TableInfoService,
+};
 use aptos_executor::block_executor::BlockExecutor;
-use aptos_indexer_grpc_fullnode::{fullnode_data_service::FullnodeDataService, ServiceContext};
-use aptos_indexer_grpc_table_info::table_info_service::TableInfoService;
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::{info, warn};
-use aptos_protos::internal::fullnode::v1::{
-    fullnode_data_server::FullnodeData, transactions_from_node_response::Response,
-    GetTransactionsFromNodeRequest,
-};
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
@@ -57,34 +49,28 @@ use aptos_vm_environment::prod_configs::{
 };
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
-use futures::StreamExt;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
 use std::{
     fs,
     path::Path,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicUsize, Arc},
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use tonic::IntoRequest;
 
 const TABLE_INFO_DB_NAME: &str = "index_async_v2_db";
 
 #[derive(Clone, Copy, Debug)]
 pub struct StorageTestConfig {
     pub pruner_config: PrunerConfig,
-    pub enable_indexer_grpc: bool,
+    pub enable_table_info: bool,
 }
 
 impl StorageTestConfig {
     pub fn init_storage_config(&self, node_config: &mut NodeConfig) {
         node_config.storage.storage_pruner_config = self.pruner_config;
-        if self.enable_indexer_grpc {
-            node_config.indexer_grpc.enabled = true;
+        if self.enable_table_info {
             node_config.indexer_table_info.table_info_service_mode =
                 aptos_config::config::TableInfoServiceMode::IndexingOnly;
 
@@ -122,13 +108,12 @@ pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
     )
 }
 
-fn init_indexer_wrapper(
+fn init_table_info_service(
     config: &NodeConfig,
     db: &DbReaderWriter,
     storage_test_config: &StorageTestConfig,
-    start_version: u64,
-) -> Option<(Arc<TableInfoService>, Arc<AtomicU64>, Arc<AtomicBool>)> {
-    if !storage_test_config.enable_indexer_grpc {
+) -> Option<Arc<TableInfoService>> {
+    if !storage_test_config.enable_table_info {
         return None;
     }
 
@@ -143,41 +128,14 @@ fn init_indexer_wrapper(
     let indexer_async_v2 =
         Arc::new(IndexerAsyncV2::new(indexer_db).expect("Failed to initialize indexer async v2"));
 
-    // Create API context for table_info_service
-    let (mp_sender, _mp_receiver) = futures::channel::mpsc::channel(1);
-    // Use ChainId::test() for benchmark
-    let chain_id = aptos_types::chain_id::ChainId::test();
-    let context = Arc::new(Context::new(
-        chain_id,
-        db.reader.clone(),
-        mp_sender,
-        config.clone(),
-        Some(Arc::new(
-            IndexerReaders::new(Some(indexer_async_v2.clone()), None).unwrap(),
-        )),
-    ));
-    let service_context = ServiceContext {
-        context: context.clone(),
-        processor_task_count: config.indexer_grpc.processor_task_count.unwrap_or_else(|| {
-            get_default_processor_task_count(config.indexer_grpc.use_data_service_interface)
-        }),
-        processor_batch_size: config.indexer_grpc.processor_batch_size,
-        output_batch_size: config.indexer_grpc.output_batch_size,
-        transaction_channel_size: config.indexer_grpc.transaction_channel_size,
-        max_transaction_filter_size_bytes: config.indexer_grpc.max_transaction_filter_size_bytes,
-    };
-
     // Spawn table_info_service in tokio runtime
-    let indexer_async_v2_clone = indexer_async_v2.clone();
-    let config_clone = config.clone();
     let indexer_runtime = tokio::runtime::Runtime::new().unwrap();
     let table_info_service = Arc::new(TableInfoService::new(
-        context,
-        indexer_async_v2_clone.next_version(),
-        config_clone.indexer_table_info.parser_task_count,
-        config_clone.indexer_table_info.parser_batch_size,
-        None, // No backup/restore for benchmark
-        indexer_async_v2_clone,
+        db.reader.clone(),
+        indexer_async_v2.next_version(),
+        config.indexer_table_info.parser_task_count,
+        config.indexer_table_info.parser_batch_size,
+        indexer_async_v2,
     ));
     let table_info_service_clone = table_info_service.clone();
     indexer_runtime.spawn(async move {
@@ -187,48 +145,17 @@ fn init_indexer_wrapper(
         );
         table_info_service_clone.run().await;
     });
-    let grpc_version = Arc::new(AtomicU64::new(0));
-    let grpc_version_clone = grpc_version.clone();
-    let abort_handle = Arc::new(AtomicBool::new(false));
-    let abort_handle_clone = abort_handle.clone();
-    indexer_runtime.spawn(async move {
-        let grpc_service = FullnodeDataService {
-            service_context,
-            abort_handle,
-        };
-        println!("Starting grpc stream at version {start_version}.");
-        let request = GetTransactionsFromNodeRequest {
-            starting_version: Some(start_version),
-            transactions_count: None,
-        };
-        let mut response = grpc_service
-            .get_transactions_from_node(request.into_request())
-            .await
-            .unwrap()
-            .into_inner();
-        while let Some(item) = response.next().await {
-            if let Ok(r) = item {
-                if let Some(response) = r.response {
-                    if let Response::Data(data) = response {
-                        if let Some(txn) = data.transactions.last().as_ref() {
-                            grpc_version_clone.store(txn.version, Ordering::SeqCst);
-                        }
-                    }
-                }
-            }
-        }
-    });
 
     // Keep runtime alive - it will be dropped when the function scope ends
     std::mem::forget(indexer_runtime);
 
-    Some((table_info_service, grpc_version, abort_handle_clone))
+    Some(table_info_service)
 }
 
 fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    enable_indexer_grpc: bool,
+    enable_table_info: bool,
 ) {
     println!("Creating checkpoint for DBs.");
     // Create rocksdb checkpoint.
@@ -237,7 +164,7 @@ fn create_checkpoint(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    if enable_indexer_grpc {
+    if enable_table_info {
         let db_path = source_dir.as_ref().join(TABLE_INFO_DB_NAME);
         let indexer_db = open_db(db_path, &Default::default(), /*readonly=*/ false)
             .expect("Failed to open table info db.");
@@ -297,7 +224,7 @@ where
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        storage_test_config.enable_indexer_grpc,
+        storage_test_config.enable_table_info,
     );
     let (mut config, genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
@@ -416,8 +343,8 @@ where
         pipeline_config
     };
 
-    // Initialize table_info_service and grpc stream if indexer_grpc is enabled
-    let indexer_wrapper = init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
+    // Initialize the table info service if enabled
+    let table_info_service = init_table_info_service(&config, &db, &storage_test_config);
 
     let executor = BlockExecutor::<V>::new(db.clone());
     let (pipeline, block_sender) = Pipeline::new(
@@ -425,7 +352,7 @@ where
         start_version,
         &pipeline_config,
         Some(num_blocks),
-        indexer_wrapper,
+        table_info_service,
         transaction_feedback,
     );
 
@@ -590,7 +517,7 @@ pub fn add_accounts<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        storage_test_config.enable_indexer_grpc,
+        storage_test_config.enable_table_info,
     );
     add_accounts_impl::<V>(
         num_new_accounts,
@@ -629,7 +556,7 @@ fn add_accounts_impl<V>(
     let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
     // Initialize indexer if enabled
-    let indexer_wrapper = init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
+    let table_info_service = init_table_info_service(&config, &db, &storage_test_config);
 
     let executor = BlockExecutor::<V>::new(db.clone());
 
@@ -665,7 +592,7 @@ fn add_accounts_impl<V>(
         current_version,
         &pipeline_config,
         Some(num_new_accounts / block_size * 101 / 100),
-        indexer_wrapper,
+        table_info_service,
         None,
     );
 
@@ -764,7 +691,7 @@ pub struct SingleRunAdditionalConfigs {
     /// stitched together in arbitrary order
     pub num_generator_workers: usize,
     pub split_stages: bool,
-    pub enable_indexer_grpc: bool,
+    pub enable_table_info: bool,
 }
 
 pub fn run_single_with_default_params(
@@ -871,7 +798,7 @@ pub fn run_single_with_default_params(
             ..
         } => split_stages,
     };
-    let enable_indexer_grpc = match mode {
+    let enable_table_info = match mode {
         SingleRunMode::TEST
         | SingleRunMode::EXACT { .. }
         | SingleRunMode::BENCHMARK {
@@ -881,11 +808,10 @@ pub fn run_single_with_default_params(
         SingleRunMode::BENCHMARK {
             additional_configs:
                 Some(SingleRunAdditionalConfigs {
-                    enable_indexer_grpc,
-                    ..
+                    enable_table_info, ..
                 }),
             ..
-        } => enable_indexer_grpc,
+        } => enable_table_info,
     };
 
     let num_main_signer_accounts = num_accounts / 5;
@@ -901,13 +827,13 @@ pub fn run_single_with_default_params(
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
         print_transactions,
-        wait_for_indexer_grpc: enable_indexer_grpc,
+        wait_for_table_info: enable_table_info,
         ..Default::default()
     };
 
     let storage_test_config = StorageTestConfig {
         pruner_config: NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
-        enable_indexer_grpc,
+        enable_table_info,
     };
 
     create_db_with_accounts::<AptosVMBlockExecutor>(
@@ -930,7 +856,7 @@ pub fn run_single_with_default_params(
         print_transactions,
         num_generator_workers,
         split_stages,
-        wait_for_indexer_grpc: enable_indexer_grpc,
+        wait_for_table_info: enable_table_info,
         ..Default::default()
     };
 
@@ -1051,7 +977,6 @@ mod tests {
             aptos_genesis::test_utils::test_config_with_custom_features(features);
         config.storage.dir = db_dir.as_ref().to_path_buf();
         config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
-        config.indexer_grpc.enabled = false; // Disable indexer for tests
 
         let (txn, vm_result) = {
             let vm_db = init_db(&config);
@@ -1215,7 +1140,7 @@ mod tests {
 
         let storage_test_config = StorageTestConfig {
             pruner_config: NO_OP_STORAGE_PRUNER_CONFIG,
-            enable_indexer_grpc: true,
+            enable_table_info: true,
         };
 
         crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(
@@ -1227,7 +1152,7 @@ mod tests {
             storage_test_config,
             verify_sequence_numbers,
             PipelineConfig {
-                wait_for_indexer_grpc: true,
+                wait_for_table_info: true,
                 ..Default::default()
             },
             features.clone(),
@@ -1260,7 +1185,7 @@ mod tests {
             verify_sequence_numbers,
             storage_test_config,
             PipelineConfig {
-                wait_for_indexer_grpc: true,
+                wait_for_table_info: true,
                 ..Default::default()
             },
             features,

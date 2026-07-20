@@ -40,7 +40,6 @@ services:
     command: ["/usr/local/bin/aptos-node", "--test", "--test-dir", "/opt/aptos/var/", "--test-config-override", "/opt/aptos/config.yaml"]
     ports:
       - "8080:8080" # REST API
-      - "50051:50051" # Indexer GRPC, if enabled
     expose:
       - 9101
 

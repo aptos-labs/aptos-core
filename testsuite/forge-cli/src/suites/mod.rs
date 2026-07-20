@@ -3,7 +3,6 @@
 
 pub mod dag;
 pub mod db;
-pub mod indexer;
 pub mod land_blocking;
 pub mod multi_region;
 pub mod pfn;

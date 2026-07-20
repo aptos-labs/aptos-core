@@ -10,7 +10,7 @@ use crate::{
     parser::{config::ParserConfig, ParserContext},
     utils::database::{establish_connection_pool, run_migrations},
 };
-use aptos_indexer_grpc_server_framework::RunnableConfig;
+use aptos_server_framework::RunnableConfig;
 use axum::Router;
 use diesel::{
     r2d2::{ConnectionManager, Pool},

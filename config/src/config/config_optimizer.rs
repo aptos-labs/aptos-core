@@ -3,7 +3,7 @@
 
 use super::{
     ConsensusConfig, ConsensusObserverConfig, DiscoveryMethod, Identity, IdentityFromConfig,
-    IdentitySource, IndexerGrpcConfig, NetworkConfig, StorageConfig, DEFAULT_PUBLIC_NETWORK_PORT,
+    IdentitySource, NetworkConfig, StorageConfig, DEFAULT_PUBLIC_NETWORK_PORT,
 };
 use crate::{
     config::{
@@ -122,9 +122,6 @@ impl ConfigOptimizer for NodeConfig {
         }
         if ExecutionConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(ExecutionConfig::get_optimizer_name());
-        }
-        if IndexerGrpcConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
-            optimizers_with_modifications.push(IndexerGrpcConfig::get_optimizer_name());
         }
         if InspectionServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(InspectionServiceConfig::get_optimizer_name());

@@ -58,8 +58,6 @@ aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
-aptos-indexer-grpc-fullnode = { workspace = true }
-aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-jwk-consensus = { workspace = true }

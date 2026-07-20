@@ -8,11 +8,6 @@ describe('releaseImages', () => {
         const releaseGroup = getImageReleaseGroupByImageTagPrefix(prefix);
         expect(releaseGroup).toEqual('aptos-node');
     });
-    it('gets indexer image group', () => {
-        const prefix = 'aptos-indexer-grpc-vX.Y.Z';
-        const releaseGroup = getImageReleaseGroupByImageTagPrefix(prefix);
-        expect(releaseGroup).toEqual('aptos-indexer-grpc');
-    });
     it('gets aptos-node as the node image group', () => {
         const prefix = 'aptos-node-vX.Y.Z';
         const releaseGroup = getImageReleaseGroupByImageTagPrefix(prefix);

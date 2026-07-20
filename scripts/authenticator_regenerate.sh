@@ -41,5 +41,4 @@ echo
 echo "WARNING: If you are adding a new transaction authenticator..."
 echo " 1. Check out https://github.com/aptos-labs/aptos-core/blob/main/testsuite/generate-format/README.md"
 echo "    * In particular, be sure to edit the *.yaml files in testsuite/generate-format/tests/staged"
-echo " 2. ecosystem/indexer-grpc/indexer-grpc-fullnode/src/convert.rs must be manually updated"
 echo

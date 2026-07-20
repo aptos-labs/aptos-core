@@ -6,14 +6,9 @@ use serde::{Deserialize, Serialize};
 // Useful defaults
 pub const DEFAULT_PARSER_TASK_COUNT: u16 = 20;
 pub const DEFAULT_PARSER_BATCH_SIZE: u16 = 1000;
-pub const DEFAULT_TABLE_INFO_BUCKET: &str = "default-table-info";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum TableInfoServiceMode {
-    /// Backup service mode with GCS bucket name.
-    Backup(String),
-    /// Restore service mode with GCS bucket name.
-    Restore(String),
     IndexingOnly,
     Disabled,
 }

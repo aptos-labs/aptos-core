@@ -290,8 +290,10 @@ mod dbtool_tests {
             RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             NO_OP_STORAGE_PRUNER_CONFIG,
         };
-        use aptos_db_indexer::utils::PrefixedStateValueIterator as IndexerPrefixedStateValueIterator;
-        use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
+        use aptos_db_indexer::{
+            internal_indexer_db_service::InternalIndexerDBService,
+            utils::PrefixedStateValueIterator as IndexerPrefixedStateValueIterator,
+        };
         let db = test_execution_with_storage_impl_inner(false, old_db_dir.as_path());
         let (rt, port) = start_local_backup_service(Arc::clone(&db));
         let server_addr = format!(" http://localhost:{}", port);

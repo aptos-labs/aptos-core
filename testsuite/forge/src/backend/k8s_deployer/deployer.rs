@@ -306,7 +306,7 @@ impl ForgeDeployerManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MockK8sResourceApi, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO};
+    use crate::{MockK8sResourceApi, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO};
     use serde_json::json;
 
     fn get_mock_forge_deployer_manager() -> ForgeDeployerManager {
@@ -319,12 +319,12 @@ mod tests {
             serviceaccount_api: Arc::new(MockK8sResourceApi::new()),
             rolebinding_api: Arc::new(MockK8sResourceApi::new()),
             namespace,
-            image_repo: FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+            image_repo: FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
             image_tag: None,
         }
     }
 
-    /// Test creating a forge deployer manager and creating an indexer deployment with it. Nothing
+    /// Test creating a forge deployer manager and creating a deployment with it. Nothing
     /// exists in the namespace yet
     #[tokio::test]
     async fn test_start_deployer_fresh_environment() {
@@ -338,17 +338,17 @@ mod tests {
         ))
         .expect("Issue creating Forge deployer config");
         manager.start(config).await.unwrap();
-        let indexer_deployer_name = manager.get_name();
+        let testnet_deployer_name = manager.get_name();
         manager
             .jobs_api
-            .get(&indexer_deployer_name)
+            .get(&testnet_deployer_name)
             .await
-            .unwrap_or_else(|_| panic!("Expected job {} to exist", indexer_deployer_name));
+            .unwrap_or_else(|_| panic!("Expected job {} to exist", testnet_deployer_name));
         manager
             .config_maps_api
-            .get(&indexer_deployer_name)
+            .get(&testnet_deployer_name)
             .await
-            .unwrap_or_else(|_| panic!("Expected configmap {} to exist", indexer_deployer_name));
+            .unwrap_or_else(|_| panic!("Expected configmap {} to exist", testnet_deployer_name));
     }
 
     /// Test starting a deployer with an existing job in the namespace. The deployer should

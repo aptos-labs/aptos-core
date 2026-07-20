@@ -3,17 +3,17 @@
 
 use crate::{
     block_preparation::BlockPreparationStage,
-    indexer_grpc_waiter::IndexerGrpcWaiter,
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
     measurements::{EventMeasurements, OverallMeasuring},
     metrics::NUM_TXNS,
+    table_info_waiter::TableInfoWaiter,
     OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
+use aptos_db_indexer::table_info_service::TableInfoService;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
-use aptos_indexer_grpc_table_info::table_info_service::TableInfoService;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_metrics_core::IntCounterVecHelper;
@@ -29,7 +29,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc::{self, SyncSender},
         Arc,
     },
@@ -55,7 +54,7 @@ pub struct PipelineConfig {
     pub num_sig_verify_threads: usize,
 
     pub print_transactions: bool,
-    pub wait_for_indexer_grpc: bool,
+    pub wait_for_table_info: bool,
 }
 
 pub struct Pipeline<V> {
@@ -76,7 +75,7 @@ where
         config: &PipelineConfig,
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
-        indexer_wrapper: Option<(Arc<TableInfoService>, Arc<AtomicU64>, Arc<AtomicBool>)>,
+        table_info_service: Option<Arc<TableInfoService>>,
         transaction_feedback: Option<Arc<dyn TransactionFeedback>>,
     ) -> (Self, SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
@@ -124,8 +123,8 @@ where
         let (start_ledger_update_tx, start_ledger_update_rx) =
             create_start_tx_rx(config.split_stages);
         let (start_commit_tx, start_commit_rx) = create_start_tx_rx(config.split_stages);
-        let (start_indexer_grpc_wait_tx, start_indexer_grpc_wait_rx) =
-            create_start_tx_rx(config.wait_for_indexer_grpc);
+        let (start_table_info_wait_tx, start_table_info_wait_rx) =
+            create_start_tx_rx(config.wait_for_table_info);
 
         let mut join_handles = vec![];
 
@@ -306,9 +305,9 @@ where
                         TransactionCommitter::new(executor_3, start_version, commit_receiver);
                     let final_version = committer.run();
 
-                    // Store the final version for indexer_grpc waiter
+                    // Store the final version for the table info waiter
                     *target_version_clone.lock() = Some(final_version);
-                    start_indexer_grpc_wait_tx.map(|tx| tx.send(()));
+                    start_table_info_wait_tx.map(|tx| tx.send(()));
 
                     0
                 })
@@ -316,16 +315,16 @@ where
             join_handles.push(commit_thread);
         }
 
-        // Add indexer_grpc waiter stage
-        if config.wait_for_indexer_grpc && !config.skip_commit {
-            if let Some(indexer_wrapper) = indexer_wrapper {
-                let waiter = IndexerGrpcWaiter::new(indexer_wrapper.0, indexer_wrapper.1);
+        // Add table info waiter stage
+        if config.wait_for_table_info && !config.skip_commit {
+            if let Some(table_info_service) = table_info_service {
+                let waiter = TableInfoWaiter::new(table_info_service);
                 let target_version_for_waiter = target_version.clone();
                 let waiter_thread = std::thread::Builder::new()
-                    .name("indexer_grpc_waiter".to_string())
+                    .name("table_info_waiter".to_string())
                     .spawn(move || {
-                        start_indexer_grpc_wait_rx.map(|rx| rx.recv());
-                        info!("Starting indexer_grpc waiter thread");
+                        start_table_info_wait_rx.map(|rx| rx.recv());
+                        info!("Starting table info waiter thread");
 
                         // Wait for target version to be set by commit thread
                         let target_ver = loop {
@@ -340,13 +339,12 @@ where
                         runtime.block_on(
                             waiter.wait_for_version(target_ver - 1, /*abort_on_finish=*/ true),
                         );
-                        indexer_wrapper.2.store(true, Ordering::SeqCst);
-                        info!("Indexer_grpc waiter finished");
+                        info!("Table info waiter finished");
                         // This is a HACK. Just sleep here to wait the DB lock to drop.
                         std::thread::sleep(std::time::Duration::from_secs(2));
                         0
                     })
-                    .expect("Failed to spawn indexer_grpc waiter thread.");
+                    .expect("Failed to spawn table info waiter thread.");
                 join_handles.push(waiter_thread);
             }
         }

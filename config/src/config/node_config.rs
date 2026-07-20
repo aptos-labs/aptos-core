@@ -10,10 +10,9 @@ use crate::{
         node_startup_config::NodeStartupConfig, persistable_config::PersistableConfig,
         transaction_filters_config::TransactionFiltersConfig,
         transaction_tracing_config::TransactionTracingConfig, utils::RootPath, AdminServiceConfig,
-        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerGrpcConfig,
-        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
-        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
-        TelemetryServiceConfig,
+        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, InspectionServiceConfig,
+        LoggerConfig, MempoolConfig, NetworkConfig, PeerMonitoringServiceConfig,
+        SafetyRulesTestConfig, StateSyncConfig, StorageConfig, TelemetryServiceConfig,
     },
     network_id::NetworkId,
 };
@@ -56,8 +55,6 @@ pub struct NodeConfig {
     pub failpoints: Option<HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub full_node_networks: Vec<NetworkConfig>,
-    #[serde(default)]
-    pub indexer_grpc: IndexerGrpcConfig,
     #[serde(default)]
     pub indexer_table_info: IndexerTableInfoConfig,
     #[serde(default)]

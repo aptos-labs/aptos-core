@@ -4,7 +4,7 @@
 use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
 use crate::node::local_testnet::utils::socket_addr_to_url;
 use anyhow::{anyhow, Context, Result};
-use aptos_config::config::{NodeConfig, DEFAULT_GRPC_STREAM_PORT};
+use aptos_config::config::NodeConfig;
 use aptos_node::{load_node_config, start_test_environment_node};
 use async_trait::async_trait;
 use clap::Parser;
@@ -19,8 +19,7 @@ use std::{
     time::Duration,
 };
 
-/// Args specific to running a node (and its components, e.g. the txn stream) in the
-/// localnet.
+/// Args specific to running a node in the localnet.
 #[derive(Debug, Parser)]
 pub struct NodeArgs {
     /// An overridable config template for the test node
@@ -49,26 +48,6 @@ pub struct NodeArgs {
     #[clap(long, value_parser = aptos_node::load_seed)]
     pub seed: Option<[u8; 32]>,
 
-    /// Do not run a transaction stream service alongside the node.
-    ///
-    /// Note: In reality this is not the same as running a Transaction Stream Service,
-    /// it is just using the stream directly on the node, but in practice this
-    /// distinction shouldn't matter.
-    #[clap(long)]
-    no_txn_stream: bool,
-
-    /// The port at which to expose the grpc transaction stream.
-    #[clap(long, default_value_t = DEFAULT_GRPC_STREAM_PORT)]
-    txn_stream_port: u16,
-
-    /// Use the internal FullnodeData gRPC interface instead of the RawData (data
-    /// service) interface for the transaction stream. This is needed for example when
-    /// running the indexer-grpc-manager stack against the localnet, since the manager
-    /// expects the FullnodeData interface. If you aren't sure if you need to enable
-    /// this, you almost certainly don't.
-    #[clap(long)]
-    use_internal_fullnode_data_interface: bool,
-
     /// If set we won't run the node at all.
     //
     // Note: I decided that since running multiple partial localnets is a rare
@@ -96,7 +75,6 @@ pub struct NodeManager {
     config: NodeConfig,
     test_dir: PathBuf,
     no_node: bool,
-    use_internal_fullnode_data_interface: bool,
 }
 
 pub fn build_node_config(
@@ -137,46 +115,22 @@ impl NodeManager {
             args.node_args.performance,
             test_dir.clone(),
         )?;
-        Self::new_with_config(
-            node_config,
-            bind_to,
-            test_dir,
-            !args.node_args.no_txn_stream,
-            args.node_args.txn_stream_port,
-            args.node_args.no_node,
-            args.node_args.use_internal_fullnode_data_interface,
-        )
+        Self::new_with_config(node_config, bind_to, test_dir, args.node_args.no_node)
     }
 
     pub fn new_with_config(
         mut node_config: NodeConfig,
         bind_to: Ipv4Addr,
         test_dir: PathBuf,
-        run_txn_stream: bool,
-        txn_stream_port: u16,
         no_node: bool,
-        use_internal_fullnode_data_interface: bool,
     ) -> Result<Self> {
         eprintln!();
 
-        // Enable the grpc stream on the node if we will run a txn stream service.
-        node_config.indexer_grpc.enabled = run_txn_stream;
-        // When use_internal_fullnode_data_interface is set, expose the internal
-        // FullnodeData gRPC interface instead of the RawData interface. The
-        // indexer-grpc-manager expects FullnodeData/GetTransactionsFromNode.
-        node_config.indexer_grpc.use_data_service_interface =
-            run_txn_stream && !use_internal_fullnode_data_interface;
-        node_config.indexer_grpc.address.set_port(txn_stream_port);
-
-        node_config.indexer_table_info.table_info_service_mode = match run_txn_stream {
-            // Localnet should be responsible for backup or restore of table info tables.
-            true => aptos_config::config::TableInfoServiceMode::IndexingOnly,
-            false => aptos_config::config::TableInfoServiceMode::Disabled,
-        };
+        node_config.indexer_table_info.table_info_service_mode =
+            aptos_config::config::TableInfoServiceMode::IndexingOnly;
 
         // Bind to the requested address.
         node_config.api.address.set_ip(IpAddr::V4(bind_to));
-        node_config.indexer_grpc.address.set_ip(IpAddr::V4(bind_to));
         node_config.admin_service.address = bind_to.to_string();
         node_config.inspection_service.address = bind_to.to_string();
         node_config.indexer_db_config.enable_event = true;
@@ -187,21 +141,11 @@ impl NodeManager {
             config: node_config,
             test_dir,
             no_node,
-            use_internal_fullnode_data_interface,
         })
     }
 
     pub fn get_node_api_url(&self) -> Url {
         let mut addr = self.config.api.address;
-        // If bound to 0.0.0.0, clients should connect to 127.0.0.1 instead.
-        if addr.ip().is_unspecified() {
-            addr.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-        }
-        socket_addr_to_url(&addr, "http").unwrap()
-    }
-
-    pub fn get_data_service_url(&self) -> Url {
-        let mut addr = self.config.indexer_grpc.address;
         // If bound to 0.0.0.0, clients should connect to 127.0.0.1 instead.
         if addr.ip().is_unspecified() {
             addr.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
@@ -216,20 +160,8 @@ impl ServiceManager for NodeManager {
         "Node API".to_string()
     }
 
-    /// We return health checkers for both the Node API and the txn stream (if enabled).
-    /// As it is now, it is fine to make downstream services wait for both but if that
-    /// changes we can refactor.
     fn get_health_checkers(&self) -> HashSet<HealthChecker> {
-        let node_api_url = self.get_node_api_url();
-        let mut checkers = HashSet::new();
-        checkers.insert(HealthChecker::NodeApi(node_api_url));
-        // The DataServiceGrpc health check uses the RawData interface, which
-        // is not available when the FullnodeData interface is exposed instead.
-        if self.config.indexer_grpc.enabled && !self.use_internal_fullnode_data_interface {
-            let data_service_url = self.get_data_service_url();
-            checkers.insert(HealthChecker::DataServiceGrpc(data_service_url));
-        }
-        checkers
+        hashset! {HealthChecker::NodeApi(self.get_node_api_url())}
     }
 
     fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker> {

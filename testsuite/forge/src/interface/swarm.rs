@@ -106,10 +106,6 @@ pub trait Swarm: Sync + Send {
     }
 
     fn get_default_pfn_node_config(&self) -> NodeConfig;
-
-    /// Check if the swarm has an indexer. NOTE: in the future we should make this more rich, and include
-    /// indexer endpoints, similar to how we collect validator and fullnode endpoints.
-    fn has_indexer(&self) -> bool;
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}

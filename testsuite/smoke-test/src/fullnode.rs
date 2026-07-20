@@ -9,12 +9,12 @@ use crate::{
 use anyhow::bail;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
+use aptos_db_indexer::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_db_indexer_schemas::{
     metadata::MetadataKey,
     schema::{indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema},
 };
 use aptos_forge::{NodeExt, Result, Swarm, SwarmExt};
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_rest_client::Client as RestClient;
 use aptos_schemadb::DB;
 use aptos_types::{account_address::AccountAddress, state_store::state_key::StateKey};

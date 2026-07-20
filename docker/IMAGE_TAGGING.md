@@ -85,7 +85,7 @@ Images are built by [`workflow-run-docker-rust-build.yaml`](../.github/workflows
 
 ## Release workflows
 
-### Versioned releases (`aptos-node-vX.Y.Z`, `aptos-indexer-grpc-vX.Y.Z`)
+### Versioned releases (`aptos-node-vX.Y.Z`)
 
 Triggered by pushing a tag or one of the named network branches (`devnet`, `testnet`, `mainnet`, etc.) via [`copy-images-to-dockerhub-release.yaml`](../.github/workflows/copy-images-to-dockerhub-release.yaml). The git ref name (`github.ref_name`) becomes `IMAGE_TAG_PREFIX`.
 
@@ -108,8 +108,7 @@ Both release paths call [`copy-images-to-dockerhub.yaml`](../.github/workflows/c
 
 | Prefix contains | Release group | Images |
 |---|---|---|
-| `aptos-node` (default) | `aptos-node` | `validator`, `validator-testing`, `faucet`, `tools`, `indexer-grpc` |
-| `aptos-indexer-grpc` | `aptos-indexer-grpc` | `indexer-grpc` |
+| `aptos-node` (default) | `aptos-node` | `validator`, `validator-testing`, `faucet`, `tools` |
 
 `validator-testing` is released to GCP only — never to Docker Hub (controlled by `IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL` in [`docker/release-images.mjs`](release-images.mjs)).
 
@@ -123,7 +122,6 @@ Each image declares which (profile, feature) combinations are released. Defined 
 | `validator-testing` | `release`, `performance` |
 | `faucet` | `release`, `performance` |
 | `tools` | `release`, `performance` |
-| `indexer-grpc` | `release`, `performance` |
 
 ## Release validation
 

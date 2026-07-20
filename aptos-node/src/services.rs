@@ -11,12 +11,12 @@ use aptos_consensus::{
     quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
-use aptos_db_indexer::{db_indexer::InternalIndexerDB, indexer_reader::IndexerReaders};
-use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
-use aptos_indexer_grpc_table_info::runtime::{
-    bootstrap as bootstrap_indexer_table_info, bootstrap_internal_indexer_db,
+use aptos_db_indexer::{
+    db_indexer::InternalIndexerDB,
+    indexer_reader::IndexerReaders,
+    runtime::{bootstrap_internal_indexer_db, bootstrap_table_info},
 };
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_inspection_service::server::InspectionServiceComponents;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{
@@ -43,19 +43,17 @@ const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const DEFAULT_MAX_NUM_WORKER_THREADS: usize = 32;
 
-/// Bootstraps the API and transaction streaming services. Returns the
+/// Bootstraps the API and the indexer services. Returns the
 /// Mempool client receiver, runtimes, and the Mempool client sender.
-pub fn bootstrap_api_and_streaming(
+pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     chain_id: ChainId,
     internal_indexer_db: Option<InternalIndexerDB>,
     update_receiver: Option<WatchReceiver<(Instant, Version)>>,
     api_port_tx: Option<oneshot::Sender<u16>>,
-    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
-    Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
@@ -65,15 +63,11 @@ pub fn bootstrap_api_and_streaming(
     let (mempool_client_sender, mempool_client_receiver) =
         mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let (indexer_table_info_runtime, indexer_async_v2) = match bootstrap_indexer_table_info(
-        node_config,
-        chain_id,
-        db_rw.clone(),
-        mempool_client_sender.clone(),
-    ) {
-        Some((runtime, indexer_v2)) => (Some(runtime), Some(indexer_v2)),
-        None => (None, None),
-    };
+    let (indexer_table_info_runtime, indexer_async_v2) =
+        match bootstrap_table_info(node_config, db_rw.clone()) {
+            Some((runtime, indexer_v2)) => (Some(runtime), Some(indexer_v2)),
+            None => (None, None),
+        };
 
     let (db_indexer_runtime, txn_event_reader) = match bootstrap_internal_indexer_db(
         node_config,
@@ -99,28 +93,17 @@ pub fn bootstrap_api_and_streaming(
             chain_id,
             db_rw.reader.clone(),
             mempool_client_sender.clone(),
-            indexer_reader.clone(),
+            indexer_reader,
             api_port_tx,
         )?)
     } else {
         None
     };
 
-    // Creates the indexer grpc runtime
-    let indexer_grpc = bootstrap_indexer_grpc(
-        node_config,
-        chain_id,
-        db_rw.reader.clone(),
-        mempool_client_sender.clone(),
-        indexer_reader,
-        indexer_grpc_port_tx,
-    );
-
     Ok((
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_grpc,
         db_indexer_runtime,
         mempool_client_sender,
     ))

@@ -23,8 +23,8 @@ use aptos_db::{
         StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch, StateValueWriter,
     },
 };
+use aptos_db_indexer::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
 use aptos_logger::info;

@@ -22,19 +22,10 @@ aptos-types = { workspace = true }
 
 # third party deps
 anyhow = { workspace = true }
-bollard = { workspace = true }
 clap = { workspace = true }
-diesel = { workspace = true, features = ["postgres_backend"] }
-diesel-async = { workspace = true }
 futures = { workspace = true }
-maplit = { workspace = true }
 rand = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
-uuid = { workspace = true }
-
-# indexer deps
-aptos-indexer-processor-sdk = { workspace = true }
-processor = { workspace = true }

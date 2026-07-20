@@ -39,10 +39,6 @@ on:
         required: false
         type: string
         description: The Forge k8s cluster to be used for test
-      FORGE_INDEXER_DEPLOYER_PROFILE:
-        required: false
-        type: string
-        description: If set enables an indexer stack with your test, spinning up with the provided profile from https://github.com/aptos-labs/internal-ops/blob/main/infra/cli/commands/forge/profiles.ts
       FORGE_NUM_VALIDATORS:
         required: false
         type: string
@@ -78,7 +74,6 @@ jobs:
           echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
           echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
           echo "FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}"
-          echo "FORGE_INDEXER_DEPLOYER_PROFILE: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}"
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
@@ -90,7 +85,6 @@ jobs:
       forgeNumValidators: ${{ inputs.FORGE_NUM_VALIDATORS }}
       forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
       forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
-      forgeIndexerDeployerProfile: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     needs: [determine-forge-run-metadata]
@@ -106,5 +100,3 @@ jobs:
       FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
       FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
       FORGE_RETAIN_DEBUG_LOGS: ${{ needs.determine-forge-run-metadata.outputs.forgeRetainDebugLogs == 'true' }}
-      FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile != '' }}
-      FORGE_DEPLOYER_PROFILE: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile }}

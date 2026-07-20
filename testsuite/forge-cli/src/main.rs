@@ -14,7 +14,6 @@ use std::{self, num::NonZeroUsize, path::PathBuf, process, time::Duration};
 use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
-    indexer::get_indexer_test,
     land_blocking::get_land_blocking_test,
     multi_region::get_multi_region_test,
     pfn::get_pfn_test,
@@ -155,8 +154,6 @@ struct K8sSwarm {
         help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
     )]
     retain_debug_logs: bool,
-    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
-    enable_indexer: bool,
     #[clap(
         long,
         help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable). Overrides the test suite default if set."
@@ -225,14 +222,6 @@ struct Create {
     connect_directly: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
-    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
-    enable_indexer: bool,
-    #[clap(
-        long,
-        help = "Override the image tag used for indexer",
-        requires = "enable_indexer"
-    )]
-    indexer_image_tag: Option<String>,
     #[clap(
         long,
         help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable)",
@@ -369,7 +358,6 @@ fn main() -> Result<()> {
                             k8s.reuse,
                             k8s.keep,
                             k8s.enable_haproxy,
-                            k8s.enable_indexer,
                             pfn_deployment_configs,
                             pfn_base_node_config,
                             k8s.deployer_profile.clone(),
@@ -401,21 +389,6 @@ fn main() -> Result<()> {
             OperatorCommand::Create(create) => {
                 let kube_client = runtime.block_on(create_k8s_client())?;
                 let era = generate_new_era();
-                let indexer_image_tag = create
-                    .indexer_image_tag
-                    .or(Some(create.validator_image_tag.clone()))
-                    .expect("Expected indexer or validator image tag to use");
-                let config: Value = serde_json::from_value(json!({
-                    "profile": create.deployer_profile,
-                    "era": era.clone(),
-                    "namespace": create.namespace.clone(),
-                    "indexer-grpc-values": {
-                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, &indexer_image_tag),
-                        "fullnodeConfig": {
-                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &indexer_image_tag),
-                        }
-                    },
-                }))?;
 
                 // Clone values needed by multiple deployer futures before they move
                 let pfn_kube_client = kube_client.clone();
@@ -436,29 +409,12 @@ fn main() -> Result<()> {
                         create.move_modules_dir,
                         false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validate their health
                         create.enable_haproxy,
-                        create.enable_indexer,
                         create.deployer_profile,
                         None,
                         None,
                         true,
                     )
                     .await
-                }
-                .boxed();
-
-                let deploy_indexer_fut = async {
-                    if create.enable_indexer {
-                        let indexer_deployer = ForgeDeployerManager::new(
-                            kube_client.clone(),
-                            create.namespace.clone(),
-                            FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                            None,
-                        );
-                        indexer_deployer.start(config).await?;
-                        indexer_deployer.wait_completed().await
-                    } else {
-                        Ok(())
-                    }
                 }
                 .boxed();
 
@@ -499,11 +455,7 @@ fn main() -> Result<()> {
                 }
                 .boxed();
 
-                runtime.block_on(future::try_join3(
-                    deploy_testnet_fut,
-                    deploy_indexer_fut,
-                    deploy_pfn_fut,
-                ))?;
+                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_pfn_fut))?;
                 Ok(())
             },
         },
@@ -563,7 +515,6 @@ fn get_test_suite(
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
         boxed!(|| get_state_sync_test(test_name)),
         boxed!(|| get_dag_test(test_name, duration, test_cmd)),
-        boxed!(|| get_indexer_test(test_name)),
         boxed!(|| get_ungrouped_test(test_name, duration)),
     ];
 

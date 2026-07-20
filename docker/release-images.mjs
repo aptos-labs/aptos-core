@@ -48,8 +48,7 @@ import {
 // When we release aptos-node, we also want to release related images for tooling, testing, etc. Similarly, other images have other related images
 // that we can release together, ie in a release group.
 const IMAGES_TO_RELEASE_BY_RELEASE_GROUP = {
-  "aptos-node": ["validator", "validator-testing", "faucet", "tools", "indexer-grpc"],
-  "aptos-indexer-grpc": ["indexer-grpc"],
+  "aptos-node": ["validator", "validator-testing", "faucet", "tools"],
 };
 
 const IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL = ["validator-testing"];
@@ -67,10 +66,6 @@ const IMAGES_TO_RELEASE = {
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   tools: {
-    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
-    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
-  },
-  "indexer-grpc": {
     [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
@@ -171,7 +166,6 @@ async function main() {
 
 // The image tag prefix is used to determine the release group. Examples:
 // * tag a release as "aptos-node-vX.Y.Z"
-// * tag a release as "aptos-indexer-grpc-vX.Y.Z"
 export function getImageReleaseGroupByImageTagPrefix(prefix) {
   // iterate over the keys in IMAGES_TO_RELEASE_BY_RELEASE_GROUP
   // if the prefix includes the release group, then return the release group

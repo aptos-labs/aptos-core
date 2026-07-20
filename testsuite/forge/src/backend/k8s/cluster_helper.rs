@@ -567,7 +567,6 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
-    enable_indexer: bool,
     deployer_profile: String,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
@@ -624,17 +623,9 @@ pub async fn install_testnet_resources(
         serde_yaml::to_string(&aptos_node_helm_values).unwrap(),
     );
 
-    // disable uploading genesis to blob storage since indexer requires it in the cluster
-    if enable_indexer {
-        aptos_node_helm_values["genesis_blob_upload_url"] = "".into();
-    }
     // run genesis from this directory in the image
     if let Some(genesis_modules_path) = genesis_modules_path {
         genesis_helm_values["genesis"]["moveModulesDir"] = genesis_modules_path.into();
-    }
-    // disable uploading genesis to blob storage since indexer requires it in the cluster
-    if enable_indexer {
-        genesis_helm_values["genesis"]["genesis_blob_upload_url"] = "".into();
     }
 
     let config: serde_json::Value = serde_json::from_value(serde_json::json!({

@@ -62,12 +62,6 @@ fn test_create_single_node_test_config() {
     let config_override_path = test_dir.join("override.yaml");
     let config_override: serde_yaml::Value = serde_yaml::from_str(
         r#"
-        indexer_grpc:
-            enabled: true
-            address: 0.0.0.0:50053
-            processor_task_count: 10
-            processor_batch_size: 100
-            output_batch_size: 100
         indexer_table_info:
             table_info_service_mode: IndexingOnly
         api:
@@ -100,7 +94,10 @@ fn test_create_single_node_test_config() {
     .unwrap();
 
     // overridden configs
-    assert!(merged_config.indexer_grpc.enabled);
+    assert_eq!(
+        merged_config.indexer_table_info.table_info_service_mode,
+        aptos_config::config::TableInfoServiceMode::IndexingOnly
+    );
     // default config is unchanged
     assert_eq!(
         merged_config

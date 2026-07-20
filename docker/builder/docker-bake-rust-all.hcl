@@ -59,7 +59,6 @@ group "all" {
     "forge",
     "telemetry-service",
     "keyless-pepper-service",
-    "indexer-grpc",
     "validator-testing",
     "nft-metadata-crawler",
   ])
@@ -129,24 +128,12 @@ target "forge-builder" {
   ]
 }
 
-target "indexer-builder" {
-  dockerfile = "docker/builder/builder.Dockerfile"
-  target     = "indexer-builder"
-  contexts = {
-    builder-base = "target:builder-base"
-  }
-  secret = [
-    "id=GIT_CREDENTIALS"
-  ]
-}
-
 target "_common" {
   contexts = {
     debian-base     = "target:debian-base"
     node-builder    = "target:aptos-node-builder"
     forge-builder   = "target:forge-builder"
     tools-builder   = "target:tools-builder"
-    indexer-builder = "target:indexer-builder"
   }
   labels = {
     "org.label-schema.schema-version" = "1.0",
@@ -217,13 +204,6 @@ target "keyless-pepper-service" {
   dockerfile = "docker/builder/keyless-pepper-service.Dockerfile"
   target     = "keyless-pepper-service"
   tags       = generate_tags("keyless-pepper-service")
-}
-
-target "indexer-grpc" {
-  inherits   = ["_common"]
-  dockerfile = "docker/builder/indexer-grpc.Dockerfile"
-  target     = "indexer-grpc"
-  tags       = generate_tags("indexer-grpc")
 }
 
 target "nft-metadata-crawler" {
