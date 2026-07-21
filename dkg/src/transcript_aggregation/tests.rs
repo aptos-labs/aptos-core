@@ -15,7 +15,7 @@ use aptos_types::{
 };
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 #[test]
 fn test_transcript_aggregation_state() {
@@ -164,4 +164,68 @@ fn test_transcript_aggregation_state() {
         transcript_bytes: bcs::to_bytes(&good_trx_4).unwrap(),
     });
     assert!(matches!(result, Ok(Some(_))));
+}
+
+#[test]
+fn test_oversized_transcript_rejected_before_deserialization() {
+    let num_validators = 5;
+    let epoch = 999;
+    let addrs: Vec<AccountAddress> = (0..num_validators)
+        .map(|_| AccountAddress::random())
+        .collect();
+    let private_keys: Vec<bls12381_keys::PrivateKey> = (0..num_validators)
+        .map(|_| bls12381_keys::PrivateKey::generate_for_testing())
+        .collect();
+    let public_keys: Vec<bls12381_keys::PublicKey> = (0..num_validators)
+        .map(|i| bls12381_keys::PublicKey::from(&private_keys[i]))
+        .collect();
+    let voting_powers = [1, 1, 1, 6, 6];
+    let validator_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)
+        .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
+        .collect();
+    let validator_consensus_info_move_structs = validator_infos
+        .clone()
+        .into_iter()
+        .map(ValidatorConsensusInfoMoveStruct::from)
+        .collect::<Vec<_>>();
+    let verifier = ValidatorVerifier::new(validator_infos.clone());
+    let pub_params = RealDKG::new_public_params(&DKGSessionMetadata {
+        dealer_epoch: epoch,
+        randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+        dealer_validator_set: validator_consensus_info_move_structs.clone(),
+        target_validator_set: validator_consensus_info_move_structs.clone(),
+    });
+    let epoch_state = Arc::new(EpochState::new(epoch, verifier));
+    let trx_agg_state = Arc::new(TranscriptAggregationState::<RealDKG>::new(
+        duration_since_epoch(),
+        addrs[0],
+        pub_params.clone(),
+        epoch_state,
+    ));
+
+    let session_max = RealDKG::expected_max_transcript_size(&pub_params);
+    let oversized_bytes = vec![0u8; session_max + 1];
+
+    let start = Instant::now();
+    let result = trx_agg_state.add(addrs[0], DKGTranscript {
+        metadata: DKGTranscriptMetadata {
+            epoch,
+            author: addrs[0],
+        },
+        transcript_bytes: oversized_bytes,
+    });
+    let elapsed = start.elapsed();
+
+    // Must be rejected with a size error.
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("exceeds session max"),
+        "unexpected error: {err_msg}"
+    );
+    // Must complete in under one second — proving deserialization was not attempted.
+    assert!(
+        elapsed.as_secs() < 1,
+        "size gate took too long ({elapsed:?}), deserialization may have been attempted"
+    );
 }

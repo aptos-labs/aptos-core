@@ -122,6 +122,11 @@ impl DKGTrait for DummyDKG {
     fn get_dealers(transcript: &DummyDKGTranscript) -> BTreeSet<u64> {
         transcript.contributions_by_dealer.keys().copied().collect()
     }
+
+    fn expected_max_transcript_size(_params: &Self::PublicParams) -> usize {
+        // DummyDKGTranscript is a u64 + BTreeMap<u64, u64>; 64 KiB is more than sufficient.
+        64 * 1024
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

@@ -227,6 +227,11 @@ pub trait DKGTrait: Debug {
         player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,
     ) -> Result<Self::DealtSecret>;
     fn get_dealers(transcript: &Self::Transcript) -> BTreeSet<u64>;
+
+    /// Upper bound on the BCS-encoded byte size of a single valid inbound transcript for this
+    /// session, derived from the session's wire layout. Used as a cheap structural gate before
+    /// deserialization to reject oversized blobs without allocating memory proportional to input.
+    fn expected_max_transcript_size(params: &Self::PublicParams) -> usize;
 }
 
 pub mod dummy_dkg;

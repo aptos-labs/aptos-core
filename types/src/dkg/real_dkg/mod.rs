@@ -500,6 +500,39 @@ impl DKGTrait for RealDKG {
             .map(|x| x.id as u64)
             .collect()
     }
+
+    fn expected_max_transcript_size(params: &Self::PublicParams) -> usize {
+        // Derives a tight upper bound from the session's WeightedConfig.
+        //
+        // WTrx (WeightedTranscript) BCS wire layout at total weight W (compressed curve points):
+        //   soks:  Vec<SoK> with 1 element per single-dealer transcript ≈ 240 B
+        //   R:     W × G1  (48 B each) + ULEB128 length prefix
+        //   R_hat: W × G2  (96 B each) + ULEB128 length prefix
+        //   V:     (W+1) × G1           + ULEB128 length prefix  [W evals + dealt pubkey]
+        //   V_hat: (W+1) × G2           + ULEB128 length prefix
+        //   C:     W × G1               + ULEB128 length prefix
+        // Plus 4 KiB slack for BCS framing overhead.
+        fn wtrx_bound(total_weight: usize) -> usize {
+            const G1: usize = 48;
+            const G2: usize = 96;
+            const SOK_VEC: usize = 240; // 1 SoK (~232 B) + 8 B ULEB128 length prefix
+            const VEC_PREFIXES: usize = 5 * 8; // 5 remaining Vec fields
+            const BCS_SLACK: usize = 4096;
+            SOK_VEC
+                + total_weight * (3 * G1 + 2 * G2)
+                + (G1 + G2) // V[W] and V_hat[W]: the dealt public key elements
+                + VEC_PREFIXES
+                + BCS_SLACK
+        }
+        let main_bound = wtrx_bound(params.pvss_config.wconfig.get_total_weight());
+        let fast_bound = params
+            .pvss_config
+            .fast_wconfig
+            .as_ref()
+            .map_or(0, |c| wtrx_bound(c.get_total_weight()));
+        // 4 KiB for the outer Transcripts struct (Option tag, BCS struct framing).
+        main_bound + fast_bound + 4096
+    }
 }
 
 impl RealDKG {
