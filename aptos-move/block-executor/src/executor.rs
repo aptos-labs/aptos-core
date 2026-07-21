@@ -18,10 +18,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind},
     scheduler_wrapper::SchedulerWrapper,
-    task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
-        TransactionOutput,
-    },
+    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
@@ -29,42 +26,41 @@ use crate::{
     view::{LatestView, ParallelState, SequentialState, ViewState},
     worker_pool::WorkerPool,
 };
-use aptos_aggregator::{
-    delayed_change::{ApplyBase, DelayedChange},
-    delta_change_set::serialize,
-};
+use aptos_aggregator::delayed_change::{ApplyBase, DelayedChange};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+        config::BlockExecutorConfig,
+        output::CommittedTransactionOutput,
+        transaction_slice_metadata::TransactionSliceMetadata,
+        value::{SpeculativeValue, ValueWithLayout},
     },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     on_chain_config::Features,
-    state_store::{state_value::StateValue, TStateView},
+    state_store::TStateView,
     transaction::{
         block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
         BlockOutput, FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
-use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
-use bytes::Bytes;
+use aptos_vm_types::resolver::ResourceGroupSize;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
@@ -75,7 +71,8 @@ use std::{
     marker::{PhantomData, Sync},
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
-use triomphe::Arc as TriompheArc;
+
+type CommittedOutput<E> = <<E as ExecutorTask>::Output as TransactionOutput>::CommittedOutput;
 
 struct SharedSyncParams<'a, T, E, S>
 where
@@ -85,14 +82,14 @@ where
 {
     // TODO: should not need to pass base view.
     base_view: &'a S,
-    versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    versioned_cache: &'a MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     last_input_output: &'a TxnLastInputOutput<T, E::Output>,
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
-    final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
+    final_results: &'a ExplicitSyncWrapper<Vec<CommittedOutput<E>>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
 
@@ -110,7 +107,7 @@ where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T, AuxiliaryInfo = A>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitHook,
+    L: TransactionCommitHook<CommittedOutput<E>>,
     TP: TxnProvider<T, A> + Sync,
     A: AuxiliaryInfoTrait,
 {
@@ -168,7 +165,7 @@ where
     /// all pre-written keys were actually written, triggering fallback to sequential execution
     /// if not.
     fn verify_pre_writes(txn: &T, maybe_output: Option<&E::Output>) -> Result<(), PanicError> {
-        let pre_write_entries = T::pre_write_values(txn);
+        let pre_write_entries = E::pre_write_values(txn);
         if pre_write_entries.is_empty() {
             return Ok(()); // No pre-writes, nothing to verify
         }
@@ -198,7 +195,7 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         abort_manager: &mut AbortManager,
     ) -> Result<(), PanicError> {
         // The order is reversed in BlockSTMv2 as opposed to V1, avoiding the necessity
@@ -214,14 +211,13 @@ where
             idx_to_execute,
             |prev_key_ref| {
                 match resource_write_set.remove_entry(prev_key_ref) {
-                    Some((key, (value, maybe_layout))) => {
+                    Some((key, value)) => {
                         abort_manager.invalidate_dependencies(
                             versioned_cache.data().write_v2::<false>(
                                 key,
                                 idx_to_execute,
                                 incarnation,
                                 value,
-                                maybe_layout,
                             )?,
                         )?;
                     },
@@ -239,13 +235,12 @@ where
         )?;
 
         // Handle remaining entries in resource_write_set (new writes)
-        for (key, (value, maybe_layout)) in resource_write_set {
+        for (key, value) in resource_write_set {
             abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
                 key,
                 idx_to_execute,
                 incarnation,
                 value,
-                maybe_layout,
             )?)?;
         }
 
@@ -259,7 +254,7 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         abort_manager: &mut AbortManager,
     ) -> Result<(), PanicError> {
         // The order of applying new group writes versus clearing previous writes is reversed
@@ -286,8 +281,7 @@ where
                                 group_key.clone(),
                                 idx_to_execute,
                                 incarnation,
-                                TriompheArc::new(group_metadata_op),
-                                None,
+                                group_metadata_op,
                             )?,
                         )?;
                         abort_manager.invalidate_dependencies(
@@ -331,8 +325,7 @@ where
                     group_key.clone(),
                     idx_to_execute,
                     incarnation,
-                    TriompheArc::new(group_metadata_op),
-                    None,
+                    group_metadata_op,
                 )?,
             )?;
             abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
@@ -353,7 +346,7 @@ where
         idx_to_execute: TxnIndex,
         read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         is_v2: bool,
     ) -> Result<(), PanicError> {
         let mut prev_modified_delayed_fields = last_input_output
@@ -419,7 +412,7 @@ where
         txn: &T,
         auxiliary_info: &A,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         executor: &E,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
@@ -510,36 +503,6 @@ where
             &mut abort_manager,
         )?;
 
-        // Legacy aggregator v1 handling.
-        let mut prev_modified_aggregator_v1_keys = last_input_output
-            .modified_aggregator_v1_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
-        if let Some(output) = maybe_output {
-            let output_before_guard = output.before_materialization()?;
-
-            // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
-            // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
-            // commit-time validation in BlockSTMv2.
-            for (key, value) in output_before_guard.aggregator_v1_write_set().into_iter() {
-                prev_modified_aggregator_v1_keys.remove(&key);
-
-                versioned_cache.data().write(
-                    key,
-                    idx_to_execute,
-                    incarnation,
-                    TriompheArc::new(value),
-                    None,
-                )?;
-            }
-            for (key, delta) in output_before_guard.aggregator_v1_delta_set().into_iter() {
-                prev_modified_aggregator_v1_keys.remove(&key);
-                versioned_cache.data().add_delta(key, idx_to_execute, delta);
-            }
-        }
-        for key in prev_modified_aggregator_v1_keys {
-            versioned_cache.data().remove(&key, idx_to_execute);
-        }
-
         last_input_output.record(
             idx_to_execute,
             read_set,
@@ -582,7 +545,7 @@ where
         // transaction starts processing the outputs, as well as when the execution is finished.
         maybe_scheduler: Option<&Scheduler>,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         executor: &E,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
@@ -628,7 +591,7 @@ where
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
+            .map_or_else(HashSet::new, |keys| keys.collect());
         let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
             .modified_group_key_and_tags_cloned(idx_to_execute)
             .into_iter()
@@ -692,31 +655,14 @@ where
 
             let resource_write_set = output_before_guard.resource_write_set();
 
-            // Then, process resource & aggregator_v1 writes.
-            for (k, v, maybe_layout) in resource_write_set
-                .into_iter()
-                .map(|(k, (v, maybe_layout))| (k, v, maybe_layout))
-                .chain(
-                    output_before_guard
-                        .aggregator_v1_write_set()
-                        .into_iter()
-                        .map(|(state_key, write_op)| (state_key, TriompheArc::new(write_op), None)),
-                )
-            {
+            // Then, process resource writes (aggregator v1 writes are part of this set).
+            for (k, v) in resource_write_set.into_iter() {
                 if !prev_modified_resource_keys.remove(&k) {
                     needs_suffix_validation = true;
                 }
                 versioned_cache
                     .data()
-                    .write(k, idx_to_execute, incarnation, v, maybe_layout)?;
-            }
-
-            // Then, apply deltas.
-            for (k, d) in output_before_guard.aggregator_v1_delta_set().into_iter() {
-                if !prev_modified_resource_keys.remove(&k) {
-                    needs_suffix_validation = true;
-                }
-                versioned_cache.data().add_delta(k, idx_to_execute, d);
+                    .write(k, idx_to_execute, incarnation, v)?;
             }
 
             Ok(())
@@ -778,7 +724,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     ) -> Result<bool, PanicError> {
         // The previous read-set must be recorded because:
         // 1. The transaction has finished at least one execution in order for it
@@ -836,7 +782,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         skip_module_reads_validation: bool,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
@@ -875,7 +821,7 @@ where
         valid: bool,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         scheduler: &Scheduler,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
@@ -899,9 +845,8 @@ where
     /// returns false (indicating that transaction needs to be re-executed).
     fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
-        is_v2: bool,
     ) -> Result<bool, PanicError> {
         if last_input_output.is_speculative_failure(txn_idx) {
             return Ok(false);
@@ -910,18 +855,7 @@ where
             .read_set(txn_idx)
             .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
 
-        if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
-            || (is_v2
-                && !read_set.validate_aggregator_v1_reads(
-                    versioned_cache.data(),
-                    last_input_output
-                        .modified_aggregator_v1_keys(txn_idx)
-                        .ok_or_else(|| {
-                            code_invariant_error("Modified aggregator v1 keys must be recorded")
-                        })?,
-                    txn_idx,
-                )?)
-        {
+        if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)? {
             return Ok(false);
         }
 
@@ -952,7 +886,7 @@ where
         txn_idx: TxnIndex,
         incarnation: Incarnation,
         scheduler: SchedulerWrapper,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output>,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
@@ -1015,12 +949,7 @@ where
             },
         }
 
-        if !Self::validate_and_commit_delayed_fields(
-            txn_idx,
-            versioned_cache,
-            last_input_output,
-            scheduler.is_v2(),
-        )? {
+        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
             return Err(code_invariant_error(format!(
                 "Delayed field validation after re-execution failed for txn {}",
                 txn_idx
@@ -1059,12 +988,7 @@ where
         let block_limit_processor = &mut shared_sync_params.block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
-        if !Self::validate_and_commit_delayed_fields(
-            txn_idx,
-            versioned_cache,
-            last_input_output,
-            scheduler.is_v2(),
-        )? {
+        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
             // Transaction needs to be re-executed, one final time.
             side_effect_at_commit = true;
 
@@ -1119,62 +1043,6 @@ where
         )
     }
 
-    fn materialize_aggregator_v1_delta_writes(
-        txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        base_view: &S,
-    ) -> Vec<(T::Key, WriteOp)> {
-        // Materialize all the aggregator v1 deltas.
-        let mut aggregator_v1_delta_writes = Vec::with_capacity(4);
-        if let Some(aggregator_v1_delta_keys_iter) =
-            last_input_output.aggregator_v1_delta_keys(txn_idx)
-        {
-            for k in aggregator_v1_delta_keys_iter {
-                // Note that delta materialization happens concurrently, but under concurrent
-                // commit_hooks (which may be dispatched by the coordinator), threads may end up
-                // contending on delta materialization of the same aggregator. However, the
-                // materialization is based on previously materialized values and should not
-                // introduce long critical sections. Moreover, with more aggregators, and given
-                // that the commit_hook will be performed at dispersed times based on the
-                // completion of the respective previous tasks of threads, this should not be
-                // an immediate bottleneck - confirmed by an experiment with 32 core and a
-                // single materialized aggregator. If needed, the contention may be further
-                // mitigated by batching consecutive commit_hooks.
-                let committed_delta = versioned_cache
-                    .data()
-                    .materialize_delta(&k, txn_idx)
-                    .unwrap_or_else(|op| {
-                        // TODO[agg_v1](cleanup): this logic should improve with the new AGGR data structure
-                        // TODO[agg_v1](cleanup): and the ugly base_view parameter will also disappear.
-                        let storage_value = base_view
-                            .get_state_value(&k)
-                            .expect("Error reading the base value for committed delta in storage");
-
-                        let w: T::Value = TransactionWrite::from_state_value(storage_value);
-                        let value_u128 = w
-                            .as_u128()
-                            .expect("Aggregator base value deserialization error")
-                            .expect("Aggregator base value must exist");
-
-                        versioned_cache.data().set_base_value(
-                            k.clone(),
-                            ValueWithLayout::RawFromStorage(TriompheArc::new(w)),
-                        );
-                        op.apply_to(value_u128)
-                            .expect("Materializing delta w. base value set must succeed")
-                    });
-
-                // Must contain committed value as we set the base value above.
-                aggregator_v1_delta_writes.push((
-                    k,
-                    WriteOp::legacy_modification(serialize(&committed_delta).into()),
-                ));
-            }
-        }
-        aggregator_v1_delta_writes
-    }
-
     // If output_idx is set, then the finalized output is recorded at that index,
     // which might be different from txn_idx. This is used for block epilogue txn,
     // because the block may be cut, necessitating the block epilogue txn to be
@@ -1187,7 +1055,7 @@ where
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
         shared_sync_params: &SharedSyncParams<T, E, S>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<CommittedOutput<E>, PanicError> {
         let last_input_output = shared_sync_params.last_input_output;
 
         // Do a final validation for safety as a part of (parallel) post-processing.
@@ -1228,61 +1096,22 @@ where
             txn_idx,
         );
 
-        let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
-            .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                let (finalized_group, group_size) = shared_sync_params
-                    .versioned_cache
-                    .group_data()
-                    .finalize_group(&group_key, txn_idx)?;
-
-                map_finalized_group::<T>(
-                    group_key,
-                    finalized_group,
-                    group_size,
-                    metadata_op,
-                    is_read_needing_exchange,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let materialized_finalized_groups =
-            map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-
-        let serialized_groups =
-            serialize_groups::<T>(materialized_finalized_groups).map_err(|e| {
-                code_invariant_error(format!("Panic error in serializing groups {e:?}"))
-            })?;
-
-        let resource_write_set = last_input_output.resource_write_set(txn_idx)?;
-        let resource_writes_to_materialize = resource_writes_to_materialize!(
-            resource_write_set,
-            last_input_output,
-            last_input_output,
-            txn_idx
-        )?;
-        let materialized_resource_write_set =
-            map_id_to_values_in_write_set(resource_writes_to_materialize, &latest_view)?;
-
-        let events = last_input_output.events(txn_idx);
-        let materialized_events = map_id_to_values_events(events, &latest_view)?;
-        let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
-            txn_idx,
-            last_input_output,
-            shared_sync_params.versioned_cache,
-            shared_sync_params.base_view,
-        );
+        let read_set = last_input_output
+            .read_set(txn_idx)
+            .ok_or_else(|| code_invariant_error("Read set must be recorded for materialization"))?;
+        let materializer = ParallelMaterializer::new(&latest_view, read_set);
 
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        let trace = last_input_output.record_materialized_txn_output(
-            txn_idx,
-            aggregator_v1_delta_writes,
-            materialized_resource_write_set
-                .into_iter()
-                .chain(serialized_groups)
-                .collect(),
-            materialized_events,
-        )?;
+        let (committed_output, trace) = last_input_output
+            .materialize(txn_idx, &materializer)
+            .map_err(|e| match e {
+                PanicOr::CodeInvariantError(msg) => PanicError::CodeInvariantError(msg),
+                PanicOr::Or(e) => {
+                    code_invariant_error(format!("Panic error in serializing groups {e:?}"))
+                },
+            })?;
 
         if environment.async_runtime_checks_enabled() && !trace.is_empty() {
             // Note that the trace may be empty (if block was small and executor decides not to
@@ -1325,13 +1154,14 @@ where
             }
         }
 
-        Ok(())
+        Ok(committed_output)
     }
 
     fn record_finalized_output(
         &self,
         txn_idx: TxnIndex,
         output_idx: TxnIndex,
+        committed_output: CommittedOutput<E>,
         shared_sync_params: &SharedSyncParams<T, E, S>,
     ) -> Result<(), PanicError> {
         if output_idx < txn_idx {
@@ -1341,14 +1171,12 @@ where
             )));
         }
 
-        let last_input_output = shared_sync_params.last_input_output;
-        if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            last_input_output.notify_listener(txn_idx, txn_commit_listener)?;
+        if let Some(hook) = &self.transaction_commit_hook {
+            hook.on_transaction_committed(txn_idx, &committed_output);
         }
-
         let mut final_results = shared_sync_params.final_results.acquire();
 
-        final_results[output_idx as usize] = last_input_output.take_output(txn_idx)?;
+        final_results[output_idx as usize] = committed_output;
         Ok(())
     }
 
@@ -1378,13 +1206,13 @@ where
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                self.materialize_txn_commit(
+                let output = self.materialize_txn_commit(
                     txn_idx,
                     scheduler_wrapper,
                     environment,
                     shared_sync_params,
                 )?;
-                self.record_finalized_output(txn_idx, txn_idx, shared_sync_params)?;
+                self.record_finalized_output(txn_idx, txn_idx, output, shared_sync_params)?;
             }
             Ok(())
         };
@@ -1587,13 +1415,13 @@ where
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
-                    self.materialize_txn_commit(
+                    let output = self.materialize_txn_commit(
                         txn_idx,
                         scheduler_wrapper,
                         environment,
                         shared_sync_params,
                     )?;
-                    self.record_finalized_output(txn_idx, txn_idx, shared_sync_params)?;
+                    self.record_finalized_output(txn_idx, txn_idx, output, shared_sync_params)?;
                 },
                 TaskKind::NextTask => {
                     // TODO: Anything intelligent to do here?.
@@ -1673,11 +1501,8 @@ where
         {
             if epilogue_txn_idx == 0
                 || epilogue_txn_idx as usize > num_txns
-                || !final_results.dereference()[epilogue_txn_idx as usize - 1]
-                    .check_materialization()?
-                || final_results.dereference()[epilogue_txn_idx as usize - 1]
-                    .after_materialization()?
-                    .has_new_epoch_event()
+                || final_results.dereference()[epilogue_txn_idx as usize - 1].is_retry()
+                || final_results.dereference()[epilogue_txn_idx as usize - 1].has_new_epoch_event()
             {
                 // If this error fires, and epilogue_txn_idx is not 0 or > num_txns,
                 // then is_retry_check_after_commit would have created a panic error,
@@ -1687,7 +1512,7 @@ where
                             epilogue_txn_idx
                         )));
             }
-            if final_results.dereference()[epilogue_txn_idx as usize].check_materialization()? {
+            if !final_results.dereference()[epilogue_txn_idx as usize].is_retry() {
                 return Err(code_invariant_error(format!(
                     "Output at epilogue txn index {} must be placeholder (is_retry set)",
                     epilogue_txn_idx
@@ -1753,7 +1578,7 @@ where
                     runtime_environment,
                     &self.config,
                 )?;
-                self.materialize_txn_commit(
+                let output = self.materialize_txn_commit(
                     epilogue_txn_idx,
                     scheduler,
                     environment,
@@ -1762,6 +1587,7 @@ where
                 self.record_finalized_output(
                     epilogue_txn_idx,
                     num_txns as TxnIndex,
+                    output,
                     shared_sync_params,
                 )?;
 
@@ -1782,7 +1608,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T, E::Output>, ()> {
+    ) -> Result<BlockOutput<T, CommittedOutput<E>>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // BlockSTMv2 should have less restrictions on the number of workers but we
         // still sanity check that it is not instantiated w. concurrency level 1.
@@ -1801,7 +1627,7 @@ where
         // +1 for potential BlockEpilogue txn.
         let final_results = ExplicitSyncWrapper::new(
             (0..num_txns + 1)
-                .map(|_| E::Output::skip_output())
+                .map(|_| CommittedOutput::<E>::retry())
                 .collect::<Vec<_>>(),
         );
 
@@ -1823,12 +1649,12 @@ where
         let mut versioned_cache = MVHashMap::new();
         if self.config.local.enable_pre_write {
             for txn_idx in 0..num_txns {
-                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                let values = E::pre_write_values(signature_verified_block.get_txn(txn_idx));
                 for (k, v) in values {
                     // pre-write doesn't need to use write_v2 because there's no dependencies.
                     versioned_cache
                         .data()
-                        .write(k, txn_idx, 0, triomphe::Arc::new(v), None)
+                        .write(k, txn_idx, 0, v)
                         .map_err(|e| {
                             error!("Pre-write failed for txn {}: {:?}", txn_idx, e);
                         })?;
@@ -1950,7 +1776,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T, E::Output>, ()> {
+    ) -> Result<BlockOutput<T, CommittedOutput<E>>, ()> {
         self.execute_transactions_parallel(
             signature_verified_block,
             base_view,
@@ -1965,7 +1791,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T, E::Output>, ()> {
+    ) -> Result<BlockOutput<T, CommittedOutput<E>>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1979,11 +1805,11 @@ where
         let mut versioned_cache = MVHashMap::new();
         if self.config.local.enable_pre_write {
             for txn_idx in 0..signature_verified_block.num_txns() as u32 {
-                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                let values = E::pre_write_values(signature_verified_block.get_txn(txn_idx));
                 for (k, v) in values {
                     versioned_cache
                         .data()
-                        .write(k, txn_idx, 0, triomphe::Arc::new(v), None)
+                        .write(k, txn_idx, 0, v)
                         .map_err(|e| {
                             error!("Pre-write failed for txn {}: {:?}", txn_idx, e);
                         })?;
@@ -2009,7 +1835,7 @@ where
         let final_results = ExplicitSyncWrapper::new(
             // +1 for potential BlockEpilogue txn.
             (0..(num_txns + 1))
-                .map(|_| E::Output::skip_output())
+                .map(|_| CommittedOutput::<E>::retry())
                 .collect::<Vec<_>>(),
         );
 
@@ -2127,7 +1953,7 @@ where
         &self,
         block_id: HashValue,
         signature_verified_block: &TP,
-        outputs: impl Iterator<Item = &'a E::Output>,
+        outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
         epilogue_txn_idx: TxnIndex,
         block_end_info: TBlockEndInfoExt<T::Key>,
         features: &Features,
@@ -2164,11 +1990,10 @@ where
             // TODO(grao): Also include other transactions that is "Keep" if we are confident
             // that we successfully charge enough gas amount as it appears in the FeeStatement
             // for every corner cases.
-            if !output.is_materialized_and_success() {
+            if !output.is_success() {
                 continue;
             }
-            let output_after_guard = output.after_materialization()?;
-            let fee_statement = output_after_guard.fee_statement();
+            let fee_statement = output.fee_statement();
 
             let txn = signature_verified_block.get_txn(i as TxnIndex);
             if let Some(user_txn) = txn.try_as_signed_user_txn() {
@@ -2224,37 +2049,31 @@ where
             Module,
             AptosModuleExtension,
         >,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         output_before_guard: &<E::Output as TransactionOutput>::BeforeMaterializationGuard<'_>,
-        resource_write_set: HashMap<
-            T::Key,
-            (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>),
-        >,
+        resource_write_set: HashMap<T::Key, ValueWithLayout<T::Value>>,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
-        for (key, (write_op, layout)) in resource_write_set.into_iter() {
-            unsync_map.write(key, write_op, layout);
+        for (key, value) in resource_write_set.into_iter() {
+            unsync_map.write(key, value);
         }
 
         for (group_key, (metadata_op, group_size, group_ops)) in
             output_before_guard.resource_group_write_set().into_iter()
         {
             unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
-            unsync_map.write(group_key, TriompheArc::new(metadata_op), None);
+            unsync_map.write(group_key, metadata_op);
         }
 
-        for (key, write_op) in output_before_guard.aggregator_v1_write_set().into_iter() {
-            unsync_map.write(key, TriompheArc::new(write_op), None);
-        }
-
-        for write in output_before_guard.module_write_set().values() {
-            add_module_write_to_module_cache::<T>(
-                write,
+        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
+            add_module_write_to_module_cache(
+                module_id,
+                state_value,
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
                 unsync_map.module_cache(),
-            )?;
-        }
+            )
+        })?;
 
         let mut second_phase = Vec::new();
         let mut updates = HashMap::new();
@@ -2313,7 +2132,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<T, E::Output>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<T, CommittedOutput<E>>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
@@ -2366,9 +2185,6 @@ where
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
-                    if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_execution_aborted(idx as TxnIndex);
-                    }
                     error!(
                         "Sequential execution FatalVMError by transaction {}",
                         idx as TxnIndex
@@ -2379,18 +2195,12 @@ where
                     ));
                 },
                 ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_execution_aborted(idx as TxnIndex);
-                    }
                     alert!("Sequential execution DelayedFieldsCodeInvariantError error by transaction {}: {}", idx as TxnIndex, msg);
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
                         BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
                     ));
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
-                    if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_execution_aborted(idx as TxnIndex);
-                    }
                     alert!("Sequential execution SpeculativeExecutionAbortError error by transaction {}: {}", idx as TxnIndex, msg);
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
                         BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
@@ -2445,17 +2255,6 @@ where
                         num_committed_user_txns += 1;
                     }
 
-                    // Drop to acquire a write lock, then re-assign the output_before_guard.
-                    drop(output_before_guard);
-                    output.legacy_sequential_materialize_agg_v1(&latest_view);
-                    let output_before_guard = output.before_materialization()?;
-
-                    assert_eq!(
-                        output_before_guard.aggregator_v1_delta_set().len(),
-                        0,
-                        "Sequential execution must materialize deltas"
-                    );
-
                     if resource_group_bcs_fallback {
                         // Dynamic change set optimizations are enabled, and resource group serialization
                         // previously failed in bcs serialization for preparing final transaction outputs.
@@ -2467,16 +2266,11 @@ where
                             (
                                 group
                                     .map(|(resource_tag, value_with_layout)| {
-                                        let value = match value_with_layout {
-                                            ValueWithLayout::RawFromStorage(value)
-                                            | ValueWithLayout::Exchanged(value, _) => value,
-                                        };
-                                        (
-                                            resource_tag,
-                                            value
-                                                .extract_raw_bytes()
-                                                .expect("Deletions should already be applied"),
-                                        )
+                                        let bytes = value_with_layout
+                                            .extract_value()
+                                            .extract_raw_bytes()
+                                            .expect("Deletions should already be applied");
+                                        (resource_tag, bytes)
                                     })
                                     .collect(),
                                 size,
@@ -2513,13 +2307,14 @@ where
                                     if output_group_size.get() != group_size.get() {
                                         return false;
                                     }
-                                    for (value_tag, (group_op, _)) in group_ops {
+                                    for (value_tag, group_op) in group_ops {
                                         if group_op.is_deletion() {
                                             finalized_group.remove(&value_tag);
                                         } else {
                                             finalized_group.insert(
                                                 value_tag,
                                                 group_op
+                                                    .extract_value()
                                                     .extract_raw_bytes()
                                                     .expect("Not a deletion"),
                                             );
@@ -2538,7 +2333,7 @@ where
                             // The corresponding error / alert must already be triggered, the goal in sequential
                             // fallback is to just skip any transactions that would cause such serialization errors.
                             alert!("Discarding transaction because serialization failed in bcs fallback");
-                            ret.push(E::Output::discard_output(
+                            ret.push(CommittedOutput::<E>::discard(
                                 StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                             ));
                             idx += 1;
@@ -2557,69 +2352,36 @@ where
                     }
 
                     // Apply the writes.
-                    let resource_write_set = output_before_guard.resource_write_set();
                     Self::apply_output_sequential(
                         idx as TxnIndex,
                         runtime_environment,
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
                         &output_before_guard,
-                        resource_write_set.clone(),
+                        output_before_guard.resource_write_set(),
                     )?;
 
+                    // The guard borrows the output immutably; drop it before
+                    // materialization, which needs the output mutably.
+                    drop(output_before_guard);
+
                     // If dynamic change set materialization part (indented for clarity/variable scope):
-                    {
-                        let finalized_groups = groups_to_finalize!(output_before_guard,)
-                            .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                                let (group_ops_iter, group_size) =
-                                    unsync_map.finalize_group(&group_key);
-                                map_finalized_group::<T>(
-                                    group_key,
-                                    group_ops_iter.collect(),
-                                    group_size,
-                                    metadata_op,
-                                    is_read_needing_exchange,
-                                )
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        let materialized_finalized_groups =
-                            map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-                        let serialized_groups =
-                            serialize_groups::<T>(materialized_finalized_groups).map_err(|_| {
+                    let committed_output = {
+                        let materializer = SequentialMaterializer::new(&latest_view);
+                        let (committed_output, trace) = materialize_output(
+                            &mut output,
+                            &materializer,
+                        )
+                        .map_err(|e| match e {
+                            PanicOr::CodeInvariantError(msg) => {
+                                SequentialBlockExecutionError::from(PanicError::CodeInvariantError(
+                                    msg,
+                                ))
+                            },
+                            PanicOr::Or(ResourceGroupSerializationError) => {
                                 SequentialBlockExecutionError::ResourceGroupSerializationError
-                            })?;
-
-                        let resource_writes_to_materialize = resource_writes_to_materialize!(
-                            resource_write_set,
-                            output_before_guard,
-                            unsync_map,
-                        )?;
-                        // Replace delayed field id with values in resource write set and read set.
-                        let materialized_resource_write_set = map_id_to_values_in_write_set(
-                            resource_writes_to_materialize,
-                            &latest_view,
-                        )?;
-
-                        // Replace delayed field id with values in events
-                        let materialized_events = map_id_to_values_events(
-                            Box::new(output_before_guard.get_events().into_iter()),
-                            &latest_view,
-                        )?;
-                        // Output before guard holds a read lock, drop before incorporating materialized
-                        // output which needs a write lock.
-                        drop(output_before_guard);
-
-                        let trace = output.incorporate_materialized_txn_output(
-                            // No aggregator v1 delta writes are needed for sequential execution.
-                            // They are already handled because we passed materialize_deltas=true
-                            // to execute_transaction.
-                            vec![],
-                            materialized_resource_write_set
-                                .into_iter()
-                                .chain(serialized_groups.into_iter())
-                                .collect(),
-                            materialized_events,
-                        )?;
+                            },
+                        })?;
 
                         // Sequential execution never collects any traces.
                         if !trace.is_empty() {
@@ -2628,7 +2390,9 @@ where
                             );
                             return Err(err.into());
                         }
-                    }
+
+                        committed_output
+                    };
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
 
@@ -2639,10 +2403,9 @@ where
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook
-                            .on_transaction_committed(idx as TxnIndex, output.committed_output());
+                        commit_hook.on_transaction_committed(idx as TxnIndex, &committed_output);
                     }
-                    ret.push(output);
+                    ret.push(committed_output);
                 },
             };
 
@@ -2655,11 +2418,11 @@ where
             if must_skip || block_limit_processor.should_end_block_sequential() || idx == num_txns {
                 let mut has_reconfig = false;
                 if let Some(last_output) = ret.last() {
-                    if last_output.after_materialization()?.has_new_epoch_event() {
+                    if last_output.has_new_epoch_event() {
                         has_reconfig = true;
                     }
                 }
-                ret.resize_with(num_txns, E::Output::skip_output);
+                ret.resize_with(num_txns, CommittedOutput::<E>::retry);
                 if let Some(block_id) =
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
@@ -2699,7 +2462,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<T, E::Output>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<T, CommittedOutput<E>>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
@@ -2807,7 +2570,7 @@ where
                 },
             };
             let ret = (0..signature_verified_block.num_txns())
-                .map(|_| E::Output::discard_output(error_code))
+                .map(|_| CommittedOutput::<E>::discard(error_code))
                 .collect();
             return Ok(BlockOutput::new(ret, None));
         }
@@ -2823,7 +2586,7 @@ where
         &self,
         block: &TP,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        outputs: impl Iterator<Item = &'a E::Output>,
+        outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
         epilogue_txn_idx: TxnIndex,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         environment: &AptosEnvironment,

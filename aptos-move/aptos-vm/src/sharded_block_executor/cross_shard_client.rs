@@ -14,7 +14,6 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     write_set::TransactionWrite,
 };
-use once_cell::sync::OnceCell;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -100,18 +99,10 @@ impl CrossShardCommitSender {
         }
     }
 
-    fn send_remote_update_for_success(
-        &self,
-        txn_idx: TxnIndex,
-        txn_output: &OnceCell<TransactionOutput>,
-    ) {
+    fn send_remote_update_for_success(&self, txn_idx: TxnIndex, txn_output: &TransactionOutput) {
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
-        let write_set = txn_output
-            .get()
-            .expect("Committed output must be set")
-            .write_set();
 
-        for (state_key, write_op) in write_set.expect_write_op_iter() {
+        for (state_key, write_op) in txn_output.write_set().expect_write_op_iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
                 for (dependent_shard_id, round_id) in dependent_shard_ids.iter() {
                     trace!("Sending remote update for success for shard id {:?} and txn_idx: {:?}, state_key: {:?}, dependent shard id: {:?}", self.shard_id, txn_idx, state_key, dependent_shard_id);
@@ -134,20 +125,12 @@ impl CrossShardCommitSender {
     }
 }
 
-impl TransactionCommitHook for CrossShardCommitSender {
-    fn on_transaction_committed(
-        &self,
-        txn_idx: TxnIndex,
-        txn_output: &OnceCell<TransactionOutput>,
-    ) {
+impl TransactionCommitHook<TransactionOutput> for CrossShardCommitSender {
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &TransactionOutput) {
         let global_txn_idx = txn_idx + self.index_offset;
         if self.dependent_edges.contains_key(&global_txn_idx) {
             self.send_remote_update_for_success(global_txn_idx, txn_output);
         }
-    }
-
-    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
-        todo!("on_transaction_aborted not supported for sharded execution yet")
     }
 }
 

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{
-    types::{test::KeyType, Incarnation, MVDataError, MVDataOutput, TxnIndex, ValueWithLayout},
+    types::{test::KeyType, Incarnation, MVDataError, MVDataOutput, TxnIndex},
     MVHashMap,
 };
 use crate::{types::ShiftedTxnIndex, unit_tests::proptest_types::MockValue};
@@ -19,7 +19,6 @@ use std::{
     time::Duration,
 };
 use test_case::test_case;
-use triomphe::Arc;
 
 #[derive(Debug, Clone)]
 enum Operator<V: Debug + Clone> {
@@ -132,8 +131,7 @@ fn test_dependencies(
                                                 key,
                                                 idx as TxnIndex,
                                                 0,
-                                                Arc::new(MockValue::new(Some(*v))),
-                                                None,
+                                                MockValue::new(Some(*v)),
                                             )
                                             .unwrap(),
                                     );
@@ -146,8 +144,7 @@ fn test_dependencies(
                                                 key.clone(),
                                                 idx as TxnIndex,
                                                 0,
-                                                Arc::new(MockValue::new(Some(*v))),
-                                                None,
+                                                MockValue::new(Some(*v)),
                                             )
                                             .unwrap(),
                                     );
@@ -191,30 +188,20 @@ fn test_dependencies(
                                         || {
                                             // Comparison ignores version since push invalidation
                                             // is based only on values.
-                                            value
-                                                == ValueWithLayout::Exchanged(
-                                                    Arc::new(MockValue::new(None)),
-                                                    None,
-                                                )
+                                            value == MockValue::new(None)
                                         },
                                         |(_expected_txn_idx, expected_output)| {
                                             // Comparison ignores expected_txn_idx since push
                                             // validation is based only on values.
-                                            value
-                                                == ValueWithLayout::Exchanged(
-                                                    Arc::new(expected_output.clone()),
-                                                    None,
-                                                )
+                                            value == expected_output.clone()
                                         },
                                     )
                             },
                             Err(MVDataError::Uninitialized) => {
                                 map.data().set_base_value(
                                     KeyType(key),
-                                    ValueWithLayout::Exchanged(
-                                        Arc::new(MockValue::new(None)),
-                                        None,
-                                    ),
+                                    MockValue::new(None),
+                                    |_, _| {},
                                 );
                                 assert_ok!(rescheduled_reads.push((txn_idx, incarnation + 1)));
                                 false

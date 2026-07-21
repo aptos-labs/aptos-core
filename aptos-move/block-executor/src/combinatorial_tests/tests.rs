@@ -182,124 +182,6 @@ fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
     );
 }
 
-fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
-    let mut runner = TestRunner::default();
-
-    let universe = vec(any::<[u8; 32]>(), 50)
-        .new_tree(&mut runner)
-        .expect("creating a new value should succeed")
-        .current();
-    let transaction_gen = vec(
-        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        num_txns,
-    )
-    .new_tree(&mut runner)
-    .expect("creating a new value should succeed")
-    .current();
-
-    // Do not allow deletions as resolver can't apply delta to a deleted aggregator.
-    let transactions: Vec<_> = transaction_gen
-        .into_iter()
-        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
-        .collect();
-    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
-
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
-        phantom: PhantomData,
-    };
-
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
-
-    for _ in 0..20 {
-        let mut guard = AptosModuleCacheManagerGuard::none();
-
-        let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
-            DeltaDataView<KeyType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-        >::new(
-            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-            executor_thread_pool.clone(),
-            None,
-        )
-        .execute_transactions_parallel(
-            &txn_provider,
-            &data_view,
-            &TransactionSliceMetadata::unknown(),
-            &mut guard,
-        );
-
-        BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
-            .assert_parallel_output(&output);
-    }
-}
-
-fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
-    let mut runner = TestRunner::default();
-
-    let universe = vec(any::<[u8; 32]>(), 50)
-        .new_tree(&mut runner)
-        .expect("creating a new value should succeed")
-        .current();
-    let transaction_gen = vec(
-        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        num_txns,
-    )
-    .new_tree(&mut runner)
-    .expect("creating a new value should succeed")
-    .current();
-
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
-        phantom: PhantomData,
-    };
-
-    // Do not allow deletes as that would panic in resolver.
-    let transactions: Vec<_> = transaction_gen
-        .into_iter()
-        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
-        .collect();
-    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
-
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
-
-    for _ in 0..20 {
-        let mut guard = AptosModuleCacheManagerGuard::none();
-
-        let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
-            DeltaDataView<KeyType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-        >::new(
-            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-            executor_thread_pool.clone(),
-            None,
-        )
-        .execute_transactions_parallel(
-            &txn_provider,
-            &data_view,
-            &TransactionSliceMetadata::unknown(),
-            &mut guard,
-        );
-
-        BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
-            .assert_parallel_output(&output);
-    }
-}
-
 fn dynamic_read_writes_contended_with_block_gas_limit(
     num_txns: usize,
     maybe_block_gas_limit: Option<u64>,
@@ -594,16 +476,6 @@ fn dynamic_read_writes() {
 }
 
 #[test]
-fn deltas_writes_mixed() {
-    deltas_writes_mixed_with_block_gas_limit(1000, None);
-}
-
-#[test]
-fn deltas_resolver() {
-    deltas_resolver_with_block_gas_limit(1000, None);
-}
-
-#[test]
 fn dynamic_read_writes_contended() {
     dynamic_read_writes_contended_with_block_gas_limit(1000, None);
 }
@@ -681,24 +553,6 @@ fn dynamic_read_writes_with_block_gas_limit_test() {
         Some(rand::thread_rng().gen_range(0, 3000) as u64),
     );
     dynamic_read_writes_with_block_gas_limit(3000, Some(0));
-}
-
-#[test]
-fn deltas_writes_mixed_with_block_gas_limit_test() {
-    deltas_writes_mixed_with_block_gas_limit(
-        1000,
-        Some(rand::thread_rng().gen_range(0, 1000) as u64),
-    );
-    deltas_writes_mixed_with_block_gas_limit(1000, Some(0));
-}
-
-#[test]
-fn deltas_resolver_with_block_gas_limit_test() {
-    deltas_resolver_with_block_gas_limit(
-        1000,
-        Some(rand::thread_rng().gen_range(0, 1000 * MAX_GAS_PER_TXN / 2)),
-    );
-    deltas_resolver_with_block_gas_limit(1000, Some(0));
 }
 
 #[test]

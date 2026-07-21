@@ -68,11 +68,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                         &log_context,
                         &AuxiliaryInfo::default(),
                     )
-                    .map(|(_vm_status, vm_output)| {
-                        vm_output
-                            .try_materialize_into_transaction_output(state_view)
-                            .unwrap()
-                    })
+                    .map(|(_vm_status, vm_output)| vm_output.into_transaction_output().unwrap())
                 })
                 .collect::<Result<Vec<_>, _>>()
         })?;

@@ -6,10 +6,7 @@ use crate::{
         DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
         RESERVED_TAG,
     },
-    task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
-        TransactionOutput,
-    },
+    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
     },
@@ -18,17 +15,20 @@ use aptos_aggregator::{
     bounded_math::SignedU128,
     delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::{DeltaOp, DeltaWithMax},
-    resolver::TAggregatorV1View,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
+    block_executor::{output::CommittedTransactionOutput, value::ValueWithLayout},
     contract_event::TransactionEvent,
-    error::PanicError,
+    error::{code_invariant_error, PanicError},
     executable::ModulePath,
     fee_statement::FeeStatement,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::AuxiliaryInfo,
-    write_set::{TransactionWrite, WriteOp, WriteOpKind},
+    write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
@@ -42,7 +42,7 @@ use aptos_vm_types::{
     },
 };
 use bytes::Bytes;
-use claims::{assert_none, assert_ok};
+use claims::assert_ok;
 use move_core_types::{
     language_storage::ModuleId,
     value::{MoveStructLayout, MoveTypeLayout},
@@ -124,10 +124,9 @@ macro_rules! try_with_status {
     };
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct MockOutput<K, E> {
     pub(crate) writes: Vec<(K, ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
-    pub(crate) aggregator_v1_writes: Vec<(K, ValueType)>,
     // Key, metadata_op, inner_ops
     pub(crate) group_writes: Vec<(
         K,
@@ -142,7 +141,6 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) delayed_field_reads: Vec<(DelayedFieldID, u128, K)>,
     pub(crate) module_read_results: Vec<Option<StateValueMetadata>>,
     pub(crate) read_group_size_or_metadata: Vec<(K, GroupSizeOrMetadata)>,
-    pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) patched_resource_write_set: OnceCell<HashMap<K, ValueType>>,
     pub(crate) total_gas: u64,
     pub(crate) called_write_summary: OnceCell<()>,
@@ -160,20 +158,9 @@ pub(crate) struct MockOutputBuilder<K, E> {
 
 impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E> {
     /// Create a new builder from mock incarnation.
-    pub(crate) fn from_mock_incarnation(
-        mock_incarnation: &MockIncarnation<K, E>,
-        delta_test_kind: DeltaTestKind,
-    ) -> Self {
+    pub(crate) fn from_mock_incarnation(mock_incarnation: &MockIncarnation<K, E>) -> Self {
         let output = MockOutput {
             writes: Vec::with_capacity(mock_incarnation.resource_writes.len()),
-            aggregator_v1_writes: mock_incarnation
-                .resource_writes
-                .clone()
-                .into_iter()
-                .filter_map(|(k, v, has_delta)| {
-                    (has_delta && delta_test_kind == DeltaTestKind::AggregatorV1).then_some((k, v))
-                })
-                .collect(),
             group_writes: Vec::with_capacity(mock_incarnation.group_writes.len()),
             module_writes: mock_incarnation.module_writes.clone().into_iter().collect(),
             deltas: Vec::with_capacity(mock_incarnation.deltas.len()),
@@ -182,7 +169,6 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
             delayed_field_reads: vec![],
             module_read_results: Vec::with_capacity(mock_incarnation.module_reads.len()),
             read_group_size_or_metadata: Vec::with_capacity(mock_incarnation.group_queries.len()),
-            materialized_delta_writes: OnceCell::new(),
             patched_resource_write_set: OnceCell::new(),
             total_gas: mock_incarnation.gas,
             called_write_summary: OnceCell::new(),
@@ -223,7 +209,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Returns self for method chaining
     pub(crate) fn add_resource_reads(
         &mut self,
-        view: &impl TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout>,
         key_pairs: &[(K, bool)],
         delayed_fields_enabled: bool,
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
@@ -275,7 +261,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     pub(crate) fn add_group_reads(
         &mut self,
         view: &(impl TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + TExecutorView<K, u32, MoveTypeLayout, ValueType>),
+              + TExecutorView<K, u32, MoveTypeLayout>),
         group_reads: &[(K, u32, bool)],
         delayed_fields_enabled: bool,
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
@@ -314,7 +300,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     pub(crate) fn add_group_queries(
         &mut self,
         view: &(impl TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + TExecutorView<K, u32, MoveTypeLayout, ValueType>),
+              + TExecutorView<K, u32, MoveTypeLayout>),
         group_queries: &[(K, bool)],
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
         for (group_key, query_metadata) in group_queries {
@@ -358,7 +344,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>>
     where
         View: TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-            + TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+            + TExecutorView<K, u32, MoveTypeLayout>,
     {
         // Group writes
         for (key, metadata, inner_ops) in group_writes {
@@ -498,17 +484,12 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     // Group view is because get_delayed_field_id_from_resource dispatches, but there is
     // a TODO to have TExecutorView contain TResourceGroupView anyway.
     where
-        View: TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        View: TExecutorView<K, u32, MoveTypeLayout>
             + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>,
     {
         for (k, new_value, has_delta) in resource_writes.iter() {
             let mut value_to_add = new_value.clone();
             let mut value_to_add_layout = None;
-            if *has_delta && !delayed_fields_enabled {
-                // Already handled by aggregator_v1_writes.
-                continue;
-            }
-
             if *has_delta && delayed_fields_enabled && value_to_add.bytes().is_some() {
                 let prev_id = self.get_delayed_field_id_from_resource(view, k, None)?;
                 value_to_add.set_bytes(serialize_from_delayed_field_id(prev_id, txn_idx));
@@ -529,7 +510,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Returns self for method chaining
     pub(crate) fn add_deltas(
         &mut self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         deltas: &[(K, DeltaOp, Option<u32>)],
         delta_test_kind: DeltaTestKind,
@@ -554,14 +535,6 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
                         .push((k.clone(), *delta, Some((id, success))));
                 }
             },
-            DeltaTestKind::AggregatorV1 => {
-                self.output
-                    .deltas
-                    .extend(deltas.iter().map(|(k, delta, maybe_tag)| {
-                        assert_none!(maybe_tag, "AggregatorV1 not supported in groups");
-                        (k.clone(), *delta, None)
-                    }));
-            },
             DeltaTestKind::None => {},
         }
 
@@ -576,7 +549,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Helper to extract a delayed field ID for a resource key (assuming value is exchanged).
     fn get_delayed_field_id_from_resource(
         &mut self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         key: &K,
         maybe_tag: Option<u32>,
@@ -617,7 +590,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
     /// Returns an error ExecutionStatus if the read fails.
     fn add_delayed_field_from_read_result(
         &mut self,
-        view: &impl TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout>,
         key: &K,
         bytes: &[u8],
     ) -> Result<(), ExecutionStatus<MockOutput<K, E>, usize>> {
@@ -647,7 +620,6 @@ impl<K, E> MockOutput<K, E> {
     fn empty_success_output() -> Self {
         Self {
             writes: vec![],
-            aggregator_v1_writes: vec![],
             group_writes: vec![],
             module_writes: BTreeMap::new(),
             deltas: vec![],
@@ -656,7 +628,6 @@ impl<K, E> MockOutput<K, E> {
             delayed_field_reads: vec![],
             module_read_results: vec![],
             read_group_size_or_metadata: vec![],
-            materialized_delta_writes: OnceCell::new(),
             patched_resource_write_set: OnceCell::new(),
             total_gas: 0,
             called_write_summary: OnceCell::new(),
@@ -671,7 +642,6 @@ impl<K, E> MockOutput<K, E> {
     pub(crate) fn skipped_output(error_msg: Option<String>) -> Self {
         Self {
             writes: vec![],
-            aggregator_v1_writes: vec![],
             group_writes: vec![],
             module_writes: BTreeMap::new(),
             deltas: vec![],
@@ -680,7 +650,6 @@ impl<K, E> MockOutput<K, E> {
             delayed_field_reads: vec![],
             module_read_results: vec![],
             read_group_size_or_metadata: vec![],
-            materialized_delta_writes: OnceCell::new(),
             patched_resource_write_set: OnceCell::new(),
             total_gas: 0,
             called_write_summary: OnceCell::new(),
@@ -721,64 +690,31 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type AfterMaterializationGuard<'a> = &'a Self;
     type BeforeMaterializationGuard<'a> = &'a Self;
+    type CommittedOutput = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
-
-    fn committed_output(&self) -> &OnceCell<aptos_types::transaction::TransactionOutput> {
-        unimplemented!("Not used in tests");
-    }
 
     fn skip_output() -> Self {
         Self::skipped_output(None)
-    }
-
-    fn discard_output(discard_code: StatusCode) -> Self {
-        Self::with_discard_code(discard_code)
     }
 
     fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
         Ok(self)
     }
 
-    fn after_materialization(&self) -> Result<Self::AfterMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        Ok(!self.skipped)
-    }
-
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        _view: &impl TAggregatorV1View<Identifier = K>,
-    ) {
-        // TODO[agg_v2](tests): implement this method and compare
-        // against sequential execution results v. aggregator v1.
-    }
-
     fn incorporate_materialized_txn_output(
         &mut self,
-        aggregator_v1_writes: Vec<(K, WriteOp)>,
         patched_resource_write_set: Vec<(K, ValueType)>,
         _patched_events: Vec<E>,
-    ) -> Result<Trace, PanicError> {
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         assert_ok!(self
             .patched_resource_write_set
             .set(patched_resource_write_set.clone().into_iter().collect()));
-        assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
-        // TODO: Also test patched events.
-        Ok(Trace::empty())
-    }
+        // TODO: Also test patched events
 
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {
-        // No compatibility issues here since the move-vm doesn't use the dynamic flag.
-    }
-
-    fn is_materialized_and_success(&self) -> bool {
-        // TODO(BlockSTMv2): Actually test that materialize is called.
-        // A skipped transaction is not a success.
-        !self.skipped
+        // The mock's committed output is a snapshot of itself, carrying the reads
+        // and patched writes the baseline verifies.
+        Ok((self.clone(), Trace::empty()))
     }
 }
 
@@ -787,38 +723,33 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<K, (TriompheArc<ValueType>, Option<TriompheArc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<K, ValueWithLayout<ValueType>> {
         self.writes
             .iter()
             .map(|(key, value, maybe_layout)| {
                 (
                     key.clone(),
-                    (TriompheArc::new(value.clone()), maybe_layout.clone()),
+                    ValueWithLayout::Exchanged(
+                        TriompheArc::new(value.clone()),
+                        maybe_layout.clone(),
+                    ),
                 )
             })
             .collect()
     }
 
-    fn module_write_set(&self) -> &BTreeMap<K, ModuleWrite<ValueType>> {
-        &self.module_writes
-    }
-
-    fn aggregator_v1_write_set(&self) -> BTreeMap<K, ValueType> {
-        self.aggregator_v1_writes.clone().into_iter().collect()
-    }
-
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<K, DeltaOp> {
-        if !self.deltas.is_empty() && self.deltas[0].2.is_none() {
-            // When testing with delayed fields the Option is Some(id, success).
-            self.deltas
-                .iter()
-                .map(|(k, delta, _)| (k.clone(), *delta))
-                .collect()
-        } else {
-            BTreeMap::new()
+    fn for_each_module_write(
+        &self,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        for write in self.module_writes.values() {
+            let state_value = write
+                .write_op()
+                .as_state_value()
+                .ok_or_else(|| code_invariant_error("Modules cannot be deleted"))?;
+            callback(write.module_id(), state_value)?;
         }
+        Ok(())
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
@@ -865,18 +796,37 @@ where
     ) -> HashMap<
         K,
         (
-            ValueType,
+            ValueWithLayout<ValueType>,
             ResourceGroupSize,
-            BTreeMap<u32, (ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<u32, ValueWithLayout<ValueType>>,
         ),
     > {
         self.group_writes
             .iter()
-            .map(|(key, value, size, ops)| (key.clone(), (value.clone(), *size, ops.clone())))
+            .map(|(key, value, size, ops)| {
+                (
+                    key.clone(),
+                    (
+                        ValueWithLayout::Exchanged(TriompheArc::new(value.clone()), None),
+                        *size,
+                        ops.iter()
+                            .map(|(tag, (op, maybe_layout))| {
+                                (
+                                    *tag,
+                                    ValueWithLayout::Exchanged(
+                                        TriompheArc::new(op.clone()),
+                                        maybe_layout.clone(),
+                                    ),
+                                )
+                            })
+                            .collect(),
+                    ),
+                )
+            })
             .collect()
     }
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         callback: &mut dyn FnMut(&K) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
@@ -928,7 +878,7 @@ where
     }
 }
 
-impl<K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
+impl<K, E> CommittedTransactionOutput for MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
@@ -940,6 +890,22 @@ where
     fn has_new_epoch_event(&self) -> bool {
         // For tests, it is ok to return false.
         false
+    }
+
+    fn is_retry(&self) -> bool {
+        self.skipped
+    }
+
+    fn is_success(&self) -> bool {
+        !self.skipped
+    }
+
+    fn retry() -> Self {
+        Self::skipped_output(None)
+    }
+
+    fn discard(discard_code: StatusCode) -> Self {
+        Self::with_discard_code(discard_code)
     }
 }
 
@@ -990,7 +956,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
               + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
@@ -1013,8 +979,7 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Initialize the builder and use the railway pattern to execute builder operations.
-                let mut builder =
-                    MockOutputBuilder::from_mock_incarnation(behavior, *delta_test_kind);
+                let mut builder = MockOutputBuilder::from_mock_incarnation(behavior);
                 let builder_result = BuilderOperation::new(&mut builder)
                     .and_then(|b| b.add_module_reads(view, &behavior.module_reads))
                     .and_then(|b| {
@@ -1057,7 +1022,7 @@ where
                 ExecutionStatus::Success(builder.build())
             },
             MockTransaction::SkipRest(gas) => {
-                let mut mock_output = MockOutput::skip_output();
+                let mut mock_output = MockOutput::retry();
                 mock_output.total_gas = *gas;
                 ExecutionStatus::SkipRest(mock_output)
             },
@@ -1072,8 +1037,22 @@ where
         }
     }
 
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        true
+    fn pre_write_values(txn: &Self::Txn) -> Vec<(K, ValueWithLayout<ValueType>)> {
+        match txn {
+            MockTransaction::Write { pre_writes, .. } => pre_writes
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        ValueWithLayout::Exchanged(TriompheArc::new(v.clone()), None),
+                    )
+                })
+                .collect(),
+            MockTransaction::InterruptRequested
+            | MockTransaction::SkipRest(_)
+            | MockTransaction::Abort
+            | MockTransaction::StateCheckpoint => vec![],
+        }
     }
 }
 

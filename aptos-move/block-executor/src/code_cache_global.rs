@@ -4,10 +4,8 @@
 use crate::counters::GLOBAL_LAYOUT_CACHE_MISSES;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    error::PanicError, transaction::BlockExecutableTransaction, vm::modules::AptosModuleExtension,
-    write_set::TransactionWrite,
+    error::PanicError, state_store::state_value::StateValue, vm::modules::AptosModuleExtension,
 };
-use aptos_vm_types::module_write_set::ModuleWrite;
 use dashmap::DashMap;
 use hashbrown::{Equivalent, HashMap};
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
@@ -273,9 +271,11 @@ where
     }
 }
 
-/// Converts module write into cached module representation, and adds it to the module cache.
-pub(crate) fn add_module_write_to_module_cache<T: BlockExecutableTransaction>(
-    write: &ModuleWrite<T::Value>,
+/// Converts a published module's state value into the cached module representation, and adds it
+/// to the module cache.
+pub(crate) fn add_module_write_to_module_cache(
+    module_id: &ModuleId,
+    state_value: StateValue,
     txn_idx: TxnIndex,
     runtime_environment: &RuntimeEnvironment,
     global_module_cache: &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
@@ -287,11 +287,6 @@ pub(crate) fn add_module_write_to_module_cache<T: BlockExecutableTransaction>(
         Version = Option<TxnIndex>,
     >,
 ) -> Result<(), PanicError> {
-    let state_value = write
-        .write_op()
-        .as_state_value()
-        .ok_or_else(|| PanicError::CodeInvariantError("Modules cannot be deleted".to_string()))?;
-
     // Since we have successfully serialized the module when converting into this transaction
     // write, the deserialization should never fail.
     let compiled_module = runtime_environment
@@ -303,23 +298,15 @@ pub(crate) fn add_module_write_to_module_cache<T: BlockExecutableTransaction>(
     let extension = Arc::new(AptosModuleExtension::new(state_value));
 
     per_block_module_cache
-        .insert_deserialized_module(
-            write.module_id().clone(),
-            compiled_module,
-            extension,
-            Some(txn_idx),
-        )
+        .insert_deserialized_module(module_id.clone(), compiled_module, extension, Some(txn_idx))
         .map_err(|err| {
             let msg = format!(
-                "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
-                write.module_address(),
-                write.module_name(),
-                txn_idx,
-                err
+                "Failed to insert code for module {} at version {} to module cache: {:?}",
+                module_id, txn_idx, err
             );
             PanicError::CodeInvariantError(msg)
         })?;
-    global_module_cache.mark_overridden(write.module_id());
+    global_module_cache.mark_overridden(module_id);
     Ok(())
 }
 

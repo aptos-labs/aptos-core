@@ -37,7 +37,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        Transaction, TransactionOutput, TransactionStatus, WriteSetPayload,
+        TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -157,18 +157,6 @@ impl ExecutorTask for NativeVMExecutorTask {
             },
             Err(_) => ExecutionStatus::SpeculativeExecutionAbortError("something".to_string()),
         }
-    }
-
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
-        if txn.is_valid() {
-            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
-            {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_groups_split_in_change_set is enabled.
-                return false;
-            }
-        }
-        true
     }
 }
 
@@ -345,13 +333,7 @@ impl NativeVMExecutorTask {
         ));
 
         Ok((
-            VMChangeSet::new(
-                resource_write_set,
-                events,
-                delayed_field_change_set,
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
+            VMChangeSet::new(resource_write_set, events, delayed_field_change_set),
             gas_units,
         ))
     }
@@ -407,10 +389,13 @@ impl NativeVMExecutorTask {
                     account.sequence_number += 1;
                     resource_write_set.insert(
                         sender_account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::modification(
-                            Bytes::from(bcs::to_bytes(&account).map_err(hide_error)?),
-                            metadata,
-                        )),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::modification(
+                                Bytes::from(bcs::to_bytes(&account).map_err(hide_error)?),
+                                metadata,
+                            ),
+                            false,
+                        ),
                     );
                     Ok(())
                 } else {
@@ -427,9 +412,12 @@ impl NativeVMExecutorTask {
                     account.sequence_number = 1;
                     resource_write_set.insert(
                         sender_account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
-                            bcs::to_bytes(&account).map_err(hide_error)?,
-                        ))),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::legacy_creation(Bytes::from(
+                                bcs::to_bytes(&account).map_err(hide_error)?,
+                            )),
+                            false,
+                        ),
                     );
                     Ok(())
                 } else {
@@ -469,9 +457,12 @@ impl NativeVMExecutorTask {
 
                     resource_write_set.insert(
                         account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
-                            bcs::to_bytes(&account).map_err(hide_error)?,
-                        ))),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::legacy_creation(Bytes::from(
+                                bcs::to_bytes(&account).map_err(hide_error)?,
+                            )),
+                            false,
+                        ),
                     );
                 }
             },

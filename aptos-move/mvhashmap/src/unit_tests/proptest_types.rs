@@ -5,15 +5,9 @@ use super::{
     types::{test::KeyType, MVDataError, MVDataOutput, MVGroupError, TxnIndex},
     MVHashMap,
 };
-use crate::types::ValueWithLayout;
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
-use aptos_types::{
-    state_store::state_value::StateValue,
-    write_set::{TransactionWrite, WriteOpKind},
-};
+use aptos_types::{block_executor::value::SpeculativeValue, write_set::WriteOpKind};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
-use claims::assert_none;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -21,7 +15,6 @@ use std::{
     hash::Hash,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use triomphe::Arc;
 
 const DEFAULT_TIMEOUT: u64 = 30;
 
@@ -30,7 +23,6 @@ enum Operator<V: Debug + Clone> {
     Insert(V),
     Remove,
     Read,
-    Update(DeltaOp),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,9 +30,6 @@ enum ExpectedOutput<V: Clone + Debug + Eq + PartialEq> {
     NotInMap,
     Deleted,
     Value(V),
-    Resolved(u128),
-    Unresolved(DeltaOp),
-    Failure,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,51 +52,44 @@ impl<V: Into<Vec<u8>> + Clone + Eq + PartialEq> MockValue<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone + Debug + Eq + PartialEq> TransactionWrite for MockValue<V> {
-    fn bytes(&self) -> Option<&Bytes> {
-        self.maybe_bytes.as_ref()
+impl<V: Into<Vec<u8>> + Clone + Debug + Eq + PartialEq + Send + Sync> SpeculativeValue
+    for MockValue<V>
+{
+    fn eq_value(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn eq_metadata(&self, _other: &Self) -> bool {
+        unimplemented!("Irrelevant for the tests")
+    }
+
+    fn bytes_len(&self) -> Option<usize> {
+        self.maybe_value.as_ref().map(|v| v.clone().into().len())
+    }
+
+    fn is_deletion(&self) -> bool {
+        // A missing value represents a deletion.
+        self.maybe_value.is_none()
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn as_state_value(&self) -> Option<StateValue> {
-        unimplemented!("Irrelevant for the test")
-    }
-
-    fn set_bytes(&mut self, bytes: Bytes) {
-        self.maybe_bytes = Some(bytes);
+        unimplemented!("Irrelevant for the tests")
     }
 }
 
-enum Data<V: Eq + PartialEq> {
-    Write(MockValue<V>),
-    Delta(DeltaOp),
-}
-struct Baseline<K, V: Eq + PartialEq>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
+struct Baseline<K, V: Eq + PartialEq>(HashMap<K, BTreeMap<TxnIndex, MockValue<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
     K: Hash + Eq + Clone + Debug,
     V: Clone + Into<Vec<u8>> + Debug + Eq + PartialEq,
 {
-    pub fn new(txns: &[(K, Operator<V>)], ignore_updates: bool) -> Self {
-        let mut baseline: HashMap<K, BTreeMap<TxnIndex, Data<V>>> = HashMap::new();
+    pub fn new(txns: &[(K, Operator<V>)]) -> Self {
+        let mut baseline: HashMap<K, BTreeMap<TxnIndex, MockValue<V>>> = HashMap::new();
         for (idx, (k, op)) in txns.iter().enumerate() {
             let value_to_update = match op {
-                Operator::Insert(v) => Data::Write(MockValue::new(Some(v.clone()))),
-                Operator::Remove => Data::Write(MockValue::new(None)),
-                Operator::Update(d) => {
-                    if ignore_updates {
-                        continue;
-                    }
-                    Data::Delta(*d)
-                },
+                Operator::Insert(v) => MockValue::new(Some(v.clone())),
+                Operator::Remove => MockValue::new(None),
                 Operator::Read => continue,
             };
 
@@ -122,63 +104,12 @@ where
     pub fn get(&self, key: &K, txn_idx: TxnIndex) -> ExpectedOutput<V> {
         match self.0.get(key).map(|tree| tree.range(..txn_idx)) {
             None => ExpectedOutput::NotInMap,
-            Some(mut iter) => {
-                let mut acc: Option<DeltaOp> = None;
-                let mut failure = false;
-                while let Some((_, data)) = iter.next_back() {
-                    match data {
-                        Data::Write(v) => match acc {
-                            Some(d) => {
-                                match v.as_u128().unwrap() {
-                                    Some(value) => {
-                                        assert!(!failure); // acc should be none.
-                                        match d.apply_to(value) {
-                                            Err(_) => return ExpectedOutput::Failure,
-                                            Ok(i) => return ExpectedOutput::Resolved(i),
-                                        }
-                                    },
-                                    None => {
-                                        // v must be a deletion.
-                                        assert_none!(v.bytes());
-                                        return ExpectedOutput::Deleted;
-                                    },
-                                }
-                            },
-                            None => match v.maybe_value.as_ref() {
-                                Some(w) => {
-                                    return if failure {
-                                        ExpectedOutput::Failure
-                                    } else {
-                                        ExpectedOutput::Value(w.clone())
-                                    };
-                                },
-                                None => return ExpectedOutput::Deleted,
-                            },
-                        },
-                        Data::Delta(d) => match acc.as_mut() {
-                            Some(a) => {
-                                if a.merge_with_previous_delta(*d).is_err() {
-                                    failure = true;
-                                }
-                            },
-                            None => acc = Some(*d),
-                        },
-                    }
-
-                    if failure {
-                        // for overriding the delta failure if entry is deleted.
-                        acc = None;
-                    }
-                }
-
-                if failure {
-                    ExpectedOutput::Failure
-                } else {
-                    match acc {
-                        Some(d) => ExpectedOutput::Unresolved(d),
-                        None => ExpectedOutput::NotInMap,
-                    }
-                }
+            Some(mut iter) => match iter.next_back() {
+                None => ExpectedOutput::NotInMap,
+                Some((_, v)) => match v.maybe_value.as_ref() {
+                    Some(w) => ExpectedOutput::Value(w.clone()),
+                    None => ExpectedOutput::Deleted,
+                },
             },
         }
     }
@@ -187,22 +118,13 @@ where
 fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V>> {
     prop_oneof![
         2 => any::<V>().prop_map(Operator::Insert),
-        4 => any::<u32>().prop_map(|v| {
-            // TODO: Is there a proptest way of doing that?
-            if v % 2 == 0 {
-                Operator::Update(delta_sub(v as u128, u32::MAX as u128))
-            } else {
-                Operator::Update(delta_add(v as u128, u32::MAX as u128))
-            }
-        }),
         1 => Just(Operator::Remove),
-        1 => Just(Operator::Read),
+        2 => Just(Operator::Read),
     ]
 }
 
-// If test group is set, we prop-test the group_data multi-version hashmap: we ignore the
-// Update/Deltas (as only data() MVHashMap deals with AggregatorV1 and even that will get
-// deprecated in favor of the dedicated aggregator MVHashMap for AggregatorV2).
+// If test group is set, we prop-test the group_data multi-version hashmap, otherwise the
+// data() multi-version hashmap.
 fn run_and_assert<K, V>(
     universe: Vec<K>,
     transaction_gens: Vec<(Index, Operator<V>)>,
@@ -217,7 +139,7 @@ where
         .map(|(idx, op)| (idx.get(&universe).clone(), op))
         .collect::<Vec<_>>();
 
-    let baseline = Baseline::new(transactions.as_slice(), test_group);
+    let baseline = Baseline::new(transactions.as_slice());
     let map = MVHashMap::<KeyType<K>, usize, MockValue<V>, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
@@ -228,7 +150,6 @@ where
         .filter_map(|(idx, (key, op))| match op {
             Operator::Read => None,
             Operator::Insert(_) | Operator::Remove => Some((key.clone(), idx)),
-            Operator::Update(_) => (!test_group).then_some((key.clone(), idx)),
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
@@ -244,7 +165,7 @@ where
                     key.clone(),
                     idx,
                     0,
-                    vec![(5, (value, None))],
+                    vec![(5, value)],
                     ResourceGroupSize::zero_combined(),
                     HashSet::new(),
                 )
@@ -253,9 +174,7 @@ where
             map.group_data()
                 .mark_estimate(&key, idx, tags_5.iter().collect());
         } else {
-            map.data()
-                .write(key.clone(), idx, 0, Arc::new(value), None)
-                .unwrap();
+            map.data().write(key.clone(), idx, 0, value).unwrap();
             map.data().mark_estimate(&key, idx);
         }
     }
@@ -279,11 +198,7 @@ where
                         use MVDataOutput::*;
 
                         let baseline = baseline.get(key, idx as TxnIndex);
-                        let assert_value = |v: ValueWithLayout<MockValue<V>>| match v
-                            .extract_value_no_layout()
-                            .maybe_value
-                            .as_ref()
-                        {
+                        let assert_value = |v: MockValue<V>| match v.maybe_value.as_ref() {
                             Some(w) => {
                                 assert_eq!(baseline, ExpectedOutput::Value(w.clone()), "{:?}", idx);
                             },
@@ -320,30 +235,8 @@ where
                                         assert_value(v);
                                         break;
                                     },
-                                    Ok(Resolved(v)) => {
-                                        assert_eq!(
-                                            baseline,
-                                            ExpectedOutput::Resolved(v),
-                                            "{:?}",
-                                            idx
-                                        );
-                                        break;
-                                    },
                                     Err(Uninitialized) => {
                                         assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
-                                        break;
-                                    },
-                                    Err(DeltaApplicationFailure) => {
-                                        assert_eq!(baseline, ExpectedOutput::Failure, "{:?}", idx);
-                                        break;
-                                    },
-                                    Err(Unresolved(d)) => {
-                                        assert_eq!(
-                                            baseline,
-                                            ExpectedOutput::Unresolved(d),
-                                            "{:?}",
-                                            idx
-                                        );
                                         break;
                                     },
                                     Err(Dependency(_i)) => (),
@@ -365,15 +258,13 @@ where
                                     key,
                                     idx as TxnIndex,
                                     1,
-                                    vec![(5, (value, None))],
+                                    vec![(5, value)],
                                     ResourceGroupSize::zero_combined(),
                                     HashSet::new(),
                                 )
                                 .unwrap();
                         } else {
-                            map.data()
-                                .write(key, idx as TxnIndex, 1, Arc::new(value), None)
-                                .unwrap();
+                            map.data().write(key, idx as TxnIndex, 1, value).unwrap();
                         }
                     },
                     Operator::Insert(v) => {
@@ -385,21 +276,13 @@ where
                                     key,
                                     idx as TxnIndex,
                                     1,
-                                    vec![(5, (value, None))],
+                                    vec![(5, value)],
                                     ResourceGroupSize::zero_combined(),
                                     HashSet::new(),
                                 )
                                 .unwrap();
                         } else {
-                            map.data()
-                                .write(key, idx as TxnIndex, 1, Arc::new(value), None)
-                                .unwrap();
-                        }
-                    },
-                    Operator::Update(delta) => {
-                        if !test_group {
-                            map.data()
-                                .add_delta(KeyType(key.clone()), idx as TxnIndex, *delta)
+                            map.data().write(key, idx as TxnIndex, 1, value).unwrap();
                         }
                     },
                 }

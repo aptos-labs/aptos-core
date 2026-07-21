@@ -2,43 +2,40 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::{CapturedReads, DataRead, ReadKind},
+    captured_reads::CapturedReads,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
-    errors::ParallelBlockExecutionError,
+    errors::{ParallelBlockExecutionError, ResourceGroupSerializationError},
+    executor_utilities::{materialize_output, Materializer},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
     task::{BeforeMaterializationOutput, ExecutionStatus, TransactionOutput},
-    txn_commit_hook::TransactionCommitHook,
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
+    block_executor::value::ValueWithLayout,
     error::{code_invariant_error, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
-    state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
-    write_set::WriteOp,
 };
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{execution_tracing::Trace, Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use parking_lot::Mutex;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashSet},
     fmt::Debug,
-    iter::{empty, Iterator},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
-use triomphe::Arc as TriompheArc;
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
@@ -183,14 +180,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
         })
     }
 
-    fn take_output(&mut self) -> Result<O, PanicError> {
-        self.check_success_or_skip_status()?;
-
-        self.output.take().ok_or_else(|| {
-            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
-        })
-    }
-
     fn check_success_or_skip_status(&self) -> Result<&O, PanicError> {
         if self.output_status_kind != OutputStatusKind::Success
             && self.output_status_kind != OutputStatusKind::SkipRest
@@ -260,26 +249,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
 
     pub(crate) fn record_speculative_failure(&self, txn_idx: TxnIndex) {
         self.speculative_failures[txn_idx as usize].store(true, Ordering::Relaxed);
-    }
-
-    pub fn fetch_exchanged_data(
-        &self,
-        key: &T::Key,
-        txn_idx: TxnIndex,
-    ) -> Result<(TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>), PanicError> {
-        let guard = self.inputs[txn_idx as usize].lock();
-        let input = guard.as_ref().ok_or_else(|| {
-            code_invariant_error("Read must be recorded before fetching exchanged data".to_string())
-        })?;
-        let data_read = input.get_by_kind(key, None, ReadKind::Value);
-        if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
-            Ok((value, layout))
-        } else {
-            Err(code_invariant_error(format!(
-                "Read value needing exchange {:?} not in Exchanged format",
-                data_read
-            )))
-        }
     }
 
     pub(crate) fn is_speculative_failure(&self, txn_idx: TxnIndex) -> bool {
@@ -405,39 +374,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         Ok(())
     }
 
-    pub(crate) fn notify_listener<L: TransactionCommitHook>(
-        &self,
-        txn_idx: TxnIndex,
-        txn_listener: &L,
-    ) -> Result<(), PanicError> {
-        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
-        match output_wrapper.output_status_kind {
-            OutputStatusKind::Success | OutputStatusKind::SkipRest => {
-                txn_listener.on_transaction_committed(
-                    txn_idx,
-                    output_wrapper
-                        .output
-                        .as_ref()
-                        .expect("Output must be set when status is success or skip rest")
-                        .committed_output(),
-                );
-            },
-            OutputStatusKind::Abort(_) => {
-                txn_listener.on_execution_aborted(txn_idx);
-            },
-            OutputStatusKind::SpeculativeExecutionAbortError
-            | OutputStatusKind::DelayedFieldsCodeInvariantError
-            | OutputStatusKind::None => {
-                return Err(code_invariant_error(format!(
-                    "Unexpected output status kind {:?}",
-                    output_wrapper.output_status_kind
-                )));
-            },
-        }
-
-        Ok(())
-    }
-
     pub(crate) fn for_each_resource_key_no_aggregator_v1(
         &self,
         txn_idx: TxnIndex,
@@ -447,7 +383,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         if let Some(output) = output_wrapper.output.as_ref() {
             output
                 .before_materialization()?
-                .for_each_resource_key_no_aggregator_v1(&mut callback)?;
+                .for_each_resource_key(&mut callback)?;
         }
 
         Ok(())
@@ -478,43 +414,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     }
 
     // Extracts a set of resource paths (keys) written or updated during execution from
-    // transaction output. The group keys are not included, and the boolean indicates
-    // whether the resource is used as an AggregatorV1.
-    // Used only in BlockSTMv1. BlockSTMv2 uses modified_resource_keys_no_aggregator_v1
-    // and modified_aggregator_v1_keys methods below.
+    // transaction output. The group keys are not included.
     pub(crate) fn modified_resource_keys(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| {
-                let inner = t.before_materialization().expect("Output must be set");
-                Some(
-                    inner
-                        .resource_write_set()
-                        .into_iter()
-                        .map(|(k, (_, _))| (k, false))
-                        .chain(
-                            inner
-                                .aggregator_v1_write_set()
-                                .into_keys()
-                                .map(|k| (k, true)),
-                        )
-                        .chain(
-                            inner
-                                .aggregator_v1_delta_set()
-                                .into_keys()
-                                .map(|k| (k, true)),
-                        ),
-                )
-            },
-            None
-        )
-    }
-
-    pub(crate) fn modified_aggregator_v1_keys(
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = T::Key>> {
@@ -523,12 +424,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             txn_idx,
             |t| {
                 let inner = t.before_materialization().expect("Output must be set");
-                Some(
-                    inner
-                        .aggregator_v1_write_set()
-                        .into_keys()
-                        .chain(inner.aggregator_v1_delta_set().into_keys()),
-                )
+                Some(inner.resource_write_set().into_keys())
             },
             None
         )
@@ -544,7 +440,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
         scheduler: &SchedulerWrapper<'_>,
     ) -> Result<bool, PanicError> {
@@ -555,19 +451,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
 
         let mut published = false;
         let mut module_ids_for_v2 = BTreeSet::new();
-        for write in output_before_guard.module_write_set().values() {
+        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
             published = true;
             if scheduler.is_v2() {
-                module_ids_for_v2.insert(write.module_id().clone());
+                module_ids_for_v2.insert(module_id.clone());
             }
-            add_module_write_to_module_cache::<T>(
-                write,
+            add_module_write_to_module_cache(
+                module_id,
+                state_value,
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
                 versioned_cache.module_cache(),
-            )?;
-        }
+            )
+        })?;
         if published {
             // Record validation requirements after the modules are published.
             scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
@@ -592,100 +489,23 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         )
     }
 
-    pub(crate) fn reads_needing_delayed_field_exchange(
+    // Called when a transaction is committed to materialize its recorded output:
+    // resource group updates are finalized and serialized, and delayed field
+    // identifiers are replaced with committed values in resource writes and events.
+    //
+    // !!! [CAUTION] !!!: This finalizes the output and may not be concurrent with
+    // any other accesses to the output (e.g. querying the write-set, events, etc),
+    // as these read accesses are not synchronized and assumed to have terminated.
+    pub(crate) fn materialize<M: Materializer<T>>(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
-        with_success_or_skip_rest!(self, txn_idx, reads_needing_delayed_field_exchange, vec![])
-            .expect("Output must be set")
-    }
-
-    pub(crate) fn group_reads_needing_delayed_field_exchange(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, StateValueMetadata)> {
+        materializer: &M,
+    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>> {
         with_success_or_skip_rest!(
             self,
             txn_idx,
-            group_reads_needing_delayed_field_exchange,
-            vec![]
+            |mut t| materialize_output(t, materializer),
+            Err(code_invariant_error("[BlockSTM]: Output must be recorded after execution").into())
         )
-        .expect("Output must be set")
-    }
-
-    pub(crate) fn aggregator_v1_delta_keys(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = T::Key>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| Some(
-                t.before_materialization()
-                    .expect("Output must be set")
-                    .aggregator_v1_delta_set()
-                    .into_keys()
-            ),
-            None
-        )
-    }
-
-    pub(crate) fn resource_group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {
-        with_success_or_skip_rest!(self, txn_idx, resource_group_metadata_ops, vec![])
-            .expect("Output must be set")
-    }
-
-    pub(crate) fn events(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| Box::new(
-                t.before_materialization()
-                    .expect("Output must be set")
-                    .get_events()
-                    .into_iter()
-            ),
-            Box::new(empty())
-        )
-    }
-
-    pub(crate) fn resource_write_set(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Result<
-        HashMap<T::Key, (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>)>,
-        PanicError,
-    > {
-        with_success_or_skip_rest!(self, txn_idx, resource_write_set, HashMap::new())
-    }
-
-    // Called when a transaction is committed to record WriteOps for materialized aggregator values
-    // corresponding to the (deltas) in the recorded final output of the transaction, as well as
-    // finalized group updates.
-    pub(crate) fn record_materialized_txn_output(
-        &self,
-        txn_idx: TxnIndex,
-        delta_writes: Vec<(T::Key, WriteOp)>,
-        patched_resource_write_set: Vec<(T::Key, T::Value)>,
-        patched_events: Vec<T::Event>,
-    ) -> Result<Trace, PanicError> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |mut t| t.incorporate_materialized_txn_output(
-                delta_writes,
-                patched_resource_write_set,
-                patched_events
-            ),
-            Ok(Trace::empty())
-        )
-    }
-
-    // Must be executed after parallel execution is done, grabs outputs.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> Result<O, PanicError> {
-        self.output_wrappers[txn_idx as usize].lock().take_output()
     }
 }
