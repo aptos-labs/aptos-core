@@ -193,7 +193,11 @@ export function assertTagMatchesSourceVersion(imageTag) {
   }
 }
 
-const APTOS_RELEASE_REGEX = /aptos-node-v(\d+\.\d+\.\d+)/;
+// Capture X.Y.Z and any -rc[.N] suffix; Cargo.toml is required to match
+// exactly (the pre-flight `validate-aptos-node-version` workflow job
+// enforces this and is the primary gate, but we keep the in-script check
+// as defense-in-depth).
+const APTOS_RELEASE_REGEX = /aptos-node-v(\d+\.\d+\.\d+(?:-rc(?:\.\d+)?)?)/;
 
 function doesTagMatchConfig(imageTag, configVersion) {
   if (!APTOS_RELEASE_REGEX.test(imageTag)) {
