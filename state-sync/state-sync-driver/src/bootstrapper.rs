@@ -260,10 +260,6 @@ pub(crate) struct StateValueSyncer {
 
     // The transaction output (inc. info and proof) for the version we're syncing
     transaction_output_to_sync: Option<TransactionOutputListWithProofV2>,
-
-    // Whether a data stream has been requested for this kind at the current
-    // target (distinguishes "not yet streamed" from "streamed, empty tree").
-    stream_requested: bool,
 }
 
 impl StateValueSyncer {
@@ -273,7 +269,6 @@ impl StateValueSyncer {
             ledger_info_to_sync: None,
             next_state_index_to_process: 0,
             transaction_output_to_sync: None,
-            stream_requested: false,
         }
     }
 
@@ -300,6 +295,10 @@ impl StateValueSyncer {
 pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
+
+    // The snapshot kind of the active data stream, if it is a state-value
+    // snapshot stream (used to detect an empty tree on a clean end-of-stream).
+    active_snapshot_kind: Option<StateKind>,
 
     // The channel used to notify a listener of successful bootstrapping
     bootstrap_notifier_channel: Option<oneshot::Sender<Result<(), Error>>>,
@@ -361,6 +360,7 @@ impl<
             state_value_syncer: StateValueSyncer::new(),
             position_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
+            active_snapshot_kind: None,
             bootstrap_notifier_channel: None,
             bootstrapped: false,
             driver_configuration,
@@ -718,7 +718,6 @@ impl<
         // Fetch the missing state values
         self.state_value_syncer_mut(kind)
             .update_next_state_index_to_process(next_state_index_to_process);
-        self.state_value_syncer_mut(kind).stream_requested = true;
         let data_stream = self
             .streaming_client
             .get_all_state_values(
@@ -728,6 +727,7 @@ impl<
             )
             .await?;
         self.active_data_stream = Some(data_stream);
+        self.active_snapshot_kind = Some(kind);
 
         Ok(())
     }
@@ -808,6 +808,7 @@ impl<
             highest_synced_version,
         ));
         self.active_data_stream = Some(data_stream);
+        self.active_snapshot_kind = None;
 
         Ok(())
     }
@@ -861,6 +862,7 @@ impl<
                 .get_all_epoch_ending_ledger_infos(next_epoch_end)
                 .await?;
             self.active_data_stream = Some(epoch_ending_stream);
+            self.active_snapshot_kind = None;
         } else if self.verified_epoch_states.verified_waypoint() {
             info!(LogSchema::new(LogEntry::Bootstrapper).message(
                 "No new epoch ending ledger infos to fetch! All peers are in the same epoch!"
@@ -1160,6 +1162,7 @@ impl<
                 .get_all_transaction_outputs(version, version, version)
                 .await?;
             self.active_data_stream = Some(data_stream);
+            self.active_snapshot_kind = None;
             return Ok(());
         }
 
@@ -1193,30 +1196,9 @@ impl<
                     )));
                 },
                 None => {
-                    // No progress recorded. If the stream was already requested and
-                    // returned no state values, the tree is empty: verify emptiness
-                    // against the committed root (not the unproved peer count) rather
-                    // than re-streaming. Otherwise, start streaming.
-                    let stream_requested = self.state_value_syncer(kind).stream_requested;
-                    let receiver_initialized = self
-                        .state_value_syncer(kind)
-                        .initialized_state_snapshot_receiver;
-                    if stream_requested && !receiver_initialized {
-                        if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
-                            self.metadata_storage.update_last_persisted_index(
-                                &target_ledger_info,
-                                0,
-                                true,
-                                kind,
-                            )?;
-                            continue;
-                        }
-                        return Err(Error::UnexpectedError(format!(
-                            "The {:?} snapshot stream ended without any state values, but the \
-                             committed snapshot root is not the empty-tree placeholder! Target: {:?}",
-                            kind, target_ledger_info,
-                        )));
-                    }
+                    // This kind hasn't started syncing yet. Stream it from the
+                    // beginning. An empty tree (a stream that ends without any state
+                    // values) is completed by the end-of-stream handler.
                     return self
                         .fetch_missing_state_values(target_ledger_info, false, kind)
                         .await;
@@ -1657,8 +1639,52 @@ impl<
 
         // Return an error if the payload was invalid
         match data_notification.data_payload {
-            DataPayload::EndOfStream => Ok(()),
+            DataPayload::EndOfStream => self.complete_empty_snapshot_if_applicable().await,
             _ => Err(Error::InvalidPayload("Unexpected payload type!".into())),
+        }
+    }
+
+    /// Completes a snapshot whose stream ended cleanly without serving any state
+    /// value (i.e. no receiver was ever initialized), which only happens for an
+    /// empty tree. Emptiness is decided by the committed snapshot root, never the
+    /// unproved peer count; a non-empty root here means the peer ended the stream
+    /// early, which is surfaced as an error so the stream is retried. A stream
+    /// aborted mid-chunk (e.g. a bad root hash) never reaches this path: it is
+    /// reset with an error before end-of-stream, so it is retried rather than
+    /// mistaken for an empty tree.
+    async fn complete_empty_snapshot_if_applicable(&mut self) -> Result<(), Error> {
+        let kind = match self.active_snapshot_kind {
+            Some(kind) => kind,
+            None => return Ok(()),
+        };
+        if !self.get_bootstrapping_mode().is_fast_sync()
+            || self
+                .state_value_syncer(kind)
+                .initialized_state_snapshot_receiver
+        {
+            return Ok(());
+        }
+        let target_ledger_info = self
+            .state_value_syncer(kind)
+            .ledger_info_to_sync
+            .clone()
+            .ok_or_else(|| {
+                Error::UnexpectedError(format!("The {:?} ledger info to sync is missing!", kind))
+            })?;
+        if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
+            self.metadata_storage.update_last_persisted_index(
+                &target_ledger_info,
+                0,
+                true,
+                kind,
+            )?;
+            Ok(())
+        } else {
+            Err(Error::UnexpectedError(format!(
+                "The {:?} snapshot stream ended without any state values, but the committed \
+                 snapshot root is not the empty-tree placeholder! Target: {:?}",
+                kind, target_ledger_info,
+            )))
         }
     }
 
