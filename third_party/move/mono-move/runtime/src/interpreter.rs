@@ -652,6 +652,44 @@ fn u256_from_u8(x: u8) -> U256 {
     U256::from_le_bytes(bytes)
 }
 
+/// Resolve the enum fat pointer at `enum_ref` and its runtime tag to the
+/// field's location `(heap_object_ptr, object_relative_offset)` via the
+/// per-tag `offsets` table. A tag past the table is heap corruption (a
+/// well-formed enum's tag is always in range) and surfaces as an invariant
+/// violation; a `None` hole means the runtime variant does not declare the
+/// field, a user-level `EnumVariantMismatch` error.
+///
+/// # Safety
+///
+/// `fp + enum_ref` must hold a valid fat pointer to a live enum heap object.
+#[inline(always)]
+unsafe fn variant_field_loc(
+    fp: *mut u8,
+    enum_ref: FrameOffset,
+    offsets: &[Option<u32>],
+) -> VMResult<(*mut u8, u32)> {
+    // SAFETY: forwarded from this function's contract.
+    let (ref_base, ref_off) = unsafe { read_fat_ptr(fp, enum_ref) };
+    let obj_ptr = unsafe { read_ptr(ref_base, ref_off as usize) };
+    let tag = unsafe { read_enum_tag(obj_ptr) };
+    let Some(variant_offset) = offsets.get(tag as usize) else {
+        // A tag past the variant table is heap corruption (a well-formed
+        // enum's tag is always in range), not a user-level mismatch.
+        invariant_violation!(EnumTagOutOfRange {
+            tag,
+            variant_count: offsets.len(),
+        });
+    };
+    match variant_offset {
+        Some(offset) => Ok((obj_ptr, *offset)),
+        // Tag in range but this variant does not declare the field (move
+        // semantics for this is a runtime error).
+        None => Err(VMInternalError::new(RuntimeError::EnumVariantMismatch {
+            tag,
+        })),
+    }
+}
+
 // Dispatch on an [`IntOperand`]: for each variant, invoke the caller's
 // `$action!` macro with three arguments — `($rust_ty, $sign, $rhs_value)`.
 // `$sign` is the literal token `unsigned` or `signed`, letting `$action!`
@@ -1539,8 +1577,11 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Move8 { dst, src } => {
-                        let v = read_u64(fp, src);
-                        write_u64(fp, dst, v);
+                        // The slots need not be 8-aligned (see `Move8`'s doc),
+                        // so the accesses must be unaligned — same codegen as
+                        // aligned loads on x86-64/aarch64.
+                        let v = (fp.add(src.into()) as *const u64).read_unaligned();
+                        (fp.add(dst.into()) as *mut u64).write_unaligned(v);
                     },
 
                     MicroOp::Move { dst, src, size } => {
@@ -1812,8 +1853,12 @@ impl InterpreterContext<'_> {
                         offset,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        let val = read_u64(obj_ptr, offset as usize);
-                        write_u64(fp, dst, val);
+                        // Neither `heap_ptr + offset` nor the frame slot need
+                        // be 8-aligned (see the op's doc), so the accesses
+                        // must be unaligned — same codegen as aligned loads
+                        // on x86-64/aarch64.
+                        let val = (obj_ptr.add(offset as usize) as *const u64).read_unaligned();
+                        (fp.add(dst.into()) as *mut u64).write_unaligned(val);
                     },
 
                     MicroOp::HeapMoveFrom {
@@ -1836,8 +1881,9 @@ impl InterpreterContext<'_> {
                         src,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        let val = read_u64(fp, src);
-                        write_u64(obj_ptr, offset as usize, val);
+                        // Unaligned accesses: see `HeapMoveFrom8` above.
+                        let val = (fp.add(src.into()) as *const u64).read_unaligned();
+                        (obj_ptr.add(offset as usize) as *mut u64).write_unaligned(val);
                     },
 
                     MicroOp::HeapMoveToImm8 {
@@ -1846,7 +1892,8 @@ impl InterpreterContext<'_> {
                         imm,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        write_u64(obj_ptr, offset as usize, imm);
+                        // Unaligned access: see `HeapMoveFrom8` above.
+                        (obj_ptr.add(offset as usize) as *mut u64).write_unaligned(imm);
                     },
 
                     MicroOp::HeapMoveTo {
@@ -2019,36 +2066,15 @@ impl InterpreterContext<'_> {
                         write_bool(fp, dst, tag == variant);
                     },
 
-                    MicroOp::EnumBorrowVariantField {
+                    MicroOp::EnumBorrowVariantFieldByTag {
                         dst,
                         enum_ref,
                         ref offsets,
                     } => {
-                        // Deref the enum fat pointer to the heap object, read the
-                        // tag, then borrow the field at that variant's offset.
-                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
-                        let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                        let tag = read_enum_tag(obj_ptr);
-                        let Some(variant_offset) = offsets.get(tag as usize) else {
-                            // A tag past the variant table is heap corruption (a
-                            // well-formed enum's tag is always in range), not a
-                            // user-level mismatch. Surface it as an invariant
-                            // violation.
-                            invariant_violation!(EnumTagOutOfRange {
-                                tag,
-                                variant_count: offsets.len(),
-                            });
-                        };
-                        match variant_offset {
-                            Some(offset) => write_fat_ptr(fp, dst, obj_ptr, *offset as u64),
-                            // Tag in range but this variant does not declare the
-                            // field (move semantics for this is a runtime error).
-                            None => {
-                                return Err(VMInternalError::new(
-                                    RuntimeError::EnumVariantMismatch { tag },
-                                ))
-                            },
-                        }
+                        // The field reference written to `dst` is a fat pointer
+                        // pairing the heap object with the tag-selected offset.
+                        let (obj_ptr, offset) = variant_field_loc(fp, enum_ref, offsets)?;
+                        write_fat_ptr(fp, dst, obj_ptr, offset as u64);
                     },
 
                     MicroOp::EnumCheckVariant { enum_ptr, variant } => {
@@ -2076,20 +2102,19 @@ impl InterpreterContext<'_> {
                         write_ptr(fp, dst, obj_ptr);
                     },
 
-                    MicroOp::EnumReadVariantField {
+                    MicroOp::HeapReadOffset {
                         dst,
-                        enum_ref,
+                        obj_ref,
                         offset,
                         size,
                     } => {
-                        // Double deref of the enum fat pointer to the heap object,
-                        // then copy the field bytes directly — no intermediate
-                        // scratch reference. The offset is a static uniform offset
-                        // (no tag dispatch).
-                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                        // Deref the fat pointer to the heap object, then copy
+                        // the bytes at the static offset directly (no tag
+                        // dispatch).
+                        let (ref_base, ref_off) = read_fat_ptr(fp, obj_ref);
                         let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                        // Non-overlapping: `dst` is a stack-region slot, the field
-                        // is heap-object bytes.
+                        // Non-overlapping: `dst` is a stack-region slot, the
+                        // source is heap-object bytes.
                         std::ptr::copy_nonoverlapping(
                             obj_ptr.add(offset as usize),
                             fp.add(dst.into()),
@@ -2097,16 +2122,48 @@ impl InterpreterContext<'_> {
                         );
                     },
 
-                    MicroOp::EnumWriteVariantField {
-                        enum_ref,
+                    MicroOp::HeapWriteOffset {
+                        obj_ref,
                         offset,
                         src,
                         size,
                     } => {
-                        let (ref_base, ref_off) = read_fat_ptr(fp, enum_ref);
+                        let (ref_base, ref_off) = read_fat_ptr(fp, obj_ref);
                         let obj_ptr = read_ptr(ref_base, ref_off as usize);
-                        // Non-overlapping: `src` is a stack-region slot, the field
-                        // is heap-object bytes.
+                        // Non-overlapping: `src` is a stack-region slot, the
+                        // destination is heap-object bytes.
+                        std::ptr::copy_nonoverlapping(
+                            fp.add(src.into()),
+                            obj_ptr.add(offset as usize),
+                            size as usize,
+                        );
+                    },
+
+                    MicroOp::EnumReadVariantFieldByTag {
+                        dst,
+                        enum_ref,
+                        ref offsets,
+                        size,
+                    } => {
+                        let (obj_ptr, offset) = variant_field_loc(fp, enum_ref, offsets)?;
+                        // Non-overlapping: `dst` is a stack-region slot, the
+                        // field is heap-object bytes.
+                        std::ptr::copy_nonoverlapping(
+                            obj_ptr.add(offset as usize),
+                            fp.add(dst.into()),
+                            size as usize,
+                        );
+                    },
+
+                    MicroOp::EnumWriteVariantFieldByTag {
+                        enum_ref,
+                        ref offsets,
+                        src,
+                        size,
+                    } => {
+                        let (obj_ptr, offset) = variant_field_loc(fp, enum_ref, offsets)?;
+                        // Non-overlapping: `src` is a stack-region slot, the
+                        // field is heap-object bytes.
                         std::ptr::copy_nonoverlapping(
                             fp.add(src.into()),
                             obj_ptr.add(offset as usize),

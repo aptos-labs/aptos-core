@@ -174,6 +174,14 @@ fn variant_field_name(module: &CompiledModule, idx: VariantFieldHandleIndex) -> 
     format!("{}::{}::{}", sname, vname, fname)
 }
 
+/// Render a fused field chain's path as `Owner0::f0.Owner1::f1...`.
+fn field_path_name(module: &CompiledModule, path: &super::FieldPath) -> String {
+    path.iter()
+        .map(|step| field_name(module, step.1))
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
 fn display_instr(
     f: &mut fmt::Formatter<'_>,
     module: &CompiledModule,
@@ -440,6 +448,80 @@ fn display_instr(
                 field_name(module, *idx),
                 slot_name(*local),
                 slot_name(*v)
+            )
+        },
+
+        // --- Fused field chains ---
+        Instr::ReadFieldChain(d, path, s) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "read_field_chain {}, {}",
+                field_path_name(module, path),
+                slot_name(*s)
+            )
+        },
+        Instr::WriteFieldChain(path, d, v) => {
+            write!(
+                f,
+                "write_field_chain {}, {}, {}",
+                field_path_name(module, path),
+                slot_name(*d),
+                slot_name(*v)
+            )
+        },
+        Instr::ImmBorrowFieldChain(d, path, s) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "imm_borrow_field_chain {}, {}",
+                field_path_name(module, path),
+                slot_name(*s)
+            )
+        },
+        Instr::MutBorrowFieldChain(d, path, s) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "mut_borrow_field_chain {}, {}",
+                field_path_name(module, path),
+                slot_name(*s)
+            )
+        },
+        Instr::ReadLocalFieldChain(d, path, local) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "read_local_field_chain {}, {}",
+                field_path_name(module, path),
+                slot_name(*local)
+            )
+        },
+        Instr::WriteLocalFieldChain(path, local, v) => {
+            write!(
+                f,
+                "write_local_field_chain {}, {}, {}",
+                field_path_name(module, path),
+                slot_name(*local),
+                slot_name(*v)
+            )
+        },
+        Instr::ImmBorrowLocalFieldChain(d, path, local) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "imm_borrow_local_field_chain {}, {}",
+                field_path_name(module, path),
+                slot_name(*local)
+            )
+        },
+        Instr::MutBorrowLocalFieldChain(d, path, local) => {
+            write_dst(f, *d)?;
+            write!(
+                f,
+                "mut_borrow_local_field_chain {}, {}",
+                field_path_name(module, path),
+                slot_name(*local)
             )
         },
 

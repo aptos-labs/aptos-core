@@ -2,13 +2,12 @@
 // module 0x42::enum_by_ref_param
 
 fun read_x() {
-  frame_data_size: 40
+  frame_data_size: 24
   entry_gas: 17
   code:
-    0: EnumBorrowVariantField [24] <- &(*[0]) by tag [Some(9), Some(16)]
-    1: ReadRef [16] <- *[24] (size=1)
-    2: Move(1) [0] <- [16]
-    3: Return
+    0: EnumReadVariantFieldByTag(1) [16] <- (*[0]) by tag [Some(9), Some(16)]
+    1: Move(1) [0] <- [16]
+    2: Return
 }
 
 fun read_x_a() {

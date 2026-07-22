@@ -30,7 +30,7 @@
 //!   caller-provided closures (`impl FnMut`) are monomorphized and inlined
 //!   at each call site.
 
-use super::{BinaryOp, ImmValue, Instr, Slot};
+use super::{BinaryOp, FieldPath, ImmValue, Instr, Slot};
 use mono_move_core::types::InternedType;
 use smallvec::SmallVec;
 
@@ -123,6 +123,92 @@ pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
     matches!(instr, Instr::Call(..) | Instr::CallClosure(..))
 }
 
+/// The local whose storage `instr` mutably borrows, if any. A later write
+/// through that borrow mutates the local without a def at the write site (a
+/// hidden write), so coalescing and copy propagation both derive their
+/// guards from this single predicate.
+pub(crate) fn mut_local_borrow_target(instr: &Instr) -> Option<Slot> {
+    match instr {
+        // Mutable borrows of a local's storage.
+        Instr::MutBorrowLoc(_, local)
+        | Instr::MutBorrowLocField(_, _, _, local)
+        | Instr::MutBorrowLocalFieldChain(_, _, local) => Some(*local),
+
+        // Every other instruction: no local storage is mutably borrowed.
+        Instr::Pack(..)
+        | Instr::Unpack(..)
+        | Instr::PackVariant(..)
+        | Instr::UnpackVariant(..)
+        | Instr::TestVariant(..)
+        | Instr::ImmBorrowField(..)
+        | Instr::MutBorrowField(..)
+        | Instr::ReadField(..)
+        | Instr::WriteField(..)
+        | Instr::ImmBorrowLocField(..)
+        | Instr::ReadLocalField(..)
+        | Instr::WriteLocalField(..)
+        | Instr::ReadFieldChain(..)
+        | Instr::WriteFieldChain(..)
+        | Instr::ImmBorrowFieldChain(..)
+        | Instr::MutBorrowFieldChain(..)
+        | Instr::ReadLocalFieldChain(..)
+        | Instr::WriteLocalFieldChain(..)
+        | Instr::ImmBorrowLocalFieldChain(..)
+        | Instr::ImmBorrowVariantField(..)
+        | Instr::MutBorrowVariantField(..)
+        | Instr::ReadVariantField(..)
+        | Instr::WriteVariantField(..)
+        | Instr::PackClosure(..)
+        | Instr::CallClosure(..)
+        | Instr::Exists(..)
+        | Instr::MoveFrom(..)
+        | Instr::MoveTo(..)
+        | Instr::ImmBorrowGlobal(..)
+        | Instr::MutBorrowGlobal(..)
+        | Instr::VecPack(..)
+        | Instr::VecLen(..)
+        | Instr::VecImmBorrow(..)
+        | Instr::VecMutBorrow(..)
+        | Instr::VecPushBack(..)
+        | Instr::VecPopBack(..)
+        | Instr::VecUnpack(..)
+        | Instr::VecSwap(..)
+        | Instr::LdConst(..)
+        | Instr::LdTrue(..)
+        | Instr::LdFalse(..)
+        | Instr::LdU8(..)
+        | Instr::LdU16(..)
+        | Instr::LdU32(..)
+        | Instr::LdU64(..)
+        | Instr::LdU128(..)
+        | Instr::LdU256(..)
+        | Instr::LdI8(..)
+        | Instr::LdI16(..)
+        | Instr::LdI32(..)
+        | Instr::LdI64(..)
+        | Instr::LdI128(..)
+        | Instr::LdI256(..)
+        | Instr::Copy(..)
+        | Instr::Move(..)
+        | Instr::UnaryOp(..)
+        | Instr::BinaryOp(..)
+        | Instr::BinaryOpImm(..)
+        | Instr::ImmBorrowLoc(..)
+        | Instr::ReadRef(..)
+        | Instr::WriteRef(..)
+        | Instr::Call(..)
+        | Instr::Branch(..)
+        | Instr::BrTrue(..)
+        | Instr::BrFalse(..)
+        | Instr::BrCmp(..)
+        | Instr::BrCmpImm(..)
+        | Instr::Ret(..)
+        | Instr::Abort(..)
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
+    }
+}
+
 /// Resource type carried by a global-storage instruction (`exists`,
 /// `move_from`, `move_to`, `borrow_global[_mut]`), if any. The returned type
 /// is the interned resource nominal embedded in the instruction; it may still
@@ -151,6 +237,14 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
         | Instr::MutBorrowLocField(..)
         | Instr::ReadLocalField(..)
         | Instr::WriteLocalField(..)
+        | Instr::ReadFieldChain(..)
+        | Instr::WriteFieldChain(..)
+        | Instr::ImmBorrowFieldChain(..)
+        | Instr::MutBorrowFieldChain(..)
+        | Instr::ReadLocalFieldChain(..)
+        | Instr::WriteLocalFieldChain(..)
+        | Instr::ImmBorrowLocalFieldChain(..)
+        | Instr::MutBorrowLocalFieldChain(..)
         | Instr::ImmBorrowVariantField(..)
         | Instr::MutBorrowVariantField(..)
         | Instr::ReadVariantField(..)
@@ -235,6 +329,21 @@ pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedTy
         | Instr::ReadLocalField(_, owner, _, _)
         | Instr::WriteLocalField(owner, _, _, _) => Some((*owner, NominalKind::Struct)),
 
+        // A struct chain's first owner contains every later owner as an inline
+        // field (each later owner is the previous hop's field type), so
+        // discovering it transitively lays out the whole path. The containment
+        // invariant is debug-checked at the discovery site.
+        Instr::ReadFieldChain(_, path, _)
+        | Instr::WriteFieldChain(path, _, _)
+        | Instr::ImmBorrowFieldChain(_, path, _)
+        | Instr::MutBorrowFieldChain(_, path, _)
+        | Instr::ReadLocalFieldChain(_, path, _)
+        | Instr::WriteLocalFieldChain(path, _, _)
+        | Instr::ImmBorrowLocalFieldChain(_, path, _)
+        | Instr::MutBorrowLocalFieldChain(_, path, _) => {
+            path.first().map(|(owner, _)| (*owner, NominalKind::Struct))
+        },
+
         // Variant ops carry the instantiated enum type directly.
         Instr::PackVariant(_, ty, _, _)
         | Instr::UnpackVariant(_, ty, _, _)
@@ -268,6 +377,88 @@ pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedTy
 
         // No struct type involved.
         Instr::LdConst(..)
+        | Instr::LdTrue(..)
+        | Instr::LdFalse(..)
+        | Instr::LdU8(..)
+        | Instr::LdU16(..)
+        | Instr::LdU32(..)
+        | Instr::LdU64(..)
+        | Instr::LdU128(..)
+        | Instr::LdU256(..)
+        | Instr::LdI8(..)
+        | Instr::LdI16(..)
+        | Instr::LdI32(..)
+        | Instr::LdI64(..)
+        | Instr::LdI128(..)
+        | Instr::LdI256(..)
+        | Instr::Copy(..)
+        | Instr::Move(..)
+        | Instr::UnaryOp(..)
+        | Instr::BinaryOp(..)
+        | Instr::BinaryOpImm(..)
+        | Instr::ImmBorrowLoc(..)
+        | Instr::MutBorrowLoc(..)
+        | Instr::ReadRef(..)
+        | Instr::WriteRef(..)
+        | Instr::Call(..)
+        | Instr::Branch(..)
+        | Instr::BrTrue(..)
+        | Instr::BrFalse(..)
+        | Instr::BrCmp(..)
+        | Instr::BrCmpImm(..)
+        | Instr::Ret(..)
+        | Instr::Abort(..)
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
+    }
+}
+
+/// The fused-chain `FieldPath` carried by `instr`, if any.
+pub(crate) fn chain_field_path(instr: &Instr) -> Option<&FieldPath> {
+    match instr {
+        Instr::ReadFieldChain(_, path, _)
+        | Instr::WriteFieldChain(path, _, _)
+        | Instr::ImmBorrowFieldChain(_, path, _)
+        | Instr::MutBorrowFieldChain(_, path, _)
+        | Instr::ReadLocalFieldChain(_, path, _)
+        | Instr::WriteLocalFieldChain(path, _, _)
+        | Instr::ImmBorrowLocalFieldChain(_, path, _)
+        | Instr::MutBorrowLocalFieldChain(_, path, _) => Some(path),
+
+        // Every other instruction: no fused chain.
+        Instr::Pack(..)
+        | Instr::Unpack(..)
+        | Instr::PackVariant(..)
+        | Instr::UnpackVariant(..)
+        | Instr::TestVariant(..)
+        | Instr::ImmBorrowField(..)
+        | Instr::MutBorrowField(..)
+        | Instr::ReadField(..)
+        | Instr::WriteField(..)
+        | Instr::ImmBorrowLocField(..)
+        | Instr::MutBorrowLocField(..)
+        | Instr::ReadLocalField(..)
+        | Instr::WriteLocalField(..)
+        | Instr::ImmBorrowVariantField(..)
+        | Instr::MutBorrowVariantField(..)
+        | Instr::ReadVariantField(..)
+        | Instr::WriteVariantField(..)
+        | Instr::PackClosure(..)
+        | Instr::CallClosure(..)
+        | Instr::Exists(..)
+        | Instr::MoveFrom(..)
+        | Instr::MoveTo(..)
+        | Instr::ImmBorrowGlobal(..)
+        | Instr::MutBorrowGlobal(..)
+        | Instr::VecPack(..)
+        | Instr::VecLen(..)
+        | Instr::VecImmBorrow(..)
+        | Instr::VecMutBorrow(..)
+        | Instr::VecPushBack(..)
+        | Instr::VecPopBack(..)
+        | Instr::VecUnpack(..)
+        | Instr::VecSwap(..)
+        | Instr::LdConst(..)
         | Instr::LdTrue(..)
         | Instr::LdFalse(..)
         | Instr::LdU8(..)
@@ -355,6 +546,14 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::MutBorrowLocField(..)
         | Instr::ReadLocalField(..)
         | Instr::WriteLocalField(..)
+        | Instr::ReadFieldChain(..)
+        | Instr::WriteFieldChain(..)
+        | Instr::ImmBorrowFieldChain(..)
+        | Instr::MutBorrowFieldChain(..)
+        | Instr::ReadLocalFieldChain(..)
+        | Instr::WriteLocalFieldChain(..)
+        | Instr::ImmBorrowLocalFieldChain(..)
+        | Instr::MutBorrowLocalFieldChain(..)
         | Instr::Exists(..)
         | Instr::MoveFrom(..)
         | Instr::MoveTo(..)
@@ -430,6 +629,14 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::MutBorrowLocField(_, _, _, _)
         | Instr::ReadLocalField(_, _, _, _)
         | Instr::WriteLocalField(_, _, _, _)
+        | Instr::ReadFieldChain(_, _, _)
+        | Instr::WriteFieldChain(_, _, _)
+        | Instr::ImmBorrowFieldChain(_, _, _)
+        | Instr::MutBorrowFieldChain(_, _, _)
+        | Instr::ReadLocalFieldChain(_, _, _)
+        | Instr::WriteLocalFieldChain(_, _, _)
+        | Instr::ImmBorrowLocalFieldChain(_, _, _)
+        | Instr::MutBorrowLocalFieldChain(_, _, _)
         | Instr::Exists(_, _, _)
         | Instr::MoveFrom(_, _, _)
         | Instr::MoveTo(_, _, _)
@@ -580,10 +787,14 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             def::<DEFS>(*dst, &mut f);
             storage_use::<USES>(*src, &mut f);
         },
+        // Field chains share the slot shape of their single-field counterparts;
+        // only the carried `path` differs.
         Instr::ImmBorrowField(dst, _, _, src)
         | Instr::MutBorrowField(dst, _, _, src)
         | Instr::ImmBorrowVariantField(dst, _, _, src)
         | Instr::MutBorrowVariantField(dst, _, _, src)
+        | Instr::ImmBorrowFieldChain(dst, _, src)
+        | Instr::MutBorrowFieldChain(dst, _, src)
         | Instr::ReadRef(dst, src) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*src, &mut f);
@@ -593,11 +804,15 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*val, &mut f);
         },
 
-        Instr::ReadField(dst, _, _, src) | Instr::ReadVariantField(dst, _, _, src) => {
+        Instr::ReadField(dst, _, _, src)
+        | Instr::ReadVariantField(dst, _, _, src)
+        | Instr::ReadFieldChain(dst, _, src) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*src, &mut f);
         },
-        Instr::WriteField(_, _, ref_slot, val) | Instr::WriteVariantField(_, _, ref_slot, val) => {
+        Instr::WriteField(_, _, ref_slot, val)
+        | Instr::WriteVariantField(_, _, ref_slot, val)
+        | Instr::WriteFieldChain(_, ref_slot, val) => {
             used::<USES>(*ref_slot, &mut f);
             used::<USES>(*val, &mut f);
         },
@@ -606,14 +821,17 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
         // a place use.
         Instr::ImmBorrowLocField(dst, _, _, local)
         | Instr::MutBorrowLocField(dst, _, _, local)
-        | Instr::ReadLocalField(dst, _, _, local) => {
+        | Instr::ReadLocalField(dst, _, _, local)
+        | Instr::ImmBorrowLocalFieldChain(dst, _, local)
+        | Instr::MutBorrowLocalFieldChain(dst, _, local)
+        | Instr::ReadLocalFieldChain(dst, _, local) => {
             def::<DEFS>(*dst, &mut f);
             storage_use::<USES>(*local, &mut f);
         },
         // `local` is both a def (a field is written in-place) and a
         // place use (the other fields persist, so the slot
         // stays live with the same type after the write).
-        Instr::WriteLocalField(_, _, local, val) => {
+        Instr::WriteLocalField(_, _, local, val) | Instr::WriteLocalFieldChain(_, local, val) => {
             def::<DEFS>(*local, &mut f);
             storage_use::<USES>(*local, &mut f);
             used::<USES>(*val, &mut f);
@@ -795,10 +1013,13 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
+        // Field chains share the slot shape of their single-field counterparts.
         Instr::ImmBorrowField(dst, _, _, src)
         | Instr::MutBorrowField(dst, _, _, src)
         | Instr::ImmBorrowVariantField(dst, _, _, src)
         | Instr::MutBorrowVariantField(dst, _, _, src)
+        | Instr::ImmBorrowFieldChain(dst, _, src)
+        | Instr::MutBorrowFieldChain(dst, _, src)
         | Instr::ReadRef(dst, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
@@ -814,7 +1035,9 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::ReadField(dst, _, _, src) | Instr::ReadVariantField(dst, _, _, src) => {
+        Instr::ReadField(dst, _, _, src)
+        | Instr::ReadVariantField(dst, _, _, src)
+        | Instr::ReadFieldChain(dst, _, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -822,7 +1045,9 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::WriteField(_, _, ref_slot, val) | Instr::WriteVariantField(_, _, ref_slot, val) => {
+        Instr::WriteField(_, _, ref_slot, val)
+        | Instr::WriteVariantField(_, _, ref_slot, val)
+        | Instr::WriteFieldChain(_, ref_slot, val) => {
             if USES {
                 rewrite_slot(ref_slot, &mut f);
                 rewrite_slot(val, &mut f);
@@ -833,7 +1058,10 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
         // SKIP_PLACE_USE.
         Instr::ImmBorrowLocField(dst, _, _, local)
         | Instr::MutBorrowLocField(dst, _, _, local)
-        | Instr::ReadLocalField(dst, _, _, local) => {
+        | Instr::ReadLocalField(dst, _, _, local)
+        | Instr::ImmBorrowLocalFieldChain(dst, _, local)
+        | Instr::MutBorrowLocalFieldChain(dst, _, local)
+        | Instr::ReadLocalFieldChain(dst, _, local) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -841,7 +1069,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(local, &mut f);
             }
         },
-        Instr::WriteLocalField(_, _, local, val) => {
+        Instr::WriteLocalField(_, _, local, val) | Instr::WriteLocalFieldChain(_, local, val) => {
             // `local` is both a def and a place use of one
             // operand: rewrite once when either role is active. Under
             // SKIP_PLACE_USE only the use side is suppressed.

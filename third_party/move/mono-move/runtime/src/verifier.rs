@@ -558,7 +558,7 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_1(pc, dst);
             },
 
-            MicroOp::EnumBorrowVariantField { dst, enum_ref, .. } => {
+            MicroOp::EnumBorrowVariantFieldByTag { dst, enum_ref, .. } => {
                 self.check_frame_access(Some(pc), enum_ref, 16);
                 self.check_frame_access(Some(pc), dst, 16);
             },
@@ -576,28 +576,48 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_enum_new(pc, descriptor_id, variant);
             },
 
-            MicroOp::EnumReadVariantField {
-                dst,
-                enum_ref,
+            // Read's `dst` and write's `src` are both the size-wide frame slot
+            // the value moves to/from; the checks are otherwise identical.
+            MicroOp::HeapReadOffset {
+                dst: value_slot,
+                obj_ref,
                 offset,
                 size,
+            }
+            | MicroOp::HeapWriteOffset {
+                obj_ref,
+                offset,
+                src: value_slot,
+                size,
             } => {
-                self.check_frame_access(Some(pc), enum_ref, 16);
+                self.check_frame_access(Some(pc), obj_ref, 16);
                 self.check_nonzero_size(pc, size);
                 self.check_ref_offset_size_no_overflow(pc, offset, size);
-                self.check_frame_access(Some(pc), dst, size);
+                self.check_frame_access(Some(pc), value_slot, size);
             },
 
-            MicroOp::EnumWriteVariantField {
+            // Read's `dst` and write's `src` are both the size-wide frame slot
+            // the field value moves to/from; the checks are otherwise identical.
+            MicroOp::EnumReadVariantFieldByTag {
+                dst: value_slot,
                 enum_ref,
-                offset,
-                src,
+                ref offsets,
+                size,
+            }
+            | MicroOp::EnumWriteVariantFieldByTag {
+                src: value_slot,
+                enum_ref,
+                ref offsets,
                 size,
             } => {
                 self.check_frame_access(Some(pc), enum_ref, 16);
                 self.check_nonzero_size(pc, size);
-                self.check_ref_offset_size_no_overflow(pc, offset, size);
-                self.check_frame_access(Some(pc), src, size);
+                // Any tag may be selected at runtime, so every present offset
+                // must keep `offset + size` within `u32`.
+                for offset in offsets.iter().flatten() {
+                    self.check_ref_offset_size_no_overflow(pc, *offset, size);
+                }
+                self.check_frame_access(Some(pc), value_slot, size);
             },
 
             // Each owned heap pointer at `base + off` is an 8-byte frame slot.
