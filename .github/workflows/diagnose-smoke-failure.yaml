@@ -1,22 +1,7 @@
 name: Diagnose smoke failure
 on:
-  workflow_dispatch:
-    inputs:
-      job_id:
-        description: Failed GitHub Actions job ID
-        required: true
-        type: string
-        default: "88895849775"
-      run_id:
-        description: Workflow run ID
-        required: true
-        type: string
-        default: "29908567425"
-      pr_number:
-        description: PR number to comment on
-        required: true
-        type: string
-        default: "20171"
+  push:
+    branches: [cursor/diagnose-smoke-partition4-15d2]
 
 permissions:
   actions: read
@@ -26,21 +11,23 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
+    env:
+      JOB_ID: "88895849775"
+      RUN_ID: "29908567425"
+      PR_NUMBER: "20171"
     steps:
       - name: Fetch job logs and extract failure
         env:
           GH_TOKEN: ${{ github.token }}
-          JOB_ID: ${{ inputs.job_id }}
-          RUN_ID: ${{ inputs.run_id }}
-          PR_NUMBER: ${{ inputs.pr_number }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/diag
           echo "Downloading logs for job $JOB_ID ..."
-          if ! gh run view --job "$JOB_ID" --repo "${{ github.repository }}" --log > /tmp/diag/job.log 2>/tmp/diag/log.err; then
+          if gh run view --job "$JOB_ID" --repo "${{ github.repository }}" --log > /tmp/diag/job.log 2>/tmp/diag/log.err; then
+            echo "Downloaded job logs ($(wc -c < /tmp/diag/job.log) bytes)"
+          else
             echo "gh run view --log failed:" | tee /tmp/diag/summary.md
-            cat /tmp/diag/log.err | tee -a /tmp/diag/summary.md
-            # Fall back to artifact
+            cat /tmp/diag/log.err | tee -a /tmp/diag/summary.md || true
             echo "Trying artifact download..." | tee -a /tmp/diag/summary.md
             gh run download "$RUN_ID" --repo "${{ github.repository }}" -n failed-smoke-test-logs-4 -D /tmp/diag/artifact || true
           fi
@@ -50,12 +37,12 @@ jobs:
             echo
             echo "- Run: https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
             echo "- Job: https://github.com/${{ github.repository }}/actions/runs/$RUN_ID/job/$JOB_ID"
+            echo "- Diagnostic workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo
             echo "### nextest / cargo failure excerpts"
             echo '```'
-            # Prefer structured failure lines from nextest
             if [[ -f /tmp/diag/job.log ]]; then
-              grep -n -iE 'FAIL|FAILED|error:|panicked|test result|failures:|Canceling|RETRY|try #|slow timeout|Summary|──|━━' /tmp/diag/job.log \
+              grep -n -iE 'FAIL|FAILED|error:|panicked|test result|failures:|Canceling|RETRY|try #|slow timeout|Summary' /tmp/diag/job.log \
                 | tail -n 200 || true
               echo
               echo "---- last 80 lines ----"
@@ -67,7 +54,6 @@ jobs:
             echo '```'
           } > /tmp/diag/comment.md
 
-          # Keep comment within GitHub size limits
           if [[ $(wc -c < /tmp/diag/comment.md) -gt 60000 ]]; then
             head -c 60000 /tmp/diag/comment.md > /tmp/diag/comment.trimmed.md
             echo -e "\n\n_(truncated)_" >> /tmp/diag/comment.trimmed.md
