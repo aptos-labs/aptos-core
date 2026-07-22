@@ -55,7 +55,7 @@ jobs:
             echo '```'
             # Prefer structured failure lines from nextest
             if [[ -f /tmp/diag/job.log ]]; then
-              rg -n -i 'FAIL|FAILED|error:|panicked|test result|failures:|Canceling|RETRY|try #|slow timeout|──|━━|Summary' /tmp/diag/job.log \
+              grep -n -iE 'FAIL|FAILED|error:|panicked|test result|failures:|Canceling|RETRY|try #|slow timeout|Summary|──|━━' /tmp/diag/job.log \
                 | tail -n 200 || true
               echo
               echo "---- last 80 lines ----"
