@@ -346,6 +346,8 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::Struct(_) => transaction::MoveTypes::Struct,
         MoveType::GenericTypeParam { .. } => transaction::MoveTypes::GenericTypeParam,
         MoveType::Reference { .. } => transaction::MoveTypes::Reference,
+        // TODO(#20246): function type info is silently lost here; the protos have no
+        // function type variant.
         MoveType::Function { .. } => transaction::MoveTypes::Unparsable,
         MoveType::Unparsable(_) => transaction::MoveTypes::Unparsable,
     };

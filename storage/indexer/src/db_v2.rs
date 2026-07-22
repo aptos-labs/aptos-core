@@ -1,10 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-/// This file is a copy of the file storage/indexer/src/lib.rs.
-/// At the end of the migration to migrate table info mapping
-/// from storage critical path to indexer, the other file will be removed
-/// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
+/// TODO(#20246): this file was planned to move to `indexer-grpc-table-info` as part
+/// of a migration that stalled; consolidate code placement of the indexer stack.
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
