@@ -22,9 +22,9 @@ use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockEndInfo,
-        BlockOutput, ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction,
-        Transaction, TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef,
-        TransactionOutput, TransactionStatus, WriteSetPayload,
+        BlockError, BlockOutput, ChangeSet, ExecutionStatus, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        TransactionExecutableRef, TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -71,7 +71,7 @@ impl VMBlockExecutor for MockVM {
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, BlockError> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();

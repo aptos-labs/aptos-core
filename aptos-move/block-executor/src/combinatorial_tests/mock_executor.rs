@@ -189,7 +189,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         &mut self,
         view: &S,
         module_ids: &[ModuleId],
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>> {
         for module_id in module_ids {
             let metadata = try_with_status!(
                 view.unmetered_get_module_state_value_metadata(
@@ -212,7 +212,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         view: &impl TExecutorView<K, u32, MoveTypeLayout>,
         key_pairs: &[(K, bool)],
         delayed_fields_enabled: bool,
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>> {
         for (key, has_deltas) in key_pairs {
             match (has_deltas, delayed_fields_enabled) {
                 // Regular resource read (no delayed fields)
@@ -264,7 +264,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
               + TExecutorView<K, u32, MoveTypeLayout>),
         group_reads: &[(K, u32, bool)],
         delayed_fields_enabled: bool,
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>> {
         for (group_key, resource_tag, has_delta) in group_reads {
             let maybe_layout =
                 (*has_delta && delayed_fields_enabled && *resource_tag == RESERVED_TAG)
@@ -302,7 +302,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         view: &(impl TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
               + TExecutorView<K, u32, MoveTypeLayout>),
         group_queries: &[(K, bool)],
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>> {
         for (group_key, query_metadata) in group_queries {
             let res = if *query_metadata {
                 // Query metadata
@@ -341,7 +341,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         group_writes: &[(K, StateValueMetadata, HashMap<u32, (ValueType, bool)>)],
         delayed_fields_enabled: bool,
         txn_idx: u32,
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>>
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>>
     where
         View: TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
             + TExecutorView<K, u32, MoveTypeLayout>,
@@ -480,7 +480,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         resource_writes: &[(K, ValueType, bool)],
         delayed_fields_enabled: bool,
         txn_idx: u32,
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>>
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>>
     // Group view is because get_delayed_field_id_from_resource dispatches, but there is
     // a TODO to have TExecutorView contain TResourceGroupView anyway.
     where
@@ -514,7 +514,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         deltas: &[(K, DeltaOp, Option<u32>)],
         delta_test_kind: DeltaTestKind,
-    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>>> {
         match delta_test_kind {
             DeltaTestKind::DelayedFields => {
                 for (k, delta, maybe_tag) in deltas {
@@ -553,7 +553,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         key: &K,
         maybe_tag: Option<u32>,
-    ) -> Result<DelayedFieldID, ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<DelayedFieldID, ExecutionStatus<MockOutput<K, E>>> {
         let bytes = match maybe_tag {
             None => try_with_status!(
                 view.get_resource_bytes(key, Some(&*MOCK_LAYOUT)),
@@ -593,7 +593,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         view: &impl TExecutorView<K, u32, MoveTypeLayout>,
         key: &K,
         bytes: &[u8],
-    ) -> Result<(), ExecutionStatus<MockOutput<K, E>, usize>> {
+    ) -> Result<(), ExecutionStatus<MockOutput<K, E>>> {
         let id = deserialize_to_delayed_field_id(bytes)
             .expect("Must deserialize delayed field tuple")
             .0;
@@ -942,7 +942,6 @@ where
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
@@ -963,7 +962,7 @@ where
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
+    ) -> ExecutionStatus<Self::Output> {
         match txn {
             MockTransaction::Write {
                 incarnation_counter,
@@ -1026,7 +1025,7 @@ where
                 mock_output.total_gas = *gas;
                 ExecutionStatus::SkipRest(mock_output)
             },
-            MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
+            MockTransaction::Abort => ExecutionStatus::Abort(txn_idx.to_string()),
             MockTransaction::InterruptRequested => {
                 while !view.interrupt_requested() {}
                 ExecutionStatus::SkipRest(MockOutput::skip_output())
@@ -1062,7 +1061,7 @@ where
 /// that might fail, allowing for a cleaner code flow.
 struct BuilderOperation<'a, K: Clone + Debug, E: Clone> {
     builder: &'a mut MockOutputBuilder<K, E>,
-    status: Option<ExecutionStatus<MockOutput<K, E>, usize>>,
+    status: Option<ExecutionStatus<MockOutput<K, E>>>,
 }
 
 impl<'a, K: Clone + Debug, E: Clone> BuilderOperation<'a, K, E> {
@@ -1078,7 +1077,7 @@ impl<'a, K: Clone + Debug, E: Clone> BuilderOperation<'a, K, E> {
         F: FnOnce(
             &mut MockOutputBuilder<K, E>,
         )
-            -> Result<&mut MockOutputBuilder<K, E>, ExecutionStatus<MockOutput<K, E>, usize>>,
+            -> Result<&mut MockOutputBuilder<K, E>, ExecutionStatus<MockOutput<K, E>>>,
     {
         if self.status.is_none() {
             if let Err(status) = op(self.builder) {
@@ -1088,9 +1087,7 @@ impl<'a, K: Clone + Debug, E: Clone> BuilderOperation<'a, K, E> {
         self
     }
 
-    fn finish(
-        self,
-    ) -> Result<&'a mut MockOutputBuilder<K, E>, ExecutionStatus<MockOutput<K, E>, usize>> {
+    fn finish(self) -> Result<&'a mut MockOutputBuilder<K, E>, ExecutionStatus<MockOutput<K, E>>> {
         match self.status {
             None => Ok(self.builder),
             Some(status) => Err(status),

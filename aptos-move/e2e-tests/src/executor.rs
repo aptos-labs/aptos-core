@@ -58,7 +58,7 @@ use aptos_types::{
         Transaction, TransactionExecutableRef, TransactionOutput, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput,
     },
-    vm_status::VMStatus,
+    vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType, CoinType,
 };
@@ -884,7 +884,14 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             )
             .map(BlockOutput::into_transaction_outputs_forced)
         };
-        let outputs = result?;
+        // This test harness threads VMStatus, while block execution now returns BlockError.
+        // Block-level errors are fatal and rare here, so we stringify into a generic VMStatus.
+        let outputs = result.map_err(|err| {
+            VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                Some(err.message().to_string()),
+            )
+        })?;
         Ok(outputs)
     }
 

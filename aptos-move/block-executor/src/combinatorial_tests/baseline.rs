@@ -9,7 +9,6 @@ use crate::{
             MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
         },
     },
-    errors::{BlockExecutionError, BlockExecutionResult},
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, deserialize_to_delayed_field_u128,
         serialize_from_delayed_field_u128,
@@ -18,8 +17,10 @@ use crate::{
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    contract_event::TransactionEvent, executable::ModulePath,
-    state_store::state_value::StateValueMetadata, transaction::BlockOutput,
+    contract_event::TransactionEvent,
+    executable::ModulePath,
+    state_store::state_value::StateValueMetadata,
+    transaction::{BlockError, BlockOutput},
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{
@@ -992,19 +993,23 @@ where
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Clone + Debug + Send + Sync + TransactionEvent + 'static>(
         &self,
-        results: &BlockExecutionResult<BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>, usize>,
+        results: &Result<BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>, BlockError>,
     ) {
         match results {
             Ok(block_output) => {
                 self.assert_success(block_output);
             },
-            Err(BlockExecutionError::FatalVMError(idx)) => {
+            Err(err) => {
+                // The mock aborts with the index of the aborting transaction as the message,
+                // and the baseline breaks at that index, so it equals the count of successfully
+                // processed transactions.
                 assert_matches!(&self.status, BaselineStatus::Aborted);
-                assert_eq!(*idx, self.read_values.len());
-                assert_eq!(*idx, self.resolved_deltas.len());
-            },
-            Err(BlockExecutionError::FatalBlockExecutorError(e)) => {
-                unimplemented!("not tested here FallbackToSequential({:?})", e);
+                let idx: usize = err
+                    .message()
+                    .parse()
+                    .expect("mock abort message is the aborting transaction index");
+                assert_eq!(idx, self.read_values.len());
+                assert_eq!(idx, self.resolved_deltas.len());
             },
         }
     }

@@ -7,7 +7,6 @@ use aptos_types::{
     transaction::{ChangeSet, Transaction, TransactionStatus, WriteSetPayload},
     write_set::TransactionWrite,
 };
-use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn no_deletion_in_genesis() {
@@ -60,8 +59,6 @@ fn fail_no_epoch_change_write_set() {
     let receiver = executor.create_raw_account_data(100_000, 10);
     let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000, 0);
 
-    let output_err = executor
-        .execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)])
-        .unwrap_err();
-    assert_eq!(StatusCode::INVALID_WRITE_SET, output_err.status_code());
+    let output = executor.execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)]);
+    assert!(output.is_err());
 }

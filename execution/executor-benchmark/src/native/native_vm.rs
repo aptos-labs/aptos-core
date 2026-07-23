@@ -36,8 +36,8 @@ use aptos_types::{
     move_utils::move_event_v2::MoveEventV2Type,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        TransactionOutput, TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
+        BlockOutput, TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -85,7 +85,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, BlockError> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block::<
             _,
             NoOpTransactionCommitHook<VMStatus>,
@@ -116,7 +116,6 @@ pub(crate) struct NativeVMExecutorTask {
 
 impl ExecutorTask for NativeVMExecutorTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
@@ -139,7 +138,7 @@ impl ExecutorTask for NativeVMExecutorTask {
         txn: &SignatureVerifiedTransaction,
         _auxiliary_info: &AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+    ) -> ExecutionStatus<AptosTransactionOutput> {
         match self.execute_transaction_impl(executor_with_group_view, txn) {
             Ok((change_set, gas_units)) => {
                 ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(

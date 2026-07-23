@@ -25,10 +25,7 @@ use aptos_vm_types::{
     resolver::{BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
-use move_core_types::{
-    account_address::AccountAddress,
-    vm_status::{StatusCode, VMStatus},
-};
+use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 
 pub struct AptosExecutorTask {
     vm: AptosVM,
@@ -37,7 +34,6 @@ pub struct AptosExecutorTask {
 
 impl ExecutorTask for AptosExecutorTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
@@ -63,7 +59,7 @@ impl ExecutorTask for AptosExecutorTask {
         txn: &SignatureVerifiedTransaction,
         auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+    ) -> ExecutionStatus<AptosTransactionOutput> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
@@ -135,7 +131,7 @@ impl ExecutorTask for AptosExecutorTask {
                         err.message().cloned().unwrap_or_default(),
                     )
                 } else {
-                    ExecutionStatus::Abort(err)
+                    ExecutionStatus::Abort(err.to_string())
                 }
             },
         }

@@ -34,12 +34,12 @@ use triomphe::Arc as TriompheArc;
 
 /// The execution result of a transaction
 #[derive(Debug)]
-pub enum ExecutionStatus<O, E> {
+pub enum ExecutionStatus<O> {
     /// Transaction was executed successfully.
     Success(O),
     /// Transaction hit a none recoverable error during execution, halt the execution and propagate
     /// the error back to the caller.
-    Abort(E),
+    Abort(String),
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
@@ -61,9 +61,6 @@ pub trait ExecutorTask {
 
     /// The output of a transaction. This should contain the side effect of this transaction.
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
-
-    /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
     /// Create an instance of the transaction executor.
     fn init(
@@ -93,7 +90,7 @@ pub trait ExecutorTask {
         txn: &Self::Txn,
         auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error>;
+    ) -> ExecutionStatus<Self::Output>;
 
     fn pre_write_values(
         _txn: &Self::Txn,

@@ -7,7 +7,6 @@ use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_S
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager,
-    errors::BlockExecutionError,
     executor::BlockExecutor,
     task::{
         BeforeMaterializationOutput, ExecutorTask,
@@ -31,8 +30,8 @@ use aptos_types::{
         StateView, StateViewId,
     },
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        TransactionOutput, TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
+        BlockExecutionResult, BlockOutput, TransactionOutput, TransactionStatus,
     },
     write_set::{TransactionWrite, WriteOp},
 };
@@ -45,7 +44,6 @@ use aptos_vm_types::{
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
@@ -398,11 +396,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 }
 
 pub struct AptosBlockExecutorWrapper<
-    E: ExecutorTask<
-        Txn = SignatureVerifiedTransaction,
-        Error = VMStatus,
-        Output = AptosTransactionOutput,
-    >,
+    E: ExecutorTask<Txn = SignatureVerifiedTransaction, Output = AptosTransactionOutput>,
 > {
     _phantom: PhantomData<E>,
 }
@@ -411,7 +405,6 @@ impl<
         E: ExecutorTask<
             Txn = SignatureVerifiedTransaction,
             AuxiliaryInfo = AuxiliaryInfo,
-            Error = VMStatus,
             Output = AptosTransactionOutput,
         >,
     > AptosBlockExecutorWrapper<E>
@@ -427,7 +420,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
@@ -439,11 +432,13 @@ impl<
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
-        let mut module_cache_manager_guard = module_cache_manager.try_lock(
-            &state_view,
-            &config.local.module_cache_config,
-            transaction_slice_metadata,
-        )?;
+        let mut module_cache_manager_guard = module_cache_manager
+            .try_lock(
+                &state_view,
+                &config.local.module_cache_config,
+                transaction_slice_metadata,
+            )
+            .map_err(|status| BlockError::new(status.to_string()))?;
 
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
@@ -472,14 +467,7 @@ impl<
 
                 Ok(BlockOutput::new(transaction_outputs, block_epilogue_txn))
             },
-            Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
-                err_msg,
-            ))) => Err(VMStatus::Error {
-                status_code: StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
-                sub_status: None,
-                message: Some(err_msg),
-            }),
-            Err(BlockExecutionError::FatalVMError(err)) => Err(err),
+            Err(err) => Err(err),
         }
     }
 }
