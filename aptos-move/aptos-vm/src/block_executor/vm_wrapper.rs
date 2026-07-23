@@ -7,6 +7,7 @@ use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::value::ValueWithLayout,
+    error::{code_invariant_error, PanicError},
     state_store::{state_key::StateKey, StateView, StateViewId},
     timestamp::TimestampResource,
     transaction::{
@@ -59,9 +60,9 @@ impl ExecutorTask for AptosExecutorTask {
         txn: &SignatureVerifiedTransaction,
         auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput> {
+    ) -> Result<ExecutionStatus<AptosTransactionOutput>, PanicError> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
-            ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
+            Err(code_invariant_error("fail points error"))
         });
 
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
@@ -90,48 +91,46 @@ impl ExecutorTask for AptosExecutorTask {
                     )
                 };
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
-                    ExecutionStatus::SpeculativeExecutionAbortError(
-                        vm_status.message().cloned().unwrap_or_default(),
-                    )
+                    Ok(ExecutionStatus::SpeculativeFailure)
                 } else if vm_status.status_code()
                     == StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
                 {
-                    ExecutionStatus::DelayedFieldsCodeInvariantError(
+                    Err(code_invariant_error(
                         vm_status.message().cloned().unwrap_or_default(),
-                    )
+                    ))
                 } else if AptosVM::should_restart_execution(vm_output.events()) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new_with_read_set(
-                        vm_output, read_set,
-                    ))
+                    Ok(ExecutionStatus::Executed {
+                        output: AptosTransactionOutput::new_with_read_set(vm_output, read_set),
+                        skips_rest: true,
+                    })
                 } else {
                     assert!(
                         Self::is_transaction_dynamic_change_set_capable(txn),
                         "DirectWriteSet should always create SkipRest transaction, validate_waypoint_change_set provides this guarantee"
                     );
-                    ExecutionStatus::Success(AptosTransactionOutput::new_with_read_set(
-                        vm_output, read_set,
-                    ))
+                    Ok(ExecutionStatus::Executed {
+                        output: AptosTransactionOutput::new_with_read_set(vm_output, read_set),
+                        skips_rest: false,
+                    })
                 }
             },
             // execute_single_transaction only returns an error when transactions that should never fail
             // (BlockMetadataTransaction and GenesisTransaction) return an error themselves.
             Err(err) => {
                 if err.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
-                    ExecutionStatus::SpeculativeExecutionAbortError(
-                        err.message().cloned().unwrap_or_default(),
-                    )
+                    Ok(ExecutionStatus::SpeculativeFailure)
                 } else if err.status_code()
                     == StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
                 {
-                    ExecutionStatus::DelayedFieldsCodeInvariantError(
+                    Err(code_invariant_error(
                         err.message().cloned().unwrap_or_default(),
-                    )
+                    ))
                 } else {
-                    ExecutionStatus::Abort(err.to_string())
+                    Ok(ExecutionStatus::Aborted(err.to_string()))
                 }
             },
         }

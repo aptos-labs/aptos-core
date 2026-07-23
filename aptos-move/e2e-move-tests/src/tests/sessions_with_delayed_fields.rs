@@ -172,7 +172,7 @@ impl TransactionOutput for TestOutput {
     }
 
     fn incorporate_materialized_txn_output(
-        &mut self,
+        self,
         _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         _patched_events: Vec<ContractEvent>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
@@ -289,7 +289,7 @@ impl ExecutorTask for TestTask {
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output> {
+    ) -> Result<ExecutionStatus<Self::Output>, PanicError> {
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         let mut change_set_1 = self.run(&resolver, view, &txn.session_1);
         println!("  [session_1] change set: {:?}", change_set_1);
@@ -338,7 +338,10 @@ impl ExecutorTask for TestTask {
         };
         *outcome_cell().lock().unwrap() = Some(outcome);
 
-        ExecutionStatus::Success(TestOutput)
+        Ok(ExecutionStatus::Executed {
+            output: TestOutput,
+            skips_rest: false,
+        })
     }
 }
 
