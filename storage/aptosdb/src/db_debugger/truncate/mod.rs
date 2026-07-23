@@ -159,7 +159,7 @@ impl Cmd {
 mod test {
     use super::*;
     use crate::{
-        db::{test_helper::arb_blocks_to_commit_with_block_nums, AptosDB},
+        db::{test_helper::arb_blocks_to_commit_with_params, AptosDB},
         schema::{
             epoch_by_version::EpochByVersionSchema,
             jellyfish_merkle_node::JellyfishMerkleNodeSchema, ledger_info::LedgerInfoSchema,
@@ -179,10 +179,15 @@ mod test {
     use proptest::prelude::*;
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1))]
+        #![proptest_config(ProptestConfig::with_cases(5))]
 
         #[test]
-        fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
+        fn test_truncation(input in arb_blocks_to_commit_with_params(
+            500, /* num_accounts — large pool so new key creations continue past target_version */
+            2,   /* max_user_txns_per_block */
+            80,  /* min_blocks */
+            120, /* max_blocks */
+        )) {
             use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
             aptos_logger::Logger::new().init();
             let sharding_config = ShardingConfig {

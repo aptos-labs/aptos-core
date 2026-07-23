@@ -216,10 +216,24 @@ pub fn arb_blocks_to_commit_with_block_nums(
         bool,
     ),
 > {
+    arb_blocks_to_commit_with_params(5, 2, min_blocks, max_blocks)
+}
+
+pub fn arb_blocks_to_commit_with_params(
+    num_accounts: usize,
+    max_user_txns_per_block: usize,
+    min_blocks: usize,
+    max_blocks: usize,
+) -> impl Strategy<
+    Value = (
+        Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+        bool,
+    ),
+> {
     (
         arb_blocks_to_commit_impl(
-            5, /* num_accounts */
-            2, /* max_user_txn_per_block */
+            num_accounts,
+            max_user_txns_per_block,
             min_blocks, max_blocks,
         ),
         proptest::bool::ANY,
