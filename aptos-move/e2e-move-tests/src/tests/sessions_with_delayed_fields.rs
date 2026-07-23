@@ -14,7 +14,7 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutorTask, RecordedOutput, TransactionOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
@@ -59,7 +59,6 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     value::{MoveTypeLayout, MoveValue},
-    vm_status::VMStatus,
 };
 use move_vm_runtime::{
     execution_tracing::Trace,
@@ -160,16 +159,14 @@ impl BlockExecutableTransaction for TestTransaction {
 struct TestOutput;
 
 impl TransactionOutput for TestOutput {
-    type BeforeMaterializationGuard<'a> = &'a Self;
     type CommittedOutput = aptos_types::transaction::TransactionOutput;
+    type Key = StateKey;
+    type Tag = StructTag;
     type Txn = TestTransaction;
+    type Value = ValueWithLayout<WriteOp>;
 
     fn skip_output() -> Self {
         Self
-    }
-
-    fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
-        Ok(self)
     }
 
     fn incorporate_materialized_txn_output(
@@ -182,11 +179,17 @@ impl TransactionOutput for TestOutput {
             Trace::empty(),
         ))
     }
-}
 
-impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         HashMap::new()
+    }
+
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+        vec![]
+    }
+
+    fn legacy_v1_resource_group_tags(&self) -> Vec<(StateKey, HashSet<StructTag>)> {
+        vec![]
     }
 
     fn for_each_module_write(
@@ -268,7 +271,6 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
 
 impl ExecutorTask for TestTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = TestOutput;
     type Txn = TestTransaction;
 
@@ -291,7 +293,7 @@ impl ExecutorTask for TestTask {
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
+    ) -> Result<RecordedOutput<Self::Output>, PanicError> {
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         let mut change_set_1 = self.run(&resolver, view, &txn.session_1);
         println!("  [session_1] change set: {:?}", change_set_1);
@@ -340,7 +342,10 @@ impl ExecutorTask for TestTask {
         };
         *outcome_cell().lock().unwrap() = Some(outcome);
 
-        ExecutionStatus::Success(TestOutput)
+        Ok(RecordedOutput::Committed {
+            output: TestOutput,
+            skips_rest: false,
+        })
     }
 }
 

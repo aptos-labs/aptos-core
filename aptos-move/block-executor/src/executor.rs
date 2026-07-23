@@ -2,14 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::{CapturedReads, SnapshotModuleView},
+    captured_reads::TxnInput,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
         self, BLOCKSTM_VERSION_NUMBER, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
         PARALLEL_EXECUTION_SECONDS, PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS,
-        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, TRACE_REPLAY_SECONDS, VM_INIT_SECONDS,
-        WORK_WITH_TASK_SECONDS,
+        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -18,12 +17,12 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind},
     scheduler_wrapper::SchedulerWrapper,
-    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
+    single_transaction_executor::{LatestViewArgs, SingleTransactionExecutor},
+    task::{RecordedOutput, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
     types::ReadWriteSummary,
-    view::{LatestView, ParallelState, SequentialState, ViewState},
     worker_pool::WorkerPool,
 };
 use aptos_aggregator::delayed_change::{ApplyBase, DelayedChange};
@@ -31,7 +30,7 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex},
+    types::{Incarnation, TxnIndex},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -61,7 +60,7 @@ use core::panic;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use once_cell::sync::Lazy;
@@ -72,12 +71,13 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
-type CommittedOutput<E> = <<E as ExecutorTask>::Output as TransactionOutput>::CommittedOutput;
+type CommittedOutput<E> =
+    <<E as SingleTransactionExecutor>::Output as TransactionOutput>::CommittedOutput;
 
 struct SharedSyncParams<'a, T, E, S>
 where
     T: BlockExecutableTransaction,
-    E: ExecutorTask<Txn = T>,
+    E: SingleTransactionExecutor<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
 {
     // TODO: should not need to pass base view.
@@ -85,7 +85,7 @@ where
     versioned_cache: &'a MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-    last_input_output: &'a TxnLastInputOutput<T, E::Output>,
+    last_input_output: &'a TxnLastInputOutput<T, E::Input, E::Output>,
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -105,7 +105,11 @@ pub struct BlockExecutor<T, E, S, L, TP, A> {
 impl<T, E, S, L, TP, A> BlockExecutor<T, E, S, L, TP, A>
 where
     T: BlockExecutableTransaction,
-    E: ExecutorTask<Txn = T, AuxiliaryInfo = A>,
+    E: SingleTransactionExecutor<
+        Txn = T,
+        AuxiliaryInfo = A,
+        Input: TxnInput<Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+    >,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<CommittedOutput<E>>,
     TP: TxnProvider<T, A> + Sync,
@@ -125,35 +129,6 @@ where
             config,
             transaction_commit_hook,
             phantom: PhantomData,
-        }
-    }
-
-    // The bool in the result indicates whether execution result is a speculative abort.
-    fn process_execution_result<'a>(
-        execution_result: &'a ExecutionStatus<E::Output, E::Error>,
-        read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        txn_idx: TxnIndex,
-    ) -> Result<(Option<&'a E::Output>, bool), PanicError> {
-        match execution_result {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                Ok((Some(output), false))
-            },
-            ExecutionStatus::SpeculativeExecutionAbortError(_msg) => {
-                // TODO(BlockSTMv2): cleaner to rename or distinguish V2 early abort
-                // from DeltaApplicationFailure. This is also why we return the bool
-                // separately for now instead of relying on the read set.
-                read_set.capture_delayed_field_read_error(&PanicOr::Or(
-                    MVDelayedFieldsError::DeltaApplicationFailure,
-                ));
-                Ok((None, true))
-            },
-            ExecutionStatus::Abort(_err) => Ok((None, false)),
-            ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                Err(code_invariant_error(format!(
-                    "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
-                    txn_idx, msg
-                )))
-            },
         }
     }
 
@@ -177,8 +152,7 @@ where
             )
         })?;
 
-        let output_before_guard = output.before_materialization()?;
-        let resource_write_set = output_before_guard.resource_write_set();
+        let resource_write_set = output.resource_write_set();
 
         for (key, _) in pre_write_entries {
             if !resource_write_set.contains_key(&key) {
@@ -194,18 +168,15 @@ where
         maybe_output: Option<&E::Output>,
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         abort_manager: &mut AbortManager,
     ) -> Result<(), PanicError> {
         // The order is reversed in BlockSTMv2 as opposed to V1, avoiding the necessity
         // to clone the previous keys.
 
-        let mut resource_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
-            output
-                .before_materialization()
-                .map(|inner| inner.resource_write_set())
-        })?;
+        let mut resource_write_set =
+            maybe_output.map_or_else(HashMap::new, |output| output.resource_write_set());
 
         last_input_output.for_each_resource_key_no_aggregator_v1(
             idx_to_execute,
@@ -253,7 +224,7 @@ where
         maybe_output: Option<&E::Output>,
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         abort_manager: &mut AbortManager,
     ) -> Result<(), PanicError> {
@@ -261,11 +232,8 @@ where
         // in BlockSTMv2 as opposed to V1, which avoids the necessity to clone group keys and
         // previous tags.
 
-        let mut resource_group_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
-            output
-                .before_materialization()
-                .map(|inner| inner.resource_group_write_set())
-        })?;
+        let mut resource_group_write_set =
+            maybe_output.map_or_else(HashMap::new, |output| output.resource_group_write_set());
 
         last_input_output.for_each_resource_group_key_and_tags(
             idx_to_execute,
@@ -344,8 +312,8 @@ where
     fn process_delayed_field_output(
         maybe_output: Option<&E::Output>,
         idx_to_execute: TxnIndex,
-        read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        read_set: &mut E::Input,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         is_v2: bool,
     ) -> Result<(), PanicError> {
@@ -367,8 +335,7 @@ where
         // }
 
         if let Some(output) = maybe_output {
-            let output_before_guard = output.before_materialization()?;
-            for (id, change) in output_before_guard.delayed_field_change_set().into_iter() {
+            for (id, change) in output.delayed_field_change_set().into_iter() {
                 prev_modified_delayed_fields.remove(&id);
 
                 let entry = change.into_entry_no_additional_history();
@@ -387,9 +354,7 @@ where
                             )));
                         },
                         PanicOr::Or(_) => {
-                            read_set.capture_delayed_field_read_error(&PanicOr::Or(
-                                MVDelayedFieldsError::DeltaApplicationFailure,
-                            ));
+                            read_set.record_delayed_field_application_failure();
                         },
                     };
                 }
@@ -411,45 +376,25 @@ where
         incarnation: Incarnation,
         txn: &T,
         auxiliary_info: &A,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         executor: &E,
-        base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        runtime_environment: &RuntimeEnvironment,
-        parallel_state: ParallelState<T>,
+        args: LatestViewArgs<'_, E::Input, S>,
         scheduler: &SchedulerV2,
         config: &BlockExecutorConfig,
     ) -> Result<(), PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
 
         let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
-        let sync_view = LatestView::new(
-            base_view,
-            global_module_cache,
-            runtime_environment,
-            ViewState::Sync(parallel_state),
-            idx_to_execute,
-        );
-        let execution_result =
-            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute);
-
-        let mut read_set = sync_view.take_parallel_reads();
+        let global_module_cache = args.global_module_cache();
+        let (recorded, mut read_set) = executor.execute(args, txn, auxiliary_info, idx_to_execute)?;
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
                 "Incorrect use detected in CapturedReads after executing txn = {idx_to_execute} incarnation = {incarnation}"
             )));
         }
 
-        let (maybe_output, is_speculative_failure) =
-            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
-
-        if is_speculative_failure {
+        if recorded.is_speculative_failure() {
             // Recording in order to check the invariant that the final, committed incarnation
             // of each transaction is not a speculative failure.
             last_input_output.record_speculative_failure(idx_to_execute);
@@ -474,12 +419,12 @@ where
         // incorrect pre-write values. Only needed when pre-writes are enabled, as
         // the check guards against stale pre-write data in the MVHashMap.
         if config.local.enable_pre_write {
-            Self::verify_pre_writes(txn, maybe_output)?;
+            Self::verify_pre_writes(txn, recorded.committed_output())?;
         }
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         Self::process_delayed_field_output(
-            maybe_output,
+            recorded.committed_output(),
             idx_to_execute,
             &mut read_set,
             last_input_output,
@@ -487,7 +432,7 @@ where
             true,
         )?;
         Self::process_resource_group_output_v2(
-            maybe_output,
+            recorded.committed_output(),
             idx_to_execute,
             incarnation,
             last_input_output,
@@ -495,7 +440,7 @@ where
             &mut abort_manager,
         )?;
         Self::process_resource_output_v2(
-            maybe_output,
+            recorded.committed_output(),
             idx_to_execute,
             incarnation,
             last_input_output,
@@ -506,7 +451,7 @@ where
         last_input_output.record(
             idx_to_execute,
             read_set,
-            execution_result,
+            recorded,
             &config.onchain.block_gas_limit_type,
             txn.user_txn_bytes_len() as u64,
         )?;
@@ -544,49 +489,30 @@ where
         // Passed for BlockSTMv1 during speculative execution, and used to record when the
         // transaction starts processing the outputs, as well as when the execution is finished.
         maybe_scheduler: Option<&Scheduler>,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         executor: &E,
-        base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        runtime_environment: &RuntimeEnvironment,
-        parallel_state: ParallelState<T>,
+        args: LatestViewArgs<'_, E::Input, S>,
         config: &BlockExecutorConfig,
     ) -> Result<SchedulerTask, PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
 
-        // VM execution.
-        let sync_view = LatestView::new(
-            base_view,
-            global_module_cache,
-            runtime_environment,
-            ViewState::Sync(parallel_state),
-            idx_to_execute,
-        );
-        let execution_result =
-            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute);
-
-        let mut read_set = sync_view.take_parallel_reads();
+        // VM execution. The read set carries a speculative failure (if any) so that
+        // BlockSTMv1 validation fails and the transaction re-executes.
+        let (recorded, mut read_set) = executor.execute(args, txn, auxiliary_info, idx_to_execute)?;
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
                 "Incorrect use detected in CapturedReads after executing txn = {} incarnation = {}",
                 idx_to_execute, incarnation
             )));
         }
-        let (processed_output, _) =
-            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
         // Verify that all pre-written keys were actually written by the transaction.
         // If not, fallback to sequential execution to avoid speculative reads seeing
         // incorrect pre-write values. Only needed when pre-writes are enabled, as
         // the check guards against stale pre-write data in the MVHashMap.
         if config.local.enable_pre_write {
-            Self::verify_pre_writes(txn, processed_output)?;
+            Self::verify_pre_writes(txn, recorded.committed_output())?;
         }
 
         let mut prev_modified_resource_keys = last_input_output
@@ -606,7 +532,7 @@ where
         // executed later at the same index (after block cutting).
         // TODO(BlockSTMv2): Replace with a compile-time check if possible, or custom clippy lint.
         Self::process_delayed_field_output(
-            processed_output,
+            recorded.committed_output(),
             idx_to_execute,
             &mut read_set,
             last_input_output,
@@ -620,9 +546,8 @@ where
         // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<(), PanicError> {
-            let output_before_guard = output.before_materialization()?;
             for (group_key, (group_metadata_op, group_size, group_ops)) in
-                output_before_guard.resource_group_write_set().into_iter()
+                output.resource_group_write_set().into_iter()
             {
                 let prev_tags = prev_modified_group_keys
                     .remove(&group_key)
@@ -653,7 +578,7 @@ where
                 }
             }
 
-            let resource_write_set = output_before_guard.resource_write_set();
+            let resource_write_set = output.resource_write_set();
 
             // Then, process resource writes (aggregator v1 writes are part of this set).
             for (k, v) in resource_write_set.into_iter() {
@@ -668,7 +593,7 @@ where
             Ok(())
         };
 
-        if let Some(output) = processed_output {
+        if let Some(output) = recorded.committed_output() {
             apply_updates(output)?;
         }
 
@@ -699,7 +624,7 @@ where
         last_input_output.record(
             idx_to_execute,
             read_set,
-            execution_result,
+            recorded,
             &config.onchain.block_gas_limit_type,
             txn.user_txn_bytes_len() as u64,
         )?;
@@ -717,7 +642,7 @@ where
         incarnation_to_validate: Incarnation,
         scheduler: &SchedulerV2,
         updated_module_keys: &BTreeSet<ModuleId>,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -744,7 +669,7 @@ where
             ))
         })?;
         // Perform invariant checks or return early based on read set's incarnation.
-        let blockstm_v2_incarnation = read_set.blockstm_v2_incarnation().ok_or_else(|| {
+        let blockstm_v2_incarnation = read_set.incarnation().ok_or_else(|| {
             code_invariant_error(
                 "BlockSTMv2 must be enabled in CapturedReads when validating module reads",
             )
@@ -775,7 +700,7 @@ where
 
     fn validate(
         idx_to_validate: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -820,7 +745,7 @@ where
         incarnation: Incarnation,
         valid: bool,
         validation_wave: Wave,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         scheduler: &Scheduler,
     ) -> Result<SchedulerTask, PanicError> {
@@ -846,7 +771,7 @@ where
     fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
     ) -> Result<bool, PanicError> {
         if last_input_output.is_speculative_failure(txn_idx) {
             return Ok(false);
@@ -887,7 +812,7 @@ where
         incarnation: Incarnation,
         scheduler: SchedulerWrapper,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
@@ -901,13 +826,16 @@ where
         runtime_environment: &RuntimeEnvironment,
         config: &BlockExecutorConfig,
     ) -> Result<(), PanicError> {
-        let parallel_state = ParallelState::new(
-            versioned_cache,
+        let args = LatestViewArgs::Parallel {
+            base_view,
+            versioned_map: versioned_cache,
+            global_module_cache,
+            runtime_environment,
             scheduler,
             start_shared_counter,
             shared_counter,
             incarnation,
-        );
+        };
 
         match scheduler.as_v2() {
             None => {
@@ -922,10 +850,7 @@ where
                     last_input_output,
                     versioned_cache,
                     executor,
-                    base_view,
-                    global_module_cache,
-                    runtime_environment,
-                    parallel_state,
+                    args,
                     config,
                 )?;
             },
@@ -939,10 +864,7 @@ where
                     last_input_output,
                     versioned_cache,
                     executor,
-                    base_view,
-                    global_module_cache,
-                    runtime_environment,
-                    parallel_state,
+                    args,
                     scheduler,
                     config,
                 )?;
@@ -1051,6 +973,7 @@ where
     // still appear at the end of the block.
     fn materialize_txn_commit(
         &self,
+        executor: &E,
         txn_idx: TxnIndex,
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
@@ -1079,82 +1002,36 @@ where
             )));
         }
 
-        let parallel_state = ParallelState::<T>::new(
-            shared_sync_params.versioned_cache,
-            scheduler,
-            shared_sync_params.start_shared_counter,
-            shared_sync_params.delayed_field_id_counter,
-            0,
-            // Incarnation does not matter here (no re-execution & interrupts)
-            // TODO(BlockSTMv2): we could still provide the latest incarnation.
-        );
-        let latest_view = LatestView::new(
-            shared_sync_params.base_view,
-            shared_sync_params.global_module_cache,
-            environment.runtime_environment(),
-            ViewState::Sync(parallel_state),
-            txn_idx,
-        );
-
         let read_set = last_input_output
             .read_set(txn_idx)
             .ok_or_else(|| code_invariant_error("Read set must be recorded for materialization"))?;
-        let materializer = ParallelMaterializer::new(&latest_view, read_set);
+        let mut output = last_input_output.take_committed_output(txn_idx)?;
+
+        // Incarnation does not matter here (no re-execution & interrupts).
+        // TODO(BlockSTMv2): we could still provide the latest incarnation.
+        let args = LatestViewArgs::Parallel {
+            base_view: shared_sync_params.base_view,
+            versioned_map: shared_sync_params.versioned_cache,
+            global_module_cache: shared_sync_params.global_module_cache,
+            runtime_environment: environment.runtime_environment(),
+            scheduler,
+            start_shared_counter: shared_sync_params.start_shared_counter,
+            shared_counter: shared_sync_params.delayed_field_id_counter,
+            incarnation: 0,
+        };
 
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        let (committed_output, trace) = last_input_output
-            .materialize(txn_idx, &materializer)
+        // Any legacy trace replay happens inside the executor's materialize.
+        executor
+            .materialize(&mut output, &read_set, args, txn_idx)
             .map_err(|e| match e {
                 PanicOr::CodeInvariantError(msg) => PanicError::CodeInvariantError(msg),
                 PanicOr::Or(e) => {
                     code_invariant_error(format!("Panic error in serializing groups {e:?}"))
                 },
-            })?;
-
-        if environment.async_runtime_checks_enabled() && !trace.is_empty() {
-            // Note that the trace may be empty (if block was small and executor decides not to
-            // collect the trace and replay, or if the VM decides it is not profitable to do this
-            // check for this particular transaction), so we check it in advance.
-
-            // Retrieve the read-set that was captured during execution. This contains the snapshot
-            // of all modules accessed at execution time. It is important to use this view so that
-            // replay does not see potentially different newer state.
-            let read_set = last_input_output.read_set(txn_idx).ok_or_else(|| {
-                code_invariant_error("Read set must be recorded for trace replay")
-            })?;
-
-            // Create a module view that resolves modules from the read-set snapshot, ensuring that
-            // the replay sees the same module versions as execution. This prevents race conditions
-            // where modules are published between execution and post-commit processing.
-            let snapshot_view =
-                SnapshotModuleView::new(&read_set, environment.runtime_environment());
-
-            let result = {
-                counters::update_txn_trace_counters(&trace);
-                let _timer = TRACE_REPLAY_SECONDS.start_timer();
-                // Use snapshot_view instead of latest_view to avoid module cache race.
-                TypeChecker::new(&snapshot_view).replay(&trace)
-            };
-
-            // In case of runtime type check errors, fallback to sequential execution. There errors
-            // are supposed to be unlikely so this fallback is fine, and is mostly needed to make
-            // sure transaction epilogue runs after failure, etc.
-            if let Err(err) = result {
-                alert!(
-                    "Runtime type check failed during replay of transaction {}: {:?}",
-                    txn_idx,
-                    err
-                );
-                return Err(PanicError::CodeInvariantError(format!(
-                    "Sequential fallback on type check failure for transaction {}: {:?}",
-                    txn_idx, err
-                )));
-            }
-        }
-
-        Ok(committed_output)
+            })
     }
 
     fn record_finalized_output(
@@ -1207,6 +1084,7 @@ where
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 let output = self.materialize_txn_commit(
+                    executor,
                     txn_idx,
                     scheduler_wrapper,
                     environment,
@@ -1290,16 +1168,16 @@ where
                     last_input_output,
                     versioned_cache,
                     executor,
-                    base_view,
-                    global_module_cache,
-                    runtime_environment,
-                    ParallelState::new(
-                        versioned_cache,
-                        scheduler_wrapper,
-                        shared_sync_params.start_shared_counter,
-                        shared_sync_params.delayed_field_id_counter,
+                    LatestViewArgs::Parallel {
+                        base_view,
+                        versioned_map: versioned_cache,
+                        global_module_cache,
+                        runtime_environment,
+                        scheduler: scheduler_wrapper,
+                        start_shared_counter: shared_sync_params.start_shared_counter,
+                        shared_counter: shared_sync_params.delayed_field_id_counter,
                         incarnation,
-                    ),
+                    },
                     &self.config,
                 )?,
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
@@ -1400,22 +1278,23 @@ where
                         last_input_output,
                         versioned_cache,
                         executor,
-                        base_view,
-                        shared_sync_params.global_module_cache,
-                        runtime_environment,
-                        ParallelState::new(
-                            versioned_cache,
-                            scheduler_wrapper,
-                            shared_sync_params.start_shared_counter,
-                            shared_sync_params.delayed_field_id_counter,
+                        LatestViewArgs::Parallel {
+                            base_view,
+                            versioned_map: versioned_cache,
+                            global_module_cache,
+                            runtime_environment,
+                            scheduler: scheduler_wrapper,
+                            start_shared_counter: shared_sync_params.start_shared_counter,
+                            shared_counter: shared_sync_params.delayed_field_id_counter,
                             incarnation,
-                        ),
+                        },
                         scheduler,
                         &self.config,
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
                     let output = self.materialize_txn_commit(
+                        executor,
                         txn_idx,
                         scheduler_wrapper,
                         environment,
@@ -1579,6 +1458,7 @@ where
                     &self.config,
                 )?;
                 let output = self.materialize_txn_commit(
+                    executor,
                     epilogue_txn_idx,
                     scheduler,
                     environment,
@@ -1645,7 +1525,7 @@ where
         let shared_maybe_error = AtomicBool::new(false);
 
         // +1 for potential BlockEpilogue txn.
-        let last_input_output = TxnLastInputOutput::new(num_txns + 1);
+        let last_input_output = TxnLastInputOutput::<T, E::Input, E::Output>::new(num_txns + 1);
         let mut versioned_cache = MVHashMap::new();
         if self.config.local.enable_pre_write {
             for txn_idx in 0..num_txns {
@@ -1845,7 +1725,7 @@ where
 
         let skip_module_reads_validation = AtomicBool::new(true);
         // +1 for potential BlockEpilogue txn.
-        let last_input_output = TxnLastInputOutput::new(num_txns + 1);
+        let last_input_output = TxnLastInputOutput::<T, E::Input, E::Output>::new(num_txns + 1);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
@@ -2050,21 +1930,21 @@ where
             AptosModuleExtension,
         >,
         unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
-        output_before_guard: &<E::Output as TransactionOutput>::BeforeMaterializationGuard<'_>,
+        output: &E::Output,
         resource_write_set: HashMap<T::Key, ValueWithLayout<T::Value>>,
-    ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<(), SequentialBlockExecutionError> {
         for (key, value) in resource_write_set.into_iter() {
             unsync_map.write(key, value);
         }
 
         for (group_key, (metadata_op, group_size, group_ops)) in
-            output_before_guard.resource_group_write_set().into_iter()
+            output.resource_group_write_set().into_iter()
         {
             unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
             unsync_map.write(group_key, metadata_op);
         }
 
-        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
+        output.for_each_module_write(&mut |module_id, state_value| {
             add_module_write_to_module_cache(
                 module_id,
                 state_value,
@@ -2077,7 +1957,7 @@ where
 
         let mut second_phase = Vec::new();
         let mut updates = HashMap::new();
-        for (id, change) in output_before_guard.delayed_field_change_set().into_iter() {
+        for (id, change) in output.delayed_field_change_set().into_iter() {
             match change {
                 DelayedChange::Create(value) => {
                     assert_none!(
@@ -2132,7 +2012,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<T, CommittedOutput<E>>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<T, CommittedOutput<E>>, SequentialBlockExecutionError> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
@@ -2173,41 +2053,44 @@ where
                 break;
             };
             let auxiliary_info = signature_verified_block.get_auxiliary_info(idx as TxnIndex);
-            let latest_view = LatestView::<T, S>::new(
+            let args = LatestViewArgs::Sequential {
                 base_view,
-                module_cache_manager_guard.module_cache(),
+                unsync_map: &unsync_map,
+                global_module_cache: module_cache_manager_guard.module_cache(),
                 runtime_environment,
-                ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
-                idx as TxnIndex,
-            );
-            let res =
-                executor.execute_transaction(&latest_view, txn, &auxiliary_info, idx as TxnIndex);
-            let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
-            match res {
-                ExecutionStatus::Abort(err) => {
+                start_counter,
+                counter: &counter,
+            };
+            // A code-invariant error (Err) aborts the block via the From<PanicError> conversion.
+            let (recorded, sequential_reads) =
+                executor.execute(args, txn, &auxiliary_info, idx as TxnIndex)?;
+            let must_skip = matches!(recorded, RecordedOutput::Committed {
+                skips_rest: true,
+                ..
+            });
+            match recorded {
+                RecordedOutput::Aborted(msg) => {
                     error!(
                         "Sequential execution FatalVMError by transaction {}",
                         idx as TxnIndex
                     );
                     // Record the status indicating the unrecoverable VM failure.
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockExecutionError::FatalVMError(err),
+                        BlockExecutionError::FatalVMError(msg),
                     ));
                 },
-                ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    alert!("Sequential execution DelayedFieldsCodeInvariantError error by transaction {}: {}", idx as TxnIndex, msg);
+                RecordedOutput::SpeculativeFailure => {
+                    alert!(
+                        "Sequential execution observed a speculative failure at transaction {}",
+                        idx as TxnIndex
+                    );
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(
+                            "Speculative failure must not occur during sequential execution",
+                        )),
                     ));
                 },
-                ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
-                    alert!("Sequential execution SpeculativeExecutionAbortError error by transaction {}: {}", idx as TxnIndex, msg);
-                    return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
-                    ));
-                },
-                ExecutionStatus::Success(mut output) | ExecutionStatus::SkipRest(mut output) => {
-                    let output_before_guard = output.before_materialization()?;
+                RecordedOutput::Committed { mut output, .. } => {
                     // Calculating the accumulated gas costs of the committed txns.
 
                     let approx_output_size = self
@@ -2216,7 +2099,7 @@ where
                         .block_gas_limit_type
                         .block_output_limit()
                         .map(|_| {
-                            output_before_guard.output_approx_size()
+                            output.output_approx_size()
                                 + if self
                                     .config
                                     .onchain
@@ -2229,7 +2112,6 @@ where
                                 } as u64
                         });
 
-                    let sequential_reads = latest_view.take_sequential_reads();
                     let read_write_summary = self
                         .config
                         .onchain
@@ -2238,12 +2120,12 @@ where
                         .map(|_| {
                             ReadWriteSummary::new(
                                 sequential_reads.get_read_summary(),
-                                output_before_guard.get_write_summary(),
+                                output.get_write_summary(),
                             )
                         });
 
                     block_limit_processor.accumulate_fee_statement(
-                        output_before_guard.fee_statement(),
+                        output.fee_statement(),
                         read_write_summary,
                         approx_output_size,
                     );
@@ -2278,7 +2160,7 @@ where
                         };
 
                         // The IDs are not exchanged but it doesn't change the types (Bytes) or size.
-                        let serialization_error = output_before_guard
+                        let serialization_error = output
                             .group_reads_needing_delayed_field_exchange()
                             .iter()
                             .any(|(group_key, _)| {
@@ -2295,10 +2177,8 @@ where
                                     Err(_) => true,
                                 }
                             })
-                            || output_before_guard
-                                .resource_group_write_set()
-                                .into_iter()
-                                .any(|(group_key, (_, output_group_size, group_ops))| {
+                            || output.resource_group_write_set().into_iter().any(
+                                |(group_key, (_, output_group_size, group_ops))| {
                                     fail_point!("fail-point-resource-group-serialization", |_| {
                                         true
                                     });
@@ -2327,7 +2207,8 @@ where
                                         },
                                         Err(_) => true,
                                     }
-                                });
+                                },
+                            );
 
                         if serialization_error {
                             // The corresponding error / alert must already be triggered, the goal in sequential
@@ -2346,8 +2227,8 @@ where
                     // carry empty read/write sets.
                     if block_limit_processor.is_hot_state_accumulation_enabled() {
                         block_limit_processor.accumulate_hot_state_rw(
-                            output_before_guard.storage_keys_written(),
-                            output_before_guard.storage_keys_read(),
+                            output.storage_keys_written(),
+                            output.storage_keys_read(),
                         );
                     }
 
@@ -2357,46 +2238,32 @@ where
                         runtime_environment,
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
-                        &output_before_guard,
-                        output_before_guard.resource_write_set(),
+                        &output,
+                        output.resource_write_set(),
                     )?;
 
-                    // The guard borrows the output immutably; drop it before
-                    // materialization, which needs the output mutably.
-                    drop(output_before_guard);
-
-                    // If dynamic change set materialization part (indented for clarity/variable scope):
-                    let committed_output = {
-                        let materializer = SequentialMaterializer::new(&latest_view);
-                        let (committed_output, trace) = materialize_output(
-                            &mut output,
-                            &materializer,
-                        )
+                    // Materialize the output. Sequential execution never collects
+                    // traces, so the executor performs no trace replay here.
+                    let args = LatestViewArgs::Sequential {
+                        base_view,
+                        unsync_map: &unsync_map,
+                        global_module_cache: module_cache_manager_guard.module_cache(),
+                        runtime_environment,
+                        start_counter,
+                        counter: &counter,
+                    };
+                    let committed_output = executor
+                        .materialize(&mut output, &sequential_reads, args, idx as TxnIndex)
                         .map_err(|e| match e {
-                            PanicOr::CodeInvariantError(msg) => {
-                                SequentialBlockExecutionError::from(PanicError::CodeInvariantError(
-                                    msg,
-                                ))
-                            },
+                            PanicOr::CodeInvariantError(msg) => SequentialBlockExecutionError::from(
+                                PanicError::CodeInvariantError(msg),
+                            ),
                             PanicOr::Or(ResourceGroupSerializationError) => {
                                 SequentialBlockExecutionError::ResourceGroupSerializationError
                             },
                         })?;
 
-                        // Sequential execution never collects any traces.
-                        if !trace.is_empty() {
-                            let err = code_invariant_error(
-                                "Sequential execution should not record any traces",
-                            );
-                            return Err(err.into());
-                        }
-
-                        committed_output
-                    };
-                    // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
-                    //   output.set_txn_output_for_non_dynamic_change_set();
-
-                    if sequential_reads.incorrect_use {
+                    if sequential_reads.is_incorrect_use() {
                         return Err(
                             code_invariant_error("Incorrect use in sequential execution").into(),
                         );
@@ -2462,7 +2329,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<T, CommittedOutput<E>>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<T, CommittedOutput<E>>> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {

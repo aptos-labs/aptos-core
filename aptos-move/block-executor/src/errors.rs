@@ -16,36 +16,36 @@ pub(crate) enum ParallelBlockExecutionError {
 // This is separate error because we need to match the error variant to provide a specialized
 // fallback logic if a resource group serialization error occurs.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ResourceGroupSerializationError;
+pub struct ResourceGroupSerializationError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// Logging is bottlenecked in constructors.
-pub(crate) enum SequentialBlockExecutionError<E> {
+pub(crate) enum SequentialBlockExecutionError {
     // This is separate error because we need to match the error variant to provide a specialized
     // fallback logic if a resource group serialization error occurs.
     ResourceGroupSerializationError,
-    ErrorToReturn(BlockExecutionError<E>),
+    ErrorToReturn(BlockExecutionError),
 }
 
 /// If the unrecoverable error occurs during sequential execution (e.g. fallback),
 /// the error is propagated back to the caller (block execution is aborted).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BlockExecutionError<E> {
+pub enum BlockExecutionError {
     /// unrecoverable BlockSTM error
     FatalBlockExecutorError(PanicError),
-    /// unrecoverable VM error
-    FatalVMError(E),
+    /// unrecoverable VM error (stringified; the block fails regardless of the specific error).
+    FatalVMError(String),
 }
 
-pub type BlockExecutionResult<T, E> = Result<T, BlockExecutionError<E>>;
+pub type BlockExecutionResult<T> = Result<T, BlockExecutionError>;
 
-impl<E> From<PanicError> for BlockExecutionError<E> {
+impl From<PanicError> for BlockExecutionError {
     fn from(err: PanicError) -> Self {
         BlockExecutionError::FatalBlockExecutorError(err)
     }
 }
 
-impl<E> From<PanicError> for SequentialBlockExecutionError<E> {
+impl From<PanicError> for SequentialBlockExecutionError {
     fn from(err: PanicError) -> Self {
         SequentialBlockExecutionError::ErrorToReturn(BlockExecutionError::FatalBlockExecutorError(
             err,

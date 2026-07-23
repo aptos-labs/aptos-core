@@ -153,32 +153,35 @@ impl VMOutput {
     }
 
     /// Constructs `TransactionOutput`.
-    pub fn into_transaction_output(self) -> Result<TransactionOutput, PanicError> {
-        let Self {
-            change_set,
-            module_write_set,
-            fee_statement,
-            status,
-            trace,
-        } = self;
+    pub fn into_transaction_output(mut self) -> Result<TransactionOutput, PanicError> {
+        self.take_transaction_output()
+    }
 
+    /// Builds the [`TransactionOutput`] by draining the change set and module write
+    /// set out of `self` (leaving them empty) and copying the transaction metadata.
+    /// Does not consume `self`, so it can run behind a mutable borrow (e.g. from an
+    /// output held in the block executor's output store).
+    fn take_transaction_output(&mut self) -> Result<TransactionOutput, PanicError> {
         // INVARIANT:
         //   When converting to transaction output, trace is either irrelevant or has already been
         //   extracted.
-        if !trace.is_empty() {
+        if !self.trace.is_empty() {
             return Err(PanicError::CodeInvariantError(
                 "Non-empty trace found when converting to transaction output".to_string(),
             ));
         }
 
+        let change_set = std::mem::replace(&mut self.change_set, VMChangeSet::empty());
+        let module_write_set =
+            std::mem::replace(&mut self.module_write_set, ModuleWriteSet::empty());
         let (write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
         Ok(TransactionOutput::new(
             write_set,
             events,
-            fee_statement.gas_used(),
-            status,
+            self.fee_statement.gas_used(),
+            self.status.clone(),
             TransactionAuxiliaryData::default(),
         ))
     }
@@ -188,6 +191,17 @@ impl VMOutput {
     /// and returns a [`TransactionOutput`].
     pub fn into_transaction_output_with_materialized_write_set(
         mut self,
+        patched_resource_write_set: Vec<(StateKey, WriteOp)>,
+        patched_events: Vec<ContractEvent>,
+    ) -> Result<TransactionOutput, PanicError> {
+        self.materialize_into_transaction_output(patched_resource_write_set, patched_events)
+    }
+
+    /// Non-consuming variant of [`Self::into_transaction_output_with_materialized_write_set`]:
+    /// patches materialized delayed fields into the change set, then drains it into a
+    /// [`TransactionOutput`], leaving `self` emptied.
+    pub fn materialize_into_transaction_output(
+        &mut self,
         patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
     ) -> Result<TransactionOutput, PanicError> {
@@ -204,7 +218,7 @@ impl VMOutput {
         }
         self.change_set.set_events(patched_events.into_iter());
 
-        self.into_transaction_output()
+        self.take_transaction_output()
     }
 }
 

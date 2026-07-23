@@ -11,6 +11,7 @@ use crate::{
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams},
     },
     executor::BlockExecutor,
+    single_transaction_executor::LegacyAdapter,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
 };
@@ -131,7 +132,7 @@ where
 
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
-            MockTask<KeyType<K>, E>,
+            LegacyAdapter<MockTask<KeyType<K>, E>>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo>,
