@@ -7,13 +7,16 @@
 //! same layout as `address`. Permissioned signers are not supported, for now.
 
 use crate::{monomorphic_natives, NativeEntry};
-use mono_move_core::native::{NativeContext, NativeContextFamily, NativeStatus, VMInternalError};
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus},
+    VMResult,
+};
 
 /// `0x1::create_signer::create_signer(addr: address): signer`
 ///
 /// No-op. A `signer` has the same 32-byte layout as its `address`, so no conversion
 /// needs to be done.
-pub fn native_create_signer<C: NativeContext>(_ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_create_signer<C: NativeContext>(_ctx: &C) -> VMResult<NativeStatus> {
     Ok(NativeStatus::Success)
 }
 
@@ -21,16 +24,14 @@ pub fn native_create_signer<C: NativeContext>(_ctx: &C) -> Result<NativeStatus, 
 ///
 /// No-op. A `signer` has the same 32-byte layout as its `address`, so no change to
 /// the reference as well.
-pub fn native_borrow_address<C: NativeContext>(_ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_borrow_address<C: NativeContext>(_ctx: &C) -> VMResult<NativeStatus> {
     Ok(NativeStatus::Success)
 }
 
 /// `0x1::permissioned_signer::is_permissioned_signer_impl(s: &signer): bool`
 ///
 /// Always returns `false` as we do not support permissioned signers for now.
-pub fn native_is_permissioned_signer<C: NativeContext>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_is_permissioned_signer<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: `bool` matches the Move-level `bool` return at slot 0.
     unsafe { ctx.set_return(0, false) }?;
     Ok(NativeStatus::Success)

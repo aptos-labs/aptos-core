@@ -7,15 +7,33 @@
 //! real `Home`/`Xfer` slots using liveness-driven type-keyed reuse.
 
 use super::{analysis::BlockAnalysis, ssa_function::SSAFunction};
-use crate::{
-    error::{SlotAllocError, SlotAllocResult},
-    stackless_exec_ir::{
-        instr_utils::{collect_defs_and_uses, remap_all_slots_with},
-        BasicBlock, Instr, Slot,
-    },
+use crate::stackless_exec_ir::{
+    instr_utils::{collect_defs_and_uses, remap_all_slots_with},
+    BasicBlock, Instr, Slot,
 };
-use mono_move_core::types::InternedType;
+use mono_move_core::{
+    types::InternedType, ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult,
+};
 use shared_dsa::UnorderedMap;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+enum SlotAllocError {
+    #[error("VID type not found during SSA allocation")]
+    VidTypeNotFound,
+
+    #[error("vid_type called on a non-Vid slot")]
+    VidTypeOnNonVidSlot,
+}
+
+impl IntoExecutionError for SlotAllocError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use SlotAllocError::*;
+        match self {
+            VidTypeNotFound | VidTypeOnNonVidSlot => ExecutionErrorKind::InvariantViolation,
+        }
+    }
+}
 
 /// Output of slot allocation for a single function.
 pub(crate) struct AllocatedFunction {
@@ -130,7 +148,7 @@ impl SlotTable {
 /// Pre: SSA blocks after fusion passes; vid_types maps each `Vid(i)`
 ///      to its type at index `i`.
 /// Post: all `Vid`s replaced with real `Home`/`Xfer` slots.
-pub(crate) fn allocate_slots(ssa: SSAFunction) -> SlotAllocResult<AllocatedFunction> {
+pub(crate) fn allocate_slots(ssa: SSAFunction) -> VMResult<AllocatedFunction> {
     let mut table = SlotTable::new(&ssa.local_types);
     let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
     let mut global_num_xfer_positions: u16 = 0;
@@ -163,13 +181,13 @@ pub(crate) fn allocate_slots(ssa: SSAFunction) -> SlotAllocResult<AllocatedFunct
     })
 }
 
-fn vid_type(vid: Slot, vid_types: &[InternedType]) -> SlotAllocResult<InternedType> {
+fn vid_type(vid: Slot, vid_types: &[InternedType]) -> VMResult<InternedType> {
     match vid {
         Slot::Vid(i) => vid_types
             .get(i as usize)
             .copied()
-            .ok_or(SlotAllocError::VidTypeNotFound),
-        _ => Err(SlotAllocError::VidTypeOnNonVidSlot),
+            .ok_or_else(|| VMInternalError::new(SlotAllocError::VidTypeNotFound)),
+        _ => Err(VMInternalError::new(SlotAllocError::VidTypeOnNonVidSlot)),
     }
 }
 
@@ -185,7 +203,7 @@ fn allocate_block_in_place(
     carry_pool: UnorderedMap<InternedType, Vec<Slot>>,
     vid_types: &[InternedType],
     analysis: &BlockAnalysis,
-) -> SlotAllocResult<(u16, UnorderedMap<InternedType, Vec<Slot>>)> {
+) -> VMResult<(u16, UnorderedMap<InternedType, Vec<Slot>>)> {
     if instrs.is_empty() {
         return Ok((0, carry_pool));
     }

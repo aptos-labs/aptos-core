@@ -5,8 +5,9 @@
 //! implementation that deserializes a value from its BCS encoding.
 
 use crate::{polymorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, VMInternalError, Vector,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Vector},
+    VMResult,
 };
 
 /// `0x1::from_bcs::from_bytes<T>(bytes: vector<u8>): T`, and the identical
@@ -16,7 +17,7 @@ use mono_move_core::native::{
 /// as a VM error.
 //
 // TODO(metering): charge gas.
-pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is `vector<u8>`, passed by value.
     let v: Vector<u8> = unsafe { ctx.arg(0)? };

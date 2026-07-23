@@ -13,7 +13,7 @@ use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{
     ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
 };
-use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner};
+use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::{
@@ -171,7 +171,7 @@ fn execute(
         EMPTY_TYPE_LIST,
     ) {
         Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-        Err(err) => return classify_loader_error(&err),
+        Err(err) => return classify_error(&err),
     };
 
     let mut interpreter = InterpreterContext::new(
@@ -190,7 +190,7 @@ fn execute(
     match interpreter.run() {
         Ok(RuntimeStatus::Success) => TestResult::Success,
         Ok(RuntimeStatus::Aborted { code, message }) => TestResult::Abort { code, message },
-        Err(err) => classify_runtime_error(&err),
+        Err(err) => classify_error(&err),
     }
 }
 
@@ -290,6 +290,20 @@ pub enum TestOutcome {
     Unsupported(String),
 }
 
+/// Classifies a boundary error by recovering its concrete component type.
+/// Loader and runtime errors keep their precise per-variant meaning; anything
+/// else (specializer/lowering pass errors) means mono-move cannot lower this
+/// input yet.
+fn classify_error(err: &VMInternalError) -> TestResult {
+    if let Some(e) = err.downcast_ref::<LoaderError>() {
+        classify_loader_error(e)
+    } else if let Some(e) = err.downcast_ref::<RuntimeError>() {
+        classify_runtime_error(e)
+    } else {
+        TestResult::Error(err.to_string())
+    }
+}
+
 fn classify_loader_error(err: &LoaderError) -> TestResult {
     match err {
         // mono-move can't build or resolve this yet: a native it doesn't
@@ -297,25 +311,17 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
         // no body to lower), or a feature the specializer/verifier can't lower.
         LoaderError::FunctionIrMissing
         | LoaderError::LoweringSkipped { .. }
-        | LoaderError::Specializer(_)
-        | LoaderError::Deserialization(_)
-        | LoaderError::Verification(_)
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),
-        // Genuine problems: a runaway against the (effectively unbounded)
-        // budget, storage/context infrastructure errors, or a VM bug.
-        LoaderError::GasExhausted(_)
-        | LoaderError::ModuleProvider(_)
-        | LoaderError::GlobalContext(_)
-        | LoaderError::InvariantViolation(_) => TestResult::Error(err.to_string()),
+        // Genuine problems: storage/context infrastructure errors, or a VM bug.
+        LoaderError::GlobalContext(_) | LoaderError::InvariantViolation(_) => {
+            TestResult::Error(err.to_string())
+        },
     }
 }
 
 fn classify_runtime_error(err: &RuntimeError) -> TestResult {
     match err {
-        // A loader error surfaced during lazy dispatch keeps its precise meaning.
-        RuntimeError::Loader(inner) => classify_loader_error(inner),
-
         // The program failed at runtime: overflow, OOB, missing resource, a hit
         // limit, ... mono-move matches the existing VM's behaviour and limits,
         // so these are real failures a `#[expected_failure]` test may want.
@@ -346,10 +352,10 @@ fn classify_runtime_error(err: &RuntimeError) -> TestResult {
         | RuntimeError::AbortMessageTooLong { .. }
         | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
 
-        // Genuine problems: runaway gas, infrastructure failure, or a VM bug.
-        RuntimeError::GasExhausted(_)
-        | RuntimeError::InvariantViolation(_)
-        | RuntimeError::ResourceProvider(_) => TestResult::Error(err.to_string()),
+        // Genuine problems: infrastructure failure, or a VM bug.
+        RuntimeError::InvariantViolation(_) | RuntimeError::ResourceProvider(_) => {
+            TestResult::Error(err.to_string())
+        },
     }
 }
 

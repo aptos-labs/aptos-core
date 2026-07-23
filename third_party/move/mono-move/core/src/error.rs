@@ -20,7 +20,7 @@
 //! maps each internal variant to one of these categories. The internal
 //! enums and conversions live in their own crates.
 
-use std::fmt;
+use std::{any::Any, fmt};
 use thiserror::Error;
 
 /// Stable public category enum. Callers branch on this; they do not
@@ -67,6 +67,10 @@ impl fmt::Display for ExecutionErrorKind {
 /// The message is human-readable and deterministic for a given internal
 /// variant + payload, but must not be parsed programmatically. Callers
 /// that need to branch use [`ExecutionErrorKind`].
+///
+/// TODO(correctness): before production, audit every message reaching this type
+/// (across all `IntoExecutionError` impls). We plan to persist them, so once
+/// live a message change is breaking and needs feature gating.
 #[derive(Debug, Error)]
 #[error("{kind}: {message}")]
 pub struct ExecutionError {
@@ -85,7 +89,7 @@ pub struct ExecutionError {
 /// below then folds the per-variant message (via [`fmt::Display`]) and
 /// the chosen category into a public [`ExecutionError`] uniformly, so
 /// each subsystem only writes the kind mapping — never the wrapping.
-pub trait IntoExecutionError: fmt::Display {
+pub trait IntoExecutionError: fmt::Display + Any + Send + Sync {
     fn kind(&self) -> ExecutionErrorKind;
 }
 

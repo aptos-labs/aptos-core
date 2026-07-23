@@ -6,6 +6,7 @@
 use crate::{
     interner::{InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError},
     types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    ExecutionErrorKind, IntoExecutionError,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -28,6 +29,16 @@ pub enum PreparedModuleError {
 
     #[error(transparent)]
     TypeSubstitution(#[from] TypeSubstitutionError),
+}
+
+impl IntoExecutionError for PreparedModuleError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use PreparedModuleError::*;
+        match self {
+            NativeFieldsDeprecated => ExecutionErrorKind::InvariantViolation,
+            TypeSubstitution(err) => err.kind(),
+        }
+    }
 }
 
 /// Wraps deserialized and verified [`CompiledModule`] with pre-interned type

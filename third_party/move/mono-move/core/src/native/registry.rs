@@ -8,8 +8,9 @@
 use super::context::NativeContext;
 use crate::{
     interner::{InternedIdentifier, InternedModuleId},
-    native::{NativeStatus, VMInternalError},
+    native::NativeStatus,
     types::InternedTypeList,
+    VMResult,
 };
 use shared_dsa::UnorderedMap;
 use thiserror::Error;
@@ -60,9 +61,7 @@ pub trait NativeContextFamily {
 /// Without this, we cannot store native functions in a registry, which would
 /// otherwise mandate a fixed lifetime.
 pub type NativeFunction<F> = Box<
-    dyn for<'a> Fn(&<F as NativeContextFamily>::Of<'a>) -> Result<NativeStatus, VMInternalError>
-        + Send
-        + Sync,
+    dyn for<'a> Fn(&<F as NativeContextFamily>::Of<'a>) -> VMResult<NativeStatus> + Send + Sync,
 >;
 
 /// Resolves a native call to its [`NativeIdx`] from the callee's qualified name

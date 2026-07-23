@@ -3,14 +3,14 @@
 
 //! MonoMove effects → Aptos [`TransactionOutput`].
 
-use crate::{error::OutputResult, events::to_contract_events};
+use crate::events::to_contract_events;
 use aptos_types::{
     transaction::{
         AbortInfo, ExecutionStatus, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
     write_set::WriteSet,
 };
-use mono_move_core::{value_layout::LayoutProvider, ExecutionErrorKind, ExecutionResult};
+use mono_move_core::{value_layout::LayoutProvider, ExecutionErrorKind, ExecutionResult, VMResult};
 use mono_move_runtime::SessionEffects;
 use move_core_types::vm_status::AbortLocation;
 
@@ -29,7 +29,7 @@ pub fn to_transaction_output(
     result: ExecutionResult,
     gas_used: u64,
     auxiliary_data: TransactionAuxiliaryData,
-) -> OutputResult<TransactionOutput> {
+) -> VMResult<TransactionOutput> {
     let (write_set, events) = match &result {
         ExecutionResult::Success => {
             let write_set = effects.write_set(layouts)?;

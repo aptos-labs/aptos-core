@@ -23,9 +23,8 @@
 //! `< frame_data_size`), disjoint from the arg region. No cycles, so no
 //! scratch slot needed for arg setup.
 
-use super::lower_utils::ranges_overlap;
-use crate::error::{LoweringError, LoweringResult};
-use mono_move_core::{FrameOffset, MicroOp};
+use super::{lower_utils::ranges_overlap, LoweringError};
+use mono_move_core::{FrameOffset, MicroOp, VMInternalError, VMResult};
 use smallbitvec::SmallBitVec;
 use smallvec::SmallVec;
 
@@ -64,7 +63,7 @@ pub(crate) fn emit_parallel_copy(
     out: &mut Vec<MicroOp>,
     copies: &[Copy],
     scratch: Option<FrameOffset>,
-) -> LoweringResult<()> {
+) -> VMResult<()> {
     // Filter trivial copies. Inline-stack-allocated for the common
     // small-N path; spills to heap only for adversarial wide signatures.
     let mut copies: SmallVec<[Copy; STACK_COPY_CAPACITY]> = copies
@@ -81,7 +80,9 @@ pub(crate) fn emit_parallel_copy(
         return Ok(());
     }
     let Some(scratch) = scratch else {
-        return Err(LoweringError::ScratchSlotRequiredForParallelCopy);
+        return Err(VMInternalError::new(
+            LoweringError::ScratchSlotRequiredForParallelCopy,
+        ));
     };
 
     // Invariants:

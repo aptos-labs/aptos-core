@@ -24,16 +24,68 @@
 //! — these arms charge only the shallow byte move.
 
 use crate::{
-    error::{GasInstrumentationError, GasInstrumentationResult, LoweringResult},
     lower::context::concrete_type_size,
     stackless_exec_ir::{instr_utils::for_each_value_use, BasicBlock, Instr, ModuleIR, Slot},
 };
 use mono_move_core::{
     types::{strip_ref, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Interner, LayoutProvider, PreparedModule,
+    ExecutionErrorKind, Interner, IntoExecutionError, LayoutProvider, PreparedModule,
+    VMInternalError, VMResult,
 };
 use move_binary_format::file_format::FieldHandleIndex;
 use smallvec::SmallVec;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+enum GasInstrumentationError {
+    #[error("expected a reference type")]
+    ExpectedReferenceType,
+
+    #[error("Xfer({xfer}) read without a prior call-return binding")]
+    XferReadWithoutBinding { xfer: u16 },
+
+    #[error("Vid slot in post-allocation IR")]
+    VidInPostAllocationIr,
+
+    #[error("field owner is not a struct type")]
+    FieldOwnerNotStruct,
+
+    #[error("variant owner is not an enum type")]
+    VariantOwnerNotEnum,
+
+    #[error("enum definition not found")]
+    EnumDefinitionNotFound,
+
+    #[error("type is not an enum")]
+    NotAnEnum,
+
+    #[error("call return {ret_idx} has no matching signature type")]
+    CallReturnNoSignatureType { ret_idx: usize },
+
+    #[error("CallClosure signature is empty")]
+    ClosureSignatureEmpty,
+
+    #[error("CallClosure signature must start with a Function type")]
+    ClosureSignatureNotFunction,
+}
+
+impl IntoExecutionError for GasInstrumentationError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use GasInstrumentationError::*;
+        match self {
+            ExpectedReferenceType
+            | XferReadWithoutBinding { .. }
+            | VidInPostAllocationIr
+            | FieldOwnerNotStruct
+            | VariantOwnerNotEnum
+            | EnumDefinitionNotFound
+            | NotAnEnum
+            | CallReturnNoSignatureType { .. }
+            | ClosureSignatureEmpty
+            | ClosureSignatureNotFunction => ExecutionErrorKind::InvariantViolation,
+        }
+    }
+}
 
 // --- Loads ---
 const LD: u64 = 2;
@@ -121,10 +173,7 @@ impl BlockCost {
 // =============================================================================
 
 /// Emit a per-block [`BlockCost`] formula for every function in `module_ir`.
-pub(crate) fn instrument<I: Interner>(
-    module_ir: &mut ModuleIR,
-    interner: &I,
-) -> GasInstrumentationResult<()> {
+pub(crate) fn instrument<I: Interner>(module_ir: &mut ModuleIR, interner: &I) -> VMResult<()> {
     let ModuleIR { module, functions } = module_ir;
     for func in functions.iter_mut().flatten() {
         let mut emitter = Emitter {
@@ -158,28 +207,30 @@ struct Emitter<'a, I: Interner> {
 impl<I: Interner> Emitter<'_, I> {
     /// Type of the value in `slot`. An Xfer slot read here always holds a prior
     /// call's return (call arguments are costed from the callee signature).
-    fn slot_ty(&self, slot: Slot) -> GasInstrumentationResult<InternedType> {
+    fn slot_ty(&self, slot: Slot) -> VMResult<InternedType> {
         match slot {
             Slot::Home(i) => Ok(self.home_slot_types[i as usize]),
-            Slot::Xfer(j) => self.xfer_ret_types[j as usize]
-                .ok_or(GasInstrumentationError::XferReadWithoutBinding { xfer: j }),
-            Slot::Vid(_) => Err(GasInstrumentationError::VidInPostAllocationIr),
+            Slot::Xfer(j) => self.xfer_ret_types[j as usize].ok_or_else(|| {
+                VMInternalError::new(GasInstrumentationError::XferReadWithoutBinding { xfer: j })
+            }),
+            Slot::Vid(_) => Err(VMInternalError::new(
+                GasInstrumentationError::VidInPostAllocationIr,
+            )),
         }
     }
 
     /// Pointee type of a reference slot (`ReadRef`/`WriteRef` touch the pointee).
-    fn pointee_ty(&self, ref_slot: Slot) -> GasInstrumentationResult<InternedType> {
-        strip_ref(self.slot_ty(ref_slot)?).ok_or(GasInstrumentationError::ExpectedReferenceType)
+    fn pointee_ty(&self, ref_slot: Slot) -> VMResult<InternedType> {
+        strip_ref(self.slot_ty(ref_slot)?)
+            .ok_or_else(|| VMInternalError::new(GasInstrumentationError::ExpectedReferenceType))
     }
 
     /// Type of struct field `fh`, with the owner nominal's type arguments applied.
-    fn field_ty(
-        &self,
-        owner: InternedType,
-        fh: FieldHandleIndex,
-    ) -> GasInstrumentationResult<InternedType> {
+    fn field_ty(&self, owner: InternedType, fh: FieldHandleIndex) -> VMResult<InternedType> {
         let Type::Nominal { ty_args, .. } = view_type(owner) else {
-            return Err(GasInstrumentationError::FieldOwnerNotStruct);
+            return Err(VMInternalError::new(
+                GasInstrumentationError::FieldOwnerNotStruct,
+            ));
         };
         Ok(self
             .interner
@@ -192,9 +243,11 @@ impl<I: Interner> Emitter<'_, I> {
         &self,
         enum_ty: InternedType,
         variant: u16,
-    ) -> GasInstrumentationResult<Vec<InternedType>> {
+    ) -> VMResult<Vec<InternedType>> {
         let Type::Nominal { name, ty_args, .. } = view_type(enum_ty) else {
-            return Err(GasInstrumentationError::VariantOwnerNotEnum);
+            return Err(VMInternalError::new(
+                GasInstrumentationError::VariantOwnerNotEnum,
+            ));
         };
         let def_idx = self
             .module
@@ -211,7 +264,7 @@ impl<I: Interner> Emitter<'_, I> {
     }
 
     /// Cost of the formula for one block, resetting Xfer tracking at its start.
-    fn block_cost(&mut self, block: &BasicBlock) -> GasInstrumentationResult<BlockCost> {
+    fn block_cost(&mut self, block: &BasicBlock) -> VMResult<BlockCost> {
         // Xfer slots are block-local.
         self.xfer_ret_types.fill(None);
         let mut b = BlockCost::zero();
@@ -236,7 +289,7 @@ impl<I: Interner> Emitter<'_, I> {
     }
 
     /// Emit the cost of `instr` into `b`.
-    fn instr_cost(&mut self, b: &mut BlockCost, instr: &Instr) -> GasInstrumentationResult<()> {
+    fn instr_cost(&mut self, b: &mut BlockCost, instr: &Instr) -> VMResult<()> {
         match instr {
             // --- Loads ---
             Instr::LdConst(..)
@@ -393,7 +446,7 @@ impl<I: Interner> Emitter<'_, I> {
         param_types: InternedTypeList,
         ret_slots: &[Slot],
         ret_types: InternedTypeList,
-    ) -> GasInstrumentationResult<()> {
+    ) -> VMResult<()> {
         b.add_constant(CALL);
         for &param in view_type_list(param_types) {
             b.add_sized(MOVE_BASE, MOVE_PER_BYTE, param);
@@ -406,7 +459,11 @@ impl<I: Interner> Emitter<'_, I> {
                 Slot::Home(i) => {
                     b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.home_slot_types[i as usize])
                 },
-                Slot::Vid(_) => return Err(GasInstrumentationError::VidInPostAllocationIr),
+                Slot::Vid(_) => {
+                    return Err(VMInternalError::new(
+                        GasInstrumentationError::VidInPostAllocationIr,
+                    ))
+                },
             }
         }
         self.bind_call_returns(ret_slots, ret_types)?;
@@ -418,7 +475,7 @@ impl<I: Interner> Emitter<'_, I> {
         &mut self,
         ret_slots: &[Slot],
         ret_types: InternedTypeList,
-    ) -> GasInstrumentationResult<()> {
+    ) -> VMResult<()> {
         self.xfer_ret_types.fill(None);
         let ret_types = view_type_list(ret_types);
         for (k, ret) in ret_slots.iter().enumerate() {
@@ -437,14 +494,16 @@ impl<I: Interner> Emitter<'_, I> {
 /// leading `Function` type of a `CallClosure` signature.
 fn closure_signature(
     sig_types: InternedTypeList,
-) -> GasInstrumentationResult<(InternedType, InternedTypeList, InternedTypeList)> {
+) -> VMResult<(InternedType, InternedTypeList, InternedTypeList)> {
     let closure_ty = view_type_list(sig_types)
         .first()
         .copied()
         .ok_or(GasInstrumentationError::ClosureSignatureEmpty)?;
     match view_type(closure_ty) {
         Type::Function { args, results, .. } => Ok((closure_ty, *args, *results)),
-        _ => Err(GasInstrumentationError::ClosureSignatureNotFunction),
+        _ => Err(VMInternalError::new(
+            GasInstrumentationError::ClosureSignatureNotFunction,
+        )),
     }
 }
 
@@ -455,13 +514,13 @@ fn closure_signature(
 /// Resolves the types in a [`BlockCost`] to concrete sizes for an instantiation.
 pub(crate) trait CostResolver {
     /// Substitute the instantiation's type arguments into `ty`.
-    fn concrete_ty(&self, ty: InternedType) -> LoweringResult<InternedType>;
+    fn concrete_ty(&self, ty: InternedType) -> VMResult<InternedType>;
 
     /// Value layouts, for reading concrete type sizes.
     fn layouts(&self) -> &dyn LayoutProvider;
 
     /// Evaluate a block's cost formula to concrete gas for this instantiation.
-    fn resolve_block_cost(&self, cost: &BlockCost) -> LoweringResult<u64> {
+    fn resolve_block_cost(&self, cost: &BlockCost) -> VMResult<u64> {
         let mut total = cost.base;
         for &(coeff, ty) in &cost.terms {
             let concrete_ty = self.concrete_ty(ty)?;

@@ -4,8 +4,9 @@
 //! Natives for the `hash` module (`std::hash`).
 
 use crate::{monomorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, VMInternalError, Vector,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Vector},
+    VMResult,
 };
 use sha2::{Digest, Sha256};
 use sha3::Sha3_256;
@@ -13,7 +14,7 @@ use sha3::Sha3_256;
 /// `0x1::hash::sha2_256(data: vector<u8>): vector<u8>`
 //
 // TODO(metering): charge gas.
-pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
     let digest = {
@@ -31,7 +32,7 @@ pub fn native_sha2_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 /// `0x1::hash::sha3_256(data: vector<u8>): vector<u8>`
 //
 // TODO(metering): charge gas.
-pub fn native_sha3_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_sha3_256<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
     let digest = {

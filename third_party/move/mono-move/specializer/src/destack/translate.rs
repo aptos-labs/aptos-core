@@ -4,11 +4,8 @@
 //! Conversion pipeline: Bytecode → SSA → instruction fusion → slot allocation.
 
 use super::ssa_conversion::SsaConverter;
-use crate::{
-    error::SpecializerResult,
-    stackless_exec_ir::{FunctionIR, ModuleIR},
-};
-use mono_move_core::{Interner, PreparedModule};
+use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
+use mono_move_core::{Interner, PreparedModule, VMResult};
 use move_binary_format::access::ModuleAccess;
 
 /// Convert an entire compiled module to stackless IR.
@@ -39,10 +36,7 @@ use move_binary_format::access::ModuleAccess;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed slots
 ///   truly hold dead values, so type-keyed slot recycling is sound.
-pub fn translate_module(
-    module: PreparedModule,
-    interner: &impl Interner,
-) -> SpecializerResult<ModuleIR> {
+pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMResult<ModuleIR> {
     let functions = module
         .function_defs
         .iter()
@@ -86,7 +80,7 @@ pub fn translate_module(
                 block_costs: Vec::new(),
             }))
         })
-        .collect::<SpecializerResult<Vec<_>>>()?;
+        .collect::<VMResult<Vec<_>>>()?;
 
     Ok(ModuleIR { module, functions })
 }

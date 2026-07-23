@@ -23,14 +23,14 @@
 //!   Add differential tests for these walks against the existing Move VM.
 
 use crate::{
-    error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
-    heap::{heap_alloc, AllocationError, AllocationResult, Heap},
+    error::{RuntimeError, RuntimeInvariantViolation},
+    heap::{heap_alloc, AllocationResult, Heap},
     memory::{read_enum_tag, read_ptr, read_vec_len, write_enum_tag, write_ptr, write_u64},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, ValueLayout, ENUM_DATA_OFFSET,
-    OBJECT_HEADER_SIZE,
+    types::InternedType, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
+    ValueLayout, ENUM_DATA_OFFSET, OBJECT_HEADER_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use std::cmp::Ordering;
@@ -40,7 +40,7 @@ use std::cmp::Ordering;
 pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     ty: InternedType,
-) -> RuntimeResult<Option<usize>> {
+) -> VMResult<Option<usize>> {
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
     Ok(layout.fixed_serialized_size().map(|n| n as usize))
 }
@@ -56,7 +56,7 @@ pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,
     ty: InternedType,
-) -> RuntimeResult<usize> {
+) -> VMResult<usize> {
     // TODO(perf): Implement a more efficient serialized size implementation:
     //   - Use constant serialized size as fast path
     //   - Avoid allocations into buffer when serializing.
@@ -74,7 +74,7 @@ pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,
     ty: InternedType,
-) -> RuntimeResult<Vec<u8>> {
+) -> VMResult<Vec<u8>> {
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
 
     let mut out = vec![];
@@ -98,7 +98,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     base: *const u8,
     layout: &ValueLayout,
     out: &mut Vec<u8>,
-) -> RuntimeResult<()> {
+) -> VMResult<()> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     if layout.has_no_pointers_no_padding() {
@@ -115,9 +115,9 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => Err(unreachable(
+        | LayoutKind::Address => Err(VMInternalError::new(unreachable(
             "Primitive types have no padding / pointers and must be already handled",
-        )),
+        ))),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
                 let field_layout = layouts.layout(field.id).ok_or_else(layout_not_found)?;
@@ -137,7 +137,9 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             let vec_ptr = unsafe { read_ptr(base, 0usize) };
             let len = unsafe { read_vec_len(vec_ptr) };
             if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
-                return Err(RuntimeError::BCSSequenceTooLong { len });
+                return Err(VMInternalError::new(RuntimeError::BCSSequenceTooLong {
+                    len,
+                }));
             }
             write_uleb128_len(out, len);
             if len == 0 {
@@ -193,7 +195,9 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
-        LayoutKind::Ref => Err(unreachable("References cannot be serialized")),
+        LayoutKind::Ref => Err(VMInternalError::new(unreachable(
+            "References cannot be serialized",
+        ))),
     }
 }
 
@@ -214,7 +218,7 @@ pub unsafe fn equals<T: LayoutProvider + ?Sized>(
     a: *const u8,
     b: *const u8,
     ty: InternedType,
-) -> RuntimeResult<bool> {
+) -> VMResult<bool> {
     let id = layouts.layout_id(ty).ok_or_else(layout_not_found)?;
     // SAFETY: caller must enforce the safety precondition.
     unsafe { equals_impl(layouts, a, b, id) }
@@ -236,7 +240,7 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     a: *const u8,
     b: *const u8,
     id: LayoutId,
-) -> RuntimeResult<bool> {
+) -> VMResult<bool> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
@@ -251,9 +255,9 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => Err(unreachable(
+        | LayoutKind::Address => Err(VMInternalError::new(unreachable(
             "Primitive layouts must be handled by fast-path",
-        )),
+        ))),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
                 // SAFETY: value is a valid struct, so all fields lie at `offset`
@@ -329,7 +333,10 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
                 .get(tag_a as usize)
                 .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
             if tag_b as usize >= variants.len() {
-                return Err(enum_tag_out_of_range(tag_b, variants.len()));
+                return Err(VMInternalError::new(enum_tag_out_of_range(
+                    tag_b,
+                    variants.len(),
+                )));
             }
 
             if tag_a != tag_b {
@@ -350,7 +357,9 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
-        LayoutKind::Ref => Err(unreachable("Equality runs on pointee types only")),
+        LayoutKind::Ref => Err(VMInternalError::new(unreachable(
+            "Equality runs on pointee types only",
+        ))),
     }
 }
 
@@ -381,7 +390,7 @@ pub unsafe fn compare<T: LayoutProvider + ?Sized>(
     a: *const u8,
     b: *const u8,
     ty: InternedType,
-) -> RuntimeResult<Ordering> {
+) -> VMResult<Ordering> {
     let id = layouts.layout_id(ty).ok_or_else(layout_not_found)?;
     // SAFETY: caller must enforce the safety precondition.
     unsafe { compare_impl(layouts, a, b, id) }
@@ -404,7 +413,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     a: *const u8,
     b: *const u8,
     id: LayoutId,
-) -> RuntimeResult<Ordering> {
+) -> VMResult<Ordering> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
@@ -433,7 +442,11 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                     32 => {
                         U256::from_le_bytes(read_array(a)).cmp(&U256::from_le_bytes(read_array(b)))
                     },
-                    _ => return Err(unreachable("Unexpected unsigned integer width")),
+                    _ => {
+                        return Err(VMInternalError::new(unreachable(
+                            "Unexpected unsigned integer width",
+                        )))
+                    },
                 }
             })
         },
@@ -451,7 +464,11 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                     32 => {
                         I256::from_le_bytes(read_array(a)).cmp(&I256::from_le_bytes(read_array(b)))
                     },
-                    _ => return Err(unreachable("Unexpected signed integer width")),
+                    _ => {
+                        return Err(VMInternalError::new(unreachable(
+                            "Unexpected signed integer width",
+                        )))
+                    },
                 }
             })
         },
@@ -518,7 +535,10 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                 .get(tag_a as usize)
                 .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
             if tag_b as usize >= variants.len() {
-                return Err(enum_tag_out_of_range(tag_b, variants.len()));
+                return Err(VMInternalError::new(enum_tag_out_of_range(
+                    tag_b,
+                    variants.len(),
+                )));
             }
 
             let ord = tag_a.cmp(&tag_b);
@@ -540,7 +560,9 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // TODO(completeness): function values are not yet supported.
             todo!("function values are not yet supported");
         },
-        LayoutKind::Ref => Err(unreachable("Comparison runs on pointee types only")),
+        LayoutKind::Ref => Err(VMInternalError::new(unreachable(
+            "Comparison runs on pointee types only",
+        ))),
     }
 }
 
@@ -598,10 +620,10 @@ pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
     ty: InternedType,
     bytes: &[u8],
     dst: *mut u8,
-) -> RuntimeResult<()> {
+) -> VMResult<()> {
     // SAFETY: forwarded to the caller.
     unsafe { deserialize(layouts, heap, ty, bytes, dst) }
-        .map_err(AllocationError::into_runtime_error)
+        .map_err(|e| VMInternalError::new(e.into_runtime_error()))
 }
 
 /// # Safety
@@ -819,8 +841,8 @@ unsafe fn bytes_cmp(a: *const u8, b: *const u8, n: usize) -> Ordering {
 
 /// Borrows the next `n` bytes, advancing the cursor. Returns an error if
 /// there is not enough bytes to read or the size of the slice overflows.
-fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> RuntimeResult<&'b [u8]> {
-    let end = cursor.checked_add(n).ok_or_else(|| RuntimeError::BCSEof)?;
+fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> Result<&'b [u8], RuntimeError> {
+    let end = cursor.checked_add(n).ok_or(RuntimeError::BCSEof)?;
     if end > bytes.len() {
         return Err(RuntimeError::BCSEof);
     }
@@ -851,11 +873,11 @@ fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
 /// if:
 /// - data is not a valid ULEB128,
 /// - end of input is unexpectedly reached.
-fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> RuntimeResult<u64> {
+fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     loop {
-        let byte = *bytes.get(*cursor).ok_or_else(|| RuntimeError::BCSEof)?;
+        let byte = *bytes.get(*cursor).ok_or(RuntimeError::BCSEof)?;
         *cursor += 1;
 
         let cur = (byte & 0x7F) as u64;

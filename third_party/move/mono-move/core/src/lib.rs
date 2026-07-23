@@ -61,10 +61,4 @@ pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
-pub use vm_error::{
-    ArithOp, GasInstrumentationError, GasInstrumentationResult, GlobalStorageOp, LoaderError,
-    LoaderInvariantViolation, LoaderResult, LoweringError, LoweringResult, RuntimeError,
-    RuntimeInvariantViolation, RuntimeResult, Signedness, SlotAllocError, SlotAllocResult,
-    SpecializerError, SpecializerResult, SsaConversionError, SsaConversionResult, VecOp,
-    XferVerifierError, XferVerifierResult,
-};
+pub use vm_error::{VMInternalError, VMResult};

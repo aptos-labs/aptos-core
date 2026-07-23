@@ -53,13 +53,13 @@
 //! never relocated.
 
 use crate::{
-    error::{GlobalStorageOp, RuntimeError, RuntimeResult},
+    error::{GlobalStorageOp, RuntimeError},
     heap::RootScanner,
     invariant_violation,
 };
 use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey, ResourceProvider, StorageRead,
+    storage::resource_provider::InMemoryStorageKey, ResourceProvider, StorageRead, VMResult,
 };
 use std::ptr::NonNull;
 
@@ -253,7 +253,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<bool> {
+    ) -> Result<bool, RuntimeError> {
         Ok(get_or_create_resource_entry(&mut self.entries, provider, key)?.exists())
     }
 
@@ -263,7 +263,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<NonNull<u8>> {
+    ) -> Result<NonNull<u8>, RuntimeError> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr()
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
@@ -283,7 +283,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<EntryPtr> {
+    ) -> Result<EntryPtr, RuntimeError> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr_mut(self.current_epoch)
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
@@ -326,7 +326,7 @@ impl ResourceReadWriteSet {
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
         ptr: NonNull<u8>,
-    ) -> RuntimeResult<()> {
+    ) -> Result<(), RuntimeError> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
         if entry.exists() {
             return Err(RuntimeError::ResourceAlreadyExists {
@@ -352,7 +352,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<EntryPtr> {
+    ) -> Result<EntryPtr, RuntimeError> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
         let ptr = entry.as_ptr_mut(self.current_epoch).ok_or_else(|| {
             RuntimeError::ResourceDoesNotExist {
@@ -432,7 +432,7 @@ impl ResourceReadWriteSet {
     ///
     /// Note: allocations that became unreachable are eventually reclaimed by
     /// the next GC.
-    pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
+    pub fn rollback(&mut self, n: usize) -> VMResult<()> {
         if n == 0 {
             return Ok(());
         }
@@ -504,7 +504,7 @@ fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
     provider: &dyn ResourceProvider,
     key: &InMemoryStorageKey,
-) -> RuntimeResult<&'a mut Entry> {
+) -> Result<&'a mut Entry, RuntimeError> {
     match entries.entry_ref(key) {
         EntryRef::Occupied(entry) => Ok(entry.into_mut()),
         EntryRef::Vacant(entry) => {

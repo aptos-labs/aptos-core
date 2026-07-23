@@ -78,17 +78,74 @@
 //! coalescing, if ever added, would need to revisit this.)
 
 #[cfg(debug_assertions)]
-use crate::error::{XferVerifierError, XferVerifierResult};
-#[cfg(debug_assertions)]
 use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
     instr_utils::{clobbers_xfer, for_each_def, for_each_use},
     Instr, Slot,
 };
+#[cfg(debug_assertions)]
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 use smallbitvec::SmallBitVec;
 #[cfg(debug_assertions)]
 use std::collections::BTreeMap;
+#[cfg(debug_assertions)]
+use thiserror::Error;
+
+#[cfg(debug_assertions)]
+#[derive(Debug, Error)]
+enum XferVerifierError {
+    #[error("post-optimize Xfer verifier: block {block}, instr {instr}: {inner}")]
+    XferCallStructural {
+        block: usize,
+        instr: usize,
+        inner: Box<XferVerifierError>,
+    },
+
+    #[error(
+        "arg positionality: args[{arg_idx}] resolves to Xfer({got}), expected Xfer({arg_idx})"
+    )]
+    XferArgPositionality { arg_idx: usize, got: u16 },
+
+    #[error("return Xfer prefix: rets[{ret_idx}] resolves to Xfer({got}) after a non-Xfer ret")]
+    XferReturnPrefix { ret_idx: usize, got: u16 },
+
+    #[error("return monotonicity: rets[{ret_idx}] = Xfer({got}) <= prev Xfer({prev})")]
+    XferReturnNotMonotonic { ret_idx: usize, got: u16, prev: u16 },
+
+    #[error("post-optimize Xfer verifier: block {block}, instr {instr}: use of Xfer({xfer}) with no live def earlier in this block")]
+    XferUseWithoutLiveDef {
+        block: usize,
+        instr: usize,
+        xfer: u16,
+    },
+
+    #[error("post-optimize Xfer verifier: block {block}, instr {instr}: Xfer({xfer}) bound at call boundary but not consumed as args[{xfer}]")]
+    XferBoundNotConsumed {
+        block: usize,
+        instr: usize,
+        xfer: u16,
+    },
+
+    #[error("post-optimize Xfer verifier: block {block}: Xfer({xfer}) bound at block end (Xfer lifetimes must be block-local)")]
+    XferBoundAtBlockEnd { block: usize, xfer: u16 },
+}
+
+#[cfg(debug_assertions)]
+impl IntoExecutionError for XferVerifierError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use XferVerifierError::*;
+        match self {
+            XferCallStructural { .. }
+            | XferArgPositionality { .. }
+            | XferReturnPrefix { .. }
+            | XferReturnNotMonotonic { .. }
+            | XferUseWithoutLiveDef { .. }
+            | XferBoundNotConsumed { .. }
+            | XferBoundAtBlockEnd { .. } => ExecutionErrorKind::InvariantViolation,
+        }
+    }
+}
 
 /// Analysis results for a single basic block. All map keys are `Vid`s.
 pub(crate) struct BlockAnalysis {
@@ -511,7 +568,7 @@ fn check_call_structural_invariants<F>(
     args: &[Slot],
     rets: &[Slot],
     xfer_pos: F,
-) -> XferVerifierResult<()>
+) -> Result<(), XferVerifierError>
 where
     F: Fn(&Slot) -> Option<u16>,
 {
@@ -789,7 +846,7 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
 #[cfg(debug_assertions)]
 pub(crate) fn assert_xfer_invariants_on_final_ir(
     func: &crate::stackless_exec_ir::FunctionIR,
-) -> XferVerifierResult<()> {
+) -> VMResult<()> {
     let num_xfer = func.num_xfer_positions as usize;
     let mut bound: Vec<bool> = vec![false; num_xfer];
     for (b_idx, block) in func.blocks.iter().enumerate() {
@@ -807,11 +864,13 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                 }
             });
             if let Some(j) = unbound {
-                return Err(XferVerifierError::XferUseWithoutLiveDef {
-                    block: b_idx,
-                    instr: i,
-                    xfer: j,
-                });
+                return Err(VMInternalError::new(
+                    XferVerifierError::XferUseWithoutLiveDef {
+                        block: b_idx,
+                        instr: i,
+                        xfer: j,
+                    },
+                ));
             }
 
             // (2) at a call boundary, every bound Xfer slot must
@@ -842,11 +901,13 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
                     if b {
                         let consumed_here = j < args.len() && args[j] == Slot::Xfer(j as u16);
                         if !consumed_here {
-                            return Err(XferVerifierError::XferBoundNotConsumed {
-                                block: b_idx,
-                                instr: i,
-                                xfer: j as u16,
-                            });
+                            return Err(VMInternalError::new(
+                                XferVerifierError::XferBoundNotConsumed {
+                                    block: b_idx,
+                                    instr: i,
+                                    xfer: j as u16,
+                                },
+                            ));
                         }
                     }
                 }
@@ -874,10 +935,12 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
         // (3) no Xfer binding may survive past the end of a block.
         for (j, &b) in bound.iter().enumerate() {
             if b {
-                return Err(XferVerifierError::XferBoundAtBlockEnd {
-                    block: b_idx,
-                    xfer: j as u16,
-                });
+                return Err(VMInternalError::new(
+                    XferVerifierError::XferBoundAtBlockEnd {
+                        block: b_idx,
+                        xfer: j as u16,
+                    },
+                ));
             }
         }
     }

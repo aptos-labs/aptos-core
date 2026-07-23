@@ -12918,12 +12918,14 @@ dependencies = [
 name = "mono-move-loader"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "mono-move-core",
  "mono-move-global-context",
  "mono-move-testsuite",
  "move-core-types",
  "shared-dsa",
  "specializer",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -13016,6 +13018,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -13055,6 +13058,7 @@ dependencies = [
  "smallvec",
  "specializer",
  "tempfile",
+ "thiserror 1.0.69",
  "walkdir",
 ]
 
@@ -18598,6 +18602,7 @@ dependencies = [
  "shared-dsa",
  "smallbitvec",
  "smallvec",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

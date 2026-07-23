@@ -3,7 +3,7 @@
 
 //! Errors raised while building a transaction output.
 
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError, RuntimeError};
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,9 +16,6 @@ pub enum OutputError {
 
     #[error("failed to build contract event: {0}")]
     InvalidEvent(String),
-
-    #[error(transparent)]
-    Runtime(#[from] RuntimeError),
 }
 
 impl IntoExecutionError for OutputError {
@@ -27,9 +24,6 @@ impl IntoExecutionError for OutputError {
             OutputError::InvalidEventType => ExecutionErrorKind::InvariantViolation,
             OutputError::InvalidEventGuid(_) => ExecutionErrorKind::InvalidOperation,
             OutputError::InvalidEvent(_) => ExecutionErrorKind::RuntimeLimitExceeded,
-            OutputError::Runtime(err) => err.kind(),
         }
     }
 }
-
-pub type OutputResult<T> = Result<T, OutputError>;

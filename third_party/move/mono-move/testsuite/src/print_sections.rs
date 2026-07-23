@@ -20,7 +20,7 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
     types::{InternedType, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, LayoutId, LayoutProvider, ValueLayout,
+    DescriptorId, FieldTypes, FrameOffset, LayoutId, LayoutProvider, VMResult, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -31,7 +31,6 @@ use specializer::{
         SpecializerContext,
     },
     stackless_exec_ir::ModuleIR,
-    LoweringResult,
 };
 
 /// Render the requested sections for all modules into a single string.
@@ -107,7 +106,7 @@ fn push_module_banner(out: &mut String, module: &CompiledModule) {
 fn lower_functions(
     guard: &ExecutionGuard<'_>,
     module_ir: &ModuleIR,
-) -> Vec<(String, LoweringResult<LoweringOutcome>)> {
+) -> Vec<(String, VMResult<LoweringOutcome>)> {
     let mut loader_ctx = SnapshotLoaderContext { guard, module_ir };
     module_ir
         .functions
@@ -214,7 +213,7 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> LoweringResult<Option<FieldTypes>> {
+    ) -> VMResult<Option<FieldTypes>> {
         if *module_id != self.module_ir.module.id() {
             return Ok(None);
         }

@@ -15,6 +15,6 @@ pub mod error;
 pub mod events;
 pub mod output;
 
-pub use error::{OutputError, OutputResult};
+pub use error::OutputError;
 pub use events::to_contract_events;
 pub use output::{to_transaction_output, to_transaction_status};

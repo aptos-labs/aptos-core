@@ -13,7 +13,7 @@
 //! value equals the pre-state so the write set reflects real changes only.
 
 use crate::{
-    error::{RuntimeError, RuntimeResult},
+    error::RuntimeError,
     global_storage::{ResourceReadWriteSet, WriteClass},
     invariant_violation, value_utils,
 };
@@ -23,7 +23,7 @@ use aptos_types::{
 };
 use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey, struct_tag_of, types::InternedType,
-    value_layout::LayoutProvider,
+    value_layout::LayoutProvider, VMInternalError, VMResult,
 };
 use std::ptr::NonNull;
 
@@ -35,7 +35,7 @@ use std::ptr::NonNull;
 pub(crate) fn build_write_set<L: LayoutProvider + ?Sized>(
     rws: &ResourceReadWriteSet,
     layouts: &L,
-) -> RuntimeResult<WriteSet> {
+) -> VMResult<WriteSet> {
     let mut writes = Vec::new();
     for (key, class) in rws.writes() {
         let state_key = state_key_of(key)?;
@@ -61,7 +61,7 @@ pub(crate) fn build_write_set<L: LayoutProvider + ?Sized>(
 }
 
 /// The Aptos [`StateKey`] for a read-write-set key.
-fn state_key_of(key: &InMemoryStorageKey) -> RuntimeResult<StateKey> {
+fn state_key_of(key: &InMemoryStorageKey) -> VMResult<StateKey> {
     match key {
         InMemoryStorageKey::Resource { address, ty } => {
             let Some(struct_tag) = struct_tag_of(*ty) else {
@@ -71,7 +71,8 @@ fn state_key_of(key: &InMemoryStorageKey) -> RuntimeResult<StateKey> {
             };
             // A resource type nested deeper than the state key encoding allows is a runtime limit,
             // not an invariant violation: it is reachable with a sufficiently nested type.
-            StateKey::resource(address, &struct_tag).map_err(|_| RuntimeError::StateKeyTypeTooDeep)
+            StateKey::resource(address, &struct_tag)
+                .map_err(|_| VMInternalError::new(RuntimeError::StateKeyTypeTooDeep))
         },
         InMemoryStorageKey::TableItem { handle, key, .. } => {
             Ok(StateKey::table_item(&TableHandle(handle.address()), key))
@@ -92,7 +93,7 @@ fn serialize_value<L: LayoutProvider + ?Sized>(
     layouts: &L,
     ptr: NonNull<u8>,
     ty: InternedType,
-) -> RuntimeResult<Vec<u8>> {
+) -> VMResult<Vec<u8>> {
     // SAFETY: `ptr` is the current value of a `LocalHeap` entry — a fully
     // initialized value of type `ty` living in this transaction's heap. The
     // heap stays alive for the call and no GC runs during write-set

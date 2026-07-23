@@ -24,10 +24,10 @@ use mono_move_core::{
         InternedType, InternedTypeList, ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY,
         I64_TY, I8_TY, SIGNER_TY, U128_TY, U16_TY, U256_TY, U32_TY, U64_TY, U8_TY,
     },
-    Function, GasMeter, Interner, LoaderError,
+    ExecutionErrorKind, Function, GasExhaustedError, GasMeter, Interner, VMInternalError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_natives::{
     EventStore, ObjectContextExtension, StorageUsageAtEpochBoundary, TransactionContextExtension,
 };
@@ -190,7 +190,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
             ExecOutcome::Success { events, writes }
         },
         Ok(RuntimeStatus::Aborted { code, message }) => ExecOutcome::Aborted { code, message },
-        Err(err) => classify_error(err),
+        Err(err) => classify_error(&err),
     };
 
     // Timing: per-run reset is outside the timer; only argument placement + execution are timed.
@@ -307,11 +307,29 @@ fn place_args(
     Ok(())
 }
 
-/// Maps a MonoMove runtime error to an [`ExecOutcome::Failure`] with a [`FailureKind`].
-fn classify_error(err: RuntimeError) -> ExecOutcome {
+/// Maps a MonoMove error to an [`ExecOutcome::Failure`] with a [`FailureKind`].
+fn classify_error(err: &VMInternalError) -> ExecOutcome {
+    let kind = if err.downcast_ref::<GasExhaustedError>().is_some() {
+        FailureKind::OutOfGas
+    } else if let Some(e) = err.downcast_ref::<LoaderError>() {
+        classify_loader_error(e)
+    } else if let Some(e) = err.downcast_ref::<RuntimeError>() {
+        classify_runtime_error(e)
+    } else if err.kind() == ExecutionErrorKind::InvariantViolation {
+        FailureKind::InvariantViolation
+    } else {
+        FailureKind::Other
+    };
+    ExecOutcome::Failure {
+        kind,
+        detail: format!("{}", err),
+    }
+}
+
+/// Maps a runtime error to a [`FailureKind`].
+fn classify_runtime_error(err: &RuntimeError) -> FailureKind {
     use RuntimeError as E;
-    let kind = match &err {
-        E::GasExhausted(_) => FailureKind::OutOfGas,
+    match err {
         E::ArithmeticOverflow { .. }
         | E::ArithmeticUnderflow { .. }
         | E::DivisionByZero { .. }
@@ -339,27 +357,16 @@ fn classify_error(err: RuntimeError) -> ExecOutcome {
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. } => FailureKind::Other,
         E::InvariantViolation(_) | E::ResourceProvider(_) => FailureKind::InvariantViolation,
-        E::Loader(loader_err) => classify_loader_error(loader_err),
-    };
-    ExecOutcome::Failure {
-        kind,
-        detail: format!("{}", err),
     }
 }
 
 /// Maps a loader error to a [`FailureKind`].
 fn classify_loader_error(err: &LoaderError) -> FailureKind {
     match err {
-        LoaderError::GasExhausted(_) => FailureKind::OutOfGas,
         LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. }
         | LoaderError::FunctionIrMissing => FailureKind::Linker,
-        LoaderError::LoweringSkipped { .. }
-        | LoaderError::Deserialization(_)
-        | LoaderError::Verification(_)
-        | LoaderError::ModuleProvider(_)
-        | LoaderError::GlobalContext(_)
-        | LoaderError::Specializer(_) => FailureKind::Other,
+        LoaderError::LoweringSkipped { .. } | LoaderError::GlobalContext(_) => FailureKind::Other,
         LoaderError::InvariantViolation(_) => FailureKind::InvariantViolation,
     }
 }

@@ -3,9 +3,11 @@
 
 //! MonoMove event store → Aptos [`ContractEvent`]s.
 
-use crate::error::{OutputError, OutputResult};
+use crate::error::OutputError;
 use aptos_types::{contract_event::ContractEvent, event::EventKey};
-use mono_move_core::{native::NativeExtensions, type_tag_of, value_layout::LayoutProvider};
+use mono_move_core::{
+    native::NativeExtensions, type_tag_of, value_layout::LayoutProvider, VMInternalError, VMResult,
+};
 use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::serialize;
 
@@ -18,10 +20,8 @@ use mono_move_runtime::serialize;
 pub unsafe fn to_contract_events(
     extensions: &NativeExtensions,
     layouts: &impl LayoutProvider,
-) -> OutputResult<Vec<ContractEvent>> {
-    let store = extensions
-        .get_mut::<EventStore>()
-        .map_err(|e| e.into_runtime_error())?;
+) -> VMResult<Vec<ContractEvent>> {
+    let store = extensions.get_mut::<EventStore>()?;
     store
         .entries()
         .iter()
@@ -35,11 +35,12 @@ pub unsafe fn to_contract_events(
                     guid,
                     sequence_number,
                 } => {
-                    let key: EventKey = bcs::from_bytes(guid)?;
+                    let key: EventKey =
+                        bcs::from_bytes(guid).map_err(OutputError::InvalidEventGuid)?;
                     ContractEvent::new_v1(key, *sequence_number, type_tag, data)
                 },
             };
-            event.map_err(|e| OutputError::InvalidEvent(e.to_string()))
+            event.map_err(|e| VMInternalError::new(OutputError::InvalidEvent(e.to_string())))
         })
         .collect()
 }

@@ -5,8 +5,8 @@
 
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
-    native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, VMInternalError},
-    TRIVIAL_DESCRIPTOR_ID,
+    native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref},
+    VMResult, TRIVIAL_DESCRIPTOR_ID,
 };
 
 // Variant tags of `std::option::Option`, in declaration order.
@@ -19,7 +19,7 @@ const OPTION_SOME_TAG: u64 = 1;
 /// VM error.
 //
 // TODO(metering): charge gas.
-pub fn native_to_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_to_bytes<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is the reference `&T`, whose pointee type is `ty`.
     let arg: Ref<Opaque> = unsafe { ctx.arg(0)? };
@@ -37,7 +37,7 @@ pub fn native_to_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 /// failure propagates as a VM error.
 //
 // TODO(metering): charge gas.
-pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is the reference `&T`, whose pointee type is `ty`.
     let arg: Ref<Opaque> = unsafe { ctx.arg(0)? };
@@ -53,9 +53,7 @@ pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> Result<NativeStatus,
 /// `Some(n)` if every value of `T` serializes to `n` bytes, else `None`.
 //
 // TODO(metering): charge gas.
-pub fn native_constant_serialized_size<C: NativeContext>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_constant_serialized_size<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let ty = ctx.ty_arg(0)?;
     // `Option<u64>` is the enum `{ None, Some { e: u64 } }`; both variants are
     // pointer-free, so the value is built under the trivial descriptor.
