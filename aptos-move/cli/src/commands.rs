@@ -16,7 +16,7 @@ use crate::{
     },
     script_compile::CompileScriptFunction,
     sim::Sim,
-    stored_package::CachedPackageRegistry,
+    stored_package::{ensure_safe_name, CachedPackageRegistry},
     transactions::TxnOptions,
     MoveEnv, ResourceAccountSeed, WithMoveEnv,
 };
@@ -2051,6 +2051,8 @@ impl CliCommand<&'static str> for DownloadPackage {
         if self.print_metadata {
             println!("{}", package);
         }
+        ensure_safe_name(package.name())
+            .map_err(|err| CliError::CommandArgumentError(err.to_string()))?;
         let package_path = output_dir.join(package.name());
         package
             .save_package_to_disk(package_path.as_path())
