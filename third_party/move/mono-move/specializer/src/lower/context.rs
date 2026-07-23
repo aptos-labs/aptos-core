@@ -613,31 +613,31 @@ pub fn try_build_context<'a>(
     let mut closure_pack_idx = 0usize;
     for instr in func_ir.instrs() {
         let (handle_idx, param_list, ret_list, call_ty_args) = match instr {
-            Instr::Call(_, handle_idx, call_ty_args, _) => {
-                let resolved_ty_args = interner.subst_type_list(*call_ty_args, ty_args)?;
+            Instr::Call(data) => {
+                let resolved_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
                 let (params, returns) = instantiate_callee_signature(
                     &module_ir.module,
                     interner,
-                    *handle_idx,
+                    data.function_handle,
                     resolved_ty_args,
                 )?;
-                (*handle_idx, params, returns, resolved_ty_args)
+                (data.function_handle, params, returns, resolved_ty_args)
             },
-            Instr::PackClosure(_, handle_idx, call_ty_args, _, _) => {
-                let closure_ty_args = interner.subst_type_list(*call_ty_args, ty_args)?;
+            Instr::PackClosure(data) => {
+                let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
                 // Bytecode verifier's instruction consistency check should
                 // guarantee the invariant below.
                 debug_assert!(
-                    !call_ty_args.is_empty()
+                    !data.ty_args.is_empty()
                         || module_ir
                             .module
-                            .function_handle_at(*handle_idx)
+                            .function_handle_at(data.function_handle)
                             .type_parameters
                             .is_empty(),
                     "non-generic PackClosure must target a non-generic function"
                 );
                 let (callee_module_id, callee_func_name) =
-                    callee_identity(&module_ir.module, *handle_idx);
+                    callee_identity(&module_ir.module, data.function_handle);
                 // TODO(completeness): support native closure targets. `CallClosure` resolves
                 // via `load_function`, which has no IR for natives, so skip them.
                 if natives
@@ -670,12 +670,8 @@ pub fn try_build_context<'a>(
                 });
                 continue;
             },
-            Instr::CallClosure(_, sig_types, _) => {
-                let first = view_type_list(*sig_types)
-                    .first()
-                    .copied()
-                    .ok_or(LoweringError::ClosureSignatureEmpty)?;
-                let Type::Function { results, .. } = view_type(first) else {
+            Instr::CallClosure(data) => {
+                let Type::Function { results, .. } = view_type(data.closure_ty) else {
                     return Err(VMInternalError::new(
                         LoweringError::ClosureSignatureNotFunction,
                     ));
@@ -1098,18 +1094,18 @@ fn try_discover_types_for_lowering_in_function_impl(
         // still discovered. Otherwise, we need to feed `CallClosure` signature
         // types here and recurse into `Type::Function`.
         let (params, returns, handle_idx, callee_ty_args) = match instr {
-            Instr::Call(_, handle_idx, call_ty_args, _) => {
+            Instr::Call(data) => {
                 let (params, returns) = instantiate_callee_signature(
                     &module_ir.module,
                     interner,
-                    *handle_idx,
-                    *call_ty_args,
+                    data.function_handle,
+                    data.ty_args,
                 )?;
                 (
                     Some(params),
                     Some(returns),
-                    Some(*handle_idx),
-                    *call_ty_args,
+                    Some(data.function_handle),
+                    data.ty_args,
                 )
             },
             _ => (None, None, None, EMPTY_TYPE_LIST),
@@ -1159,14 +1155,14 @@ fn try_discover_types_for_lowering_in_function_impl(
 
         // `PackClosure`: resolve the captured-data layout and record it
         // positionally, in IR order, for the build pass.
-        if let Instr::PackClosure(_, handle_idx, call_ty_args, mask, _) = instr {
-            let closure_ty_args = interner.subst_type_list(*call_ty_args, ty_args)?;
+        if let Instr::PackClosure(data) = instr {
+            let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
             let layout = discover_captured_data_descriptor(
                 ctx,
                 interner,
                 module_ir,
-                *handle_idx,
-                *mask,
+                data.function_handle,
+                data.mask,
                 closure_ty_args,
             )?;
             descriptors.closure_captured.push(layout);

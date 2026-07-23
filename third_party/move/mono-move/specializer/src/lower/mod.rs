@@ -23,9 +23,6 @@ enum LoweringError {
     #[error("expected a reference type")]
     ExpectedReferenceType,
 
-    #[error("CallClosure signature is empty")]
-    ClosureSignatureEmpty,
-
     #[error("CallClosure signature must start with a Function type")]
     ClosureSignatureNotFunction,
 
@@ -159,9 +156,6 @@ enum LoweringError {
     #[error("{op}: neither reverse nor forward emit is overlap-safe")]
     NotOverlapSafe { op: &'static str },
 
-    #[error("CallClosure has no closure operand")]
-    CallClosureNoOperand,
-
     // ---- global storage ----
     #[error("{op}: box-pointer slot not reserved")]
     BoxPtrSlotNotReserved { op: &'static str },
@@ -196,7 +190,6 @@ impl IntoExecutionError for LoweringError {
         match self {
             NativeAbi(e) => e.kind(),
             ExpectedReferenceType
-            | ClosureSignatureEmpty
             | ClosureSignatureNotFunction
             | VidInPostAllocationIr
             | ScratchSlotRequiredForParallelCopy
@@ -234,7 +227,6 @@ impl IntoExecutionError for LoweringError {
             | ComparisonNoLowering
             | FieldCountMismatch { .. }
             | NotOverlapSafe { .. }
-            | CallClosureNoOperand
             | BoxPtrSlotNotReserved { .. }
             | ResourceTypeNoDescriptor { .. }
             | VectorTypeNoDescriptor { .. }

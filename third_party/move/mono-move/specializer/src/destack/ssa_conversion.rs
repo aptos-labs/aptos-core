@@ -8,7 +8,10 @@
 //! are mutable across blocks and keep their original slot indices.
 
 use super::ssa_function::SSAFunction;
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpKind, Instr, Label, Slot, UnaryOp};
+use crate::stackless_exec_ir::{
+    BasicBlock, BinaryOp, CallClosureData, CallData, CmpKind, ImmValue, Instr, Label,
+    PackClosureData, Slot, UnaryOp,
+};
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
@@ -190,12 +193,22 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             .ok_or_else(|| VMInternalError::new(SsaConversionError::StackUnderflow))
     }
 
-    fn pop_n_reverse(&mut self, n: usize) -> VMResult<Vec<Slot>> {
+    fn pop_n_reverse(&mut self, n: usize) -> VMResult<Box<[Slot]>> {
         if self.stack.len() < n {
             return Err(VMInternalError::new(SsaConversionError::StackUnderflow));
         }
         let start = self.stack.len() - n;
         Ok(self.stack.drain(start..).collect())
+    }
+
+    /// Freeze a result-slot list, push each result onto the simulated stack,
+    /// and return the frozen list for the emitted instruction's operand.
+    fn push_results(&mut self, results: Vec<Slot>) -> Box<[Slot]> {
+        let results = results.into_boxed_slice();
+        for &slot in &results {
+            self.push_slot(slot);
+        }
+        results
     }
 
     /// Returns the type of a Vid slot by looking it up in `vid_types`.
@@ -390,88 +403,32 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 
     /// Converts a single stack-based bytecode into slot-based SSA instruction(s).
     ///
-    /// Each bytecode pops its operands from the simulated stack, allocates a fresh
-    /// value ID for each result, emits the corresponding slot-based instruction, and
-    /// pushes the results back. The stack is only a compile-time simulation — the
-    /// emitted IR is purely slot-based.
+    /// Each bytecode pops its operands from the simulated stack, allocates a
+    /// fresh value ID for each result, emits the corresponding slot-based
+    /// instruction, and pushes the results back. The stack is only a compile-time
+    /// simulation — the emitted IR is purely slot-based.
     fn convert_bytecode(&mut self, module: &PreparedModule, bc: &Bytecode) -> VMResult<()> {
         use Bytecode as B;
         match bc {
             // --- Loads ---
-            B::LdU8(v) => {
-                let dst = self.alloc_vid(ty::U8_TY)?;
-                self.current_block_instrs.push(Instr::LdU8(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU16(v) => {
-                let dst = self.alloc_vid(ty::U16_TY)?;
-                self.current_block_instrs.push(Instr::LdU16(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU32(v) => {
-                let dst = self.alloc_vid(ty::U32_TY)?;
-                self.current_block_instrs.push(Instr::LdU32(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU64(v) => {
-                let dst = self.alloc_vid(ty::U64_TY)?;
-                self.current_block_instrs.push(Instr::LdU64(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU128(v) => {
-                let dst = self.alloc_vid(ty::U128_TY)?;
-                self.current_block_instrs.push(Instr::LdU128(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU256(v) => {
-                let dst = self.alloc_vid(ty::U256_TY)?;
-                self.current_block_instrs.push(Instr::LdU256(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI8(v) => {
-                let dst = self.alloc_vid(ty::I8_TY)?;
-                self.current_block_instrs.push(Instr::LdI8(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI16(v) => {
-                let dst = self.alloc_vid(ty::I16_TY)?;
-                self.current_block_instrs.push(Instr::LdI16(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI32(v) => {
-                let dst = self.alloc_vid(ty::I32_TY)?;
-                self.current_block_instrs.push(Instr::LdI32(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI64(v) => {
-                let dst = self.alloc_vid(ty::I64_TY)?;
-                self.current_block_instrs.push(Instr::LdI64(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI128(v) => {
-                let dst = self.alloc_vid(ty::I128_TY)?;
-                self.current_block_instrs.push(Instr::LdI128(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI256(v) => {
-                let dst = self.alloc_vid(ty::I256_TY)?;
-                self.current_block_instrs.push(Instr::LdI256(dst, *v));
-                self.push_slot(dst);
-            },
+            B::LdU8(value) => self.convert_load(ty::U8_TY, ImmValue::U8(*value))?,
+            B::LdU16(value) => self.convert_load(ty::U16_TY, ImmValue::U16(*value))?,
+            B::LdU32(value) => self.convert_load(ty::U32_TY, ImmValue::U32(*value))?,
+            B::LdU64(value) => self.convert_load(ty::U64_TY, ImmValue::U64(*value))?,
+            B::LdU128(value) => self.convert_load(ty::U128_TY, ImmValue::U128(Box::new(*value)))?,
+            B::LdU256(value) => self.convert_load(ty::U256_TY, ImmValue::U256(Box::new(*value)))?,
+            B::LdI8(value) => self.convert_load(ty::I8_TY, ImmValue::I8(*value))?,
+            B::LdI16(value) => self.convert_load(ty::I16_TY, ImmValue::I16(*value))?,
+            B::LdI32(value) => self.convert_load(ty::I32_TY, ImmValue::I32(*value))?,
+            B::LdI64(value) => self.convert_load(ty::I64_TY, ImmValue::I64(*value))?,
+            B::LdI128(value) => self.convert_load(ty::I128_TY, ImmValue::I128(Box::new(*value)))?,
+            B::LdI256(value) => self.convert_load(ty::I256_TY, ImmValue::I256(Box::new(*value)))?,
+            B::LdTrue => self.convert_load(ty::BOOL_TY, ImmValue::Bool(true))?,
+            B::LdFalse => self.convert_load(ty::BOOL_TY, ImmValue::Bool(false))?,
             B::LdConst(idx) => {
                 let ty = module.interned_constant_type_at(*idx);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs.push(Instr::LdConst(dst, *idx));
-                self.push_slot(dst);
-            },
-            B::LdTrue => {
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs.push(Instr::LdTrue(dst));
-                self.push_slot(dst);
-            },
-            B::LdFalse => {
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs.push(Instr::LdFalse(dst));
                 self.push_slot(dst);
             },
 
@@ -588,12 +545,10 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
                 }
+                let dsts = self.push_results(dsts);
                 let struct_ty = module.interned_nominal_def_type_at(*idx);
                 self.current_block_instrs
-                    .push(Instr::Unpack(dsts.clone(), struct_ty, src));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                    .push(Instr::Unpack(dsts, struct_ty, src));
             },
             B::UnpackGeneric(idx) => {
                 let src = self.pop_slot()?;
@@ -610,11 +565,9 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     let fty = self.interner.subst_type(fty, ty_args)?;
                     dsts.push(self.alloc_vid(fty)?);
                 }
+                let dsts = self.push_results(dsts);
                 self.current_block_instrs
-                    .push(Instr::Unpack(dsts.clone(), inst_ty, src));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                    .push(Instr::Unpack(dsts, inst_ty, src));
             },
 
             // --- Variant ops ---
@@ -656,16 +609,10 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
                 }
+                let dsts = self.push_results(dsts);
                 let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
-                self.current_block_instrs.push(Instr::UnpackVariant(
-                    dsts.clone(),
-                    enum_ty,
-                    variant,
-                    src,
-                ));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                self.current_block_instrs
+                    .push(Instr::UnpackVariant(dsts, enum_ty, variant, src));
             },
             B::UnpackVariantGeneric(idx) => {
                 let src = self.pop_slot()?;
@@ -681,15 +628,13 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     let fty = self.interner.subst_type(fty, ty_args)?;
                     dsts.push(self.alloc_vid(fty)?);
                 }
+                let dsts = self.push_results(dsts);
                 self.current_block_instrs.push(Instr::UnpackVariant(
-                    dsts.clone(),
+                    dsts,
                     inst_ty,
                     variant_ord,
                     src,
                 ));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
             },
             B::TestVariant(idx) => {
                 let src = self.pop_slot()?;
@@ -919,15 +864,14 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 for &rty in ret_types {
                     rets.push(self.alloc_vid(rty)?);
                 }
-                self.current_block_instrs.push(Instr::Call(
-                    rets.clone(),
-                    *idx,
-                    ty::EMPTY_TYPE_LIST,
-                    args,
-                ));
-                for r in rets {
-                    self.push_slot(r);
-                }
+                let rets = self.push_results(rets);
+                self.current_block_instrs
+                    .push(Instr::Call(Box::new(CallData {
+                        rets,
+                        function_handle: *idx,
+                        ty_args: ty::EMPTY_TYPE_LIST,
+                        args,
+                    })));
             },
             B::CallGeneric(idx) => {
                 let (handle_idx, ty_args) = self.fun_inst_parts(module, *idx);
@@ -941,15 +885,14 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     let rty = self.interner.subst_type(rty, ty_args)?;
                     rets.push(self.alloc_vid(rty)?);
                 }
-                self.current_block_instrs.push(Instr::Call(
-                    rets.clone(),
-                    handle_idx,
-                    ty_args,
-                    args,
-                ));
-                for r in rets {
-                    self.push_slot(r);
-                }
+                let rets = self.push_results(rets);
+                self.current_block_instrs
+                    .push(Instr::Call(Box::new(CallData {
+                        rets,
+                        function_handle: handle_idx,
+                        ty_args,
+                        args,
+                    })));
             },
 
             // --- Closures ---
@@ -969,13 +912,14 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
                 let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::PackClosure(
-                    dst,
-                    *fhi,
-                    ty::EMPTY_TYPE_LIST,
-                    *mask,
-                    captured,
-                ));
+                self.current_block_instrs
+                    .push(Instr::PackClosure(Box::new(PackClosureData {
+                        dst,
+                        function_handle: *fhi,
+                        ty_args: ty::EMPTY_TYPE_LIST,
+                        mask: *mask,
+                        captured,
+                    })));
                 self.push_slot(dst);
             },
             B::PackClosureGeneric(fii, mask) => {
@@ -998,44 +942,43 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
                 let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::PackClosure(
-                    dst, handle_idx, ty_args, *mask, captured,
-                ));
+                self.current_block_instrs
+                    .push(Instr::PackClosure(Box::new(PackClosureData {
+                        dst,
+                        function_handle: handle_idx,
+                        ty_args,
+                        mask: *mask,
+                        captured,
+                    })));
                 self.push_slot(dst);
             },
             B::CallClosure(sig_idx) => {
-                let sig_types = module.interned_types_at(*sig_idx);
-                let first = sig_types
+                // The bytecode verifier pins the instruction's signature to a
+                // single element: the closure's function type.
+                let closure_ty = module
+                    .interned_types_at(*sig_idx)
                     .first()
                     .copied()
                     .ok_or(SsaConversionError::ClosureSignatureEmpty)?;
-                let (num_args, ret_types) =
-                    if let Type::Function { args, results, .. } = view_type(first) {
-                        (
-                            view_type_list(*args).len(),
-                            view_type_list(*results).to_vec(),
-                        )
-                    } else {
-                        return Err(VMInternalError::new(
-                            SsaConversionError::ClosureSignatureNotFunction,
-                        ));
-                    };
-                let closure = self.pop_slot()?;
-                let mut all_args = self.pop_n_reverse(num_args)?;
-                all_args.push(closure);
+                let Type::Function { args, results, .. } = view_type(closure_ty) else {
+                    return Err(VMInternalError::new(
+                        SsaConversionError::ClosureSignatureNotFunction,
+                    ));
+                };
+                let num_args = view_type_list(*args).len();
+                let ret_types = view_type_list(*results);
+                // The closure sits on top of its arguments, so it lands last —
+                // as `CallClosureData::args` requires.
+                let all_args = self.pop_n_reverse(num_args + 1)?;
                 let mut rets = Vec::with_capacity(ret_types.len());
-                for rty in &ret_types {
-                    rets.push(self.alloc_vid(*rty)?);
+                for &rty in ret_types {
+                    rets.push(self.alloc_vid(rty)?);
                 }
-                let signature_types = self.interner.type_list_of(sig_types);
-                self.current_block_instrs.push(Instr::CallClosure(
-                    rets.clone(),
-                    signature_types,
-                    all_args,
-                ));
-                for r in rets {
-                    self.push_slot(r);
-                }
+                let rets = self.push_results(rets);
+                self.current_block_instrs
+                    .push(Instr::CallClosure(Box::new(CallClosureData::new(
+                        rets, closure_ty, all_args,
+                    ))));
             },
 
             // --- Vector ops ---
@@ -1102,11 +1045,9 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 for _ in 0..count {
                     dsts.push(self.alloc_vid(elem_ty)?);
                 }
+                let dsts = self.push_results(dsts);
                 self.current_block_instrs
-                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, src));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                    .push(Instr::VecUnpack(dsts, elem_ty, src));
             },
             B::VecSwap(sig_idx) => {
                 let j = self.pop_slot()?;
@@ -1133,7 +1074,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 self.current_block_instrs.push(Instr::BrFalse(label, cond));
             },
             B::Ret => {
-                let rets: Vec<Slot> = self.stack.drain(..).collect();
+                let rets: Box<[Slot]> = self.stack.drain(..).collect();
                 self.current_block_instrs.push(Instr::Ret(rets));
             },
             B::Abort => {
@@ -1148,6 +1089,13 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 
             B::Nop => {},
         }
+        Ok(())
+    }
+
+    fn convert_load(&mut self, result_ty: InternedType, imm: ImmValue) -> VMResult<()> {
+        let dst = self.alloc_vid(result_ty)?;
+        self.current_block_instrs.push(Instr::LdImm(dst, imm));
+        self.push_slot(dst);
         Ok(())
     }
 

@@ -9,7 +9,7 @@
 //! once within its block and never crosses a block boundary.
 
 use crate::stackless_exec_ir::{
-    instr_utils::{extract_imm_value, for_each_value_use, is_commutative},
+    instr_utils::{for_each_value_use, is_commutative},
     BasicBlock, BinaryOp, FieldPath, Instr, Slot,
 };
 use mono_move_core::types::InternedType;
@@ -323,12 +323,9 @@ fn try_build_chain(
         Instr::MutBorrowLoc(..) | Instr::MutBorrowField(..)
     );
     let (root, mut cur_ref, mut idx, mut path) = match &instrs[start] {
-        Instr::ImmBorrowLoc(produced, local) | Instr::MutBorrowLoc(produced, local) => (
-            ChainRoot::Local(*local),
-            *produced,
-            start + 1,
-            FieldPath::new(),
-        ),
+        Instr::ImmBorrowLoc(produced, local) | Instr::MutBorrowLoc(produced, local) => {
+            (ChainRoot::Local(*local), *produced, start + 1, Vec::new())
+        },
         Instr::ImmBorrowField(produced, owner, fh, src)
         | Instr::MutBorrowField(produced, owner, fh, src) => {
             (ChainRoot::Ref(*src), *produced, start + 1, vec![(
@@ -397,7 +394,7 @@ fn try_build_chain(
     };
 
     Some(FusedChain {
-        instr: build_chain_instr(root, is_mut, path, terminal),
+        instr: build_chain_instr(root, is_mut, path.into(), terminal),
         place_at,
         borrow_end,
     })
@@ -428,15 +425,16 @@ fn build_chain_instr(
     }
 }
 
-/// Try to fuse a `Ld*` + `BinaryOp` pair into a `BinaryOpImm` instruction.
+/// Try to fuse a `LdImm` + `BinaryOp` pair into a `BinaryOpImm` instruction.
 fn try_fuse_immediate_binop(first: &Instr, second: &Instr) -> Option<Instr> {
-    let (tmp, imm) = extract_imm_value(first)?;
-    match second {
-        Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
-            Some(Instr::BinaryOpImm(*dst, *op, *lhs, imm))
+    match (first, second) {
+        (Instr::LdImm(tmp, imm), Instr::BinaryOp(dst, op, lhs, rhs)) if *tmp == *rhs => {
+            Some(Instr::BinaryOpImm(*dst, *op, *lhs, imm.clone()))
         },
-        Instr::BinaryOp(dst, op, lhs, rhs) if *lhs == tmp && is_commutative(op) => {
-            Some(Instr::BinaryOpImm(*dst, *op, *rhs, imm))
+        (Instr::LdImm(tmp, imm), Instr::BinaryOp(dst, op, lhs, rhs))
+            if *tmp == *lhs && is_commutative(op) =>
+        {
+            Some(Instr::BinaryOpImm(*dst, *op, *rhs, imm.clone()))
         },
         _ => None,
     }

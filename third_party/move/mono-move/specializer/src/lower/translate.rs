@@ -690,111 +690,12 @@ impl<'a> LoweringState<'a> {
     fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> VMResult<()> {
         match instr {
             // --- Loads ---
-            Instr::LdU64(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
-                    dst: dst_info.offset,
-                    imm: v.to_le_bytes(),
-                })?;
-            },
-            Instr::LdTrue(dst) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm1 {
-                    dst: dst_info.offset,
-                    imm: 1,
-                })?;
-            },
-            Instr::LdFalse(dst) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm1 {
-                    dst: dst_info.offset,
-                    imm: 0,
-                })?;
-            },
             // TODO(correctness): audit every integer-width use across the
             // specializer and confirm each is the correct width (slot sizes,
             // immediate widths, sign extension).
-            // 1-byte integers store directly into their 1-byte slot.
-            Instr::LdU8(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm1 {
-                    dst: dst_info.offset,
-                    imm: *v,
-                })?;
-            },
-            // 2-/4-byte integers store directly into their 2-/4-byte slot.
-            Instr::LdU16(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm2 {
-                    dst: dst_info.offset,
-                    imm: v.to_le_bytes(),
-                })?;
-            },
-            Instr::LdU32(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm4 {
-                    dst: dst_info.offset,
-                    imm: v.to_le_bytes(),
-                })?;
-            },
-            // 1-byte integers store directly into their 1-byte slot.
-            Instr::LdI8(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm1 {
-                    dst: dst_info.offset,
-                    imm: *v as u8,
-                })?;
-            },
-            // 2-/4-byte signed integers store their two's-complement LE bytes
-            // directly into their 2-/4-byte slot.
-            Instr::LdI16(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm2 {
-                    dst: dst_info.offset,
-                    imm: v.to_le_bytes(),
-                })?;
-            },
-            Instr::LdI32(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm4 {
-                    dst: dst_info.offset,
-                    imm: v.to_le_bytes(),
-                })?;
-            },
-            Instr::LdI64(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm8 {
-                    dst: dst_info.offset,
-                    imm: v.to_le_bytes(),
-                })?;
-            },
-            Instr::LdU128(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm16 {
-                    dst: dst_info.offset,
-                    imm: Box::new(v.to_le_bytes()),
-                })?;
-            },
-            Instr::LdI128(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm16 {
-                    dst: dst_info.offset,
-                    imm: Box::new(v.to_le_bytes()),
-                })?;
-            },
-            Instr::LdU256(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm32 {
-                    dst: dst_info.offset,
-                    imm: Box::new(v.to_le_bytes()),
-                })?;
-            },
-            Instr::LdI256(dst, v) => {
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::StoreImm32 {
-                    dst: dst_info.offset,
-                    imm: Box::new(v.to_le_bytes()),
-                })?;
+            Instr::LdImm(dst, imm) => {
+                let dst_off = self.def_slot(*dst)?.offset;
+                self.emit(store_imm_op(dst_off, imm))?;
             },
             Instr::LdConst(dst, idx) => {
                 let ty = view_type(self.ctx.module.interned_constant_type_at(*idx));
@@ -1416,8 +1317,8 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Calls ---
-            Instr::Call(rets, _handle_idx, _ty_args, args) => {
-                self.lower_call(func_ir, args, rets)?;
+            Instr::Call(data) => {
+                self.lower_call(func_ir, &data.args, &data.rets)?;
             },
 
             // --- Return ---
@@ -1748,40 +1649,36 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Closures ---
-            Instr::PackClosure(dst, _, _, mask, captured) => {
+            Instr::PackClosure(data) => {
                 // Target identity (with composed type arguments for the
                 // generic form) + captured-data descriptor were resolved in
                 // `try_build_context`; read them positionally.
                 let info = &self.ctx.closure_pack_sites[self.closure_pack_cursor];
                 self.closure_pack_cursor += 1;
-                let dst_off = self.def_slot(*dst)?.offset;
+                let dst_off = self.def_slot(data.dst)?.offset;
                 // Captured sources, in ascending captured-param order (the
                 // destacker already ordered the IR `captured` list this way).
-                let captured_slots = self.slots_to_sized_slots(captured)?;
+                let captured_slots = self.slots_to_sized_slots(&data.captured)?;
                 self.emit(MicroOp::PackClosure(Box::new(PackClosureOp {
                     dst: dst_off,
                     func_ref: ClosureFuncRef::Unresolved(info.func_ref),
-                    mask: mask.bits(),
+                    mask: data.mask.bits(),
                     captured_data_descriptor_id: info.captured_data_descriptor_id,
                     values_size: info.values_size,
                     captured: captured_slots,
                 })))?;
             },
-            Instr::CallClosure(rets, _sig_types, all_args) => {
+            Instr::CallClosure(data) => {
                 let ret_slots = &self.ctx.closure_call_sites[self.closure_call_cursor];
                 self.closure_call_cursor += 1;
-                // The destacker pushes the closure as the last operand;
-                // everything before it is a provided (non-captured) argument.
-                let Some((closure_slot, provided)) = all_args.split_last() else {
-                    return Err(VMInternalError::new(LoweringError::CallClosureNoOperand));
-                };
-                let closure_src = self.slot(*closure_slot)?.offset;
+                let (closure_slot, provided) = data.closure_and_provided();
+                let closure_src = self.slot(closure_slot)?.offset;
                 let provided_args = self.slots_to_sized_slots(provided)?;
                 self.emit(MicroOp::CallClosure(Box::new(CallClosureOp {
                     closure_src,
                     provided_args,
                 })))?;
-                self.bind_call_returns(rets, ret_slots)?;
+                self.bind_call_returns(&data.rets, ret_slots)?;
             },
 
             // --- Global storage ---
@@ -2589,8 +2486,65 @@ fn cmp_operand_from_imm(imm: &ImmValue) -> VMResult<IntOperand> {
     }
 }
 
+/// Build the `StoreImm*` micro-op storing `imm` at frame offset `dst`.
+/// Values store their two's-complement LE bytes directly into the slot of
+/// their width.
+fn store_imm_op(dst: FrameOffset, imm: &ImmValue) -> MicroOp {
+    match imm {
+        ImmValue::Bool(value) => MicroOp::StoreImm1 {
+            dst,
+            imm: *value as u8,
+        },
+        ImmValue::U8(value) => MicroOp::StoreImm1 { dst, imm: *value },
+        ImmValue::I8(value) => MicroOp::StoreImm1 {
+            dst,
+            imm: *value as u8,
+        },
+        ImmValue::U16(value) => MicroOp::StoreImm2 {
+            dst,
+            imm: value.to_le_bytes(),
+        },
+        ImmValue::I16(value) => MicroOp::StoreImm2 {
+            dst,
+            imm: value.to_le_bytes(),
+        },
+        ImmValue::U32(value) => MicroOp::StoreImm4 {
+            dst,
+            imm: value.to_le_bytes(),
+        },
+        ImmValue::I32(value) => MicroOp::StoreImm4 {
+            dst,
+            imm: value.to_le_bytes(),
+        },
+        ImmValue::U64(value) => MicroOp::StoreImm8 {
+            dst,
+            imm: value.to_le_bytes(),
+        },
+        ImmValue::I64(value) => MicroOp::StoreImm8 {
+            dst,
+            imm: value.to_le_bytes(),
+        },
+        ImmValue::U128(value) => MicroOp::StoreImm16 {
+            dst,
+            imm: Box::new(value.to_le_bytes()),
+        },
+        ImmValue::I128(value) => MicroOp::StoreImm16 {
+            dst,
+            imm: Box::new(value.to_le_bytes()),
+        },
+        ImmValue::U256(value) => MicroOp::StoreImm32 {
+            dst,
+            imm: Box::new(value.to_le_bytes()),
+        },
+        ImmValue::I256(value) => MicroOp::StoreImm32 {
+            dst,
+            imm: Box::new(value.to_le_bytes()),
+        },
+    }
+}
+
 /// Build an [`IntOperand`] imm arm matching `imm`. The destacker emits an
-/// `ImmValue` variant whose type matches the typed slot's `Ld*` source,
+/// `ImmValue` variant whose type matches the typed slot's `LdImm` source,
 /// so a 1:1 map is enough here.
 fn int_operand_from_imm(imm: &ImmValue) -> VMResult<IntOperand> {
     Ok(match imm {

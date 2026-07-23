@@ -193,61 +193,9 @@ fn display_instr(
             write_dst(f, *d)?;
             write!(f, "ld_const #{}", idx.0)
         },
-        Instr::LdTrue(d) => {
+        Instr::LdImm(d, imm) => {
             write_dst(f, *d)?;
-            write!(f, "ld_true")
-        },
-        Instr::LdFalse(d) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_false")
-        },
-        Instr::LdU8(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_u8 {}", v)
-        },
-        Instr::LdU16(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_u16 {}", v)
-        },
-        Instr::LdU32(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_u32 {}", v)
-        },
-        Instr::LdU64(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_u64 {}", v)
-        },
-        Instr::LdU128(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_u128 {}", v)
-        },
-        Instr::LdU256(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_u256 {}", v)
-        },
-        Instr::LdI8(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_i8 {}", v)
-        },
-        Instr::LdI16(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_i16 {}", v)
-        },
-        Instr::LdI32(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_i32 {}", v)
-        },
-        Instr::LdI64(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_i64 {}", v)
-        },
-        Instr::LdI128(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_i128 {}", v)
-        },
-        Instr::LdI256(d, v) => {
-            write_dst(f, *d)?;
-            write!(f, "ld_i256 {}", v)
+            write_load_imm(f, imm)
         },
 
         // --- Slot ops: dst := copy/move src ---
@@ -558,27 +506,31 @@ fn display_instr(
         },
 
         // --- Calls ---
-        Instr::Call(rets, idx, ty_args, args) => {
-            write_dsts(f, rets)?;
-            write!(f, "call {}", func_name(module, *idx))?;
-            write_ty_args(f, *ty_args)?;
-            write!(f, ", {}", slot_names(args))
+        Instr::Call(data) => {
+            write_dsts(f, &data.rets)?;
+            write!(f, "call {}", func_name(module, data.function_handle))?;
+            write_ty_args(f, data.ty_args)?;
+            write!(f, ", {}", slot_names(&data.args))
         },
 
         // --- Closures ---
-        Instr::PackClosure(d, idx, ty_args, mask, captured) => {
-            write_dst(f, *d)?;
-            write!(f, "pack_closure {}", func_name(module, *idx))?;
-            write_ty_args(f, *ty_args)?;
-            write!(f, ", {}, {}", mask, slot_names(captured))
+        Instr::PackClosure(data) => {
+            write_dst(f, data.dst)?;
+            write!(
+                f,
+                "pack_closure {}",
+                func_name(module, data.function_handle)
+            )?;
+            write_ty_args(f, data.ty_args)?;
+            write!(f, ", {}, {}", data.mask, slot_names(&data.captured))
         },
-        Instr::CallClosure(rets, sig_types, args) => {
-            write_dsts(f, rets)?;
+        Instr::CallClosure(data) => {
+            write_dsts(f, &data.rets)?;
             write!(f, "call_closure ")?;
             write!(f, "[")?;
-            display_type_list(f, *sig_types)?;
+            display_type(f, data.closure_ty)?;
             write!(f, "]")?;
-            write!(f, ", {}", slot_names(args))
+            write!(f, ", {}", slot_names(&data.args))
         },
 
         // --- Vector ---
@@ -699,6 +651,26 @@ fn cmp_op_name(op: &CmpKind) -> &'static str {
         CmpKind::Ge => "ge",
         CmpKind::Eq => "eq",
         CmpKind::Neq => "neq",
+    }
+}
+
+/// Load mnemonic for an immediate: `ld_true`, `ld_false`, or `ld_<width> <value>`.
+fn write_load_imm(f: &mut fmt::Formatter<'_>, imm: &ImmValue) -> fmt::Result {
+    match imm {
+        ImmValue::Bool(true) => write!(f, "ld_true"),
+        ImmValue::Bool(false) => write!(f, "ld_false"),
+        ImmValue::U8(value) => write!(f, "ld_u8 {}", value),
+        ImmValue::U16(value) => write!(f, "ld_u16 {}", value),
+        ImmValue::U32(value) => write!(f, "ld_u32 {}", value),
+        ImmValue::U64(value) => write!(f, "ld_u64 {}", value),
+        ImmValue::U128(value) => write!(f, "ld_u128 {}", value),
+        ImmValue::U256(value) => write!(f, "ld_u256 {}", value),
+        ImmValue::I8(value) => write!(f, "ld_i8 {}", value),
+        ImmValue::I16(value) => write!(f, "ld_i16 {}", value),
+        ImmValue::I32(value) => write!(f, "ld_i32 {}", value),
+        ImmValue::I64(value) => write!(f, "ld_i64 {}", value),
+        ImmValue::I128(value) => write!(f, "ld_i128 {}", value),
+        ImmValue::I256(value) => write!(f, "ld_i256 {}", value),
     }
 }
 
