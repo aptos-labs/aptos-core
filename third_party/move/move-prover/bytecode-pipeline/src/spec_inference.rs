@@ -115,8 +115,8 @@ use move_model::{
         StructId,
     },
     pragmas::{
-        CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS,
-        INFERENCE_PRAGMA, OPAQUE_PRAGMA,
+        ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
+        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     sourcifier::Sourcifier,
@@ -186,6 +186,11 @@ pub struct WPState {
     /// Tracks globals directly modified by MoveFrom/MoveTo (which bypass the borrow+writeback path).
     /// Each entry is a `global<R>(addr)` expression (no label) used to emit `modifies` clauses.
     pub direct_modifies: Vec<Exp>,
+    /// Whether abort conditions were dropped because they crossed a memory
+    /// havoc (loop-modified global memory): cumulative abort effects cannot be
+    /// inferred exactly there. The resulting aborts specification is emitted
+    /// as partial.
+    pub aborts_partial: bool,
 }
 
 impl WPState {
@@ -201,6 +206,7 @@ impl WPState {
             captured_globals: BTreeSet::new(),
             update_globals: BTreeSet::new(),
             direct_modifies: vec![],
+            aborts_partial: false,
         }
     }
 
@@ -216,6 +222,7 @@ impl WPState {
             captured_globals: BTreeSet::new(),
             update_globals: BTreeSet::new(),
             direct_modifies: vec![],
+            aborts_partial: false,
         }
     }
 
@@ -231,6 +238,7 @@ impl WPState {
             captured_globals: self.captured_globals.clone(),
             update_globals: self.update_globals.clone(),
             direct_modifies: self.direct_modifies.iter().map(&mut f).collect(),
+            aborts_partial: self.aborts_partial,
         }
     }
 
@@ -306,6 +314,8 @@ impl AbstractDomain for WPState {
         // analysis and never reach this point.
         let self_is_abort_only = !self.is_normal_return;
         let other_is_abort_only = !other.is_normal_return;
+
+        self.aborts_partial = self.aborts_partial || other.aborts_partial;
 
         if self_is_abort_only && !other_is_abort_only {
             // Current is abort-only; adopt incoming state wholesale
@@ -1063,7 +1073,19 @@ fn update_spec<'env>(
             })
             .filter(|e| !is_trivial_true(e) && !is_trivial_false(e))
             .collect();
-        if aborts_conds.is_empty() {
+        if state.aborts_partial {
+            // Abort conditions crossing a memory-havocking loop were dropped;
+            // the remaining ones are a lower bound, not exact.
+            spec.properties.insert(
+                pool.make(ABORTS_IF_IS_PARTIAL_PRAGMA),
+                PropertyValue::Value(Value::Bool(true)),
+            );
+            spec.conditions.extend(
+                aborts_conds
+                    .iter()
+                    .map(|e| mk_cond(ConditionKind::AbortsIf, e)),
+            );
+        } else if aborts_conds.is_empty() {
             // No abort conditions: emit `aborts_if false` to indicate the function
             // never aborts. Without this, an opaque function with no aborts_if would
             // have unspecified abort behavior when called.
@@ -2067,6 +2089,7 @@ fn simplify_state<'env>(generator: &mut impl ExpGenerator<'env>, state: &WPState
         captured_globals: state.captured_globals.clone(),
         update_globals: state.update_globals.clone(),
         direct_modifies,
+        aborts_partial: state.aborts_partial,
     }
 }
 
@@ -2336,6 +2359,7 @@ impl StateBoundaryAnalysis<'_, '_> {
             Bytecode::Call(_, dests, op, srcs, _) => match op {
                 Operation::WriteBack(BorrowNode::GlobalRoot(_), _) => true,
                 Operation::MoveTo(_, _, _) | Operation::MoveFrom(_, _, _) => true,
+                Operation::HavocGlobal(_, _, _) => true,
                 Operation::Function(module_id, fun_id, type_inst) => {
                     // Mirror the backward WP's cascade: a function call is only
                     // non-state-changing if it qualifies for one of the direct-
@@ -3363,6 +3387,17 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                     // WP[stop](Q) = true  (unreachable; no conditions propagate)
                     Operation::Stop => {
                         *state = WPState::new(state.post);
+                    },
+                    // Memory havoc at loop headers: nothing is known about the
+                    // post-havoc memory. Abort conditions crossing the havoc
+                    // are dropped (cumulative loop aborts are inexact, so the
+                    // aborts spec becomes partial); `state.post` is advanced
+                    // so ensures accumulated backward for pre-loop code bind
+                    // strictly before the loop, never to the end-state.
+                    Operation::HavocGlobal(_, _, _) => {
+                        state.aborts.clear();
+                        state.aborts_partial = true;
+                        state.post = self.forward_label_at(offset);
                     },
                 }
             },
@@ -4644,6 +4679,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             captured_globals: state.captured_globals.clone(),
             update_globals: state.update_globals.clone(),
             direct_modifies,
+            aborts_partial: state.aborts_partial,
         }
     }
 
@@ -4783,6 +4819,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             captured_globals: BTreeSet::new(),
             update_globals: BTreeSet::new(),
             direct_modifies: vec![],
+            aborts_partial: false,
         }
     }
 

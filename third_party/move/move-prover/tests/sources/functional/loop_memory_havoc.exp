@@ -1,0 +1,289 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/loop_memory_havoc.move:19:9
+   │
+19 │         ensures global<R>(addr).x == old(global<R>(addr).x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/loop_memory_havoc.move:9: bump_loop_frame_fails
+   =     at tests/sources/functional/loop_memory_havoc.move:18: bump_loop_frame_fails (spec)
+   =     at tests/sources/functional/loop_memory_havoc.move:9: bump_loop_frame_fails
+   =         addr = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:10: bump_loop_frame_fails
+   =         i = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:11: bump_loop_frame_fails
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:19: bump_loop_frame_fails (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/loop_memory_havoc.move:29:9
+   │
+29 │         ensures global<R>(addr).x == old(global<R>(addr).x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/loop_memory_havoc.move:23: bump_once_fails
+   =     at tests/sources/functional/loop_memory_havoc.move:28: bump_once_fails (spec)
+   =     at tests/sources/functional/loop_memory_havoc.move:23: bump_once_fails
+   =         addr = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:24: bump_once_fails
+   =         r = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:25: bump_once_fails
+   =     at tests/sources/functional/loop_memory_havoc.move:29: bump_once_fails (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/loop_memory_havoc.move:74:9
+   │
+74 │         ensures gcount == old(gcount);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/loop_memory_havoc.move:64: ghost_inline_update_fails
+   =         n = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:65: ghost_inline_update_fails
+   =         i = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:66: ghost_inline_update_fails
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:74: ghost_inline_update_fails (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/loop_memory_havoc.move:96:9
+   │
+96 │         ensures gcount == old(gcount);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/loop_memory_havoc.move:88: ghost_callee_update_fails
+   =         n = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:89: ghost_callee_update_fails
+   =         i = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:90: ghost_callee_update_fails
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/loop_memory_havoc.move:96: ghost_callee_update_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:125:9
+    │
+125 │         ensures gcount == old(gcount);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:106: ghost_update_after_preamble_fails
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:116: ghost_update_after_preamble_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:117: ghost_update_after_preamble_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:125: ghost_update_after_preamble_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:180:9
+    │
+180 │         ensures global<R>(addr).x == old(global<R>(addr).x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:170: fv_modifies_update_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:179: fv_modifies_update_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:170: fv_modifies_update_fails
+    =         f = <redacted>
+    =         addr = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:171: fv_modifies_update_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:172: fv_modifies_update_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:180: fv_modifies_update_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:222:9
+    │
+222 │ ╭         ensures Counter[std::signer::address_of(s)].x
+223 │ │             == old(Counter[std::signer::address_of(s)].x);
+    │ ╰──────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:211: fv_field_modifies_update_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:220: fv_field_modifies_update_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:221: fv_field_modifies_update_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:211: fv_field_modifies_update_fails
+    =         addr = <redacted>
+    =         s = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:212: fv_field_modifies_update_fails
+    =         m = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:213: fv_field_modifies_update_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:214: fv_field_modifies_update_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:222: fv_field_modifies_update_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:255:9
+    │
+255 │ ╭         ensures Counter[std::signer::address_of(s)].x
+256 │ │             == old(Counter[std::signer::address_of(s)].x);
+    │ ╰──────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:245: fv_local_closure_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:254: fv_local_closure_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:245: fv_local_closure_fails
+    =         s = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:246: fv_local_closure_fails
+    =         f = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:247: fv_local_closure_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:248: fv_local_closure_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:255: fv_local_closure_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:276:9
+    │
+276 │ ╭         ensures Counter[std::signer::address_of(s)].x
+277 │ │             == old(Counter[std::signer::address_of(s)].x);
+    │ ╰──────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:266: fv_returned_closure_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:275: fv_returned_closure_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:266: fv_returned_closure_fails
+    =         s = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:267: fv_returned_closure_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:263: make_bumper
+    =         result = <redacted>
+    =         f = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:268: fv_returned_closure_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:269: fv_returned_closure_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:276: fv_returned_closure_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:317:9
+    │
+317 │         ensures Counter[a].x == old(Counter[a].x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:307: fv_curry_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:316: fv_curry_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:307: fv_curry_fails
+    =         a = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:308: fv_curry_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:304: make_curry
+    =         f = <redacted>
+    =         a = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:305: make_curry
+    =         result = <redacted>
+    =         g = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:309: fv_curry_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:310: fv_curry_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:317: fv_curry_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:341:9
+    │
+341 │ ╭         ensures Counter[std::signer::address_of(s)].x
+342 │ │             == old(Counter[std::signer::address_of(s)].x);
+    │ ╰──────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:330: fv_wild_forward_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:340: fv_wild_forward_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:330: fv_wild_forward_fails
+    =         f = <redacted>
+    =         s = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:331: fv_wild_forward_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:332: fv_wild_forward_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:341: fv_wild_forward_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:365:9
+    │
+365 │ ╭         ensures Counter[std::signer::address_of(s)].x
+366 │ │             == old(Counter[std::signer::address_of(s)].x);
+    │ ╰──────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:355: fv_forward_depth2_fails
+    =     at tests/sources/functional/loop_memory_havoc.move:364: fv_forward_depth2_fails (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:355: fv_forward_depth2_fails
+    =         f = <redacted>
+    =         s = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:356: fv_forward_depth2_fails
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:357: fv_forward_depth2_fails
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:365: fv_forward_depth2_fails (spec)
+
+error: precondition does not hold at this call
+    ┌─ tests/sources/functional/loop_memory_havoc.move:385:9
+    │
+385 │         requires exists<R>(a);
+    │         ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:372: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:385: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:372: rec_bump
+    =         a = <redacted>
+    =         n = <redacted>
+    =         depth = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:373: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:378: rec_bump
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:379: rec_bump
+    =     enter loop, variable(s) $t4 havocked and reassigned
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:380: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:385: rec_bump (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:386:9
+    │
+386 │         ensures R[a].x == old(R[a].x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:372: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:385: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:372: rec_bump
+    =         a = <redacted>
+    =         n = <redacted>
+    =         depth = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:373: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:378: rec_bump
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:379: rec_bump
+    =     enter loop, variable(s) $t4 havocked and reassigned
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:383: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:386: rec_bump (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:403:9
+    │
+403 │         ensures G<T>[a].v == old(G<T>[a].v);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:393: gen_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:402: gen_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:393: gen_bump
+    =         a = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:394: gen_bump
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:395: gen_bump
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:403: gen_bump (spec)

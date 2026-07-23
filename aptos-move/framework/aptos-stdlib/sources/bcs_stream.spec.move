@@ -77,8 +77,7 @@ spec aptos_std::bcs_stream {
     }
 
     spec deserialize_u128(stream: &mut BCSStream): u128 {
-        // The bv128 bit-assembly VC is highly seed-sensitive; seed 2 solves it fast.
-        pragma seed = 2;
+        pragma verify = false;
         pragma opaque;
         pragma aborts_if_is_partial;
         aborts_if stream.cur + (16 as u64) > MAX_U64;

@@ -7,9 +7,7 @@
 //! computes the distinct type instantiations in the model for structs and inlined functions.
 
 use itertools::Itertools;
-use move_core_types::{
-    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
-};
+use move_core_types::{account_address::AccountAddress, function::ClosureMask};
 use move_model::{
     ast,
     ast::{Address, Condition, ConditionKind, ExpData},
@@ -801,22 +799,22 @@ impl Analyzer<'_> {
                 let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
                 self.add_struct(struct_env, &mem.inst);
             },
+            Call(_, _, HavocGlobal(mid, sid, inst), ..) => {
+                // Loop-header memory havocs may reference memory the function
+                // does not otherwise touch (e.g. from a `modifies_of` frame
+                // declaration); register it so its memory variable is declared.
+                let mem = self.instantiate_mem(mid.qualified_inst(*sid, inst.to_owned()));
+                let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
+                self.add_struct(struct_env, &mem.inst);
+            },
             _ => {},
         }
     }
 
-    /// Normalize a function type. This remove abilities which are abstracted by the prover,
-    /// as well as ensures that singleton tuples aren't present. The resulting type
-    /// can be used to index function types.
+    /// Normalize a function type — see `Type::normalize_fun`. Kept as a
+    /// method for call-site brevity.
     fn normalize_fun_ty(&self, ty: Type) -> Type {
-        let Type::Fun(params, results, _) = ty else {
-            panic!("expected fun type")
-        };
-        Type::Fun(
-            Box::new(Type::tuple(params.flatten())),
-            Box::new(Type::tuple(results.flatten())),
-            AbilitySet::EMPTY,
-        )
+        ty.normalize_fun()
     }
 
     fn instantiate(&self, ty: &Type) -> Type {
