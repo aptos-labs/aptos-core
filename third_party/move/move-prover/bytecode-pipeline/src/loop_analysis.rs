@@ -172,7 +172,9 @@ impl LoopAnalysisProcessor {
                                 ast::Operation::WellFormed,
                                 vec![builder.mk_temporary(*idx)],
                             );
-                            builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
+                            let id = builder.new_attr();
+                            builder.emit(Bytecode::Prop(id, PropKind::Assume, exp));
+                            builder.data.shallow_wellformed_assumes.insert(id);
                         }
 
                         // trace implicitly reassigned variables after havocking
