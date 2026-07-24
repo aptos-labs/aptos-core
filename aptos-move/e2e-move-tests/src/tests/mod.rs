@@ -45,6 +45,7 @@ mod keyless_feature_gating;
 mod large_package_publishing;
 mod layout_caches;
 mod lazy_natives;
+mod legacy_bytecode_publishing;
 mod macros;
 mod max_loop_depth;
 mod memory_quota;

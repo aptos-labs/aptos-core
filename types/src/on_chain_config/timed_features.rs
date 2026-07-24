@@ -50,6 +50,10 @@ pub enum TimedFeatureFlag {
     /// of same struct nodes, counting cache hits as 1 node instead of re-expanding its full
     /// subtree.
     ConstantSerializedSizeLocalCache,
+
+    /// Reject publishing of v5 module bytecode. Publishing only; already-published modules keep
+    /// loading and executing at any version.
+    RejectV5ModulePublishing,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -96,7 +100,8 @@ impl TimedFeatureOverride {
                 | UseFullTransactionSizeForGasCheck
                 | EnableStrictBoundsInProdConfig
                 | RevisedBoundsInProdConfig
-                | ConstantSerializedSizeLocalCache,
+                | ConstantSerializedSizeLocalCache
+                | RejectV5ModulePublishing,
             ) => None,
         }
     }
@@ -232,6 +237,16 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (ConstantSerializedSizeLocalCache, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 3, 13, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Security hardening: ban publishing of v5 module bytecode.
+            (RejectV5ModulePublishing, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 24, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (RejectV5ModulePublishing, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 29, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
