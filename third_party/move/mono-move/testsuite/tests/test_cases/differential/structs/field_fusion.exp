@@ -16,8 +16,8 @@ fun add_two_fields(r0): u64 {
     r2: u64
   code:
   L0:
-    0: r1 := read_local_field Pair::_1, r0
-    1: r2 := read_local_field Pair::_2, r0
+    0: r1 := read_loc_field Pair::_1, r0
+    1: r2 := read_loc_field Pair::_2, r0
     2: r2 := add r1, r2
     3: ret [r2]
 }
@@ -27,7 +27,7 @@ fun field_to_call(r0): u64 {
     r0: 0x66::field_fusion::Pair
   code:
   L0:
-    0: x0 := read_local_field Pair::_1, r0
+    0: x0 := read_loc_field Pair::_1, r0
     1: [x0] := call identity, [x0]
     2: ret [x0]
 }
@@ -40,8 +40,8 @@ fun two_fields_to_call(r0, r1): u64 {
     r3: u64
   code:
   L0:
-    0: r2 := read_local_field Pair::_1, r0
-    1: r3 := read_local_field Pair::_2, r1
+    0: r2 := read_loc_field Pair::_1, r0
+    1: r3 := read_loc_field Pair::_2, r1
     2: x0 := add r2, r3
     3: [x0] := call identity, [x0]
     4: ret [x0]
@@ -53,7 +53,7 @@ fun field_plus_constant(r0): u64 {
     r1: u64
   code:
   L0:
-    0: r1 := read_local_field Pair::_1, r0
+    0: r1 := read_loc_field Pair::_1, r0
     1: r1 := add r1, #42
     2: ret [r1]
 }

@@ -574,7 +574,7 @@ pub fn try_build_context<'a>(
     //    GC-tracked.
     let needs_resource_box_slot = func_ir
         .instrs()
-        .any(|instr| matches!(instr, Instr::MoveTo(..) | Instr::MoveFrom(..)));
+        .any(|instr| matches!(instr, Instr::MoveTo { .. } | Instr::MoveFrom { .. }));
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
@@ -595,7 +595,10 @@ pub fn try_build_context<'a>(
         // Pack/unpack may need an 8-byte scratch to keep the enum pointer out of
         // an aliased field slot (resolved per-instruction in lowering; the exact
         // alias depends on final slot offsets, which aren't known yet here).
-        if matches!(instr, Instr::PackVariant(..) | Instr::UnpackVariant(..)) {
+        if matches!(
+            instr,
+            Instr::PackVariant { .. } | Instr::UnpackVariant { .. }
+        ) {
             needs_enum_ptr_scratch = true;
         }
     }
@@ -613,7 +616,7 @@ pub fn try_build_context<'a>(
     let mut closure_pack_idx = 0usize;
     for instr in func_ir.instrs() {
         let (handle_idx, param_list, ret_list, call_ty_args) = match instr {
-            Instr::Call(data) => {
+            Instr::Call { data } => {
                 let resolved_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
                 let (params, returns) = instantiate_callee_signature(
                     &module_ir.module,
@@ -623,7 +626,7 @@ pub fn try_build_context<'a>(
                 )?;
                 (data.function_handle, params, returns, resolved_ty_args)
             },
-            Instr::PackClosure(data) => {
+            Instr::PackClosure { data } => {
                 let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
                 // Bytecode verifier's instruction consistency check should
                 // guarantee the invariant below.
@@ -670,7 +673,7 @@ pub fn try_build_context<'a>(
                 });
                 continue;
             },
-            Instr::CallClosure(data) => {
+            Instr::CallClosure { data } => {
                 let Type::Function { results, .. } = view_type(data.closure_ty) else {
                     return Err(VMInternalError::new(
                         LoweringError::ClosureSignatureNotFunction,
@@ -1094,7 +1097,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // still discovered. Otherwise, we need to feed `CallClosure` signature
         // types here and recurse into `Type::Function`.
         let (params, returns, handle_idx, callee_ty_args) = match instr {
-            Instr::Call(data) => {
+            Instr::Call { data } => {
                 let (params, returns) = instantiate_callee_signature(
                     &module_ir.module,
                     interner,
@@ -1155,7 +1158,7 @@ fn try_discover_types_for_lowering_in_function_impl(
 
         // `PackClosure`: resolve the captured-data layout and record it
         // positionally, in IR order, for the build pass.
-        if let Instr::PackClosure(data) = instr {
+        if let Instr::PackClosure { data } = instr {
             let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
             let layout = discover_captured_data_descriptor(
                 ctx,
@@ -1182,8 +1185,8 @@ fn try_discover_types_for_lowering_in_function_impl(
         // constant needs its (possibly nested) vector descriptors published
         // so `StoreImmVec` can resolve them at runtime, so discover the
         // constant's type here.
-        if let Instr::LdConst(_, idx) = instr {
-            let ty = module_ir.module.interned_constant_type_at(*idx);
+        if let Instr::LdConst { const_idx, .. } = instr {
+            let ty = module_ir.module.interned_constant_type_at(*const_idx);
             discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
     }

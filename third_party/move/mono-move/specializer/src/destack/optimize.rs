@@ -55,11 +55,11 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// reference (via `WriteRef`, function calls, etc.) without appearing as a
 /// def in `get_defs_uses`. So we kill subst entries for the borrowed slot
 /// at `MutBorrowLoc` — conservatively assuming hidden writes may follow.
-/// `MutBorrowLocField` and `WriteLocalField` have the same hazard.
+/// `MutBorrowLocField` and `WriteLocField` have the same hazard.
 ///
 /// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
 /// borrowed slot cannot be modified while immutably borrowed. The same
-/// holds for `ImmBorrowLocField` and `ReadLocalField`.
+/// holds for `ImmBorrowLocField` and `ReadLocField`.
 ///
 /// ## Why cross-block mutable borrows are safe
 ///
@@ -78,13 +78,13 @@ fn copy_propagation(func: &mut FunctionIR) {
 
             // Kill subst for locals whose storage may be mutated without a
             // full def: mut borrows (writes go through the ref) and
-            // `WriteLocalField` (partial write). `WriteLocalFieldChain`
+            // `WriteLocField` (partial write). `WriteLocFieldChain`
             // reports its root local as a def, so it is covered by the
             // `for_each_def` kill below; the ref-rooted `WriteFieldChain`
             // writes through a reference whose originating mut borrow was
             // already killed here.
             let mut hidden_write = mut_local_borrow_target(instr);
-            if let Instr::WriteLocalField(_, _, local, _) = instr {
+            if let Instr::WriteLocField { local, .. } = instr {
                 hidden_write = Some(*local);
             }
             if let Some(src) = hidden_write {
@@ -98,7 +98,7 @@ fn copy_propagation(func: &mut FunctionIR) {
             });
 
             match instr {
-                Instr::Copy(dst, src) | Instr::Move(dst, src) => {
+                Instr::Copy { dst, src } | Instr::Move { dst, src } => {
                     // Xfer slot values don't survive a call boundary,
                     // so don't copy propagate from them.
                     if !matches!(src, Slot::Xfer(_)) {
@@ -111,12 +111,14 @@ fn copy_propagation(func: &mut FunctionIR) {
     }
 }
 
-/// Pass: Remove `Move(r, r)` and `Copy(r, r)` instructions.
+/// Pass: Remove `Move` and `Copy` instructions whose `dst == src`.
 fn eliminate_identity_moves(func: &mut FunctionIR) {
     for block in &mut func.blocks {
         block
             .instrs
-            .retain(|instr| !matches!(instr, Instr::Move(d, s) | Instr::Copy(d, s) if d == s));
+            .retain(|instr| {
+                !matches!(instr, Instr::Move { dst, src } | Instr::Copy { dst, src } if dst == src)
+            });
     }
 }
 
@@ -152,7 +154,9 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
 
         for (i, instr) in block.instrs.iter().enumerate().rev() {
             let is_removable = match instr {
-                Instr::Copy(dst, _) | Instr::Move(dst, _) if !cross_block_slots.contains(dst) => {
+                Instr::Copy { dst, .. } | Instr::Move { dst, .. }
+                    if !cross_block_slots.contains(dst) =>
+                {
                     !live.contains(dst)
                 },
                 _ => false,

@@ -693,13 +693,13 @@ impl<'a> LoweringState<'a> {
             // TODO(correctness): audit every integer-width use across the
             // specializer and confirm each is the correct width (slot sizes,
             // immediate widths, sign extension).
-            Instr::LdImm(dst, imm) => {
+            Instr::LdImm { dst, imm } => {
                 let dst_off = self.def_slot(*dst)?.offset;
                 self.emit(store_imm_op(dst_off, imm))?;
             },
-            Instr::LdConst(dst, idx) => {
-                let ty = view_type(self.ctx.module.interned_constant_type_at(*idx));
-                let bcs_bytes = self.ctx.module.constant_data_at(*idx);
+            Instr::LdConst { dst, const_idx } => {
+                let ty = view_type(self.ctx.module.interned_constant_type_at(*const_idx));
+                let bcs_bytes = self.ctx.module.constant_data_at(*const_idx);
                 let dst_info = self.def_slot(*dst)?;
                 // Constants store their value BCS-encoded. Fixed-width
                 // integers encode as their raw little-endian bytes and
@@ -714,43 +714,43 @@ impl<'a> LoweringState<'a> {
                     Type::Bool | Type::U8 | Type::I8 => {
                         self.emit(MicroOp::StoreImm1 {
                             dst: dst_info.offset,
-                            imm: const_imm::<1>(*idx, bcs_bytes)?[0],
+                            imm: const_imm::<1>(*const_idx, bcs_bytes)?[0],
                         })?;
                     },
                     Type::U16 | Type::I16 => {
                         self.emit(MicroOp::StoreImm2 {
                             dst: dst_info.offset,
-                            imm: const_imm::<2>(*idx, bcs_bytes)?,
+                            imm: const_imm::<2>(*const_idx, bcs_bytes)?,
                         })?;
                     },
                     Type::U32 | Type::I32 => {
                         self.emit(MicroOp::StoreImm4 {
                             dst: dst_info.offset,
-                            imm: const_imm::<4>(*idx, bcs_bytes)?,
+                            imm: const_imm::<4>(*const_idx, bcs_bytes)?,
                         })?;
                     },
                     Type::U64 | Type::I64 => {
                         self.emit(MicroOp::StoreImm8 {
                             dst: dst_info.offset,
-                            imm: const_imm::<8>(*idx, bcs_bytes)?,
+                            imm: const_imm::<8>(*const_idx, bcs_bytes)?,
                         })?;
                     },
                     Type::U128 | Type::I128 => {
                         self.emit(MicroOp::StoreImm16 {
                             dst: dst_info.offset,
-                            imm: Box::new(const_imm::<16>(*idx, bcs_bytes)?),
+                            imm: Box::new(const_imm::<16>(*const_idx, bcs_bytes)?),
                         })?;
                     },
                     Type::U256 | Type::I256 | Type::Address => {
                         self.emit(MicroOp::StoreImm32 {
                             dst: dst_info.offset,
-                            imm: Box::new(const_imm::<32>(*idx, bcs_bytes)?),
+                            imm: Box::new(const_imm::<32>(*const_idx, bcs_bytes)?),
                         })?;
                     },
                     Type::Vector { .. } => {
                         self.emit(MicroOp::StoreImmVec {
                             dst: dst_info.offset,
-                            idx: *idx,
+                            idx: *const_idx,
                         })?;
                     },
                     // The bytecode verifier rejects constants of these types,
@@ -762,7 +762,7 @@ impl<'a> LoweringState<'a> {
                     | Type::Function { .. }
                     | Type::TypeParam { .. } => {
                         return Err(VMInternalError::new(
-                            LoweringError::LdConstTypeNotPermitted { idx: idx.0 },
+                            LoweringError::LdConstTypeNotPermitted { idx: const_idx.0 },
                         ))
                     },
                 }
@@ -770,14 +770,14 @@ impl<'a> LoweringState<'a> {
 
             // --- Copy/Move ---
             // `Move` transfers ownership: a byte copy is the whole operation.
-            Instr::Move(dst, src) => {
+            Instr::Move { dst, src } => {
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit_single_move(dst_info.offset, src_info)?;
             },
             // `Copy` must produce an independent value: byte copy, then deep-copy
             // any owned heap pointers so a heap-backed value does not alias.
-            Instr::Copy(dst, src) => {
+            Instr::Copy { dst, src } => {
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_typed_slot(*dst)?;
                 self.emit_single_move(dst_info.slot.offset, src_info)?;
@@ -785,7 +785,7 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Binary ops ---
-            Instr::BinaryOp(dst, op, lhs, rhs) => {
+            Instr::BinaryOp { dst, op, lhs, rhs } => {
                 // TODO(cleanup): BinaryOp / BinaryOpImm share most of their shape
                 // (operand resolution + per-kind emit); consider factoring
                 // out the common skeleton once cast / cmp ops settle.
@@ -925,20 +925,20 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Binary ops with immediate ---
-            Instr::BinaryOpImm(dst, op, src, imm) => {
+            Instr::BinaryOpImm { dst, op, lhs, imm } => {
                 // TODO(cleanup): see [`Instr::BinaryOp`] above on factoring out the
                 // shared skeleton between the reg-reg and imm forms.
-                let src_info = self.slot(*src)?;
+                let lhs_info = self.slot(*lhs)?;
                 let dst_info = self.def_slot(*dst)?;
-                let src_ty = self.slot_type(*src)?;
+                let lhs_ty = self.slot_type(*lhs)?;
                 let dst = dst_info.offset;
-                let lhs = src_info.offset;
+                let lhs = lhs_info.offset;
 
                 // Fast path: u64 specialized imm variants where they exist.
                 // u64 BitAnd/BitOr/BitXor/Cmp/Or/And imm have no specialized
                 // variant and fall through to the unspecialized path below.
                 let mut handled = false;
-                if src_ty.is_u64() {
+                if lhs_ty.is_u64() {
                     let emitted = match op {
                         BinaryOp::Add => Some(MicroOp::AddU64Imm {
                             dst,
@@ -1028,7 +1028,7 @@ impl<'a> LoweringState<'a> {
                             })?;
                         },
                         BinaryOp::Shl | BinaryOp::Shr => {
-                            let ty = IntTy::from_type(src_ty)
+                            let ty = IntTy::from_type(lhs_ty)
                                 .filter(|t| !t.is_signed())
                                 .ok_or(LoweringError::ShiftRequiresUnsignedNonU64)?;
                             let shift_op = IntShiftOp {
@@ -1071,7 +1071,7 @@ impl<'a> LoweringState<'a> {
                             };
                             let identity = matches!(op, BinaryOp::And);
                             if *b == identity {
-                                self.emit_single_move(dst, src_info)?;
+                                self.emit_single_move(dst, lhs_info)?;
                             } else {
                                 self.emit(MicroOp::StoreImm1 {
                                     dst,
@@ -1084,7 +1084,7 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Unary ops ---
-            Instr::UnaryOp(dst, op, src) => match op {
+            Instr::UnaryOp { dst, op, src } => match op {
                 UnaryOp::Cast(to) => self.lower_cast(*dst, *src, *to)?,
                 UnaryOp::Negate => {
                     let src_ty = self.slot_type(*src)?;
@@ -1119,21 +1119,21 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- References ---
-            Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
-                let src_info = self.slot(*src)?;
+            Instr::ImmBorrowLoc { dst, local } | Instr::MutBorrowLoc { dst, local } => {
+                let src_info = self.slot(*local)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::SlotBorrow {
                     dst: dst_info.offset,
                     local: src_info.offset,
                 })?;
             },
-            Instr::ReadRef(dst, ref_src) => {
+            Instr::ReadRef { dst, src } => {
                 // TODO(perf): `size` could equivalently come from `dst_info.size`
                 // (the loaded value's slot) — IR typing forces it to equal
                 // the ref's pointee size. `ref_pointee_size` is the more
                 // type-faithful path; `dst_info.size` would be cheaper.
-                let size = self.ref_pointee_size(*ref_src)?;
-                let ref_info = self.slot(*ref_src)?;
+                let size = self.ref_pointee_size(*src)?;
+                let ref_info = self.slot(*src)?;
                 let dst_info = self.def_typed_slot(*dst)?;
                 self.emit(MicroOp::ReadRef {
                     dst: dst_info.slot.offset,
@@ -1142,14 +1142,14 @@ impl<'a> LoweringState<'a> {
                 })?;
                 self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
             },
-            Instr::WriteRef(ref_dst, src) => {
+            Instr::WriteRef { dst_ref, val } => {
                 // TODO(perf): `size` could equivalently come from `src_info.size`
                 // (the value being written) — IR typing forces it to equal
                 // the ref's pointee size. `ref_pointee_size` is the more
                 // type-faithful path; `src_info.size` would be cheaper.
-                let size = self.ref_pointee_size(*ref_dst)?;
-                let ref_info = self.slot(*ref_dst)?;
-                let src_info = self.slot(*src)?;
+                let size = self.ref_pointee_size(*dst_ref)?;
+                let ref_info = self.slot(*dst_ref)?;
+                let src_info = self.slot(*val)?;
                 self.emit(MicroOp::WriteRef {
                     ref_ptr: ref_info.offset,
                     src: src_info.offset,
@@ -1158,28 +1158,36 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Control flow ---
-            Instr::Branch(Label(l)) => {
+            Instr::Branch {
+                target: Label(label),
+            } => {
                 self.record_branch_fixup();
                 self.emit(MicroOp::Jump {
-                    target: CodeOffset(encode_label(*l)),
+                    target: CodeOffset(encode_label(*label)),
                     gas: 0,
                 })?;
             },
-            Instr::BrTrue(Label(l), cond) => {
+            Instr::BrTrue {
+                target: Label(label),
+                cond,
+            } => {
                 let cond_info = self.slot(*cond)?;
                 self.record_branch_fixup();
                 self.emit(MicroOp::JumpNotZeroByte {
-                    target: CodeOffset(encode_label(*l)),
+                    target: CodeOffset(encode_label(*label)),
                     src: cond_info.offset,
                     gas_taken: 0,
                     gas_fallthrough: 0,
                 })?;
             },
-            Instr::BrFalse(Label(l), cond) => {
+            Instr::BrFalse {
+                target: Label(label),
+                cond,
+            } => {
                 let cond_info = self.slot(*cond)?;
                 self.record_branch_fixup();
                 self.emit(MicroOp::JumpZeroByte {
-                    target: CodeOffset(encode_label(*l)),
+                    target: CodeOffset(encode_label(*label)),
                     src: cond_info.offset,
                     gas_taken: 0,
                     gas_fallthrough: 0,
@@ -1187,13 +1195,18 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Fused compare+branch ---
-            Instr::BrCmp(Label(l), op, lhs, rhs) => {
+            Instr::BrCmp {
+                target: Label(label),
+                op,
+                lhs,
+                rhs,
+            } => {
                 let lhs_interned = self.slot_interned_type(*lhs)?;
                 let lhs_ty = view_type(lhs_interned);
                 let lhs_info = self.slot(*lhs)?;
                 let lhs_off = lhs_info.offset;
                 let rhs_off = self.slot(*rhs)?.offset;
-                let target = CodeOffset(encode_label(*l));
+                let target = CodeOffset(encode_label(*label));
                 self.record_branch_fixup();
                 // Fast path: unsigned `u64` ordering / not-equal use the
                 // specialized jumps. Everything else goes through the general
@@ -1267,12 +1280,17 @@ impl<'a> LoweringState<'a> {
                     },
                 }
             },
-            Instr::BrCmpImm(Label(l), op, src, imm) => {
-                let src_ty = self.slot_type(*src)?;
-                let src_off = self.slot(*src)?.offset;
-                let target = CodeOffset(encode_label(*l));
+            Instr::BrCmpImm {
+                target: Label(label),
+                op,
+                lhs,
+                imm,
+            } => {
+                let lhs_ty = self.slot_type(*lhs)?;
+                let lhs_off = self.slot(*lhs)?.offset;
+                let target = CodeOffset(encode_label(*label));
                 self.record_branch_fixup();
-                if src_ty.is_u64() {
+                if lhs_ty.is_u64() {
                     // Fast path: specialized unsigned `u64` ordering jumps.
                     // Note: equality has no specialized imm jump, so it uses
                     // the general `JumpIntCmp`.
@@ -1280,58 +1298,58 @@ impl<'a> LoweringState<'a> {
                     match op {
                         CmpKind::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
                             target,
-                            src: src_off,
+                            src: lhs_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
                         CmpKind::Lt => self.emit(MicroOp::JumpLessU64Imm {
                             target,
-                            src: src_off,
+                            src: lhs_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
                         CmpKind::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
                             target,
-                            src: src_off,
+                            src: lhs_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
                         CmpKind::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
                             target,
-                            src: src_off,
+                            src: lhs_off,
                             imm: v,
                             gas_taken: 0,
                             gas_fallthrough: 0,
                         })?,
                         CmpKind::Eq | CmpKind::Neq => {
-                            self.emit_jump_int_cmp(target, *op, src_off, IntOperand::ImmU64(v))?
+                            self.emit_jump_int_cmp(target, *op, lhs_off, IntOperand::ImmU64(v))?
                         },
                     }
                 } else {
                     let rhs_op = cmp_operand_from_imm(imm)?;
-                    self.emit_jump_int_cmp(target, *op, src_off, rhs_op)?;
+                    self.emit_jump_int_cmp(target, *op, lhs_off, rhs_op)?;
                 }
             },
 
             // --- Calls ---
-            Instr::Call(data) => {
+            Instr::Call { data } => {
                 self.lower_call(func_ir, &data.args, &data.rets)?;
             },
 
             // --- Return ---
-            Instr::Ret(slots) => {
+            Instr::Ret { srcs } => {
                 // `return_slots` overlap the home region (calling
                 // convention reuses that space), so a function like
                 // `swap(a, b) -> (b, a)` produces a swap-cycle in the
                 // copy graph. `emit_parallel_copy` handles arbitrary
                 // cycles via the function's reserved scratch slot.
-                let mut copies = Vec::with_capacity(slots.len());
-                for (k, slot) in slots.iter().enumerate() {
+                let mut copies = Vec::with_capacity(srcs.len());
+                for (ret_idx, slot) in srcs.iter().enumerate() {
                     let src = self.slot(*slot)?;
-                    let dst = self.ctx.return_slots[k];
+                    let dst = self.ctx.return_slots[ret_idx];
                     copies.push(parallel_copy::Copy {
                         src: src.offset,
                         dst: dst.offset,
@@ -1343,13 +1361,13 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Abort ---
-            Instr::Abort(code) => {
+            Instr::Abort { code } => {
                 let code = self.slot(*code)?;
                 self.emit(MicroOp::Abort { code: code.offset })?;
             },
-            Instr::AbortMsg(code, message) => {
+            Instr::AbortMsg { code, msg } => {
                 let code = self.slot(*code)?;
-                let message = self.slot(*message)?;
+                let message = self.slot(*msg)?;
                 self.emit(MicroOp::AbortMsg {
                     code: code.offset,
                     message: message.offset,
@@ -1357,7 +1375,7 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Vector ---
-            Instr::VecLen(dst, _elem_ty, vec_ref) => {
+            Instr::VecLen { dst, vec_ref, .. } => {
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::VecLen {
@@ -1365,8 +1383,18 @@ impl<'a> LoweringState<'a> {
                     vec_ref: vec_ref_info.offset,
                 })?;
             },
-            Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx)
-            | Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx) => {
+            Instr::VecImmBorrow {
+                dst,
+                elem_ty,
+                vec_ref,
+                idx,
+            }
+            | Instr::VecMutBorrow {
+                dst,
+                elem_ty,
+                vec_ref,
+                idx,
+            } => {
                 let elem_size = concrete_type_size(
                     self.ctx.layouts,
                     self.concrete_ty(*elem_ty)?,
@@ -1383,7 +1411,11 @@ impl<'a> LoweringState<'a> {
                     elem_size,
                 })?;
             },
-            Instr::VecPopBack(dst, elem_ty, vec_ref) => {
+            Instr::VecPopBack {
+                dst,
+                elem_ty,
+                vec_ref,
+            } => {
                 let elem_size = concrete_type_size(
                     self.ctx.layouts,
                     self.concrete_ty(*elem_ty)?,
@@ -1397,7 +1429,11 @@ impl<'a> LoweringState<'a> {
                     elem_size,
                 })?;
             },
-            Instr::VecPack(dst, elem_ty, elems) => {
+            Instr::VecPack {
+                dst,
+                elem_ty,
+                srcs: elems,
+            } => {
                 let dst_typed = self.def_typed_slot(*dst)?;
                 // Empty literal keeps the fast path: null pointer is the empty
                 // vector — no allocation, no descriptor needed.
@@ -1424,7 +1460,7 @@ impl<'a> LoweringState<'a> {
                     })))?;
                 }
             },
-            Instr::VecUnpack(dsts, elem_ty, src) => {
+            Instr::VecUnpack { dsts, elem_ty, src } => {
                 // TODO(completeness): the Move compiler only emits `VecUnpack` with count 0,
                 // but handwritten bytecode may use it with any count. If we
                 // restrict to count 0, we can apply simplifications.
@@ -1444,7 +1480,12 @@ impl<'a> LoweringState<'a> {
                     dsts: dst_offsets,
                 })))?;
             },
-            Instr::VecSwap(elem_ty, vec_ref, idx_a, idx_b) => {
+            Instr::VecSwap {
+                vec_ref,
+                elem_ty,
+                idx_a,
+                idx_b,
+            } => {
                 let elem_size = concrete_type_size(
                     self.ctx.layouts,
                     self.concrete_ty(*elem_ty)?,
@@ -1460,7 +1501,11 @@ impl<'a> LoweringState<'a> {
                     elem_size,
                 })?;
             },
-            Instr::VecPushBack(elem_ty, vec_ref, val) => {
+            Instr::VecPushBack {
+                vec_ref,
+                elem_ty,
+                val,
+            } => {
                 let elem_size = concrete_type_size(
                     self.ctx.layouts,
                     self.concrete_ty(*elem_ty)?,
@@ -1484,17 +1529,37 @@ impl<'a> LoweringState<'a> {
             // The struct lives in a frame slot at compile-time-known offset;
             // the field's absolute frame offset is therefore also compile-time.
             // No fat pointer is materialized.
-            Instr::ImmBorrowLocField(dst, owner, fh, local)
-            | Instr::MutBorrowLocField(dst, owner, fh, local) => {
-                let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            Instr::ImmBorrowLocField {
+                dst,
+                owner_ty,
+                field,
+                local,
+            }
+            | Instr::MutBorrowLocField {
+                dst,
+                owner_ty,
+                field,
+                local,
+            } => {
+                let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner_ty)?, *field)?;
                 self.lower_local_field_borrow(field_offset, *local, *dst)?;
             },
-            Instr::ReadLocalField(dst, owner, fh, local) => {
-                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            Instr::ReadLocField {
+                dst,
+                owner_ty,
+                field,
+                local,
+            } => {
+                let field = self.resolve_field(self.concrete_ty(*owner_ty)?, *field)?;
                 self.lower_local_field_read(field, *local, *dst)?;
             },
-            Instr::WriteLocalField(owner, fh, local, val) => {
-                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            Instr::WriteLocField {
+                local,
+                owner_ty,
+                field,
+                val,
+            } => {
+                let field = self.resolve_field(self.concrete_ty(*owner_ty)?, *field)?;
                 self.lower_local_field_write(field, *local, *val)?;
             },
 
@@ -1504,17 +1569,37 @@ impl<'a> LoweringState<'a> {
             // pointer in `src` (or `dst_ref`). Use the offset-bearing ref
             // micro-ops to fold the field offset into the address compute in a
             // single dispatch.
-            Instr::ImmBorrowField(dst, owner, fh, src)
-            | Instr::MutBorrowField(dst, owner, fh, src) => {
-                let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            Instr::ImmBorrowField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            }
+            | Instr::MutBorrowField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            } => {
+                let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner_ty)?, *field)?;
                 self.lower_ref_field_borrow(field_offset, *src, *dst)?;
             },
-            Instr::ReadField(dst, owner, fh, src) => {
-                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            Instr::ReadField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            } => {
+                let field = self.resolve_field(self.concrete_ty(*owner_ty)?, *field)?;
                 self.lower_ref_field_read(field, *src, *dst)?;
             },
-            Instr::WriteField(owner, fh, dst_ref, val) => {
-                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            Instr::WriteField {
+                dst_ref,
+                owner_ty,
+                field,
+                val,
+            } => {
+                let field = self.resolve_field(self.concrete_ty(*owner_ty)?, *field)?;
                 self.lower_ref_field_write(field, *dst_ref, *val)?;
             },
 
@@ -1523,29 +1608,29 @@ impl<'a> LoweringState<'a> {
             // The whole run reaches one field at `base(root) + Σ offsets`, so
             // each lowers to exactly one micro-op (the same one the single-field
             // op uses), with the summed offset and terminal size folded in.
-            Instr::ReadLocalFieldChain(dst, path, local) => {
+            Instr::ReadLocFieldChain { dst, path, local } => {
                 let field = self.resolve_field_path(path)?;
                 self.lower_local_field_read(field, *local, *dst)?;
             },
-            Instr::WriteLocalFieldChain(path, local, val) => {
+            Instr::WriteLocFieldChain { local, path, val } => {
                 let field = self.resolve_field_path(path)?;
                 self.lower_local_field_write(field, *local, *val)?;
             },
-            Instr::ImmBorrowLocalFieldChain(dst, path, local)
-            | Instr::MutBorrowLocalFieldChain(dst, path, local) => {
+            Instr::ImmBorrowLocFieldChain { dst, path, local }
+            | Instr::MutBorrowLocFieldChain { dst, path, local } => {
                 let (field_offset, _) = self.resolve_field_path(path)?;
                 self.lower_local_field_borrow(field_offset, *local, *dst)?;
             },
-            Instr::ReadFieldChain(dst, path, src) => {
+            Instr::ReadFieldChain { dst, path, src } => {
                 let field = self.resolve_field_path(path)?;
                 self.lower_ref_field_read(field, *src, *dst)?;
             },
-            Instr::WriteFieldChain(path, dst_ref, val) => {
+            Instr::WriteFieldChain { dst_ref, path, val } => {
                 let field = self.resolve_field_path(path)?;
                 self.lower_ref_field_write(field, *dst_ref, *val)?;
             },
-            Instr::ImmBorrowFieldChain(dst, path, src)
-            | Instr::MutBorrowFieldChain(dst, path, src) => {
+            Instr::ImmBorrowFieldChain { dst, path, src }
+            | Instr::MutBorrowFieldChain { dst, path, src } => {
                 let (field_offset, _) = self.resolve_field_path(path)?;
                 self.lower_ref_field_borrow(field_offset, *src, *dst)?;
             },
@@ -1557,21 +1642,25 @@ impl<'a> LoweringState<'a> {
             // else forward if `forward_emit_is_safe`, else bail. A true
             // copy cycle (which neither order resolves) needs a swap-style
             // bytecode op which does not currently exist.
-            Instr::Pack(dst, struct_ty, args) => {
+            Instr::Pack {
+                dst,
+                struct_ty,
+                srcs,
+            } => {
                 // After substitution, `struct_ty` must be a concrete nominal
                 // with a populated layout.
                 let struct_ty = self.concrete_ty(*struct_ty)?;
                 // (offset, size, align) per field.
                 let field_layouts = self.struct_field_layouts(struct_ty, "Pack")?;
-                if field_layouts.len() != args.len() {
+                if field_layouts.len() != srcs.len() {
                     return Err(VMInternalError::new(LoweringError::FieldCountMismatch {
                         op: "Pack",
-                        provided: args.len(),
+                        provided: srcs.len(),
                         expected: field_layouts.len(),
                     }));
                 }
                 let dst_info = self.def_slot(*dst)?;
-                let arg_infos = args
+                let arg_infos = srcs
                     .iter()
                     .map(|s| self.slot(*s))
                     .collect::<VMResult<Vec<_>>>()?;
@@ -1603,7 +1692,11 @@ impl<'a> LoweringState<'a> {
                     })?;
                 }
             },
-            Instr::Unpack(dsts, struct_ty, src) => {
+            Instr::Unpack {
+                dsts,
+                struct_ty,
+                src,
+            } => {
                 // See the `Instr::Pack` arm above for the `struct_ty` contract.
                 let struct_ty = self.concrete_ty(*struct_ty)?;
                 let field_layouts = self.struct_field_layouts(struct_ty, "Unpack")?;
@@ -1649,7 +1742,7 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Closures ---
-            Instr::PackClosure(data) => {
+            Instr::PackClosure { data } => {
                 // Target identity (with composed type arguments for the
                 // generic form) + captured-data descriptor were resolved in
                 // `try_build_context`; read them positionally.
@@ -1668,7 +1761,7 @@ impl<'a> LoweringState<'a> {
                     captured: captured_slots,
                 })))?;
             },
-            Instr::CallClosure(data) => {
+            Instr::CallClosure { data } => {
                 let ret_slots = &self.ctx.closure_call_sites[self.closure_call_cursor];
                 self.closure_call_cursor += 1;
                 let (closure_slot, provided) = data.closure_and_provided();
@@ -1682,8 +1775,12 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Global storage ---
-            Instr::Exists(dst, ty, addr) => {
-                let concrete_ty = self.concrete_ty(*ty)?;
+            Instr::Exists {
+                dst,
+                resource_ty,
+                addr,
+            } => {
+                let concrete_ty = self.concrete_ty(*resource_ty)?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::Exists {
@@ -1692,8 +1789,12 @@ impl<'a> LoweringState<'a> {
                     dst: dst_info.offset,
                 })?;
             },
-            Instr::ImmBorrowGlobal(dst, ty, addr) => {
-                let concrete_ty = self.concrete_ty(*ty)?;
+            Instr::ImmBorrowGlobal {
+                dst,
+                resource_ty,
+                addr,
+            } => {
+                let concrete_ty = self.concrete_ty(*resource_ty)?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::BorrowGlobal {
@@ -1702,8 +1803,12 @@ impl<'a> LoweringState<'a> {
                     ty: concrete_ty,
                 })?;
             },
-            Instr::MutBorrowGlobal(dst, ty, addr) => {
-                let concrete_ty = self.concrete_ty(*ty)?;
+            Instr::MutBorrowGlobal {
+                dst,
+                resource_ty,
+                addr,
+            } => {
+                let concrete_ty = self.concrete_ty(*resource_ty)?;
                 let addr_info = self.slot(*addr)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::BorrowGlobalMut {
@@ -1712,12 +1817,16 @@ impl<'a> LoweringState<'a> {
                     ty: concrete_ty,
                 })?;
             },
-            Instr::MoveFrom(dst, ty, addr) => {
+            Instr::MoveFrom {
+                dst,
+                resource_ty,
+                addr,
+            } => {
                 // Move the resource out as an 8-byte heap pointer into
                 // `box_ptr`, then unbox its inline value into `dst`. `MoveFrom`
                 // may GC (deep-copy) before it writes `box_ptr`; the unbox copy
                 // that follows does not allocate.
-                let concrete_ty = self.concrete_ty(*ty)?;
+                let concrete_ty = self.concrete_ty(*resource_ty)?;
                 let box_ptr = self
                     .ctx
                     .resource_box_slot
@@ -1736,7 +1845,11 @@ impl<'a> LoweringState<'a> {
                 );
                 self.emit_heap_move_from(dst_info.offset, box_ptr, dst_info.size)?;
             },
-            Instr::MoveTo(ty, signer, val) => {
+            Instr::MoveTo {
+                resource_ty,
+                signer,
+                val,
+            } => {
                 // Box the inline resource value into a fresh heap object, then
                 // publish the pointer. `HeapNew` allocates (and may GC) before
                 // it writes `box_ptr`; the `HeapMoveTo` box copy and `MoveTo`
@@ -1751,7 +1864,7 @@ impl<'a> LoweringState<'a> {
                 // the relocated child pointer, not a stale one. This relies on
                 // `frame_layout` being a whole-function root set; it would break
                 // if safe points became per-PC / liveness-based.
-                let concrete_ty = self.concrete_ty(*ty)?;
+                let concrete_ty = self.concrete_ty(*resource_ty)?;
                 let descriptor_id = self
                     .ctx
                     .descriptor_id(concrete_ty)
@@ -1787,22 +1900,27 @@ impl<'a> LoweringState<'a> {
             // others read/write/borrow through the heap pointer. Field offsets
             // come from the derived `EnumLayout`; the `enum_*` helpers add
             // `ENUM_DATA_OFFSET`.
-            Instr::PackVariant(dst, enum_ty, variant_ord, args) => {
+            Instr::PackVariant {
+                dst,
+                enum_ty,
+                variant,
+                srcs,
+            } => {
                 let enum_ty = self.concrete_ty(*enum_ty)?;
                 let ctx = self.ctx;
                 let layout = ctx
                     .enum_layout(enum_ty)
                     .ok_or(LoweringError::EnumLayoutNotDerived { op: "PackVariant" })?;
-                let variant_fields = layout.variants.get(*variant_ord as usize).ok_or(
+                let variant_fields = layout.variants.get(*variant as usize).ok_or(
                     LoweringError::VariantOrdinalOutOfRange {
                         op: "PackVariant",
-                        ordinal: *variant_ord as usize,
+                        ordinal: *variant as usize,
                     },
                 )?;
-                if variant_fields.len() != args.len() {
+                if variant_fields.len() != srcs.len() {
                     return Err(VMInternalError::new(LoweringError::FieldCountMismatch {
                         op: "PackVariant",
-                        provided: args.len(),
+                        provided: srcs.len(),
                         expected: variant_fields.len(),
                     }));
                 }
@@ -1814,7 +1932,7 @@ impl<'a> LoweringState<'a> {
                 let dst_off = self.def_slot(*dst)?.offset;
                 // Resolve the field arg slots up front so we can detect aliasing
                 // before emitting.
-                let arg_slots = self.slots_to_sized_slots(args)?;
+                let arg_slots = self.slots_to_sized_slots(srcs)?;
                 // `EnumNew` writes the heap pointer to its target slot BEFORE the
                 // field stores read the args. The slot allocator may thread the
                 // enum dst and a field arg through one Xfer position (its
@@ -1838,7 +1956,7 @@ impl<'a> LoweringState<'a> {
                 } else {
                     dst_off
                 };
-                self.emit(MicroOp::enum_new(pack_ptr, descriptor_id, *variant_ord))?;
+                self.emit(MicroOp::enum_new(pack_ptr, descriptor_id, *variant))?;
                 // `enum_store` is non-allocating: no safe point between `EnumNew`
                 // and the final store, so the scratch pointer never spans a GC.
                 for (field, arg) in variant_fields.iter().zip(arg_slots.iter()) {
@@ -1857,7 +1975,12 @@ impl<'a> LoweringState<'a> {
                     })?;
                 }
             },
-            Instr::UnpackVariant(dsts, enum_ty, variant_ord, src) => {
+            Instr::UnpackVariant {
+                dsts,
+                enum_ty,
+                variant,
+                src,
+            } => {
                 let enum_ty = self.concrete_ty(*enum_ty)?;
                 let ctx = self.ctx;
                 let layout =
@@ -1865,10 +1988,10 @@ impl<'a> LoweringState<'a> {
                         .ok_or(LoweringError::EnumLayoutNotDerived {
                             op: "UnpackVariant",
                         })?;
-                let variant_fields = layout.variants.get(*variant_ord as usize).ok_or(
+                let variant_fields = layout.variants.get(*variant as usize).ok_or(
                     LoweringError::VariantOrdinalOutOfRange {
                         op: "UnpackVariant",
-                        ordinal: *variant_ord as usize,
+                        ordinal: *variant as usize,
                     },
                 )?;
                 if variant_fields.len() != dsts.len() {
@@ -1934,7 +2057,7 @@ impl<'a> LoweringState<'a> {
                 // one. The fact must key on the shared local (TestVariant takes
                 // a `&enum`, UnpackVariant the value); there is no
                 // `VariantSwitch` in this IR to shortcut through.
-                self.emit(MicroOp::enum_check_variant(load_ptr, *variant_ord as u64))?;
+                self.emit(MicroOp::enum_check_variant(load_ptr, *variant as u64))?;
                 for (field, &dst_off) in variant_fields.iter().zip(dst_offs.iter()) {
                     let size = field.size;
                     let load = if size == 8 {
@@ -1945,23 +2068,26 @@ impl<'a> LoweringState<'a> {
                     self.emit(load)?;
                 }
             },
-            Instr::TestVariant(dst, _enum_ty, variant_ord, src) => {
+            Instr::TestVariant {
+                dst, variant, src, ..
+            } => {
                 // `src` is an enum reference.
                 let enum_ref = self.slot(*src)?.offset;
                 let dst_off = self.def_slot(*dst)?.offset;
-                self.emit(MicroOp::enum_test_tag(
-                    enum_ref,
-                    *variant_ord as u64,
-                    dst_off,
-                ))?;
+                self.emit(MicroOp::enum_test_tag(enum_ref, *variant as u64, dst_off))?;
             },
             // By-reference field read/write: `src`/`dst_ref` is an enum fat
             // pointer. The uniform-offset fast path fuses the heap deref and the
             // value copy into one `Enum{Read,Write}VariantField`; the divergent
             // path fuses the tag dispatch and the copy into one
             // `Enum{Read,Write}VariantFieldByTag`. Both are non-allocating.
-            Instr::ReadVariantField(dst, enum_ty, vfh, src) => {
-                let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
+            Instr::ReadVariantField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            } => {
+                let access = self.resolve_variant_field(self.concrete_ty(*owner_ty)?, *field)?;
                 let src_off = self.slot(*src)?.offset;
                 let dst_typed = self.def_typed_slot(*dst)?;
                 let dst_off = dst_typed.slot.offset;
@@ -1983,8 +2109,13 @@ impl<'a> LoweringState<'a> {
                 // itself heap-backed, make it independent.
                 self.maybe_deep_copy(dst_typed.ty, dst_off)?;
             },
-            Instr::WriteVariantField(enum_ty, vfh, dst_ref, val) => {
-                let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
+            Instr::WriteVariantField {
+                dst_ref,
+                owner_ty,
+                field,
+                val,
+            } => {
+                let access = self.resolve_variant_field(self.concrete_ty(*owner_ty)?, *field)?;
                 let ref_off = self.slot(*dst_ref)?.offset;
                 let val_off = self.slot(*val)?.offset;
                 match access.uniform_offset {
@@ -2006,9 +2137,19 @@ impl<'a> LoweringState<'a> {
             // into `dst`; the borrow derefs the enum and offsets into the heap
             // object — statically when uniform, else by runtime tag (aborting
             // when the variant does not declare the field).
-            Instr::ImmBorrowVariantField(dst, enum_ty, vfh, src)
-            | Instr::MutBorrowVariantField(dst, enum_ty, vfh, src) => {
-                let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
+            Instr::ImmBorrowVariantField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            }
+            | Instr::MutBorrowVariantField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            } => {
+                let access = self.resolve_variant_field(self.concrete_ty(*owner_ty)?, *field)?;
                 let src_off = self.slot(*src)?.offset;
                 let dst_off = self.def_slot(*dst)?.offset;
                 match access.uniform_offset {

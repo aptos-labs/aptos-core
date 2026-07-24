@@ -308,63 +308,75 @@ impl<I: Interner> Emitter<'_, I> {
     fn instr_cost(&mut self, b: &mut BlockCost, instr: &Instr) -> VMResult<()> {
         match instr {
             // --- Loads ---
-            Instr::LdConst(..) | Instr::LdImm(..) => b.add_constant(LD),
+            Instr::LdConst { .. } | Instr::LdImm { .. } => b.add_constant(LD),
 
             // --- Slot ops ---
-            Instr::Copy(_, src) | Instr::Move(_, src) => {
+            Instr::Copy { src, .. } | Instr::Move { src, .. } => {
                 b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.slot_ty(*src)?)
             },
 
             // --- Unary / Binary ---
-            Instr::UnaryOp(..) | Instr::BinaryOp(..) | Instr::BinaryOpImm(..) => b.add_constant(OP),
+            Instr::UnaryOp { .. } | Instr::BinaryOp { .. } | Instr::BinaryOpImm { .. } => {
+                b.add_constant(OP)
+            },
 
             // --- Structs ---
-            Instr::Pack(_, struct_ty, _) | Instr::Unpack(_, struct_ty, _) => {
+            Instr::Pack { struct_ty, .. } | Instr::Unpack { struct_ty, .. } => {
                 b.add_sized(MOVE_BASE, MOVE_PER_BYTE, *struct_ty)
             },
 
             // --- Enums ---
-            Instr::PackVariant(_, enum_ty, variant, _)
-            | Instr::UnpackVariant(_, enum_ty, variant, _) => {
+            Instr::PackVariant {
+                enum_ty, variant, ..
+            }
+            | Instr::UnpackVariant {
+                enum_ty, variant, ..
+            } => {
                 b.add_constant(PACK_UNPACK);
                 for field_ty in self.variant_field_tys(*enum_ty, *variant)? {
                     b.add_sized(MOVE_BASE, MOVE_PER_BYTE, field_ty);
                 }
             },
-            Instr::TestVariant(..) => b.add_constant(TEST_VARIANT),
+            Instr::TestVariant { .. } => b.add_constant(TEST_VARIANT),
 
             // --- References ---
-            Instr::ImmBorrowLoc(..)
-            | Instr::MutBorrowLoc(..)
-            | Instr::ImmBorrowField(..)
-            | Instr::MutBorrowField(..)
-            | Instr::ImmBorrowVariantField(..)
-            | Instr::MutBorrowVariantField(..) => b.add_constant(BORROW),
-            Instr::ReadRef(_, ref_src) => {
-                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.pointee_ty(*ref_src)?)
+            Instr::ImmBorrowLoc { .. }
+            | Instr::MutBorrowLoc { .. }
+            | Instr::ImmBorrowField { .. }
+            | Instr::MutBorrowField { .. }
+            | Instr::ImmBorrowVariantField { .. }
+            | Instr::MutBorrowVariantField { .. } => b.add_constant(BORROW),
+            Instr::ReadRef { src, .. } => {
+                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.pointee_ty(*src)?)
             },
-            Instr::WriteRef(ref_dst, _) => {
-                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.pointee_ty(*ref_dst)?)
+            Instr::WriteRef { dst_ref, .. } => {
+                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.pointee_ty(*dst_ref)?)
             },
 
             // --- Fused field access (borrow + read/write) ---
-            Instr::ReadField(_, owner, fh, _) => {
-                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.field_ty(*owner, *fh)?)
-            },
-            Instr::WriteField(_, _, _, val) => {
+            Instr::ReadField {
+                owner_ty, field, ..
+            } => b.add_sized(
+                REF_RW_BASE,
+                REF_RW_PER_BYTE,
+                self.field_ty(*owner_ty, *field)?,
+            ),
+            Instr::WriteField { val, .. } => {
                 b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.slot_ty(*val)?)
             },
-            Instr::ReadVariantField(..) => b.add_constant(FIELD_READ),
-            Instr::WriteVariantField(_, _, _, val) => {
+            Instr::ReadVariantField { .. } => b.add_constant(FIELD_READ),
+            Instr::WriteVariantField { val, .. } => {
                 b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.slot_ty(*val)?)
             },
 
             // --- Fused inline-struct field access ---
-            Instr::ImmBorrowLocField(..) | Instr::MutBorrowLocField(..) => b.add_constant(BORROW),
-            Instr::ReadLocalField(_, owner, fh, _) => {
-                b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.field_ty(*owner, *fh)?)
+            Instr::ImmBorrowLocField { .. } | Instr::MutBorrowLocField { .. } => {
+                b.add_constant(BORROW)
             },
-            Instr::WriteLocalField(_, _, _, val) => {
+            Instr::ReadLocField {
+                owner_ty, field, ..
+            } => b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.field_ty(*owner_ty, *field)?),
+            Instr::WriteLocField { val, .. } => {
                 b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.slot_ty(*val)?)
             },
 
@@ -372,30 +384,31 @@ impl<I: Interner> Emitter<'_, I> {
             // sequence charges, so fusing never changes a program's gas.
             // TODO(metering): emit gas from pre-optimization IR instead of
             // hand-replicating pre-fusion costs per fused op. ---
-            Instr::ImmBorrowFieldChain(_, path, _)
-            | Instr::MutBorrowFieldChain(_, path, _)
-            | Instr::ImmBorrowLocalFieldChain(_, path, _)
-            | Instr::MutBorrowLocalFieldChain(_, path, _) => {
+            Instr::ImmBorrowFieldChain { path, .. }
+            | Instr::MutBorrowFieldChain { path, .. }
+            | Instr::ImmBorrowLocFieldChain { path, .. }
+            | Instr::MutBorrowLocFieldChain { path, .. } => {
                 b.add_constant(BORROW * path.len() as u64)
             },
-            Instr::ReadFieldChain(_, path, _) | Instr::ReadLocalFieldChain(_, path, _) => {
+            Instr::ReadFieldChain { path, .. } | Instr::ReadLocFieldChain { path, .. } => {
                 b.add_constant(BORROW * (path.len() as u64).saturating_sub(1));
                 b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.chain_terminal_ty(path)?);
             },
-            Instr::WriteFieldChain(path, _, val) | Instr::WriteLocalFieldChain(path, _, val) => {
+            Instr::WriteFieldChain { path, val, .. }
+            | Instr::WriteLocFieldChain { path, val, .. } => {
                 b.add_constant(BORROW * (path.len() as u64).saturating_sub(1));
                 b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.slot_ty(*val)?);
             },
 
             // --- Globals ---
-            Instr::Exists(..)
-            | Instr::MoveFrom(..)
-            | Instr::MoveTo(..)
-            | Instr::ImmBorrowGlobal(..)
-            | Instr::MutBorrowGlobal(..) => b.add_constant(GLOBAL),
+            Instr::Exists { .. }
+            | Instr::MoveFrom { .. }
+            | Instr::MoveTo { .. }
+            | Instr::ImmBorrowGlobal { .. }
+            | Instr::MutBorrowGlobal { .. } => b.add_constant(GLOBAL),
 
             // --- Calls ---
-            Instr::Call(data) => {
+            Instr::Call { data } => {
                 let sig = self.module.function_signature_at(data.function_handle);
                 let params = self.interner.subst_type_list(sig.params, data.ty_args)?;
                 let returns = self.interner.subst_type_list(sig.returns, data.ty_args)?;
@@ -403,13 +416,13 @@ impl<I: Interner> Emitter<'_, I> {
             },
 
             // --- Closures ---
-            Instr::PackClosure(data) => {
+            Instr::PackClosure { data } => {
                 b.add_constant(PACK_CLOSURE);
                 for arg in &data.captured {
                     b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.slot_ty(*arg)?);
                 }
             },
-            Instr::CallClosure(data) => {
+            Instr::CallClosure { data } => {
                 let (params, returns) = closure_signature(data.closure_ty)?;
                 self.call_cost(b, params, &data.rets, returns)?;
                 // The closure value is passed as the last operand; charge its move.
@@ -417,42 +430,43 @@ impl<I: Interner> Emitter<'_, I> {
             },
 
             // --- Vector ---
-            Instr::VecPack(_, _, elems) => {
+            Instr::VecPack { srcs, .. } => {
                 b.add_constant(VEC_NEW);
-                for elem in elems {
+                for elem in srcs {
                     b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.slot_ty(*elem)?);
                 }
             },
-            Instr::VecLen(..) => b.add_constant(VEC_LEN),
-            Instr::VecImmBorrow(..) | Instr::VecMutBorrow(..) => b.add_constant(VEC_BORROW),
-            Instr::VecPushBack(elem_ty, _, _) | Instr::VecPopBack(_, elem_ty, _) => {
+            Instr::VecLen { .. } => b.add_constant(VEC_LEN),
+            Instr::VecImmBorrow { .. } | Instr::VecMutBorrow { .. } => b.add_constant(VEC_BORROW),
+            Instr::VecPushBack { elem_ty, .. } | Instr::VecPopBack { elem_ty, .. } => {
                 b.add_sized(VEC_ELEM_BASE, VEC_ELEM_PER_BYTE, *elem_ty)
             },
-            Instr::VecUnpack(dsts, elem_ty, _) => {
+            Instr::VecUnpack { dsts, elem_ty, .. } => {
                 let n = dsts.len() as u64;
                 b.add_constant(VEC_NEW);
                 b.add_sized(n * MOVE_BASE, n * MOVE_PER_BYTE, *elem_ty);
             },
-            Instr::VecSwap(elem_ty, _, _, _) => {
+            Instr::VecSwap { elem_ty, .. } => {
                 // 2x per-element: two element accesses.
                 b.add_sized(2 * VEC_ELEM_BASE, 2 * VEC_ELEM_PER_BYTE, *elem_ty);
             },
 
             // --- Control flow ---
-            Instr::Branch(..) => b.add_constant(JUMP),
-            Instr::BrTrue(..) | Instr::BrFalse(..) | Instr::BrCmp(..) | Instr::BrCmpImm(..) => {
-                b.add_constant(COND_JUMP)
-            },
-            Instr::Ret(slots) => {
+            Instr::Branch { .. } => b.add_constant(JUMP),
+            Instr::BrTrue { .. }
+            | Instr::BrFalse { .. }
+            | Instr::BrCmp { .. }
+            | Instr::BrCmpImm { .. } => b.add_constant(COND_JUMP),
+            Instr::Ret { srcs } => {
                 b.add_constant(RETURN);
                 // 2x per slot upper-bounds the cycle-breaking scratch moves
                 // `emit_parallel_copy` adds for a cyclic (e.g. swap-style) return.
-                for slot in slots {
+                for slot in srcs {
                     b.add_sized(2 * MOVE_BASE, 2 * MOVE_PER_BYTE, self.slot_ty(*slot)?);
                 }
             },
-            Instr::Abort(..) => b.add_constant(ABORT),
-            Instr::AbortMsg(..) => b.add_constant(ABORT_MSG),
+            Instr::Abort { .. } => b.add_constant(ABORT),
+            Instr::AbortMsg { .. } => b.add_constant(ABORT_MSG),
 
             Instr::ForceGC => b.add_constant(FORCE_GC),
         }

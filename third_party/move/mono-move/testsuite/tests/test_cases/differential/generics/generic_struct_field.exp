@@ -12,15 +12,15 @@ fun local_field_ops(r0, r1): u64 {
   code:
   L0:
     0: r2 := pack 0x42::generic_struct_field::Pair<u8, u64>, [r0, r1]
-    1: r3 := read_local_field Pair::second, r2
+    1: r3 := read_loc_field Pair::second, r2
     2: r3 := add r3, #1
-    3: write_local_field Pair::second, r2, r3
-    4: r4 := read_local_field Pair::first, r2
+    3: write_loc_field Pair::second, r2, r3
+    4: r4 := read_loc_field Pair::first, r2
     5: r4 := add r4, #1u8
-    6: write_local_field Pair::first, r2, r4
-    7: r4 := read_local_field Pair::first, r2
+    6: write_loc_field Pair::first, r2, r4
+    7: r4 := read_loc_field Pair::first, r2
     8: r3 := cast_u64 r4
-    9: r5 := read_local_field Pair::second, r2
+    9: r5 := read_loc_field Pair::second, r2
     10: r5 := add r3, r5
     11: ret [r5]
 }
@@ -82,9 +82,9 @@ fun write_via_mut_ref(r0, r1): u64 {
     2: r4 := read_field Pair::second, r3
     3: r4 := add r4, #10
     4: write_field Pair::second, r3, r4
-    5: r5 := read_local_field Pair::first, r2
+    5: r5 := read_loc_field Pair::first, r2
     6: r4 := cast_u64 r5
-    7: r6 := read_local_field Pair::second, r2
+    7: r6 := read_loc_field Pair::second, r2
     8: r6 := add r4, r6
     9: ret [r6]
 }
