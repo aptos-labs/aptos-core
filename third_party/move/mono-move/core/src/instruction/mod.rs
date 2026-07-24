@@ -285,6 +285,25 @@ pub struct VecPackOp {
     pub srcs: Vec<FrameOffset>,
 }
 
+/// Operand data for [`MicroOp::VecMoveRange`].
+#[derive(Clone, Debug)]
+pub struct VecMoveRangeOp {
+    /// Fat pointer to the source vector (`&mut vector<T>`).
+    pub from: FrameOffset,
+    /// First index removed from `from` (u64 slot).
+    pub removal_position: FrameOffset,
+    /// Number of elements moved (u64 slot).
+    pub length: FrameOffset,
+    /// Fat pointer to the destination vector (`&mut vector<T>`).
+    pub to: FrameOffset,
+    /// Index in `to` the elements are inserted at (u64 slot).
+    pub insert_position: FrameOffset,
+    /// Byte width of one element.
+    pub elem_size: u32,
+    /// GC trace descriptor for the element type (used to grow/allocate `to`).
+    pub descriptor_id: DescriptorId,
+}
+
 /// Operand data for [`MicroOp::VecUnpack`].
 #[derive(Clone, Debug)]
 pub struct VecUnpackOp {
@@ -784,9 +803,6 @@ pub enum MicroOp {
     // `elem_size` is baked into each instruction (statically known).
     //
     // May want:
-    // - VecMoveRange (bulk move between vectors) — tricky: this is
-    //   really a memcpy between two heap-allocated regions, but we
-    //   currently have no vector-to-vector addressing mode,
     // - specializations for common element sizes (e.g. 1-byte for
     //   byte strings, 8-byte for primitives).
     //======================================================================
@@ -872,6 +888,15 @@ pub enum MicroOp {
         idx_b: FrameOffset,
         elem_size: u32,
     },
+
+    /// Move `length` elements out of `from` at `removal_position` and insert them
+    /// into `to` at `insert_position`, closing the gap left in `from` and opening
+    /// room in `to`. Grows `to` (writing the new pointer back through it) when it
+    /// lacks capacity. `from`/`to` are 16-byte fat pointers whose targets hold the
+    /// vectors' heap pointers; the positions and length are u64 slots. `from` and
+    /// `to` must be distinct vectors. Aborts if the positions/length fall outside
+    /// the vectors. MAY TRIGGER GC.
+    VecMoveRange(Box<VecMoveRangeOp>),
 
     /// Creates a vector from the constant pool, allocating it on the heap and
     /// writing the data pointer into `dst`. The empty-vector constant creates
@@ -1704,6 +1729,19 @@ impl fmt::Display for MicroOp {
                     vec_ref.0, idx_a.0, vec_ref.0, idx_b.0, elem_size
                 )
             },
+            MicroOp::VecMoveRange(op) => {
+                write!(
+                    f,
+                    "VecMoveRange [{}][[{}]..+[{}]] -> [{}][[{}]] (size={}, desc={})",
+                    op.from.0,
+                    op.removal_position.0,
+                    op.length.0,
+                    op.to.0,
+                    op.insert_position.0,
+                    op.elem_size,
+                    op.descriptor_id.0,
+                )
+            },
             MicroOp::StoreImmVec { dst, idx } => {
                 write!(f, "StoreImmVec [{}] <- const[{}]", dst.0, idx.0)
             },
@@ -2168,6 +2206,7 @@ impl MicroOp {
             MicroOp::HeapNew { .. }
             | MicroOp::EnumNew { .. }
             | MicroOp::VecPushBack { .. }
+            | MicroOp::VecMoveRange(_)
             | MicroOp::VecPack(_)
             | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)

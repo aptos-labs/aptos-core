@@ -26,11 +26,12 @@ use mono_move_core::{
     IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp,
     JumpValueCmpOp, JumpValueRefCmpOp, LayoutKind, LayoutProvider, MicroOp, PackClosureOp,
     SafePointEntry, ShiftOperand, SizedSlot, VMInternalError, VMResult, ValueCmpOp, ValueRefCmpOp,
-    VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
+    VecMoveRangeOp, VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, VariantFieldHandleIndex,
 };
+use move_core_types::{account_address::AccountAddress, ident_str};
 
 /// Validates that a primitive constant's BCS bytes are exactly `N` wide and
 /// returns them as a fixed array. Fixed-width integers and `address` encode
@@ -2113,6 +2114,25 @@ impl<'a> LoweringState<'a> {
     fn lower_call(&mut self, _func_ir: &FunctionIR, args: &[Slot], rets: &[Slot]) -> VMResult<()> {
         let cs = &self.ctx.call_sites[self.call_site_cursor];
 
+        // `0x1::vector::move_range` lowers to a dedicated micro-op rather than a
+        // native call, reading its operands in place (no arg-region copy). The
+        // std `vector` module is protected, so name-matching is unambiguous.
+        let vector_mod = self
+            .ctx
+            .interner
+            .module_id_of(&AccountAddress::ONE, ident_str!("vector"));
+        if cs.callee_module_id == vector_mod
+            && cs.callee_func_name == self.ctx.interner.identifier_of(ident_str!("move_range"))
+        {
+            // Emit the op while the argument xfer bindings are still live, so its
+            // safe point captures the `from`/`to` references as GC roots, then
+            // clear them — the call consumes them and `move_range` has no rets.
+            self.lower_vector_move_range(args)?;
+            self.call_site_cursor += 1;
+            self.bind_call_returns(rets, &cs.ret_slots)?;
+            return Ok(());
+        }
+
         // Debug: assert the byte-overlap precondition that makes
         // reverse-order emit sound. The upstream invariants on
         // `xfer_precolor` should always satisfy it; this guard catches
@@ -2190,6 +2210,35 @@ impl<'a> LoweringState<'a> {
         // Place each ret (Xfer rets are already written by `CallIndirect`).
         self.bind_call_returns(rets, &cs.ret_slots)?;
         Ok(())
+    }
+
+    /// Lower a `vector::move_range` call to a [`MicroOp::VecMoveRange`], reading
+    /// its five operands directly from their source slots. The element layout
+    /// comes from the `from` argument's referent type (`&mut vector<T>`); both
+    /// `from` and `to` share it. `move_range` returns nothing, so no rets bind.
+    fn lower_vector_move_range(&mut self, args: &[Slot]) -> VMResult<()> {
+        if args.len() != 5 {
+            return Err(VMInternalError::new(LoweringError::MoveRangeArity {
+                got: args.len(),
+            }));
+        }
+        let vec_ty = strip_ref(self.slot_interned_type(args[0])?)
+            .ok_or(LoweringError::ExpectedReferenceType)?;
+        let Type::Vector { elem } = view_type(vec_ty) else {
+            return Err(VMInternalError::new(LoweringError::MoveRangeArgNotVector));
+        };
+        let elem_size =
+            concrete_type_size(self.ctx.layouts, *elem, "vector::move_range elem type")?;
+        let descriptor_id = self.vector_descriptor_id("VecMoveRange", vec_ty)?;
+        self.emit(MicroOp::VecMoveRange(Box::new(VecMoveRangeOp {
+            from: self.slot(args[0])?.offset,
+            removal_position: self.slot(args[1])?.offset,
+            length: self.slot(args[2])?.offset,
+            to: self.slot(args[3])?.offset,
+            insert_position: self.slot(args[4])?.offset,
+            elem_size,
+            descriptor_id,
+        })))
     }
 
     /// Resolve each branch's target label to a real micro-op index, and fill

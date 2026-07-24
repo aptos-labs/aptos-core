@@ -684,6 +684,16 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_nonzero_size(pc, elem_size);
             },
 
+            MicroOp::VecMoveRange(ref op) => {
+                self.check_frame_access(Some(pc), op.from, 16);
+                self.check_frame_access_8(pc, op.removal_position);
+                self.check_frame_access_8(pc, op.length);
+                self.check_frame_access(Some(pc), op.to, 16);
+                self.check_frame_access_8(pc, op.insert_position);
+                self.check_nonzero_size(pc, op.elem_size);
+                self.check_vector_descriptor(pc, "VecMoveRange", op.descriptor_id, op.elem_size);
+            },
+
             // ----- Borrow producing fat pointer (16B dst) -----
             MicroOp::VecBorrow {
                 dst,

@@ -23,6 +23,12 @@ enum LoweringError {
     #[error("expected a reference type")]
     ExpectedReferenceType,
 
+    #[error("vector::move_range expects 5 arguments, got {got}")]
+    MoveRangeArity { got: usize },
+
+    #[error("vector::move_range: argument 0 is not a vector reference")]
+    MoveRangeArgNotVector,
+
     #[error("CallClosure signature is empty")]
     ClosureSignatureEmpty,
 
@@ -192,6 +198,8 @@ impl IntoExecutionError for LoweringError {
         match self {
             NativeAbi(e) => e.kind(),
             ExpectedReferenceType
+            | MoveRangeArity { .. }
+            | MoveRangeArgNotVector
             | ClosureSignatureEmpty
             | ClosureSignatureNotFunction
             | VidInPostAllocationIr

@@ -197,6 +197,7 @@ pub enum VecOp {
     StoreElem,
     Borrow,
     Swap,
+    MoveRange,
 }
 
 impl fmt::Display for VecOp {
@@ -206,6 +207,7 @@ impl fmt::Display for VecOp {
             VecOp::StoreElem => write!(f, "VecStoreElem"),
             VecOp::Borrow => write!(f, "VecBorrow"),
             VecOp::Swap => write!(f, "VecSwap"),
+            VecOp::MoveRange => write!(f, "VecMoveRange"),
         }
     }
 }

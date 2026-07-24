@@ -39,11 +39,12 @@ use mono_move_core::{
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
-    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    VMInternalError, VMResult, VecMoveRangeOp, VecPackOp, VecUnpackOp,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
+    OBJECT_HEADER_SIZE,
 };
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::int256::{I256, U256};
@@ -1725,6 +1726,10 @@ impl InterpreterContext<'_> {
                         }
                     },
 
+                    MicroOp::VecMoveRange(ref op) => {
+                        self.exec_vec_move_range(regs, op)?;
+                    },
+
                     // ----- Reference (fat pointer) instructions -----
                     MicroOp::VecBorrow {
                         dst,
@@ -2245,6 +2250,136 @@ impl InterpreterContext<'_> {
                 );
             }
             write_ptr(fp, op.dst, vec_ptr);
+        }
+        Ok(())
+    }
+
+    /// Executes [`MicroOp::VecMoveRange`]: moves `op.length` elements out of
+    /// `from` at `removal_position` and inserts them into `to` at
+    /// `insert_position`, closing the gap left in `from` and growing `to` (via
+    /// `grow_vec_ref!` / a fresh `alloc_vec!`, which MAY TRIGGER GC) when it
+    /// lacks capacity. Out of line and `#[inline(never)]` to keep this heavy op
+    /// out of the hot dispatch loop.
+    ///
+    /// # Safety
+    ///
+    /// - `regs.fp` is the current frame pointer.
+    /// - `op`'s slots are in-bounds for the current frame; `from`/`to` are fat
+    ///   pointers to distinct `vector<T>` values whose element width is
+    ///   `op.elem_size`.
+    #[inline(never)]
+    unsafe fn exec_vec_move_range(
+        &mut self,
+        regs: VMRegisters,
+        op: &VecMoveRangeOp,
+    ) -> VMResult<()> {
+        let fp = regs.fp;
+        let elem_size = op.elem_size;
+        let removal_position = unsafe { read_u64(fp, op.removal_position) };
+        let length = unsafe { read_u64(fp, op.length) };
+        let insert_position = unsafe { read_u64(fp, op.insert_position) };
+
+        let (from_base, from_off) = unsafe { read_fat_ptr(fp, op.from) };
+        let from_ptr = unsafe { read_ptr(from_base, from_off as usize) };
+        let (to_base, to_off) = unsafe { read_fat_ptr(fp, op.to) };
+        let mut to_ptr = unsafe { read_ptr(to_base, to_off as usize) };
+
+        let from_len = unsafe { read_vec_len(from_ptr) };
+        let to_len = unsafe { read_vec_len(to_ptr) };
+
+        // The removal range must lie within `from`, the insertion point within `to`.
+        if removal_position
+            .checked_add(length)
+            .is_none_or(|end| end > from_len)
+        {
+            return Err(VMInternalError::new(RuntimeError::VectorIndexOutOfBounds {
+                op: VecOp::MoveRange,
+                idx: removal_position.saturating_add(length),
+                len: from_len,
+            }));
+        }
+        if insert_position > to_len {
+            return Err(VMInternalError::new(RuntimeError::VectorIndexOutOfBounds {
+                op: VecOp::MoveRange,
+                idx: insert_position,
+                len: to_len,
+            }));
+        }
+        if length == 0 {
+            return Ok(());
+        }
+
+        // Ensure `to` can hold the inserted elements, growing it (and writing the
+        // new pointer back through its reference) when needed.
+        let required = to_len + length;
+        if to_ptr.is_null() {
+            to_ptr = alloc_vec!(
+                self,
+                fp,
+                regs.pc,
+                regs.func,
+                op.descriptor_id,
+                elem_size,
+                required
+            )?;
+            let (to_base, to_off) = unsafe { read_fat_ptr(fp, op.to) };
+            unsafe { write_ptr(to_base, to_off as usize, to_ptr) };
+        } else {
+            let total = unsafe { read_obj_size(to_ptr) } as usize;
+            let cap = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size as usize) as u64;
+            if cap < required {
+                to_ptr = grow_vec_ref!(
+                    self,
+                    fp,
+                    regs.pc,
+                    regs.func,
+                    op.to.into(),
+                    elem_size,
+                    required
+                )?;
+            }
+        }
+
+        // A grow may have relocated `from` via GC; re-read it through its rooted
+        // reference before touching its elements.
+        let (from_base, from_off) = unsafe { read_fat_ptr(fp, op.from) };
+        let from_ptr = unsafe { read_ptr(from_base, from_off as usize) };
+        debug_assert!(
+            from_ptr != to_ptr,
+            "vector::move_range requires distinct `from`/`to` vectors"
+        );
+
+        let elem = elem_size as usize;
+        let (rp, ip, len) = (
+            removal_position as usize,
+            insert_position as usize,
+            length as usize,
+        );
+        // SAFETY: the bounds check and the grow keep every range within its
+        // vector's allocation, and no allocation runs past this point.
+        unsafe {
+            let from_data = from_ptr.add(VEC_DATA_OFFSET);
+            let to_data = to_ptr.add(VEC_DATA_OFFSET);
+            // Open a gap in `to` by shifting its tail up, ...
+            std::ptr::copy(
+                to_data.add(ip * elem),
+                to_data.add((ip + len) * elem),
+                (to_len as usize - ip) * elem,
+            );
+            // ... fill it with the moved range (distinct vectors, non-overlapping), ...
+            std::ptr::copy_nonoverlapping(
+                from_data.add(rp * elem),
+                to_data.add(ip * elem),
+                len * elem,
+            );
+            // ... and close the gap left in `from` by shifting its tail down.
+            std::ptr::copy(
+                from_data.add((rp + len) * elem),
+                from_data.add(rp * elem),
+                (from_len as usize - rp - len) * elem,
+            );
+            write_u64(from_ptr, VEC_LENGTH_OFFSET, from_len - length);
+            write_u64(to_ptr, VEC_LENGTH_OFFSET, to_len + length);
         }
         Ok(())
     }
