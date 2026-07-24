@@ -26,8 +26,8 @@
 use crate::{
     lower::context::concrete_type_size,
     stackless_exec_ir::{
-        instr_utils::{clobbers_xfer, for_each_value_use},
-        BasicBlock, Instr, ModuleIR, Slot,
+        instr_utils::{clobbers_transfer, for_each_value_use},
+        BasicBlock, Instr, ModuleIR, NamedSlot,
     },
 };
 use mono_move_core::{
@@ -44,14 +44,11 @@ enum GasInstrumentationError {
     #[error("expected a reference type")]
     ExpectedReferenceType,
 
-    #[error("Xfer({xfer}) read without a prior call-return binding")]
-    XferReadWithoutBinding { xfer: u16 },
+    #[error("Transfer({transfer}) read without a prior call-return binding")]
+    TransferReadWithoutBinding { transfer: u16 },
 
     #[error("empty field chain")]
     EmptyFieldChain,
-
-    #[error("Vid slot in post-allocation IR")]
-    VidInPostAllocationIr,
 
     #[error("field owner is not a struct type")]
     FieldOwnerNotStruct,
@@ -77,9 +74,8 @@ impl IntoExecutionError for GasInstrumentationError {
         use GasInstrumentationError::*;
         match self {
             ExpectedReferenceType
-            | XferReadWithoutBinding { .. }
+            | TransferReadWithoutBinding { .. }
             | EmptyFieldChain
-            | VidInPostAllocationIr
             | FieldOwnerNotStruct
             | VariantOwnerNotEnum
             | EnumDefinitionNotFound
@@ -183,7 +179,7 @@ pub(crate) fn instrument<I: Interner>(module_ir: &mut ModuleIR, interner: &I) ->
             module,
             interner,
             home_slot_types: &func.home_slot_types,
-            xfer_ret_types: vec![None; func.num_xfer_positions as usize],
+            transfer_ret_types: vec![None; func.num_transfer_positions as usize],
         };
         // Indexed by block label (dense `0..blocks.len()`).
         let mut costs = vec![BlockCost::zero(); func.blocks.len()];
@@ -195,35 +191,34 @@ pub(crate) fn instrument<I: Interner>(module_ir: &mut ModuleIR, interner: &I) ->
     Ok(())
 }
 
-/// Builds cost formulas by walking the IR. Xfer slots carry no type in the IR,
+/// Builds cost formulas by walking the IR. Transfer slots carry no type in the IR,
 /// so the emitter tracks the type flowing through each one.
 struct Emitter<'a, I: Interner> {
     module: &'a PreparedModule,
     interner: &'a I,
     /// Type of each Home slot, indexed by Home slot id.
     home_slot_types: &'a [InternedType],
-    /// Type bound to each Xfer position by the most recent call's returns.
+    /// Type bound to each Transfer position by the most recent call's returns.
     /// Block-local: reset per block and clobbered by every call.
-    xfer_ret_types: Vec<Option<InternedType>>,
+    transfer_ret_types: Vec<Option<InternedType>>,
 }
 
 impl<I: Interner> Emitter<'_, I> {
-    /// Type of the value in `slot`. An Xfer slot read here always holds a prior
+    /// Type of the value in `slot`. A Transfer slot read here always holds a prior
     /// call's return (call arguments are costed from the callee signature).
-    fn slot_ty(&self, slot: Slot) -> VMResult<InternedType> {
+    fn slot_ty(&self, slot: NamedSlot) -> VMResult<InternedType> {
         match slot {
-            Slot::Home(i) => Ok(self.home_slot_types[i as usize]),
-            Slot::Xfer(j) => self.xfer_ret_types[j as usize].ok_or_else(|| {
-                VMInternalError::new(GasInstrumentationError::XferReadWithoutBinding { xfer: j })
+            NamedSlot::Home(i) => Ok(self.home_slot_types[i.0 as usize]),
+            NamedSlot::Transfer(j) => self.transfer_ret_types[j.0 as usize].ok_or_else(|| {
+                VMInternalError::new(GasInstrumentationError::TransferReadWithoutBinding {
+                    transfer: j.0,
+                })
             }),
-            Slot::Vid(_) => Err(VMInternalError::new(
-                GasInstrumentationError::VidInPostAllocationIr,
-            )),
         }
     }
 
     /// Pointee type of a reference slot (`ReadRef`/`WriteRef` touch the pointee).
-    fn pointee_ty(&self, ref_slot: Slot) -> VMResult<InternedType> {
+    fn pointee_ty(&self, ref_slot: NamedSlot) -> VMResult<InternedType> {
         strip_ref(self.slot_ty(ref_slot)?)
             .ok_or_else(|| VMInternalError::new(GasInstrumentationError::ExpectedReferenceType))
     }
@@ -279,33 +274,33 @@ impl<I: Interner> Emitter<'_, I> {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
-    /// Cost of the formula for one block, resetting Xfer tracking at its start.
-    fn block_cost(&mut self, block: &BasicBlock) -> VMResult<BlockCost> {
-        // Xfer slots are block-local.
-        self.xfer_ret_types.fill(None);
+    /// Cost of the formula for one block, resetting Transfer tracking at its start.
+    fn block_cost(&mut self, block: &BasicBlock<NamedSlot>) -> VMResult<BlockCost> {
+        // Transfer slots are block-local.
+        self.transfer_ret_types.fill(None);
         let mut b = BlockCost::zero();
         for instr in &block.instrs {
             self.instr_cost(&mut b, instr)?;
-            self.advance_xfer_tracking(instr);
+            self.advance_transfer_tracking(instr);
         }
         Ok(b)
     }
 
-    /// After costing `instr`, drop the Xfer slots it consumed. Calls manage
+    /// After costing `instr`, drop the Transfer slots it consumed. Calls manage
     /// their own return bindings in [`Self::call_cost`].
-    fn advance_xfer_tracking(&mut self, instr: &Instr) {
-        if clobbers_xfer(instr) {
+    fn advance_transfer_tracking(&mut self, instr: &Instr<NamedSlot>) {
+        if clobbers_transfer(instr) {
             return;
         }
         for_each_value_use(instr, |s| {
-            if let Slot::Xfer(j) = s {
-                self.xfer_ret_types[j as usize] = None;
+            if let NamedSlot::Transfer(j) = s {
+                self.transfer_ret_types[j.0 as usize] = None;
             }
         });
     }
 
     /// Emit the cost of `instr` into `b`.
-    fn instr_cost(&mut self, b: &mut BlockCost, instr: &Instr) -> VMResult<()> {
+    fn instr_cost(&mut self, b: &mut BlockCost, instr: &Instr<NamedSlot>) -> VMResult<()> {
         match instr {
             // --- Loads ---
             Instr::LdConst { .. } | Instr::LdImm { .. } => b.add_constant(LD),
@@ -474,12 +469,12 @@ impl<I: Interner> Emitter<'_, I> {
     }
 
     /// Dispatch, a move per argument (sized from the callee signature), and a
-    /// move per Home-slot return. Also binds the call's Xfer returns.
+    /// move per Home-slot return. Also binds the call's Transfer returns.
     fn call_cost(
         &mut self,
         b: &mut BlockCost,
         param_types: InternedTypeList,
-        ret_slots: &[Slot],
+        ret_slots: &[NamedSlot],
         ret_types: InternedTypeList,
     ) -> VMResult<()> {
         b.add_constant(CALL);
@@ -488,16 +483,11 @@ impl<I: Interner> Emitter<'_, I> {
         }
         for ret in ret_slots {
             match *ret {
-                Slot::Xfer(_) => {
+                NamedSlot::Transfer(_) => {
                     // Placed without a copy.
                 },
-                Slot::Home(i) => {
-                    b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.home_slot_types[i as usize])
-                },
-                Slot::Vid(_) => {
-                    return Err(VMInternalError::new(
-                        GasInstrumentationError::VidInPostAllocationIr,
-                    ))
+                NamedSlot::Home(i) => {
+                    b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.home_slot_types[i.0 as usize])
                 },
             }
         }
@@ -505,20 +495,20 @@ impl<I: Interner> Emitter<'_, I> {
         Ok(())
     }
 
-    /// Clobber all Xfer slots, then bind each Xfer return to its callee type.
+    /// Clobber all Transfer slots, then bind each Transfer return to its callee type.
     fn bind_call_returns(
         &mut self,
-        ret_slots: &[Slot],
+        ret_slots: &[NamedSlot],
         ret_types: InternedTypeList,
     ) -> VMResult<()> {
-        self.xfer_ret_types.fill(None);
+        self.transfer_ret_types.fill(None);
         let ret_types = view_type_list(ret_types);
         for (k, ret) in ret_slots.iter().enumerate() {
-            if let Slot::Xfer(j) = *ret {
+            if let NamedSlot::Transfer(j) = *ret {
                 let ty = *ret_types
                     .get(k)
                     .ok_or(GasInstrumentationError::CallReturnNoSignatureType { ret_idx: k })?;
-                self.xfer_ret_types[j as usize] = Some(ty);
+                self.transfer_ret_types[j.0 as usize] = Some(ty);
             }
         }
         Ok(())

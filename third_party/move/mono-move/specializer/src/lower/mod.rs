@@ -27,8 +27,8 @@ enum LoweringError {
     ClosureSignatureNotFunction,
 
     // ---- post-allocation IR sanity ----
-    #[error("Vid slot in post-allocation IR")]
-    VidInPostAllocationIr,
+    #[error("Transfer({transfer}) read without a prior def in this block")]
+    TransferReadWithoutDef { transfer: u16 },
 
     #[error("scratch slot required when emitting 2+ parallel copies")]
     ScratchSlotRequiredForParallelCopy,
@@ -179,9 +179,6 @@ enum LoweringError {
 
     #[error("field chain offset overflow")]
     FieldChainOffsetOverflow,
-
-    #[error("Xfer({xfer}) read without a prior def in this block")]
-    XferReadWithoutDef { xfer: u16 },
 }
 
 impl IntoExecutionError for LoweringError {
@@ -191,7 +188,7 @@ impl IntoExecutionError for LoweringError {
             NativeAbi(e) => e.kind(),
             ExpectedReferenceType
             | ClosureSignatureNotFunction
-            | VidInPostAllocationIr
+            | TransferReadWithoutDef { .. }
             | ScratchSlotRequiredForParallelCopy
             | LayoutNotPopulated
             | TypeParamReachedGcLayout
@@ -233,8 +230,7 @@ impl IntoExecutionError for LoweringError {
             | VariantOrdinalOutOfRange { .. }
             | EnumPtrScratchMissing { .. }
             | EmptyFieldChain
-            | FieldChainOffsetOverflow
-            | XferReadWithoutDef { .. } => ExecutionErrorKind::InvariantViolation,
+            | FieldChainOffsetOverflow => ExecutionErrorKind::InvariantViolation,
         }
     }
 }

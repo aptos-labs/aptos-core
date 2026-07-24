@@ -10,7 +10,7 @@
 
 use crate::stackless_exec_ir::{
     instr_utils::{for_each_value_use, is_commutative},
-    BasicBlock, BinaryOp, FieldPath, Instr, Slot,
+    BasicBlock, BinaryOp, FieldPath, Instr, SsaSlot,
 };
 use mono_move_core::types::InternedType;
 use shared_dsa::UnorderedMap;
@@ -18,9 +18,9 @@ use shared_dsa::UnorderedMap;
 /// Intermediate SSA representation of a single function, before slot allocation.
 pub(crate) struct SSAFunction {
     /// Basic blocks in SSA form.
-    pub blocks: Vec<BasicBlock>,
+    pub blocks: Vec<BasicBlock<SsaSlot>>,
     /// Type of each value ID, indexed directly by the value ID number.
-    pub vid_types: Vec<InternedType>,
+    pub value_id_types: Vec<InternedType>,
     /// Types of all locals (params ++ declared locals).
     pub local_types: Vec<InternedType>,
 }
@@ -53,7 +53,10 @@ impl SSAFunction {
 /// For each position, calls `try_fuse(&instrs[r], &instrs[r+1])`. If it returns
 /// `Some(fused)`, the pair is replaced by the single fused instruction. Otherwise
 /// the instruction is kept as-is. Uses a write-cursor so no allocation is needed.
-fn fuse_pairs(instrs: &mut Vec<Instr>, try_fuse: fn(&Instr, &Instr) -> Option<Instr>) {
+fn fuse_pairs(
+    instrs: &mut Vec<Instr<SsaSlot>>,
+    try_fuse: fn(&Instr<SsaSlot>, &Instr<SsaSlot>) -> Option<Instr<SsaSlot>>,
+) {
     let mut write = 0;
     let mut read = 0;
     while read < instrs.len() {
@@ -79,7 +82,10 @@ fn fuse_pairs(instrs: &mut Vec<Instr>, try_fuse: fn(&Instr, &Instr) -> Option<In
 }
 
 /// Try to fuse a borrow+deref pair into a combined field access instruction.
-fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
+fn try_fuse_field_access(
+    first: &Instr<SsaSlot>,
+    second: &Instr<SsaSlot>,
+) -> Option<Instr<SsaSlot>> {
     match (first, second) {
         (
             Instr::ImmBorrowField {
@@ -149,7 +155,10 @@ fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
 
 /// Try to fuse a `borrow_loc` followed by a field op on its result into a
 /// single local-field op, eliding the intermediate fat pointer.
-fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
+fn try_fuse_local_field_access(
+    first: &Instr<SsaSlot>,
+    second: &Instr<SsaSlot>,
+) -> Option<Instr<SsaSlot>> {
     match (first, second) {
         (
             Instr::ImmBorrowLoc { dst: ref_r, local },
@@ -214,7 +223,10 @@ fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
 /// Try to fuse a comparison + conditional branch pair into a single `BrCmp`/`BrCmpImm`.
 ///
 /// Handles both `BrTrue` (keeps the comparison operator) and `BrFalse` (negates it).
-fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
+fn try_fuse_compare_branch(
+    first: &Instr<SsaSlot>,
+    second: &Instr<SsaSlot>,
+) -> Option<Instr<SsaSlot>> {
     match (first, second) {
         (
             Instr::BinaryOp {
@@ -279,29 +291,29 @@ fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
 /// Where a fused field chain is rooted.
 enum ChainRoot {
     /// A by-value inline-struct local (the `*BorrowLoc` is absorbed).
-    Local(Slot),
+    Local(SsaSlot),
     /// A reference (any non-chain ref value).
-    Ref(Slot),
+    Ref(SsaSlot),
 }
 
 /// How a chain ends.
 enum ChainTerminal {
     /// `ReadRef` of the deepest reference — a by-value field read. `dst` is
     /// the `ReadRef`'s destination, receiving the field's bytes.
-    Read { dst: Slot },
+    Read { dst: SsaSlot },
     /// `WriteRef` through the deepest reference — a field write. `val` is the
     /// `WriteRef`'s value operand, whose bytes are stored into the field.
-    Write { val: Slot },
+    Write { val: SsaSlot },
     /// The deepest reference escapes (returned, passed, frozen, ...) — a
     /// borrow. `dst` is that reference itself, which the fused instruction
     /// takes over defining; its consumers stay unchanged.
-    Borrow { dst: Slot },
+    Borrow { dst: SsaSlot },
 }
 
 /// A fused chain and how it rewrites the instruction stream.
 struct FusedChain {
     /// The fused instruction.
-    instr: Instr,
+    instr: Instr<SsaSlot>,
     /// The single position that survives the rewrite: `instr` overwrites the
     /// original instruction here (the terminal read/write, or the last borrow
     /// for a borrow chain); every other absorbed position is deleted.
@@ -329,7 +341,7 @@ const MIN_CHAIN_DEPTH: usize = 2;
 /// that terminal is sound because a reference is an address compute
 /// (`base + offset`), not a value snapshot, and Move forbids modifying the root
 /// while it stays borrowed. Depth-1 runs are left to the pairwise passes.
-fn fuse_field_chains(instrs: &mut Vec<Instr>) {
+fn fuse_field_chains(instrs: &mut Vec<Instr<SsaSlot>>) {
     // Every fusable chain contains at least `MIN_CHAIN_DEPTH` struct field
     // borrows; skip the analysis allocations for blocks that cannot hold one
     // (the common case).
@@ -353,7 +365,7 @@ fn fuse_field_chains(instrs: &mut Vec<Instr>) {
     // the compaction loop below: `placed[pos]` replaces the instruction at
     // `pos` with the fused one, `removed[pos]` deletes it. `placed` stays
     // empty when nothing fuses.
-    let mut placed: Vec<Option<Instr>> = Vec::new();
+    let mut placed: Vec<Option<Instr<SsaSlot>>> = Vec::new();
     let mut removed: Vec<bool> = Vec::new();
 
     let mut start = 0;
@@ -405,14 +417,14 @@ fn fuse_field_chains(instrs: &mut Vec<Instr>) {
     instrs.truncate(write);
 }
 
-/// For each `Vid`, the `(use count, last consumer position)` pair. A reference
-/// `Vid` is linkable into a chain only when its use count is exactly 1, in which
+/// For each `ValueId`, the `(use count, last consumer position)` pair. A reference
+/// `ValueId` is linkable into a chain only when its use count is exactly 1, in which
 /// case the recorded position is that sole consumer's.
-fn value_use_info(instrs: &[Instr]) -> UnorderedMap<Slot, (u32, usize)> {
-    let mut info: UnorderedMap<Slot, (u32, usize)> = UnorderedMap::new();
+fn value_use_info(instrs: &[Instr<SsaSlot>]) -> UnorderedMap<SsaSlot, (u32, usize)> {
+    let mut info: UnorderedMap<SsaSlot, (u32, usize)> = UnorderedMap::new();
     for (pos, instr) in instrs.iter().enumerate() {
         for_each_value_use(instr, |slot| {
-            if slot.is_vid() {
+            if slot.is_value_id() {
                 let entry = info.entry(slot).or_insert((0, pos));
                 entry.0 += 1;
                 entry.1 = pos;
@@ -424,11 +436,12 @@ fn value_use_info(instrs: &[Instr]) -> UnorderedMap<Slot, (u32, usize)> {
 
 /// Try to build a fused field chain rooted at `instrs[start]`.
 fn try_build_chain(
-    instrs: &[Instr],
+    instrs: &[Instr<SsaSlot>],
     start: usize,
-    use_info: &UnorderedMap<Slot, (u32, usize)>,
+    use_info: &UnorderedMap<SsaSlot, (u32, usize)>,
 ) -> Option<FusedChain> {
-    let linkable = |slot: Slot| slot.is_vid() && matches!(use_info.get(&slot), Some(&(1, _)));
+    let linkable =
+        |slot: SsaSlot| slot.is_value_id() && matches!(use_info.get(&slot), Some(&(1, _)));
 
     // Identify the head: the root, the reference the next struct field-borrow
     // must consume, the next index, and the path so far. The borrow kind (`Imm`
@@ -506,7 +519,7 @@ fn try_build_chain(
     // escapes (returned, passed, frozen, used more than once) and ends a borrow.
     // Field borrows are pure address computes (no abort), so the terminal may
     // sink past intervening instructions freely.
-    let sole_use_pos = if cur_ref.is_vid() {
+    let sole_use_pos = if cur_ref.is_value_id() {
         use_info
             .get(&cur_ref)
             .and_then(|&(count, pos)| (count == 1).then_some(pos))
@@ -545,7 +558,7 @@ fn build_chain_instr(
     is_mut: bool,
     path: FieldPath,
     terminal: ChainTerminal,
-) -> Instr {
+) -> Instr<SsaSlot> {
     match root {
         ChainRoot::Local(local) => match terminal {
             ChainTerminal::Read { dst } => Instr::ReadLocFieldChain { dst, path, local },
@@ -571,7 +584,10 @@ fn build_chain_instr(
 }
 
 /// Try to fuse a `LdImm` + `BinaryOp` pair into a `BinaryOpImm` instruction.
-fn try_fuse_immediate_binop(first: &Instr, second: &Instr) -> Option<Instr> {
+fn try_fuse_immediate_binop(
+    first: &Instr<SsaSlot>,
+    second: &Instr<SsaSlot>,
+) -> Option<Instr<SsaSlot>> {
     match (first, second) {
         (Instr::LdImm { dst: tmp, imm }, Instr::BinaryOp { dst, op, lhs, rhs }) if *tmp == *rhs => {
             Some(Instr::BinaryOpImm {

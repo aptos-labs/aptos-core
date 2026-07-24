@@ -4,7 +4,10 @@
 //! Display for the stackless IR. Types render from their interned form;
 //! entity handles (functions, fields, variants) resolve via `CompiledModule`.
 
-use super::{BinaryOp, CmpKind, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
+use super::{
+    BinaryOp, CmpKind, FunctionIR, HomeIndex, ImmValue, Instr, ModuleIR, NamedSlot, SsaSlot,
+    UnaryOp,
+};
 use mono_move_core::types::{display_type, display_type_list, InternedTypeList};
 use move_binary_format::{
     access::ModuleAccess,
@@ -12,6 +15,24 @@ use move_binary_format::{
     CompiledModule,
 };
 use std::fmt;
+
+impl fmt::Display for SsaSlot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SsaSlot::Home(i) => write!(f, "r{}", i.0),
+            SsaSlot::ValueId(i) => write!(f, "v{}", i),
+        }
+    }
+}
+
+impl fmt::Display for NamedSlot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NamedSlot::Home(i) => write!(f, "r{}", i.0),
+            NamedSlot::Transfer(i) => write!(f, "x{}", i.0),
+        }
+    }
+}
 
 impl fmt::Display for ModuleIR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -46,7 +67,7 @@ fn display_function(
         if i > 0 {
             write!(f, ", ")?;
         }
-        write!(f, "{}", slot_name(Slot::Home(i as u16)))?;
+        write!(f, "{}", NamedSlot::Home(HomeIndex(i as u16)))?;
     }
     write!(f, ")")?;
     if !returns.is_empty() {
@@ -60,11 +81,11 @@ fn display_function(
     }
     writeln!(f, " {{")?;
     let num_temps = func.num_home_slots - func.num_params - func.num_locals;
-    if func.num_xfer_positions > 0 {
+    if func.num_transfer_positions > 0 {
         writeln!(
             f,
-            "  slots: params({}), locals({}), temps({}), xfer({})",
-            func.num_params, func.num_locals, num_temps, func.num_xfer_positions
+            "  slots: params({}), locals({}), temps({}), transfer({})",
+            func.num_params, func.num_locals, num_temps, func.num_transfer_positions
         )?;
     } else {
         writeln!(
@@ -99,26 +120,18 @@ fn display_function(
     Ok(())
 }
 
-fn slot_name(s: Slot) -> String {
-    match s {
-        Slot::Home(i) => format!("r{}", i),
-        Slot::Xfer(i) => format!("x{}", i),
-        Slot::Vid(i) => format!("v{}", i),
-    }
-}
-
-fn slot_names(ss: &[Slot]) -> String {
-    let parts: Vec<String> = ss.iter().map(|s| slot_name(*s)).collect();
+fn slot_names<SlotForm: fmt::Display>(ss: &[SlotForm]) -> String {
+    let parts: Vec<String> = ss.iter().map(|s| s.to_string()).collect();
     format!("[{}]", parts.join(", "))
 }
 
 /// Write `dest := ` prefix for a single destination slot.
-fn write_dst(f: &mut fmt::Formatter<'_>, d: Slot) -> fmt::Result {
-    write!(f, "{} := ", slot_name(d))
+fn write_dst<SlotForm: fmt::Display>(f: &mut fmt::Formatter<'_>, d: SlotForm) -> fmt::Result {
+    write!(f, "{} := ", d)
 }
 
 /// Write `[dests] := ` prefix for multiple destination slots.
-fn write_dsts(f: &mut fmt::Formatter<'_>, ds: &[Slot]) -> fmt::Result {
+fn write_dsts<SlotForm: fmt::Display>(f: &mut fmt::Formatter<'_>, ds: &[SlotForm]) -> fmt::Result {
     write!(f, "{} := ", slot_names(ds))
 }
 
@@ -182,10 +195,10 @@ fn field_path_name(module: &CompiledModule, path: &super::FieldPath) -> String {
         .join(".")
 }
 
-fn display_instr(
+fn display_instr<SlotForm: Copy + fmt::Display>(
     f: &mut fmt::Formatter<'_>,
     module: &CompiledModule,
-    instr: &Instr,
+    instr: &Instr<SlotForm>,
 ) -> fmt::Result {
     match instr {
         // --- Loads: dst := instr literal ---
@@ -201,40 +214,28 @@ fn display_instr(
         // --- Slot ops: dst := copy/move src ---
         Instr::Copy { dst, src } => {
             write_dst(f, *dst)?;
-            write!(f, "copy {}", slot_name(*src))
+            write!(f, "copy {}", src)
         },
         Instr::Move { dst, src } => {
             write_dst(f, *dst)?;
-            write!(f, "move {}", slot_name(*src))
+            write!(f, "move {}", src)
         },
 
         // --- Unary: dst := op src ---
         Instr::UnaryOp { dst, op, src } => {
             write_dst(f, *dst)?;
             write_unary_op(f, op)?;
-            write!(f, " {}", slot_name(*src))
+            write!(f, " {}", src)
         },
         // --- Binary: dst := op lhs, rhs ---
         Instr::BinaryOp { dst, op, lhs, rhs } => {
             write_dst(f, *dst)?;
-            write!(
-                f,
-                "{} {}, {}",
-                binary_op_name(op),
-                slot_name(*lhs),
-                slot_name(*rhs)
-            )
+            write!(f, "{} {}, {}", binary_op_name(op), lhs, rhs)
         },
         // --- Binary immediate: dst := op lhs, #imm ---
         Instr::BinaryOpImm { dst, op, lhs, imm } => {
             write_dst(f, *dst)?;
-            write!(
-                f,
-                "{} {}, {}",
-                binary_op_name(op),
-                slot_name(*lhs),
-                imm_value(imm)
-            )
+            write!(f, "{} {}, {}", binary_op_name(op), lhs, imm_value(imm))
         },
 
         // --- Struct ---
@@ -256,7 +257,7 @@ fn display_instr(
             write_dsts(f, dsts)?;
             write!(f, "unpack ")?;
             display_type(f, *struct_ty)?;
-            write!(f, ", {}", slot_name(*src))
+            write!(f, ", {}", src)
         },
 
         // --- Variant ---
@@ -280,7 +281,7 @@ fn display_instr(
             write_dsts(f, dsts)?;
             write!(f, "unpack_variant ")?;
             display_type(f, *enum_ty)?;
-            write!(f, "@{}, {}", variant, slot_name(*src))
+            write!(f, "@{}, {}", variant, src)
         },
         Instr::TestVariant {
             dst,
@@ -291,17 +292,17 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "test_variant ")?;
             display_type(f, *enum_ty)?;
-            write!(f, "@{}, {}", variant, slot_name(*src))
+            write!(f, "@{}, {}", variant, src)
         },
 
         // --- References ---
         Instr::ImmBorrowLoc { dst, local } => {
             write_dst(f, *dst)?;
-            write!(f, "imm_borrow_loc {}", slot_name(*local))
+            write!(f, "imm_borrow_loc {}", local)
         },
         Instr::MutBorrowLoc { dst, local } => {
             write_dst(f, *dst)?;
-            write!(f, "mut_borrow_loc {}", slot_name(*local))
+            write!(f, "mut_borrow_loc {}", local)
         },
         Instr::ImmBorrowField {
             dst, field, src, ..
@@ -311,7 +312,7 @@ fn display_instr(
                 f,
                 "imm_borrow_field {}, {}",
                 field_name(module, *field),
-                slot_name(*src)
+                src
             )
         },
         Instr::MutBorrowField {
@@ -322,7 +323,7 @@ fn display_instr(
                 f,
                 "mut_borrow_field {}, {}",
                 field_name(module, *field),
-                slot_name(*src)
+                src
             )
         },
         Instr::ImmBorrowVariantField {
@@ -333,7 +334,7 @@ fn display_instr(
                 f,
                 "imm_borrow_variant_field {}, {}",
                 variant_field_name(module, *field),
-                slot_name(*src)
+                src
             )
         },
         Instr::MutBorrowVariantField {
@@ -344,16 +345,16 @@ fn display_instr(
                 f,
                 "mut_borrow_variant_field {}, {}",
                 variant_field_name(module, *field),
-                slot_name(*src)
+                src
             )
         },
         Instr::ReadRef { dst, src } => {
             write_dst(f, *dst)?;
-            write!(f, "read_ref {}", slot_name(*src))
+            write!(f, "read_ref {}", src)
         },
         // WriteRef has no destination (side-effect only)
         Instr::WriteRef { dst_ref, val } => {
-            write!(f, "write_ref {}, {}", slot_name(*dst_ref), slot_name(*val))
+            write!(f, "write_ref {}, {}", dst_ref, val)
         },
 
         // --- Fused field access ---
@@ -361,12 +362,7 @@ fn display_instr(
             dst, field, src, ..
         } => {
             write_dst(f, *dst)?;
-            write!(
-                f,
-                "read_field {}, {}",
-                field_name(module, *field),
-                slot_name(*src)
-            )
+            write!(f, "read_field {}, {}", field_name(module, *field), src)
         },
         Instr::WriteField {
             dst_ref,
@@ -378,8 +374,8 @@ fn display_instr(
                 f,
                 "write_field {}, {}, {}",
                 field_name(module, *field),
-                slot_name(*dst_ref),
-                slot_name(*val)
+                dst_ref,
+                val
             )
         },
         Instr::ReadVariantField {
@@ -390,7 +386,7 @@ fn display_instr(
                 f,
                 "read_variant_field {}, {}",
                 variant_field_name(module, *field),
-                slot_name(*src)
+                src
             )
         },
         Instr::WriteVariantField {
@@ -403,8 +399,8 @@ fn display_instr(
                 f,
                 "write_variant_field {}, {}, {}",
                 variant_field_name(module, *field),
-                slot_name(*dst_ref),
-                slot_name(*val)
+                dst_ref,
+                val
             )
         },
 
@@ -417,7 +413,7 @@ fn display_instr(
                 f,
                 "imm_borrow_loc_field {}, {}",
                 field_name(module, *field),
-                slot_name(*local)
+                local
             )
         },
         Instr::MutBorrowLocField {
@@ -428,7 +424,7 @@ fn display_instr(
                 f,
                 "mut_borrow_loc_field {}, {}",
                 field_name(module, *field),
-                slot_name(*local)
+                local
             )
         },
         Instr::ReadLocField {
@@ -439,7 +435,7 @@ fn display_instr(
                 f,
                 "read_loc_field {}, {}",
                 field_name(module, *field),
-                slot_name(*local)
+                local
             )
         },
         Instr::WriteLocField {
@@ -449,8 +445,8 @@ fn display_instr(
                 f,
                 "write_loc_field {}, {}, {}",
                 field_name(module, *field),
-                slot_name(*local),
-                slot_name(*val)
+                local,
+                val
             )
         },
 
@@ -461,7 +457,7 @@ fn display_instr(
                 f,
                 "read_field_chain {}, {}",
                 field_path_name(module, path),
-                slot_name(*src)
+                src
             )
         },
         Instr::WriteFieldChain { dst_ref, path, val } => {
@@ -469,8 +465,8 @@ fn display_instr(
                 f,
                 "write_field_chain {}, {}, {}",
                 field_path_name(module, path),
-                slot_name(*dst_ref),
-                slot_name(*val)
+                dst_ref,
+                val
             )
         },
         Instr::ImmBorrowFieldChain { dst, path, src } => {
@@ -479,7 +475,7 @@ fn display_instr(
                 f,
                 "imm_borrow_field_chain {}, {}",
                 field_path_name(module, path),
-                slot_name(*src)
+                src
             )
         },
         Instr::MutBorrowFieldChain { dst, path, src } => {
@@ -488,7 +484,7 @@ fn display_instr(
                 f,
                 "mut_borrow_field_chain {}, {}",
                 field_path_name(module, path),
-                slot_name(*src)
+                src
             )
         },
         Instr::ReadLocFieldChain { dst, path, local } => {
@@ -497,7 +493,7 @@ fn display_instr(
                 f,
                 "read_loc_field_chain {}, {}",
                 field_path_name(module, path),
-                slot_name(*local)
+                local
             )
         },
         Instr::WriteLocFieldChain { local, path, val } => {
@@ -505,8 +501,8 @@ fn display_instr(
                 f,
                 "write_loc_field_chain {}, {}, {}",
                 field_path_name(module, path),
-                slot_name(*local),
-                slot_name(*val)
+                local,
+                val
             )
         },
         Instr::ImmBorrowLocFieldChain { dst, path, local } => {
@@ -515,7 +511,7 @@ fn display_instr(
                 f,
                 "imm_borrow_loc_field_chain {}, {}",
                 field_path_name(module, path),
-                slot_name(*local)
+                local
             )
         },
         Instr::MutBorrowLocFieldChain { dst, path, local } => {
@@ -524,7 +520,7 @@ fn display_instr(
                 f,
                 "mut_borrow_loc_field_chain {}, {}",
                 field_path_name(module, path),
-                slot_name(*local)
+                local
             )
         },
 
@@ -537,7 +533,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "exists ")?;
             display_type(f, *resource_ty)?;
-            write!(f, ", {}", slot_name(*addr))
+            write!(f, ", {}", addr)
         },
         Instr::MoveFrom {
             dst,
@@ -547,7 +543,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "move_from ")?;
             display_type(f, *resource_ty)?;
-            write!(f, ", {}", slot_name(*addr))
+            write!(f, ", {}", addr)
         },
         // MoveTo has no destination (side-effect)
         Instr::MoveTo {
@@ -557,7 +553,7 @@ fn display_instr(
         } => {
             write!(f, "move_to ")?;
             display_type(f, *resource_ty)?;
-            write!(f, ", {}, {}", slot_name(*signer), slot_name(*val))
+            write!(f, ", {}, {}", signer, val)
         },
         Instr::ImmBorrowGlobal {
             dst,
@@ -567,7 +563,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "imm_borrow_global ")?;
             display_type(f, *resource_ty)?;
-            write!(f, ", {}", slot_name(*addr))
+            write!(f, ", {}", addr)
         },
         Instr::MutBorrowGlobal {
             dst,
@@ -577,7 +573,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "mut_borrow_global ")?;
             display_type(f, *resource_ty)?;
-            write!(f, ", {}", slot_name(*addr))
+            write!(f, ", {}", addr)
         },
 
         // --- Calls ---
@@ -623,7 +619,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "vec_len ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}", slot_name(*vec_ref))
+            write!(f, ", {}", vec_ref)
         },
         Instr::VecImmBorrow {
             dst,
@@ -634,7 +630,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "vec_imm_borrow ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}, {}", slot_name(*vec_ref), slot_name(*idx))
+            write!(f, ", {}, {}", vec_ref, idx)
         },
         Instr::VecMutBorrow {
             dst,
@@ -645,7 +641,7 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "vec_mut_borrow ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}, {}", slot_name(*vec_ref), slot_name(*idx))
+            write!(f, ", {}, {}", vec_ref, idx)
         },
         // VecPushBack has no destination
         Instr::VecPushBack {
@@ -655,7 +651,7 @@ fn display_instr(
         } => {
             write!(f, "vec_push_back ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}, {}", slot_name(*vec_ref), slot_name(*val))
+            write!(f, ", {}, {}", vec_ref, val)
         },
         Instr::VecPopBack {
             dst,
@@ -665,13 +661,13 @@ fn display_instr(
             write_dst(f, *dst)?;
             write!(f, "vec_pop_back ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}", slot_name(*vec_ref))
+            write!(f, ", {}", vec_ref)
         },
         Instr::VecUnpack { dsts, elem_ty, src } => {
             write_dsts(f, dsts)?;
             write!(f, "vec_unpack ")?;
             display_type(f, *elem_ty)?;
-            write!(f, ", {}, {}", dsts.len(), slot_name(*src))
+            write!(f, ", {}, {}", dsts.len(), src)
         },
         // VecSwap has no destination
         Instr::VecSwap {
@@ -682,34 +678,21 @@ fn display_instr(
         } => {
             write!(f, "vec_swap ")?;
             display_type(f, *elem_ty)?;
-            write!(
-                f,
-                ", {}, {}, {}",
-                slot_name(*vec_ref),
-                slot_name(*idx_a),
-                slot_name(*idx_b)
-            )
+            write!(f, ", {}, {}, {}", vec_ref, idx_a, idx_b)
         },
 
         // --- Control flow (no destinations) ---
         Instr::Branch { target } => write!(f, "branch L{}", target.0),
-        Instr::BrTrue { target, cond } => write!(f, "br_true L{}, {}", target.0, slot_name(*cond)),
+        Instr::BrTrue { target, cond } => write!(f, "br_true L{}, {}", target.0, cond),
         Instr::BrFalse { target, cond } => {
-            write!(f, "br_false L{}, {}", target.0, slot_name(*cond))
+            write!(f, "br_false L{}, {}", target.0, cond)
         },
         Instr::BrCmp {
             target,
             op,
             lhs,
             rhs,
-        } => write!(
-            f,
-            "br_{} L{}, {}, {}",
-            cmp_op_name(op),
-            target.0,
-            slot_name(*lhs),
-            slot_name(*rhs)
-        ),
+        } => write!(f, "br_{} L{}, {}, {}", cmp_op_name(op), target.0, lhs, rhs),
         Instr::BrCmpImm {
             target,
             op,
@@ -720,13 +703,13 @@ fn display_instr(
             "br_{} L{}, {}, {}",
             cmp_op_name(op),
             target.0,
-            slot_name(*lhs),
+            lhs,
             imm_value(imm)
         ),
         Instr::Ret { srcs } => write!(f, "ret {}", slot_names(srcs)),
-        Instr::Abort { code } => write!(f, "abort {}", slot_name(*code)),
+        Instr::Abort { code } => write!(f, "abort {}", code),
         Instr::AbortMsg { code, msg } => {
-            write!(f, "abort_msg {}, {}", slot_name(*code), slot_name(*msg))
+            write!(f, "abort_msg {}, {}", code, msg)
         },
         Instr::ForceGC => write!(f, "force_gc"),
     }

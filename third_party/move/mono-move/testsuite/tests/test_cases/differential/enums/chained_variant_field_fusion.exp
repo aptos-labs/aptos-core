@@ -86,7 +86,7 @@ fun read_u(r0): u8 {
 }
 
 fun run_read_e(r0, r1): u8 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u8
     r2: 0x99::chained_variant_field_fusion::E
@@ -99,7 +99,7 @@ fun run_read_e(r0, r1): u8 {
 }
 
 fun run_read_f(r0): u8 {
-  slots: params(1), locals(1), temps(4), xfer(1)
+  slots: params(1), locals(1), temps(4), transfer(1)
     r0: u64
     r1: 0x99::chained_variant_field_fusion::F
     r2: u8
@@ -126,7 +126,7 @@ fun run_read_f(r0): u8 {
 }
 
 fun run_read_u(r0, r1): u8 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u8
     r2: 0x99::chained_variant_field_fusion::U
@@ -139,7 +139,7 @@ fun run_read_u(r0, r1): u8 {
 }
 
 fun run_write_e(r0, r1): u8 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u8
     r2: 0x99::chained_variant_field_fusion::E

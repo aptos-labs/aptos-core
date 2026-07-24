@@ -213,7 +213,7 @@ fun make_adder(r0): |u64|u64 {
 }
 
 fun use_adder(r0, r1): u64 {
-  slots: params(2), locals(1), temps(1), xfer(1)
+  slots: params(2), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
     r2: |u64|u64

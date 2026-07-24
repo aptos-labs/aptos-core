@@ -28,7 +28,7 @@ fun consume_two(r0, r1): u64 {
 }
 
 fun pack_natural(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(2)
+  slots: params(0), locals(0), temps(0), transfer(2)
   code:
   L0:
     0: [x0, x1] := call split, []
@@ -38,7 +38,7 @@ fun pack_natural(): u64 {
 }
 
 fun pack_reordered(): u64 {
-  slots: params(0), locals(2), temps(0), xfer(2)
+  slots: params(0), locals(2), temps(0), transfer(2)
     r0: u64
     r1: u64
   code:
@@ -74,7 +74,7 @@ fun split(): u64 * u64 {
 }
 
 fun unpack_natural(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(2)
+  slots: params(0), locals(0), temps(0), transfer(2)
   code:
   L0:
     0: [x0] := call pair_provider, []
@@ -84,7 +84,7 @@ fun unpack_natural(): u64 {
 }
 
 fun unpack_reordered(): u64 {
-  slots: params(0), locals(2), temps(0), xfer(2)
+  slots: params(0), locals(2), temps(0), transfer(2)
     r0: u64
     r1: u64
   code:

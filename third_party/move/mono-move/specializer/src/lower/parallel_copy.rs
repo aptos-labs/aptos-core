@@ -17,7 +17,7 @@
 //! `lower_call`'s arg-setup path inlines reverse-order emission directly
 //! and uses [`reverse_emit_is_safe`] as a debug assertion. Soundness
 //! rests on arg positionality + return monotonicity (see
-//! `BlockAnalysis::analyze`): pass-through Xfer args land at
+//! `BlockAnalysis::analyze`): pass-through Transfer args land at
 //! `arg_offset(j) ≥ ret_offset(k_j)` everywhere, so the dependency graph
 //! is forward-only. Home args' sources live in the home region (offsets
 //! `< frame_data_size`), disjoint from the arg region. No cycles, so no

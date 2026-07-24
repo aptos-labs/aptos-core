@@ -10,7 +10,7 @@ fun identity(r0): _0 {
 }
 
 fun call_u64(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(1)
+  slots: params(0), locals(0), temps(0), transfer(1)
   code:
   L0:
     0: x0 := ld_u64 10
@@ -19,7 +19,7 @@ fun call_u64(): u64 {
 }
 
 fun call_bool(): bool {
-  slots: params(0), locals(0), temps(0), xfer(1)
+  slots: params(0), locals(0), temps(0), transfer(1)
   code:
   L0:
     0: x0 := ld_true

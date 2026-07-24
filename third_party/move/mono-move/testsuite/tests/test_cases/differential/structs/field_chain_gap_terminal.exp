@@ -44,7 +44,7 @@ fun write_gap(r0, r1) {
 }
 
 fun test_read_gap(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: 0x67::field_chain_gap_terminal::S
   code:
@@ -56,7 +56,7 @@ fun test_read_gap(r0): u64 {
 }
 
 fun test_write_gap(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u64
     r2: 0x67::field_chain_gap_terminal::S

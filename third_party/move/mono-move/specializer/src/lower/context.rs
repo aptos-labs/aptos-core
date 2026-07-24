@@ -314,7 +314,7 @@ pub struct LoweringContext<'a> {
     /// Where `Instr::Ret` writes before the `Return` micro-op. Laid out
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
-    pub num_xfer_positions: u16,
+    pub num_transfer_positions: u16,
     /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
     /// live at a time, and they have the same GC invariant.
@@ -751,7 +751,7 @@ pub fn try_build_context<'a>(
         frame_data_size,
         call_sites,
         return_slots,
-        num_xfer_positions: func_ir.num_xfer_positions,
+        num_transfer_positions: func_ir.num_transfer_positions,
         scratch,
         resource_box_slot,
         enum_ptr_scratch,
@@ -1326,10 +1326,10 @@ fn try_build_inline_value_layout(
 /// Invariant behind first-owner-only chain discovery: each later `path` owner
 /// must be the previous hop's field type, so the transitive walk of the first
 /// owner reaches every later one. Trivially true for non-chain instructions.
-fn chain_path_is_inline_contained(
+fn chain_path_is_inline_contained<SlotForm>(
     interner: &impl Interner,
     module: &PreparedModule,
-    instr: &Instr,
+    instr: &Instr<SlotForm>,
 ) -> bool {
     let Some(path) = chain_field_path(instr) else {
         return true;

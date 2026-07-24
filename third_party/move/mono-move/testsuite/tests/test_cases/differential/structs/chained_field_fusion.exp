@@ -61,7 +61,7 @@ fun borrow_chain(r0): &u64 {
 }
 
 fun use_borrow_chain(r0): u64 {
-  slots: params(1), locals(0), temps(1), xfer(1)
+  slots: params(1), locals(0), temps(1), transfer(1)
     r0: &0x66::chained_field_fusion::S
     r1: u64
   code:
@@ -87,7 +87,7 @@ fun read_shared(r0): u64 {
 }
 
 fun test_read_by_value(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(2)
+  slots: params(1), locals(1), temps(0), transfer(2)
     r0: u64
     r1: 0x66::chained_field_fusion::S
   code:
@@ -99,7 +99,7 @@ fun test_read_by_value(r0): u64 {
 }
 
 fun test_read_by_ref(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(2)
+  slots: params(1), locals(1), temps(0), transfer(2)
     r0: u64
     r1: 0x66::chained_field_fusion::S
   code:
@@ -112,7 +112,7 @@ fun test_read_by_ref(r0): u64 {
 }
 
 fun test_write_by_ref(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u64
     r2: 0x66::chained_field_fusion::S
@@ -127,7 +127,7 @@ fun test_write_by_ref(r0, r1): u64 {
 }
 
 fun test_borrow_chain(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(2)
+  slots: params(1), locals(1), temps(0), transfer(2)
     r0: u64
     r1: 0x66::chained_field_fusion::S
   code:
@@ -140,7 +140,7 @@ fun test_borrow_chain(r0): u64 {
 }
 
 fun test_read_shared(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u64
     r2: 0x66::chained_field_fusion::S

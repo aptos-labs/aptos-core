@@ -24,40 +24,50 @@ use move_core_types::{
     int256::{I256, U256},
 };
 
-/// Named slot operand.
-/// TODO(cleanup): consider renaming this enum to `NamedSlot`, to contrast with `SizedSlot`.
-///
-/// - `Home` — frame-local storage: parameters, declared locals, and temporaries
-///   due to destackification. These map 1:1 to frame slots.
-///
-/// - `Xfer` — transfer slots used for both  passing arguments to a callee
-///   (before the call) and receiving return values (after the call).
-///   `Xfer` overlaps with the callee's  parameter/return area, so values
-///   produced directly into a `Xfer` slot avoid a copy at the call site.
-///
-/// - `Vid` — SSA value ID, a 0-based temporary that exists only in the
-///   pre-allocation IR. Slot allocation replaces every `Vid` with a real
-///   `Home` or `Xfer` slot.
+/// Index of a `Home` slot within the frame's local area. Shared by
+/// [`SsaSlot::Home`] and [`NamedSlot::Home`]: slot allocation maps pinned
+/// locals across the two forms index-preservingly.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Slot {
-    /// Params, locals, and temporaries — displayed as `r0, r1, ...`
-    Home(u16),
-    /// Call-interface slots — displayed as `x0, x1, ...`
-    Xfer(u16),
-    /// SSA value ID (pre-allocation only) — displayed as `v0, v1, ...`
-    Vid(u16),
+pub struct HomeIndex(pub u16);
+
+/// Position within the frame's transfer area.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TransferPosition(pub u16);
+
+/// Instruction operand used while a function is in SSA form, before slot
+/// allocation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SsaSlot {
+    /// Frame-local storage for parameters and declared locals. These map
+    /// 1:1 to frame slots and stay mutable across blocks. Displayed as
+    /// `r0, r1, ...`.
+    Home(HomeIndex),
+    /// SSA value ID, a temporary defined exactly once within its block.
+    /// Displayed as `v0, v1, ...`.
+    ValueId(u16),
 }
 
-impl Slot {
-    /// Returns `true` if this is a Vid slot (SSA value ID).
-    pub fn is_vid(self) -> bool {
-        matches!(self, Slot::Vid(_))
+impl SsaSlot {
+    /// Returns `true` if this is a `ValueId` slot (SSA value ID).
+    pub fn is_value_id(self) -> bool {
+        matches!(self, SsaSlot::ValueId(_))
     }
+}
 
-    /// Returns `true` if this is a Home slot (pinned local).
-    pub fn is_home(self) -> bool {
-        matches!(self, Slot::Home(_))
-    }
+/// Instruction operand after slot allocation: a concrete named position in
+/// the runtime frame. Contrast with the lowering layer's `SizedSlot`, which
+/// adds layout (offset and size) to the name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NamedSlot {
+    /// Frame-local storage: parameters, declared locals, and temporaries
+    /// due to destackification. Displayed as `r0, r1, ...`.
+    Home(HomeIndex),
+    /// Call-interface slots, used for both passing arguments to a callee
+    /// (before the call) and receiving return values (after the call).
+    /// `Transfer` overlaps with the callee's parameter/return area, so
+    /// values produced directly into a `Transfer` slot avoid a copy at the
+    /// call site. Displayed as `x0, x1, ...`.
+    Transfer(TransferPosition),
 }
 
 /// Label for branch targets.
@@ -126,38 +136,42 @@ pub type FieldPath = Box<[(InternedType, FieldHandleIndex)]>;
 /// non-generic call. Inside a generic function `ty_args` may still
 /// contain the enclosing function's `TypeParam`s.
 #[derive(Clone)]
-pub struct CallData {
-    pub rets: Box<[Slot]>,
+pub struct CallData<SlotForm> {
+    pub rets: Box<[SlotForm]>,
     pub function_handle: FunctionHandleIndex,
     pub ty_args: InternedTypeList,
-    pub args: Box<[Slot]>,
+    pub args: Box<[SlotForm]>,
 }
 
 /// Payload of [`Instr::PackClosure`] (same `(function_handle, ty_args)`
 /// contract as [`CallData`]).
 #[derive(Clone)]
-pub struct PackClosureData {
-    pub dst: Slot,
+pub struct PackClosureData<SlotForm> {
+    pub dst: SlotForm,
     pub function_handle: FunctionHandleIndex,
     pub ty_args: InternedTypeList,
     pub mask: ClosureMask,
-    pub captured: Box<[Slot]>,
+    pub captured: Box<[SlotForm]>,
 }
 
 /// Payload of [`Instr::CallClosure`].
 #[derive(Clone)]
-pub struct CallClosureData {
-    pub rets: Box<[Slot]>,
+pub struct CallClosureData<SlotForm> {
+    pub rets: Box<[SlotForm]>,
     /// The closure's type; always a `Type::Function`.
     pub closure_ty: InternedType,
     /// The arguments provided to the closure, followed by the closure
     /// itself as the last element. Never empty; enforced by [`Self::new`].
-    args: Box<[Slot]>,
+    args: Box<[SlotForm]>,
 }
 
-impl CallClosureData {
+impl<SlotForm> CallClosureData<SlotForm> {
     /// `args` must end with the closure operand (hence be non-empty).
-    pub(crate) fn new(rets: Box<[Slot]>, closure_ty: InternedType, args: Box<[Slot]>) -> Self {
+    pub(crate) fn new(
+        rets: Box<[SlotForm]>,
+        closure_ty: InternedType,
+        args: Box<[SlotForm]>,
+    ) -> Self {
         debug_assert!(
             !args.is_empty(),
             "CallClosure args must include the closure"
@@ -170,7 +184,10 @@ impl CallClosureData {
     }
 
     /// Splits `args` into `(closure, provided arguments)`.
-    pub fn closure_and_provided(&self) -> (Slot, &[Slot]) {
+    pub fn closure_and_provided(&self) -> (SlotForm, &[SlotForm])
+    where
+        SlotForm: Copy,
+    {
         let (closure, provided) = self
             .args
             .split_last()
@@ -179,7 +196,11 @@ impl CallClosureData {
     }
 }
 
-/// A stackless IR instruction with explicit named-slot operands.
+/// A stackless IR instruction with explicit slot operands.
+///
+/// Generic over the slot form `SlotForm`: [`SsaSlot`] before slot allocation,
+/// [`NamedSlot`] after. Slot allocation is the only conversion between the
+/// two (see `destack::slot_alloc`).
 ///
 /// # Field order
 ///
@@ -202,7 +223,7 @@ impl CallClosureData {
 /// Every slot operand is written (a def), read (a value use), or referenced
 /// by location (a place use):
 /// - `dst`/`dsts` are defs.
-/// - Sources are value uses: a `Vid` is consumed (single-use SSA before
+/// - Sources are value uses: a `ValueId` is consumed (single-use SSA before
 ///   slot allocation); a `Home` slot stays valid unless moved out. A
 ///   written-through reference is also a value use — its pointee is
 ///   mutated, but the slot is not a def.
@@ -223,46 +244,50 @@ impl CallClosureData {
 ///
 /// `Branch`, `Ret`, `Abort`, and `AbortMsg` terminate a block; `BrTrue`,
 /// `BrFalse`, `BrCmp`, and `BrCmpImm` fall through when not taken. `Call`
-/// and `CallClosure` clobber all `Xfer` slots.
+/// and `CallClosure` clobber all `Transfer` slots.
 ///
 /// TODO(cleanup): change uses of raw integers into newtypes/type-aliases.
 #[derive(Clone)]
-pub enum Instr {
+pub enum Instr<SlotForm> {
     // --- Loads ---
     /// `dst = const_pool[const_idx]` — load a constant, deserialized from
     /// its BCS byte blob in the constant pool.
     LdConst {
-        dst: Slot,
+        dst: SlotForm,
         const_idx: ConstantPoolIndex,
     },
     /// `dst = imm` — load a bool or integer literal.
-    LdImm { dst: Slot, imm: ImmValue },
+    LdImm { dst: SlotForm, imm: ImmValue },
 
     // --- Slot ops ---
     /// `dst = copy(src)`, source remains valid.
-    Copy { dst: Slot, src: Slot },
+    Copy { dst: SlotForm, src: SlotForm },
     /// `dst = move(src)`, source invalidated.
-    Move { dst: Slot, src: Slot },
+    Move { dst: SlotForm, src: SlotForm },
 
     // --- Unary / Binary ---
     /// `dst = op(src)`. `Cast` aborts when the value does not fit the
     /// target integer type.
-    UnaryOp { dst: Slot, op: UnaryOp, src: Slot },
+    UnaryOp {
+        dst: SlotForm,
+        op: UnaryOp,
+        src: SlotForm,
+    },
     /// `dst = op(lhs, rhs)`. Arithmetic aborts on overflow and on
     /// division/modulo by zero; shifts abort when the amount is at least
     /// the operand width.
     BinaryOp {
-        dst: Slot,
+        dst: SlotForm,
         op: BinaryOp,
-        lhs: Slot,
-        rhs: Slot,
+        lhs: SlotForm,
+        rhs: SlotForm,
     },
     /// `dst = op(lhs, imm)` — [`Instr::BinaryOp`] with an immediate right
     /// operand.
     BinaryOpImm {
-        dst: Slot,
+        dst: SlotForm,
         op: BinaryOp,
-        lhs: Slot,
+        lhs: SlotForm,
         imm: ImmValue,
     },
 
@@ -270,152 +295,152 @@ pub enum Instr {
     /// `dst = struct_ty { srcs }` — construct a struct from the field
     /// values, in field declaration order.
     Pack {
-        dst: Slot,
+        dst: SlotForm,
         struct_ty: InternedType,
-        srcs: Box<[Slot]>,
+        srcs: Box<[SlotForm]>,
     },
     /// `dsts = fields of src` — destructure a `struct_ty` value into its
     /// field values, in field declaration order.
     Unpack {
-        dsts: Box<[Slot]>,
+        dsts: Box<[SlotForm]>,
         struct_ty: InternedType,
-        src: Slot,
+        src: SlotForm,
     },
 
     // --- Variant (enum type + variant ordinal) ---
     /// `dst = enum_ty::variant { srcs }` — construct an enum value with tag
     /// `variant` from the field values, in field declaration order.
     PackVariant {
-        dst: Slot,
+        dst: SlotForm,
         enum_ty: InternedType,
         variant: u16,
-        srcs: Box<[Slot]>,
+        srcs: Box<[SlotForm]>,
     },
     /// `dsts = fields of src` — destructure an `enum_ty` value; aborts when
     /// the value's runtime tag is not `variant`.
     UnpackVariant {
-        dsts: Box<[Slot]>,
+        dsts: Box<[SlotForm]>,
         enum_ty: InternedType,
         variant: u16,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = (tag(*src) == variant)` — `src` holds a reference to an
     /// `enum_ty` value.
     TestVariant {
-        dst: Slot,
+        dst: SlotForm,
         enum_ty: InternedType,
         variant: u16,
-        src: Slot,
+        src: SlotForm,
     },
 
     // --- References ---
     //
     /// `dst = &local`.
-    ImmBorrowLoc { dst: Slot, local: Slot },
+    ImmBorrowLoc { dst: SlotForm, local: SlotForm },
     /// `dst = &mut local`. A later write through `dst` mutates `local`
     /// without a def at the write site (a hidden write).
-    MutBorrowLoc { dst: Slot, local: Slot },
+    MutBorrowLoc { dst: SlotForm, local: SlotForm },
     // Field ops carry the instantiated owner type (`owner_ty`) and a
     // non-generic field handle (`field`) giving the field position.
     /// `dst = &(*src).field` — pure address computation, no abort.
     ImmBorrowField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = &mut (*src).field` — pure address computation, no abort.
     MutBorrowField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = &(*src).field` on an enum; aborts when the value's runtime
     /// variant does not declare `field`.
     ImmBorrowVariantField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: VariantFieldHandleIndex,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = &mut (*src).field` on an enum; aborts when the value's
     /// runtime variant does not declare `field`.
     MutBorrowVariantField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: VariantFieldHandleIndex,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = *src`.
-    ReadRef { dst: Slot, src: Slot },
+    ReadRef { dst: SlotForm, src: SlotForm },
     /// `*dst_ref = val`
-    WriteRef { dst_ref: Slot, val: Slot },
+    WriteRef { dst_ref: SlotForm, val: SlotForm },
 
     // --- Fused field access (borrow+read/write combined) ---
     /// `dst = (*src).field` (imm_borrow_field + read_ref)
     ReadField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        src: Slot,
+        src: SlotForm,
     },
     /// `(*dst_ref).field = val` (mut_borrow_field + write_ref)
     WriteField {
-        dst_ref: Slot,
+        dst_ref: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        val: Slot,
+        val: SlotForm,
     },
     /// `dst = (*src).field` on an enum (imm_borrow_variant_field +
     /// read_ref); aborts when the value's runtime variant does not declare
     /// `field`.
     ReadVariantField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: VariantFieldHandleIndex,
-        src: Slot,
+        src: SlotForm,
     },
     /// `(*dst_ref).field = val` on an enum (mut_borrow_variant_field +
     /// write_ref); aborts when the value's runtime variant does not declare
     /// `field`.
     WriteVariantField {
-        dst_ref: Slot,
+        dst_ref: SlotForm,
         owner_ty: InternedType,
         field: VariantFieldHandleIndex,
-        val: Slot,
+        val: SlotForm,
     },
 
     // --- Fused inline-struct field access (borrow_loc + field op combined) ---
     /// `dst = &local.field` (imm_borrow_loc + imm_borrow_field on an inline struct local)
     ImmBorrowLocField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        local: Slot,
+        local: SlotForm,
     },
     /// `dst = &mut local.field`. Hidden-write hazard as in
     /// [`Instr::MutBorrowLoc`].
     MutBorrowLocField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        local: Slot,
+        local: SlotForm,
     },
     /// `dst = local.field` (imm_borrow_loc + read_field on an inline struct local)
     ReadLocField {
-        dst: Slot,
+        dst: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        local: Slot,
+        local: SlotForm,
     },
     /// `local.field = val` (mut_borrow_loc + write_field on an inline
     /// struct local).
     WriteLocField {
-        local: Slot,
+        local: SlotForm,
         owner_ty: InternedType,
         field: FieldHandleIndex,
-        val: Slot,
+        val: SlotForm,
     },
 
     // --- Fused inline-struct field CHAINS ---
@@ -431,212 +456,218 @@ pub enum Instr {
     //
     /// `dst = (*src).path`.
     ReadFieldChain {
-        dst: Slot,
+        dst: SlotForm,
         path: FieldPath,
-        src: Slot,
+        src: SlotForm,
     },
     /// `(*dst_ref).path = val`.
     WriteFieldChain {
-        dst_ref: Slot,
+        dst_ref: SlotForm,
         path: FieldPath,
-        val: Slot,
+        val: SlotForm,
     },
     /// `dst = &(*src).path`.
     ImmBorrowFieldChain {
-        dst: Slot,
+        dst: SlotForm,
         path: FieldPath,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = &mut (*src).path`.
     MutBorrowFieldChain {
-        dst: Slot,
+        dst: SlotForm,
         path: FieldPath,
-        src: Slot,
+        src: SlotForm,
     },
     /// `dst = local.path`.
     ReadLocFieldChain {
-        dst: Slot,
+        dst: SlotForm,
         path: FieldPath,
-        local: Slot,
+        local: SlotForm,
     },
     /// `local.path = val`.
     WriteLocFieldChain {
-        local: Slot,
+        local: SlotForm,
         path: FieldPath,
-        val: Slot,
+        val: SlotForm,
     },
     /// `dst = &local.path`.
     ImmBorrowLocFieldChain {
-        dst: Slot,
+        dst: SlotForm,
         path: FieldPath,
-        local: Slot,
+        local: SlotForm,
     },
     /// `dst = &mut local.path`. Hidden-write hazard as in
     /// [`Instr::MutBorrowLoc`].
     MutBorrowLocFieldChain {
-        dst: Slot,
+        dst: SlotForm,
         path: FieldPath,
-        local: Slot,
+        local: SlotForm,
     },
 
     // --- Globals (`resource_ty` names the resource in global storage) ---
     /// `dst = exists<resource_ty>(addr)` — true iff global storage holds a
     /// `resource_ty` at `addr`.
     Exists {
-        dst: Slot,
+        dst: SlotForm,
         resource_ty: InternedType,
-        addr: Slot,
+        addr: SlotForm,
     },
     /// `dst = move_from<resource_ty>(addr)` — remove the resource from
     /// global storage; aborts when none exists at `addr`.
     MoveFrom {
-        dst: Slot,
+        dst: SlotForm,
         resource_ty: InternedType,
-        addr: Slot,
+        addr: SlotForm,
     },
     /// `move_to<resource_ty>(signer, val)` — publish `val` under the
     /// signer's address; aborts when a resource of this type already exists
     /// there.
     MoveTo {
         resource_ty: InternedType,
-        signer: Slot,
-        val: Slot,
+        signer: SlotForm,
+        val: SlotForm,
     },
     /// `dst = &global<resource_ty>(addr)`; aborts when no resource exists
     /// at `addr`.
     ImmBorrowGlobal {
-        dst: Slot,
+        dst: SlotForm,
         resource_ty: InternedType,
-        addr: Slot,
+        addr: SlotForm,
     },
     /// `dst = &mut global<resource_ty>(addr)`; aborts when no resource
     /// exists at `addr`.
     MutBorrowGlobal {
-        dst: Slot,
+        dst: SlotForm,
         resource_ty: InternedType,
-        addr: Slot,
+        addr: SlotForm,
     },
 
     // --- Calls (payload boxed to keep `Instr` small; see `CallData`) ---
     /// `data.rets = data.function_handle<data.ty_args>(data.args)`.
-    Call { data: Box<CallData> },
+    Call { data: Box<CallData<SlotForm>> },
 
     // --- Closures (payloads boxed; see `PackClosureData`/`CallClosureData`) ---
     /// `data.dst` receives a closure over `data.function_handle<data.ty_args>`
     /// in which the values of `data.captured` are pre-bound to the argument
     /// positions marked in `data.mask`; the remaining positions are filled by
     /// the arguments supplied when the closure is called.
-    PackClosure { data: Box<PackClosureData> },
+    PackClosure {
+        data: Box<PackClosureData<SlotForm>>,
+    },
     /// `data.rets = closure(provided args)` — the closure operand is the
     /// last element of `data.args` (see
     /// [`CallClosureData::closure_and_provided`]).
-    CallClosure { data: Box<CallClosureData> },
+    CallClosure {
+        data: Box<CallClosureData<SlotForm>>,
+    },
 
     // --- Vector (`elem_ty` is the vector's element type) ---
     /// `dst = vector[srcs]`.
     VecPack {
-        dst: Slot,
+        dst: SlotForm,
         elem_ty: InternedType,
-        srcs: Box<[Slot]>,
+        srcs: Box<[SlotForm]>,
     },
     /// `dst = (*vec_ref).length()`.
     VecLen {
-        dst: Slot,
+        dst: SlotForm,
         elem_ty: InternedType,
-        vec_ref: Slot,
+        vec_ref: SlotForm,
     },
     /// `dst = &(*vec_ref)[idx]`; aborts when `idx` is out of bounds.
     VecImmBorrow {
-        dst: Slot,
+        dst: SlotForm,
         elem_ty: InternedType,
-        vec_ref: Slot,
-        idx: Slot,
+        vec_ref: SlotForm,
+        idx: SlotForm,
     },
     /// `dst = &mut (*vec_ref)[idx]`; aborts when `idx` is out of bounds.
     VecMutBorrow {
-        dst: Slot,
+        dst: SlotForm,
         elem_ty: InternedType,
-        vec_ref: Slot,
-        idx: Slot,
+        vec_ref: SlotForm,
+        idx: SlotForm,
     },
     /// `(*vec_ref).push_back(val)`.
     VecPushBack {
-        vec_ref: Slot,
+        vec_ref: SlotForm,
         elem_ty: InternedType,
-        val: Slot,
+        val: SlotForm,
     },
     /// `dst = (*vec_ref).pop_back()`; aborts on an empty vector.
     VecPopBack {
-        dst: Slot,
+        dst: SlotForm,
         elem_ty: InternedType,
-        vec_ref: Slot,
+        vec_ref: SlotForm,
     },
     /// `dsts = elements of src`; aborts unless the vector's length is
     /// exactly `dsts.len()`.
     VecUnpack {
-        dsts: Box<[Slot]>,
+        dsts: Box<[SlotForm]>,
         elem_ty: InternedType,
-        src: Slot,
+        src: SlotForm,
     },
     /// `(*vec_ref).swap(idx_a, idx_b)`; aborts when either index is out of
     /// bounds.
     VecSwap {
-        vec_ref: Slot,
+        vec_ref: SlotForm,
         elem_ty: InternedType,
-        idx_a: Slot,
-        idx_b: Slot,
+        idx_a: SlotForm,
+        idx_b: SlotForm,
     },
 
     // --- Control flow ---
     /// Unconditional jump to `target`.
     Branch { target: Label },
     /// Jump to `target` when `cond` is true; otherwise fall through.
-    BrTrue { target: Label, cond: Slot },
+    BrTrue { target: Label, cond: SlotForm },
     /// Jump to `target` when `cond` is false; otherwise fall through.
-    BrFalse { target: Label, cond: Slot },
+    BrFalse { target: Label, cond: SlotForm },
     /// Jump to `target` when `op(lhs, rhs)` is true; otherwise fall through
     /// (fused compare + conditional branch).
     BrCmp {
         target: Label,
         op: CmpKind,
-        lhs: Slot,
-        rhs: Slot,
+        lhs: SlotForm,
+        rhs: SlotForm,
     },
     /// Jump to `target` when `op(lhs, imm)` is true; otherwise fall
     /// through.
     BrCmpImm {
         target: Label,
         op: CmpKind,
-        lhs: Slot,
+        lhs: SlotForm,
         imm: ImmValue,
     },
     /// Return `srcs` to the caller.
-    Ret { srcs: Box<[Slot]> },
+    Ret { srcs: Box<[SlotForm]> },
     /// Abort execution with the error code held in `code`.
-    Abort { code: Slot },
+    Abort { code: SlotForm },
     /// Abort execution with the error code in `code` and the message
     /// payload in `msg`.
-    AbortMsg { code: Slot, msg: Slot },
+    AbortMsg { code: SlotForm, msg: SlotForm },
 
     // --- Test intrinsics ---
     /// Triggers a garbage collection.
     ForceGC,
 }
 
+// Both slot forms are 4 bytes (tag + u16), so both instantiations share
+// the 32-byte pin.
 const _: () = assert!(
-    std::mem::size_of::<Instr>() == 32,
+    std::mem::size_of::<Instr<SsaSlot>>() == 32 && std::mem::size_of::<Instr<NamedSlot>>() == 32,
     "Instr is no longer 32 bytes; if it grew, box the offending variant's \
     payload — if the widest variant shrank, re-pin this constant"
 );
 // The align assert matters on its own: a raw `u128`-family payload could keep
 // the size at 32 while bumping the alignment (and allocator padding) to 16.
 const _: () = assert!(
-    std::mem::align_of::<Instr>() == 8,
+    std::mem::align_of::<Instr<SsaSlot>>() == 8 && std::mem::align_of::<Instr<NamedSlot>>() == 8,
     "Instr alignment is no longer 8; if it grew, box the align-16 \
      (u128-family) payload — if it shrank, re-pin this constant"
 );
 
-impl Instr {
+impl<SlotForm> Instr<SlotForm> {
     /// Returns the variant tag as a static string. Useful for terse error
     /// messages that don't need the full operand dump.
     pub fn opcode_name(&self) -> &'static str {
@@ -706,18 +737,19 @@ impl Instr {
     }
 }
 
-/// A basic block of instructions.
+/// A basic block of instructions, generic over the slot form like
+/// [`Instr`].
 ///
 /// Every block has a label. The last instruction is a terminator.
 /// (`Branch`, `BrTrue`, `BrFalse`, `Ret`, `Abort`, `AbortMsg`).
-pub struct BasicBlock {
+pub struct BasicBlock<SlotForm> {
     /// Label identifying this block.
     pub label: Label,
     /// Instructions in this block.
-    pub instrs: Vec<Instr>,
+    pub instrs: Vec<Instr<SlotForm>>,
 }
 
-/// IR for a single function.
+/// IR for a single function, after slot allocation (named-slot form).
 pub struct FunctionIR {
     /// Function name in identifier pool.
     pub name_idx: IdentifierIndex,
@@ -729,13 +761,14 @@ pub struct FunctionIR {
     pub num_locals: u16,
     /// Total Home slots used (params + locals + temps).
     pub num_home_slots: u16,
-    /// Number of distinct `Xfer(j)` positions used across all calls in this
-    /// function.
-    pub num_xfer_positions: u16,
+    /// Number of distinct `Transfer(j)` positions used across all calls in
+    /// this function.
+    pub num_transfer_positions: u16,
     /// Basic blocks of the function.
-    pub blocks: Vec<BasicBlock>,
+    pub blocks: Vec<BasicBlock<NamedSlot>>,
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).
-    /// Xfer slots have no entry here — their types are inferred from call signatures.
+    /// Transfer slots have no entry here — their types are inferred from call
+    /// signatures.
     pub home_slot_types: Vec<InternedType>,
     /// Gas cost of each block as an unresolved formula, indexed by block label.
     pub(crate) block_costs: Vec<BlockCost>,
@@ -743,12 +776,12 @@ pub struct FunctionIR {
 
 impl FunctionIR {
     /// Iterate over all instructions across all blocks.
-    pub fn instrs(&self) -> impl Iterator<Item = &Instr> {
+    pub fn instrs(&self) -> impl Iterator<Item = &Instr<NamedSlot>> {
         self.blocks.iter().flat_map(|b| b.instrs.iter())
     }
 
     /// Iterate mutably over all instructions across all blocks.
-    pub fn instrs_mut(&mut self) -> impl Iterator<Item = &mut Instr> {
+    pub fn instrs_mut(&mut self) -> impl Iterator<Item = &mut Instr<NamedSlot>> {
         self.blocks.iter_mut().flat_map(|b| b.instrs.iter_mut())
     }
 }

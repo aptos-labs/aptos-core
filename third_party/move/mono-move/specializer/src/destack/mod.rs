@@ -42,10 +42,10 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> VMResult<Mod
     // over-approximating (charging for instructions that optimization removes).
     gas::instrument(&mut module_ir, interner)?;
 
-    // Debug-mode failsafe: verify xfer invariants hold after optimization.
+    // Debug-mode failsafe: verify transfer invariants hold after optimization.
     #[cfg(debug_assertions)]
     for func in module_ir.functions.iter().flatten() {
-        analysis::assert_xfer_invariants_on_final_ir(func)?;
+        analysis::assert_transfer_invariants_on_final_ir(func)?;
     }
     Ok(module_ir)
 }

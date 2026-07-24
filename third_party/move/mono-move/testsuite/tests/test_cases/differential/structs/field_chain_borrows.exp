@@ -19,7 +19,7 @@ fun build(r0): S {
 }
 
 fun bump_via_deep_mut(r0): u64 {
-  slots: params(1), locals(2), temps(1), xfer(1)
+  slots: params(1), locals(2), temps(1), transfer(1)
     r0: u64
     r1: 0x88::field_chain_borrows::S
     r2: &mut u64
@@ -57,7 +57,7 @@ fun read_ref(r0): u64 {
 }
 
 fun read_via_call(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: 0x88::field_chain_borrows::S
   code:
@@ -69,7 +69,7 @@ fun read_via_call(r0): u64 {
 }
 
 fun read_via_local_ref(r0): u64 {
-  slots: params(1), locals(1), temps(1), xfer(1)
+  slots: params(1), locals(1), temps(1), transfer(1)
     r0: u64
     r1: 0x88::field_chain_borrows::S
     r2: u64
@@ -81,7 +81,7 @@ fun read_via_local_ref(r0): u64 {
 }
 
 fun write_via_local(r0): u64 {
-  slots: params(1), locals(1), temps(1), xfer(1)
+  slots: params(1), locals(1), temps(1), transfer(1)
     r0: u64
     r1: 0x88::field_chain_borrows::S
     r2: u64

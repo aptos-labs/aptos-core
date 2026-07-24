@@ -15,8 +15,8 @@ use super::{
 use crate::{
     gas::{self, CostResolver},
     stackless_exec_ir::{
-        instr_utils::{clobbers_xfer, for_each_value_use, is_fallthrough_terminator},
-        BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
+        instr_utils::{clobbers_transfer, for_each_value_use, is_fallthrough_terminator},
+        BinaryOp, FunctionIR, ImmValue, Instr, Label, NamedSlot, TransferPosition, UnaryOp,
     },
 };
 use mono_move_core::{
@@ -68,23 +68,23 @@ pub(super) fn lower_function(
 ) -> VMResult<LoweredFunction> {
     let mut state = LoweringState::new(func_ir, ctx);
     for (block_idx, block) in func_ir.blocks.iter().enumerate() {
-        // Xfer slots are block-local.
+        // Transfer slots are block-local.
         debug_assert!(
-            state.xfer_bindings.iter().all(Option::is_none),
-            "xfer_bindings not fully cleared at block boundary",
+            state.transfer_bindings.iter().all(Option::is_none),
+            "transfer_bindings not fully cleared at block boundary",
         );
         debug_assert!(
             state.pending_def_binds.is_empty(),
             "pending_def_binds not committed at block boundary",
         );
-        state.xfer_bindings.fill(None);
+        state.transfer_bindings.fill(None);
         state.label_map[block.label.0 as usize] = Some(state.out_buf.len() as u32);
         // Resolve this block's cost formula to concrete gas for this instantiation.
         state.block_costs[block.label.0 as usize] =
             state.resolve_block_cost(&func_ir.block_costs[block.label.0 as usize])?;
         for instr in &block.instrs {
             state.lower_instr(func_ir, instr)?;
-            state.commit_xfer_bindings_after(instr);
+            state.commit_transfer_bindings_after(instr);
         }
         // Record a conditional branch's fallthrough block (the next in emission
         // order) on its fixup, so `fixup_branches` can write that block's cost
@@ -156,14 +156,14 @@ struct LoweringState<'a> {
     /// Types of the function IR's home (frame-resident) slots with the
     /// instantiation's type arguments substituted, indexed by Home slot id.
     home_slot_types: &'a [InternedType],
-    /// `Some(TypedSlot)` while `Slot::Xfer(j)` holds a fully-written
+    /// `Some(TypedSlot)` while `NamedSlot::Transfer(j)` holds a fully-written
     /// live value visible to the GC; `None` otherwise. Length
-    /// `ctx.num_xfer_positions`.
-    xfer_bindings: Vec<Option<TypedSlot>>,
-    /// Xfer bindings staged by the current IR instruction's defs and
-    /// committed by `commit_xfer_bindings_after`. Each tuple is
-    /// `(j, typed_slot)`: the Xfer position `j` and the value bound there.
-    pending_def_binds: Vec<(u16, TypedSlot)>,
+    /// `ctx.num_transfer_positions`.
+    transfer_bindings: Vec<Option<TypedSlot>>,
+    /// Transfer bindings staged by the current IR instruction's defs and
+    /// committed by `commit_transfer_bindings_after`. Each tuple is
+    /// `(j, typed_slot)`: the Transfer position `j` and the value bound there.
+    pending_def_binds: Vec<(TransferPosition, TypedSlot)>,
     /// Safe-point entries in code-offset order. Populated by `emit`
     /// when `op.is_allocating()`.
     pending_safe_points: Vec<SafePointEntry>,
@@ -181,7 +181,7 @@ impl gas::CostResolver for LoweringState<'_> {
 
 impl<'a> LoweringState<'a> {
     fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext<'a>) -> Self {
-        let num_xfer_positions = ctx.num_xfer_positions as usize;
+        let num_transfer_positions = ctx.num_transfer_positions as usize;
         LoweringState {
             ctx,
             out_buf: Vec::new(),
@@ -192,7 +192,7 @@ impl<'a> LoweringState<'a> {
             closure_pack_cursor: 0,
             closure_call_cursor: 0,
             home_slot_types: view_type_list(ctx.home_types),
-            xfer_bindings: vec![None; num_xfer_positions],
+            transfer_bindings: vec![None; num_transfer_positions],
             pending_def_binds: Vec::new(),
             pending_safe_points: Vec::new(),
         }
@@ -301,8 +301,8 @@ impl<'a> LoweringState<'a> {
     fn lower_local_field_borrow(
         &mut self,
         field_offset: u32,
-        local: Slot,
-        dst: Slot,
+        local: NamedSlot,
+        dst: NamedSlot,
     ) -> VMResult<()> {
         let local_info = self.slot(local)?;
         let dst_info = self.def_slot(dst)?;
@@ -317,8 +317,8 @@ impl<'a> LoweringState<'a> {
     fn lower_local_field_read(
         &mut self,
         field: (u32, u32),
-        local: Slot,
-        dst: Slot,
+        local: NamedSlot,
+        dst: NamedSlot,
     ) -> VMResult<()> {
         let (field_offset, field_size) = field;
         let local_info = self.slot(local)?;
@@ -336,8 +336,8 @@ impl<'a> LoweringState<'a> {
     fn lower_local_field_write(
         &mut self,
         field: (u32, u32),
-        local: Slot,
-        val: Slot,
+        local: NamedSlot,
+        val: NamedSlot,
     ) -> VMResult<()> {
         let (field_offset, field_size) = field;
         let local_info = self.slot(local)?;
@@ -352,7 +352,12 @@ impl<'a> LoweringState<'a> {
 
     /// Borrow of a field through a reference: fold the field offset into the
     /// address compute in a single dispatch.
-    fn lower_ref_field_borrow(&mut self, field_offset: u32, src: Slot, dst: Slot) -> VMResult<()> {
+    fn lower_ref_field_borrow(
+        &mut self,
+        field_offset: u32,
+        src: NamedSlot,
+        dst: NamedSlot,
+    ) -> VMResult<()> {
         let src_info = self.slot(src)?;
         let dst_info = self.def_slot(dst)?;
         self.emit(MicroOp::DeriveRefOffsetImm {
@@ -364,7 +369,12 @@ impl<'a> LoweringState<'a> {
 
     /// By-value read of a field through a reference, plus a deep copy when
     /// the field is heap-backed.
-    fn lower_ref_field_read(&mut self, field: (u32, u32), src: Slot, dst: Slot) -> VMResult<()> {
+    fn lower_ref_field_read(
+        &mut self,
+        field: (u32, u32),
+        src: NamedSlot,
+        dst: NamedSlot,
+    ) -> VMResult<()> {
         let (field_offset, field_size) = field;
         let src_info = self.slot(src)?;
         let dst_info = self.def_typed_slot(dst)?;
@@ -381,8 +391,8 @@ impl<'a> LoweringState<'a> {
     fn lower_ref_field_write(
         &mut self,
         field: (u32, u32),
-        dst_ref: Slot,
-        val: Slot,
+        dst_ref: NamedSlot,
+        val: NamedSlot,
     ) -> VMResult<()> {
         let (field_offset, field_size) = field;
         let ref_info = self.slot(dst_ref)?;
@@ -405,65 +415,63 @@ impl<'a> LoweringState<'a> {
         resolve_variant_field_access(self.ctx.module, &self.ctx.enum_layouts, enum_ty, vfh)
     }
 
-    fn xfer_binding(&self, j: u16) -> VMResult<TypedSlot> {
-        self.xfer_bindings[j as usize]
-            .ok_or_else(|| VMInternalError::new(LoweringError::XferReadWithoutDef { xfer: j }))
+    fn transfer_binding(&self, position: TransferPosition) -> VMResult<TypedSlot> {
+        self.transfer_bindings[position.0 as usize].ok_or_else(|| {
+            VMInternalError::new(LoweringError::TransferReadWithoutDef {
+                transfer: position.0,
+            })
+        })
     }
 
-    fn slot(&self, slot: Slot) -> VMResult<SizedSlot> {
+    fn slot(&self, slot: NamedSlot) -> VMResult<SizedSlot> {
         Ok(match slot {
-            Slot::Home(i) => self.ctx.home_slots[i as usize],
-            Slot::Xfer(j) => self.xfer_binding(j)?.slot,
-            Slot::Vid(_) => return Err(VMInternalError::new(LoweringError::VidInPostAllocationIr)),
+            NamedSlot::Home(i) => self.ctx.home_slots[i.0 as usize],
+            NamedSlot::Transfer(j) => self.transfer_binding(j)?.slot,
         })
     }
 
     /// Returns sized layout info for a destination slot.
-    fn def_slot(&mut self, slot: Slot) -> VMResult<SizedSlot> {
+    fn def_slot(&mut self, slot: NamedSlot) -> VMResult<SizedSlot> {
         Ok(self.def_typed_slot(slot)?.slot)
     }
 
     /// Resolves a destination slot to its sized layout and value type. For
-    /// `Slot::Xfer(j)`, stages a pending binding to arg position `j` of the
-    /// upcoming call. Errors for `Slot::Vid`.
-    fn def_typed_slot(&mut self, slot: Slot) -> VMResult<TypedSlot> {
+    /// `NamedSlot::Transfer(j)`, stages a pending binding to arg position `j` of the
+    /// upcoming call.
+    fn def_typed_slot(&mut self, slot: NamedSlot) -> VMResult<TypedSlot> {
         Ok(match slot {
-            Slot::Home(i) => TypedSlot {
-                slot: self.ctx.home_slots[i as usize],
-                ty: self.home_slot_types[i as usize],
+            NamedSlot::Home(i) => TypedSlot {
+                slot: self.ctx.home_slots[i.0 as usize],
+                ty: self.home_slot_types[i.0 as usize],
             },
-            Slot::Xfer(j) => {
+            NamedSlot::Transfer(j) => {
                 let call_site = &self.ctx.call_sites[self.call_site_cursor];
-                let typed_slot = call_site.arg_slots[j as usize];
+                let typed_slot = call_site.arg_slots[j.0 as usize];
                 self.pending_def_binds.push((j, typed_slot));
                 typed_slot
             },
-            Slot::Vid(_) => return Err(VMInternalError::new(LoweringError::VidInPostAllocationIr)),
         })
     }
 
     /// Resolves each `slot` to its [`SizedSlot`] frame layout.
-    fn slots_to_sized_slots(&self, slots: &[Slot]) -> VMResult<Vec<SizedSlot>> {
+    fn slots_to_sized_slots(&self, slots: &[NamedSlot]) -> VMResult<Vec<SizedSlot>> {
         slots.iter().map(|slot| self.slot(*slot)).collect()
     }
 
     /// Place a call's return values; `ret_slots` are their caller-frame
-    /// locations. The call clobbers the whole callee region, so clear all Xfer
-    /// bindings, then re-bind each `Xfer` ret (for GC) and copy each `Home` in.
-    fn bind_call_returns(&mut self, rets: &[Slot], ret_slots: &[TypedSlot]) -> VMResult<()> {
-        self.xfer_bindings.fill(None);
+    /// locations. The call clobbers the whole callee region, so clear all Transfer
+    /// bindings, then re-bind each `Transfer` ret (for GC) and copy each `Home` in.
+    fn bind_call_returns(&mut self, rets: &[NamedSlot], ret_slots: &[TypedSlot]) -> VMResult<()> {
+        self.transfer_bindings.fill(None);
         for (k, ret_slot) in rets.iter().enumerate() {
             match *ret_slot {
-                Slot::Xfer(j) => {
-                    self.xfer_bindings[j as usize] = Some(ret_slots[k]);
+                NamedSlot::Transfer(j) => {
+                    self.transfer_bindings[j.0 as usize] = Some(ret_slots[k]);
                 },
-                Slot::Home(i) => {
+                NamedSlot::Home(i) => {
                     let src = ret_slots[k].slot;
-                    let dst = self.ctx.home_slots[i as usize];
+                    let dst = self.ctx.home_slots[i.0 as usize];
                     self.emit_single_move(dst.offset, src)?;
-                },
-                Slot::Vid(_) => {
-                    return Err(VMInternalError::new(LoweringError::VidInPostAllocationIr))
                 },
             }
         }
@@ -473,12 +481,12 @@ impl<'a> LoweringState<'a> {
     /// Append `op` to the output buffer. For allocating `op`s,
     /// also emit a paired `SafePointEntry` whose `code_offset` is
     /// `op`'s index in the buffer and whose `heap_ptr_offsets`
-    /// are derived from the current `xfer_bindings`.
+    /// are derived from the current `transfer_bindings`.
     fn emit(&mut self, op: MicroOp) -> VMResult<()> {
         if op.is_allocating() {
             let code_offset = CodeOffset(self.out_buf.len() as u32);
-            let mut heap_ptr_offsets = Vec::with_capacity(self.xfer_bindings.len());
-            for ts in self.xfer_bindings.iter().flatten() {
+            let mut heap_ptr_offsets = Vec::with_capacity(self.transfer_bindings.len());
+            for ts in self.transfer_bindings.iter().flatten() {
                 let rels = type_pointer_offsets(self.ctx.layouts, ts.ty)?;
                 heap_ptr_offsets
                     .extend(rels.into_iter().map(|r| FrameOffset(ts.slot.offset.0 + r)));
@@ -568,17 +576,16 @@ impl<'a> LoweringState<'a> {
     }
 
     /// Interned-type corresponding to `slot`.
-    fn slot_interned_type(&self, slot: Slot) -> VMResult<InternedType> {
+    fn slot_interned_type(&self, slot: NamedSlot) -> VMResult<InternedType> {
         Ok(match slot {
-            Slot::Home(i) => self.home_slot_types[i as usize],
-            Slot::Xfer(j) => self.xfer_binding(j)?.ty,
-            Slot::Vid(_) => return Err(VMInternalError::new(LoweringError::VidInPostAllocationIr)),
+            NamedSlot::Home(i) => self.home_slot_types[i.0 as usize],
+            NamedSlot::Transfer(j) => self.transfer_binding(j)?.ty,
         })
     }
 
     /// Canonical [`Type`] variant of `slot`. Use [`Self::slot_interned_type`]
     /// when an interned pointer is needed instead.
-    fn slot_type(&self, slot: Slot) -> VMResult<&'static Type> {
+    fn slot_type(&self, slot: NamedSlot) -> VMResult<&'static Type> {
         Ok(view_type(self.slot_interned_type(slot)?))
     }
 
@@ -609,7 +616,7 @@ impl<'a> LoweringState<'a> {
 
     /// Emit an `IntCast` to `to` from `src` into `dst`. The source type comes
     /// from `src`'s slot type and the `to` type is supplied by the caller.
-    fn lower_cast(&mut self, dst: Slot, src: Slot, to: IntTy) -> VMResult<()> {
+    fn lower_cast(&mut self, dst: NamedSlot, src: NamedSlot, to: IntTy) -> VMResult<()> {
         let from =
             IntTy::from_type(self.slot_type(src)?).ok_or(LoweringError::CastSourceNotInteger)?;
         let src_info = self.slot(src)?;
@@ -623,7 +630,7 @@ impl<'a> LoweringState<'a> {
     }
 
     /// Size in bytes of `ref_slot`'s pointee.
-    fn ref_pointee_size(&self, ref_slot: Slot) -> VMResult<u32> {
+    fn ref_pointee_size(&self, ref_slot: NamedSlot) -> VMResult<u32> {
         super::context::ref_pointee_size(self.ctx.layouts, self.slot_interned_type(ref_slot)?)
     }
 
@@ -687,7 +694,7 @@ impl<'a> LoweringState<'a> {
     }
 
     /// Lower one IR instruction.
-    fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> VMResult<()> {
+    fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr<NamedSlot>) -> VMResult<()> {
         match instr {
             // --- Loads ---
             // TODO(correctness): audit every integer-width use across the
@@ -1925,7 +1932,7 @@ impl<'a> LoweringState<'a> {
                     }));
                 }
                 let descriptor_id = layout.descriptor_id;
-                // GC-safe ordering: `def_slot` only stages the dst's Xfer bind,
+                // GC-safe ordering: `def_slot` only stages the dst's Transfer bind,
                 // so the dst is not a safe-point root at the allocating
                 // `EnumNew`; the live field args are. `EnumNew` fuses the
                 // allocation and the tag store.
@@ -1935,7 +1942,7 @@ impl<'a> LoweringState<'a> {
                 let arg_slots = self.slots_to_sized_slots(srcs)?;
                 // `EnumNew` writes the heap pointer to its target slot BEFORE the
                 // field stores read the args. The slot allocator may thread the
-                // enum dst and a field arg through one Xfer position (its
+                // enum dst and a field arg through one Transfer position (its
                 // read-before-write contract assumes an instruction reads all
                 // sources before writing dst), so if `dst`'s pointer slot aliases
                 // any arg slot, writing the pointer to `dst` would clobber that
@@ -2010,7 +2017,7 @@ impl<'a> LoweringState<'a> {
                 }
                 // Each field load rereads the enum pointer from its source slot.
                 // The slot allocator may thread the consumed enum and a field
-                // output through one Xfer position (its read-before-write contract
+                // output through one Transfer position (its read-before-write contract
                 // assumes sources are read before dsts are written), so if a dst
                 // slot aliases `src`, the load that writes that dst corrupts the
                 // pointer and the next load dereferences garbage (memory-unsafe).
@@ -2168,20 +2175,20 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
-    /// Advance the Xfer state machine after `instr` has been lowered.
-    fn commit_xfer_bindings_after(&mut self, instr: &Instr) {
-        // Calls manage their own Xfer state in `lower_call`.
-        if !clobbers_xfer(instr) {
-            // Release Xfer bindings consumed by this instr's value uses.
+    /// Advance the Transfer state machine after `instr` has been lowered.
+    fn commit_transfer_bindings_after(&mut self, instr: &Instr<NamedSlot>) {
+        // Calls manage their own Transfer state in `lower_call`.
+        if !clobbers_transfer(instr) {
+            // Release Transfer bindings consumed by this instr's value uses.
             // Place uses leave the slot live, so their binding
             // must persist for the GC to scan at the next safe point.
             for_each_value_use(instr, |s| {
-                if let Slot::Xfer(j) = s {
-                    self.xfer_bindings[j as usize] = None;
+                if let NamedSlot::Transfer(j) = s {
+                    self.transfer_bindings[j.0 as usize] = None;
                 }
             });
             // Clear-then-commit so an instr that uses and re-defs the
-            // same `Xfer(j)` ends with the new value visible.
+            // same `Transfer(j)` ends with the new value visible.
             // Precolor guarantees distinct `j` per instr; assert it,
             // since a duplicate would drop a `TypedSlot` and corrupt
             // the safe-point heap-pointer map.
@@ -2191,18 +2198,18 @@ impl<'a> LoweringState<'a> {
                 for (j, _) in &self.pending_def_binds {
                     debug_assert!(
                         seen.insert(*j),
-                        "duplicate Xfer({}) staged for one IR instr",
-                        j,
+                        "duplicate Transfer({}) staged for one IR instr",
+                        j.0,
                     );
                 }
             }
             for (j, ts) in self.pending_def_binds.drain(..) {
-                self.xfer_bindings[j as usize] = Some(ts);
+                self.transfer_bindings[j.0 as usize] = Some(ts);
             }
         } else {
             debug_assert!(
                 self.pending_def_binds.is_empty(),
-                "calls must not leave a pending Xfer def bind",
+                "calls must not leave a pending Transfer def bind",
             );
         }
     }
@@ -2242,20 +2249,25 @@ impl<'a> LoweringState<'a> {
     /// + return monotonicity (see `BlockAnalysis::analyze`), which
     /// guarantee a forward-only dependency graph between arg copies.
     ///
-    /// Rets are placed lazily in `xfer_bindings` (Xfer rets) or copied
+    /// Rets are placed lazily in `transfer_bindings` (Transfer rets) or copied
     /// to Home (Home rets), with no eager hoist into the next call's
-    /// arg region. Lazy Xfer placement is sound because: (1) Home
-    /// writes target a disjoint region; (2) `xfer_precolor`'s
-    /// per-position uniqueness keeps intermediate Xfer dsts off the
+    /// arg region. Lazy Transfer placement is sound because: (1) Home
+    /// writes target a disjoint region; (2) `transfer_precolor`'s
+    /// per-position uniqueness keeps intermediate Transfer dsts off the
     /// live ret slot; and (3) the single-use invariant bounds the
     /// bound value's last read to at or before the next call, so the
     /// callee_base region is free to be reused past that point.
-    fn lower_call(&mut self, _func_ir: &FunctionIR, args: &[Slot], rets: &[Slot]) -> VMResult<()> {
+    fn lower_call(
+        &mut self,
+        _func_ir: &FunctionIR,
+        args: &[NamedSlot],
+        rets: &[NamedSlot],
+    ) -> VMResult<()> {
         let cs = &self.ctx.call_sites[self.call_site_cursor];
 
         // Debug: assert the byte-overlap precondition that makes
         // reverse-order emit sound. The upstream invariants on
-        // `xfer_precolor` should always satisfy it; this guard catches
+        // `transfer_precolor` should always satisfy it; this guard catches
         // a layer-skipping regression at the lowering site.
         #[cfg(debug_assertions)]
         {
@@ -2327,7 +2339,7 @@ impl<'a> LoweringState<'a> {
         }
         self.call_site_cursor += 1;
 
-        // Place each ret (Xfer rets are already written by `CallIndirect`).
+        // Place each ret (Transfer rets are already written by `CallIndirect`).
         self.bind_call_returns(rets, &cs.ret_slots)?;
         Ok(())
     }
