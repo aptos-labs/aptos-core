@@ -78,3 +78,7 @@ harness = false
 [[bench]]
 name = "int_arith_loop"
 harness = false
+
+[[bench]]
+name = "move_range"
+harness = false
