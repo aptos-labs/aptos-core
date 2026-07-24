@@ -11,7 +11,7 @@ echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
-    -p aptos \
+    -p movement \
     -p aptos-backup-cli \
     -p aptos-faucet-service \
     -p aptos-fn-check-client \
@@ -26,7 +26,7 @@ cargo build --locked --profile=$PROFILE \
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
-    aptos
+    movement
     aptos-faucet-service
     aptos-node-checker
     aptos-openapi-spec-generator

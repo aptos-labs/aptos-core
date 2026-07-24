@@ -140,8 +140,9 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 # ignore antithesis
 genesis_antithesis_*/
 
-# ignore cursor rules
-.cursor/rules
+# AI assistant tooling
+.cursor/
+.claude/
 
 #ignore proptest regressions
 **/proptest_regressions/*
