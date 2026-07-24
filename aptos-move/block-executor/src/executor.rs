@@ -18,7 +18,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind},
     scheduler_wrapper::SchedulerWrapper,
-    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
@@ -148,8 +148,7 @@ where
             )
         })?;
 
-        let output_before_guard = output.before_materialization()?;
-        let resource_write_set = output_before_guard.resource_write_set();
+        let resource_write_set = output.resource_write_set();
 
         for (key, _) in pre_write_entries {
             if !resource_write_set.contains_key(&key) {
@@ -172,11 +171,8 @@ where
         // The order is reversed in BlockSTMv2 as opposed to V1, avoiding the necessity
         // to clone the previous keys.
 
-        let mut resource_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
-            output
-                .before_materialization()
-                .map(|inner| inner.resource_write_set())
-        })?;
+        let mut resource_write_set =
+            maybe_output.map_or_else(HashMap::new, |output| output.resource_write_set());
 
         last_input_output.for_each_resource_key_no_aggregator_v1(
             idx_to_execute,
@@ -232,11 +228,8 @@ where
         // in BlockSTMv2 as opposed to V1, which avoids the necessity to clone group keys and
         // previous tags.
 
-        let mut resource_group_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
-            output
-                .before_materialization()
-                .map(|inner| inner.resource_group_write_set())
-        })?;
+        let mut resource_group_write_set =
+            maybe_output.map_or_else(HashMap::new, |output| output.resource_group_write_set());
 
         last_input_output.for_each_resource_group_key_and_tags(
             idx_to_execute,
@@ -338,8 +331,7 @@ where
         // }
 
         if let Some(output) = maybe_output {
-            let output_before_guard = output.before_materialization()?;
-            for (id, change) in output_before_guard.delayed_field_change_set().into_iter() {
+            for (id, change) in output.delayed_field_change_set().into_iter() {
                 prev_modified_delayed_fields.remove(&id);
 
                 let entry = change.into_entry_no_additional_history();
@@ -599,9 +591,8 @@ where
         // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<(), PanicError> {
-            let output_before_guard = output.before_materialization()?;
             for (group_key, (group_metadata_op, group_size, group_ops)) in
-                output_before_guard.resource_group_write_set().into_iter()
+                output.resource_group_write_set().into_iter()
             {
                 let prev_tags = prev_modified_group_keys
                     .remove(&group_key)
@@ -632,7 +623,7 @@ where
                 }
             }
 
-            let resource_write_set = output_before_guard.resource_write_set();
+            let resource_write_set = output.resource_write_set();
 
             // Then, process resource writes (aggregator v1 writes are part of this set).
             for (k, v) in resource_write_set.into_iter() {
@@ -2029,7 +2020,7 @@ where
             AptosModuleExtension,
         >,
         unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
-        output_before_guard: &<E::Output as TransactionOutput>::BeforeMaterializationGuard<'_>,
+        output: &E::Output,
         resource_write_set: HashMap<T::Key, ValueWithLayout<T::Value>>,
     ) -> Result<(), SequentialBlockExecutionError> {
         for (key, value) in resource_write_set.into_iter() {
@@ -2037,13 +2028,13 @@ where
         }
 
         for (group_key, (metadata_op, group_size, group_ops)) in
-            output_before_guard.resource_group_write_set().into_iter()
+            output.resource_group_write_set().into_iter()
         {
             unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
             unsync_map.write(group_key, metadata_op);
         }
 
-        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
+        output.for_each_module_write(&mut |module_id, state_value| {
             add_module_write_to_module_cache(
                 module_id,
                 state_value,
@@ -2056,7 +2047,7 @@ where
 
         let mut second_phase = Vec::new();
         let mut updates = HashMap::new();
-        for (id, change) in output_before_guard.delayed_field_change_set().into_iter() {
+        for (id, change) in output.delayed_field_change_set().into_iter() {
             match change {
                 DelayedChange::Create(value) => {
                     assert_none!(
@@ -2188,7 +2179,6 @@ where
                     )));
                 },
                 ExecutionStatus::Executed { output, skips_rest } => {
-                    let output_before_guard = output.before_materialization()?;
                     // Calculating the accumulated gas costs of the committed txns.
 
                     let approx_output_size = self
@@ -2197,7 +2187,7 @@ where
                         .block_gas_limit_type
                         .block_output_limit()
                         .map(|_| {
-                            output_before_guard.output_approx_size()
+                            output.output_approx_size()
                                 + if self
                                     .config
                                     .onchain
@@ -2219,12 +2209,12 @@ where
                         .map(|_| {
                             ReadWriteSummary::new(
                                 sequential_reads.get_read_summary(),
-                                output_before_guard.get_write_summary(),
+                                output.get_write_summary(),
                             )
                         });
 
                     block_limit_processor.accumulate_fee_statement(
-                        output_before_guard.fee_statement(),
+                        output.fee_statement(),
                         read_write_summary,
                         approx_output_size,
                     );
@@ -2259,7 +2249,7 @@ where
                         };
 
                         // The IDs are not exchanged but it doesn't change the types (Bytes) or size.
-                        let serialization_error = output_before_guard
+                        let serialization_error = output
                             .group_reads_needing_delayed_field_exchange()
                             .iter()
                             .any(|(group_key, _)| {
@@ -2276,10 +2266,8 @@ where
                                     Err(_) => true,
                                 }
                             })
-                            || output_before_guard
-                                .resource_group_write_set()
-                                .into_iter()
-                                .any(|(group_key, (_, output_group_size, group_ops))| {
+                            || output.resource_group_write_set().into_iter().any(
+                                |(group_key, (_, output_group_size, group_ops))| {
                                     fail_point!("fail-point-resource-group-serialization", |_| {
                                         true
                                     });
@@ -2308,7 +2296,8 @@ where
                                         },
                                         Err(_) => true,
                                     }
-                                });
+                                },
+                            );
 
                         if serialization_error {
                             // The corresponding error / alert must already be triggered, the goal in sequential
@@ -2327,8 +2316,8 @@ where
                     // carry empty read/write sets.
                     if block_limit_processor.is_hot_state_accumulation_enabled() {
                         block_limit_processor.accumulate_hot_state_rw(
-                            output_before_guard.storage_keys_written(),
-                            output_before_guard.storage_keys_read(),
+                            output.storage_keys_written(),
+                            output.storage_keys_read(),
                         );
                     }
 
@@ -2338,13 +2327,9 @@ where
                         runtime_environment,
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
-                        &output_before_guard,
-                        output_before_guard.resource_write_set(),
+                        &output,
+                        output.resource_write_set(),
                     )?;
-
-                    // The guard borrows the output immutably; drop it before
-                    // materialization, which consumes the output by value.
-                    drop(output_before_guard);
 
                     // If dynamic change set materialization part (indented for clarity/variable scope):
                     let committed_output = {

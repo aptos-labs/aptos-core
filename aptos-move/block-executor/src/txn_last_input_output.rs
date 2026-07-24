@@ -9,7 +9,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
-    task::{BeforeMaterializationOutput, ExecutionStatus, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
@@ -66,10 +66,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
         // Summaries are only meaningful for an executed output.
         let (maybe_approx_output_size, maybe_read_write_summary) = match &output {
             ExecutionStatus::Executed { output, .. } => {
-                let output_before_guard = output.before_materialization()?;
                 let maybe_approx_output_size =
                     block_gas_limit_type.block_output_limit().map(|_| {
-                        output_before_guard.output_approx_size()
+                        output.output_approx_size()
                             + if block_gas_limit_type.include_user_txn_size_in_block_output() {
                                 user_txn_bytes_len
                             } else {
@@ -80,7 +79,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
                     block_gas_limit_type.conflict_penalty_window().map(|_| {
                         ReadWriteSummary::new(
                             read_set.get_read_summary(),
-                            output_before_guard.get_write_summary(),
+                            output.get_write_summary(),
                         )
                     });
                 (maybe_approx_output_size, maybe_read_write_summary)
@@ -201,9 +200,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         };
 
         // Read the output facts before flipping the disjoint skips_rest flag.
-        let output_before_guard = output.before_materialization()?;
-        let has_new_epoch_event = output_before_guard.has_new_epoch_event();
-        let fee_statement = output_before_guard.fee_statement();
+        let has_new_epoch_event = output.has_new_epoch_event();
+        let fee_statement = output.fee_statement();
 
         // For committed txns, calculate the accumulated gas costs.
         block_limit_processor.accumulate_fee_statement(
@@ -212,12 +210,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             maybe_approx_output_size,
         );
         if block_limit_processor.is_hot_state_accumulation_enabled() {
-            block_limit_processor.accumulate_hot_state_rw(
-                output_before_guard.storage_keys_written(),
-                output_before_guard.storage_keys_read(),
-            );
+            block_limit_processor
+                .accumulate_hot_state_rw(output.storage_keys_written(), output.storage_keys_read());
         }
-        drop(output_before_guard);
 
         let mut must_create_epilogue_txn = if *skips_rest_flag {
             !has_new_epoch_event
@@ -277,9 +272,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     ) -> Result<(), PanicError> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         if let Some(output) = output_wrapper.get_output() {
-            output
-                .before_materialization()?
-                .for_each_resource_key(&mut callback)?;
+            output.for_each_resource_key(&mut callback)?;
         }
 
         Ok(())
@@ -293,9 +286,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     ) -> Result<(), PanicError> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         if let Some(output) = output_wrapper.get_output() {
-            output
-                .before_materialization()?
-                .for_each_resource_group_key_and_tags(&mut callback)?;
+            output.for_each_resource_group_key_and_tags(&mut callback)?;
         }
 
         Ok(())
@@ -307,10 +298,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     ) -> Vec<(T::Key, HashSet<T::Tag>)> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         match output_wrapper.get_output() {
-            Some(output) => output
-                .before_materialization()
-                .expect("Output must be set")
-                .legacy_v1_resource_group_tags(),
+            Some(output) => output.legacy_v1_resource_group_tags(),
             None => vec![],
         }
     }
@@ -323,13 +311,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     ) -> Option<impl Iterator<Item = T::Key>> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         let output = output_wrapper.get_output()?;
-        Some(
-            output
-                .before_materialization()
-                .expect("Output must be set")
-                .resource_write_set()
-                .into_keys(),
-        )
+        Some(output.resource_write_set().into_keys())
     }
 
     // The output must be an executed output, o.w. an invariant error is returned.
@@ -353,11 +335,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
                 txn_idx
             ))
         })?;
-        let output_before_guard = output.before_materialization()?;
 
         let mut published = false;
         let mut module_ids_for_v2 = BTreeSet::new();
-        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
+        output.for_each_module_write(&mut |module_id, state_value| {
             published = true;
             if scheduler.is_v2() {
                 module_ids_for_v2.insert(module_id.clone());
@@ -384,13 +365,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     ) -> Option<impl Iterator<Item = DelayedFieldID>> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         let output = output_wrapper.get_output()?;
-        Some(
-            output
-                .before_materialization()
-                .expect("Output must be set")
-                .delayed_field_change_set()
-                .into_keys(),
-        )
+        Some(output.delayed_field_change_set().into_keys())
     }
 
     // Called when a transaction is committed to materialize its recorded output:

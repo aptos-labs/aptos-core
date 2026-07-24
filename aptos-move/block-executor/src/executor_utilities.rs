@@ -5,7 +5,7 @@ use crate::{
     captured_reads::{CapturedReads, DataRead, ReadKind},
     counters,
     errors::ResourceGroupSerializationError,
-    task::{BeforeMaterializationOutput, ExecutorTask, TransactionOutput},
+    task::{ExecutorTask, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ViewState},
 };
@@ -190,22 +190,11 @@ where
     O: TransactionOutput<Txn = T>,
     M: Materializer<T>,
 {
-    let (
-        group_metadata_ops,
-        group_reads_needing_exchange,
-        resource_write_set,
-        reads_needing_exchange,
-        events,
-    ) = {
-        let guard = output.before_materialization()?;
-        (
-            guard.resource_group_metadata_ops(),
-            guard.group_reads_needing_delayed_field_exchange(),
-            guard.resource_write_set(),
-            guard.reads_needing_delayed_field_exchange(),
-            guard.get_events(),
-        )
-    };
+    let group_metadata_ops = output.resource_group_metadata_ops();
+    let group_reads_needing_exchange = output.group_reads_needing_delayed_field_exchange();
+    let resource_write_set = output.resource_write_set();
+    let reads_needing_exchange = output.reads_needing_delayed_field_exchange();
+    let events = output.get_events();
 
     let finalized_groups = group_metadata_ops
         .into_iter()
