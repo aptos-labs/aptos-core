@@ -5,7 +5,7 @@ use crate::{
     captured_reads::{CapturedReads, DataRead, ReadKind},
     counters,
     errors::ResourceGroupSerializationError,
-    task::{ExecutorTask, TransactionOutput},
+    task::{ExecutorTask, LegacyTxnOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ViewState},
 };
@@ -186,7 +186,7 @@ pub(crate) fn materialize_output<T, O, M>(
 ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
 where
     T: Transaction,
-    O: TransactionOutput<Txn = T>,
+    O: LegacyTxnOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
     M: Materializer<T>,
 {
     let group_metadata_ops = output.resource_group_metadata_ops();
@@ -272,7 +272,7 @@ where
 pub fn check_resource_group_serialization<T, O, M>(output: &O, materializer: &M) -> bool
 where
     T: Transaction,
-    O: TransactionOutput<Txn = T>,
+    O: LegacyTxnOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
     M: Materializer<T>,
 {
     let serializes =

@@ -9,7 +9,10 @@ use aptos_block_executor::{
     check_resource_group_serialization,
     code_cache_global_manager::AptosModuleCacheManager,
     executor::BlockExecutor,
-    task::{ExecutorTask, TransactionOutput as BlockExecutorTransactionOutput},
+    task::{
+        ExecutorTask, LegacyTxnOutput as BlockExecutorLegacyTxnOutput,
+        TransactionOutput as BlockExecutorTransactionOutput,
+    },
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
     types::InputOutputKey,
@@ -80,7 +83,10 @@ impl AptosTransactionOutput {
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type CommittedOutput = TransactionOutput;
+    type Key = StateKey;
+    type Tag = StructTag;
     type Txn = SignatureVerifiedTransaction;
+    type Value = ValueWithLayout<WriteOp>;
 
     /// Execution output for transactions that comes after SkipRest signal or when there was a
     /// problem creating the output (e.g. group serialization issue).
@@ -243,21 +249,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         Ok(())
     }
 
-    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
-    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
-        self.vm_output
-            .resource_write_set()
-            .iter()
-            .flat_map(|(key, write)| {
-                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                    Some((key.clone(), group_write.metadata_op().clone()))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         self.vm_output
             .resource_write_set()
@@ -297,6 +288,32 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output.delayed_field_change_set().clone()
     }
 
+    // For legacy interfaces, there are more efficient alternatives in BlockSTMv2.
+    // For now we do get the benefits of comparing different implementations.
+    // TODO: consider adjusting sequential execution and BlockSTMv1 to use the superior
+    // patterns and remove these legacy interfaces (needs to be done carefully).
+    //
+    // Internally clones and also allocates a new vector. Used for BlockSTMv1 only.
+    fn legacy_v1_resource_group_tags(&self) -> Vec<(StateKey, HashSet<StructTag>)> {
+        self.vm_output
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((
+                        key.clone(),
+                        group_write.inner_ops().keys().cloned().collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+}
+
+impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
     fn reads_needing_delayed_field_exchange(
         &self,
     ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
@@ -333,22 +350,14 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output.events().to_vec()
     }
 
-    // For legacy interfaces, there are more efficient alternatives in BlockSTMv2.
-    // For now we do get the benefits of comparing different implementations.
-    // TODO: consider adjusting sequential execution and BlockSTMv1 to use the superior
-    // patterns and remove these legacy interfaces (needs to be done carefully).
-    //
-    // Internally clones and also allocates a new vector. Used for BlockSTMv1 only.
-    fn legacy_v1_resource_group_tags(&self) -> Vec<(StateKey, HashSet<StructTag>)> {
+    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
                 if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                    Some((
-                        key.clone(),
-                        group_write.inner_ops().keys().cloned().collect(),
-                    ))
+                    Some((key.clone(), group_write.metadata_op().clone()))
                 } else {
                     None
                 }

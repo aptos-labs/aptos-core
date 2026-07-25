@@ -5,7 +5,10 @@ use crate::{executor_utilities::Materializer, types::InputOutputKey};
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::{output::CommittedTransactionOutput, value::ValueWithLayout},
+    block_executor::{
+        output::CommittedTransactionOutput,
+        value::{SpeculativeValue, ValueWithLayout},
+    },
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{
@@ -29,6 +32,7 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
+    hash::Hash,
 };
 use triomphe::Arc as TriompheArc;
 
@@ -68,7 +72,12 @@ pub trait ExecutorTask {
     type AuxiliaryInfo: AuxiliaryInfoTrait;
 
     /// The output of a transaction. This should contain the side effect of this transaction.
-    type Output: TransactionOutput<Txn = Self::Txn> + 'static;
+    type Output: LegacyTxnOutput<
+            Txn = Self::Txn,
+            Key = <Self::Txn as Transaction>::Key,
+            Tag = <Self::Txn as Transaction>::Tag,
+            Value = ValueWithLayout<<Self::Txn as Transaction>::Value>,
+        > + 'static;
 
     /// Create an instance of the transaction executor.
     fn init(
@@ -110,10 +119,14 @@ pub trait ExecutorTask {
     }
 }
 
-/// The output of executing a single transaction.
+/// The output of executing a single transaction. The associated `Key`, `Tag`, and
+/// `Value` are the multi-version map's types (the writes applied to and validated
+/// against the map); `Txn` provides the storage-side key/value/event types.
 pub trait TransactionOutput: Send + Debug {
-    /// Type of transaction and its associated key and value.
     type Txn: Transaction;
+    type Key;
+    type Tag: Clone + Eq + Hash;
+    type Value: SpeculativeValue;
     /// The materialized output produced from this (speculative) output.
     type CommittedOutput: CommittedTransactionOutput;
 
@@ -122,55 +135,25 @@ pub trait TransactionOutput: Send + Debug {
 
     /// Get the writes of a transaction from its output, separately for resources
     /// and modules.
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, ValueWithLayout<<Self::Txn as Transaction>::Value>>;
+    fn resource_write_set(&self) -> HashMap<Self::Key, Self::Value>;
 
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        StateValueMetadata,
-        TriompheArc<MoveTypeLayout>,
-    )>;
-
-    fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)>;
-
-    /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
-
     fn resource_group_write_set(
         &self,
-    ) -> HashMap<
-        <Self::Txn as Transaction>::Key,
-        (
-            ValueWithLayout<<Self::Txn as Transaction>::Value>,
-            ResourceGroupSize,
-            BTreeMap<
-                <Self::Txn as Transaction>::Tag,
-                ValueWithLayout<<Self::Txn as Transaction>::Value>,
-            >,
-        ),
-    >;
+    ) -> HashMap<Self::Key, (Self::Value, ResourceGroupSize, BTreeMap<Self::Tag, Self::Value>)>;
 
     fn for_each_resource_key(
         &self,
-        callback: &mut dyn FnMut(&<Self::Txn as Transaction>::Key) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&Self::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     fn for_each_resource_group_key_and_tags(
         &self,
         // This is &mut dyn and not Impl to sidestep an internal compiler error:
         // https://github.com/rust-lang/rust/issues/145188.
-        callback: &mut dyn FnMut(
-            &<Self::Txn as Transaction>::Key,
-            HashSet<&<Self::Txn as Transaction>::Tag>,
-        ) -> Result<(), PanicError>,
+        callback: &mut dyn FnMut(&Self::Key, HashSet<&Self::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
     /// Invokes the callback for each module published by this transaction.
@@ -180,27 +163,7 @@ pub trait TransactionOutput: Send + Debug {
         callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
-    // For now, the below interfaces for keys and metada and keys and tags are provided
-    // to avoid unnecessarily cloning the whole resource group write set.
-    // TODO: get rid of these interfaces when we can have zero-copy access to the output.
-    fn resource_group_metadata_ops(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )> {
-        self.resource_group_write_set()
-            .into_iter()
-            .map(|(key, (op, _, _))| (key, op.extract_value().clone()))
-            .collect()
-    }
-
-    fn legacy_v1_resource_group_tags(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        HashSet<<Self::Txn as Transaction>::Tag>,
-    )> {
+    fn legacy_v1_resource_group_tags(&self) -> Vec<(Self::Key, HashSet<Self::Tag>)> {
         self.resource_group_write_set()
             .into_iter()
             .map(|(key, (_, _, group_ops))| (key, group_ops.keys().cloned().collect()))
@@ -218,21 +181,41 @@ pub trait TransactionOutput: Send + Debug {
     /// Sum of all sizes of writes (keys + write_ops) and events.
     fn output_approx_size(&self) -> u64;
 
-    fn get_write_summary(
-        &self,
-    ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
 
     /// State keys read by the VM during the execution that produced this output.
-    fn storage_keys_read(&self) -> impl Iterator<Item = &<Self::Txn as Transaction>::Key>;
+    fn storage_keys_read(&self) -> impl Iterator<Item = &Self::Key>;
 
     /// Keys written when this output commits.
-    fn storage_keys_written(&self) -> impl Iterator<Item = &<Self::Txn as Transaction>::Key>;
+    fn storage_keys_written(&self) -> impl Iterator<Item = &Self::Key>;
 
     /// Verifies that this transaction's output can be materialized (e.g., outputs
     /// BCS-serialized into storage representation).
     ///
     /// Only invoked during the resource-group serialization fallback.
     fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool;
+}
+
+/// Output accessors used only by the legacy Move VM's materialization
+/// (`executor_utilities::materialize_output`); a VM that materializes its own
+/// output does not implement this.
+pub trait LegacyTxnOutput: TransactionOutput {
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(Self::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)>;
+
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(Self::Key, StateValueMetadata)>;
+
+    /// Get the events of a transaction from its output.
+    fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
+
+    /// Group metadata write ops, kept separate to avoid cloning the whole resource
+    /// group write set.
+    fn resource_group_metadata_ops(
+        &self,
+    ) -> Vec<(Self::Key, <Self::Txn as Transaction>::Value)>;
 
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized delayed fields and group

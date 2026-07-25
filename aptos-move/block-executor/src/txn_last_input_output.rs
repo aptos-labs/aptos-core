@@ -9,7 +9,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
-    task::{ExecutionStatus, TransactionOutput},
+    task::{ExecutionStatus, LegacyTxnOutput, TransactionOutput},
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
@@ -38,13 +38,13 @@ use std::{
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
-struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T>> {
+struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>> {
     output: Option<ExecutionStatus<O>>,
     maybe_read_write_summary: Option<ReadWriteSummary<T>>,
     maybe_approx_output_size: Option<u64>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
+impl<T: Transaction, O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>> OutputWrapper<T, O> {
     fn empty() -> Self {
         Self {
             output: None,
@@ -95,7 +95,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
     }
 }
 
-pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
+pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>> {
     inputs: Vec<CachePadded<Mutex<Option<Arc<TxnInput<T>>>>>>, // txn_idx -> input (read set).
 
     output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
@@ -104,7 +104,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
     speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
+impl<T: Transaction, O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>> TxnLastInputOutput<T, O> {
     /// num_txns passed here is typically larger than the number of txns in the block,
     /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
@@ -375,7 +375,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         &self,
         txn_idx: TxnIndex,
         materializer: &M,
-    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>> {
+    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
+    where
+        O: LegacyTxnOutput,
+    {
         let output = self.output_wrappers[txn_idx as usize].lock().output.take();
         match output {
             Some(ExecutionStatus::Executed { output, .. }) => {
