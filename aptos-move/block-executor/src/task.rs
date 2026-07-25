@@ -142,7 +142,14 @@ pub trait TransactionOutput: Send + Debug {
 
     fn resource_group_write_set(
         &self,
-    ) -> HashMap<Self::Key, (Self::Value, ResourceGroupSize, BTreeMap<Self::Tag, Self::Value>)>;
+    ) -> HashMap<
+        Self::Key,
+        (
+            Self::Value,
+            ResourceGroupSize,
+            BTreeMap<Self::Tag, Self::Value>,
+        ),
+    >;
 
     fn for_each_resource_key(
         &self,
@@ -204,18 +211,14 @@ pub trait LegacyTxnOutput: TransactionOutput {
         &self,
     ) -> Vec<(Self::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)>;
 
-    fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(Self::Key, StateValueMetadata)>;
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(Self::Key, StateValueMetadata)>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
 
     /// Group metadata write ops, kept separate to avoid cloning the whole resource
     /// group write set.
-    fn resource_group_metadata_ops(
-        &self,
-    ) -> Vec<(Self::Key, <Self::Txn as Transaction>::Value)>;
+    fn resource_group_metadata_ops(&self) -> Vec<(Self::Key, <Self::Txn as Transaction>::Value)>;
 
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized delayed fields and group

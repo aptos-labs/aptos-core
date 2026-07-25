@@ -310,7 +310,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             })
             .collect()
     }
-
 }
 
 impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
