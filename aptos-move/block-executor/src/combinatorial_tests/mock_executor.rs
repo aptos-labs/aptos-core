@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    check_resource_group_serialization,
     combinatorial_tests::types::{
         DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
         RESERVED_TAG,
@@ -10,6 +11,7 @@ use crate::{
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
     },
+    Materializer,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -695,6 +697,10 @@ where
 
     fn skip_output() -> Self {
         Self::skipped_output(None)
+    }
+
+    fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool {
+        check_resource_group_serialization(self, materializer)
     }
 
     fn incorporate_materialized_txn_output(

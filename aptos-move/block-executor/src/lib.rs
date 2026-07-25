@@ -145,6 +145,7 @@ pub mod counters;
 pub mod errors;
 pub mod executor;
 mod executor_utilities;
+pub use executor_utilities::{check_resource_group_serialization, Materializer};
 pub mod explicit_sync_wrapper;
 pub mod hot_state_op_accumulator;
 mod limit_processor;

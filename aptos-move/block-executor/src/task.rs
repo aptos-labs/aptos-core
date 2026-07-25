@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::types::InputOutputKey;
+use crate::{executor_utilities::Materializer, types::InputOutputKey};
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -227,6 +227,12 @@ pub trait TransactionOutput: Send + Debug {
 
     /// Keys written when this output commits.
     fn storage_keys_written(&self) -> impl Iterator<Item = &<Self::Txn as Transaction>::Key>;
+
+    /// Verifies that this transaction's output can be materialized (e.g., outputs
+    /// BCS-serialized into storage representation).
+    ///
+    /// Only invoked during the resource-group serialization fallback.
+    fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool;
 
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized delayed fields and group

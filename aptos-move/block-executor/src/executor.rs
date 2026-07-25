@@ -38,10 +38,8 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfig,
-        output::CommittedTransactionOutput,
-        transaction_slice_metadata::TransactionSliceMetadata,
-        value::{SpeculativeValue, ValueWithLayout},
+        config::BlockExecutorConfig, output::CommittedTransactionOutput,
+        transaction_slice_metadata::TransactionSliceMetadata, value::ValueWithLayout,
     },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     on_chain_config::Features,
@@ -51,14 +49,11 @@ use aptos_types::{
         BlockExecutableTransaction, BlockExecutionResult, BlockOutput, FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
-    write_set::TransactionWrite,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
-use aptos_vm_types::resolver::ResourceGroupSize;
 use claims::assert_none;
 use core::panic;
-use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
@@ -2229,76 +2224,8 @@ where
                         // Dynamic change set optimizations are enabled, and resource group serialization
                         // previously failed in bcs serialization for preparing final transaction outputs.
                         // TODO: remove this fallback when txn errors can be created from block executor.
-
-                        let finalize = |group_key| -> (BTreeMap<_, _>, ResourceGroupSize) {
-                            let (group, size) = unsync_map.finalize_group(&group_key);
-
-                            (
-                                group
-                                    .map(|(resource_tag, value_with_layout)| {
-                                        let bytes = value_with_layout
-                                            .extract_value()
-                                            .extract_raw_bytes()
-                                            .expect("Deletions should already be applied");
-                                        (resource_tag, bytes)
-                                    })
-                                    .collect(),
-                                size,
-                            )
-                        };
-
-                        // The IDs are not exchanged but it doesn't change the types (Bytes) or size.
-                        let serialization_error = output
-                            .group_reads_needing_delayed_field_exchange()
-                            .iter()
-                            .any(|(group_key, _)| {
-                                fail_point!("fail-point-resource-group-serialization", |_| {
-                                    true
-                                });
-
-                                let (finalized_group, group_size) = finalize(group_key.clone());
-                                match bcs::to_bytes(&finalized_group) {
-                                    Ok(group) => {
-                                        (!finalized_group.is_empty() || group_size.get() != 0)
-                                            && group.len() as u64 != group_size.get()
-                                    },
-                                    Err(_) => true,
-                                }
-                            })
-                            || output.resource_group_write_set().into_iter().any(
-                                |(group_key, (_, output_group_size, group_ops))| {
-                                    fail_point!("fail-point-resource-group-serialization", |_| {
-                                        true
-                                    });
-
-                                    let (mut finalized_group, group_size) = finalize(group_key);
-                                    if output_group_size.get() != group_size.get() {
-                                        return false;
-                                    }
-                                    for (value_tag, group_op) in group_ops {
-                                        if group_op.is_deletion() {
-                                            finalized_group.remove(&value_tag);
-                                        } else {
-                                            finalized_group.insert(
-                                                value_tag,
-                                                group_op
-                                                    .extract_value()
-                                                    .extract_raw_bytes()
-                                                    .expect("Not a deletion"),
-                                            );
-                                        }
-                                    }
-                                    match bcs::to_bytes(&finalized_group) {
-                                        Ok(group) => {
-                                            (!finalized_group.is_empty() || group_size.get() != 0)
-                                                && group.len() as u64 != group_size.get()
-                                        },
-                                        Err(_) => true,
-                                    }
-                                },
-                            );
-
-                        if serialization_error {
+                        let materializer = SequentialMaterializer::new(&latest_view);
+                        if !output.check_materialization(&materializer) {
                             // The corresponding error / alert must already be triggered, the goal in sequential
                             // fallback is to just skip any transactions that would cause such serialization errors.
                             alert!("Discarding transaction because serialization failed in bcs fallback");
