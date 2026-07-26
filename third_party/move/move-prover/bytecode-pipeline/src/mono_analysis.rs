@@ -1042,6 +1042,14 @@ impl Analyzer<'_> {
                     self.check_struct_fun_field(&struct_, &field, &field_ty, targs);
                 }
             }
+            // Ghost fields participate in the datatype constructor, so their
+            // types must be monomorphized too — otherwise a type used only in
+            // a ghost field never gets its own datatype emitted.
+            for field in struct_.get_ghost_fields() {
+                let field_ty = field.get_type().instantiate(targs);
+                self.add_type(&field_ty);
+                self.check_struct_fun_field(&struct_, &field, &field_ty, targs);
+            }
         }
     }
 

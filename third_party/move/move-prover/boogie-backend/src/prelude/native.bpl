@@ -9,8 +9,10 @@
 {% macro vector_module(instance) %}
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
-{%- if options.native_equality -%}
-{# Whole vector has native equality #}
+{%- if options.native_equality and instance.has_native_equality -%}
+{# Whole vector has native equality: extensional theory AND canonically
+   represented elements (ghost-bearing element types must compare
+   element-wise so ghosts are excluded). #}
 function {:inline} $IsEqual'vec{{S}}'(v1: Vec ({{T}}), v2: Vec ({{T}})): bool {
     v1 == v2
 }

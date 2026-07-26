@@ -1,0 +1,10 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field.move:35:9
+   │
+35 │         ensures result.g == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field.move:33: fresh_unconstrained
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field.move:35: fresh_unconstrained (spec)

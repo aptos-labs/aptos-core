@@ -1,0 +1,83 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/ghost_field_invariants.move:51:9
+   │
+51 │         invariant g >= x;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_invariants.move:53: bad_init_pack
+   =     at tests/sources/functional/ghost_field_invariants.move:51
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/ghost_field_invariants.move:60:9
+   │
+60 │         invariant total >= x;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_invariants.move:76: sum_break
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_invariants.move:77: sum_break
+   =     at tests/sources/functional/ghost_field_invariants.move:60
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/ghost_field_invariants.move:61:9
+   │
+61 │         invariant total >= y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_invariants.move:76: sum_break
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_invariants.move:77: sum_break
+   =     at tests/sources/functional/ghost_field_invariants.move:60
+   =     at tests/sources/functional/ghost_field_invariants.move:61
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/ghost_field_invariants.move:84:9
+   │
+84 │         invariant max_seen >= x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_invariants.move:103: mono_break_write
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_invariants.move:104: mono_break_write
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_invariants.move:103: mono_break_write
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_invariants.move:84
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/ghost_field_invariants.move:113:9
+    │
+113 │         invariant g_lo <= g_hi;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_invariants.move:120: range_pack_reversed
+    =     at tests/sources/functional/ghost_field_invariants.move:113
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/ghost_field_invariants.move:127:9
+    │
+127 │         invariant h < 100;
+    │         ^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_invariants.move:134: einit_update_bad
+    =         e = <redacted>
+    =     at tests/sources/functional/ghost_field_invariants.move:127
+
+error: ghost field initializer is out of the field type's value domain
+    ┌─ tests/sources/functional/ghost_field_invariants.move:161:9
+    │
+161 │         OvfS { x: 18446744073709551615 }
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_invariants.move:161: ovf_init_out_of_range
+
+error: ghost field update value is out of the field type's value domain
+    ┌─ tests/sources/functional/ghost_field_invariants.move:176:16
+    │
+176 │         spec { update s.g = s.g + 1; };
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_invariants.move:175: ovf_update_out_of_range
+    =         s = <redacted>
+    =     at tests/sources/functional/ghost_field_invariants.move:176: ovf_update_out_of_range

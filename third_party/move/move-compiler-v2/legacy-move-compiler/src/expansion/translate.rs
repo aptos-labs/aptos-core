@@ -1778,6 +1778,7 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
         },
         PM::Variable {
             is_global,
+            is_ghost,
             name,
             type_parameters: pty_params,
             type_: t,
@@ -1792,6 +1793,7 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
             context.set_to_outer_scope(old_aliases);
             EM::Variable {
                 is_global,
+                is_ghost,
                 name,
                 type_parameters,
                 type_: t,

@@ -33,7 +33,7 @@ use move_model::{
     exp_rewriter::strip_all_olds,
     model::{
         FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId,
+        SpecFunId, SpecVarId, StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -87,10 +87,15 @@ pub struct SpecTranslator<'env> {
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
     lifted_choice_infos: Rc<RefCell<HashMap<(ExpData, Vec<Type>), LiftedChoiceInfo>>>,
-    /// Set of (node_id, type, bool) pairs for arbitrary value expressions that need uninterpreted
-    /// function declarations. Each arbitrary value at a unique source location gets its own
-    /// uninterpreted function to ensure soundness. The bool indicates whether the arbitrary value is of bv type.
-    arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool)>>>,
+    /// Set of (node_id, type, bv, ghost) tuples for arbitrary value expressions that need
+    /// uninterpreted function declarations. Each arbitrary value at a unique source location gets
+    /// its own uninterpreted function to ensure soundness. `bv` indicates a bitvector-typed value.
+    /// `ghost` marks values backing uninitialized ghost fields at a spec-level pack: only those
+    /// get a type-domain (`$IsValid`) axiom, mirroring the havoc+assume at bytecode-level packs.
+    /// Abort-origin values stay unconstrained — a blanket axiom would inject quantified facts
+    /// into the global context of every VC in the file and regress solver performance for
+    /// unrelated functions.
+    arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool, bool)>>>,
     /// The qualified instantiated ID of the function currently being verified, if any.
     /// Used to resolve behavioral predicates on function-typed parameters.
     current_fun_qid: RefCell<Option<QualifiedInstId<FunId>>>,
@@ -1130,7 +1135,7 @@ impl SpecTranslator<'_> {
         emitln!(self.writer, "// ** arbitrary value functions");
         emitln!(self.writer);
 
-        for (node_id, ty, bv_flag) in arbitrary_values.iter() {
+        for (node_id, ty, bv_flag, is_ghost) in arbitrary_values.iter() {
             let loc = env.get_node_loc(*node_id);
             let (type_suffix, boogie_ty) = (
                 boogie_type_suffix(env, ty, *bv_flag),
@@ -1139,13 +1144,22 @@ impl SpecTranslator<'_> {
 
             self.writer.set_location(&loc);
             emitln!(self.writer, "// arbitrary value at {}", loc.display(env));
-            emitln!(
-                self.writer,
-                "function $Arbitrary_value_of'{}'_{}(): {};",
+            let fname = format!(
+                "$Arbitrary_value_of'{}'_{}",
                 type_suffix,
-                node_id.as_usize(),
-                boogie_ty
+                node_id.as_usize()
             );
+            emitln!(self.writer, "function {}(): {};", fname, boogie_ty);
+            // Ghost-origin values are constrained to the declared type's
+            // value domain, mirroring the havoc+assume at bytecode-level
+            // packs. Other origins (e.g. abort values) stay unconstrained.
+            if *is_ghost {
+                let call = format!("{}()", fname);
+                let well_formed = boogie_well_formed_expr(env, &call, ty, *bv_flag);
+                if !well_formed.is_empty() && well_formed != "true" {
+                    emitln!(self.writer, "axiom {};", well_formed);
+                }
+            }
             emitln!(self.writer);
         }
     }
@@ -1647,9 +1661,12 @@ impl SpecTranslator<'_> {
                 let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
                 let ty = self.get_node_type(node_id);
                 // Track this arbitrary value for later function declaration
-                self.arbitrary_values
-                    .borrow_mut()
-                    .insert((node_id, ty.clone(), exp_bv_flag));
+                self.arbitrary_values.borrow_mut().insert((
+                    node_id,
+                    ty.clone(),
+                    exp_bv_flag,
+                    false,
+                ));
                 // Emit call to unique uninterpreted function for this abort location
                 emit!(
                     self.writer,
@@ -2417,6 +2434,10 @@ impl SpecTranslator<'_> {
             self.translate_exp(arg);
             sep = ", ";
         }
+        // Ghost fields are additional constructor arguments. If a ghost has an
+        // initializer, translate it over the runtime pack args; otherwise emit
+        // a fresh unconstrained value.
+        self.emit_ghost_pack_args(struct_env, inst, &mut sep, node_id, Some(args));
         emit!(self.writer, ")");
     }
 
@@ -2441,7 +2462,84 @@ impl SpecTranslator<'_> {
             self.translate_exp(arg);
             sep = ", ";
         }
+        // Enum ghost initializers may not reference variant fields (ghosts are
+        // variant-agnostic), so no argument substitution is applied here.
+        self.emit_ghost_pack_args(struct_env, inst, &mut sep, node_id, None);
         emit!(self.writer, ")");
+    }
+
+    /// Emit one Boogie expression per ghost field of the struct/enum. If the
+    /// ghost has an initializer expression, translate it (with each runtime
+    /// field bare-referenced as `LocalVar(f)` substituted by the corresponding
+    /// pack argument, when `pack_args` is provided). Otherwise emit a fresh
+    /// `$Arbitrary_value_of'T'_<node>()` uninterpreted function so the ghost
+    /// is unconstrained.
+    fn emit_ghost_pack_args(
+        &self,
+        struct_env: &StructEnv<'_>,
+        inst: &[Type],
+        sep: &mut &str,
+        pack_id: NodeId,
+        pack_args: Option<&[Exp]>,
+    ) {
+        for field in struct_env.get_ghost_fields() {
+            emit!(self.writer, sep);
+            if let Some(init) = field.get_init_exp() {
+                let prepared = self.prepare_ghost_init(struct_env, inst, pack_args, init.clone());
+                self.translate_exp(&prepared);
+            } else {
+                let ty = field.get_type().instantiate(inst);
+                let loc = self.env.get_node_loc(pack_id);
+                let node = self.env.new_node(loc, ty.clone());
+                self.arbitrary_values
+                    .borrow_mut()
+                    .insert((node, ty.clone(), false, true));
+                emit!(
+                    self.writer,
+                    &format!(
+                        "$Arbitrary_value_of'{}'_{}()",
+                        boogie_type_suffix(self.env, &ty, false),
+                        node.as_usize()
+                    )
+                );
+            }
+            *sep = ", ";
+        }
+    }
+
+    /// Instantiate the initializer expression's node types with `inst` and, if
+    /// pack args are provided (struct pack, not enum variant pack), substitute
+    /// each free `LocalVar(field_name)` with the pack argument at that runtime
+    /// field's declaration offset. Uses the scope-aware `ExpRewriter` so bound
+    /// occurrences of a field name in an inner `Quant`/`Lambda`/`Block` are
+    /// not captured.
+    fn prepare_ghost_init(
+        &self,
+        struct_env: &StructEnv<'_>,
+        inst: &[Type],
+        pack_args: Option<&[Exp]>,
+        init: Exp,
+    ) -> Exp {
+        use move_model::exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget};
+        let mut map: BTreeMap<Symbol, Exp> = BTreeMap::new();
+        if let Some(args) = pack_args {
+            for field in struct_env.get_fields() {
+                let offset = field.get_offset();
+                if let Some(arg) = args.get(offset) {
+                    map.insert(field.get_name(), arg.clone());
+                }
+            }
+        }
+        let mut cb = |_id: NodeId, target: RewriteTarget| -> Option<Exp> {
+            if let RewriteTarget::LocalVar(sym) = target {
+                map.get(&sym).cloned()
+            } else {
+                None
+            }
+        };
+        ExpRewriter::new(self.env, &mut cb)
+            .set_type_args(inst)
+            .rewrite_exp(init)
     }
 
     fn translate_spec_fun_call(
@@ -2787,7 +2885,7 @@ impl SpecTranslator<'_> {
         // Track this arbitrary value for later function declaration
         self.arbitrary_values
             .borrow_mut()
-            .insert((node_id, ty.clone(), exp_bv_flag));
+            .insert((node_id, ty.clone(), exp_bv_flag, false));
         // Emit call to unique uninterpreted function for this test_variant location
         emit!(
             self.writer,
@@ -3705,18 +3803,46 @@ impl SpecTranslator<'_> {
         let ty_binding = self.get_node_type(args[0].node_id());
         let ty = ty_binding.skip_reference();
 
-        // For tuple types, use native Boogie equality since datatypes support structural equality
+        // For tuple types, use native Boogie equality since datatypes support
+        // structural equality — unless a component transitively carries a
+        // ghost field: raw datatype equality would compare the ghost
+        // constructor arguments, while Move equality ignores ghosts. In that
+        // case compare componentwise with `$IsEqual`, which is fieldwise over
+        // runtime state for ghost-bearing types.
         if let Type::Tuple(elems) = ty {
             if elems.len() >= 2 {
-                emit!(self.writer, "(");
-                self.translate_exp(&args[0]);
-                if boogie_val_fun.starts_with('!') {
-                    emit!(self.writer, " != ");
+                let has_ghost = elems
+                    .iter()
+                    .any(|e| crate::bytecode_translator::type_has_ghost_transitively(self.env, e));
+                let negated = boogie_val_fun.starts_with('!');
+                if !has_ghost {
+                    emit!(self.writer, "(");
+                    self.translate_exp(&args[0]);
+                    if negated {
+                        emit!(self.writer, " != ");
+                    } else {
+                        emit!(self.writer, " == ");
+                    }
+                    self.translate_exp(&args[1]);
+                    emit!(self.writer, ")");
                 } else {
-                    emit!(self.writer, " == ");
+                    if negated {
+                        emit!(self.writer, "!");
+                    }
+                    emit!(self.writer, "(");
+                    let mut sep = "";
+                    for (i, ety) in elems.iter().enumerate() {
+                        emit!(self.writer, sep);
+                        let suffix = boogie_type_suffix(self.env, ety, false);
+                        emit!(self.writer, "$IsEqual'{}'((", suffix);
+                        self.translate_exp(&args[0]);
+                        emit!(self.writer, ")->${}, (", i);
+                        self.translate_exp(&args[1]);
+                        emit!(self.writer, ")->${})", i);
+                        sep = " && ";
+                    }
+                    emit!(self.writer, ")");
                 }
-                self.translate_exp(&args[1]);
-                emit!(self.writer, ")");
                 return;
             }
         }
@@ -3962,9 +4088,12 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, ", {}bv{})) then ", max_val_target, source_base);
 
                 // Track and emit unique arbitrary function for this cast overflow
-                self.arbitrary_values
-                    .borrow_mut()
-                    .insert((node_id, target_type.clone(), true));
+                self.arbitrary_values.borrow_mut().insert((
+                    node_id,
+                    target_type.clone(),
+                    true,
+                    false,
+                ));
                 emit!(
                     self.writer,
                     "$Arbitrary_value_of'bv{}'_{}() else ",

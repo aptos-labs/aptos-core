@@ -14,11 +14,14 @@ use move_model::{
     exp_generator::ExpGenerator,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     memory_labels::all_labels_in_exp,
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
+    model::{
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId,
+        StructId,
+    },
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
     symbol::Symbol,
-    ty::{ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
+    ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
 };
 use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
@@ -1130,6 +1133,99 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Emits an update of a ghost field (`update base.g = rhs`), where `base`
+    /// is a local or parameter, possibly a mutable reference: the value is
+    /// rebuilt via `UpdateField` and stored back — a plain assignment for an
+    /// owned local, a `WriteRef` through a reference.
+    fn emit_ghost_field_update(&mut self, lhs: &Exp, rhs: &Exp) {
+        let (sel_node, mid, sid, fid, base) =
+            if let ExpData::Call(id, ast::Operation::Select(mid, sid, fid), args) = lhs.as_ref() {
+                (*id, *mid, *sid, *fid, args[0].clone())
+            } else {
+                unreachable!("ghost field update lhs must be a field selection")
+            };
+        let base_idx = if let ExpData::Temporary(_, idx) = base.as_ref() {
+            *idx
+        } else {
+            unreachable!("ghost field update base must be a local or parameter")
+        };
+        let base_ty = self.builder.get_local_type(base_idx);
+        let struct_ty = base_ty.skip_reference().clone();
+        let inst = self.builder.global_env().get_node_instantiation(sel_node);
+        // A bitwise-classified RHS would emit a `bv<N>`-typed argument to
+        // `$Update...`, but ghost integer fields translate to Boogie `int`
+        // — the resulting Boogie would be ill-typed. Reject up front.
+        // References are implicitly dereferenced in specification expressions,
+        // so the temporary can be used directly regardless of its kind.
+        let base_val = self.builder.mk_temporary(base_idx);
+        let update_loc = self.builder.get_current_loc();
+        let env = self.builder.global_env();
+        // The RHS expression carries a spec-arithmetic type (`num`); the
+        // range to check is the FIELD's declared type, so type the WellFormed
+        // argument with it.
+        let field_ty = env
+            .get_module(mid)
+            .into_struct(sid)
+            .get_field(fid)
+            .get_type()
+            .instantiate(&self.builder.global_env().get_node_instantiation(sel_node));
+        // Assert the new value stays within the declared type's value domain:
+        // $IsValid at boundaries includes ghost fields, which is only sound
+        // if every ghost write is checked in range. The check is skipped
+        // when it holds by construction (`num` targets, and pure copies of
+        // already-well-formed values); computed values keep it. Skipping
+        // also avoids perturbing the emitted Boogie of enclosing VCs.
+        let rhs_val = if range_check_needed(env, &field_ty, rhs) {
+            // The RHS may be a reference-typed local (implicitly dereferenced
+            // in spec expressions), so bind its dereferenced value.
+            let (rhs_temp, rhs_temp_exp) = self.builder.emit_let_skip_reference(rhs.clone());
+            let wf_arg_node = env.new_node(update_loc.clone(), field_ty);
+            let wf_node = env.new_node(update_loc.clone(), BOOL_TYPE.clone());
+            let wf_exp = ExpData::Call(wf_node, ast::Operation::WellFormed, vec![
+                ExpData::Temporary(wf_arg_node, rhs_temp).into_exp(),
+            ])
+            .into_exp();
+            self.builder.set_loc_and_vc_info(
+                update_loc,
+                "ghost field update value is out of the field type's value domain",
+            );
+            self.builder
+                .emit_with(|id| Bytecode::Prop(id, PropKind::Assert, wf_exp));
+            rhs_temp_exp
+        } else {
+            rhs.clone()
+        };
+        let new_val = self.builder.mk_call_with_inst(
+            &struct_ty,
+            inst,
+            ast::Operation::UpdateField(mid, sid, fid),
+            vec![base_val, rhs_val],
+        );
+        let (new_temp, _) = self.builder.emit_let(new_val);
+        if base_ty.is_reference() {
+            self.builder.emit_with(|id| {
+                Bytecode::Call(
+                    id,
+                    vec![],
+                    Operation::WriteRef,
+                    vec![base_idx, new_temp],
+                    None,
+                )
+            });
+        } else {
+            self.builder
+                .emit_with(|id| Bytecode::Assign(id, base_idx, new_temp, AssignKind::Store));
+        }
+        // Trigger the data-invariant instrumentation pass to assert struct
+        // invariants over the updated value. Without this, an invariant
+        // constraining the ghost field (e.g. `invariant self.g == self.x`)
+        // would be silently violable by a ghost update — and downstream
+        // `WellFormed(x)` at opaque calls would then propagate the (violated)
+        // invariant, letting callers certify false postconditions.
+        self.builder
+            .emit_with(|id| Bytecode::Call(id, vec![], Operation::PackRef, vec![base_idx], None));
+    }
+
     fn emit_updates(&mut self, spec: &TranslatedSpec, prop_rhs_opt: Option<Exp>) {
         for (loc, lhs, rhs) in &spec.updates {
             // Emit update of lhs, which is guaranteed to represent a ghost memory access.
@@ -1145,11 +1241,86 @@ impl<'a> Instrumenter<'a> {
             };
             self.emit_traces(spec, new_rhs);
 
+            if lhs
+                .extract_ghost_mem_access(self.builder.global_env())
+                .is_none()
+            {
+                // Not a ghost variable access: the builder guarantees the
+                // only other update target is a ghost field of a local. When
+                // the update comes from an inline spec block, the maintained
+                // Prop expression carries the current temporaries as
+                // `Eq(fresh_lhs, unlowered_rhs)` (the fun-spec copy has
+                // stale temporaries; the pipeline renumbers Props but not
+                // spec entries). But the fun-spec `rhs` has the properly
+                // lowered form of `old(...)` etc. Combine: use `fresh_lhs`
+                // and substitute the fun-spec's `rhs` to swap stale temps
+                // for the fresh ones observable in `fresh_lhs`.
+                if let Some(ExpData::Call(_, ast::Operation::Eq, prop_args)) =
+                    prop_rhs_opt.as_ref().map(|e| e.as_ref())
+                {
+                    let fresh_lhs = &prop_args[0];
+                    let fresh_rhs = &prop_args[1];
+                    let subst_rhs = align_temps(
+                        self.builder.global_env(),
+                        lhs.as_ref(),
+                        fresh_lhs.as_ref(),
+                        fresh_rhs.as_ref(),
+                        rhs,
+                    );
+                    self.emit_ghost_field_update(fresh_lhs, &subst_rhs);
+                } else {
+                    self.emit_ghost_field_update(lhs, new_rhs);
+                }
+                continue;
+            }
+
             // Extract the ghost mem from lhs
             let (ghost_mem, _field_id, addr) = lhs
                 .extract_ghost_mem_access(self.builder.global_env())
                 .expect("lhs of update valid");
             let ghost_mem_ty = ghost_mem.to_type();
+
+            // Assert the new value stays in the spec variable's declared
+            // type domain (the ghost memory struct's single field). $IsValid
+            // over ghost memory is assumed at every function entry, which is
+            // only sound if every update is checked in range. Use `num` for
+            // an unbounded spec variable. The RHS may be a reference-typed
+            // local (implicitly dereferenced in spec expressions), so bind
+            // its dereferenced value.
+            let env = self.builder.global_env();
+            let var_ty = env
+                .get_module(ghost_mem.module_id)
+                .into_struct(ghost_mem.id)
+                .get_field_by_offset(0)
+                .get_type()
+                .instantiate(&ghost_mem.inst);
+            let update_loc = self.builder.get_current_loc();
+            // The range check is skipped when it holds by construction
+            // (`num` targets, and pure copies of already-well-formed
+            // values); computed values keep it. Skipping also leaves the
+            // emitted Boogie of enclosing VCs unperturbed.
+            let rhs_val = if range_check_needed(env, &var_ty, new_rhs) {
+                // The RHS may be a reference-typed local (implicitly
+                // dereferenced in spec expressions), so bind its
+                // dereferenced value.
+                let (rhs_val_temp, rhs_val_exp) =
+                    self.builder.emit_let_skip_reference(new_rhs.clone());
+                let wf_arg_node = env.new_node(update_loc.clone(), var_ty);
+                let wf_node = env.new_node(update_loc.clone(), BOOL_TYPE.clone());
+                let wf_exp = ExpData::Call(wf_node, ast::Operation::WellFormed, vec![
+                    ExpData::Temporary(wf_arg_node, rhs_val_temp).into_exp(),
+                ])
+                .into_exp();
+                self.builder.set_loc_and_vc_info(
+                    update_loc,
+                    "spec variable update value is out of the variable type's value domain",
+                );
+                self.builder
+                    .emit_with(|id| Bytecode::Prop(id, PropKind::Assert, wf_exp));
+                rhs_val_exp
+            } else {
+                new_rhs.clone()
+            };
 
             // Construct new ghost mem struct value from rhs. We assign the struct value
             // directly, ignoring the `_field_id`. This is currently possible because
@@ -1159,7 +1330,7 @@ impl<'a> Instrumenter<'a> {
                 &ghost_mem_ty,
                 ghost_mem.inst.clone(),
                 ast::Operation::Pack(ghost_mem.module_id, ghost_mem.id, None),
-                vec![new_rhs.clone()],
+                vec![rhs_val],
             ));
 
             // Update memory. We create a mut ref for the location then write the value back to it.
@@ -2193,6 +2364,94 @@ impl<'a> Instrumenter<'a> {
 /// the same callee have different entry snapshots, but the aggregated call-site
 /// assumes all bind to this single label; selecting the label per call site needs
 /// a correlation between calls and the abstract state labels they define.
+/// Walk `stale_lhs` and `fresh_lhs` in parallel to build a stale→fresh
+/// Temporary index map, then rewrite `stale_rhs`'s Temporaries accordingly.
+/// Used at ghost-field update lowering, where the fun-spec keeps a lowered
+/// (`old(...)` resolved) rhs but with the pre-renumbering temporary indices;
+/// the maintained Prop marker has the fresh indices in its LHS. The two
+/// LHS expressions share structure by construction.
+/// Whether an update of a target with declared type `target_ty` needs a
+/// value-domain assert for `rhs`. The check holds by construction — and is
+/// skipped — when the target is `num` (no bounds), or when the RHS is a pure
+/// copy of an already-well-formed value: a local/temporary or a chain of
+/// field selections over one (possibly under `old`), whose type equals the
+/// declared type. Spec arithmetic yields `num`-typed nodes and casts are
+/// calls outside this shape, so computed values always keep the check.
+/// Skipping provably-redundant checks also keeps the emitted Boogie of
+/// enclosing VCs identical to what it was before this feature.
+fn range_check_needed(env: &GlobalEnv, target_ty: &Type, rhs: &Exp) -> bool {
+    if matches!(target_ty, Type::Primitive(PrimitiveType::Num)) {
+        return false;
+    }
+    fn is_pure_copy(exp: &ExpData) -> bool {
+        match exp {
+            ExpData::Temporary(..) | ExpData::LocalVar(..) => true,
+            ExpData::Call(_, ast::Operation::Select(..), args)
+            | ExpData::Call(_, ast::Operation::SelectVariants(..), args)
+            | ExpData::Call(_, ast::Operation::Old, args)
+                if args.len() == 1 =>
+            {
+                is_pure_copy(args[0].as_ref())
+            },
+            _ => false,
+        }
+    }
+    !(is_pure_copy(rhs.as_ref()) && env.get_node_type(rhs.node_id()).skip_reference() == target_ty)
+}
+
+fn align_temps(
+    env: &GlobalEnv,
+    stale_lhs: &ExpData,
+    fresh_lhs: &ExpData,
+    fresh_rhs: &ExpData,
+    stale_rhs: &Exp,
+) -> Exp {
+    // Collect the stale→fresh temporary index map, along with each stale
+    // temporary's node id (used to preserve the original type/loc when
+    // synthesizing the replacement `Temporary` expression — otherwise
+    // downstream consumers reading the node's type would panic).
+    // Walk both LHS and RHS in parallel: reaching-definition propagation
+    // can also renumber temps referenced only in the RHS (a value read
+    // from a copied local), and those wouldn't be covered by walking LHS
+    // alone. The Prop marker carries a copy of both sides with fresh
+    // temp indices; the fun-spec entry carries the properly lowered form
+    // of `old(...)` but with stale temp indices. Combining both walks
+    // gives a complete stale→fresh map without losing `old` lowering.
+    let mut map: BTreeMap<TempIndex, (TempIndex, NodeId)> = BTreeMap::new();
+    fn collect(
+        stale: &ExpData,
+        fresh: &ExpData,
+        map: &mut BTreeMap<TempIndex, (TempIndex, NodeId)>,
+    ) {
+        match (stale, fresh) {
+            (ExpData::Temporary(id, s), ExpData::Temporary(_, f)) => {
+                map.insert(*s, (*f, *id));
+            },
+            (ExpData::Call(_, op1, args1), ExpData::Call(_, op2, args2))
+                if op1 == op2 && args1.len() == args2.len() =>
+            {
+                for (a, b) in args1.iter().zip(args2.iter()) {
+                    collect(a.as_ref(), b.as_ref(), map);
+                }
+            },
+            _ => {},
+        }
+    }
+    collect(stale_lhs, fresh_lhs, &mut map);
+    collect(stale_rhs.as_ref(), fresh_rhs, &mut map);
+    if map.is_empty() {
+        return stale_rhs.clone();
+    }
+    let mut cb = |_id, target: RewriteTarget| match target {
+        RewriteTarget::Temporary(idx) => map
+            .get(&idx)
+            .map(|(fresh, orig)| ExpData::Temporary(*orig, *fresh).into_exp()),
+        _ => None,
+    };
+    let mut rewriter = ExpRewriter::new(env, &mut cb);
+    rewriter.rewrite_exp(stale_rhs.clone())
+}
+
 fn find_behavior_pre_label_for_callee(
     spec: &TranslatedSpec,
     mid: ModuleId,

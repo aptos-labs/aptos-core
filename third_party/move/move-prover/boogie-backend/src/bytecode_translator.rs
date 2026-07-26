@@ -42,8 +42,8 @@ use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedInstId,
-        StructEnv, StructId,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructEnv, StructId,
     },
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
@@ -138,10 +138,22 @@ enum BpAxiomCtx<'a> {
     FunParam {
         fun: &'a QualifiedInstId<FunId>,
         param_sym: Symbol,
+        /// Instantiation of the struct declaring the invariant being lifted;
+        /// the invariant body's type parameters are the struct's.
+        struct_inst: &'a [Type],
     },
 }
 
 impl BpAxiomCtx<'_> {
+    /// The type instantiation to apply to node types read from the invariant
+    /// body: the declaring struct's instantiation in both variants.
+    fn struct_inst(&self) -> &[Type] {
+        match self {
+            BpAxiomCtx::StructField { struct_id, .. } => &struct_id.inst,
+            BpAxiomCtx::FunParam { struct_inst, .. } => struct_inst,
+        }
+    }
+
     fn bp_fun_name(&self, env: &GlobalEnv, kind: BehaviorKind) -> String {
         match self {
             BpAxiomCtx::StructField {
@@ -154,7 +166,7 @@ impl BpAxiomCtx<'_> {
                     boogie_struct_field_spec_fun_name(env, struct_id, *field_sym, kind, &[])
                 }
             },
-            BpAxiomCtx::FunParam { fun, param_sym } => {
+            BpAxiomCtx::FunParam { fun, param_sym, .. } => {
                 if kind == BehaviorKind::ResultOf {
                     boogie_behavioral_result_fun_name(env, fun, *param_sym, &[], false)
                 } else {
@@ -3580,6 +3592,7 @@ impl<'env> BoogieTranslator<'env> {
                             let fp_ctx = BpAxiomCtx::FunParam {
                                 fun: &fp_info.fun,
                                 param_sym: fp_info.param_sym,
+                                struct_inst: &info.struct_id.inst,
                             };
                             self.emit_data_invariant_axiom_for_behavior(
                                 info,
@@ -3866,10 +3879,10 @@ impl<'env> BoogieTranslator<'env> {
             AstOperation::Gt => self.translate_binop(">", args, var_map, ctx, mem_args, result_sub),
             AstOperation::Lt => self.translate_binop("<", args, var_map, ctx, mem_args, result_sub),
             AstOperation::Eq => {
-                self.translate_binop("==", args, var_map, ctx, mem_args, result_sub)
+                self.translate_eq_or_neq(false, args, var_map, ctx, mem_args, result_sub)
             },
             AstOperation::Neq => {
-                self.translate_binop("!=", args, var_map, ctx, mem_args, result_sub)
+                self.translate_eq_or_neq(true, args, var_map, ctx, mem_args, result_sub)
             },
             AstOperation::Add => {
                 self.translate_binop("+", args, var_map, ctx, mem_args, result_sub)
@@ -3902,6 +3915,51 @@ impl<'env> BoogieTranslator<'env> {
                 Some(format!("(!{})", a))
             },
             _ => None,
+        }
+    }
+
+    /// Render `Eq`/`Neq` in a lifted invariant body. Use typed `$IsEqual`
+    /// so struct values that transitively carry a ghost compare fieldwise
+    /// over runtime state — raw Boogie `==` would compare the ghost
+    /// constructor arguments and lift a ghost-sensitive fact into the
+    /// axiom.
+    fn translate_eq_or_neq(
+        &self,
+        negated: bool,
+        args: &[Exp],
+        var_map: &BTreeMap<Symbol, String>,
+        ctx: &BpAxiomCtx,
+        mem_args: &BpMemArgs,
+        result_sub: Option<&BTreeMap<Symbol, String>>,
+    ) -> Option<String> {
+        if args.len() != 2 {
+            return None;
+        }
+        let a =
+            self.translate_invariant_body_to_boogie(&args[0], var_map, ctx, mem_args, result_sub)?;
+        let b =
+            self.translate_invariant_body_to_boogie(&args[1], var_map, ctx, mem_args, result_sub)?;
+        // The invariant body is declared on the generic struct; its node types
+        // must be instantiated with the axiom's concrete instantiation before
+        // any type-dependent routing (an open type parameter would silently
+        // route to raw `==`, lifting ghost-sensitive equality into the axiom).
+        let ty = self
+            .env
+            .get_node_type(args[0].node_id())
+            .skip_reference()
+            .instantiate(ctx.struct_inst());
+        // Divert to `$IsEqual` when the operand type carries a ghost, or is
+        // still open after instantiation (`$IsEqual` is the safe relation and
+        // an unresolvable suffix fails loudly at Boogie type check); keep raw
+        // `==` otherwise so the emitted axioms for non-ghost code are
+        // unchanged.
+        if ty.is_open() || type_has_ghost_transitively(self.env, &ty) {
+            let suffix = boogie_type_suffix(self.env, &ty, false);
+            let call = format!("$IsEqual'{}'({}, {})", suffix, a, b);
+            Some(if negated { format!("!{}", call) } else { call })
+        } else {
+            let op = if negated { "!=" } else { "==" };
+            Some(format!("({} {} {})", a, op, b))
         }
     }
 
@@ -4322,18 +4380,25 @@ impl StructTranslator<'_> {
         let struct_variant_name = boogie_struct_variant_name(struct_env, self.type_inst, variant);
         let struct_name = boogie_struct_name(struct_env, self.type_inst, false);
         let fields = struct_env.get_fields_of_variant(variant).collect_vec();
+        // Constructor arguments include the (variant-agnostic) ghost fields.
+        // Emitting per-variant $Update functions for ghost fields too makes
+        // the variant-dispatching update wrapper cover them across variants.
+        let ctor_fields = struct_env
+            .get_fields_of_variant(variant)
+            .chain(struct_env.get_ghost_fields())
+            .collect_vec();
         // Emit $Update function for each field in `variant`.
-        for (pos, field_env) in struct_env.get_fields_of_variant(variant).enumerate() {
+        for (pos, field_env) in ctor_fields.iter().enumerate() {
             let field_name = field_env.get_name().display(env.symbol_pool()).to_string();
             let field_type_name = self.boogie_type_for_struct_field(
-                &field_env,
+                field_env,
                 env,
                 &self.inst(&field_env.get_type()),
             );
             // The type name of the field is required when generating the corresponding update function
             // cannot use inst here because the caller side does not know the type instantiation info
             let field_type_name_uninst =
-                self.boogie_type_for_struct_field(&field_env, env, &field_env.get_type());
+                self.boogie_type_for_struct_field(field_env, env, &field_env.get_type());
             if field_variant_map.contains_key(&(
                 field_name.clone(),
                 (field_type_name.clone(), field_type_name_uninst.clone()),
@@ -4364,7 +4429,7 @@ impl StructTranslator<'_> {
                     suffix_variant, field_name, struct_name, field_type_name, struct_name
                 ),
                 || {
-                    let args = fields
+                    let args = ctor_fields
                         .iter()
                         .enumerate()
                         .map(|(p, f)| {
@@ -4386,17 +4451,24 @@ impl StructTranslator<'_> {
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
             || {
-                if struct_env.is_intrinsic()
-                    || struct_env
+                // Ghost fields are included: their declared type's value
+                // domain is enforced at every ghost write (pack initializers
+                // and updates are asserted in range), which justifies
+                // assuming it here at boundaries. Use `num` for an
+                // unbounded ghost integer.
+                let ghosts: Vec<_> = struct_env.get_ghost_fields().collect();
+                let empty = struct_env.is_intrinsic()
+                    || (struct_env
                         .get_fields_of_variant(variant)
                         .collect_vec()
                         .is_empty()
-                {
+                        && ghosts.is_empty());
+                if empty {
                     emitln!(writer, "true")
                 } else {
                     let mut sep = "";
                     emitln!(writer, "if s is {} then", suffix_variant);
-                    for field in &fields {
+                    for field in fields.iter().chain(ghosts.iter()) {
                         emitln!(writer, "{}", self.boogie_field_is_valid(field, sep));
                         sep = "  && ";
                     }
@@ -4422,7 +4494,12 @@ impl StructTranslator<'_> {
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", struct_name, struct_name),
             || {
-                if struct_env.is_intrinsic() || struct_env.get_field_count() == 0 {
+                // A struct with no runtime fields can still carry ghost
+                // fields whose value domain must be maintained; only emit
+                // the trivial `true` when there is genuinely nothing to
+                // check.
+                let no_ghosts = struct_env.get_ghost_fields().next().is_none();
+                if struct_env.is_intrinsic() || (struct_env.get_field_count() == 0 && no_ghosts) {
                     emitln!(writer, "true")
                 } else {
                     emit_fn()
@@ -4704,8 +4781,11 @@ impl StructTranslator<'_> {
                 .map(|variant| {
                     let struct_variant_name =
                         boogie_struct_variant_name(struct_env, self.type_inst, variant);
+                    // Ghost fields appear in every variant constructor with
+                    // the same name and type, so selection is variant-agnostic.
                     let variant_fields = struct_env
                         .get_fields_of_variant(variant)
+                        .chain(struct_env.get_ghost_fields())
                         .map(|f| self.boogie_field_arg_for_fun_sig(&f))
                         .join(", ");
                     format!("    {}({})", struct_variant_name, variant_fields,)
@@ -4714,20 +4794,28 @@ impl StructTranslator<'_> {
             emitln!(writer, "{}", constructor);
             emitln!(writer, "}");
         } else {
+            // Ghost fields become additional constructor arguments: model-only
+            // state carried by every value of the struct.
             let fields = struct_env
                 .get_fields()
+                .chain(struct_env.get_ghost_fields())
                 .map(|f| self.boogie_field_arg_for_fun_sig(&f))
                 .join(", ");
             emitln!(writer, "    {}({})", struct_name, fields,);
             emitln!(writer, "}");
         }
 
-        // Emit $UpdateField functions.
+        // Emit $UpdateField functions. Ghost fields are included: their update
+        // functions serve spec-level `update` statements, and every field
+        // update preserves the ghost arguments.
         if struct_env.has_variants() {
             self.emit_update_is_valid_for_enum(struct_env, &struct_name);
         } else {
             let suffix = boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
-            let fields = struct_env.get_fields().collect_vec();
+            let fields = struct_env
+                .get_fields()
+                .chain(struct_env.get_ghost_fields())
+                .collect_vec();
             for (pos, field_env) in fields.iter().enumerate() {
                 let field_name = field_env.get_name().display(env.symbol_pool()).to_string();
                 self.emit_function(
@@ -4760,10 +4848,14 @@ impl StructTranslator<'_> {
                 );
             }
 
-            // Emit $IsValid function.
+            // Emit $IsValid function. Ghost fields are included: their
+            // declared type's value domain is enforced at every ghost write
+            // (pack initializers and updates are asserted in range), which
+            // justifies assuming it here at boundaries. Use `num` for an
+            // unbounded ghost integer.
             self.emit_is_valid_struct(struct_env, &struct_name, || {
                 let mut sep = "";
-                for field in struct_env.get_fields() {
+                for field in struct_env.get_fields().chain(struct_env.get_ghost_fields()) {
                     emitln!(writer, "{}", self.boogie_field_is_valid(&field, sep));
                     sep = "  && ";
                 }
@@ -4786,16 +4878,29 @@ impl StructTranslator<'_> {
                 struct_name
             ),
             || {
+                // Native (raw) equality is used only when it coincides with
+                // Move value equality; ghost-bearing types are excluded inside
+                // the predicate and fall to the field-wise form over runtime
+                // fields only.
                 if struct_has_native_equality(struct_env, self.type_inst, self.parent.options) {
                     emitln!(writer, "s1 == s2")
                 } else if struct_env.has_variants() {
                     self.emit_is_equal_fn_body_for_enum(struct_env);
                 } else {
-                    let mut sep = "";
-                    for field in &struct_env.get_fields().collect_vec() {
-                        let field_equal_str = self.boogie_field_is_equal(field, sep);
-                        emit!(writer, "{}", field_equal_str,);
-                        sep = "\n&& ";
+                    let fields: Vec<_> = struct_env.get_fields().collect();
+                    if fields.is_empty() {
+                        // Ghost-only or empty struct — the field-wise form
+                        // would produce an empty function body; emit `true`
+                        // (equality by construction, since all runtime state
+                        // is trivially equal).
+                        emit!(writer, "true");
+                    } else {
+                        let mut sep = "";
+                        for field in &fields {
+                            let field_equal_str = self.boogie_field_is_equal(field, sep);
+                            emit!(writer, "{}", field_equal_str,);
+                            sep = "\n&& ";
+                        }
                     }
                 }
             },
@@ -6168,27 +6273,34 @@ impl FunctionTranslator<'_> {
                     Pack(mid, sid, inst) => {
                         let inst = &self.inst_slice(inst);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
-                        let args = srcs.iter().cloned().map(str_local).join(", ");
+                        let mut args = srcs.iter().cloned().map(str_local).collect_vec();
+                        args.extend(self.ghost_field_pack_args(
+                            &struct_env,
+                            inst,
+                            Some(srcs),
+                            &loc,
+                        ));
                         let dest_str = str_local(dests[0]);
                         emitln!(
                             writer,
                             "{} := {}({});",
                             dest_str,
                             boogie_struct_name(&struct_env, inst, false),
-                            args
+                            args.iter().join(", ")
                         );
                     },
                     PackVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
-                        let args = srcs.iter().cloned().map(str_local).join(", ");
+                        let mut args = srcs.iter().cloned().map(str_local).collect_vec();
+                        args.extend(self.ghost_field_pack_args(&struct_env, inst, None, &loc));
                         let dest_str = str_local(dests[0]);
                         emitln!(
                             writer,
                             "{} := {}({});",
                             dest_str,
                             boogie_struct_variant_name(&struct_env, inst, *variant),
-                            args
+                            args.iter().join(", ")
                         );
                     },
                     Unpack(mid, sid, _) => {
@@ -7473,6 +7585,111 @@ impl FunctionTranslator<'_> {
         format!("({},{},{})", file_idx, loc.span().start(), loc.span().end())
     }
 
+    /// For a struct with ghost fields, produces one Boogie expression per
+    /// ghost field to be appended as constructor arguments to a `Pack`.
+    ///
+    /// If a ghost field has an initializer expression (`ghost f: T = expr;`),
+    /// the initializer is translated with each `LocalVar(field_name)`
+    /// substituted by the pack argument at that runtime field's offset. Only
+    /// applied when `srcs` is `Some` (ordinary `Pack`); enum `PackVariant`
+    /// passes `None` because ghost initializers may not reference variant
+    /// fields.
+    ///
+    /// If a ghost has no initializer, a fresh temp is havoc'd and returned so
+    /// the ghost value is unconstrained. Havoc temps are pre-declared in
+    /// `compute_needed_temps`.
+    fn ghost_field_pack_args(
+        &self,
+        struct_env: &StructEnv,
+        inst: &[Type],
+        srcs: Option<&[TempIndex]>,
+        loc: &Loc,
+    ) -> Vec<String> {
+        let writer = self.parent.writer;
+        let env = struct_env.module_env.env;
+        let mut per_suffix: BTreeMap<String, usize> = BTreeMap::new();
+        let mut result = vec![];
+        for field_env in struct_env.get_ghost_fields() {
+            let ty = field_env.get_type().instantiate(inst);
+            let suffix = boogie_type_suffix(env, ty.skip_reference(), false);
+            let idx = per_suffix.entry(suffix.clone()).or_insert(0);
+            let temp = boogie_temp_from_suffix(env, &suffix, *idx);
+            *idx += 1;
+            let well_formed = boogie_well_formed_expr(env, &temp, ty.skip_reference(), false);
+            if let Some(init) = field_env.get_init_exp() {
+                // Bind the initializer to the reserved temp and assert it
+                // stays in the declared type's value domain; $IsValid at
+                // boundaries relies on every ghost write being in range.
+                let expr = self.translate_ghost_init(struct_env, inst, srcs, init.clone());
+                emitln!(writer, "{} := {};", temp, expr);
+                if !well_formed.is_empty() && well_formed != "true" {
+                    emitln!(
+                        writer,
+                        "assert {{:msg \"assert_failed{}: ghost field initializer is out of the field type's value domain\"}}",
+                        self.loc_str(loc)
+                    );
+                    emitln!(writer, "  {};", well_formed);
+                }
+            } else {
+                // Fresh unconstrained value within the declared type's
+                // domain.
+                emitln!(writer, "havoc {};", temp);
+                if !well_formed.is_empty() && well_formed != "true" {
+                    emitln!(writer, "assume {};", well_formed);
+                }
+            }
+            result.push(temp);
+        }
+        result
+    }
+
+    /// Translate a ghost-field initializer expression to a Boogie expression
+    /// string, substituting each free `LocalVar(field_name)` with the runtime
+    /// pack argument's temp reference (e.g. `$t3`) and instantiating node
+    /// types with `inst`. Uses the scope-aware `ExpRewriter` so bound
+    /// occurrences of a field name in an inner `Quant`/`Lambda`/`Block` are
+    /// not captured.
+    fn translate_ghost_init(
+        &self,
+        struct_env: &StructEnv,
+        inst: &[Type],
+        srcs: Option<&[TempIndex]>,
+        init: Exp,
+    ) -> String {
+        use move_model::exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget};
+        let env = struct_env.module_env.env;
+        let mut name_to_temp: BTreeMap<Symbol, TempIndex> = BTreeMap::new();
+        if let Some(srcs) = srcs {
+            for field in struct_env.get_fields() {
+                let offset = field.get_offset();
+                if let Some(idx) = srcs.get(offset) {
+                    name_to_temp.insert(field.get_name(), *idx);
+                }
+            }
+        }
+        let mut cb = |id: NodeId, target: RewriteTarget| -> Option<Exp> {
+            if let RewriteTarget::LocalVar(sym) = target {
+                name_to_temp
+                    .get(&sym)
+                    .map(|idx| ExpData::Temporary(id, *idx).into_exp())
+            } else {
+                None
+            }
+        };
+        let rewritten = ExpRewriter::new(env, &mut cb)
+            .set_type_args(inst)
+            .rewrite_exp(init);
+        let temp_writer = CodeWriter::new(env.internal_loc());
+        let mut temp_trans = SpecTranslator::new(&temp_writer, env, self.parent.options);
+        temp_trans.share_collected_declarations(&self.parent.spec_translator);
+        temp_trans.translate(&rewritten, inst);
+        let mut result = temp_writer.extract_result();
+        if result.ends_with('\n') {
+            result.pop();
+        }
+        result
+    }
+
     fn compute_needed_temps(&self) -> BTreeMap<(String, bool), (Type, bool, usize)> {
         use Bytecode::*;
         use Operation::*;
@@ -7528,6 +7745,22 @@ impl FunctionTranslator<'_> {
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
                         need(ty, bv_flag, 1)
+                    },
+                    Pack(pack_mid, pack_sid, pack_inst)
+                    | PackVariant(pack_mid, pack_sid, _, pack_inst) => {
+                        // Packing a struct with ghost fields needs a havocked
+                        // temp per ghost field to supply fresh (unconstrained)
+                        // ghost arguments.
+                        let struct_env = env.get_module(*pack_mid).into_struct(*pack_sid);
+                        let pack_inst = &self.inst_slice(pack_inst);
+                        let mut per_suffix: BTreeMap<String, usize> = BTreeMap::new();
+                        for field_env in struct_env.get_ghost_fields() {
+                            let ty = field_env.get_type().instantiate(pack_inst);
+                            let suffix = boogie_type_suffix(env, ty.skip_reference(), false);
+                            let cnt = per_suffix.entry(suffix).or_insert(0);
+                            *cnt += 1;
+                            need(&ty, false, *cnt);
+                        }
                     },
                     _ => {},
                 },
@@ -7925,13 +8158,114 @@ fn derive_struct_field_frame_access(
     }
 }
 
+/// Whether `struct_env @ inst` transitively carries any ghost field —
+/// either directly on itself or reachable through a runtime field's type.
+/// Used at the equality decision site: if a struct has ghosts anywhere in
+/// its runtime layout, native (raw datatype) equality would compare them,
+/// diverging from Move's runtime equality semantics.
+/// Whether `ty` transitively carries a ghost field. Equality over such types
+/// must be fieldwise over runtime state; raw Boogie datatype equality would
+/// compare ghost constructor arguments.
+pub(crate) fn type_has_ghost_transitively(env: &GlobalEnv, ty: &Type) -> bool {
+    ty_has_ghost(env, ty, &mut BTreeSet::new())
+}
+
+fn ty_has_ghost(
+    env: &GlobalEnv,
+    ty: &Type,
+    visited: &mut BTreeSet<(QualifiedId<StructId>, Vec<Type>)>,
+) -> bool {
+    match ty {
+        Type::Struct(mid, sid, ty_inst) => {
+            let qid = mid.qualified(*sid);
+            // Key the visited set on the full instantiation: `Wrap<u64>`
+            // must not shield a later `Wrap<G>` whose argument carries a
+            // ghost. Struct declarations are acyclic, so the set of
+            // instantiations encountered is finite.
+            if !visited.insert((qid, ty_inst.clone())) {
+                return false;
+            }
+            let s = env.get_struct(qid);
+            if s.get_ghost_fields().next().is_some() {
+                return true;
+            }
+            if s.has_variants() {
+                for variant in s.get_variants() {
+                    for f in s.get_fields_of_variant(variant) {
+                        if ty_has_ghost(env, &f.get_type().instantiate(ty_inst), visited) {
+                            return true;
+                        }
+                    }
+                }
+            } else {
+                for f in s.get_fields() {
+                    if ty_has_ghost(env, &f.get_type().instantiate(ty_inst), visited) {
+                        return true;
+                    }
+                }
+            }
+            false
+        },
+        Type::Vector(inner) => ty_has_ghost(env, inner, visited),
+        Type::Reference(_, inner) => ty_has_ghost(env, inner, visited),
+        Type::Tuple(tys) => tys.iter().any(|t| ty_has_ghost(env, t, visited)),
+        // An open type parameter cannot be resolved here: callers must pass
+        // fully instantiated types, since the parameter may later be bound to
+        // a ghost-bearing type which `false` would silently misroute.
+        Type::TypeParameter(_) => false,
+        // Function values: equality over closures is not ghost-routed here;
+        // captured state is not examined (see doc/dev/equality.md).
+        Type::Fun(..) => false,
+        Type::Primitive(_)
+        | Type::TypeDomain(_)
+        | Type::ResourceDomain(_, _, _)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => false,
+    }
+}
+
+fn struct_type_has_ghost_transitively(
+    env: &GlobalEnv,
+    struct_env: &StructEnv<'_>,
+    inst: &[Type],
+) -> bool {
+    let mut visited = BTreeSet::new();
+    if struct_env.get_ghost_fields().next().is_some() {
+        return true;
+    }
+    visited.insert((struct_env.get_qualified_id(), inst.to_vec()));
+    if struct_env.has_variants() {
+        for variant in struct_env.get_variants() {
+            for f in struct_env.get_fields_of_variant(variant) {
+                if ty_has_ghost(env, &f.get_type().instantiate(inst), &mut visited) {
+                    return true;
+                }
+            }
+        }
+    } else {
+        for f in struct_env.get_fields() {
+            if ty_has_ghost(env, &f.get_type().instantiate(inst), &mut visited) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn struct_has_native_equality(
     struct_env: &StructEnv<'_>,
     inst: &[Type],
     options: &BoogieOptions,
 ) -> bool {
+    // A ghost-bearing type never has native equality, regardless of options:
+    // ghosts are constructor arguments, so raw datatype equality would compare
+    // them, while Move equality is the quotient over runtime state only.
+    if struct_type_has_ghost_transitively(struct_env.module_env.env, struct_env, inst) {
+        return false;
+    }
     if options.native_equality {
-        // Everything has native equality
+        // Everything else has native equality
         return true;
     }
     if struct_env.has_variants() {
@@ -7960,18 +8294,23 @@ fn struct_has_native_equality(
     true
 }
 
+/// Whether Boogie's native (raw) equality on `ty`'s representation coincides
+/// with Move value equality. Raw equality diverges when a representation
+/// carries more than the Move value: vector storage beyond the length under
+/// non-extensional theories, and ghost constructor arguments. Ghost-bearing
+/// types therefore never have native equality, regardless of options.
 pub fn has_native_equality(env: &GlobalEnv, options: &BoogieOptions, ty: &Type) -> bool {
-    if options.native_equality {
-        // Everything has native equality
-        return true;
-    }
     match ty {
-        Type::Vector(..) => false,
+        // Native only under an extensional theory (`options.native_equality`)
+        // and with canonically-represented elements.
+        Type::Vector(elem) => options.native_equality && has_native_equality(env, options, elem),
         Type::Struct(mid, sid, sinst) => {
             struct_has_native_equality(&env.get_struct_qid(mid.qualified(*sid)), sinst, options)
         },
+        Type::Tuple(elems) => elems.iter().all(|e| has_native_equality(env, options, e)),
+        // Type parameters only reach this predicate in open (uninterpreted
+        // sort) contexts, where raw equality is the model of Move equality.
         Type::Primitive(_)
-        | Type::Tuple(_)
         | Type::TypeParameter(_)
         | Type::Reference(_, _)
         | Type::Fun(..)

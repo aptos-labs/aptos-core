@@ -4209,7 +4209,7 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
             "apply" => parse_spec_apply(context),
             "pragma" => parse_spec_pragma(context),
             "lemma" => parse_lemma(context),
-            "global" | "local" => parse_spec_variable(context),
+            "global" | "local" | "ghost" => parse_spec_variable(context),
             "update" => parse_spec_update(context),
             "modifies_of" if context.env.flags().language_version() >= LanguageVersion::V2_4 => {
                 parse_modifies_of(context)
@@ -4682,29 +4682,35 @@ fn parse_reads_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnost
 }
 
 // Parse a specification variable.
-//     SpecVariable = ( "global" | "local" )?
+//     SpecVariable = ( "global" | "local" | "ghost" )?
 //                    <Identifier> <OptionalTypeParameters>
 //                    ":" <Type>
 //                    [ "=" Exp ]  // global only
 //                    ";"
+// A "ghost" variable declares a model-only field on the struct enclosing the
+// spec block, rather than a spec variable.
 fn parse_spec_variable(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let is_global = match context.tokens.content() {
+    let (is_global, is_ghost) = match context.tokens.content() {
         "global" => {
             consume_token(context.tokens, Tok::Identifier)?;
-            true
+            (true, false)
         },
         "local" => {
             consume_token(context.tokens, Tok::Identifier)?;
-            false
+            (false, false)
         },
-        _ => false,
+        "ghost" => {
+            consume_token(context.tokens, Tok::Identifier)?;
+            (false, true)
+        },
+        _ => (false, false),
     };
     let name = parse_identifier(context)?;
     let type_parameters = parse_optional_type_parameters(context)?;
     consume_token(context.tokens, Tok::Colon)?;
     let type_ = parse_type(context)?;
-    let init = if is_global && context.tokens.peek() == Tok::Equal {
+    let init = if (is_global || is_ghost) && context.tokens.peek() == Tok::Equal {
         context.tokens.advance()?;
         Some(parse_exp(context)?)
     } else {
@@ -4718,6 +4724,7 @@ fn parse_spec_variable(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
         context.tokens.previous_end_loc(),
         SpecBlockMember_::Variable {
             is_global,
+            is_ghost,
             name,
             type_parameters,
             type_,

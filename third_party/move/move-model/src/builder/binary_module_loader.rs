@@ -365,6 +365,8 @@ impl<'a> BinaryModuleLoader<'a> {
             offset,
             variant,
             ty: self.ty(view.signature_token()),
+            is_ghost: false,
+            init: None,
         }
     }
 
