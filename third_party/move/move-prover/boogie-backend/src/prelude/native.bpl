@@ -9,8 +9,10 @@
 {% macro vector_module(instance) %}
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
-{%- if options.native_equality -%}
-{# Whole vector has native equality #}
+{%- if options.native_equality and instance.has_native_equality -%}
+{# Whole vector has native equality: extensional theory AND canonically
+   represented elements (ghost-bearing element types must compare
+   element-wise so ghosts are excluded). #}
 function {:inline} $IsEqual'vec{{S}}'(v1: Vec ({{T}}), v2: Vec ({{T}})): bool {
     v1 == v2
 }
@@ -392,7 +394,15 @@ axiom (
 {%- set SV = "'" ~ instance.1.suffix ~ "'" -%}
 {%- set ENC = "$EncodeKey'" ~ instance.0.suffix ~ "'" -%}
 
-{%- if options.native_equality -%}
+{#- A ghost-bearing value type must compare with `$IsEqual` rather than raw
+    `==`: ghosts are constructor arguments, so raw equality would include
+    them, while Move equality is the quotient over runtime state. -#}
+{%- if instance.1.has_ghost -%}
+{%- set VEQ = "$IsEqual'" ~ instance.1.suffix ~ "'(GetTable(t1, k), GetTable(t2, k))" -%}
+{%- else -%}
+{%- set VEQ = "GetTable(t1, k) == GetTable(t2, k)" -%}
+{%- endif -%}
+{%- if options.native_equality and not instance.1.has_ghost -%}
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     t1 == t2
 }
@@ -400,8 +410,8 @@ function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     LenTable(t1) == LenTable(t2) &&
     (forall k: int :: ContainsTable(t1, k) <==> ContainsTable(t2, k)) &&
-    (forall k: int :: ContainsTable(t1, k) ==> GetTable(t1, k) == GetTable(t2, k)) &&
-    (forall k: int :: ContainsTable(t2, k) ==> GetTable(t1, k) == GetTable(t2, k))
+    (forall k: int :: ContainsTable(t1, k) ==> {{VEQ}}) &&
+    (forall k: int :: ContainsTable(t2, k) ==> {{VEQ}})
 }
 {%- endif %}
 

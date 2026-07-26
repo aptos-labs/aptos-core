@@ -274,6 +274,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         matches!(self.mode, ExpTranslationMode::Spec)
     }
 
+    /// In specification expressions, ghost fields (`ghost f: T;` from the
+    /// struct's spec block) are selectable like ordinary fields; in code
+    /// contexts they do not exist. Returns the instantiated field type.
+    pub fn lookup_ghost_field_decl(
+        &self,
+        id: &QualifiedInstId<StructId>,
+        field_name: Symbol,
+    ) -> Option<Type> {
+        if self.is_spec_mode() {
+            self.parent
+                .parent
+                .lookup_struct_ghost_field_decl(id, field_name)
+        } else {
+            None
+        }
+    }
+
     pub fn type_variance(&self) -> Variance {
         if self.mode == ExpTranslationMode::Impl {
             Variance::ShallowImplVariance
@@ -873,7 +890,13 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
         id: &QualifiedInstId<StructId>,
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
-        self.parent.parent.lookup_struct_field_decl(id, field_name)
+        let result = self.parent.parent.lookup_struct_field_decl(id, field_name);
+        if result.0.is_empty() {
+            if let Some(ty) = self.lookup_ghost_field_decl(id, field_name) {
+                return (vec![(None, ty)], false);
+            }
+        }
+        result
     }
 
     fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {
@@ -5010,7 +5033,12 @@ impl ExpTranslator<'_, '_, '_> {
         field_name: Symbol,
     ) -> Operation {
         let struct_name = self.parent.parent.get_struct_name(id.to_qualified_id());
-        if self.is_empty_struct(struct_name) {
+        // Ghost fields on an otherwise-empty struct are still selectable in
+        // spec expressions; only reject empty-struct access when the target
+        // is not a declared ghost field.
+        if self.is_empty_struct(struct_name)
+            && self.lookup_ghost_field_decl(id, field_name).is_none()
+        {
             self.error(
                 loc,
                 &format!(
@@ -5021,6 +5049,10 @@ impl ExpTranslator<'_, '_, '_> {
             );
         }
         let (decls, is_variant) = self.parent.parent.lookup_struct_field_decl(id, field_name);
+        if decls.is_empty() && self.lookup_ghost_field_decl(id, field_name).is_some() {
+            // Selection of a ghost field in a specification expression.
+            return Operation::Select(id.module_id, id.id, FieldId::new(field_name));
+        }
         let field_ids = decls
             .into_iter()
             .map(|(variant, _)| {
@@ -5073,15 +5105,20 @@ impl ExpTranslator<'_, '_, '_> {
             let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
                 let field_name = self.symbol_pool().make(name.value.as_str());
+                let qid = mid.qualified_inst(sid, inst);
                 let (field_decls, _) = self
                     .parent
                     .parent
-                    .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
-                let (variant, expected_field_type) =
+                    .lookup_struct_field_decl(&qid, field_name);
+                let (variant, expected_field_type, is_ghost_field) =
                     if let Some((variant, ty)) = field_decls.into_iter().next() {
-                        (variant, ty)
+                        (variant, ty, false)
+                    } else if let Some(ty) = self.lookup_ghost_field_decl(&qid, field_name) {
+                        // Ghost fields participate in `update_field(s, f, v)` in
+                        // spec expressions — variant-agnostic.
+                        (None, ty, true)
                     } else {
-                        (None, Type::Error) // this error is reported via type unification
+                        (None, Type::Error, false) // this error is reported via type unification
                     };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
@@ -5102,6 +5139,22 @@ impl ExpTranslator<'_, '_, '_> {
 
                 // Translate the new value with the field type as the expected type.
                 let value_exp = self.translate_exp(args[2], &expected_field_type);
+                // Mirror the rejection applied to direct `update s.g = rhs`:
+                // bitwise operators lower to bitvector-typed Boogie while
+                // ghost integer fields are modeled as unbounded int, so the
+                // emitted `$Update` application would be ill-typed.
+                if is_ghost_field {
+                    let value_check = value_exp.clone().into_exp();
+                    if super::module_builder::exp_contains_bitwise_op(&value_check) {
+                        self.error(
+                            loc,
+                            "bitvector expressions (|, &, ^, int2bv) cannot appear in a \
+                             ghost field update expression (ghost integer fields are \
+                             modeled as mathematical integers)",
+                        );
+                        return self.new_error_exp();
+                    }
+                }
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
                 // For enum types, use variant-qualified FieldId (like Select does)

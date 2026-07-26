@@ -1011,6 +1011,41 @@ impl Bytecode {
                 }
                 (add_abort(val_targets, aa), mut_targets)
             },
+            // A `Prop(Assume, ...)` that records an inline ghost-field
+            // update — `stackless_bytecode_generator` encodes it as
+            // `Eq(base.f, rhs)` and keys the spec's `update_map` by the
+            // Prop's `node_id()`. Loop analysis needs to see the base as a
+            // modified local so its ghost state is havocked at the loop
+            // header (otherwise a false postcondition over the ghost state
+            // survives the loop-exit abstraction).
+            Prop(_, PropKind::Assume, exp) => {
+                let mut val = vec![];
+                let mut mut_ = vec![];
+                if func_target
+                    .get_spec()
+                    .update_map
+                    .contains_key(&exp.node_id())
+                {
+                    if let ExpData::Call(_, ast::Operation::Eq, args) = exp.as_ref() {
+                        if args.len() == 2 {
+                            if let ExpData::Call(_, ast::Operation::Select(..), sel_args) =
+                                args[0].as_ref()
+                            {
+                                if let Some(base) = sel_args.first() {
+                                    if let ExpData::Temporary(_, idx) = base.as_ref() {
+                                        if func_target.get_local_type(*idx).is_mutable_reference() {
+                                            mut_.push((*idx, false));
+                                        } else {
+                                            val.push(*idx);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                (val, mut_)
+            },
             _ => (vec![], vec![]),
         }
     }

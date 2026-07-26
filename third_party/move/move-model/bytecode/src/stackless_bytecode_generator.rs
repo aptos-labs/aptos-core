@@ -29,7 +29,10 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_model::{
-    ast::{Address, Condition, ConditionKind, ExpData, PropertyValue, Spec, TempIndex, Value},
+    ast::{
+        Address, Condition, ConditionKind, ExpData, Operation as AstOperation, PropertyValue, Spec,
+        TempIndex, Value,
+    },
     model::{FunId, FunctionEnv, Loc, ModuleId, NodeId, StructId},
     pragmas::CONDITION_UNROLL_PROP,
     symbol::Symbol,
@@ -2010,8 +2013,29 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 },
                 // Updating global spec variables are translated to Assume, which will be replaced when instrumenting the spec
                 ConditionKind::Update => {
-                    update_map.insert(cond.exp.node_id(), cond.clone());
-                    PropKind::Assume
+                    // The prop expression is the only copy maintained by
+                    // downstream temp-renumbering passes; the fun-spec copy
+                    // goes stale. Ghost *field* update targets reference
+                    // temporaries, so encode the update as `lhs == rhs` to
+                    // keep both sides maintained. Ghost variable targets
+                    // contain no temporaries and stay as the plain rhs.
+                    let env = self.func_env.module_env.env;
+                    let lhs = &cond.additional_exps[0];
+                    let prop_exp = if lhs.extract_ghost_mem_access(env).is_some() {
+                        cond.exp.clone()
+                    } else {
+                        let node_id =
+                            env.new_node(cond.loc.clone(), Type::Primitive(PrimitiveType::Bool));
+                        ExpData::Call(node_id, AstOperation::Eq, vec![
+                            lhs.clone(),
+                            cond.exp.clone(),
+                        ])
+                        .into_exp()
+                    };
+                    update_map.insert(prop_exp.node_id(), cond.clone());
+                    self.code
+                        .push(Bytecode::Prop(attr_id, PropKind::Assume, prop_exp));
+                    continue;
                 },
                 _ => {
                     self.func_env.module_env.env.diag(
@@ -2170,8 +2194,25 @@ impl BytecodeGeneratorContext {
                 },
                 // Updating global spec variables are translated to Assume, which will be replaced when instrumenting the spec
                 ConditionKind::Update => {
-                    update_map.insert(cond.exp.node_id(), cond.clone());
-                    PropKind::Assume
+                    // See the sibling arm above: ghost-field update targets
+                    // reference temporaries, so both sides are encoded in the
+                    // maintained prop expression as `lhs == rhs`.
+                    let env = func_env.module_env.env;
+                    let lhs = &cond.additional_exps[0];
+                    let prop_exp = if lhs.extract_ghost_mem_access(env).is_some() {
+                        cond.exp.clone()
+                    } else {
+                        let node_id =
+                            env.new_node(cond.loc.clone(), Type::Primitive(PrimitiveType::Bool));
+                        ExpData::Call(node_id, AstOperation::Eq, vec![
+                            lhs.clone(),
+                            cond.exp.clone(),
+                        ])
+                        .into_exp()
+                    };
+                    update_map.insert(prop_exp.node_id(), cond.clone());
+                    code.push(Bytecode::Prop(attr_id, PropKind::Assume, prop_exp));
+                    continue;
                 },
                 _ => {
                     func_env.module_env.env.diag(

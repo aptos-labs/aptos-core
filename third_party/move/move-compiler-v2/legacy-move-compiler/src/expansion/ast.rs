@@ -332,6 +332,9 @@ pub enum SpecBlockMember_ {
     },
     Variable {
         is_global: bool,
+        /// Ghost struct field, declared in a struct spec block: model-only
+        /// state carried by each value of the struct.
+        is_ghost: bool,
         name: Name,
         type_parameters: Vec<(Name, AbilitySet)>,
         type_: Type,
@@ -1449,12 +1452,15 @@ impl AstDebug for SpecBlockMember_ {
             },
             SpecBlockMember_::Variable {
                 is_global,
+                is_ghost,
                 name,
                 type_parameters,
                 type_,
                 init: _,
             } => {
-                if *is_global {
+                if *is_ghost {
+                    w.write("ghost ");
+                } else if *is_global {
                     w.write("global ");
                 } else {
                     w.write("local");
