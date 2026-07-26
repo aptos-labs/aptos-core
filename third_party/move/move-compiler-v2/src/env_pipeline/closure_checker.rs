@@ -7,9 +7,10 @@
 //! - The closure satisfies the ability requirements of it's inferred type. For the
 //!   definition of closure abilities, see
 //!   [AIP-112](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-112.md).
-//! - The closure does not capture mutable references, and captures immutable
-//!   references only as a direct argument of a retained inline-opaque call in
-//!   verify mode (where the prover models the captured location).
+//! - The closure captures references only as a direct argument of a retained
+//!   inline-opaque call in verify mode (where the prover models the captured
+//!   location: immutable captures as read-only snapshots, mutable captures as
+//!   mutations carried by the closure value and written back after the call).
 //! - In a script, the closure cannot have a lambda lifted function.
 //! ```
 
@@ -133,44 +134,43 @@ pub fn check_closures(env: &GlobalEnv) {
                         for captured in args {
                             let captured_ty = env.get_node_type(captured.node_id());
                             if captured_ty.is_reference() {
-                                // In verify mode, an immutable reference capture is
-                                // admitted for a closure passed directly as an argument
-                                // of a retained inline-opaque call: the bytecode is never
-                                // executed but only translated for the prover (the VM
-                                // rejects reference captures), and the prover models the
-                                // captured location at that call site as a read-only
-                                // snapshot. A mutable reference can never be captured:
-                                // since a function type `|T|R` is opaque about whether
-                                // its closure captured a `&mut`, the prover cannot model
-                                // writes through such a capture.
-                                let admitted = ref_capture_allowed.contains(id)
-                                    && !captured_ty.is_mutable_reference();
-                                if !admitted {
-                                    let msg = if ref_capture_allowed.contains(id) {
-                                        // Direct argument of a retained call, so the only
-                                        // problem is the mutability of the reference.
-                                        format!(
-                                            "captured value cannot be a mutable reference, but \
-                                             has type `{}`{}; in verification, lambdas may \
-                                             capture only immutable references",
-                                            captured_ty.display(&fun_env.get_type_display_ctx()),
+                                // In verify mode, a reference capture is admitted for a
+                                // closure passed directly as an argument of a retained
+                                // inline-opaque call: the bytecode is never executed but
+                                // only translated for the prover (the VM rejects
+                                // reference captures). The prover models an immutable
+                                // capture at that call site as a read-only snapshot, and
+                                // a mutable capture as a mutation carried by the closure
+                                // value, havoced across the call and written back to its
+                                // source location when the closure dies. A mutable
+                                // capture makes the closure value linear: copying it
+                                // would duplicate the carried mutation.
+                                if captured_ty.is_mutable_reference()
+                                    && required_abilities.has_ability(Ability::Copy)
+                                {
+                                    env.error_with_notes(
+                                        &env.get_node_loc(captured.node_id()),
+                                        "cannot capture a mutable reference in a closure \
+                                         requiring the `copy` ability",
+                                        vec![format!(
+                                            "expected function type: `{}`{}",
+                                            context_ty.display(&fun_env.get_type_display_ctx()),
                                             wrapper_msg()
-                                        )
-                                    } else {
-                                        let mut msg = format!(
-                                            "captured value cannot be a reference, but has type \
-                                             `{}`{}",
-                                            captured_ty.display(&fun_env.get_type_display_ctx()),
-                                            wrapper_msg()
-                                        );
-                                        if env.is_verify_mode() {
-                                            msg += "; in verification, lambdas may capture only \
-                                                    immutable references, and only as direct \
-                                                    arguments of calls to inline functions with \
-                                                    `pragma opaque`";
-                                        }
-                                        msg
-                                    };
+                                        )],
+                                    );
+                                }
+                                if !ref_capture_allowed.contains(id) {
+                                    let mut msg = format!(
+                                        "captured value cannot be a reference, but has type \
+                                         `{}`{}",
+                                        captured_ty.display(&fun_env.get_type_display_ctx()),
+                                        wrapper_msg()
+                                    );
+                                    if env.is_verify_mode() {
+                                        msg += "; in verification, lambdas may capture \
+                                                references only as direct arguments of calls \
+                                                to inline functions with `pragma opaque`";
+                                    }
                                     env.error(&env.get_node_loc(captured.node_id()), &msg)
                                 }
                             }

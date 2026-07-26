@@ -24,7 +24,11 @@ use move_model::{
     ty::Type,
     well_known::VECTOR_BORROW_MUT,
 };
-use std::{borrow::BorrowMut, collections::BTreeMap, fmt};
+use std::{
+    borrow::BorrowMut,
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 #[derive(AbstractDomain, Debug, Clone, Eq, Ord, PartialEq, PartialOrd, Default)]
 pub struct BorrowInfo {
@@ -590,6 +594,10 @@ struct BorrowAnalysis<'a> {
     livevar_annotation: &'a LiveVarAnnotation,
     targets: &'a FunctionTargetsHolder,
     borrow_natives: &'a Vec<String>,
+    /// Temps holding closure values which capture mutable references. Such a value
+    /// carries the captured mutations and enters the borrow graph as a
+    /// `BorrowNode::Reference` although its type is a function type.
+    carrying_temps: BTreeSet<TempIndex>,
 }
 
 impl<'a> BorrowAnalysis<'a> {
@@ -608,6 +616,7 @@ impl<'a> BorrowAnalysis<'a> {
             livevar_annotation,
             targets,
             borrow_natives,
+            carrying_temps: mut_capture_carrying_temps(func_target, func_target.get_bytecode()),
         }
     }
 
@@ -655,6 +664,40 @@ impl<'a> BorrowAnalysis<'a> {
     }
 }
 
+/// Computes the temps which hold closure values capturing mutable references,
+/// closed under assignment propagation. The code is passed separately since some
+/// callers process it detached from the function data.
+pub fn mut_capture_carrying_temps(
+    func_target: &FunctionTarget,
+    code: &[Bytecode],
+) -> BTreeSet<TempIndex> {
+    let mut result = BTreeSet::new();
+    loop {
+        let count = result.len();
+        for bc in code {
+            match bc {
+                Bytecode::Call(_, dests, Operation::Closure(..), srcs, _) => {
+                    if srcs
+                        .iter()
+                        .any(|src| func_target.get_local_type(*src).is_mutable_reference())
+                    {
+                        result.insert(dests[0]);
+                    }
+                },
+                Bytecode::Assign(_, dest, src, _) => {
+                    if result.contains(src) {
+                        result.insert(*dest);
+                    }
+                },
+                _ => {},
+            }
+        }
+        if result.len() == count {
+            return result;
+        }
+    }
+}
+
 impl TransferFunctions for BorrowAnalysis<'_> {
     type State = BorrowInfo;
 
@@ -668,6 +711,19 @@ impl TransferFunctions for BorrowAnalysis<'_> {
             .expect("livevar annotation");
 
         match instr {
+            Assign(_, dest, src, kind) if self.carrying_temps.contains(src) => {
+                // Assignment of a closure value carrying captured mutations: the
+                // mutations move with the value. Model as a direct borrow edge so
+                // write-backs chain through the new temp. Copies are excluded
+                // since they would duplicate live mutations.
+                assert!(
+                    !matches!(kind, AssignKind::Copy),
+                    "copy of a closure value carrying captured mutations"
+                );
+                let dest_node = BorrowNode::Reference(*dest);
+                state.add_node(dest_node.clone());
+                state.add_edge(BorrowNode::Reference(*src), dest_node, BorrowEdge::Direct);
+            },
             Assign(_, dest, src, kind) => {
                 let dest_node = self.borrow_node(*dest);
                 state.add_node(dest_node.clone());
@@ -793,6 +849,34 @@ impl TransferFunctions for BorrowAnalysis<'_> {
                             dests,
                         );
                     },
+                    Closure(mid, fid, targs, mask)
+                        if livevar_annotation_at.after.contains(&dests[0])
+                            && srcs.iter().any(|src| {
+                                self.func_target.get_local_type(*src).is_mutable_reference()
+                            }) =>
+                    {
+                        // A closure capturing mutable references becomes a carrier of
+                        // the mutations: the closure temp enters the borrow graph
+                        // borrowing from each captured reference via a `Capture` edge,
+                        // so the mutations are written back when the closure dies.
+                        // The srcs are exactly the captured operands in mask order, so
+                        // the src position is the capture slot index.
+                        let dest_node = BorrowNode::Reference(dests[0]);
+                        state.add_node(dest_node.clone());
+                        for (slot, src) in srcs.iter().enumerate() {
+                            if self.func_target.get_local_type(*src).is_mutable_reference() {
+                                state.add_edge(
+                                    BorrowNode::Reference(*src),
+                                    dest_node.clone(),
+                                    BorrowEdge::Capture(
+                                        mid.qualified_inst(*fid, targs.clone()),
+                                        *mask,
+                                        slot,
+                                    ),
+                                );
+                            }
+                        }
+                    },
                     Invoke => {
                         // For Invoke, we have no function summaries and do not know the
                         // borrow relation. Directly draw the `Invoke` edges. We only need to
@@ -842,6 +926,10 @@ impl TransferFunctions for BorrowAnalysis<'_> {
             if self.func_target.get_local_type(*idx).is_reference() {
                 let node = self.borrow_node(*idx);
                 state.del_node(&node);
+            } else if self.carrying_temps.contains(idx) {
+                // Carrying closure temps live in the graph as `Reference` nodes
+                // although their type is a function type.
+                state.del_node(&BorrowNode::Reference(*idx));
             }
         }
     }

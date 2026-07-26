@@ -1,5 +1,8 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::retained_mut_ref_capture {
+    struct R {
+        value: u64,
+    }
     private inline fun apply(f: |u64|u64,x: u64): u64 {
         (f)(x)
     }
@@ -7,19 +10,72 @@ module 0x42::retained_mut_ref_capture {
       ensures ensures_of($t0, $t1, result0());
     }
 
+    private inline fun apply_copy(f: |u64|u64 has copy,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of($t0, $t1, result0());
+    }
+
+    private inline fun apply_ref(f: |u64|&mut u64,x: u64): u64 {
+        Deref((f)(x))
+    }
+    spec {
+    }
+
+    private fun copy_mut_capture(r: &mut u64): u64 {
+        {
+          let (x: u64): (u64) = Tuple(5);
+          {
+            let (y: u64): (u64) = Tuple(x);
+            r = Add<u64>(Deref(r), y);
+            Deref(r)
+          }
+        }
+    }
+    private fun deref_helper(r: &mut u64,y: u64): &mut u64 {
+        r = Add<u64>(Deref(r), y);
+        r
+    }
     private fun direct_mut_capture(r: &mut u64): u64 {
         {
           let (x: u64): (u64) = Tuple(5);
           {
             let (y: u64): (u64) = Tuple(x);
-            Add<u64>(y, Deref(r))
+            r = Add<u64>(Deref(r), y);
+            Deref(r)
           }
+        }
+    }
+    private fun global_rooted_capture(a: address): u64 {
+        {
+          let r: &mut u64 = Borrow(Mutable)(select retained_mut_ref_capture::R.value<R>(BorrowGlobal(Mutable)<R>(a)));
+          {
+            let (x: u64): (u64) = Tuple(5);
+            {
+              let (y: u64): (u64) = Tuple(x);
+              r = Add<u64>(Deref(r), y);
+              Deref(r)
+            }
+          }
+        }
+    }
+    private fun ret_mut_capture(r: &mut u64): u64 {
+        {
+          let (x: u64): (u64) = Tuple(5);
+          Deref({
+            let (y: u64): (u64) = Tuple(x);
+            retained_mut_ref_capture::deref_helper(r, y)
+          })
         }
     }
 } // end 0x42::retained_mut_ref_capture
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::retained_mut_ref_capture {
+    struct R has key {
+        value: u64,
+    }
     inline fun apply(f: |u64|u64, x: u64): u64 {
         f(x)
     }
@@ -29,15 +85,60 @@ module 0x42::retained_mut_ref_capture {
         ensures ensures_of<f>(x, result);
     }
 
+    inline fun apply_copy(f: |u64|u64 has copy, x: u64): u64 {
+        f(x)
+    }
+
+    spec apply_copy(f: |u64|u64 has copy, x: u64): u64 {
+        pragma opaque = true;
+        ensures ensures_of<f>(x, result);
+    }
+
+    inline fun apply_ref(f: |u64|&mut u64, x: u64): u64 {
+        *f(x)
+    }
+
+    spec apply_ref(f: |u64|&mut u64, x: u64): u64 {
+        pragma opaque = true;
+    }
+
+    fun copy_mut_capture(r: &mut u64): u64 {
+        let x = 5;
+        let y = x;
+        *r = *r + y;
+        *r
+    }
+    fun deref_helper(r: &mut u64, y: u64): &mut u64 {
+        *r = *r + y;
+        r
+    }
     fun direct_mut_capture(r: &mut u64): u64 {
         let x = 5;
         let y = x;
-        y + *r
+        *r = *r + y;
+        *r
+    }
+    fun global_rooted_capture(a: address): u64 {
+        let r = &mut borrow_global_mut<R>(a).value;
+        let x = 5;
+        let y = x;
+        *r = *r + y;
+        *r
+    }
+    fun ret_mut_capture(r: &mut u64): u64 {
+        let x = 5;
+        *{
+            let y = x;
+            deref_helper(r, y)
+        }
     }
 }
 
 // -- Model dump before second bytecode pipeline
 module 0x42::retained_mut_ref_capture {
+    struct R {
+        value: u64,
+    }
     private inline fun apply(f: |u64|u64,x: u64): u64 {
         (f)(x)
     }
@@ -45,8 +146,40 @@ module 0x42::retained_mut_ref_capture {
       ensures ensures_of($t0, $t1, result0());
     }
 
+    private inline fun apply_copy(f: |u64|u64 has copy,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of($t0, $t1, result0());
+    }
+
+    private inline fun apply_ref(f: |u64|&mut u64,x: u64): u64 {
+        Deref((f)(x))
+    }
+    spec {
+    }
+
+    private fun copy_mut_capture(r: &mut u64): u64 {
+        r = Add<u64>(Deref(r), 5);
+        Deref(r)
+    }
+    private fun deref_helper(r: &mut u64,y: u64): &mut u64 {
+        r = Add<u64>(Deref(r), y);
+        r
+    }
     private fun direct_mut_capture(r: &mut u64): u64 {
-        Add<u64>(5, Deref(r))
+        r = Add<u64>(Deref(r), 5);
+        Deref(r)
+    }
+    private fun global_rooted_capture(a: address): u64 {
+        {
+          let r: &mut u64 = Borrow(Mutable)(select retained_mut_ref_capture::R.value<R>(BorrowGlobal(Mutable)<R>(a)));
+          r = Add<u64>(Deref(r), 5);
+          Deref(r)
+        }
+    }
+    private fun ret_mut_capture(r: &mut u64): u64 {
+        Deref(retained_mut_ref_capture::deref_helper(r, 5))
     }
 } // end 0x42::retained_mut_ref_capture
 
@@ -54,12 +187,72 @@ module 0x42::retained_mut_ref_capture {
 ============ disassembled file-format ==================
 // Bytecode version v10
 module 0x42::retained_mut_ref_capture
+struct R has key
+  value: u64
+
 // Function definition at index 0
-fun direct_mut_capture(l0: &mut u64): u64
+fun copy_mut_capture(l0: &mut u64): u64
+    copy_loc l0
+    read_ref
     ld_u64 5
+    add
+    copy_loc l0
+    // @5
+    write_ref
     move_loc l0
     read_ref
+    ret
+
+// Function definition at index 1
+fun deref_helper(l0: &mut u64, l1: u64): &mut u64
+    copy_loc l0
+    read_ref
+    move_loc l1
     add
+    copy_loc l0
+    // @5
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 2
+fun direct_mut_capture(l0: &mut u64): u64
+    copy_loc l0
+    read_ref
+    ld_u64 5
+    add
+    copy_loc l0
+    // @5
+    write_ref
+    move_loc l0
+    read_ref
+    ret
+
+// Function definition at index 3
+fun global_rooted_capture(l0: address): u64 acquires R
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_global R
+    mut_borrow_field R, value
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    ld_u64 5
+    add
+    copy_loc l1
+    write_ref
+    // @10
+    move_loc l1
+    read_ref
+    ret
+
+// Function definition at index 4
+fun ret_mut_capture(l0: &mut u64): u64
+    move_loc l0
+    ld_u64 5
+    call deref_helper
+    read_ref
     ret
 
 

@@ -1,0 +1,100 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::retained_mut_capture_err {
+    private inline fun call_once(f: |u64|) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t0, 1);
+    }
+
+    private fun tuple_caller(): u64 {
+        {
+          let x: u64 = 0;
+          {
+            let y: u64 = 0;
+            {
+              let (): ();
+              {
+                let (i: u64): (u64) = Tuple(1);
+                (x: u64, y: u64): (u64, u64) = Tuple(i, i)
+              }
+            };
+            Add<u64>(x, y)
+          }
+        }
+    }
+} // end 0x42::retained_mut_capture_err
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::retained_mut_capture_err {
+    inline fun call_once(f: |u64|) {
+        f(1)
+    }
+
+    spec call_once(f: |u64|) {
+        pragma opaque = true;
+        ensures ensures_of<f>(1);
+    }
+
+    fun tuple_caller(): u64 {
+        let x = 0;
+        let y = 0;
+        {
+            let ();
+            let i = 1;
+            (x,y) = (i, i)
+        };
+        x + y
+    }
+}
+
+
+Diagnostics:
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/inline-opaque/retained_mut_capture_err.move:17:17
+   │
+17 │         let x = 0;
+   │                 ^
+
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ tests/inline-opaque/retained_mut_capture_err.move:18:17
+   │
+18 │         let y = 0;
+   │                 ^
+
+// -- Model dump before second bytecode pipeline
+module 0x42::retained_mut_capture_err {
+    private inline fun call_once(f: |u64|) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t0, 1);
+    }
+
+    private fun tuple_caller(): u64 {
+        {
+          let x: u64 = 0;
+          {
+            let y: u64 = 0;
+            (x: u64, y: u64): (u64, u64) = Tuple(1, 1);
+            Add<u64>(x, y)
+          }
+        }
+    }
+} // end 0x42::retained_mut_capture_err
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::retained_mut_capture_err
+// Function definition at index 0
+fun tuple_caller(): u64
+    local l0: u64
+    local l1: u64
+    ld_u64 1
+    ld_u64 1
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

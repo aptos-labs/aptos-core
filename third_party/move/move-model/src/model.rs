@@ -5546,8 +5546,30 @@ impl<'env> FunctionEnv<'env> {
     /// sites) because the model is built for verification and the function is opaque.
     /// Such functions act like regular opaque functions in the prover: their spec is used
     /// at call sites instead of their body.
+    ///
+    /// The opaque spec is not honored — and the function expanded like any inline
+    /// function — if a function-typed parameter returns a mutable reference.
+    /// TODO(#20268): the retained treatment does not support `&mut`-returning function
+    /// parameters when lambdas capture mutable references (e.g. the accessor pattern
+    /// `|i| &mut v[i]` capturing `&mut v`): an invocation could hand back a reference
+    /// rooting inside a capture slot, which the carried-mutation model cannot express
+    /// yet. Expansion gives such calls precise verification instead. See the issue
+    /// for a layered plan to support this in the retained treatment.
     pub fn is_inline_opaque_retained(&self) -> bool {
-        self.module_env.env.is_verify_mode() && self.is_inline() && self.is_opaque()
+        self.module_env.env.is_verify_mode()
+            && self.is_inline()
+            && self.is_opaque()
+            && !self.get_parameter_types().iter().any(|ty| {
+                if let Type::Fun(_, result, _) = ty {
+                    result
+                        .clone()
+                        .flatten()
+                        .iter()
+                        .any(|t| t.is_mutable_reference())
+                } else {
+                    false
+                }
+            })
     }
 
     /// Return true if this is a lemma function (synthesized from a lemma declaration).

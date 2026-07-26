@@ -8,11 +8,13 @@
 use crate::options::ProverOptions;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
+    ast::TempIndex,
     model::FunctionEnv,
     pragmas::INTRINSIC_FUN_MAP_BORROW_MUT,
     well_known::{EVENT_EMIT_EVENT, VECTOR_BORROW_MUT},
 };
 use move_stackless_bytecode::{
+    borrow_analysis::mut_capture_carrying_temps,
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
@@ -52,6 +54,7 @@ impl FunctionTargetProcessor for CleanAndOptimizeProcessor {
         let new_instrs = Optimizer {
             options: &options,
             target: &FunctionTarget::new(func_env, &data),
+            carrying_temps: BTreeSet::new(),
         }
         .run(instrs);
         data.code = new_instrs;
@@ -88,6 +91,9 @@ impl AbstractDomain for AnalysisState {
 struct Optimizer<'a> {
     options: &'a ProverOptions,
     target: &'a FunctionTarget<'a>,
+    /// Temps holding closure values which capture mutable references (set by `run`).
+    /// They participate in the write-back analysis like references.
+    carrying_temps: BTreeSet<TempIndex>,
 }
 
 impl TransferFunctions for Optimizer<'_> {
@@ -99,7 +105,7 @@ impl TransferFunctions for Optimizer<'_> {
         use BorrowNode::*;
         use Bytecode::*;
         use Operation::*;
-        if let Call(_, _, oper, srcs, _) = instr {
+        if let Call(_, dests, oper, srcs, _) = instr {
             match oper {
                 WriteRef => {
                     state.unwritten.insert(Reference(srcs[0]));
@@ -126,10 +132,14 @@ impl TransferFunctions for Optimizer<'_> {
                         true
                     };
 
-                    // Mark &mut parameters to functions as unwritten.
+                    // Mark &mut parameters to functions as unwritten. A closure value
+                    // carrying captured mutations may be written through by the callee,
+                    // so it is treated like a &mut parameter.
                     if has_effect {
                         for src in srcs {
-                            if self.target.get_local_type(*src).is_mutable_reference() {
+                            if self.target.get_local_type(*src).is_mutable_reference()
+                                || self.carrying_temps.contains(src)
+                            {
                                 state.unwritten.insert(Reference(*src));
                             }
                         }
@@ -141,6 +151,17 @@ impl TransferFunctions for Optimizer<'_> {
                         if self.target.get_local_type(*src).is_mutable_reference() {
                             state.unwritten.insert(Reference(*src));
                         }
+                    }
+                },
+                Closure(..) => {
+                    // A closure pack capturing mutable references moves the mutations
+                    // into the closure value; keep the write-back chain from the
+                    // closure temp alive.
+                    if srcs
+                        .iter()
+                        .any(|src| self.target.get_local_type(*src).is_mutable_reference())
+                    {
+                        state.unwritten.insert(Reference(dests[0]));
                     }
                 },
                 _ => {},
@@ -166,6 +187,7 @@ impl DataflowAnalysis for Optimizer<'_> {}
 
 impl Optimizer<'_> {
     fn run(&mut self, instrs: Vec<Bytecode>) -> Vec<Bytecode> {
+        self.carrying_temps = mut_capture_carrying_temps(self.target, &instrs);
         // Rum Analysis
         let cfg = StacklessControlFlowGraph::new_forward(&instrs);
         let state = self.analyze_function(AnalysisState::default(), &instrs, &cfg);

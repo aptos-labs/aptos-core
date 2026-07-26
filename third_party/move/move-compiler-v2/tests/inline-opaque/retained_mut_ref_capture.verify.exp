@@ -1,7 +1,9 @@
 
 Diagnostics:
-error: captured value cannot be a mutable reference, but has type `&mut u64`; in verification, lambdas may capture only immutable references
-   ┌─ tests/inline-opaque/retained_mut_ref_capture.move:17:24
+error: cannot capture a mutable reference in a closure requiring the `copy` ability
+   ┌─ tests/inline-opaque/retained_mut_ref_capture.move:50:32
    │
-17 │         apply(|y| y + *r, 5)
-   │                        ^
+50 │         apply_copy(|y| { *r = *r + y; *r }, 5)
+   │                                ^
+   │
+   = expected function type: `|u64|u64 has copy`

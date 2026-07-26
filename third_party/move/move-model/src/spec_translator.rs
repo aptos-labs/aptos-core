@@ -62,6 +62,19 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     /// (function entry), so all saved memories can share one label. Using a single label
     /// avoids conflicts when multiple invariants/conditions reference overlapping memory types.
     shared_old_label: Option<MemoryLabel>,
+    /// Node ids of temporaries which must not be routed through `save_param` in
+    /// post-state context. Used for the live post-state clones of function values
+    /// appended to behavioral predicates (see `wrap_mut_ref_bp_inputs`).
+    no_save_nodes: BTreeSet<NodeId>,
+    /// Whether we are translating the right-hand side of an `update` clause.
+    in_update: bool,
+    /// Suppress appending live fun-value clones to behavioral predicates in
+    /// `wrap_mut_ref_bp_inputs`. The clone is an artifact of the verification
+    /// translation (the Boogie backend consumes it as the trailing `f_post`
+    /// slot); in spec-inference translations the canonical user-facing form
+    /// must stay clone-free, since translated expressions can end up in
+    /// inferred specs which are sourcified as ordinary Move code.
+    omit_fun_clones: bool,
 }
 
 /// A flattened proof action produced by translating a structured `Proof` tree.
@@ -314,6 +327,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     pub fn translate_fun_spec(
         auto_trace: bool,
         for_call: bool,
+        omit_fun_clones: bool,
         builder: &'b mut T,
         fun_env: &'b FunctionEnv<'a>,
         type_args: &[Type],
@@ -333,6 +347,9 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
             shared_old_label: None,
+            no_save_nodes: BTreeSet::new(),
+            in_update: false,
+            omit_fun_clones,
         };
         translator.translate_spec(for_call);
         translator.result
@@ -359,6 +376,9 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
             shared_old_label: None,
+            no_save_nodes: BTreeSet::new(),
+            in_update: false,
+            omit_fun_clones: false,
         };
         // Clone invariants so `inst` lives for the entire loop
         let invariants = invariants.collect_vec();
@@ -378,6 +398,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     pub fn translate_inline_property(
         loc: &Loc,
         auto_trace: bool,
+        omit_fun_clones: bool,
         builder: &'b mut T,
         prop: &Exp,
     ) -> (TranslatedSpec, Exp) {
@@ -395,6 +416,9 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
             shared_old_label: None,
+            no_save_nodes: BTreeSet::new(),
+            in_update: false,
+            omit_fun_clones,
         };
 
         // Handle updating of global spec variables
@@ -480,7 +504,9 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             self.in_post_state = false;
             let lhs =
                 self.translate_exp(&self.auto_trace(&cond.loc, &cond.additional_exps[0]), false);
+            self.in_update = true;
             let rhs = self.translate_exp(&self.auto_trace(&cond.loc, &cond.exp), false);
+            self.in_update = false;
             self.result.updates.push((cond.loc.clone(), lhs, rhs));
         }
 
@@ -1015,8 +1041,17 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     /// `Old(...)`-wrapped (triggering `save_param` for the captured pre-state
     /// temp). For `EnsuresOf` and `ResultOf`, a live post-state clone of each
     /// wrapped `&mut T` arg is appended after the existing user-provided
-    /// trailing args (the result slot, if any). Idempotent.
-    fn wrap_mut_ref_bp_inputs(&self, exp: &Exp) -> Exp {
+    /// trailing args (the result slot, if any).
+    ///
+    /// For a stateful function value, a live clone is appended as the final
+    /// trailing arg of `EnsuresOf`/`ResultOf`, exempted from post-state
+    /// saving (the fun input slot itself is routed through the pre-state
+    /// save by the regular post-state handling of value-typed temporaries).
+    /// The Boogie backend emits that clone as the updated fun value for
+    /// function types carrying mutations (mutable reference captures) and
+    /// drops it otherwise, so this is done uniformly for all function
+    /// values. Idempotent.
+    fn wrap_mut_ref_bp_inputs(&mut self, exp: &Exp) -> Exp {
         let env = self.builder.global_env();
         let ExpData::Call(node_id, Operation::Behavior(kind, range), args) = exp.as_ref() else {
             return exp.clone();
@@ -1049,7 +1084,20 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             })
             .collect();
         let post_state_slot_count = wrap_mask.iter().filter(|b| **b).count();
-        if post_state_slot_count == 0 {
+        // The underlying temporary when the fun exp is stateful (possibly
+        // already `Old`-wrapped by a prior pass).
+        let fun_stateful_temp = match fun_exp.as_ref() {
+            ExpData::Temporary(_, idx) => Some(*idx),
+            ExpData::Call(_, Operation::Old, inner) if inner.len() == 1 => {
+                if let ExpData::Temporary(_, idx) = inner[0].as_ref() {
+                    Some(*idx)
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        };
+        if post_state_slot_count == 0 && fun_stateful_temp.is_none() {
             return exp.clone();
         }
 
@@ -1061,14 +1109,26 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         } else {
             0
         };
-        let augmented_arity = 1
+        let fun_clone_slots =
+            if has_post_slots && fun_stateful_temp.is_some() && !self.omit_fun_clones {
+                1
+            } else {
+                0
+            };
+        // The canonical arity without the fun clone; the user may write this
+        // form explicitly (with post-state slots), so the presence of the
+        // `&mut` post-state clones and of the fun clone is detected
+        // separately by arity.
+        let canonical_arity = 1
             + num_inputs
             + if has_post_slots {
                 result_slots + post_state_slot_count
             } else {
                 0
             };
-        let needs_post_state = has_post_slots && args.len() < augmented_arity;
+        let augmented_arity = canonical_arity + fun_clone_slots;
+        let needs_post_state = has_post_slots && args.len() < canonical_arity;
+        let needs_fun_clone = fun_clone_slots > 0 && args.len() < augmented_arity;
 
         // Idempotent short-circuit when canonical form is already present.
         let all_wrapped = wrap_mask.iter().enumerate().all(|(k, needs_wrap)| {
@@ -1080,7 +1140,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                 Some(ExpData::Call(_, Operation::Old, _))
             )
         });
-        if all_wrapped && !needs_post_state {
+        if all_wrapped && !needs_post_state && !needs_fun_clone {
             return exp.clone();
         }
 
@@ -1114,7 +1174,20 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             for arg in args.iter().skip(1 + num_inputs) {
                 new_args.push(arg.clone());
             }
-            new_args.extend(post_state_clones);
+            if needs_post_state {
+                new_args.extend(post_state_clones);
+            }
+            if needs_fun_clone {
+                if let Some(idx) = fun_stateful_temp {
+                    // Live clone of the fun value, exempted from post-state
+                    // saving so it reads the current (updated) value.
+                    let fun_loc = env.get_node_loc(fun_exp.node_id());
+                    let fun_ty = env.get_node_type(fun_exp.node_id());
+                    let clone_id = env.new_node(fun_loc, fun_ty);
+                    self.no_save_nodes.insert(clone_id);
+                    new_args.push(ExpData::Temporary(clone_id, idx).into_exp());
+                }
+            }
         }
         ExpData::Call(
             *node_id,
@@ -1316,7 +1389,17 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         // Compute the effective index.
         let mut effective_idx = self.apply_param_substitution(idx);
         let local_type = self.builder.get_local_type(effective_idx);
-        if self.in_old || (self.in_post_state && !local_type.is_mutable_reference()) {
+        // In `update` clauses (translated in pre-state but placed after the call
+        // resp. body), function-typed values are routed through the pre-state save:
+        // a bare reference to a function value means the value as passed. This
+        // matters for values carrying mutable reference captures, whose temp is
+        // updated across calls; the updated value is accessible only through the
+        // trailing clone synthesized by `wrap_mut_ref_bp_inputs`.
+        if (self.in_old
+            || (self.in_post_state && !local_type.is_mutable_reference())
+            || (self.in_update && local_type.is_function()))
+            && !self.no_save_nodes.contains(&id)
+        {
             // We access a param inside of old context, or a value which might have been
             // mutated as we are in the post state. We need to create a temporary
             // to save their value at function entry, and deliver this temporary here.

@@ -97,6 +97,9 @@ pub enum HavocKind {
     MutationValue,
     /// Havoc everything in a mutation
     MutationAll,
+    /// Havoc the value parts of all mutations captured in a closure value, keeping
+    /// their pointers and all other captured values unchanged
+    CaptureValues,
 }
 
 /// A constant value.
@@ -453,6 +456,11 @@ pub enum BorrowEdge {
     Index(IndexEdgeKind),
     /// Borrow via a function value, unknown structure
     Invoke,
+    /// Mutation held in a capture slot of a closure value constructed from the given
+    /// function with the given mask. The index identifies the slot among the captured
+    /// operands. The mutation is moved into the slot when the closure is packed and
+    /// moved back out by the write-back when the closure dies.
+    Capture(QualifiedInstId<FunId>, ClosureMask, usize),
     /// Composed sequence of edges.
     Hyper(Vec<BorrowEdge>),
 }
@@ -470,6 +478,9 @@ impl BorrowEdge {
         match self {
             Self::Field(qid, variant, offset) => {
                 Self::Field(qid.instantiate_ref(params), variant.clone(), *offset)
+            },
+            Self::Capture(qid, mask, slot) => {
+                Self::Capture(qid.instantiate_ref(params), *mask, *slot)
             },
             Self::Hyper(edges) => {
                 let new_edges = edges.iter().map(|e| e.instantiate(params)).collect();
@@ -1432,6 +1443,7 @@ impl fmt::Display for OperationDisplay<'_> {
                     HavocKind::Value => "val",
                     HavocKind::MutationValue => "mut",
                     HavocKind::MutationAll => "mut_all",
+                    HavocKind::CaptureValues => "captures",
                 })?;
             },
             HavocGlobal(mid, sid, targs) => {
@@ -1638,6 +1650,10 @@ impl std::fmt::Display for BorrowEdgeDisplay<'_> {
             Index(_) => write!(f, "[]"),
             Direct => write!(f, "@"),
             Invoke => write!(f, ">"),
+            Capture(qid, _, slot) => {
+                let fun_env = self.env.get_function(qid.to_qualified_id());
+                write!(f, "capture[{}]({})", slot, fun_env.get_full_name_str())
+            },
             Hyper(es) => {
                 write!(
                     f,

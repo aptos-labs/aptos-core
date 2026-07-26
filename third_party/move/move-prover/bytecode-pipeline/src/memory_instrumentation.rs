@@ -477,7 +477,25 @@ impl<'a> Instrumenter<'a> {
                 },
             };
 
-            // Generate write_back for this reference.
+            // Generate write_back for this reference. Note that the dying node can also
+            // be a closure value carrying captured mutations (represented as a
+            // `Reference` node although of function type); its chains then start with a
+            // `Capture` edge which extracts the mutation from the closure value. Such
+            // chains may end at any root, including global storage: the deferred
+            // memory update at the final write-back is sound because the closure is
+            // the only channel to the location during the call (in the inline-expanded
+            // ground truth, reference safety and the AIP-112 reentrancy protection
+            // exclude any other access while the captured reference is live), and
+            // global invariants and modifies checks attach to the `WriteBack` here
+            // like for any mutation of global memory.
+            // A dying reference can have an empty ancestor chain when it has no
+            // incoming borrow edges, which occurs for the `&mut` result of an
+            // Invoke without `&mut` arguments: the over-approximation of dynamic
+            // call borrows draws parents only from `&mut` inputs. There is nothing
+            // to write back within the bytecode model in this case; effects through
+            // such a reference are only visible at the specification level.
+            let mut ancestors = ancestors;
+            ancestors.retain(|chain| !chain.is_empty());
             let is_conditional = ancestors.len() > 1;
             for (chain_index, chain) in ancestors.iter().enumerate() {
                 // sanity check: the src node of the first action must be the node itself

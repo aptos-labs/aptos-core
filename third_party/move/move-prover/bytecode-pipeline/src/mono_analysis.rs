@@ -105,6 +105,23 @@ pub struct ClosureInfo {
     pub mask: ClosureMask,
 }
 
+impl ClosureInfo {
+    /// Returns the (slot position, target type) pairs for mutable references captured
+    /// by this closure. The slot position indexes the captured operands; the target
+    /// type is the value type behind the reference.
+    pub fn mut_capture_slots(&self, env: &GlobalEnv) -> Vec<(usize, Type)> {
+        let fun_env = env.get_function(self.fun.to_qualified_id());
+        let param_tys = Type::instantiate_vec(fun_env.get_parameter_types(), &self.fun.inst);
+        self.mask
+            .extract(&param_tys, true)
+            .into_iter()
+            .enumerate()
+            .filter(|(_, ty)| ty.is_mutable_reference())
+            .map(|(pos, ty)| (pos, ty.skip_reference().clone()))
+            .collect()
+    }
+}
+
 /// Information about a function parameter that has function type.
 /// This is used to track function-typed parameters in verification targets
 /// so that the Boogie backend can generate appropriate variants.
@@ -777,11 +794,15 @@ impl Analyzer<'_> {
                         self.normalize_fun_ty(self.instantiate(target.get_local_type(dests[0])));
                     let fun = mid.qualified_inst(*fid, self.instantiate_vec(targs));
                     self.add_closure_spec_memory(&fun);
+                    let info = ClosureInfo { fun, mask: *mask };
+                    if !info.mut_capture_slots(self.env).is_empty() {
+                        self.register_mut_capture_tuples(&info, &fun_type);
+                    }
                     self.info
                         .fun_infos
                         .entry(fun_type)
                         .or_default()
-                        .insert(ClosureInfo { fun, mask: *mask });
+                        .insert(info);
                 }
             },
             Call(_, _, WriteBack(_, edge), ..) => {
@@ -851,6 +872,52 @@ impl Analyzer<'_> {
             let mem = mem.instantiate(&fun.inst);
             let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
             self.add_struct(struct_env, &mem.inst);
+        }
+    }
+
+    /// Register tuple instantiations needed for a mut-capturing closure variant: the
+    /// target's ensures_of result Skolem returns a tuple over declared results plus
+    /// post-states of all its `&mut` params (captured ones included), and the
+    /// evaluator-level result_of of the carrying function type gains a trailing
+    /// component for the updated fun value.
+    fn register_mut_capture_tuples(&mut self, info: &ClosureInfo, fun_type: &Type) {
+        let fun_env = self.env.get_function(info.fun.to_qualified_id());
+        let param_tys = Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+        let target_outputs: Vec<Type> = fun_env
+            .get_result_type()
+            .instantiate(&info.fun.inst)
+            .flatten()
+            .into_iter()
+            .chain(
+                param_tys
+                    .iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .cloned(),
+            )
+            .map(|ty| ty.skip_reference().clone())
+            .collect();
+        if target_outputs.len() >= 2 {
+            self.info.tuple_inst.insert(target_outputs);
+        }
+        let Type::Fun(params, results, _) = fun_type else {
+            panic!("expected fun type")
+        };
+        let eval_outputs: Vec<Type> = results
+            .clone()
+            .flatten()
+            .into_iter()
+            .chain(
+                params
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .filter(|ty| ty.is_mutable_reference()),
+            )
+            .map(|ty| ty.skip_reference().clone())
+            .chain(std::iter::once(fun_type.clone()))
+            .collect();
+        if eval_outputs.len() >= 2 {
+            self.info.tuple_inst.insert(eval_outputs);
         }
     }
 
@@ -1078,6 +1145,9 @@ impl Analyzer<'_> {
     fn add_types_in_borrow_edge(&mut self, edge: &BorrowEdge) {
         match edge {
             BorrowEdge::Direct | BorrowEdge::Invoke | BorrowEdge::Index(_) => (),
+            // For Capture, the closure datatype instance is already registered via the
+            // `Closure` operation which packed the value.
+            BorrowEdge::Capture(..) => (),
             BorrowEdge::Field(qid, _, _) => {
                 self.add_type_root(&qid.to_type());
             },

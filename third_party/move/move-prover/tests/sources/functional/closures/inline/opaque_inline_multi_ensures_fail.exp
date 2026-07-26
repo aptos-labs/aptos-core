@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: more than one `ensures_of` condition over a function value carrying mutable reference captures cannot be used in an opaque spec
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_multi_ensures_fail.move:22:9
+   │
+22 │         call_trusted_twice(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` condition over a function value carrying mutable reference captures
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

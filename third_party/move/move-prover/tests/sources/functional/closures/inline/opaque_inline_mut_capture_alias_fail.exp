@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: [boogie translator] ensures_of over a function value carrying mutable reference captures is only supported for directly referenced function values
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_mut_capture_alias_fail.move:14:17
+   │
+14 │         ensures ensures_of<g>(1); // error: only supported for directly referenced function values
+   │                 ^^^^^^^^^^^^^^^^

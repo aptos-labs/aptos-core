@@ -23,8 +23,10 @@ use move_model::{
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
-use move_prover_bytecode_pipeline::number_operation::{
-    GlobalNumberOperationState, NumOperation::Bitwise,
+use move_prover_bytecode_pipeline::{
+    mono_analysis,
+    mono_analysis::ClosureInfo,
+    number_operation::{GlobalNumberOperationState, NumOperation::Bitwise},
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
@@ -1258,6 +1260,49 @@ pub fn boogie_closure_pack_name(
     format!("$closure'{}'_{}", fun_name, mask)
 }
 
+/// Return the closure variant infos generated for the datatype of the given function
+/// type, in variant order. The type is matched against MonoInfo via its Boogie name,
+/// so it does not need to be in normalized form.
+pub fn boogie_closure_infos(env: &GlobalEnv, fun_ty: &Type) -> Vec<ClosureInfo> {
+    let mono_info = mono_analysis::get_info(env);
+    let boogie_name = boogie_type(env, fun_ty, false);
+    for (ty, infos) in &mono_info.fun_infos {
+        if boogie_type(env, ty, false) == boogie_name {
+            return infos.iter().cloned().collect();
+        }
+    }
+    vec![]
+}
+
+/// Return the variant index of the closure constructed from `fun` with `mask` within
+/// the datatype generated for the given function type.
+pub fn boogie_closure_variant_index(
+    env: &GlobalEnv,
+    fun_ty: &Type,
+    fun: &QualifiedInstId<FunId>,
+    mask: ClosureMask,
+) -> usize {
+    boogie_closure_infos(env, fun_ty)
+        .iter()
+        .position(|info| &info.fun == fun && info.mask == mask)
+        .expect("closure variant registered in mono info")
+}
+
+/// Return name of the field selector for a capture slot of a closure variant.
+/// `variant_idx` is the position of the variant within the closure infos generated
+/// for the function type's datatype.
+pub fn boogie_closure_capture_field(pos: usize, variant_idx: usize) -> String {
+    format!("p{}_v{}", pos, variant_idx)
+}
+
+/// Returns true if values of the given function type may carry mutations, i.e. the
+/// type has closure variants capturing mutable references.
+pub fn boogie_fun_ty_carries_mutations(env: &GlobalEnv, fun_ty: &Type) -> bool {
+    boogie_closure_infos(env, fun_ty)
+        .iter()
+        .any(|info| !info.mut_capture_slots(env).is_empty())
+}
+
 /// Return name of the datatype constructor for a function parameter variant.
 /// These variants represent function-typed parameters of verification targets.
 pub fn boogie_fun_param_name(
@@ -1456,8 +1501,6 @@ pub fn compute_evaluator_memory_union(
     BTreeSet<QualifiedInstId<StructId>>,
     BTreeSet<QualifiedInstId<StructId>>,
 ) {
-    use move_prover_bytecode_pipeline::mono_analysis;
-
     let mono_info = mono_analysis::get_info(env);
     let boogie_name = boogie_type(env, fun_type, false);
 
