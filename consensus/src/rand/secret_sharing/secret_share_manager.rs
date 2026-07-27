@@ -23,7 +23,7 @@ use aptos_consensus_types::{
     pipelined_block::{PipelinedBlock, SecretShareResult, TaskResult},
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, warn};
+use aptos_logger::{debug, error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -167,6 +167,13 @@ impl SecretShareManager {
                     item.resolve_round_without_key(round);
                 }
                 self.secret_share_store.lock().mark_round_skipped(round);
+                return;
+            },
+            Err(e) if e.is_cancellation() => {
+                // Expected teardown: the block was dropped or a buffer_manager
+                // reset aborted the pipeline, cancelling the derive future. Not
+                // a failure, so log at debug and don't surface it as an error.
+                debug!(round = round, "Self-share derive cancelled: {:?}", e);
                 return;
             },
             Err(e) => {

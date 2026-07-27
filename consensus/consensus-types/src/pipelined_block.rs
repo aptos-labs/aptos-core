@@ -61,6 +61,20 @@ impl Display for TaskError {
     }
 }
 
+impl TaskError {
+    /// Returns true if this error is (or propagates from) a cancelled task —
+    /// i.e. expected pipeline teardown (the block was dropped or a
+    /// buffer_manager reset aborted the pipeline) rather than a genuine
+    /// failure. A panicked `JoinError` is a real failure and returns false.
+    pub fn is_cancellation(&self) -> bool {
+        match self {
+            TaskError::JoinError(e) => e.is_cancelled(),
+            TaskError::PropagatedError(inner) => inner.is_cancellation(),
+            TaskError::InternalError(_) => false,
+        }
+    }
+}
+
 impl From<Error> for TaskError {
     fn from(value: Error) -> Self {
         Self::InternalError(Arc::new(value))
@@ -247,6 +261,31 @@ mod tests {
 
         drop(block);
         assert_eq!(ordered_blocks.pipelined_blocks().unwrap_err(), block_id);
+    }
+
+    #[tokio::test]
+    async fn task_error_is_cancellation() {
+        // An aborted task yields a cancelled JoinError — expected pipeline
+        // teardown — and must be classified as a cancellation, including when
+        // it propagates in from an upstream stage.
+        let handle = tokio::spawn(std::future::pending::<()>());
+        handle.abort();
+        let cancelled = handle.await.expect_err("aborted task should not complete");
+        assert!(cancelled.is_cancelled());
+        let cancelled = TaskError::JoinError(Arc::new(cancelled));
+        assert!(cancelled.is_cancellation());
+        assert!(TaskError::PropagatedError(Box::new(cancelled)).is_cancellation());
+
+        // A panicked task is a genuine failure, not a cancellation.
+        let handle = tokio::spawn(async { panic!("boom") });
+        let panicked = handle.await.expect_err("panicked task should not complete");
+        assert!(panicked.is_panic());
+        let panicked = TaskError::JoinError(Arc::new(panicked));
+        assert!(!panicked.is_cancellation());
+        assert!(!TaskError::PropagatedError(Box::new(panicked)).is_cancellation());
+
+        // A genuine internal error is never a cancellation.
+        assert!(!TaskError::from(anyhow::anyhow!("boom")).is_cancellation());
     }
 }
 
