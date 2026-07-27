@@ -1,9 +1,13 @@
 
 Diagnostics:
-error: cannot use `bool` with an operator which expects a value of type `integer`
-  ┌─ tests/checking/control_flow/for_type_mismatch.move:5:9
+error: expected `integer` but found a value of type `bool`
+  ┌─ tests/checking/control_flow/for_type_mismatch.move:5:19
   │
-5 │ ╭         for (i in true..false) {
-6 │ │             x = x + 1;
-7 │ │         };
-  │ ╰─────────^
+5 │         for (i in true..false) {
+  │                   ^^^^
+
+error: expected `integer` but found a value of type `bool`
+  ┌─ tests/checking/control_flow/for_type_mismatch.move:5:25
+  │
+5 │         for (i in true..false) {
+  │                         ^^^^^

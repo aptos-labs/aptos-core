@@ -1,0 +1,49 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    private fun trailing_spec_nonblock_body(n: u64): u64 {
+        {
+          let s: u64 = 0;
+          {
+            let $lb: u64 = 0;
+            {
+              let i: u64 = $lb;
+              {
+                let $ub: u64 = n;
+                loop {
+                  if spec {
+                    invariant Le(s, Mul($t0, $t0));
+                  }
+                  ;
+                  Lt(i, $ub) {
+                    s: u64 = Add<u64>(s, i);
+                    i: u64 = Add(i, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            }
+          };
+          s
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    fun trailing_spec_nonblock_body(n: u64): u64 {
+        let s = 0;
+        {
+            let _lb = 0;
+            let i = _lb;
+            let _ub = n;
+            while (i < _ub) {
+                s = s + i;
+                i = i + 1
+            } spec {
+                invariant s <= n * n;
+            }
+        };
+        s
+    }
+}

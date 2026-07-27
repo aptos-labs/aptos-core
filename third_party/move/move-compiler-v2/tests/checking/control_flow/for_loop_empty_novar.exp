@@ -1,7 +1,38 @@
+// -- Model dump before first bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        {
+          let $lb: u64 = 0;
+          {
+            let $for_iter_3: u64 = $lb;
+            {
+              let $ub: u64 = 10;
+              loop {
+                if Lt($for_iter_3, $ub) {
+                  Tuple();
+                  $for_iter_3: u64 = Add($for_iter_3, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          }
+        };
+        Tuple()
+    }
+} // end <SELF>_0
 
-Diagnostics:
-error: undeclared `_`
-  ┌─ tests/checking/control_flow/for_loop_empty_novar.move:4:9
-  │
-4 │         for (_ in 0..10) {};
-  │         ^^^^^^^^^^^^^^^^^^^
+// -- Sourcified model before first bytecode pipeline
+script {
+    fun main() {
+        {
+            let _lb = 0;
+            let _for_iter_3 = _lb;
+            let _ub = 10;
+            while (_for_iter_3 < _ub) {
+                ();
+                _for_iter_3 = _for_iter_3 + 1
+            }
+        };
+    }
+}

@@ -595,6 +595,9 @@ pub enum Exp_ {
     Match(Box<Exp>, Vec<Spanned<(LValueList, Option<Exp>, Exp)>>),
     While(Option<Label>, Box<Exp>, Box<Exp>),
     Loop(Option<Label>, Box<Exp>),
+    // for (iter in lb..ub [spec]) body, where the optional spec expression
+    // (`Exp_::Spec`) holds loop invariants declared.
+    For(Var, Box<Exp>, Box<Exp>, Box<Exp>, Option<Box<Exp>>),
     Block(Sequence),
     Lambda(
         TypedLValueList,
@@ -2004,6 +2007,20 @@ impl AstDebug for Exp_ {
                 }
                 w.write("loop ");
                 e.ast_debug(w);
+            },
+            E::For(iter, lb, ub, body, spec) => {
+                w.write("for (");
+                w.write(iter.0.value.as_str());
+                w.write(" in ");
+                lb.ast_debug(w);
+                w.write("..");
+                ub.ast_debug(w);
+                if let Some(spec) = spec {
+                    w.write(" ");
+                    spec.ast_debug(w);
+                }
+                w.write(") ");
+                body.ast_debug(w);
             },
             E::Match(e, arms) => {
                 w.write("match (");
