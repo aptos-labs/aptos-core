@@ -1,6 +1,18 @@
 Move prover returns: exiting with bytecode transformation errors
-error: more than one `ensures_of` condition over a function value carrying mutable reference captures cannot be used in an opaque spec
+error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures cannot be used in an opaque spec; describe successive applications with a single nested `fun_post_of` chain (see issue #20273)
    ┌─ tests/sources/functional/closures/inline/opaque_inline_multi_ensures_fail.move:22:9
    │
-22 │         call_trusted_twice(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` condition over a function value carrying mutable reference captures
+22 │         call_trusted_twice(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures cannot be used in an opaque spec; describe successive applications with a single nested `fun_post_of` chain (see issue #20273)
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_multi_ensures_fail.move:54:9
+   │
+54 │         call_aliased(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures cannot be used in an opaque spec; describe successive applications with a single nested `fun_post_of` chain (see issue #20273)
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_multi_ensures_fail.move:63:9
+   │
+63 │         call_mixed(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

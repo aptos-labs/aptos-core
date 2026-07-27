@@ -32,7 +32,7 @@ use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecod
 use num::BigUint;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const MAX_TUPLE_SIZE: usize = 8;
@@ -1260,18 +1260,53 @@ pub fn boogie_closure_pack_name(
     format!("$closure'{}'_{}", fun_name, mask)
 }
 
-/// Return the closure variant infos generated for the datatype of the given function
-/// type, in variant order. The type is matched against MonoInfo via its Boogie name,
-/// so it does not need to be in normalized form.
-pub fn boogie_closure_infos(env: &GlobalEnv, fun_ty: &Type) -> Vec<ClosureInfo> {
-    let mono_info = mono_analysis::get_info(env);
+/// Look up the infos registered in a MonoInfo map for the given function type,
+/// in registration order. The type is matched against the map via its Boogie
+/// name, so it does not need to be in normalized form.
+fn boogie_fun_ty_infos<T: Clone>(
+    env: &GlobalEnv,
+    map: &BTreeMap<Type, BTreeSet<T>>,
+    fun_ty: &Type,
+) -> Vec<T> {
     let boogie_name = boogie_type(env, fun_ty, false);
-    for (ty, infos) in &mono_info.fun_infos {
+    for (ty, infos) in map {
         if boogie_type(env, ty, false) == boogie_name {
             return infos.iter().cloned().collect();
         }
     }
     vec![]
+}
+
+/// Return the closure variant infos generated for the datatype of the given function
+/// type, in variant order.
+pub fn boogie_closure_infos(env: &GlobalEnv, fun_ty: &Type) -> Vec<ClosureInfo> {
+    boogie_fun_ty_infos(env, &mono_analysis::get_info(env).fun_infos, fun_ty)
+}
+
+/// Name of the closed-world `partial_of` recognizer for a (subject, witness)
+/// fun-type pair.
+pub fn boogie_partial_fun_name(env: &GlobalEnv, ty_f: &Type, ty_g: &Type) -> String {
+    format!(
+        "$partial'{}${}'",
+        boogie_type_suffix(env, ty_f, false),
+        boogie_type_suffix(env, ty_g, false)
+    )
+}
+
+/// Name of the captured-value selector for a subject fun type and capture
+/// value type.
+pub fn boogie_captures_fun_name(env: &GlobalEnv, ty_f: &Type, cap_ty: &Type) -> String {
+    format!(
+        "$captures'{}${}'",
+        boogie_type_suffix(env, ty_f, false),
+        boogie_type_suffix(env, cap_ty, false)
+    )
+}
+
+/// Return the fun-param variant infos registered for the given function type
+/// (name-matched, like `boogie_closure_infos`).
+pub fn boogie_fun_param_infos(env: &GlobalEnv, fun_ty: &Type) -> Vec<mono_analysis::FunParamInfo> {
+    boogie_fun_ty_infos(env, &mono_analysis::get_info(env).fun_param_infos, fun_ty)
 }
 
 /// Return the variant index of the closure constructed from `fun` with `mask` within
@@ -1298,8 +1333,19 @@ pub fn boogie_closure_capture_field(pos: usize, variant_idx: usize) -> String {
 /// Returns true if values of the given function type may carry mutations, i.e. the
 /// type has closure variants capturing mutable references.
 pub fn boogie_fun_ty_carries_mutations(env: &GlobalEnv, fun_ty: &Type) -> bool {
-    boogie_closure_infos(env, fun_ty)
-        .iter()
+    boogie_infos_carry_mutations(env, &boogie_closure_infos(env, fun_ty))
+}
+
+/// Returns true if any of the given closure variant infos captures a mutable
+/// reference, i.e. values of their function type may carry mutations. Variant
+/// of `boogie_fun_ty_carries_mutations` for callers which already hold the
+/// closure infos.
+pub fn boogie_infos_carry_mutations<'a, I>(env: &GlobalEnv, infos: I) -> bool
+where
+    I: IntoIterator<Item = &'a ClosureInfo>,
+{
+    infos
+        .into_iter()
         .any(|info| !info.mut_capture_slots(env).is_empty())
 }
 
@@ -1451,7 +1497,11 @@ pub fn boogie_behavioral_eval_fun_name(
     kind: BehaviorKind,
 ) -> String {
     let kind_name = match kind {
-        BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => "result_of".to_string(),
+        // These share the `result_of` tuple Skolem; `fun_post_of` projects
+        // its trailing fun slot.
+        BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) | BehaviorKind::FunPostOf => {
+            "result_of".to_string()
+        },
         _ => kind.to_string(),
     };
     format!(

@@ -19,11 +19,48 @@ module 0x42::opaque_inline_multi_ensures_fail {
     /// than one `ensures_of` cannot be instantiated at the call site.
     fun test_multiple_ensures_of(): u64 {
         let x = 0;
-        call_trusted_twice(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` condition over a function value carrying mutable reference captures
+        call_trusted_twice(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures
         x
     }
     spec test_multiple_ensures_of {
         ensures result == 1;
     }
 
+    inline fun call_mixed(f: |u64|) {
+        f(1)
+    }
+    spec call_mixed {
+        pragma opaque;
+        pragma verify = false;
+        ensures ensures_of<f>(1);
+        ensures f == fun_post_of<old(f)>(2);
+    }
+
+    inline fun call_aliased(f: |u64|) {
+        f(1)
+    }
+    spec call_aliased {
+        pragma opaque;
+        pragma verify = false;
+        let g = f;
+        ensures f == fun_post_of<g>(1);
+        ensures ensures_of<f>(2);
+    }
+
+    /// Test: a spec-`let` alias of the closure does not evade the
+    /// single-constraint guard.
+    fun test_aliased_constraints(): u64 {
+        let x = 0;
+        call_aliased(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures
+        x
+    }
+
+    /// Test: an `ensures_of` plus a separate `fun_post_of` chain root impose
+    /// two independent one-application constraints on the single havoced
+    /// value.
+    fun test_mixed_constraints(): u64 {
+        let x = 0;
+        call_mixed(|i| x = x + i spec { ensures x == old(x) + i; }); // error: more than one `ensures_of` or `fun_post_of` condition over a function value carrying mutable reference captures
+        x
+    }
 }

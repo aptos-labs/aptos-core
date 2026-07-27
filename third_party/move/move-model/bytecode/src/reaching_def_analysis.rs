@@ -246,23 +246,27 @@ impl AbstractDomain for ReachingDefState {
 
 impl ReachingDefState {
     fn def_alias(&mut self, dest: TempIndex, src: TempIndex) {
-        // ensure that the previous def is killed
+        // The previous def, and any aliases referring to it, have been
+        // invalidated by `kill`.
         assert!(!self.map.contains_key(&dest));
-
-        // cascade the definition
-        for defs in self.map.values_mut() {
-            if defs.contains(&Def::Alias(dest)) {
-                defs.insert(Def::Alias(src));
-            }
-        }
-
-        // update the new alias
         self.map.entry(dest).or_default().insert(Def::Alias(src));
     }
 
     fn kill(&mut self, dest: TempIndex) {
         self.map.remove(&dest);
         self.havoced.remove(&dest);
+        // A redefinition of `dest` also invalidates every alias referring to
+        // it: those aliases denote the value `dest` held when the copy was
+        // made, which is no longer available. Without this, a copy `s := d`
+        // followed by a redefinition of `d` (e.g. as the dest of a call)
+        // would still propagate `s -> d` at later uses. Entries left without
+        // any defs are removed entirely: `join` unions defs per key, so an
+        // empty set would vanish against another path's defs instead of
+        // invalidating them.
+        self.map.retain(|_, defs| {
+            defs.retain(|d| !matches!(d, Def::Alias(a) if *a == dest));
+            !defs.is_empty()
+        });
     }
 
     fn havoc(&mut self, dest: TempIndex) {

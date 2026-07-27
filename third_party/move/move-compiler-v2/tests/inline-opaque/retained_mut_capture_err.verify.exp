@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: modified captured variables are not yet supported in tuple or struct assignments inside of a lambda
-   ┌─ tests/inline-opaque/retained_mut_capture_err.move:19:23
+   ┌─ tests/inline-opaque/retained_mut_capture_err.move:18:23
    │
-19 │         call_once(|i| (x, y) = (i, i));
+18 │         call_once(|i| (x, y) = (i, i));
    │                       ^^^^^^^^^^^^^^^

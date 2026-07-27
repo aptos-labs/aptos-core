@@ -8,14 +8,15 @@
 use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
-        boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_choice_fun_name,
-        boogie_closure_pack_name, boogie_declare_global, boogie_field_sel, boogie_field_update,
-        boogie_fun_ty_carries_mutations, boogie_inst_suffix, boogie_modifies_memory_name,
-        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_is_struct,
-        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
-        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
-        boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
-        boogie_well_formed_expr, compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_captures_fun_name,
+        boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global, boogie_field_sel,
+        boogie_field_update, boogie_fun_ty_carries_mutations, boogie_inst_suffix,
+        boogie_modifies_memory_name, boogie_num_type_base, boogie_partial_fun_name,
+        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
+        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
+        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr,
+        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
@@ -520,10 +521,6 @@ impl SpecTranslator<'_> {
                 );
                 return;
             }
-        }
-        if let Type::Fun(..) = fun.result_type {
-            self.error(&fun.loc, "function result type not yet supported"); // TODO(LAMBDA)
-            return;
         }
         let qid = module_env.get_id().qualified(id);
         let recursive = self.env.is_spec_fun_recursive(qid);
@@ -1673,6 +1670,21 @@ impl SpecTranslator<'_> {
                 let fun_exp = &args[0];
                 let pred_args = &args[1..];
 
+                if matches!(kind, BehaviorKind::PartialOf | BehaviorKind::CapturesOf) {
+                    self.translate_variant_observation(node_id, *kind, fun_exp, pred_args);
+                    return;
+                }
+                if *kind == BehaviorKind::FunPostOf
+                    && matches!(
+                        fun_exp.as_ref(),
+                        ExpData::Call(_, Operation::Closure(..), _)
+                    )
+                {
+                    // Closure literals admitted in spec expressions never
+                    // carry mutations, so `fun_post_of` is the identity.
+                    self.translate_exp(fun_exp);
+                    return;
+                }
                 match fun_exp.as_ref() {
                     ExpData::Call(closure_id, Operation::Closure(mid, fid, mask), closure_args) => {
                         // Closure: use per-function behavioral spec function
@@ -1837,6 +1849,67 @@ impl SpecTranslator<'_> {
         self.in_behavior_pred_arg.replace(prev);
     }
 
+    /// Translate `partial_of<f>(g)` / `captures_of<f>(g)`: the closed-world
+    /// recognizer resp. captured-value selector for the (subject, witness)
+    /// fun-type pair, defined by the backend over the session's variants
+    /// (see `translate_variant_observation_defs`). The witness is any
+    /// function value; a plain function name is the common case.
+    fn translate_variant_observation(
+        &self,
+        node_id: NodeId,
+        kind: BehaviorKind,
+        fun_exp: &Exp,
+        pred_args: &[Exp],
+    ) {
+        let loc = self.env.get_node_loc(node_id);
+        let Some(witness_exp) = pred_args.first() else {
+            self.error(&loc, &format!("bug: missing witness for {}", kind));
+            return;
+        };
+        let ty_f = self
+            .env
+            .get_node_type(fun_exp.node_id())
+            .instantiate(&self.type_inst)
+            .normalize_fun();
+        let ty_g = self
+            .env
+            .get_node_type(witness_exp.node_id())
+            .instantiate(&self.type_inst)
+            .normalize_fun();
+        match kind {
+            BehaviorKind::PartialOf => {
+                emit!(
+                    self.writer,
+                    "{}(",
+                    boogie_partial_fun_name(self.env, &ty_f, &ty_g)
+                );
+                self.translate_exp(fun_exp);
+                emit!(self.writer, ", ");
+                self.translate_exp(witness_exp);
+                emit!(self.writer, ")");
+            },
+            BehaviorKind::CapturesOf => {
+                let Type::Fun(g_args, _, _) = &ty_g else {
+                    self.error(&loc, "bug: witness must have function type");
+                    return;
+                };
+                let Some(cap_ty) = g_args.clone().flatten().first().cloned() else {
+                    self.error(&loc, "bug: witness must have a leading parameter");
+                    return;
+                };
+                let cap_ty = cap_ty.skip_reference().clone();
+                emit!(
+                    self.writer,
+                    "{}(",
+                    boogie_captures_fun_name(self.env, &ty_f, &cap_ty)
+                );
+                self.translate_exp(fun_exp);
+                emit!(self.writer, ")");
+            },
+            _ => unreachable!(),
+        }
+    }
+
     /// Translate a behavioral predicate via the per-type evaluator dispatch
     /// function (used for runtime function values).
     fn translate_behavior_via_evaluator(
@@ -1861,6 +1934,29 @@ impl SpecTranslator<'_> {
         // Note that spec expressions not passing through the bytecode instrumentation
         // (e.g. behavioral spec function bodies) carry no clone.
         let carries_mutations = boogie_fun_ty_carries_mutations(self.env, &inst_fun_type);
+        if kind == BehaviorKind::FunPostOf && !carries_mutations {
+            // A value that cannot carry mutations does not advance under
+            // application: `fun_post_of` is the identity.
+            self.translate_exp(fun_exp);
+            return;
+        }
+        if kind == BehaviorKind::FunPostOf {
+            // The one-application successor is deterministic in `(f, args)`
+            // only when no variant of the fun type reads or writes global
+            // memory: a chain (e.g. a recursive spec fun folding
+            // `fun_post_of` over a vector) evaluates all steps at one memory
+            // snapshot, while the applications it describes thread distinct
+            // intermediate memories. See issue #20273.
+            let (union_used, _union_old) = compute_evaluator_memory_union(self.env, &inst_fun_type);
+            if !union_used.is_empty() {
+                self.error(
+                    &self.env.get_node_loc(node_id),
+                    "`fun_post_of` over a function value whose behavior depends on \
+                     global memory is not supported (see issue #20273)",
+                );
+                return;
+            }
+        }
         let has_fun_clone = matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
             && matches!(fun_exp.as_ref(), ExpData::Temporary(..))
             && pred_args.last().is_some_and(|last| {
@@ -1880,6 +1976,23 @@ impl SpecTranslator<'_> {
                 "ensures_of over a function value carrying mutable reference captures \
                  is only supported for directly referenced function values",
             );
+            return;
+        }
+        if carries_mutations && kind == BehaviorKind::EnsuresOf {
+            // The apply procedure computes the successor at pre-application
+            // memory, while this evaluator binds the memory at the
+            // condition's state — coherent only when no variant of the type
+            // touches global memory. See issue #20273.
+            let (union_used, _) = compute_evaluator_memory_union(self.env, &inst_fun_type);
+            if !union_used.is_empty() {
+                self.error(
+                    &self.env.get_node_loc(node_id),
+                    "`ensures_of` over a function value carrying mutable reference \
+                     captures whose behavior depends on global memory is not supported \
+                     (see issue #20273)",
+                );
+                return;
+            }
         }
 
         // The `ResultOf`/`WriteOf(j)` evaluator shares a single tuple Skolem
@@ -1910,6 +2023,11 @@ impl SpecTranslator<'_> {
             BehaviorKind::WriteOf(j) if multi_in_boogie => {
                 Some(ProjKind::Single(num_explicit_results + j))
             },
+            // FunPostOf: the trailing fun slot; when it is the only output,
+            // the scalar Skolem is the successor itself.
+            BehaviorKind::FunPostOf if multi_in_boogie => {
+                Some(ProjKind::Single(num_explicit_results + num_mut_refs))
+            },
             _ => None,
         };
 
@@ -1920,7 +2038,7 @@ impl SpecTranslator<'_> {
         // For `EnsuresOf`, the fun-value clone is dropped when the type does
         // not carry mutations (the evaluator then has no `f_post` slot).
         let emit_arg_count = match kind {
-            BehaviorKind::ResultOf => {
+            BehaviorKind::ResultOf | BehaviorKind::FunPostOf => {
                 let num_inputs = match &inst_fun_type {
                     Type::Fun(arg_ty, _, _) => arg_ty.clone().flatten().len(),
                     _ => pred_args.len(),
@@ -2069,10 +2187,7 @@ impl SpecTranslator<'_> {
         // Use resolve_memory_name to resolve labels through the label chain — when a
         // resource type was not modified at a label, its memory resolves to the predecessor.
         let uses_old = !union_old_memory.is_empty();
-        let current = match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
-        };
+        let current = if kind.is_two_state() { post } else { pre };
         let mut first = true;
         for memory in &union_used_memory {
             if uses_old && union_old_memory.contains(memory) {
@@ -2305,10 +2420,7 @@ impl SpecTranslator<'_> {
             .map(|m| m.clone().instantiate(&fun_qid.inst))
             .collect();
         let uses_old = !old_memory.is_empty();
-        let current = match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
-        };
+        let current = if kind.is_two_state() { post } else { pre };
         let mut first = true;
         for memory in used_memory {
             let memory = &memory.clone().instantiate(&fun_qid.inst);
@@ -2392,6 +2504,9 @@ impl SpecTranslator<'_> {
             BehaviorKind::EnsuresOf => "ensures_of",
             BehaviorKind::ResultOf => "result_of",
             BehaviorKind::WriteOf(_) => "write_of",
+            BehaviorKind::FunPostOf => "fun_post_of",
+            BehaviorKind::PartialOf => "partial_of",
+            BehaviorKind::CapturesOf => "captures_of",
         };
         let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
         let mem_display = struct_env.get_full_name_with_address().to_string();

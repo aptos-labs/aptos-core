@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_mut_capture_copy.move:49:9
+   │
+49 │         ensures result == 2; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_capture_copy.move:44: test_weak_spec
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_capture_copy.move:45: test_weak_spec
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_capture_copy.move:46: test_weak_spec
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_capture_copy.move:43: test_weak_spec
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_capture_copy.move:49: test_weak_spec (spec)

@@ -1,0 +1,139 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::variant_observation_check {
+    private fun apply(f: |&u64| has copy + drop): |&u64| has copy + drop {
+        f
+    }
+    spec {
+      ensures Implies(partial_of($t0, closure#0variant_observation_check::step()), Eq<u64>(captures_of(result0(), closure#0variant_observation_check::step()), captures_of($t0, closure#0variant_observation_check::step())));
+      ensures Eq<|&u64| has copy + drop>(result0(), $t0);
+      ensures Eq<u64>(write_of_0(closure#0variant_observation_check::step(), 1, 2), write_of_0(closure#0variant_observation_check::step(), 1, 2));
+    }
+
+    private fun step(s: &mut u64,e: &u64) {
+        s = Add<u64>(Deref(s), Deref(e));
+        Tuple()
+    }
+    spec {
+      ensures Eq<u64>(Freeze(false)($t0), Add(Old<u64>($t0), $t1));
+    }
+
+    spec fun $step(s: u64,e: u64) {
+        s = Add<u64>(s, e);
+        Tuple()
+    }
+} // end 0x42::variant_observation_check
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::variant_observation_check {
+    fun apply(f: |&u64| has copy + drop): |&u64| has copy + drop {
+        f
+    }
+
+    spec apply(f: |&u64| has copy + drop): |&u64| has copy + drop {
+        ensures partial_of<f>(|x,y| step(x, y)) ==> captures_of<result>(|x,y| step(x, y)) == captures_of<f>(|x,y| step(x, y));
+        ensures result == f;
+        ensures write_of_0<step>(1, 2) == write_of_0<step>(1, 2);
+    }
+
+    fun step(s: &mut u64, e: &u64) {
+        *s = *s + *e;
+    }
+
+    spec step(s: &mut u64, e: &u64) {
+        ensures s == old(s) + e;
+    }
+
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun variant_observation_check::apply($t0: |&u64| has copy + drop): |&u64| has copy + drop {
+     var $t1: |&u64| has copy + drop
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun variant_observation_check::step($t0: &mut u64, $t1: &u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t3 := read_ref($t0)
+  1: $t4 := read_ref($t1)
+  2: $t2 := +($t3, $t4)
+  3: write_ref($t0, $t2)
+  4: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::variant_observation_check {
+    private fun apply(f: |&u64| has copy + drop): |&u64| has copy + drop {
+        f
+    }
+    spec {
+      ensures Implies(partial_of($t0, closure#0variant_observation_check::step()), Eq<u64>(captures_of(result0(), closure#0variant_observation_check::step()), captures_of($t0, closure#0variant_observation_check::step())));
+      ensures Eq<|&u64| has copy + drop>(result0(), $t0);
+      ensures Eq<u64>(write_of_0(closure#0variant_observation_check::step(), 1, 2), write_of_0(closure#0variant_observation_check::step(), 1, 2));
+    }
+
+    private fun step(s: &mut u64,e: &u64) {
+        s = Add<u64>(Deref(s), Deref(e));
+        Tuple()
+    }
+    spec {
+      ensures Eq<u64>(Freeze(false)($t0), Add(Old<u64>($t0), $t1));
+    }
+
+    spec fun $step(s: u64,e: u64) {
+        s = Add<u64>(s, e);
+        Tuple()
+    }
+} // end 0x42::variant_observation_check
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun variant_observation_check::apply($t0: |&u64| has copy + drop): |&u64| has copy + drop {
+     var $t1: |&u64| has copy + drop
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun variant_observation_check::step($t0: &mut u64, $t1: &u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t3 := read_ref($t0)
+  1: $t4 := read_ref($t1)
+  2: $t2 := +($t3, $t4)
+  3: write_ref($t0, $t2)
+  4: return ()
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::variant_observation_check
+// Function definition at index 0
+fun apply(l0: |&u64| has copy + drop): |&u64| has copy + drop
+    move_loc l0
+    ret
+
+// Function definition at index 1
+fun step(l0: &mut u64, l1: &u64)
+    copy_loc l0
+    read_ref
+    move_loc l1
+    read_ref
+    add
+    // @5
+    move_loc l0
+    write_ref
+    ret
+
+
+============ bytecode verification succeeded ========

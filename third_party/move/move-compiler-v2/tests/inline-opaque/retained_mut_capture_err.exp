@@ -51,15 +51,15 @@ module 0x42::retained_mut_capture_err {
 
 Diagnostics:
 warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
-   ┌─ tests/inline-opaque/retained_mut_capture_err.move:17:17
+   ┌─ tests/inline-opaque/retained_mut_capture_err.move:16:17
    │
-17 │         let x = 0;
+16 │         let x = 0;
    │                 ^
 
 warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
-   ┌─ tests/inline-opaque/retained_mut_capture_err.move:18:17
+   ┌─ tests/inline-opaque/retained_mut_capture_err.move:17:17
    │
-18 │         let y = 0;
+17 │         let y = 0;
    │                 ^
 
 // -- Model dump before second bytecode pipeline

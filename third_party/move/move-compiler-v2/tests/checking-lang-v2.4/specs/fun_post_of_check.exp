@@ -1,0 +1,111 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::fun_post_of_check {
+    private fun apply(f: |u64|u64 has drop,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures Eq<|u64|u64 has drop>($t0, fun_post_of(Old<|u64|u64 has drop>($t0), $t1));
+      ensures Eq<|u64|u64 has drop>($t0, fun_post_of(fun_post_of(Old<|u64|u64 has drop>($t0), 1), 2));
+    }
+
+    private fun apply_ref(f: |&mut u64| has drop,r: &mut u64) {
+        (f)(r)
+    }
+    spec {
+      ensures Eq<|&mut u64| has drop>($t0, fun_post_of(Old<|&mut u64| has drop>($t0), $t1));
+    }
+
+} // end 0x42::fun_post_of_check
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::fun_post_of_check {
+    fun apply(f: |u64|u64 has drop, x: u64): u64 {
+        f(x)
+    }
+
+    spec apply(f: |u64|u64 has drop, x: u64): u64 {
+        ensures f == fun_post_of<old(f)>(x);
+        ensures f == fun_post_of<fun_post_of<old(f)>(1)>(2);
+    }
+
+    fun apply_ref(f: |&mut u64| has drop, r: &mut u64) {
+        f(r)
+    }
+
+    spec apply_ref(f: |&mut u64| has drop, r: &mut u64) {
+        ensures f == fun_post_of<old(f)>(r);
+    }
+
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun fun_post_of_check::apply($t0: |u64|u64 has drop, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun fun_post_of_check::apply_ref($t0: |&mut u64| has drop, $t1: &mut u64) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::fun_post_of_check {
+    private fun apply(f: |u64|u64 has drop,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures Eq<|u64|u64 has drop>($t0, fun_post_of(Old<|u64|u64 has drop>($t0), $t1));
+      ensures Eq<|u64|u64 has drop>($t0, fun_post_of(fun_post_of(Old<|u64|u64 has drop>($t0), 1), 2));
+    }
+
+    private fun apply_ref(f: |&mut u64| has drop,r: &mut u64) {
+        (f)(r)
+    }
+    spec {
+      ensures Eq<|&mut u64| has drop>($t0, fun_post_of(Old<|&mut u64| has drop>($t0), $t1));
+    }
+
+} // end 0x42::fun_post_of_check
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun fun_post_of_check::apply($t0: |u64|u64 has drop, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun fun_post_of_check::apply_ref($t0: |&mut u64| has drop, $t1: &mut u64) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::fun_post_of_check
+// Function definition at index 0
+fun apply(l0: |u64|u64 has drop, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64 has drop>
+    ret
+
+// Function definition at index 1
+fun apply_ref(l0: |&mut u64| has drop, l1: &mut u64)
+    move_loc l1
+    move_loc l0
+    call_closure <|&mut u64| has drop>
+    ret
+
+
+============ bytecode verification succeeded ========

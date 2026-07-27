@@ -68,6 +68,13 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     no_save_nodes: BTreeSet<NodeId>,
     /// Whether we are translating the right-hand side of an `update` clause.
     in_update: bool,
+    /// Function-typed parameters with two-state (`&mut`-like) spec semantics:
+    /// a bare reference in a post condition denotes the final value, `old(f)`
+    /// the value at entry. Opt-in per parameter, triggered by the spec
+    /// mentioning `old(f)` or `fun_post_of` over it; all other fun params
+    /// keep the legacy entry-value reading of bare post-state references.
+    /// Indices are pre-substitution (callee formals).
+    two_state_fun_params: BTreeSet<TempIndex>,
     /// Suppress appending live fun-value clones to behavioral predicates in
     /// `wrap_mut_ref_bp_inputs`. The clone is an artifact of the verification
     /// translation (the Boogie backend consumes it as the trailing `f_post`
@@ -75,6 +82,12 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     /// must stay clone-free, since translated expressions can end up in
     /// inferred specs which are sourcified as ordinary Move code.
     omit_fun_clones: bool,
+    /// Node ids of behavioral-predicate subject occurrences. Subjects always
+    /// follow the legacy routing predicate — `ensures_of<f>(x)` describes one
+    /// application FROM a state, so in a post condition the subject denotes
+    /// the entry value even under two-state semantics, while in requires/
+    /// aborts conditions and loop invariants it stays the live value.
+    subject_legacy_nodes: BTreeSet<NodeId>,
 }
 
 /// A flattened proof action produced by translating a structured `Proof` tree.
@@ -314,6 +327,184 @@ impl TranslatedSpec {
     }
 }
 
+/// Computes the set of function-typed parameters of `fun_env` with two-state
+/// (`&mut`-like) spec semantics: those mentioned under `old(..)` or as the
+/// root subject of a `fun_post_of` chain anywhere in the function's spec.
+/// Since both forms are rejected resp. absent for legacy specs, the opt-in is
+/// backward compatible: without them, bare post-state references keep the
+/// entry-value reading.
+pub fn two_state_fun_params(fun_env: &FunctionEnv<'_>) -> BTreeSet<TempIndex> {
+    let env = fun_env.module_env.env;
+    let mut result = BTreeSet::new();
+    let spec = fun_env.get_spec();
+    for cond in spec.conditions.iter().chain(spec.update_map.values()) {
+        for exp in cond.all_exps() {
+            exp.visit_pre_order(&mut |e| {
+                match e {
+                    ExpData::Call(_, Operation::Old, args) if args.len() == 1 => {
+                        if let ExpData::Temporary(id, idx) = args[0].as_ref() {
+                            if env.get_node_type(*id).is_function() {
+                                result.insert(*idx);
+                            }
+                        }
+                    },
+                    ExpData::Call(_, Operation::Behavior(BehaviorKind::FunPostOf, _), args) => {
+                        // Find the chain root, stripping nested `fun_post_of`
+                        // and `old(..)` wrappers.
+                        let mut subject = args.first();
+                        while let Some(exp) = subject {
+                            match exp.as_ref() {
+                                ExpData::Call(
+                                    _,
+                                    Operation::Behavior(BehaviorKind::FunPostOf, _),
+                                    inner,
+                                ) => subject = inner.first(),
+                                ExpData::Call(_, Operation::Old, inner) if inner.len() == 1 => {
+                                    subject = inner.first()
+                                },
+                                _ => break,
+                            }
+                        }
+                        if let Some(ExpData::Temporary(_, idx)) = subject.map(|e| e.as_ref()) {
+                            result.insert(*idx);
+                        }
+                    },
+                    _ => {},
+                }
+                true
+            });
+        }
+    }
+    result
+}
+
+/// Computes the set of function-typed parameters of `fun_env` which are
+/// reflected over by `partial_of`/`captures_of` in the function's spec.
+/// Such parameters must be verified universally over their datatype (not
+/// pinned to their abstract `$param` variant): variant-membership
+/// observations are provably false for the abstract variant, which would
+/// make the function's own verification vacuous while call sites discharge
+/// the premise at concrete closures.
+///
+/// A parameter counts as reflected over when it occurs ANYWHERE inside an
+/// argument of such an observation, at any nesting depth, in the function
+/// spec, in inline spec blocks and loop invariants (`on_impl`), or as an
+/// argument of a spec function whose body (transitively) contains such an
+/// observation. A fun-typed spec-`let` alias in observation position hides
+/// the flow, so it conservatively unpins all fun-typed parameters.
+pub fn variant_observed_fun_params(fun_env: &FunctionEnv<'_>) -> BTreeSet<TempIndex> {
+    use crate::ast::BehaviorKind;
+
+    /// Whether the spec function's body transitively contains a variant
+    /// observation.
+    fn spec_fun_observes(
+        env: &GlobalEnv,
+        qid: QualifiedId<crate::model::SpecFunId>,
+        visited: &mut BTreeSet<QualifiedId<crate::model::SpecFunId>>,
+    ) -> bool {
+        if !visited.insert(qid) {
+            return false;
+        }
+        let Some(module) = env.get_module_opt(qid.module_id) else {
+            return false;
+        };
+        let decl = module.get_spec_fun(qid.id);
+        let Some(body) = &decl.body else {
+            return false;
+        };
+        let mut found = false;
+        body.visit_pre_order(&mut |e| {
+            match e {
+                ExpData::Call(
+                    _,
+                    Operation::Behavior(BehaviorKind::PartialOf | BehaviorKind::CapturesOf, _),
+                    _,
+                ) => {
+                    found = true;
+                    return false;
+                },
+                ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
+                    if spec_fun_observes(env, mid.qualified(*fid), visited) {
+                        found = true;
+                        return false;
+                    }
+                },
+                _ => {},
+            }
+            true
+        });
+        found
+    }
+
+    /// Collects all condition expressions of a spec, including inline
+    /// (`on_impl`) specs such as loop invariants and inline assumes.
+    fn collect_spec_exps<'x>(spec: &'x crate::ast::Spec, out: &mut Vec<&'x Exp>) {
+        for cond in spec.conditions.iter().chain(spec.update_map.values()) {
+            out.extend(cond.all_exps());
+        }
+        for nested in spec.on_impl.values() {
+            collect_spec_exps(nested, out);
+        }
+    }
+
+    let env = fun_env.module_env.env;
+    let num_params = fun_env.get_parameter_count();
+    let mut result = BTreeSet::new();
+    let mut aliased = false;
+    let spec = fun_env.get_spec();
+    let mut exps: Vec<&Exp> = vec![];
+    collect_spec_exps(&spec, &mut exps);
+    let collect_from = |arg: &Exp, result: &mut BTreeSet<TempIndex>, aliased: &mut bool| {
+        arg.visit_pre_order(&mut |inner| {
+            match inner {
+                ExpData::Temporary(_, idx) if *idx < num_params => {
+                    result.insert(*idx);
+                },
+                ExpData::LocalVar(id, _) if env.get_node_type(*id).is_function() => {
+                    *aliased = true;
+                },
+                _ => {},
+            }
+            true
+        });
+    };
+    for exp in exps {
+        exp.visit_pre_order(&mut |e| {
+            match e {
+                ExpData::Call(
+                    _,
+                    Operation::Behavior(BehaviorKind::PartialOf | BehaviorKind::CapturesOf, _),
+                    args,
+                ) => {
+                    for arg in args {
+                        collect_from(arg, &mut result, &mut aliased);
+                    }
+                },
+                ExpData::Call(_, Operation::SpecFunction(mid, fid, _), args)
+                    if spec_fun_observes(env, mid.qualified(*fid), &mut BTreeSet::new()) =>
+                {
+                    // The observation sits inside the called spec function's
+                    // body; conservatively treat every fun-typed value flowing
+                    // in as reflected over.
+                    for arg in args {
+                        collect_from(arg, &mut result, &mut aliased);
+                    }
+                },
+                _ => {},
+            }
+            true
+        });
+    }
+    let params = fun_env.get_parameters_ref();
+    let fun_typed = |idx: &TempIndex| params.get(*idx).is_some_and(|p| p.1.is_function());
+    if aliased {
+        (0..num_params).filter(fun_typed).collect()
+    } else {
+        result.retain(fun_typed);
+        result
+    }
+}
+
 impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     /// Translates the specification of function `fun_env`. This can happen for a call of the
     /// function or for its definition (parameter `for_call`). This will process all the
@@ -349,6 +540,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             shared_old_label: None,
             no_save_nodes: BTreeSet::new(),
             in_update: false,
+            two_state_fun_params: two_state_fun_params(fun_env),
+            subject_legacy_nodes: BTreeSet::new(),
             omit_fun_clones,
         };
         translator.translate_spec(for_call);
@@ -378,6 +571,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             shared_old_label: None,
             no_save_nodes: BTreeSet::new(),
             in_update: false,
+            two_state_fun_params: BTreeSet::new(),
+            subject_legacy_nodes: BTreeSet::new(),
             omit_fun_clones: false,
         };
         // Clone invariants so `inst` lives for the entire loop
@@ -418,6 +613,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             shared_old_label: None,
             no_save_nodes: BTreeSet::new(),
             in_update: false,
+            two_state_fun_params: BTreeSet::new(),
+            subject_legacy_nodes: BTreeSet::new(),
             omit_fun_clones,
         };
 
@@ -898,6 +1095,11 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     }
 
     /// Expand `apply lemma(args)`: assert each requires, assume each ensures.
+    ///
+    /// TODO(#20275): applying a lemma inside its own (or a mutually
+    /// recursive) proof assumes the conclusion being proven; recursion needs
+    /// a well-foundedness check (`decreases` clause with a strictly
+    /// decreasing measure asserted at the application).
     fn expand_lemma_apply(
         &mut self,
         loc: &Loc,
@@ -1066,6 +1268,25 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         let arg_types: Vec<Type> = (*arg_ty_box).flatten();
         let num_inputs = arg_types.len();
         let num_explicit_results = (*result_ty_box).flatten().len();
+
+        // Mark the subject occurrence for legacy routing, on all paths
+        // including the early returns below: a behavioral predicate describes
+        // one application FROM a state, so the subject keeps the entry-value
+        // reading in post conditions even when `f` has two-state semantics
+        // (`ensures f == fun_post_of<f>(x)` thus means final == successor of
+        // the entry value). In pre-state conditions and loop invariants the
+        // legacy routing is the live value, as before.
+        if let ExpData::Temporary(subject_id, _) = fun_exp.as_ref() {
+            self.subject_legacy_nodes.insert(*subject_id);
+        }
+
+        // Variant observations take `[f, witness]` — no subject inputs and no
+        // post-state or fun-clone slots. Only the subject marking above
+        // applies; the generic input-arity machinery below does not.
+        if matches!(kind, BehaviorKind::PartialOf | BehaviorKind::CapturesOf) {
+            return exp.clone();
+        }
+
         if args.len() < 1 + num_inputs {
             return exp.clone();
         }
@@ -1395,9 +1616,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         // matters for values carrying mutable reference captures, whose temp is
         // updated across calls; the updated value is accessible only through the
         // trailing clone synthesized by `wrap_mut_ref_bp_inputs`.
+        //
+        // A fun param with two-state semantics (spec mentions `old(f)` or
+        // `fun_post_of` over it) reads like a `&mut` param instead: bare
+        // references in post-placed conditions denote the live (final) value
+        // and `old(f)` the entry value. Behavioral-predicate subjects are
+        // exempt and keep the legacy routing (entry value in post conditions).
+        let two_state_fun = local_type.is_function()
+            && self.two_state_fun_params.contains(&idx)
+            && !self.subject_legacy_nodes.contains(&id);
         if (self.in_old
-            || (self.in_post_state && !local_type.is_mutable_reference())
-            || (self.in_update && local_type.is_function()))
+            || (self.in_post_state && !local_type.is_mutable_reference() && !two_state_fun)
+            || (self.in_update && local_type.is_function() && !two_state_fun))
             && !self.no_save_nodes.contains(&id)
         {
             // We access a param inside of old context, or a value which might have been
@@ -1579,7 +1809,19 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         if self.type_args.is_empty() {
             None
         } else {
-            ExpData::instantiate_node(self.builder.global_env(), id, self.type_args)
+            let new_id = ExpData::instantiate_node(self.builder.global_env(), id, self.type_args)?;
+            // Node-id-keyed markings must survive instantiation: the live
+            // fun-value clones (`no_save_nodes`) and behavioral-predicate
+            // subjects (`subject_legacy_nodes`) are recorded on the
+            // pre-instantiation ids by `wrap_mut_ref_bp_inputs`, but the
+            // routing decision in `rewrite_temporary` sees the re-minted id.
+            if self.no_save_nodes.contains(&id) {
+                self.no_save_nodes.insert(new_id);
+            }
+            if self.subject_legacy_nodes.contains(&id) {
+                self.subject_legacy_nodes.insert(new_id);
+            }
+            Some(new_id)
         }
     }
 

@@ -1,8 +1,9 @@
-Move prover returns: exiting with compilation errors
-error: cannot capture a mutable reference in a closure requiring the `copy` ability
-   ┌─ tests/sources/functional/closures/inline/inline_opaque_hof_quantified_ensures_of_fail.move:36:29
+Move prover returns: exiting with bytecode transformation errors
+error: a quantified `ensures_of` or `fun_post_of` over a function value carrying mutable reference captures would over-constrain its single post value; describing iterated application requires `fun_post_of` chains (see issue #20273)
+   ┌─ tests/sources/functional/closures/inline/inline_opaque_hof_quantified_ensures_of_fail.move:33:9
    │
-36 │         for_each_ref(v, |e| s = s + *e spec { // error: cannot capture a mutable reference in a closure requiring the `copy` ability
-   │                             ^
-   │
-   = expected function type: `|&u64| has copy + drop`
+33 │ ╭         for_each_ref(v, |e| s = s + *e spec { // error: a quantified `ensures_of` or `fun_post_of` over a function value carrying mutable reference captures would over-constrain its single post value
+34 │ │             aborts_if s + e > MAX_U64;
+35 │ │             ensures s == old(s) + e;
+36 │ │         });
+   │ ╰──────────^

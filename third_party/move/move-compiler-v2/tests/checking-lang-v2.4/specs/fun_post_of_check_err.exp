@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: behavior predicate target must have function type, found `u64`
+  ┌─ tests/checking-lang-v2.4/specs/fun_post_of_check_err.move:9:17
+  │
+9 │         ensures fun_post_of<x>(1) == f;
+  │                 ^^^^^^^^^^^^^^^^^
+
+error: expected 1 argument(s) for fun_post_of but 2 were provided
+   ┌─ tests/checking-lang-v2.4/specs/fun_post_of_check_err.move:17:17
+   │
+17 │         ensures fun_post_of<f>(1, 2) == f;
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: expected `bool` but found a value of type `|u64|u64 has drop`
+   ┌─ tests/checking-lang-v2.4/specs/fun_post_of_check_err.move:25:17
+   │
+25 │         ensures fun_post_of<f>(1);
+   │                 ^^^^^^^^^^^^^^^^^

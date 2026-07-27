@@ -63,6 +63,16 @@ pub struct FatLoopSpecInfo {
     /// Loop-to-DAG transformation havocs these at the loop header, so the
     /// loop-exit path does not retain pre-loop memory.
     pub mem_targets: BTreeSet<QualifiedInstId<StructId>>,
+
+    /// Function-typed temporaries applied (`Invoke`) in the loop body which
+    /// are not reassigned by it (not in `val_targets`). Values carrying
+    /// mutable reference captures, and advancing fun-param family members,
+    /// change under application at the translation level without any
+    /// bytecode-level write; they are havoced with
+    /// `HavocKind::CaptureValues`, which the translation refines to a
+    /// variant-preserving havoc for such values and to a no-op for all
+    /// others.
+    pub fun_targets: BTreeSet<TempIndex>,
 }
 
 /// Information about fat loops in a function.
@@ -209,7 +219,7 @@ impl FatLoopBuilder<'_> {
                 None => {
                     // no spec mode, or loop invariant instrumentation route
                     let spec_info = if self.for_spec {
-                        let (val_targets, mut_targets) =
+                        let (val_targets, mut_targets, fun_targets) =
                             self.collect_loop_targets(&cfg, func_target, &sub_loops);
                         let mem_targets = self.collect_loop_memory(&cfg, func_target, &sub_loops);
                         Some(FatLoopSpecInfo {
@@ -217,6 +227,7 @@ impl FatLoopBuilder<'_> {
                             val_targets,
                             mut_targets,
                             mem_targets,
+                            fun_targets,
                         })
                     } else {
                         None
@@ -404,7 +415,11 @@ impl FatLoopBuilder<'_> {
         cfg: &StacklessControlFlowGraph,
         func_target: &FunctionTarget<'_>,
         sub_loops: &[NaturalLoop<BlockId>],
-    ) -> (BTreeSet<TempIndex>, BTreeMap<TempIndex, bool>) {
+    ) -> (
+        BTreeSet<TempIndex>,
+        BTreeMap<TempIndex, bool>,
+        BTreeSet<TempIndex>,
+    ) {
         let code = func_target.get_bytecode();
         let mut val_targets = BTreeSet::new();
         let mut mut_targets = BTreeMap::new();
@@ -413,6 +428,7 @@ impl FatLoopBuilder<'_> {
             .flat_map(|l| l.loop_body.iter())
             .copied()
             .collect();
+        let mut fun_targets = BTreeSet::new();
         for block_id in fat_loop_body {
             for code_offset in cfg
                 .instr_indexes(block_id)
@@ -429,9 +445,21 @@ impl FatLoopBuilder<'_> {
                         })
                         .or_insert(is_full_havoc);
                 }
+                // Applied fun values advance at the translation level (see
+                // `FatLoopSpecInfo::fun_targets`).
+                if let Bytecode::Call(_, _, crate::stackless_bytecode::Operation::Invoke, srcs, _) =
+                    bytecode
+                {
+                    if let Some(fun_temp) = srcs.last() {
+                        if func_target.get_local_type(*fun_temp).is_function() {
+                            fun_targets.insert(*fun_temp);
+                        }
+                    }
+                }
             }
         }
-        (val_targets, mut_targets)
+        fun_targets = fun_targets.difference(&val_targets).copied().collect();
+        (val_targets, mut_targets, fun_targets)
     }
 
     /// Collect global memories that may be modified during loop execution:
