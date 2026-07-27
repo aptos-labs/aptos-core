@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::HashSet,
     fmt::{self, Debug},
+    hash::Hash,
 };
 
 #[derive(Eq, Hash, PartialEq, Debug)]
@@ -15,15 +15,15 @@ pub enum InputOutputKey<K, T> {
     DelayedField(DelayedFieldID),
 }
 
-pub struct ReadWriteSummary<T: Transaction> {
-    pub reads: HashSet<InputOutputKey<T::Key, T::Tag>>,
-    pub writes: HashSet<InputOutputKey<T::Key, T::Tag>>,
+pub struct ReadWriteSummary<K, T> {
+    pub reads: HashSet<InputOutputKey<K, T>>,
+    pub writes: HashSet<InputOutputKey<K, T>>,
 }
 
-impl<T: Transaction> ReadWriteSummary<T> {
+impl<K: Eq + Hash, T: Eq + Hash> ReadWriteSummary<K, T> {
     pub fn new(
-        reads: HashSet<InputOutputKey<T::Key, T::Tag>>,
-        writes: HashSet<InputOutputKey<T::Key, T::Tag>>,
+        reads: HashSet<InputOutputKey<K, T>>,
+        writes: HashSet<InputOutputKey<K, T>>,
     ) -> Self {
         Self { reads, writes }
     }
@@ -32,17 +32,14 @@ impl<T: Transaction> ReadWriteSummary<T> {
         !self.reads.is_disjoint(&previous.writes)
     }
 
-    pub fn find_conflicts<'a>(
-        &'a self,
-        previous: &'a Self,
-    ) -> HashSet<&'a InputOutputKey<T::Key, T::Tag>> {
+    pub fn find_conflicts<'a>(&'a self, previous: &'a Self) -> HashSet<&'a InputOutputKey<K, T>> {
         self.reads
             .intersection(&previous.writes)
             .collect::<HashSet<_>>()
     }
 
     pub fn collapse_resource_group_conflicts(self) -> Self {
-        let collapse = |k: InputOutputKey<T::Key, T::Tag>| match k {
+        let collapse = |k: InputOutputKey<K, T>| match k {
             InputOutputKey::Resource(k) => InputOutputKey::Resource(k),
             InputOutputKey::Group(k, _) => InputOutputKey::Resource(k),
             InputOutputKey::DelayedField(id) => InputOutputKey::DelayedField(id),
@@ -53,17 +50,21 @@ impl<T: Transaction> ReadWriteSummary<T> {
         }
     }
 
-    pub fn keys_written(&self) -> impl Iterator<Item = &T::Key> {
+    pub fn keys_written(&self) -> impl Iterator<Item = &K> {
         Self::keys_except_delayed_fields(self.writes.iter())
     }
 
-    pub fn keys_read(&self) -> impl Iterator<Item = &T::Key> {
+    pub fn keys_read(&self) -> impl Iterator<Item = &K> {
         Self::keys_except_delayed_fields(self.reads.iter())
     }
 
     fn keys_except_delayed_fields<'a>(
-        keys: impl Iterator<Item = &'a InputOutputKey<T::Key, T::Tag>>,
-    ) -> impl Iterator<Item = &'a T::Key> {
+        keys: impl Iterator<Item = &'a InputOutputKey<K, T>>,
+    ) -> impl Iterator<Item = &'a K>
+    where
+        K: 'a,
+        T: 'a,
+    {
         keys.filter_map(|k| match k {
             InputOutputKey::Resource(key) | InputOutputKey::Group(key, _) => Some(key),
             InputOutputKey::DelayedField(_) => None,
@@ -71,7 +72,7 @@ impl<T: Transaction> ReadWriteSummary<T> {
     }
 }
 
-impl<T: Transaction> fmt::Debug for ReadWriteSummary<T> {
+impl<K: Debug, T: Debug> fmt::Debug for ReadWriteSummary<K, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "ReadWriteSummary")?;
         writeln!(f, "reads:")?;

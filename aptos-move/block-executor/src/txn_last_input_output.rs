@@ -2,20 +2,18 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::CapturedReadSet,
+    captured_reads::TxnInput,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
-    errors::{ParallelBlockExecutionError, ResourceGroupSerializationError},
-    executor_utilities::{materialize_output, Materializer},
+    errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
-    task::{ExecutionStatus, LegacyTxnOutput, TransactionOutput},
+    task::{ExecutionStatus, TxnOutput},
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
-    block_executor::value::ValueWithLayout,
     error::{code_invariant_error, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
     transaction::BlockExecutableTransaction as Transaction,
@@ -25,7 +23,7 @@ use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::{execution_tracing::Trace, Module, RuntimeEnvironment};
+use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use parking_lot::Mutex;
 use std::{
@@ -36,20 +34,13 @@ use std::{
     },
 };
 
-struct OutputWrapper<
-    T: Transaction,
-    O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
-> {
+struct OutputWrapper<O: TxnOutput> {
     output: Option<ExecutionStatus<O>>,
-    maybe_read_write_summary: Option<ReadWriteSummary<T>>,
+    maybe_read_write_summary: Option<ReadWriteSummary<O::Key, O::Tag>>,
     maybe_approx_output_size: Option<u64>,
 }
 
-impl<
-        T: Transaction,
-        O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
-    > OutputWrapper<T, O>
-{
+impl<O: TxnOutput> OutputWrapper<O> {
     fn empty() -> Self {
         Self {
             output: None,
@@ -62,9 +53,9 @@ impl<
         self.output.as_ref().and_then(|status| status.get_output())
     }
 
-    fn from_execution_status(
+    fn from_execution_status<I: TxnInput<Key = O::Key, Tag = O::Tag>>(
         output: ExecutionStatus<O>,
-        read_set: &CapturedReadSet<T>,
+        read_set: &I,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
     ) -> Self {
@@ -102,20 +93,19 @@ impl<
 
 pub struct TxnLastInputOutput<
     T: Transaction,
-    O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+    I: TxnInput,
+    O: TxnOutput<Txn = T, Key = I::Key, Tag = I::Tag>,
 > {
-    inputs: Vec<CachePadded<Mutex<Option<Arc<CapturedReadSet<T>>>>>>, // txn_idx -> input (read set).
+    inputs: Vec<CachePadded<Mutex<Option<Arc<I>>>>>, // txn_idx -> input (read set).
 
-    output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
+    output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<O>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
     // speculative nature of parallel execution.
     speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
-impl<
-        T: Transaction,
-        O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
-    > TxnLastInputOutput<T, O>
+impl<T: Transaction, I: TxnInput, O: TxnOutput<Txn = T, Key = I::Key, Tag = I::Tag>>
+    TxnLastInputOutput<T, I, O>
 {
     /// num_txns passed here is typically larger than the number of txns in the block,
     /// currently by 1 to account for the block epilogue txn.
@@ -136,7 +126,7 @@ impl<
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: CapturedReadSet<T>,
+        input: I,
         output: ExecutionStatus<O>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
@@ -161,7 +151,7 @@ impl<
         self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReadSet<T>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<I>> {
         Some(Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?))
     }
 
@@ -182,7 +172,7 @@ impl<
         txn_idx: TxnIndex,
         num_txns: TxnIndex,
         num_workers: usize,
-        block_limit_processor: &mut BlockGasLimitProcessor<T>,
+        block_limit_processor: &mut BlockGasLimitProcessor<I::Key, I::Tag>,
         maybe_block_epilogue_txn_idx: &ExplicitSyncWrapper<Option<TxnIndex>>,
         scheduler: &SchedulerWrapper,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
@@ -280,7 +270,7 @@ impl<
     pub(crate) fn for_each_resource_key_no_aggregator_v1(
         &self,
         txn_idx: TxnIndex,
-        mut callback: impl FnMut(&T::Key) -> Result<(), PanicError>,
+        mut callback: impl FnMut(&O::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         if let Some(output) = output_wrapper.get_output() {
@@ -294,7 +284,7 @@ impl<
     pub(crate) fn for_each_resource_group_key_and_tags(
         &self,
         txn_idx: TxnIndex,
-        mut callback: impl FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+        mut callback: impl FnMut(&O::Key, HashSet<&O::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         if let Some(output) = output_wrapper.get_output() {
@@ -307,7 +297,7 @@ impl<
     pub(crate) fn modified_group_key_and_tags_cloned(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, HashSet<T::Tag>)> {
+    ) -> Vec<(O::Key, HashSet<O::Tag>)> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         match output_wrapper.get_output() {
             Some(output) => output.legacy_v1_resource_group_tags(),
@@ -320,7 +310,7 @@ impl<
     pub(crate) fn modified_resource_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = T::Key>> {
+    ) -> Option<impl Iterator<Item = O::Key>> {
         let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
         let output = output_wrapper.get_output()?;
         Some(output.resource_write_set().into_keys())
@@ -336,7 +326,7 @@ impl<
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        versioned_cache: &MVHashMap<I::Key, I::Tag, I::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
         scheduler: &SchedulerWrapper<'_>,
     ) -> Result<bool, PanicError> {
@@ -380,28 +370,16 @@ impl<
         Some(output.delayed_field_change_set().into_keys())
     }
 
-    // Called when a transaction is committed to materialize its recorded output:
-    // resource group updates are finalized and serialized, and delayed field
-    // identifiers are replaced with committed values in resource writes and events.
-    pub(crate) fn materialize<M: Materializer<T>>(
-        &self,
-        txn_idx: TxnIndex,
-        materializer: &M,
-    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
-    where
-        O: LegacyTxnOutput,
-    {
-        let output = self.output_wrappers[txn_idx as usize].lock().output.take();
-        match output {
-            Some(ExecutionStatus::Executed { output, .. }) => {
-                materialize_output(output, materializer)
-            },
+    /// Takes the recorded output for a committed transaction so it can be
+    /// materialized (finalizing resource groups and replacing delayed field ids).
+    pub(crate) fn take_committed_output(&self, txn_idx: TxnIndex) -> Result<O, PanicError> {
+        match self.output_wrappers[txn_idx as usize].lock().output.take() {
+            Some(ExecutionStatus::Executed { output, .. }) => Ok(output),
             Some(ExecutionStatus::Aborted(_))
             | Some(ExecutionStatus::SpeculativeFailure)
             | None => Err(code_invariant_error(
                 "[BlockSTM]: Output must be recorded after execution",
-            )
-            .into()),
+            )),
         }
     }
 }
