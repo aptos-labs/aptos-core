@@ -7,7 +7,7 @@ use crate::{
         DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
         RESERVED_TAG,
     },
-    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TxnOutput},
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
     },
@@ -687,7 +687,7 @@ fn mock_fee_statement(total_gas: u64) -> FeeStatement {
         .build()
 }
 
-impl<K, E> TransactionOutput for MockOutput<K, E>
+impl<K, E> TxnOutput for MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
