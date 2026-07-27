@@ -44,7 +44,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::runtime::Handle;
+
 // ============================== //
 //  broadcast_coordinator tasks  //
 // ============================== //
@@ -55,7 +55,6 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
     backoff: bool,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
-    executor: Handle,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
@@ -104,7 +103,6 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
         Instant::now() + Duration::from_millis(interval_ms),
         peer,
         schedule_backoff,
-        executor,
     ))
 }
 

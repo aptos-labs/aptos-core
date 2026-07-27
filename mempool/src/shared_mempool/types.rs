@@ -37,10 +37,9 @@ use std::{
     fmt,
     pin::Pin,
     sync::Arc,
-    task::Waker,
     time::{Instant, SystemTime},
 };
-use tokio::runtime::Handle;
+use tokio::time::Sleep;
 
 pub type MempoolSenderBucket = u8;
 pub type TimelineIndexIdentifier = u8;
@@ -120,34 +119,19 @@ pub(crate) fn notify_subscribers(
 
 /// A future that represents a scheduled mempool txn broadcast
 pub(crate) struct ScheduledBroadcast {
-    /// Time of scheduled broadcast
-    deadline: Instant,
+    sleep: Pin<Box<Sleep>>,
     peer: PeerNetworkId,
     backoff: bool,
-    waker: Arc<Mutex<Option<Waker>>>,
 }
 
 impl ScheduledBroadcast {
-    pub fn new(deadline: Instant, peer: PeerNetworkId, backoff: bool, executor: Handle) -> Self {
-        let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
-        let waker_clone = waker.clone();
-
-        if deadline > Instant::now() {
-            let tokio_instant = tokio::time::Instant::from_std(deadline);
-            executor.spawn(async move {
-                tokio::time::sleep_until(tokio_instant).await;
-                let mut waker = waker_clone.lock();
-                if let Some(waker) = waker.take() {
-                    waker.wake()
-                }
-            });
-        }
-
+    pub fn new(deadline: Instant, peer: PeerNetworkId, backoff: bool) -> Self {
         Self {
-            deadline,
+            sleep: Box::pin(tokio::time::sleep_until(tokio::time::Instant::from_std(
+                deadline,
+            ))),
             peer,
             backoff,
-            waker,
         }
     }
 }
@@ -157,15 +141,10 @@ impl Future for ScheduledBroadcast {
 
     // (peer, whether this broadcast was scheduled as a backoff broadcast)
 
-    fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        if Instant::now() < self.deadline {
-            let waker_clone = context.waker().clone();
-            let mut waker = self.waker.lock();
-            *waker = Some(waker_clone);
-
-            Poll::Pending
-        } else {
-            Poll::Ready((self.peer, self.backoff))
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
+        match self.sleep.as_mut().poll(context) {
+            Poll::Ready(()) => Poll::Ready((self.peer, self.backoff)),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -428,9 +407,14 @@ impl Ord for MempoolMessageId {
 #[cfg(test)]
 mod test {
     use crate::shared_mempool::types::{
-        MempoolMessageId, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
+        MempoolMessageId, MultiBucketTimelineIndexIds, ScheduledBroadcast, TimelineIndexIdentifier,
     };
-    use std::collections::HashMap;
+    use aptos_config::network_id::{NetworkId, PeerNetworkId};
+    use aptos_types::PeerId;
+    use std::{
+        collections::HashMap,
+        time::{Duration, Instant},
+    };
 
     #[test]
     fn test_multi_bucket_timeline_ids_update() {
@@ -480,6 +464,19 @@ mod test {
         let left = MempoolMessageId(vec![]);
         let right = MempoolMessageId(vec![(1, 2)]);
         assert!(left < right);
+    }
+
+    #[tokio::test]
+    async fn test_scheduled_broadcast_fires() {
+        let peer = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+        let scheduled_broadcast =
+            ScheduledBroadcast::new(Instant::now() + Duration::from_millis(10), peer, true);
+
+        let result = tokio::time::timeout(Duration::from_secs(1), scheduled_broadcast)
+            .await
+            .expect("scheduled broadcast should fire");
+
+        assert_eq!(result, (peer, true));
     }
 }
 

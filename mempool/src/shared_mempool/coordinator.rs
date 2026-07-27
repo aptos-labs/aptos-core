@@ -117,13 +117,13 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
                 handle_mempool_reconfig_event(&mut smp, &bounded_executor, reconfig_notification.on_chain_configs).await;
             },
             (peer, backoff) = scheduled_broadcasts.select_next_some() => {
-                tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
+                tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts).await;
             },
             (network_id, event) = events.select_next_some() => {
                 handle_network_event(&bounded_executor, &mut smp, network_id, event).await;
             },
             _ = update_peers_interval.tick().fuse() => {
-                handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
+                handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts).await;
             },
             complete => break,
         }
@@ -420,7 +420,6 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
     peers_and_metadata: Arc<PeersAndMetadata>,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
-    executor: Handle,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
@@ -433,8 +432,7 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
         }
         for peer in &newly_added_upstream {
             debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
-            tasks::execute_broadcast(*peer, false, smp, scheduled_broadcasts, executor.clone())
-                .await;
+            tasks::execute_broadcast(*peer, false, smp, scheduled_broadcasts).await;
         }
         for peer in &disabled {
             debug!(LogSchema::new(LogEntry::LostPeer).peer(peer));
