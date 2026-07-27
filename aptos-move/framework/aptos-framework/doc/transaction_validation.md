@@ -16,16 +16,11 @@
 -  [Function `prologue_common`](#0x1_transaction_validation_prologue_common)
 -  [Function `check_for_replay_protection_regular_txn`](#0x1_transaction_validation_check_for_replay_protection_regular_txn)
 -  [Function `check_for_replay_protection_orderless_txn`](#0x1_transaction_validation_check_for_replay_protection_orderless_txn)
--  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
 -  [Function `script_prologue_extended`](#0x1_transaction_validation_script_prologue_extended)
--  [Function `multi_agent_script_prologue`](#0x1_transaction_validation_multi_agent_script_prologue)
 -  [Function `multi_agent_script_prologue_extended`](#0x1_transaction_validation_multi_agent_script_prologue_extended)
 -  [Function `multi_agent_common_prologue`](#0x1_transaction_validation_multi_agent_common_prologue)
--  [Function `fee_payer_script_prologue`](#0x1_transaction_validation_fee_payer_script_prologue)
 -  [Function `fee_payer_script_prologue_extended`](#0x1_transaction_validation_fee_payer_script_prologue_extended)
--  [Function `epilogue`](#0x1_transaction_validation_epilogue)
 -  [Function `epilogue_extended`](#0x1_transaction_validation_epilogue_extended)
--  [Function `epilogue_gas_payer`](#0x1_transaction_validation_epilogue_gas_payer)
 -  [Function `epilogue_gas_payer_extended`](#0x1_transaction_validation_epilogue_gas_payer_extended)
 -  [Function `skip_auth_key_check`](#0x1_transaction_validation_skip_auth_key_check)
 -  [Function `skip_gas_payment`](#0x1_transaction_validation_skip_gas_payment)
@@ -44,16 +39,11 @@
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
     -  [Function `check_for_replay_protection_regular_txn`](#@Specification_1_check_for_replay_protection_regular_txn)
     -  [Function `check_for_replay_protection_orderless_txn`](#@Specification_1_check_for_replay_protection_orderless_txn)
-    -  [Function `script_prologue`](#@Specification_1_script_prologue)
     -  [Function `script_prologue_extended`](#@Specification_1_script_prologue_extended)
-    -  [Function `multi_agent_script_prologue`](#@Specification_1_multi_agent_script_prologue)
     -  [Function `multi_agent_script_prologue_extended`](#@Specification_1_multi_agent_script_prologue_extended)
     -  [Function `multi_agent_common_prologue`](#@Specification_1_multi_agent_common_prologue)
-    -  [Function `fee_payer_script_prologue`](#@Specification_1_fee_payer_script_prologue)
     -  [Function `fee_payer_script_prologue_extended`](#@Specification_1_fee_payer_script_prologue_extended)
-    -  [Function `epilogue`](#@Specification_1_epilogue)
     -  [Function `epilogue_extended`](#@Specification_1_epilogue_extended)
-    -  [Function `epilogue_gas_payer`](#@Specification_1_epilogue_gas_payer)
     -  [Function `epilogue_gas_payer_extended`](#@Specification_1_epilogue_gas_payer_extended)
     -  [Function `unified_prologue`](#@Specification_1_unified_prologue)
     -  [Function `unified_prologue_fee_payer`](#@Specification_1_unified_prologue_fee_payer)
@@ -714,50 +704,6 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a id="0x1_transaction_validation_script_prologue"></a>
-
-## Function `script_prologue`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue">script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue">script_prologue</a>(
-    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: u64,
-    txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-    _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-) {
-    // prologue_common <b>with</b> is_simulation set <b>to</b> <b>false</b> behaves identically <b>to</b> the original script_prologue function.
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
-        &sender,
-        &sender,
-        ReplayProtector::SequenceNumber(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_public_key),
-        txn_gas_price,
-        txn_max_gas_units,
-        txn_expiration_time,
-        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
-        <b>false</b>,
-    )
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_transaction_validation_script_prologue_extended"></a>
 
 ## Function `script_prologue_extended`
@@ -795,57 +741,6 @@ Only called during genesis to initialize system resources for this module.
         <a href="chain_id.md#0x1_chain_id">chain_id</a>,
         is_simulation,
     )
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_transaction_validation_multi_agent_script_prologue"></a>
-
-## Function `multi_agent_script_prologue`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_script_prologue">multi_agent_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_script_prologue">multi_agent_script_prologue</a>(
-    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: u64,
-    txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
-    secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-) {
-    // prologue_common and multi_agent_common_prologue <b>with</b> is_simulation set <b>to</b> <b>false</b> behaves identically <b>to</b> the
-    // original multi_agent_script_prologue function.
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
-        &sender,
-        &sender,
-        ReplayProtector::SequenceNumber(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sender_public_key),
-        txn_gas_price,
-        txn_max_gas_units,
-        txn_expiration_time,
-        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
-        <b>false</b>,
-    );
-    <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(
-        secondary_signer_addresses,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_map">vector::map</a>(secondary_signer_public_key_hashes, |x| <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x)),
-        <b>false</b>
-    );
 }
 </code></pre>
 
@@ -983,64 +878,6 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a id="0x1_transaction_validation_fee_payer_script_prologue"></a>
-
-## Function `fee_payer_script_prologue`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue">fee_payer_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, fee_payer_address: <b>address</b>, fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue">fee_payer_script_prologue</a>(
-    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: u64,
-    txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
-    secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-    fee_payer_address: <b>address</b>,
-    fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-) {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_fee_payer_enabled">features::fee_payer_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EFEE_PAYER_NOT_ENABLED">PROLOGUE_EFEE_PAYER_NOT_ENABLED</a>));
-    // prologue_common and multi_agent_common_prologue <b>with</b> is_simulation set <b>to</b> <b>false</b> behaves identically <b>to</b> the
-    // original fee_payer_script_prologue function.
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
-        &sender,
-        &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(fee_payer_address),
-        ReplayProtector::SequenceNumber(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sender_public_key),
-        txn_gas_price,
-        txn_max_gas_units,
-        txn_expiration_time,
-        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
-        <b>false</b>,
-    );
-    <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(
-        secondary_signer_addresses,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_map">vector::map</a>(secondary_signer_public_key_hashes, |x| <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x)),
-        <b>false</b>
-    );
-    <b>assert</b>!(
-        fee_payer_public_key_hash == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(fee_payer_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
-    );
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_transaction_validation_fee_payer_script_prologue_extended"></a>
 
 ## Function `fee_payer_script_prologue_extended`
@@ -1100,50 +937,12 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a id="0x1_transaction_validation_epilogue"></a>
-
-## Function `epilogue`
-
-Epilogue function is run after a transaction is successfully executed.
-Called by the Adapter
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    storage_fee_refunded: u64,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    gas_units_remaining: u64,
-) {
-    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
-    <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(
-        <a href="account.md#0x1_account">account</a>,
-        addr,
-        storage_fee_refunded,
-        txn_gas_price,
-        txn_max_gas_units,
-        gas_units_remaining
-    );
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_transaction_validation_epilogue_extended"></a>
 
 ## Function `epilogue_extended`
 
+Epilogue function is run after a transaction is successfully executed.
+Called by the Adapter
 
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_extended">epilogue_extended</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool)
@@ -1180,53 +979,12 @@ Called by the Adapter
 
 </details>
 
-<a id="0x1_transaction_validation_epilogue_gas_payer"></a>
-
-## Function `epilogue_gas_payer`
-
-Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
-Called by the Adapter
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    gas_payer: <b>address</b>,
-    storage_fee_refunded: u64,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    gas_units_remaining: u64
-) {
-    // epilogue_gas_payer_extended <b>with</b> is_simulation set <b>to</b> <b>false</b> behaves identically <b>to</b> the original
-    // epilogue_gas_payer function.
-    <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer_extended">epilogue_gas_payer_extended</a>(
-        <a href="account.md#0x1_account">account</a>,
-        gas_payer,
-        storage_fee_refunded,
-        txn_gas_price,
-        txn_max_gas_units,
-        gas_units_remaining,
-        <b>false</b>,
-    );
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_transaction_validation_epilogue_gas_payer_extended"></a>
 
 ## Function `epilogue_gas_payer_extended`
 
+Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
+Called by the Adapter
 
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer_extended">epilogue_gas_payer_extended</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool)
@@ -1881,18 +1639,23 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a id="@Specification_1_script_prologue"></a>
+<a id="@Specification_1_script_prologue_extended"></a>
 
-### Function `script_prologue`
+### Function `script_prologue_extended`
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue">script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue_extended">script_prologue_extended</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_simulation: bool)
 </code></pre>
 
 
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
+    gas_payer: sender,
+    txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(txn_public_key),
+    replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
+};
 </code></pre>
 
 
@@ -1940,43 +1703,6 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a id="@Specification_1_script_prologue_extended"></a>
-
-### Function `script_prologue_extended`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue_extended">script_prologue_extended</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_simulation: bool)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
-    gas_payer: sender,
-    txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(txn_public_key),
-    replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
-};
-</code></pre>
-
-
-
-<a id="@Specification_1_multi_agent_script_prologue"></a>
-
-### Function `multi_agent_script_prologue`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_script_prologue">multi_agent_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_multi_agent_script_prologue_extended"></a>
 
 ### Function `multi_agent_script_prologue_extended`
@@ -2013,22 +1739,6 @@ not equal the number of singers.
 
 
 
-<a id="@Specification_1_fee_payer_script_prologue"></a>
-
-### Function `fee_payer_script_prologue`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue">fee_payer_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, fee_payer_address: <b>address</b>, fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_fee_payer_script_prologue_extended"></a>
 
 ### Function `fee_payer_script_prologue_extended`
@@ -2056,22 +1766,6 @@ not equal the number of singers.
 
 
 
-<a id="@Specification_1_epilogue"></a>
-
-### Function `epilogue`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_epilogue_extended"></a>
 
 ### Function `epilogue_extended`
@@ -2088,22 +1782,6 @@ Skip transaction_fee::burn_fee verification.
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_EpilogueGasPayerAbortsIf">EpilogueGasPayerAbortsIf</a> { gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) };
-</code></pre>
-
-
-
-<a id="@Specification_1_epilogue_gas_payer"></a>
-
-### Function `epilogue_gas_payer`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

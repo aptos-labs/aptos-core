@@ -132,20 +132,6 @@ spec aptos_framework::transaction_validation {
         };
     }
 
-    spec script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-        _script_hash: vector<u8>,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
-    }
-
     spec schema MultiAgentPrologueCommonAbortsIf {
         secondary_signer_addresses: vector<address>;
         secondary_signer_public_key_hashes: vector<Option<vector<u8>>>;
@@ -224,21 +210,6 @@ spec aptos_framework::transaction_validation {
         // };
     }
 
-    spec multi_agent_script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
-    }
-
     spec fee_payer_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -274,23 +245,6 @@ spec aptos_framework::transaction_validation {
         aborts_if !features::spec_fee_payer_enabled();
     }
 
-    spec fee_payer_script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
-        fee_payer_address: address,
-        fee_payer_public_key_hash: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
-    }
-
     /// Abort according to the conditions.
     /// `AptosCoinCapabilities` and `CoinInfo` should exists.
     /// Skip transaction_fee::burn_fee verification.
@@ -305,17 +259,6 @@ spec aptos_framework::transaction_validation {
         // TODO(fa_migration)
         pragma verify = false;
         include EpilogueGasPayerAbortsIf { gas_payer: signer::address_of(account) };
-    }
-
-    spec epilogue(
-        account: signer,
-        storage_fee_refunded: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
     }
 
     /// Abort according to the conditions.
@@ -333,18 +276,6 @@ spec aptos_framework::transaction_validation {
         // TODO(fa_migration)
         pragma verify = false;
         include EpilogueGasPayerAbortsIf;
-    }
-
-    spec epilogue_gas_payer(
-        account: signer,
-        gas_payer: address,
-        storage_fee_refunded: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
     }
 
     spec unified_prologue(

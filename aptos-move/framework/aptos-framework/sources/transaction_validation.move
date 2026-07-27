@@ -262,33 +262,6 @@ module aptos_framework::transaction_validation {
         assert!(nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_ENONCE_ALREADY_USED));
     }
 
-    fun script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-        _script_hash: vector<u8>,
-    ) {
-        // prologue_common with is_simulation set to false behaves identically to the original script_prologue function.
-        prologue_common(
-            &sender,
-            &sender,
-            ReplayProtector::SequenceNumber(txn_sequence_number),
-            option::some(txn_public_key),
-            txn_gas_price,
-            txn_max_gas_units,
-            txn_expiration_time,
-            chain_id,
-            false,
-        )
-    }
-
-    // This function extends the script_prologue by adding a parameter to indicate simulation mode.
-    // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
-    // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
     fun script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -313,40 +286,6 @@ module aptos_framework::transaction_validation {
         )
     }
 
-    fun multi_agent_script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        // prologue_common and multi_agent_common_prologue with is_simulation set to false behaves identically to the
-        // original multi_agent_script_prologue function.
-        prologue_common(
-            &sender,
-            &sender,
-            ReplayProtector::SequenceNumber(txn_sequence_number),
-            option::some(txn_sender_public_key),
-            txn_gas_price,
-            txn_max_gas_units,
-            txn_expiration_time,
-            chain_id,
-            false,
-        );
-        multi_agent_common_prologue(
-            secondary_signer_addresses,
-            vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
-            false
-        );
-    }
-
-    // This function extends the multi_agent_script_prologue by adding a parameter to indicate simulation mode.
-    // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
-    // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
     fun multi_agent_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -437,47 +376,6 @@ module aptos_framework::transaction_validation {
         }
     }
 
-    fun fee_payer_script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
-        fee_payer_address: address,
-        fee_payer_public_key_hash: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
-        // prologue_common and multi_agent_common_prologue with is_simulation set to false behaves identically to the
-        // original fee_payer_script_prologue function.
-        prologue_common(
-            &sender,
-            &create_signer::create_signer(fee_payer_address),
-            ReplayProtector::SequenceNumber(txn_sequence_number),
-            option::some(txn_sender_public_key),
-            txn_gas_price,
-            txn_max_gas_units,
-            txn_expiration_time,
-            chain_id,
-            false,
-        );
-        multi_agent_common_prologue(
-            secondary_signer_addresses,
-            vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
-            false
-        );
-        assert!(
-            fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
-            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        );
-    }
-
-    // This function extends the fee_payer_script_prologue by adding a parameter to indicate simulation mode.
-    // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
-    // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
     fun fee_payer_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -519,27 +417,6 @@ module aptos_framework::transaction_validation {
 
     /// Epilogue function is run after a transaction is successfully executed.
     /// Called by the Adapter
-    fun epilogue(
-        account: signer,
-        storage_fee_refunded: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64,
-    ) {
-        let addr = signer::address_of(&account);
-        epilogue_gas_payer(
-            account,
-            addr,
-            storage_fee_refunded,
-            txn_gas_price,
-            txn_max_gas_units,
-            gas_units_remaining
-        );
-    }
-
-    // This function extends the epilogue by adding a parameter to indicate simulation mode.
-    // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
-    // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
     fun epilogue_extended(
         account: signer,
         storage_fee_refunded: u64,
@@ -562,30 +439,6 @@ module aptos_framework::transaction_validation {
 
     /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
     /// Called by the Adapter
-    fun epilogue_gas_payer(
-        account: signer,
-        gas_payer: address,
-        storage_fee_refunded: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64
-    ) {
-        // epilogue_gas_payer_extended with is_simulation set to false behaves identically to the original
-        // epilogue_gas_payer function.
-        epilogue_gas_payer_extended(
-            account,
-            gas_payer,
-            storage_fee_refunded,
-            txn_gas_price,
-            txn_max_gas_units,
-            gas_units_remaining,
-            false,
-        );
-    }
-
-    // This function extends the epilogue_gas_payer by adding a parameter to indicate simulation mode.
-    // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
-    // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
     fun epilogue_gas_payer_extended(
         account: signer,
         gas_payer: address,

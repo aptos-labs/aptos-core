@@ -41,11 +41,6 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
         module_addr: CORE_CODE_ADDRESS,
         module_name: Identifier::new("transaction_validation").unwrap(),
-        fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
-        script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
-        user_epilogue_name: Identifier::new("epilogue").unwrap(),
-        user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
         fee_payer_prologue_extended_name: Identifier::new("fee_payer_script_prologue_extended")
             .unwrap(),
         script_prologue_extended_name: Identifier::new("script_prologue_extended").unwrap(),
@@ -69,11 +64,6 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
 pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
-    pub fee_payer_prologue_name: Identifier,
-    pub script_prologue_name: Identifier,
-    pub multi_agent_prologue_name: Identifier,
-    pub user_epilogue_name: Identifier,
-    pub user_epilogue_gas_payer_name: Identifier,
     pub fee_payer_prologue_extended_name: Identifier,
     pub script_prologue_extended_name: Identifier,
     pub multi_agent_prologue_extended_name: Identifier,
@@ -271,107 +261,57 @@ pub(crate) fn run_script_prologue(
                 .as_ref()
                 .map(|proof| proof.optional_auth_key()),
         ) {
-            if features.is_transaction_simulation_enhancement_enabled() {
-                let args = vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
-                    MoveValue::vector_address(txn_data.secondary_signers()),
-                    MoveValue::Vector(secondary_auth_keys),
-                    MoveValue::Address(fee_payer),
-                    MoveValue::vector_u8(fee_payer_auth_key.unwrap_or_default()),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(txn_expiration_timestamp_secs),
-                    MoveValue::U8(chain_id.id()),
-                    MoveValue::Bool(is_simulation),
-                ];
-                (
-                    &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_extended_name,
-                    args,
-                )
-            } else {
-                let args = vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
-                    MoveValue::vector_address(txn_data.secondary_signers()),
-                    MoveValue::Vector(secondary_auth_keys),
-                    MoveValue::Address(fee_payer),
-                    MoveValue::vector_u8(fee_payer_auth_key.unwrap_or_default()),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(txn_expiration_timestamp_secs),
-                    MoveValue::U8(chain_id.id()),
-                ];
-                (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
-            }
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::Address(fee_payer),
+                MoveValue::vector_u8(fee_payer_auth_key.unwrap_or_default()),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_extended_name,
+                args,
+            )
         } else if txn_data.is_multi_agent() {
-            if features.is_transaction_simulation_enhancement_enabled() {
-                let args = vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
-                    MoveValue::vector_address(txn_data.secondary_signers()),
-                    MoveValue::Vector(secondary_auth_keys),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(txn_expiration_timestamp_secs),
-                    MoveValue::U8(chain_id.id()),
-                    MoveValue::Bool(is_simulation),
-                ];
-                (
-                    &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_extended_name,
-                    args,
-                )
-            } else {
-                let args = vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
-                    MoveValue::vector_address(txn_data.secondary_signers()),
-                    MoveValue::Vector(secondary_auth_keys),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(txn_expiration_timestamp_secs),
-                    MoveValue::U8(chain_id.id()),
-                ];
-                (
-                    &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_name,
-                    args,
-                )
-            }
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_extended_name,
+                args,
+            )
         } else {
-            #[allow(clippy::collapsible_else_if)]
-            if features.is_transaction_simulation_enhancement_enabled() {
-                let args = vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(txn_expiration_timestamp_secs),
-                    MoveValue::U8(chain_id.id()),
-                    MoveValue::vector_u8(txn_data.script_hash.clone()),
-                    MoveValue::Bool(is_simulation),
-                ];
-                (
-                    &APTOS_TRANSACTION_VALIDATION.script_prologue_extended_name,
-                    args,
-                )
-            } else {
-                let args = vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(txn_expiration_timestamp_secs),
-                    MoveValue::U8(chain_id.id()),
-                    MoveValue::vector_u8(txn_data.script_hash.clone()),
-                ];
-                (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
-            }
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key.unwrap_or_default()),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::vector_u8(txn_data.script_hash.clone()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.script_prologue_extended_name,
+                args,
+            )
         };
 
         session
@@ -509,34 +449,19 @@ fn run_epilogue(
         // accepted it, in which case the gas payer feature is enabled.
         if let Some(fee_payer) = txn_data.fee_payer() {
             let (func_name, args) = {
-                if features.is_transaction_simulation_enhancement_enabled() {
-                    let args = vec![
-                        MoveValue::Signer(txn_data.sender),
-                        MoveValue::Address(fee_payer),
-                        MoveValue::U64(fee_statement.storage_fee_refund()),
-                        MoveValue::U64(txn_gas_price.into()),
-                        MoveValue::U64(txn_max_gas_units.into()),
-                        MoveValue::U64(gas_remaining.into()),
-                        MoveValue::Bool(is_simulation),
-                    ];
-                    (
-                        &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_extended_name,
-                        args,
-                    )
-                } else {
-                    let args = vec![
-                        MoveValue::Signer(txn_data.sender),
-                        MoveValue::Address(fee_payer),
-                        MoveValue::U64(fee_statement.storage_fee_refund()),
-                        MoveValue::U64(txn_gas_price.into()),
-                        MoveValue::U64(txn_max_gas_units.into()),
-                        MoveValue::U64(gas_remaining.into()),
-                    ];
-                    (
-                        &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
-                        args,
-                    )
-                }
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(fee_payer),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                    MoveValue::Bool(is_simulation),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_extended_name,
+                    args,
+                )
             };
             session.execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -550,29 +475,18 @@ fn run_epilogue(
         } else {
             // Regular tx, run the normal epilogue
             let (func_name, args) = {
-                if features.is_transaction_simulation_enhancement_enabled() {
-                    let args = vec![
-                        MoveValue::Signer(txn_data.sender),
-                        MoveValue::U64(fee_statement.storage_fee_refund()),
-                        MoveValue::U64(txn_gas_price.into()),
-                        MoveValue::U64(txn_max_gas_units.into()),
-                        MoveValue::U64(gas_remaining.into()),
-                        MoveValue::Bool(is_simulation),
-                    ];
-                    (
-                        &APTOS_TRANSACTION_VALIDATION.user_epilogue_extended_name,
-                        args,
-                    )
-                } else {
-                    let args = vec![
-                        MoveValue::Signer(txn_data.sender),
-                        MoveValue::U64(fee_statement.storage_fee_refund()),
-                        MoveValue::U64(txn_gas_price.into()),
-                        MoveValue::U64(txn_max_gas_units.into()),
-                        MoveValue::U64(gas_remaining.into()),
-                    ];
-                    (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
-                }
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                    MoveValue::Bool(is_simulation),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_extended_name,
+                    args,
+                )
             };
             session.execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -678,7 +592,7 @@ pub(crate) fn run_failure_epilogue(
     .or_else(|err| {
         expect_only_successful_execution(
             err,
-            APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
+            APTOS_TRANSACTION_VALIDATION.user_epilogue_extended_name.as_str(),
             log_context,
         )
     })

@@ -2471,24 +2471,18 @@ impl AptosVM {
         )?;
 
         if let Some(multisig_address) = extra_config.multisig_address() {
-            // Once "simulation_enhancement" is enabled, the simulation path also validates the
-            // multisig transaction by running the multisig prologue.
-            if !self.is_simulation
-                || self
-                    .features()
-                    .is_transaction_simulation_enhancement_enabled()
-            {
-                transaction_validation::run_multisig_prologue(
-                    session,
-                    module_storage,
-                    txn_data,
-                    executable,
-                    multisig_address,
-                    self.features(),
-                    log_context,
-                    traversal_context,
-                )?
-            }
+            // The simulation path also validates the multisig transaction by running the
+            // multisig prologue.
+            transaction_validation::run_multisig_prologue(
+                session,
+                module_storage,
+                txn_data,
+                executable,
+                multisig_address,
+                self.features(),
+                log_context,
+                traversal_context,
+            )?
         }
         Ok(())
     }
