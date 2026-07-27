@@ -1319,6 +1319,16 @@ Store amount must be at least the min stake required for a stake pool to join th
 
 
 
+<a id="0x1_staking_contract_EINVALID_BENEFICIARY_ADDRESS"></a>
+
+Beneficiary cannot be a reserved address that cannot receive coin distributions.
+
+
+<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EINVALID_BENEFICIARY_ADDRESS">EINVALID_BENEFICIARY_ADDRESS</a>: u64 = 10;
+</code></pre>
+
+
+
 <a id="0x1_staking_contract_ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY"></a>
 
 Caller must be either the staker, operator, or beneficiary.
@@ -2283,6 +2293,12 @@ the beneficiary. An operator can set one beneficiary for staking contract pools,
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>(), std::error::invalid_state(
         <a href="staking_contract.md#0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>
     ));
+    // @vm_reserved can never have an <a href="account.md#0x1_account">account</a> created for it, so it can't receive <a href="coin.md#0x1_coin">coin</a> distributions.
+    // Allowing it <b>as</b> a beneficiary would permanently brick distribution for the staking contract.
+    <b>assert</b>!(
+        new_beneficiary != @vm_reserved,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_BENEFICIARY_ADDRESS">EINVALID_BENEFICIARY_ADDRESS</a>),
+    );
     // The beneficiay <b>address</b> of an operator is stored under the operator's <b>address</b>.
     // So, the operator does not need <b>to</b> be validated <b>with</b> respect <b>to</b> a staking pool.
     <b>let</b> operator_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(operator);

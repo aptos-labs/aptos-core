@@ -37,6 +37,8 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `initialize`](#0x1_aptos_governance_initialize)
 -  [Function `update_governance_config`](#0x1_aptos_governance_update_governance_config)
 -  [Function `initialize_partial_voting`](#0x1_aptos_governance_initialize_partial_voting)
+-  [Function `partial_voting_initialized`](#0x1_aptos_governance_partial_voting_initialized)
+-  [Function `initialize_partial_voting_if_needed`](#0x1_aptos_governance_initialize_partial_voting_if_needed)
 -  [Function `get_voting_duration_secs`](#0x1_aptos_governance_get_voting_duration_secs)
 -  [Function `get_min_voting_threshold`](#0x1_aptos_governance_get_min_voting_threshold)
 -  [Function `get_required_proposer_stake`](#0x1_aptos_governance_get_required_proposer_stake)
@@ -72,6 +74,8 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_governance_config`](#@Specification_1_update_governance_config)
     -  [Function `initialize_partial_voting`](#@Specification_1_initialize_partial_voting)
+    -  [Function `partial_voting_initialized`](#@Specification_1_partial_voting_initialized)
+    -  [Function `initialize_partial_voting_if_needed`](#@Specification_1_initialize_partial_voting_if_needed)
     -  [Function `get_voting_duration_secs`](#@Specification_1_get_voting_duration_secs)
     -  [Function `get_min_voting_threshold`](#@Specification_1_get_min_voting_threshold)
     -  [Function `get_required_proposer_stake`](#@Specification_1_get_required_proposer_stake)
@@ -1094,6 +1098,65 @@ proposals with a signer for the aptos_framework (0x1) account.
     <b>move_to</b>(aptos_framework, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a> {
         votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_partial_voting_initialized"></a>
+
+## Function `partial_voting_initialized`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_partial_voting_initialized">partial_voting_initialized</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_partial_voting_initialized">partial_voting_initialized</a>(): bool {
+    <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_initialize_partial_voting_if_needed"></a>
+
+## Function `initialize_partial_voting_if_needed`
+
+Initializes the state for Aptos Governance partial voting if it has not already been initialized.
+This can only be called with a signer for the aptos_framework (0x1) account.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_partial_voting_if_needed">initialize_partial_voting_if_needed</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_partial_voting_if_needed">initialize_partial_voting_if_needed</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+
+    <b>if</b> (!<a href="aptos_governance.md#0x1_aptos_governance_partial_voting_initialized">partial_voting_initialized</a>()) {
+        <b>move_to</b>(aptos_framework, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a> {
+            votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        });
+    }
 }
 </code></pre>
 
@@ -2314,6 +2377,44 @@ Abort if structs have already been created.
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_partial_voting_initialized"></a>
+
+### Function `partial_voting_initialized`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_partial_voting_initialized">partial_voting_initialized</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize_partial_voting_if_needed"></a>
+
+### Function `initialize_partial_voting_if_needed`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_partial_voting_if_needed">initialize_partial_voting_if_needed</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+Signer address must be @aptos_framework.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
 <b>ensures</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
 </code></pre>
 

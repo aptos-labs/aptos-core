@@ -152,6 +152,7 @@ transferred to A
 -  [Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
 -  [Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
 -  [Function `delegation_pool_exists`](#0x1_delegation_pool_delegation_pool_exists)
+-  [Function `governance_records_initialized`](#0x1_delegation_pool_governance_records_initialized)
 -  [Function `partial_governance_voting_enabled`](#0x1_delegation_pool_partial_governance_voting_enabled)
 -  [Function `observed_lockup_cycle`](#0x1_delegation_pool_observed_lockup_cycle)
 -  [Function `is_next_commission_percentage_effective`](#0x1_delegation_pool_is_next_commission_percentage_effective)
@@ -179,6 +180,7 @@ transferred to A
 -  [Function `initialize_delegation_pool`](#0x1_delegation_pool_initialize_delegation_pool)
 -  [Function `beneficiary_for_operator`](#0x1_delegation_pool_beneficiary_for_operator)
 -  [Function `enable_partial_governance_voting`](#0x1_delegation_pool_enable_partial_governance_voting)
+-  [Function `enable_partial_governance_voting_if_needed`](#0x1_delegation_pool_enable_partial_governance_voting_if_needed)
 -  [Function `vote`](#0x1_delegation_pool_vote)
 -  [Function `create_proposal`](#0x1_delegation_pool_create_proposal)
 -  [Function `assert_owner_cap_exists`](#0x1_delegation_pool_assert_owner_cap_exists)
@@ -2122,6 +2124,32 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 </details>
 
+<a id="0x1_delegation_pool_governance_records_initialized"></a>
+
+## Function `governance_records_initialized`
+
+Return whether a delegation pool has governance records initialized.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_governance_records_initialized">governance_records_initialized</a>(pool_address: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_governance_records_initialized">governance_records_initialized</a>(pool_address: <b>address</b>): bool {
+    <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_delegation_pool_partial_governance_voting_enabled"></a>
 
 ## Function `partial_governance_voting_enabled`
@@ -2140,7 +2168,7 @@ Return whether a delegation pool has already enabled partial governance voting.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address) && <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(pool_address) == pool_address
+    <a href="delegation_pool.md#0x1_delegation_pool_governance_records_initialized">governance_records_initialized</a>(pool_address) && <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(pool_address) == pool_address
 }
 </code></pre>
 
@@ -3078,6 +3106,37 @@ The existing voter will be replaced. The function is permissionless.
         create_proposal_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a>&gt;(&stake_pool_signer),
         delegate_voting_power_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a>&gt;(&stake_pool_signer),
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_enable_partial_governance_voting_if_needed"></a>
+
+## Function `enable_partial_governance_voting_if_needed`
+
+Enable partial governance voting on a delegation pool if it has not already been initialized.
+This is intended for idempotent migration scripts over existing delegation pools.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting_if_needed">enable_partial_governance_voting_if_needed</a>(pool_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting_if_needed">enable_partial_governance_voting_if_needed</a>(
+    pool_address: <b>address</b>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
+    <b>if</b> (!<a href="delegation_pool.md#0x1_delegation_pool_governance_records_initialized">governance_records_initialized</a>(pool_address)) {
+        <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
+    }
 }
 </code></pre>
 

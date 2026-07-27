@@ -848,6 +848,7 @@ Lifetime: transient
 
 Whether the Atomic bridge is available
 Lifetime: transient
+Deprecated in favor of <code><a href="features.md#0x1_features_ALLOW_SERIALIZED_SCRIPT_ARGS">ALLOW_SERIALIZED_SCRIPT_ARGS</a></code> as feature flag 72
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_BRIDGE">NATIVE_BRIDGE</a>: u64 = 72;

@@ -525,6 +525,12 @@ pub enum EntryFunctionCall {
         pool_address: AccountAddress,
     },
 
+    /// Enable partial governance voting on a delegation pool if it has not already been initialized.
+    /// This is intended for idempotent migration scripts over existing delegation pools.
+    DelegationPoolEnablePartialGovernanceVotingIfNeeded {
+        pool_address: AccountAddress,
+    },
+
     /// Evict a delegator that is not allowlisted by unlocking their entire stake.
     DelegationPoolEvictDelegator {
         delegator_address: AccountAddress,
@@ -1656,6 +1662,9 @@ impl EntryFunctionCall {
             },
             DelegationPoolEnablePartialGovernanceVoting { pool_address } => {
                 delegation_pool_enable_partial_governance_voting(pool_address)
+            },
+            DelegationPoolEnablePartialGovernanceVotingIfNeeded { pool_address } => {
+                delegation_pool_enable_partial_governance_voting_if_needed(pool_address)
             },
             DelegationPoolEvictDelegator { delegator_address } => {
                 delegation_pool_evict_delegator(delegator_address)
@@ -3493,6 +3502,25 @@ pub fn delegation_pool_enable_partial_governance_voting(
             ident_str!("delegation_pool").to_owned(),
         ),
         ident_str!("enable_partial_governance_voting").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&pool_address).unwrap()],
+    ))
+}
+
+/// Enable partial governance voting on a delegation pool if it has not already been initialized.
+/// This is intended for idempotent migration scripts over existing delegation pools.
+pub fn delegation_pool_enable_partial_governance_voting_if_needed(
+    pool_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("enable_partial_governance_voting_if_needed").to_owned(),
         vec![],
         vec![bcs::to_bytes(&pool_address).unwrap()],
     ))
@@ -6722,6 +6750,20 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_enable_partial_governance_voting_if_needed(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::DelegationPoolEnablePartialGovernanceVotingIfNeeded {
+                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_evict_delegator(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -8389,6 +8431,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_enable_partial_governance_voting".to_string(),
             Box::new(decoder::delegation_pool_enable_partial_governance_voting),
+        );
+        map.insert(
+            "delegation_pool_enable_partial_governance_voting_if_needed".to_string(),
+            Box::new(decoder::delegation_pool_enable_partial_governance_voting_if_needed),
         );
         map.insert(
             "delegation_pool_evict_delegator".to_string(),
