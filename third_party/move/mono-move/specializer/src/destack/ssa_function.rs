@@ -81,25 +81,68 @@ fn fuse_pairs(instrs: &mut Vec<Instr>, try_fuse: fn(&Instr, &Instr) -> Option<In
 /// Try to fuse a borrow+deref pair into a combined field access instruction.
 fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        (Instr::ImmBorrowField(ref_r, owner, fld, src), Instr::ReadRef(dst, read_src))
-            if *ref_r == *read_src =>
-        {
-            Some(Instr::ReadField(*dst, *owner, *fld, *src))
-        },
-        (Instr::MutBorrowField(ref_r, owner, fld, dst_ref), Instr::WriteRef(write_ref, val))
-            if *ref_r == *write_ref =>
-        {
-            Some(Instr::WriteField(*owner, *fld, *dst_ref, *val))
-        },
-        (Instr::ImmBorrowVariantField(ref_r, owner, fld, src), Instr::ReadRef(dst, read_src))
-            if *ref_r == *read_src =>
-        {
-            Some(Instr::ReadVariantField(*dst, *owner, *fld, *src))
-        },
         (
-            Instr::MutBorrowVariantField(ref_r, owner, fld, dst_ref),
-            Instr::WriteRef(write_ref, val),
-        ) if *ref_r == *write_ref => Some(Instr::WriteVariantField(*owner, *fld, *dst_ref, *val)),
+            Instr::ImmBorrowField {
+                dst: ref_r,
+                owner_ty,
+                field,
+                src,
+            },
+            Instr::ReadRef { dst, src: read_src },
+        ) if *ref_r == *read_src => Some(Instr::ReadField {
+            dst: *dst,
+            owner_ty: *owner_ty,
+            field: *field,
+            src: *src,
+        }),
+        (
+            Instr::MutBorrowField {
+                dst: ref_r,
+                owner_ty,
+                field,
+                src: dst_ref,
+            },
+            Instr::WriteRef {
+                dst_ref: write_ref,
+                val,
+            },
+        ) if *ref_r == *write_ref => Some(Instr::WriteField {
+            dst_ref: *dst_ref,
+            owner_ty: *owner_ty,
+            field: *field,
+            val: *val,
+        }),
+        (
+            Instr::ImmBorrowVariantField {
+                dst: ref_r,
+                owner_ty,
+                field,
+                src,
+            },
+            Instr::ReadRef { dst, src: read_src },
+        ) if *ref_r == *read_src => Some(Instr::ReadVariantField {
+            dst: *dst,
+            owner_ty: *owner_ty,
+            field: *field,
+            src: *src,
+        }),
+        (
+            Instr::MutBorrowVariantField {
+                dst: ref_r,
+                owner_ty,
+                field,
+                src: dst_ref,
+            },
+            Instr::WriteRef {
+                dst_ref: write_ref,
+                val,
+            },
+        ) if *ref_r == *write_ref => Some(Instr::WriteVariantField {
+            dst_ref: *dst_ref,
+            owner_ty: *owner_ty,
+            field: *field,
+            val: *val,
+        }),
         _ => None,
     }
 }
@@ -108,26 +151,62 @@ fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
 /// single local-field op, eliding the intermediate fat pointer.
 fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        (Instr::ImmBorrowLoc(ref_r, local), Instr::ImmBorrowField(dst, owner, fld, src))
-            if *ref_r == *src =>
-        {
-            Some(Instr::ImmBorrowLocField(*dst, *owner, *fld, *local))
-        },
-        (Instr::MutBorrowLoc(ref_r, local), Instr::MutBorrowField(dst, owner, fld, src))
-            if *ref_r == *src =>
-        {
-            Some(Instr::MutBorrowLocField(*dst, *owner, *fld, *local))
-        },
-        (Instr::ImmBorrowLoc(ref_r, local), Instr::ReadField(dst, owner, fld, src))
-            if *ref_r == *src =>
-        {
-            Some(Instr::ReadLocalField(*dst, *owner, *fld, *local))
-        },
-        (Instr::MutBorrowLoc(ref_r, local), Instr::WriteField(owner, fld, dst_ref, val))
-            if *ref_r == *dst_ref =>
-        {
-            Some(Instr::WriteLocalField(*owner, *fld, *local, *val))
-        },
+        (
+            Instr::ImmBorrowLoc { dst: ref_r, local },
+            Instr::ImmBorrowField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            },
+        ) if *ref_r == *src => Some(Instr::ImmBorrowLocField {
+            dst: *dst,
+            owner_ty: *owner_ty,
+            field: *field,
+            local: *local,
+        }),
+        (
+            Instr::MutBorrowLoc { dst: ref_r, local },
+            Instr::MutBorrowField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            },
+        ) if *ref_r == *src => Some(Instr::MutBorrowLocField {
+            dst: *dst,
+            owner_ty: *owner_ty,
+            field: *field,
+            local: *local,
+        }),
+        (
+            Instr::ImmBorrowLoc { dst: ref_r, local },
+            Instr::ReadField {
+                dst,
+                owner_ty,
+                field,
+                src,
+            },
+        ) if *ref_r == *src => Some(Instr::ReadLocField {
+            dst: *dst,
+            owner_ty: *owner_ty,
+            field: *field,
+            local: *local,
+        }),
+        (
+            Instr::MutBorrowLoc { dst: ref_r, local },
+            Instr::WriteField {
+                dst_ref,
+                owner_ty,
+                field,
+                val,
+            },
+        ) if *ref_r == *dst_ref => Some(Instr::WriteLocField {
+            local: *local,
+            owner_ty: *owner_ty,
+            field: *field,
+            val: *val,
+        }),
         _ => None,
     }
 }
@@ -137,30 +216,62 @@ fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
 /// Handles both `BrTrue` (keeps the comparison operator) and `BrFalse` (negates it).
 fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        // BinaryOp(dst, Cmp(cmp), lhs, rhs) + BrTrue(label, dst)
-        (Instr::BinaryOp(dst, BinaryOp::Cmp(cmp), lhs, rhs), Instr::BrTrue(label, cond))
-            if *dst == *cond =>
-        {
-            Some(Instr::BrCmp(*label, *cmp, *lhs, *rhs))
-        },
-        // BinaryOp(dst, Cmp(cmp), lhs, rhs) + BrFalse(label, dst)
-        (Instr::BinaryOp(dst, BinaryOp::Cmp(cmp), lhs, rhs), Instr::BrFalse(label, cond))
-            if *dst == *cond =>
-        {
-            Some(Instr::BrCmp(*label, cmp.negate(), *lhs, *rhs))
-        },
-        // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrTrue(label, dst)
-        (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrTrue(label, cond))
-            if *dst == *cond =>
-        {
-            Some(Instr::BrCmpImm(*label, *cmp, *src, imm.clone()))
-        },
-        // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrFalse(label, dst)
-        (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrFalse(label, cond))
-            if *dst == *cond =>
-        {
-            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, imm.clone()))
-        },
+        (
+            Instr::BinaryOp {
+                dst,
+                op: BinaryOp::Cmp(cmp),
+                lhs,
+                rhs,
+            },
+            Instr::BrTrue { target, cond },
+        ) if *dst == *cond => Some(Instr::BrCmp {
+            target: *target,
+            op: *cmp,
+            lhs: *lhs,
+            rhs: *rhs,
+        }),
+        (
+            Instr::BinaryOp {
+                dst,
+                op: BinaryOp::Cmp(cmp),
+                lhs,
+                rhs,
+            },
+            Instr::BrFalse { target, cond },
+        ) if *dst == *cond => Some(Instr::BrCmp {
+            target: *target,
+            op: cmp.negate(),
+            lhs: *lhs,
+            rhs: *rhs,
+        }),
+        (
+            Instr::BinaryOpImm {
+                dst,
+                op: BinaryOp::Cmp(cmp),
+                lhs,
+                imm,
+            },
+            Instr::BrTrue { target, cond },
+        ) if *dst == *cond => Some(Instr::BrCmpImm {
+            target: *target,
+            op: *cmp,
+            lhs: *lhs,
+            imm: imm.clone(),
+        }),
+        (
+            Instr::BinaryOpImm {
+                dst,
+                op: BinaryOp::Cmp(cmp),
+                lhs,
+                imm,
+            },
+            Instr::BrFalse { target, cond },
+        ) if *dst == *cond => Some(Instr::BrCmpImm {
+            target: *target,
+            op: cmp.negate(),
+            lhs: *lhs,
+            imm: imm.clone(),
+        }),
         _ => None,
     }
 }
@@ -224,7 +335,12 @@ fn fuse_field_chains(instrs: &mut Vec<Instr>) {
     // (the common case).
     let field_borrows = instrs
         .iter()
-        .filter(|instr| matches!(instr, Instr::ImmBorrowField(..) | Instr::MutBorrowField(..)))
+        .filter(|instr| {
+            matches!(
+                instr,
+                Instr::ImmBorrowField { .. } | Instr::MutBorrowField { .. }
+            )
+        })
         .take(MIN_CHAIN_DEPTH)
         .count();
     if field_borrows < MIN_CHAIN_DEPTH {
@@ -320,18 +436,31 @@ fn try_build_chain(
     // each Imm/Mut head pair.
     let is_mut = matches!(
         &instrs[start],
-        Instr::MutBorrowLoc(..) | Instr::MutBorrowField(..)
+        Instr::MutBorrowLoc { .. } | Instr::MutBorrowField { .. }
     );
     let (root, mut cur_ref, mut idx, mut path) = match &instrs[start] {
-        Instr::ImmBorrowLoc(produced, local) | Instr::MutBorrowLoc(produced, local) => {
-            (ChainRoot::Local(*local), *produced, start + 1, Vec::new())
-        },
-        Instr::ImmBorrowField(produced, owner, fh, src)
-        | Instr::MutBorrowField(produced, owner, fh, src) => {
-            (ChainRoot::Ref(*src), *produced, start + 1, vec![(
-                *owner, *fh,
-            )])
-        },
+        Instr::ImmBorrowLoc {
+            dst: produced,
+            local,
+        }
+        | Instr::MutBorrowLoc {
+            dst: produced,
+            local,
+        } => (ChainRoot::Local(*local), *produced, start + 1, Vec::new()),
+        Instr::ImmBorrowField {
+            dst: produced,
+            owner_ty,
+            field,
+            src,
+        }
+        | Instr::MutBorrowField {
+            dst: produced,
+            owner_ty,
+            field,
+            src,
+        } => (ChainRoot::Ref(*src), *produced, start + 1, vec![(
+            *owner_ty, *field,
+        )]),
         _ => return None,
     };
 
@@ -340,13 +469,23 @@ fn try_build_chain(
     // may be separated, by a write's right-hand-side computation.)
     while linkable(cur_ref) {
         match instrs.get(idx) {
-            Some(Instr::ImmBorrowField(produced, owner, fh, src)) if !is_mut && *src == cur_ref => {
-                path.push((*owner, *fh));
+            Some(Instr::ImmBorrowField {
+                dst: produced,
+                owner_ty,
+                field,
+                src,
+            }) if !is_mut && *src == cur_ref => {
+                path.push((*owner_ty, *field));
                 cur_ref = *produced;
                 idx += 1;
             },
-            Some(Instr::MutBorrowField(produced, owner, fh, src)) if is_mut && *src == cur_ref => {
-                path.push((*owner, *fh));
+            Some(Instr::MutBorrowField {
+                dst: produced,
+                owner_ty,
+                field,
+                src,
+            }) if is_mut && *src == cur_ref => {
+                path.push((*owner_ty, *field));
                 cur_ref = *produced;
                 idx += 1;
             },
@@ -375,10 +514,10 @@ fn try_build_chain(
         None
     };
     let terminal_consumer = sole_use_pos.and_then(|term_idx| match &instrs[term_idx] {
-        Instr::ReadRef(dst, src) if *src == cur_ref => {
+        Instr::ReadRef { dst, src } if *src == cur_ref => {
             Some((ChainTerminal::Read { dst: *dst }, term_idx))
         },
-        Instr::WriteRef(ref_slot, val) if *ref_slot == cur_ref => {
+        Instr::WriteRef { dst_ref, val } if *dst_ref == cur_ref => {
             Some((ChainTerminal::Write { val: *val }, term_idx))
         },
         _ => None,
@@ -409,18 +548,24 @@ fn build_chain_instr(
 ) -> Instr {
     match root {
         ChainRoot::Local(local) => match terminal {
-            ChainTerminal::Read { dst } => Instr::ReadLocalFieldChain(dst, path, local),
-            ChainTerminal::Write { val } => Instr::WriteLocalFieldChain(path, local, val),
+            ChainTerminal::Read { dst } => Instr::ReadLocFieldChain { dst, path, local },
+            ChainTerminal::Write { val } => Instr::WriteLocFieldChain { local, path, val },
             ChainTerminal::Borrow { dst } if is_mut => {
-                Instr::MutBorrowLocalFieldChain(dst, path, local)
+                Instr::MutBorrowLocFieldChain { dst, path, local }
             },
-            ChainTerminal::Borrow { dst } => Instr::ImmBorrowLocalFieldChain(dst, path, local),
+            ChainTerminal::Borrow { dst } => Instr::ImmBorrowLocFieldChain { dst, path, local },
         },
         ChainRoot::Ref(src) => match terminal {
-            ChainTerminal::Read { dst } => Instr::ReadFieldChain(dst, path, src),
-            ChainTerminal::Write { val } => Instr::WriteFieldChain(path, src, val),
-            ChainTerminal::Borrow { dst } if is_mut => Instr::MutBorrowFieldChain(dst, path, src),
-            ChainTerminal::Borrow { dst } => Instr::ImmBorrowFieldChain(dst, path, src),
+            ChainTerminal::Read { dst } => Instr::ReadFieldChain { dst, path, src },
+            ChainTerminal::Write { val } => Instr::WriteFieldChain {
+                dst_ref: src,
+                path,
+                val,
+            },
+            ChainTerminal::Borrow { dst } if is_mut => {
+                Instr::MutBorrowFieldChain { dst, path, src }
+            },
+            ChainTerminal::Borrow { dst } => Instr::ImmBorrowFieldChain { dst, path, src },
         },
     }
 }
@@ -428,13 +573,23 @@ fn build_chain_instr(
 /// Try to fuse a `LdImm` + `BinaryOp` pair into a `BinaryOpImm` instruction.
 fn try_fuse_immediate_binop(first: &Instr, second: &Instr) -> Option<Instr> {
     match (first, second) {
-        (Instr::LdImm(tmp, imm), Instr::BinaryOp(dst, op, lhs, rhs)) if *tmp == *rhs => {
-            Some(Instr::BinaryOpImm(*dst, *op, *lhs, imm.clone()))
+        (Instr::LdImm { dst: tmp, imm }, Instr::BinaryOp { dst, op, lhs, rhs }) if *tmp == *rhs => {
+            Some(Instr::BinaryOpImm {
+                dst: *dst,
+                op: *op,
+                lhs: *lhs,
+                imm: imm.clone(),
+            })
         },
-        (Instr::LdImm(tmp, imm), Instr::BinaryOp(dst, op, lhs, rhs))
+        (Instr::LdImm { dst: tmp, imm }, Instr::BinaryOp { dst, op, lhs, rhs })
             if *tmp == *lhs && is_commutative(op) =>
         {
-            Some(Instr::BinaryOpImm(*dst, *op, *rhs, imm.clone()))
+            Some(Instr::BinaryOpImm {
+                dst: *dst,
+                op: *op,
+                lhs: *rhs,
+                imm: imm.clone(),
+            })
         },
         _ => None,
     }

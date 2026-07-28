@@ -8,9 +8,9 @@ fun consume(r0): u64 {
     r2: u64
   code:
   L0:
-    0: r1 := read_local_field Pair::a, r0
+    0: r1 := read_loc_field Pair::a, r0
     1: r1 := mul r1, #1000
-    2: r2 := read_local_field Pair::b, r0
+    2: r2 := read_loc_field Pair::b, r0
     3: r2 := add r1, r2
     4: ret [r2]
 }

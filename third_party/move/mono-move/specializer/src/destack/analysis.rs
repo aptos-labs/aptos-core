@@ -159,7 +159,7 @@ pub(crate) struct BlockAnalysis {
     /// Vid's slot can be reused.
     pub live_end: UnorderedMap<Slot, usize>,
     /// `Vid` → Home slot, when the Vid will later be moved into the Home
-    /// slot (`Move(Home, vid)`, the `st_loc` shape produced by destack)
+    /// slot (`Move { dst: Home, src: vid }`, the `st_loc` shape produced by destack)
     /// and the Home slot is not accessed between the Vid's def and the
     /// store. Sound because destack emits this shape only for `StLoc`,
     /// where the Vid is popped — the move is its last use, so coloring
@@ -191,7 +191,7 @@ impl BlockAnalysis {
     /// skips Vids already in `stloc_targets`, and `xfer_precolor` skips
     /// Vids already in either earlier map. (`coalesce_to_local` ∩ call
     /// rets is empty by SSA: a Vid defined by a `Call` is never the
-    /// `dst` of `Copy/Move(vid, Home)`.)
+    /// `dst` of `Copy`/`Move { dst: vid, src: Home }`.)
     pub(crate) fn analyze(instrs: &[Instr]) -> Self {
         // Forward scan: build per-`Vid` and per-`Home` position indices.
         // `Vid` -> last instruction index where it appears as def or use.
@@ -258,7 +258,7 @@ impl BlockAnalysis {
         // per candidate.
         let mut stloc_targets: UnorderedMap<Slot, Slot> = UnorderedMap::new();
         for (i, instr) in instrs.iter().enumerate() {
-            if let Instr::Move(dst, src) = instr
+            if let Instr::Move { dst, src } = instr
                 && dst.is_home()
                 && src.is_vid()
                 && !stloc_targets.contains_key(src)
@@ -277,8 +277,9 @@ impl BlockAnalysis {
         // via binary search.
         let mut coalesce_to_local: UnorderedMap<Slot, Slot> = UnorderedMap::new();
         for (i, instr) in instrs.iter().enumerate() {
-            if let Instr::Copy(dst @ Slot::Vid(_), src @ Slot::Home(_))
-            | Instr::Move(dst @ Slot::Vid(_), src @ Slot::Home(_)) = instr
+            if let Instr::Copy { dst, src } | Instr::Move { dst, src } = instr
+                && dst.is_vid()
+                && src.is_home()
             {
                 let vid = *dst;
                 if let Some(&lu) = live_end.get(&vid)
@@ -806,7 +807,7 @@ fn assert_xfer_invariants(
 /// covering both variants, see `instr_utils::call_boundary_rets_and_args`.
 #[inline]
 fn direct_call_rets_and_args(instr: &Instr) -> Option<(&[Slot], &[Slot])> {
-    if let Instr::Call(data) = instr {
+    if let Instr::Call { data } = instr {
         Some((&data.rets, &data.args))
     } else {
         None
@@ -957,12 +958,14 @@ mod tests {
     fn analyze_handles_wide_call_signatures() {
         // 200 args exercises `SmallBitVec`'s heap-allocated path.
         let args: Box<[Slot]> = (0..200).map(Slot::Vid).collect();
-        let instrs = vec![Instr::Call(Box::new(CallData {
-            rets: Box::new([]),
-            function_handle: FunctionHandleIndex(0),
-            ty_args: EMPTY_TYPE_LIST,
-            args,
-        }))];
+        let instrs = vec![Instr::Call {
+            data: Box::new(CallData {
+                rets: Box::new([]),
+                function_handle: FunctionHandleIndex(0),
+                ty_args: EMPTY_TYPE_LIST,
+                args,
+            }),
+        }];
         let analysis = BlockAnalysis::analyze(&instrs);
         assert_eq!(analysis.max_xfer_positions, 200);
     }

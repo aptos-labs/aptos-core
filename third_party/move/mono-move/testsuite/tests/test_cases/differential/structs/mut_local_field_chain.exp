@@ -27,11 +27,11 @@ fun bump(r0): u64 {
   code:
   L0:
     0: [r1] := call build, [r0]
-    1: r2 := mut_borrow_local_field_chain S::x.A::y.B::z, r1
+    1: r2 := mut_borrow_loc_field_chain S::x.A::y.B::z, r1
     2: r3 := read_ref r2
     3: r3 := add r3, #1
     4: write_ref r2, r3
-    5: r3 := read_local_field_chain S::x.A::y.B::z, r1
+    5: r3 := read_loc_field_chain S::x.A::y.B::z, r1
     6: ret [r3]
 }
 === micro-ops ===
