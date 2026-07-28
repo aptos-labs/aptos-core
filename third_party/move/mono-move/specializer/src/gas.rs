@@ -25,7 +25,10 @@
 
 use crate::{
     lower::context::concrete_type_size,
-    stackless_exec_ir::{instr_utils::for_each_value_use, BasicBlock, Instr, ModuleIR, Slot},
+    stackless_exec_ir::{
+        instr_utils::{clobbers_xfer, for_each_value_use},
+        BasicBlock, Instr, ModuleIR, Slot,
+    },
 };
 use mono_move_core::{
     types::{strip_ref, view_type, view_type_list, InternedType, InternedTypeList, Type},
@@ -65,9 +68,6 @@ enum GasInstrumentationError {
     #[error("call return {ret_idx} has no matching signature type")]
     CallReturnNoSignatureType { ret_idx: usize },
 
-    #[error("CallClosure signature is empty")]
-    ClosureSignatureEmpty,
-
     #[error("CallClosure signature must start with a Function type")]
     ClosureSignatureNotFunction,
 }
@@ -85,7 +85,6 @@ impl IntoExecutionError for GasInstrumentationError {
             | EnumDefinitionNotFound
             | NotAnEnum
             | CallReturnNoSignatureType { .. }
-            | ClosureSignatureEmpty
             | ClosureSignatureNotFunction => ExecutionErrorKind::InvariantViolation,
         }
     }
@@ -295,7 +294,7 @@ impl<I: Interner> Emitter<'_, I> {
     /// After costing `instr`, drop the Xfer slots it consumed. Calls manage
     /// their own return bindings in [`Self::call_cost`].
     fn advance_xfer_tracking(&mut self, instr: &Instr) {
-        if matches!(instr, Instr::Call(..) | Instr::CallClosure(..)) {
+        if clobbers_xfer(instr) {
             return;
         }
         for_each_value_use(instr, |s| {
@@ -309,21 +308,7 @@ impl<I: Interner> Emitter<'_, I> {
     fn instr_cost(&mut self, b: &mut BlockCost, instr: &Instr) -> VMResult<()> {
         match instr {
             // --- Loads ---
-            Instr::LdConst(..)
-            | Instr::LdTrue(..)
-            | Instr::LdFalse(..)
-            | Instr::LdU8(..)
-            | Instr::LdU16(..)
-            | Instr::LdU32(..)
-            | Instr::LdU64(..)
-            | Instr::LdU128(..)
-            | Instr::LdU256(..)
-            | Instr::LdI8(..)
-            | Instr::LdI16(..)
-            | Instr::LdI32(..)
-            | Instr::LdI64(..)
-            | Instr::LdI128(..)
-            | Instr::LdI256(..) => b.add_constant(LD),
+            Instr::LdConst(..) | Instr::LdImm(..) => b.add_constant(LD),
 
             // --- Slot ops ---
             Instr::Copy(_, src) | Instr::Move(_, src) => {
@@ -410,25 +395,25 @@ impl<I: Interner> Emitter<'_, I> {
             | Instr::MutBorrowGlobal(..) => b.add_constant(GLOBAL),
 
             // --- Calls ---
-            Instr::Call(rets, handle, ty_args, _args) => {
-                let sig = self.module.function_signature_at(*handle);
-                let params = self.interner.subst_type_list(sig.params, *ty_args)?;
-                let returns = self.interner.subst_type_list(sig.returns, *ty_args)?;
-                self.call_cost(b, params, rets, returns)?;
+            Instr::Call(data) => {
+                let sig = self.module.function_signature_at(data.function_handle);
+                let params = self.interner.subst_type_list(sig.params, data.ty_args)?;
+                let returns = self.interner.subst_type_list(sig.returns, data.ty_args)?;
+                self.call_cost(b, params, &data.rets, returns)?;
             },
 
             // --- Closures ---
-            Instr::PackClosure(_, _, _, _, args) => {
+            Instr::PackClosure(data) => {
                 b.add_constant(PACK_CLOSURE);
-                for arg in args {
+                for arg in &data.captured {
                     b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.slot_ty(*arg)?);
                 }
             },
-            Instr::CallClosure(rets, sig_types, _args) => {
-                let (closure_ty, params, returns) = closure_signature(*sig_types)?;
-                self.call_cost(b, params, rets, returns)?;
+            Instr::CallClosure(data) => {
+                let (params, returns) = closure_signature(data.closure_ty)?;
+                self.call_cost(b, params, &data.rets, returns)?;
                 // The closure value is passed as the last operand; charge its move.
-                b.add_sized(MOVE_BASE, MOVE_PER_BYTE, closure_ty);
+                b.add_sized(MOVE_BASE, MOVE_PER_BYTE, data.closure_ty);
             },
 
             // --- Vector ---
@@ -526,17 +511,10 @@ impl<I: Interner> Emitter<'_, I> {
     }
 }
 
-/// The closure's function type and its `(param types, result types)`, from the
-/// leading `Function` type of a `CallClosure` signature.
-fn closure_signature(
-    sig_types: InternedTypeList,
-) -> VMResult<(InternedType, InternedTypeList, InternedTypeList)> {
-    let closure_ty = view_type_list(sig_types)
-        .first()
-        .copied()
-        .ok_or(GasInstrumentationError::ClosureSignatureEmpty)?;
+/// The `(param types, result types)` of a closure's `Function` type.
+fn closure_signature(closure_ty: InternedType) -> VMResult<(InternedTypeList, InternedTypeList)> {
     match view_type(closure_ty) {
-        Type::Function { args, results, .. } => Ok((closure_ty, *args, *results)),
+        Type::Function { args, results, .. } => Ok((*args, *results)),
         _ => Err(VMInternalError::new(
             GasInstrumentationError::ClosureSignatureNotFunction,
         )),

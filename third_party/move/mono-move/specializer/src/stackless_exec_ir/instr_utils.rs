@@ -6,7 +6,7 @@
 //! Provides read-only slot visitors (`for_each_def`, `for_each_use`,
 //! `for_each_slot`, `collect_defs_and_uses`), in-place slot rewriters
 //! (`remap_all_slots_with`, `remap_source_slots_with`), and miscellaneous
-//! instruction helpers (`extract_imm_value`, `is_commutative`).
+//! instruction helpers (`call_boundary_rets_and_args`, `is_commutative`).
 //!
 //! # Architecture
 //!
@@ -30,7 +30,7 @@
 //!   caller-provided closures (`impl FnMut`) are monomorphized and inlined
 //!   at each call site.
 
-use super::{BinaryOp, FieldPath, ImmValue, Instr, Slot};
+use super::{BinaryOp, FieldPath, Instr, Slot};
 use mono_move_core::types::InternedType;
 use smallvec::SmallVec;
 
@@ -117,10 +117,81 @@ pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> 
 // Other instruction utilities
 // =============================================================================
 
+/// `(rets, args)` of a call-boundary instruction (`Call`, `CallClosure`),
+/// `None` for everything else.
+#[inline]
+pub(crate) fn call_boundary_rets_and_args(instr: &Instr) -> Option<(&[Slot], &[Slot])> {
+    match instr {
+        Instr::Call(data) => Some((&data.rets, &data.args)),
+        Instr::CallClosure(data) => Some((&data.rets, &data.args)),
+
+        // Every other instruction: not a call boundary.
+        Instr::LdConst(..)
+        | Instr::LdImm(..)
+        | Instr::Copy(..)
+        | Instr::Move(..)
+        | Instr::UnaryOp(..)
+        | Instr::BinaryOp(..)
+        | Instr::BinaryOpImm(..)
+        | Instr::Pack(..)
+        | Instr::Unpack(..)
+        | Instr::PackVariant(..)
+        | Instr::UnpackVariant(..)
+        | Instr::TestVariant(..)
+        | Instr::ImmBorrowLoc(..)
+        | Instr::MutBorrowLoc(..)
+        | Instr::ImmBorrowField(..)
+        | Instr::MutBorrowField(..)
+        | Instr::ImmBorrowVariantField(..)
+        | Instr::MutBorrowVariantField(..)
+        | Instr::ReadRef(..)
+        | Instr::WriteRef(..)
+        | Instr::ReadField(..)
+        | Instr::WriteField(..)
+        | Instr::ReadVariantField(..)
+        | Instr::WriteVariantField(..)
+        | Instr::ImmBorrowLocField(..)
+        | Instr::MutBorrowLocField(..)
+        | Instr::ReadLocalField(..)
+        | Instr::WriteLocalField(..)
+        | Instr::ReadFieldChain(..)
+        | Instr::WriteFieldChain(..)
+        | Instr::ImmBorrowFieldChain(..)
+        | Instr::MutBorrowFieldChain(..)
+        | Instr::ReadLocalFieldChain(..)
+        | Instr::WriteLocalFieldChain(..)
+        | Instr::ImmBorrowLocalFieldChain(..)
+        | Instr::MutBorrowLocalFieldChain(..)
+        | Instr::Exists(..)
+        | Instr::MoveFrom(..)
+        | Instr::MoveTo(..)
+        | Instr::ImmBorrowGlobal(..)
+        | Instr::MutBorrowGlobal(..)
+        | Instr::PackClosure(..)
+        | Instr::VecPack(..)
+        | Instr::VecLen(..)
+        | Instr::VecImmBorrow(..)
+        | Instr::VecMutBorrow(..)
+        | Instr::VecPushBack(..)
+        | Instr::VecPopBack(..)
+        | Instr::VecUnpack(..)
+        | Instr::VecSwap(..)
+        | Instr::Branch(..)
+        | Instr::BrTrue(..)
+        | Instr::BrFalse(..)
+        | Instr::BrCmp(..)
+        | Instr::BrCmpImm(..)
+        | Instr::Ret(..)
+        | Instr::Abort(..)
+        | Instr::AbortMsg(..)
+        | Instr::ForceGC => None,
+    }
+}
+
 /// Call-like instructions (`Call`, `CallClosure`) that clobber Xfer slots.
 #[inline]
 pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
-    matches!(instr, Instr::Call(..) | Instr::CallClosure(..))
+    call_boundary_rets_and_args(instr).is_some()
 }
 
 /// The local whose storage `instr` mutably borrows, if any. A later write
@@ -174,20 +245,7 @@ pub(crate) fn mut_local_borrow_target(instr: &Instr) -> Option<Slot> {
         | Instr::VecUnpack(..)
         | Instr::VecSwap(..)
         | Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
+        | Instr::LdImm(..)
         | Instr::Copy(..)
         | Instr::Move(..)
         | Instr::UnaryOp(..)
@@ -224,7 +282,8 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
         | Instr::MutBorrowGlobal(_, ty, _) => Some(*ty),
 
         // Every other instruction: no resource type involved.
-        Instr::Pack(..)
+        Instr::LdImm(..)
+        | Instr::Pack(..)
         | Instr::Unpack(..)
         | Instr::PackVariant(..)
         | Instr::UnpackVariant(..)
@@ -260,20 +319,6 @@ pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
         | Instr::VecUnpack(..)
         | Instr::VecSwap(..)
         | Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
         | Instr::Copy(..)
         | Instr::Move(..)
         | Instr::UnaryOp(..)
@@ -377,20 +422,7 @@ pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedTy
 
         // No struct type involved.
         Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
+        | Instr::LdImm(..)
         | Instr::Copy(..)
         | Instr::Move(..)
         | Instr::UnaryOp(..)
@@ -459,20 +491,7 @@ pub(crate) fn chain_field_path(instr: &Instr) -> Option<&FieldPath> {
         | Instr::VecUnpack(..)
         | Instr::VecSwap(..)
         | Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
+        | Instr::LdImm(..)
         | Instr::Copy(..)
         | Instr::Move(..)
         | Instr::UnaryOp(..)
@@ -506,20 +525,7 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::Abort(..)
         | Instr::AbortMsg(..)
         | Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
+        | Instr::LdImm(..)
         | Instr::Copy(..)
         | Instr::Move(..)
         | Instr::UnaryOp(..)
@@ -571,97 +577,6 @@ pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
         | Instr::VecUnpack(..)
         | Instr::VecSwap(..)
         | Instr::ForceGC => false,
-    }
-}
-
-/// Extract the destination slot and immediate value from a load instruction.
-// TODO(perf): the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
-// a `Box` here, even when `try_fuse_immediate_binop` decides not to fuse.
-// Consider splitting `extract_imm_value` into a cheap "would this fuse?"
-// check + a separate constructor, or otherwise pulling allocation behind
-// the fusion-eligibility check.
-pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
-    match instr {
-        Instr::LdTrue(dst) => Some((*dst, ImmValue::Bool(true))),
-        Instr::LdFalse(dst) => Some((*dst, ImmValue::Bool(false))),
-        Instr::LdU8(dst, val) => Some((*dst, ImmValue::U8(*val))),
-        Instr::LdU16(dst, val) => Some((*dst, ImmValue::U16(*val))),
-        Instr::LdU32(dst, val) => Some((*dst, ImmValue::U32(*val))),
-        Instr::LdU64(dst, val) => Some((*dst, ImmValue::U64(*val))),
-        Instr::LdU128(dst, val) => Some((*dst, ImmValue::U128(Box::new(*val)))),
-        Instr::LdU256(dst, val) => Some((*dst, ImmValue::U256(Box::new(*val)))),
-        Instr::LdI8(dst, val) => Some((*dst, ImmValue::I8(*val))),
-        Instr::LdI16(dst, val) => Some((*dst, ImmValue::I16(*val))),
-        Instr::LdI32(dst, val) => Some((*dst, ImmValue::I32(*val))),
-        Instr::LdI64(dst, val) => Some((*dst, ImmValue::I64(*val))),
-        Instr::LdI128(dst, val) => Some((*dst, ImmValue::I128(Box::new(*val)))),
-        Instr::LdI256(dst, val) => Some((*dst, ImmValue::I256(Box::new(*val)))),
-
-        // `LdConst` loads from the constant pool — its payload isn't a
-        // fixed-width integer literal, so it's never fusible into
-        // `BinaryOpImm`.
-        Instr::LdConst(_, _) => None,
-
-        // Non-load instructions.
-        Instr::Copy(_, _)
-        | Instr::Move(_, _)
-        | Instr::UnaryOp(_, _, _)
-        | Instr::BinaryOp(_, _, _, _)
-        | Instr::BinaryOpImm(_, _, _, _)
-        | Instr::Pack(_, _, _)
-        | Instr::Unpack(_, _, _)
-        | Instr::PackVariant(_, _, _, _)
-        | Instr::UnpackVariant(_, _, _, _)
-        | Instr::TestVariant(_, _, _, _)
-        | Instr::ImmBorrowLoc(_, _)
-        | Instr::MutBorrowLoc(_, _)
-        | Instr::ImmBorrowField(_, _, _, _)
-        | Instr::MutBorrowField(_, _, _, _)
-        | Instr::ImmBorrowVariantField(_, _, _, _)
-        | Instr::MutBorrowVariantField(_, _, _, _)
-        | Instr::ReadRef(_, _)
-        | Instr::WriteRef(_, _)
-        | Instr::ReadField(_, _, _, _)
-        | Instr::WriteField(_, _, _, _)
-        | Instr::ReadVariantField(_, _, _, _)
-        | Instr::WriteVariantField(_, _, _, _)
-        | Instr::ImmBorrowLocField(_, _, _, _)
-        | Instr::MutBorrowLocField(_, _, _, _)
-        | Instr::ReadLocalField(_, _, _, _)
-        | Instr::WriteLocalField(_, _, _, _)
-        | Instr::ReadFieldChain(_, _, _)
-        | Instr::WriteFieldChain(_, _, _)
-        | Instr::ImmBorrowFieldChain(_, _, _)
-        | Instr::MutBorrowFieldChain(_, _, _)
-        | Instr::ReadLocalFieldChain(_, _, _)
-        | Instr::WriteLocalFieldChain(_, _, _)
-        | Instr::ImmBorrowLocalFieldChain(_, _, _)
-        | Instr::MutBorrowLocalFieldChain(_, _, _)
-        | Instr::Exists(_, _, _)
-        | Instr::MoveFrom(_, _, _)
-        | Instr::MoveTo(_, _, _)
-        | Instr::ImmBorrowGlobal(_, _, _)
-        | Instr::MutBorrowGlobal(_, _, _)
-        | Instr::Call(_, _, _, _)
-        | Instr::PackClosure(_, _, _, _, _)
-        | Instr::CallClosure(_, _, _)
-        | Instr::VecPack(_, _, _)
-        | Instr::VecLen(_, _, _)
-        | Instr::VecImmBorrow(_, _, _, _)
-        | Instr::VecMutBorrow(_, _, _, _)
-        | Instr::VecPushBack(_, _, _)
-        | Instr::VecPopBack(_, _, _)
-        | Instr::VecUnpack(_, _, _)
-        | Instr::VecSwap(_, _, _, _)
-        | Instr::Branch(_)
-        | Instr::BrTrue(_, _)
-        | Instr::BrFalse(_, _)
-        | Instr::BrCmp(_, _, _, _)
-        | Instr::BrCmpImm(_, _, _, _)
-        | Instr::Ret(_)
-        | Instr::Abort(_)
-        | Instr::AbortMsg(_, _)
-        | Instr::ForceGC => None,
     }
 }
 
@@ -738,21 +653,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
     mut f: impl FnMut(Slot, SlotRole),
 ) {
     match instr {
-        Instr::LdConst(dst, _)
-        | Instr::LdTrue(dst)
-        | Instr::LdFalse(dst)
-        | Instr::LdU8(dst, _)
-        | Instr::LdU16(dst, _)
-        | Instr::LdU32(dst, _)
-        | Instr::LdU64(dst, _)
-        | Instr::LdU128(dst, _)
-        | Instr::LdU256(dst, _)
-        | Instr::LdI8(dst, _)
-        | Instr::LdI16(dst, _)
-        | Instr::LdI32(dst, _)
-        | Instr::LdI64(dst, _)
-        | Instr::LdI128(dst, _)
-        | Instr::LdI256(dst, _) => def::<DEFS>(*dst, &mut f),
+        Instr::LdConst(dst, _) | Instr::LdImm(dst, _) => def::<DEFS>(*dst, &mut f),
 
         Instr::Copy(dst, src) | Instr::Move(dst, src) | Instr::UnaryOp(dst, _, src) => {
             def::<DEFS>(*dst, &mut f);
@@ -850,13 +751,17 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*addr, &mut f);
         },
 
-        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
-            defs::<DEFS>(rets, &mut f);
-            uses::<USES>(args, &mut f);
+        Instr::Call(data) => {
+            defs::<DEFS>(&data.rets, &mut f);
+            uses::<USES>(&data.args, &mut f);
         },
-        Instr::PackClosure(dst, _, _, _, captured) => {
-            def::<DEFS>(*dst, &mut f);
-            uses::<USES>(captured, &mut f);
+        Instr::CallClosure(data) => {
+            defs::<DEFS>(&data.rets, &mut f);
+            uses::<USES>(&data.args, &mut f);
+        },
+        Instr::PackClosure(data) => {
+            def::<DEFS>(data.dst, &mut f);
+            uses::<USES>(&data.captured, &mut f);
         },
 
         Instr::VecPack(dst, _, elems) => {
@@ -933,21 +838,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
     mut f: impl FnMut(Slot) -> Slot,
 ) {
     match instr {
-        Instr::LdConst(dst, _)
-        | Instr::LdTrue(dst)
-        | Instr::LdFalse(dst)
-        | Instr::LdU8(dst, _)
-        | Instr::LdU16(dst, _)
-        | Instr::LdU32(dst, _)
-        | Instr::LdU64(dst, _)
-        | Instr::LdU128(dst, _)
-        | Instr::LdU256(dst, _)
-        | Instr::LdI8(dst, _)
-        | Instr::LdI16(dst, _)
-        | Instr::LdI32(dst, _)
-        | Instr::LdI64(dst, _)
-        | Instr::LdI128(dst, _)
-        | Instr::LdI256(dst, _) => {
+        Instr::LdConst(dst, _) | Instr::LdImm(dst, _) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -1104,20 +995,28 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
+        Instr::Call(data) => {
             if DEFS {
-                rewrite_slots(rets, &mut f);
+                rewrite_slots(&mut data.rets, &mut f);
             }
             if USES {
-                rewrite_slots(args, &mut f);
+                rewrite_slots(&mut data.args, &mut f);
             }
         },
-        Instr::PackClosure(dst, _, _, _, captured) => {
+        Instr::CallClosure(data) => {
             if DEFS {
-                rewrite_slot(dst, &mut f);
+                rewrite_slots(&mut data.rets, &mut f);
             }
             if USES {
-                rewrite_slots(captured, &mut f);
+                rewrite_slots(&mut data.args, &mut f);
+            }
+        },
+        Instr::PackClosure(data) => {
+            if DEFS {
+                rewrite_slot(&mut data.dst, &mut f);
+            }
+            if USES {
+                rewrite_slots(&mut data.captured, &mut f);
             }
         },
 

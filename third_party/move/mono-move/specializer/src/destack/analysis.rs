@@ -80,7 +80,10 @@
 #[cfg(debug_assertions)]
 use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
-    instr_utils::{clobbers_xfer, for_each_def, for_each_use, mut_local_borrow_target},
+    instr_utils::{
+        call_boundary_rets_and_args, clobbers_xfer, for_each_def, for_each_use,
+        mut_local_borrow_target,
+    },
     Instr, Slot,
 };
 #[cfg(debug_assertions)]
@@ -389,7 +392,7 @@ impl BlockAnalysis {
         // only spills to the heap for genuinely wide signatures.
         let mut args_claim: Vec<SmallBitVec> = Vec::with_capacity(call_positions.len());
         for &call_pos in &call_positions {
-            let Some((rets, args)) = call_rets_and_args(&instrs[call_pos]) else {
+            let Some((rets, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
                 args_claim.push(SmallBitVec::new());
                 continue;
             };
@@ -413,13 +416,13 @@ impl BlockAnalysis {
         // re-insert an args-side precolor and undo the cascade).
         let mut handled_rets: UnorderedSet<Slot> = UnorderedSet::new();
         for (call_idx, &call_pos) in call_positions.iter().enumerate() {
-            let Some((rets, _)) = call_rets_and_args(&instrs[call_pos]) else {
+            let Some((rets, _)) = direct_call_rets_and_args(&instrs[call_pos]) else {
                 continue;
             };
             let next_call_opt = call_positions.get(call_idx + 1).copied();
             let next_call = next_call_opt.unwrap_or(instrs.len());
-            let next_args =
-                next_call_opt.and_then(|p| call_rets_and_args(&instrs[p]).map(|(_, a)| a));
+            let next_args = next_call_opt
+                .and_then(|pos| direct_call_rets_and_args(&instrs[pos]).map(|(_, args)| args));
             let next_args_claim = args_claim.get(call_idx + 1);
 
             let mut found_home = false;
@@ -478,7 +481,7 @@ impl BlockAnalysis {
 
         // Args walk — args fill-in.
         for (call_idx, &call_pos) in call_positions.iter().enumerate() {
-            let Some((_, args)) = call_rets_and_args(&instrs[call_pos]) else {
+            let Some((_, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
                 continue;
             };
             let claim = &args_claim[call_idx];
@@ -635,7 +638,7 @@ fn assert_xfer_invariants(
     };
 
     for (call_idx, &call_pos) in call_positions.iter().enumerate() {
-        let Some((rets, args)) = call_rets_and_args(&instrs[call_pos]) else {
+        let Some((rets, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
             continue;
         };
         let prev_call = (call_idx > 0).then(|| call_positions[call_idx - 1]);
@@ -756,7 +759,7 @@ fn assert_xfer_invariants(
     let mut by_slot: BTreeMap<Slot, Vec<Slot>> = BTreeMap::new();
     let mut seen_vids: UnorderedSet<Slot> = UnorderedSet::new();
     for &call_pos in call_positions {
-        let Some((rets, args)) = call_rets_and_args(&instrs[call_pos]) else {
+        let Some((rets, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
             continue;
         };
         for vid in rets.iter().chain(args.iter()) {
@@ -799,11 +802,12 @@ fn assert_xfer_invariants(
 /// Returns `(rets, args)` for `Call`. `CallClosure` is
 /// intentionally excluded: Xfer precoloring leaves closure calls alone
 /// (they still count as call boundaries via `clobbers_xfer`, just not
-/// destructured for slot inspection).
+/// destructured for slot inspection). For the boundary-wide counterpart
+/// covering both variants, see `instr_utils::call_boundary_rets_and_args`.
 #[inline]
-fn call_rets_and_args(instr: &Instr) -> Option<(&[Slot], &[Slot])> {
-    if let Instr::Call(rets, _, _, args) = instr {
-        Some((rets, args))
+fn direct_call_rets_and_args(instr: &Instr) -> Option<(&[Slot], &[Slot])> {
+    if let Instr::Call(data) = instr {
+        Some((&data.rets, &data.args))
     } else {
         None
     }
@@ -875,13 +879,7 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
             // (2) at a call boundary, every bound Xfer slot must
             // be consumed by this call's args as args[j] = Xfer(j)
             // (arg positionality).
-            if clobbers_xfer(instr) {
-                let (rets, args): (&[Slot], &[Slot]) = match instr {
-                    Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
-                        (rets, args)
-                    },
-                    _ => unreachable!("clobbers_xfer matches only Call variants"),
-                };
+            if let Some((rets, args)) = call_boundary_rets_and_args(instr) {
                 // Structural invariants (arg positionality, return Xfer prefix,
                 // return monotonicity).
                 check_call_structural_invariants(args, rets, |s| match s {
@@ -949,6 +947,7 @@ pub(crate) fn assert_xfer_invariants_on_final_ir(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stackless_exec_ir::CallData;
     use mono_move_core::types::EMPTY_TYPE_LIST;
     use move_binary_format::file_format::FunctionHandleIndex;
 
@@ -957,13 +956,13 @@ mod tests {
     #[test]
     fn analyze_handles_wide_call_signatures() {
         // 200 args exercises `SmallBitVec`'s heap-allocated path.
-        let args: Vec<Slot> = (0..200).map(Slot::Vid).collect();
-        let instrs = vec![Instr::Call(
-            vec![],
-            FunctionHandleIndex(0),
-            EMPTY_TYPE_LIST,
+        let args: Box<[Slot]> = (0..200).map(Slot::Vid).collect();
+        let instrs = vec![Instr::Call(Box::new(CallData {
+            rets: Box::new([]),
+            function_handle: FunctionHandleIndex(0),
+            ty_args: EMPTY_TYPE_LIST,
             args,
-        )];
+        }))];
         let analysis = BlockAnalysis::analyze(&instrs);
         assert_eq!(analysis.max_xfer_positions, 200);
     }

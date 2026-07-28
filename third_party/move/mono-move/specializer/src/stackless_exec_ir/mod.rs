@@ -92,8 +92,8 @@ pub enum BinaryOp {
     And,
 }
 
-/// Immediate values for `BinaryOpImm`. Wide widths (u128 / U256 / i128 /
-/// I256) are boxed.
+/// Immediate values used by `Instr`. Wide widths (u128 / U256 / i128 / I256)
+/// are boxed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ImmValue {
     Bool(bool),
@@ -117,33 +117,83 @@ const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
 /// A chain of inline-struct field selections, each an `(instantiated owner
 /// type, field handle)` pair.
-pub type FieldPath = Vec<(InternedType, FieldHandleIndex)>;
+pub type FieldPath = Box<[(InternedType, FieldHandleIndex)]>;
+
+/// Payload of [`Instr::Call`].
+///
+/// `function_handle` gives the callee identity; `ty_args` is the
+/// instantiation's type arguments, and is `EMPTY_TYPE_LIST` for a
+/// non-generic call. Inside a generic function `ty_args` may still
+/// contain the enclosing function's `TypeParam`s.
+#[derive(Clone)]
+pub struct CallData {
+    pub rets: Box<[Slot]>,
+    pub function_handle: FunctionHandleIndex,
+    pub ty_args: InternedTypeList,
+    pub args: Box<[Slot]>,
+}
+
+/// Payload of [`Instr::PackClosure`] (same `(function_handle, ty_args)`
+/// contract as [`CallData`]).
+#[derive(Clone)]
+pub struct PackClosureData {
+    pub dst: Slot,
+    pub function_handle: FunctionHandleIndex,
+    pub ty_args: InternedTypeList,
+    pub mask: ClosureMask,
+    pub captured: Box<[Slot]>,
+}
+
+/// Payload of [`Instr::CallClosure`].
+#[derive(Clone)]
+pub struct CallClosureData {
+    pub rets: Box<[Slot]>,
+    /// The closure's type; always a `Type::Function`.
+    pub closure_ty: InternedType,
+    /// The arguments provided to the closure, followed by the closure
+    /// itself as the last element. Never empty; enforced by [`Self::new`].
+    args: Box<[Slot]>,
+}
+
+impl CallClosureData {
+    /// `args` must end with the closure operand (hence be non-empty).
+    pub(crate) fn new(rets: Box<[Slot]>, closure_ty: InternedType, args: Box<[Slot]>) -> Self {
+        debug_assert!(
+            !args.is_empty(),
+            "CallClosure args must include the closure"
+        );
+        Self {
+            rets,
+            closure_ty,
+            args,
+        }
+    }
+
+    /// Splits `args` into `(closure, provided arguments)`.
+    pub fn closure_and_provided(&self) -> (Slot, &[Slot]) {
+        let (closure, provided) = self
+            .args
+            .split_last()
+            .expect("CallClosure args are non-empty by construction");
+        (*closure, provided)
+    }
+}
 
 /// A stackless IR instruction with explicit named-slot operands.
 ///
 /// TODO(cleanup):
 /// (1) convert variants to struct-style (named fields) so call sites read
-/// `Instr::Move { dst, src }` rather than positional tuples.
+/// `Instr::Move { dst, src }` rather than positional tuples. Payloads that
+/// would push a variant past the size/align asserts below get a boxed
+/// named-field `*Data` struct instead (as the call-ish variants do).
 /// (2) add description for each instruction variant.
 /// (3) change uses of raw integers into newtypes/type-aliases.
 #[derive(Clone)]
 pub enum Instr {
     // --- Loads ---
     LdConst(Slot, ConstantPoolIndex),
-    LdTrue(Slot),
-    LdFalse(Slot),
-    LdU8(Slot, u8),
-    LdU16(Slot, u16),
-    LdU32(Slot, u32),
-    LdU64(Slot, u64),
-    LdU128(Slot, u128),
-    LdU256(Slot, U256),
-    LdI8(Slot, i8),
-    LdI16(Slot, i16),
-    LdI32(Slot, i32),
-    LdI64(Slot, i64),
-    LdI128(Slot, i128),
-    LdI256(Slot, I256),
+    /// `dst = imm` — load a bool or integer literal.
+    LdImm(Slot, ImmValue),
 
     // --- Slot ops ---
     /// `dst = copy(src)`, source remains valid.
@@ -164,13 +214,13 @@ pub enum Instr {
     // Contract: the carried `InternedType` is the instantiated nominal, with
     // the instantiation's type arguments already applied. Inside a generic
     // function it may still contain the enclosing function's `TypeParam`s.
-    Pack(Slot, InternedType, Vec<Slot>),
-    Unpack(Vec<Slot>, InternedType, Slot),
+    Pack(Slot, InternedType, Box<[Slot]>),
+    Unpack(Box<[Slot]>, InternedType, Slot),
 
     // --- Variant (enum type + variant ordinal; same type contract as
     // `Pack`/`Unpack`) ---
-    PackVariant(Slot, InternedType, u16, Vec<Slot>),
-    UnpackVariant(Vec<Slot>, InternedType, u16, Slot),
+    PackVariant(Slot, InternedType, u16, Box<[Slot]>),
+    UnpackVariant(Box<[Slot]>, InternedType, u16, Slot),
     TestVariant(Slot, InternedType, u16, Slot),
 
     // --- References ---
@@ -244,36 +294,21 @@ pub enum Instr {
     ImmBorrowGlobal(Slot, InternedType, Slot),
     MutBorrowGlobal(Slot, InternedType, Slot),
 
-    // --- Calls ---
-    //
-    // Carries `(inner FunctionHandleIndex, target ty_args)`: the handle gives the
-    // callee identity; `ty_args` is the instantiation's type arguments, and is
-    // `EMPTY_TYPE_LIST` for a non-generic call. Same type contract as
-    // `Pack`/`Unpack` — inside a generic function the args may still contain the
-    // enclosing function's `TypeParam`s.
-    Call(Vec<Slot>, FunctionHandleIndex, InternedTypeList, Vec<Slot>),
+    // --- Calls (payload boxed to keep `Instr` small; see `CallData`) ---
+    Call(Box<CallData>),
 
-    // --- Closures (same `(inner handle, target ty_args)` contract as `Call`) ---
-    PackClosure(
-        Slot,
-        FunctionHandleIndex,
-        InternedTypeList,
-        ClosureMask,
-        Vec<Slot>,
-    ),
-    /// `CallClosure(rets, signature_types, args)` — `signature_types` is the
-    /// interned list of types from the closure's signature (arg types followed
-    /// by result types, matching the source `SignatureIndex`).
-    CallClosure(Vec<Slot>, InternedTypeList, Vec<Slot>),
+    // --- Closures (payloads boxed; see `PackClosureData`/`CallClosureData`) ---
+    PackClosure(Box<PackClosureData>),
+    CallClosure(Box<CallClosureData>),
 
     // --- Vector (second field is the vector's element type) ---
-    VecPack(Slot, InternedType, Vec<Slot>),
+    VecPack(Slot, InternedType, Box<[Slot]>),
     VecLen(Slot, InternedType, Slot),
     VecImmBorrow(Slot, InternedType, Slot, Slot),
     VecMutBorrow(Slot, InternedType, Slot, Slot),
     VecPushBack(InternedType, Slot, Slot),
     VecPopBack(Slot, InternedType, Slot),
-    VecUnpack(Vec<Slot>, InternedType, Slot),
+    VecUnpack(Box<[Slot]>, InternedType, Slot),
     VecSwap(InternedType, Slot, Slot, Slot),
 
     // --- Control flow ---
@@ -284,7 +319,7 @@ pub enum Instr {
     BrCmp(Label, CmpKind, Slot, Slot),
     /// `BrCmpImm(target, op, src, imm)` — branch to `target` if `op(src, imm)` is true.
     BrCmpImm(Label, CmpKind, Slot, ImmValue),
-    Ret(Vec<Slot>),
+    Ret(Box<[Slot]>),
     Abort(Slot),
     AbortMsg(Slot, Slot),
 
@@ -293,26 +328,26 @@ pub enum Instr {
     ForceGC,
 }
 
+const _: () = assert!(
+    std::mem::size_of::<Instr>() == 32,
+    "Instr is no longer 32 bytes; if it grew, box the offending variant's \
+    payload — if the widest variant shrank, re-pin this constant"
+);
+// The align assert matters on its own: a raw `u128`-family payload could keep
+// the size at 32 while bumping the alignment (and allocator padding) to 16.
+const _: () = assert!(
+    std::mem::align_of::<Instr>() == 8,
+    "Instr alignment is no longer 8; if it grew, box the align-16 \
+     (u128-family) payload — if it shrank, re-pin this constant"
+);
+
 impl Instr {
     /// Returns the variant tag as a static string. Useful for terse error
     /// messages that don't need the full operand dump.
     pub fn opcode_name(&self) -> &'static str {
         match self {
             Instr::LdConst(..) => "LdConst",
-            Instr::LdTrue(..) => "LdTrue",
-            Instr::LdFalse(..) => "LdFalse",
-            Instr::LdU8(..) => "LdU8",
-            Instr::LdU16(..) => "LdU16",
-            Instr::LdU32(..) => "LdU32",
-            Instr::LdU64(..) => "LdU64",
-            Instr::LdU128(..) => "LdU128",
-            Instr::LdU256(..) => "LdU256",
-            Instr::LdI8(..) => "LdI8",
-            Instr::LdI16(..) => "LdI16",
-            Instr::LdI32(..) => "LdI32",
-            Instr::LdI64(..) => "LdI64",
-            Instr::LdI128(..) => "LdI128",
-            Instr::LdI256(..) => "LdI256",
+            Instr::LdImm(..) => "LdImm",
             Instr::Copy(..) => "Copy",
             Instr::Move(..) => "Move",
             Instr::UnaryOp(..) => "UnaryOp",
