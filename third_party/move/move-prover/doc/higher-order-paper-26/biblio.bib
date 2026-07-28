@@ -6,6 +6,11 @@
 
 %% Saved with string encoding Unicode (UTF-8)
 
+% IEEEtran.bst control entry: keep authors spelled out for consecutive
+% entries by the same authors instead of replacing them with an em-dash.
+@IEEEtranBSTCTL{BSTcontrol,
+	CTLdash_repeated_names = "no"}
+
 @misc{grieskamp2025movehigherorder,
   author = {Wolfgang Grieskamp},
   title  = {Move Goes Higher Order},
@@ -344,6 +349,16 @@
 	volume = {3},
 	year = {2019}}
 
+@article{RustClosures21,
+	author = {Fabian Wolff and Aurel B{\'{\i}}l{\'{y}} and Christoph Matheja and Peter M{\"{u}}ller and Alexander J. Summers},
+	doi = {10.1145/3485522},
+	journal = {{PACMPL}},
+	number = {{OOPSLA}},
+	pages = {1--29},
+	title = {Modular specification and verification of closures in {Rust}},
+	volume = {5},
+	year = {2021}}
+
 @inproceedings{SMTLib2010,
 	author = {Clark Barrett and Aaron Stump and Cesare Tinelli},
 	booktitle = {Proceedings of the 8th International Workshop on Satisfiability Modulo Theories (Edinburgh, UK)},
@@ -607,7 +622,7 @@
 @article{solcverify,
 	author = {{\'{A}}kos Hajdu and Dejan Jovanovic},
 	journal = {CoRR},
-	title = {solc-verify: {A} Modular Verifier for Solidity Smart Contracts},
+	title = {solc-verify: {A} Modular Verifier for {Solidity} Smart Contracts},
 	volume = {abs/1907.04262},
 	year = {2019}}
 
@@ -1223,16 +1238,16 @@
 @misc{InferenceTestsuite,
   author       = {{Aptos Labs}},
   title        = {{Move Prover Spec Inference Test Suite}},
-  howpublished = {\url{https://github.com/aptos-labs/aptos-core/tree/fde503186e/third_party/move/move-prover/tests/inference}},
-  note         = {Commit \texttt{fde503186e}, accessed 2026-07-24},
+  howpublished = {\url{https://github.com/aptos-labs/aptos-core/tree/28f82080e3/third_party/move/move-prover/tests/inference}},
+  note         = {Commit \texttt{28f82080e3}, accessed 2026-07-28},
   year         = {2026}
 }
 
 @misc{PaperExamples,
   author       = {{Aptos Labs}},
   title        = {{Higher-Order Paper Examples}},
-  howpublished = {\url{https://github.com/aptos-labs/aptos-core/tree/fde503186e/third_party/move/move-prover/doc/higher-order-paper-26/examples}},
-  note         = {Commit \texttt{fde503186e}, accessed 2026-07-24},
+  howpublished = {\url{https://github.com/aptos-labs/aptos-core/tree/28f82080e3/third_party/move/move-prover/doc/higher-order-paper-26/examples}},
+  note         = {Commit \texttt{28f82080e3}, accessed 2026-07-28},
   year         = {2026}
 }
 
