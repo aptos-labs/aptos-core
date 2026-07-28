@@ -473,6 +473,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         pragma aborts_if_is_partial;
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };

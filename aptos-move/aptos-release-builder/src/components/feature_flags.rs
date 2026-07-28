@@ -177,6 +177,7 @@ pub enum FeatureFlag {
     GasRefundFaMint,
     FunctionValueDispatch,
     DisableClosureBcsSerialization,
+    LazyModuleInitialization,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -461,6 +462,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DisableClosureBcsSerialization => {
                 AptosFeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION
             },
+            FeatureFlag::LazyModuleInitialization => AptosFeatureFlag::LAZY_MODULE_INITIALIZATION,
         }
     }
 }
@@ -672,6 +674,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION => {
                 FeatureFlag::DisableClosureBcsSerialization
             },
+            AptosFeatureFlag::LAZY_MODULE_INITIALIZATION => FeatureFlag::LazyModuleInitialization,
         }
     }
 }

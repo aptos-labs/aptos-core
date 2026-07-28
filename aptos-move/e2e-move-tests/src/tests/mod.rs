@@ -42,6 +42,7 @@ mod governance_updates;
 mod hot_state;
 mod infinite_loop;
 mod init_module;
+mod init_module_api;
 mod init_module_closure_store;
 mod keyless_feature_gating;
 mod large_package_publishing;

@@ -210,6 +210,7 @@ fn test_db_indexer_data() {
         ident_str!("coin"),
         ident_str!("guid"),
         ident_str!("hash"),
+        ident_str!("init"),
         ident_str!("jwks"),
         ident_str!("util"),
         ident_str!("block"),
