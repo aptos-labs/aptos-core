@@ -64,20 +64,40 @@ Simulate a transaction without committing it. Useful for estimating gas, checkin
 
 ```shellscript filename="Terminal"
 aptos move simulate \
+  --sender-account 0xABC \
   --function-id 0x42::counter::increment \
   --args address:0xABC u64:1 \
   --profile devnet
 
 aptos move simulate \
+  --local \
+  --private-key <PRIVATE_KEY> \
   --function-id 0x42::counter::increment \
-  --args address:0xABC u64:1 \
-  --local                                # local VM instead of remote simulation
+  --args address:0xABC u64:1
+
+aptos move simulate \
+  --local-simulation \
+  --sender-account 0xABC \
+  --function-id 0x42::counter::increment \
+  --args address:0xABC u64:1
 ```
 
 | Flag | Meaning |
 |---|---|
-| `--local` | Simulate in a local VM (using the latest state pulled from the network), instead of asking the fullnode to simulate. |
+| Default | Requests remote fullnode simulation. With no key material, supply `--sender-account` or configure the profile account; authentication-key validation is skipped. |
+| `--local` | Execute locally with a real transaction signature and the normal VM path. Requires a private key. The transaction is not submitted. |
+| `--local-simulation` | Execute locally in simulation mode. Without key material, supply `--sender-account`; authentication-key validation is skipped, so the result does not establish submit authorization. |
+| `--sender-account <ADDR>` | Override the sender address. Key requirements depend on the selected mode. |
 | Plus the same `--function-id` / `--type-args` / `--args` shape as `run`. | |
+
+For best-effort VM failure diagnostics in either local mode, set `MOVE_TRACE_EXEC=vm_error`:
+
+```shellscript filename="Terminal"
+MOVE_TRACE_EXEC=vm_error aptos move simulate --local-simulation --sender-account 0xABC \
+  --function-id 0x42::counter::increment --args address:0xABC u64:1
+```
+
+This is a developer trace of VM internals; its format and source mapping are not a stable CLI interface.
 
 ## `aptos move replay`
 

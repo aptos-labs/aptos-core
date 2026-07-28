@@ -2294,7 +2294,17 @@ impl CliCommand<TransactionSummary> for RunFunction {
 /// BETA: subject to change
 ///
 /// This allows you to simulate and see the output from any function or Move script all in one command.
-/// It additionally lets you simulate for any account
+///
+/// By default, simulation is performed by the remote fullnode. With private or public
+/// key material, remote simulation uses a zero Ed25519 signature and validates the
+/// authentication key. Without key material, supply `--sender-account` (or configure
+/// a profile account); it uses an unauthenticated simulation transaction and skips
+/// authentication-key validation, so the result does not establish submit authorization.
+///
+/// `--local` preserves normal local execution semantics: it needs a private key,
+/// creates a real signature, and runs the normal VM without submitting the transaction.
+/// `--local-simulation` runs the local simulation VM with the same unauthenticated
+/// simulation behavior as remote simulation, and is intended for local debugging.
 ///
 #[derive(Parser)]
 pub struct Simulate {
@@ -2304,8 +2314,14 @@ pub struct Simulate {
     #[clap(flatten)]
     entry_function_args: EntryFunctionArguments,
 
-    #[clap(long)]
+    /// Execute locally with a real signature using the normal VM path. Requires a private key.
+    #[clap(long, conflicts_with = "local_simulation")]
     local: bool,
+
+    /// Execute locally in VM simulation mode. Without key material, authentication-key validation
+    /// is skipped; use this mode for debugging, not to establish submit authorization.
+    #[clap(long, conflicts_with = "local")]
+    local_simulation: bool,
 
     /// Include simulated events and state changes in the output.
     #[clap(long)]
@@ -2332,6 +2348,10 @@ impl CliCommand<TransactionSummary> for Simulate {
         if self.local {
             self.txn_options
                 .simulate_locally(payload, &self.env, self.show_details)
+                .await
+        } else if self.local_simulation {
+            self.txn_options
+                .simulate_locally_simulation(payload, &self.env, self.show_details)
                 .await
         } else {
             let mut rng = rand::rngs::StdRng::from_entropy();
@@ -2373,6 +2393,8 @@ mod simulate_flag_tests {
             "u64:1",
         ]);
         assert!(!simulate.show_details);
+        assert!(!simulate.local);
+        assert!(!simulate.local_simulation);
     }
 
     #[test]
@@ -2387,6 +2409,22 @@ mod simulate_flag_tests {
             "--show-details",
         ]);
         assert!(simulate.show_details);
+    }
+
+    #[test]
+    fn local_modes_conflict() {
+        let result = TestCli::try_parse_from([
+            "test",
+            "simulate",
+            "--local",
+            "--local-simulation",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(result.is_err());
     }
 }
 

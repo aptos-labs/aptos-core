@@ -5,9 +5,11 @@ use crate::MoveDebugger;
 use aptos_cli_common::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::FrameName;
-use aptos_types::transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction};
+use aptos_types::transaction::{
+    AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, TransactionOutput,
+};
 use aptos_validator_interface::LocalModuleOverrides;
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
 use aptos_vm_environment::{environment::AptosEnvironment, prod_configs};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
@@ -45,6 +47,22 @@ pub fn run_transaction_using_debugger(
     );
 
     Ok((vm_status, vm_output))
+}
+
+/// Simulates a transaction locally without checking its authenticator.
+///
+/// This mirrors the fullnode simulation endpoint: the VM runs in simulation
+/// mode, so a [`NoAccountAuthenticator`](aptos_types::transaction::authenticator::AccountAuthenticator::NoAccountAuthenticator)
+/// can be used to simulate any sender without a private or public key.
+pub fn simulate_transaction_using_debugger(
+    debugger: &dyn MoveDebugger,
+    version: u64,
+    transaction: SignedTransaction,
+) -> CliTypedResult<(VMStatus, TransactionOutput)> {
+    prod_configs::set_debugging_enabled(true);
+
+    let state_view = debugger.state_view_at_version(version);
+    Ok(AptosSimulationVM::create_vm_and_simulate_signed_transaction(&transaction, &state_view))
 }
 
 /// Replay a transaction with local module overrides and an optional source
