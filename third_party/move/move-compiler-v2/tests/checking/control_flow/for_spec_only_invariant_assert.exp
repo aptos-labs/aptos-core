@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid spec block member
+  ┌─ tests/checking/control_flow/for_spec_only_invariant_assert.move:5:31
+  │
+5 │         for (i in 0..n spec { assert s == i; }) {
+  │                               ^^^^^^^^^^^^^^ only 'invariant' allowed here

@@ -16,7 +16,9 @@ use crate::{
         translate::{lower_function, LoweredFunction},
     },
     stackless_exec_ir::{
-        instr_utils::{field_layout_nominal_in_instr, resource_type_in_instr, NominalKind},
+        instr_utils::{
+            chain_field_path, field_layout_nominal_in_instr, resource_type_in_instr, NominalKind,
+        },
         FunctionIR, Instr, ModuleIR,
     },
 };
@@ -218,8 +220,7 @@ pub(crate) struct VariantFieldAccess {
     /// variant tag; length is the enum's variant count.
     pub offsets: Vec<Option<u32>>,
     /// `Some(off)` when every variant declares the field at the same offset:
-    /// the static fast path (no tag dispatch, membership check, or scratch
-    /// reference needed).
+    /// the static fast path (no tag dispatch or membership check).
     pub uniform_offset: Option<u32>,
 }
 
@@ -338,14 +339,6 @@ pub struct LoweringContext<'a> {
     /// deep copy for [`Instr::MoveFrom`]) collects *before* the write, so it
     /// does not need GC tracking.
     pub resource_box_slot: Option<FrameOffset>,
-    /// 16-byte scratch fat-pointer slot for by-reference variant-field
-    /// read/write (`ReadVariantField`/`WriteVariantField`): the `enum_borrow`
-    /// (a heap deref) writes the field reference here, then `ReadRef`/
-    /// `WriteRef` consumes it. `None` when the function has no such ops.
-    ///
-    /// Invariant: like `scratch`, its live range (borrow → deref) never spans
-    /// an allocating micro-op, so it needs no GC tracking.
-    pub variant_field_scratch: Option<FrameOffset>,
     /// 8-byte scratch heap-pointer slot for enum `PackVariant`/`UnpackVariant`
     /// when the slot-allocator aliases the enum-pointer slot with a field slot.
     /// `PackVariant` stages the freshly allocated pointer here and publishes it
@@ -585,9 +578,8 @@ pub fn try_build_context<'a>(
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
-    //    layout was derivable during discovery, and (2) detect which scratch
-    //    slots the lowering needs.
-    let mut needs_variant_field_scratch = false;
+    //    layout was derivable during discovery, and (2) detect whether
+    //    pack/unpack needs the enum-pointer scratch slot.
     let mut needs_enum_ptr_scratch = false;
     for instr in func_ir.instrs() {
         let Some((enum_ty, NominalKind::Enum)) = field_layout_nominal_in_instr(instr) else {
@@ -600,18 +592,6 @@ pub fn try_build_context<'a>(
             // layout was not derivable.
             return Ok(BuildContextOutcome::Skipped("enum layout not derivable"));
         }
-        // A by-reference variant-field read/write may need the 16-byte scratch
-        // fat-pointer slot: only the divergent-offset path uses it (the
-        // tag-dispatched borrow writes the field reference there for the
-        // following `ReadRef`/`WriteRef`, both non-allocating, so it never spans
-        // a safe point), but reserve conservatively for any such op rather than
-        // re-resolving each access here just to learn whether it is uniform.
-        if matches!(
-            instr,
-            Instr::ReadVariantField(..) | Instr::WriteVariantField(..)
-        ) {
-            needs_variant_field_scratch = true;
-        }
         // Pack/unpack may need an 8-byte scratch to keep the enum pointer out of
         // an aliased field slot (resolved per-instruction in lowering; the exact
         // alias depends on final slot offsets, which aren't known yet here).
@@ -619,8 +599,6 @@ pub fn try_build_context<'a>(
             needs_enum_ptr_scratch = true;
         }
     }
-    let variant_field_scratch =
-        needs_variant_field_scratch.then(|| reserve_slot(&mut frame_data_size, 16));
     let enum_ptr_scratch = needs_enum_ptr_scratch.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // TODO(perf): we need to revisit the complexity and performance of this function
@@ -777,7 +755,6 @@ pub fn try_build_context<'a>(
         num_xfer_positions: func_ir.num_xfer_positions,
         scratch,
         resource_box_slot,
-        variant_field_scratch,
         enum_ptr_scratch,
         descriptors: descriptors.vec,
         enum_layouts: descriptors.enum_layouts,
@@ -1169,7 +1146,13 @@ fn try_discover_types_for_lowering_in_function_impl(
         }
 
         // Catch the field-layout nominal an instruction references directly
-        // that isn't reached by the home/call walks above.
+        // that isn't reached by the home/call walks above. For fused chains
+        // this is the first owner only: walking it transitively reaches every
+        // later owner because each is the previous hop's field type.
+        debug_assert!(
+            chain_path_is_inline_contained(interner, &module_ir.module, instr),
+            "chain path owner is not the previous hop's field type"
+        );
         if let Some((ty, _kind)) = field_layout_nominal_in_instr(instr) {
             discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
@@ -1339,6 +1322,28 @@ fn try_build_inline_value_layout(
         flags,
         layout_fields.into_boxed_slice(),
     )))
+}
+
+/// Invariant behind first-owner-only chain discovery: each later `path` owner
+/// must be the previous hop's field type, so the transitive walk of the first
+/// owner reaches every later one. Trivially true for non-chain instructions.
+fn chain_path_is_inline_contained(
+    interner: &impl Interner,
+    module: &PreparedModule,
+    instr: &Instr,
+) -> bool {
+    let Some(path) = chain_field_path(instr) else {
+        return true;
+    };
+    path.windows(2).all(|hops| {
+        let ((owner, field_handle), (next_owner, _)) = (hops[0], hops[1]);
+        let Type::Nominal { ty_args, .. } = view_type(owner) else {
+            return false;
+        };
+        interner
+            .subst_type(module.interned_field_type_at(field_handle), *ty_args)
+            .is_ok_and(|field_ty| field_ty == next_owner)
+    })
 }
 
 /// Recursive post-order DFS that visits every nominal reachable from the given

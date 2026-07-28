@@ -80,7 +80,7 @@
 #[cfg(debug_assertions)]
 use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
-    instr_utils::{clobbers_xfer, for_each_def, for_each_use},
+    instr_utils::{clobbers_xfer, for_each_def, for_each_use, mut_local_borrow_target},
     Instr, Slot,
 };
 #[cfg(debug_assertions)]
@@ -233,11 +233,10 @@ impl BlockAnalysis {
                     // cannot appear
                 },
             });
-            // Both shapes yield a `&mut` into the local's storage.
-            if let Instr::MutBorrowLoc(_, local @ Slot::Home(_))
-            | Instr::MutBorrowLocField(_, _, _, local @ Slot::Home(_)) = instr
-            {
-                home_mut_borrow_pos.entry(*local).or_default().push(i);
+            // A `&mut` into a home local's storage can defer a write through
+            // the returned reference, conflicting with coalescing.
+            if let Some(local @ Slot::Home(_)) = mut_local_borrow_target(instr) {
+                home_mut_borrow_pos.entry(local).or_default().push(i);
             }
         }
 

@@ -1028,6 +1028,56 @@ A loop invariant is translated into two `assert` statements and one `assume` sta
 - An `assume` statement that encodes the property that the invariant holds at loop iteration `I`.
 - An `assert` statement that checks whether the invariant continues to hold at loop iteration `I+1`.
 
+Loop invariants for a `while` or `for` loop are placed in the loop header. For a `for`
+loop, the invariant is written directly after the range and before the loop body. At the
+loop head, the iterator variable holds the *next* value to be processed, so accumulator
+invariants are stated in their classical form. For example:
+
+```move
+module 0x42::m {
+  fun sum_range(n: u64): u64 {
+    let sum = 0;
+    for (i in 0..n spec {
+      invariant i <= n;
+      invariant sum == i * (i - 1) / 2;
+    }) {
+      sum = sum + i;
+    };
+    sum
+  }
+  spec sum_range {
+    requires n < 1000;
+    aborts_if false;
+    ensures result == n * (n - 1) / 2;
+  }
+}
+```
+
+Alternatively, and like a `while` loop, the invariant of a `for` loop may be given in a
+trailing spec block placed after the loop body instead of in the header. The iterator
+variable is in scope in the trailing spec block. The following is equivalent to the
+example above:
+
+```move
+module 0x42::m {
+  fun sum_range(n: u64): u64 {
+    let sum = 0;
+    for (i in 0..n) {
+      sum = sum + i;
+    } spec {
+      invariant i <= n;
+      invariant sum == i * (i - 1) / 2;
+    };
+    sum
+  }
+}
+```
+
+The invariant may be placed in the header or in the trailing spec block, but not both. A
+`for` loop spec block may only contain `invariant` statements. A `continue` inside a `for`
+loop still advances the iterator, so the invariant must be preserved on the `continue`
+back edge as well.
+
 ### Referring to pre-state
 
 Occasionally, we would like to refer to the pre-state of a mutable function argument in inline spec

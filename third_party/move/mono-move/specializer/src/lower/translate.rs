@@ -242,14 +242,157 @@ impl<'a> LoweringState<'a> {
     }
 
     /// Resolve a `FieldHandleIndex` against the struct type `struct_ty`
-    /// and return `(field_byte_offset, field_byte_size)`.
+    /// and return `(field_byte_offset, field_byte_size)`. Indexes the single
+    /// field directly, resolving only its child layout — unlike
+    /// [`Self::struct_field_layouts`], which builds the all-fields table that
+    /// `Pack`/`Unpack` need.
     fn resolve_field(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> VMResult<(u32, u32)> {
-        let fields = self.struct_field_layouts(struct_ty, "field access")?;
+        let op = "field access";
+        let layout = self
+            .ctx
+            .layouts
+            .layout_by_ty(struct_ty)
+            .ok_or(LoweringError::StructLayoutNotPopulated { op })?;
+        let LayoutKind::Struct { fields } = &layout.kind else {
+            return Err(VMInternalError::new(LoweringError::NominalTypeNotStruct {
+                op,
+            }));
+        };
         let pos = self.ctx.module.field_position_at(fh) as usize;
-        let (offset, size, _align) = *fields
+        let field = fields
             .get(pos)
             .ok_or(LoweringError::FieldIndexOutOfRange { pos })?;
-        Ok((offset, size))
+        let child = self
+            .ctx
+            .layouts
+            .layout(field.id)
+            .ok_or(LoweringError::FieldLayoutIdUnresolved { op })?;
+        Ok((field.offset, child.size))
+    }
+
+    /// Resolve a fused inline-struct chain `path` into `(summed_field_offset,
+    /// terminal_field_size)`: the byte offset of the deepest field relative to
+    /// the chain's root, plus that field's byte size. Each step's owner is
+    /// substituted to a concrete type before resolution, so the fold is
+    /// instantiation-correct; the running offset is `checked_add`ed.
+    fn resolve_field_path(
+        &self,
+        path: &[(InternedType, FieldHandleIndex)],
+    ) -> VMResult<(u32, u32)> {
+        if path.is_empty() {
+            return Err(VMInternalError::new(LoweringError::EmptyFieldChain));
+        }
+        let mut sum: u32 = 0;
+        let mut terminal_size: u32 = 0;
+        for (owner, fh) in path {
+            let (offset, size) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+            sum = sum
+                .checked_add(offset)
+                .ok_or(LoweringError::FieldChainOffsetOverflow)?;
+            terminal_size = size;
+        }
+        Ok((sum, terminal_size))
+    }
+
+    // --- Shared field-access emission (single-field and chain arms) ---
+
+    /// Borrow of an inline-struct local's field: the field's absolute frame
+    /// offset is compile-time, so no fat pointer is materialized.
+    fn lower_local_field_borrow(
+        &mut self,
+        field_offset: u32,
+        local: Slot,
+        dst: Slot,
+    ) -> VMResult<()> {
+        let local_info = self.slot(local)?;
+        let dst_info = self.def_slot(dst)?;
+        self.emit(MicroOp::SlotBorrow {
+            dst: dst_info.offset,
+            local: FrameOffset(local_info.offset.0 + field_offset),
+        })
+    }
+
+    /// By-value read of an inline-struct local's field: a frame move, plus a
+    /// deep copy when the field is heap-backed.
+    fn lower_local_field_read(
+        &mut self,
+        field: (u32, u32),
+        local: Slot,
+        dst: Slot,
+    ) -> VMResult<()> {
+        let (field_offset, field_size) = field;
+        let local_info = self.slot(local)?;
+        let dst_info = self.def_typed_slot(dst)?;
+        let src = SizedSlot {
+            offset: FrameOffset(local_info.offset.0 + field_offset),
+            size: field_size,
+            align: local_info.align,
+        };
+        self.emit_single_move(dst_info.slot.offset, src)?;
+        self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)
+    }
+
+    /// By-value write into an inline-struct local's field: a frame move.
+    fn lower_local_field_write(
+        &mut self,
+        field: (u32, u32),
+        local: Slot,
+        val: Slot,
+    ) -> VMResult<()> {
+        let (field_offset, field_size) = field;
+        let local_info = self.slot(local)?;
+        let val_info = self.slot(val)?;
+        let src = SizedSlot {
+            offset: val_info.offset,
+            size: field_size,
+            align: val_info.align,
+        };
+        self.emit_single_move(FrameOffset(local_info.offset.0 + field_offset), src)
+    }
+
+    /// Borrow of a field through a reference: fold the field offset into the
+    /// address compute in a single dispatch.
+    fn lower_ref_field_borrow(&mut self, field_offset: u32, src: Slot, dst: Slot) -> VMResult<()> {
+        let src_info = self.slot(src)?;
+        let dst_info = self.def_slot(dst)?;
+        self.emit(MicroOp::DeriveRefOffsetImm {
+            dst_ref: dst_info.offset,
+            src_ref: src_info.offset,
+            offset: field_offset,
+        })
+    }
+
+    /// By-value read of a field through a reference, plus a deep copy when
+    /// the field is heap-backed.
+    fn lower_ref_field_read(&mut self, field: (u32, u32), src: Slot, dst: Slot) -> VMResult<()> {
+        let (field_offset, field_size) = field;
+        let src_info = self.slot(src)?;
+        let dst_info = self.def_typed_slot(dst)?;
+        self.emit(MicroOp::ReadRefOffset {
+            dst: dst_info.slot.offset,
+            ref_ptr: src_info.offset,
+            offset: field_offset,
+            size: field_size,
+        })?;
+        self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)
+    }
+
+    /// By-value write into a field through a reference.
+    fn lower_ref_field_write(
+        &mut self,
+        field: (u32, u32),
+        dst_ref: Slot,
+        val: Slot,
+    ) -> VMResult<()> {
+        let (field_offset, field_size) = field;
+        let ref_info = self.slot(dst_ref)?;
+        let val_info = self.slot(val)?;
+        self.emit(MicroOp::WriteRefOffset {
+            ref_ptr: ref_info.offset,
+            offset: field_offset,
+            src: val_info.offset,
+            size: field_size,
+        })
     }
 
     /// Resolve a `VariantFieldHandleIndex` against `enum_ty`'s derived
@@ -260,27 +403,6 @@ impl<'a> LoweringState<'a> {
         vfh: VariantFieldHandleIndex,
     ) -> VMResult<VariantFieldAccess> {
         resolve_variant_field_access(self.ctx.module, &self.ctx.enum_layouts, enum_ty, vfh)
-    }
-
-    /// Emit the borrow of a variant field's reference into `dst_ref`. Uses the
-    /// static `enum_borrow` when the offset is variant-independent, else the
-    /// tag-dispatched `EnumBorrowVariantField` (which also aborts when the
-    /// runtime variant does not declare the field).
-    fn emit_variant_field_borrow(
-        &mut self,
-        access: &VariantFieldAccess,
-        enum_ref: FrameOffset,
-        dst_ref: FrameOffset,
-    ) -> VMResult<()> {
-        match access.uniform_offset {
-            Some(offset) => self.emit(MicroOp::enum_borrow(enum_ref, offset, dst_ref))?,
-            None => self.emit(MicroOp::enum_borrow_variant_field(
-                enum_ref,
-                &access.offsets,
-                dst_ref,
-            ))?,
-        }
-        Ok(())
     }
 
     fn xfer_binding(&self, j: u16) -> VMResult<TypedSlot> {
@@ -512,6 +634,8 @@ impl<'a> LoweringState<'a> {
         if dst_offset == src.offset {
             return Ok(());
         }
+        // `Move8` is sound at any offset alignment (it uses unaligned
+        // accesses), so dispatch purely on size.
         if src.size == 8 {
             self.emit(MicroOp::Move8 {
                 dst: dst_offset,
@@ -1462,37 +1586,15 @@ impl<'a> LoweringState<'a> {
             Instr::ImmBorrowLocField(dst, owner, fh, local)
             | Instr::MutBorrowLocField(dst, owner, fh, local) => {
                 let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
-                let local_info = self.slot(*local)?;
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::SlotBorrow {
-                    dst: dst_info.offset,
-                    local: FrameOffset(local_info.offset.0 + field_offset),
-                })?;
+                self.lower_local_field_borrow(field_offset, *local, *dst)?;
             },
             Instr::ReadLocalField(dst, owner, fh, local) => {
-                let (field_offset, field_size) =
-                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
-                let local_info = self.slot(*local)?;
-                let dst_info = self.def_typed_slot(*dst)?;
-                let src = SizedSlot {
-                    offset: FrameOffset(local_info.offset.0 + field_offset),
-                    size: field_size,
-                    align: local_info.align,
-                };
-                self.emit_single_move(dst_info.slot.offset, src)?;
-                self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
+                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+                self.lower_local_field_read(field, *local, *dst)?;
             },
             Instr::WriteLocalField(owner, fh, local, val) => {
-                let (field_offset, field_size) =
-                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
-                let local_info = self.slot(*local)?;
-                let val_info = self.slot(*val)?;
-                let src = SizedSlot {
-                    offset: val_info.offset,
-                    size: field_size,
-                    align: val_info.align,
-                };
-                self.emit_single_move(FrameOffset(local_info.offset.0 + field_offset), src)?;
+                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+                self.lower_local_field_write(field, *local, *val)?;
             },
 
             // --- Inline-struct: by-ref ---
@@ -1504,38 +1606,47 @@ impl<'a> LoweringState<'a> {
             Instr::ImmBorrowField(dst, owner, fh, src)
             | Instr::MutBorrowField(dst, owner, fh, src) => {
                 let (field_offset, _) = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
-                let src_info = self.slot(*src)?;
-                let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::DeriveRefOffsetImm {
-                    dst_ref: dst_info.offset,
-                    src_ref: src_info.offset,
-                    offset: field_offset,
-                })?;
+                self.lower_ref_field_borrow(field_offset, *src, *dst)?;
             },
             Instr::ReadField(dst, owner, fh, src) => {
-                let (field_offset, field_size) =
-                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
-                let src_info = self.slot(*src)?;
-                let dst_info = self.def_typed_slot(*dst)?;
-                self.emit(MicroOp::ReadRefOffset {
-                    dst: dst_info.slot.offset,
-                    ref_ptr: src_info.offset,
-                    offset: field_offset,
-                    size: field_size,
-                })?;
-                self.maybe_deep_copy(dst_info.ty, dst_info.slot.offset)?;
+                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+                self.lower_ref_field_read(field, *src, *dst)?;
             },
             Instr::WriteField(owner, fh, dst_ref, val) => {
-                let (field_offset, field_size) =
-                    self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
-                let ref_info = self.slot(*dst_ref)?;
-                let val_info = self.slot(*val)?;
-                self.emit(MicroOp::WriteRefOffset {
-                    ref_ptr: ref_info.offset,
-                    offset: field_offset,
-                    src: val_info.offset,
-                    size: field_size,
-                })?;
+                let field = self.resolve_field(self.concrete_ty(*owner)?, *fh)?;
+                self.lower_ref_field_write(field, *dst_ref, *val)?;
+            },
+
+            // --- Fused inline-struct field CHAINS ---
+            //
+            // The whole run reaches one field at `base(root) + Σ offsets`, so
+            // each lowers to exactly one micro-op (the same one the single-field
+            // op uses), with the summed offset and terminal size folded in.
+            Instr::ReadLocalFieldChain(dst, path, local) => {
+                let field = self.resolve_field_path(path)?;
+                self.lower_local_field_read(field, *local, *dst)?;
+            },
+            Instr::WriteLocalFieldChain(path, local, val) => {
+                let field = self.resolve_field_path(path)?;
+                self.lower_local_field_write(field, *local, *val)?;
+            },
+            Instr::ImmBorrowLocalFieldChain(dst, path, local)
+            | Instr::MutBorrowLocalFieldChain(dst, path, local) => {
+                let (field_offset, _) = self.resolve_field_path(path)?;
+                self.lower_local_field_borrow(field_offset, *local, *dst)?;
+            },
+            Instr::ReadFieldChain(dst, path, src) => {
+                let field = self.resolve_field_path(path)?;
+                self.lower_ref_field_read(field, *src, *dst)?;
+            },
+            Instr::WriteFieldChain(path, dst_ref, val) => {
+                let field = self.resolve_field_path(path)?;
+                self.lower_ref_field_write(field, *dst_ref, *val)?;
+            },
+            Instr::ImmBorrowFieldChain(dst, path, src)
+            | Instr::MutBorrowFieldChain(dst, path, src) => {
+                let (field_offset, _) = self.resolve_field_path(path)?;
+                self.lower_ref_field_borrow(field_offset, *src, *dst)?;
             },
 
             // --- Pack / Unpack: per-field byte copies between frame slots ---
@@ -1948,13 +2059,10 @@ impl<'a> LoweringState<'a> {
                 ))?;
             },
             // By-reference field read/write: `src`/`dst_ref` is an enum fat
-            // pointer. The uniform-offset fast path fuses the heap deref and
-            // the value copy into one `Enum{Read,Write}VariantField` (no
-            // scratch reference). The divergent-offset path resolves the offset
-            // by tag: `emit_variant_field_borrow` materializes a field
-            // reference in the scratch slot, then `ReadRef`/`WriteRef` accesses
-            // it. Every op here is non-allocating, so the scratch reference
-            // never spans a safe point.
+            // pointer. The uniform-offset fast path fuses the heap deref and the
+            // value copy into one `Enum{Read,Write}VariantField`; the divergent
+            // path fuses the tag dispatch and the copy into one
+            // `Enum{Read,Write}VariantFieldByTag`. Both are non-allocating.
             Instr::ReadVariantField(dst, enum_ty, vfh, src) => {
                 let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
                 let src_off = self.slot(*src)?.offset;
@@ -1967,19 +2075,12 @@ impl<'a> LoweringState<'a> {
                         dst_off,
                         access.field_size,
                     ))?,
-                    None => {
-                        let scratch = self.ctx.variant_field_scratch.ok_or(
-                            LoweringError::VariantFieldScratchMissing {
-                                op: "ReadVariantField",
-                            },
-                        )?;
-                        self.emit_variant_field_borrow(&access, src_off, scratch)?;
-                        self.emit(MicroOp::ReadRef {
-                            dst: dst_off,
-                            ref_ptr: scratch,
-                            size: access.field_size,
-                        })?;
-                    },
+                    None => self.emit(MicroOp::enum_read_variant_field_by_tag(
+                        src_off,
+                        &access.offsets,
+                        dst_off,
+                        access.field_size,
+                    ))?,
                 }
                 // A by-value variant-field read materializes the field; if it is
                 // itself heap-backed, make it independent.
@@ -1996,30 +2097,31 @@ impl<'a> LoweringState<'a> {
                         val_off,
                         access.field_size,
                     ))?,
-                    None => {
-                        let scratch = self.ctx.variant_field_scratch.ok_or(
-                            LoweringError::VariantFieldScratchMissing {
-                                op: "WriteVariantField",
-                            },
-                        )?;
-                        self.emit_variant_field_borrow(&access, ref_off, scratch)?;
-                        self.emit(MicroOp::WriteRef {
-                            ref_ptr: scratch,
-                            src: val_off,
-                            size: access.field_size,
-                        })?;
-                    },
+                    None => self.emit(MicroOp::enum_write_variant_field_by_tag(
+                        ref_off,
+                        &access.offsets,
+                        val_off,
+                        access.field_size,
+                    ))?,
                 }
             },
             // Borrowing a variant field directly produces a field reference
             // into `dst`; the borrow derefs the enum and offsets into the heap
-            // object (statically or by runtime tag).
+            // object — statically when uniform, else by runtime tag (aborting
+            // when the variant does not declare the field).
             Instr::ImmBorrowVariantField(dst, enum_ty, vfh, src)
             | Instr::MutBorrowVariantField(dst, enum_ty, vfh, src) => {
                 let access = self.resolve_variant_field(self.concrete_ty(*enum_ty)?, *vfh)?;
                 let src_off = self.slot(*src)?.offset;
                 let dst_off = self.def_slot(*dst)?.offset;
-                self.emit_variant_field_borrow(&access, src_off, dst_off)?;
+                match access.uniform_offset {
+                    Some(offset) => self.emit(MicroOp::enum_borrow(src_off, offset, dst_off))?,
+                    None => self.emit(MicroOp::enum_borrow_variant_field_by_tag(
+                        src_off,
+                        &access.offsets,
+                        dst_off,
+                    ))?,
+                }
             },
 
             Instr::ForceGC => self.emit(MicroOp::ForceGC)?,

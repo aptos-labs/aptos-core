@@ -5,15 +5,12 @@ script {
     fun main() {
         let _v0 = 0;
         let _v1 = 0;
-        let _v2 = false;
-        loop {
-            if (_v2) _v1 = _v1 + 1 else _v2 = true;
-            if (!(_v1 < 10)) break;
+        while (_v1 < 10) {
             _v0 = _v0 + 1;
             if (_v0 >= 15) break;
             _v0 = _v0 + 2;
-            if (_v1 % 2 == 0) continue;
-            _v0 = _v0 * 2
+            if (!(_v1 % 2 == 0)) _v0 = _v0 * 2;
+            _v1 = _v1 + 1
         };
         assert!(_v0 == 16, _v0);
     }

@@ -39,7 +39,7 @@ fun mutate_vec_push() {
 }
 
 fun publish_nested_read() {
-  frame_data_size: 224
+  frame_data_size: 208
   entry_gas: 308
   code:
     0: VecNew [72]
@@ -53,19 +53,18 @@ fun publish_nested_read() {
     8: Move8 [136] <- [72]
     9: Move8 [152] <- [136]
     10: Move8 [144] <- [112]
-    11: HeapNew [216] desc=3
-    12: HeapMoveTo [216]+0 <- [144] (size=16)
-    13: MoveTo<0x42::nested_globals::Outer> signer=[120], src=[216]
+    11: HeapNew [200] desc=3
+    12: HeapMoveTo [200]+0 <- [144] (size=16)
+    13: MoveTo<0x42::nested_globals::Outer> signer=[120], src=[200]
     14: BorrowGlobal<0x42::nested_globals::Outer> [80] <- addr=[32], ty=
     15: ReadRefOffset [112] <- *([80]+0) (size=8)
     16: DeriveRefOffsetImm [160] <- [80]+8
-    17: DeriveRefOffsetImm [176] <- [160]+0
-    18: StoreImm8 [192] <- #1
-    19: VecBorrow [200] <- &[176][[192]] (elem_size=8)
-    20: ReadRef [192] <- *[200] (size=8)
-    21: AddU64 [192] <- [112] + [192]
-    22: Move8 [0] <- [192]
-    23: Return
+    17: StoreImm8 [176] <- #1
+    18: VecBorrow [184] <- &[160][[176]] (elem_size=8)
+    19: ReadRef [176] <- *[184] (size=8)
+    20: AddU64 [176] <- [112] + [176]
+    21: Move8 [0] <- [176]
+    22: Return
   safe_point_layouts:
     2: []
     5: []
@@ -137,6 +136,6 @@ fun publish_vec_take() {
 === frame-layout ===
 // module 0x42::nested_globals
 fun mutate_vec_push: heap_ptr_offsets=[72, 80, 96, 112, 144, 152, 168, 184] zero_frame=true
-fun publish_nested_read: heap_ptr_offsets=[72, 80, 96, 120, 136, 152, 160, 176, 200] zero_frame=true
+fun publish_nested_read: heap_ptr_offsets=[72, 80, 96, 120, 136, 152, 160, 184] zero_frame=true
 fun publish_vec_read: heap_ptr_offsets=[72, 80, 96, 120, 144, 152, 176] zero_frame=true
 fun publish_vec_take: heap_ptr_offsets=[72, 80, 88, 104, 136, 144, 168] zero_frame=true

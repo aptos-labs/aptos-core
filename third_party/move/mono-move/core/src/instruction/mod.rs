@@ -362,7 +362,9 @@ pub enum MicroOp {
         imm: Box<[u8; 32]>,
     },
 
-    /// Copy 8 bytes from `src` to `dst`.
+    /// Copy 8 bytes from `src` to `dst`. Neither slot need be 8-aligned: a
+    /// size-8 aggregate (e.g. `{u32, u32}`, align 4) can sit at a 4-aligned
+    /// field offset.
     Move8 {
         dst: FrameOffset,
         src: FrameOffset,
@@ -953,6 +955,25 @@ pub enum MicroOp {
         size: u32,
     },
 
+    /// Read within a heap object at a static offset: `obj_ref` is a fat pointer
+    /// whose target holds the heap object pointer; copies `size` bytes at byte
+    /// `offset` within the object into `dst`.
+    HeapReadOffset {
+        dst: FrameOffset,
+        obj_ref: FrameOffset,
+        offset: u32,
+        size: u32,
+    },
+
+    /// Write within a heap object at a static offset: copies `size` bytes
+    /// from `src` to byte `offset` within the object.
+    HeapWriteOffset {
+        obj_ref: FrameOffset,
+        offset: u32,
+        src: FrameOffset,
+        size: u32,
+    },
+
     /// Copies the 16-byte fat pointer from `src_ref` to `dst_ref`, while
     /// adding `offset` to the offset part of the fat pointer.
     ///
@@ -1012,6 +1033,9 @@ pub enum MicroOp {
     },
 
     /// Copy 8 bytes from a heap object at `heap_ptr + offset` into `dst`.
+    /// Neither `dst` nor `heap_ptr + offset` need be 8-aligned: a size-8
+    /// aggregate (e.g. `{u32, u32}`, align 4) can sit at a 4-aligned slot
+    /// or field offset.
     HeapMoveFrom8 {
         dst: FrameOffset,
         heap_ptr: FrameOffset,
@@ -1027,6 +1051,9 @@ pub enum MicroOp {
     },
 
     /// Copy 8 bytes from `src` into a heap object at `heap_ptr + offset`.
+    /// Neither `src` nor `heap_ptr + offset` need be 8-aligned: a size-8
+    /// aggregate (e.g. `{u32, u32}`, align 4) can sit at a 4-aligned slot
+    /// or field offset.
     HeapMoveTo8 {
         heap_ptr: FrameOffset,
         offset: u32,
@@ -1034,6 +1061,7 @@ pub enum MicroOp {
     },
 
     /// Write an immediate u64 into a heap object at `heap_ptr + offset`.
+    /// `heap_ptr + offset` need not be 8-aligned (see `HeapMoveTo8`).
     HeapMoveToImm8 {
         heap_ptr: FrameOffset,
         offset: u32,
@@ -1177,12 +1205,13 @@ pub enum MicroOp {
     /// If `None` (the runtime variant does not declare the field), aborts with
     /// a variant mismatch (expected Move semantics).
     ///
-    /// `off` is the full object-relative offset (already includes
-    /// `ENUM_DATA_OFFSET`); indexing by tag handles a field shared across
-    /// variants that sits at different byte offsets in each. An access whose
-    /// handle covers every variant, all placing the field at one fixed offset,
-    /// uses the static `enum_borrow` (`HeapBorrow`) fast path instead.
-    EnumBorrowVariantField {
+    /// Each `off` is measured from the object's start — the `ENUM_DATA_OFFSET`
+    /// tag skip is folded in when the op is constructed. Indexing by tag
+    /// handles a field shared across variants that sits at different byte
+    /// offsets in each. An access whose handle covers every variant, all
+    /// placing the field at one fixed offset, uses the [`MicroOp::HeapBorrow`]
+    /// fast path instead.
+    EnumBorrowVariantFieldByTag {
         dst: FrameOffset,
         enum_ref: FrameOffset,
         // TODO(perf): the boxed slice is a separate allocation and a
@@ -1215,38 +1244,33 @@ pub enum MicroOp {
         variant: VariantTag,
     },
 
-    /// Read a variant field by value through an enum reference at a static
-    /// object-relative `offset`. The uniform-offset fast path: the access's
-    /// handle covers every variant, all placing the field at the same offset,
-    /// so no runtime tag dispatch or mismatch check is needed. Derefs the
-    /// 16-byte `enum_ref` fat pointer to the heap object (a double deref), then
-    /// copies `size` bytes from `obj + offset` into `dst`. Fuses the
-    /// `HeapBorrow` + `ReadRef` (the divergent path still routes through a
-    /// scratch reference).
-    ///
-    // TODO(cleanup): nothing here is enum-specific — this reads any field through a
-    // reference at a static offset. Rename to a non-enum-specific name as part
-    // of a naming-consistency pass.
-    EnumReadVariantField {
+    /// Read a variant field by value through an enum reference, selecting the
+    /// field's object byte offset by the runtime variant tag: derefs the
+    /// 16-byte `enum_ref` fat pointer to the heap object, reads the tag, and
+    /// if `offsets[tag]` is `Some(off)` copies `size` bytes at byte `off`
+    /// within the object into `dst`; a `None` hole (the runtime variant does
+    /// not declare the field) aborts with a variant mismatch. Each `off` is
+    /// measured from the object's start — the `ENUM_DATA_OFFSET` tag skip is
+    /// folded in when the op is constructed. When every variant places the
+    /// field at one offset, [`MicroOp::HeapReadOffset`] is used instead.
+    EnumReadVariantFieldByTag {
         dst: FrameOffset,
         enum_ref: FrameOffset,
-        offset: u32,
+        // See `EnumBorrowVariantFieldByTag::offsets` for the boxed-slice rationale
+        // and the `size_of::<MicroOp>() == 48` constraint.
+        offsets: Box<[Option<u32>]>,
         size: u32,
     },
 
-    /// Write a variant field by value through an enum reference at a static
-    /// object-relative `offset` (uniform-offset fast path; see
-    /// [`MicroOp::EnumReadVariantField`]). Derefs the 16-byte `enum_ref` fat
-    /// pointer to the heap object, then copies `size` bytes from `src` into
-    /// `obj + offset`. Fuses `HeapBorrow` + `WriteRef` (the divergent path
-    /// still routes through a scratch reference).
-    ///
-    // TODO(cleanup): nothing here is enum-specific — this writes any field through a
-    // reference at a static offset, and is reusable when fusing. Rename to a
-    // non-enum-specific name as part of a naming-consistency pass.
-    EnumWriteVariantField {
+    /// Write a variant field by value through an enum reference, selecting the
+    /// field's object byte offset by the runtime variant tag (symmetric
+    /// counterpart to [`MicroOp::EnumReadVariantFieldByTag`]). Aborts with a
+    /// variant mismatch when `offsets[tag]` is `None`. When every variant
+    /// places the field at one offset, [`MicroOp::HeapWriteOffset`] is used
+    /// instead.
+    EnumWriteVariantFieldByTag {
         enum_ref: FrameOffset,
-        offset: u32,
+        offsets: Box<[Option<u32>]>,
         src: FrameOffset,
         size: u32,
     },
@@ -1944,14 +1968,14 @@ impl fmt::Display for MicroOp {
                     dst.0, enum_ref.0, variant
                 )
             },
-            MicroOp::EnumBorrowVariantField {
+            MicroOp::EnumBorrowVariantFieldByTag {
                 dst,
                 enum_ref,
                 offsets,
             } => {
                 write!(
                     f,
-                    "EnumBorrowVariantField [{}] <- &(*[{}]) by tag {:?}",
+                    "EnumBorrowVariantFieldByTag [{}] <- &(*[{}]) by tag {:?}",
                     dst.0, enum_ref.0, offsets
                 )
             },
@@ -1973,28 +1997,52 @@ impl fmt::Display for MicroOp {
                     dst.0, descriptor_id, variant
                 )
             },
-            MicroOp::EnumReadVariantField {
+            MicroOp::HeapReadOffset {
                 dst,
-                enum_ref,
+                obj_ref,
                 offset,
                 size,
             } => {
                 write!(
                     f,
-                    "EnumReadVariantField({}) [{}] <- (*[{}]).{}",
-                    size, dst.0, enum_ref.0, offset
+                    "HeapReadOffset({}) [{}] <- (*[{}]).{}",
+                    size, dst.0, obj_ref.0, offset
                 )
             },
-            MicroOp::EnumWriteVariantField {
-                enum_ref,
+            MicroOp::HeapWriteOffset {
+                obj_ref,
                 offset,
                 src,
                 size,
             } => {
                 write!(
                     f,
-                    "EnumWriteVariantField({}) (*[{}]).{} <- [{}]",
-                    size, enum_ref.0, offset, src.0
+                    "HeapWriteOffset({}) (*[{}]).{} <- [{}]",
+                    size, obj_ref.0, offset, src.0
+                )
+            },
+            MicroOp::EnumReadVariantFieldByTag {
+                dst,
+                enum_ref,
+                offsets,
+                size,
+            } => {
+                write!(
+                    f,
+                    "EnumReadVariantFieldByTag({}) [{}] <- (*[{}]) by tag {:?}",
+                    size, dst.0, enum_ref.0, offsets
+                )
+            },
+            MicroOp::EnumWriteVariantFieldByTag {
+                enum_ref,
+                offsets,
+                src,
+                size,
+            } => {
+                write!(
+                    f,
+                    "EnumWriteVariantFieldByTag({}) (*[{}]) <- [{}] by tag {:?}",
+                    size, enum_ref.0, src.0, offsets
                 )
             },
             MicroOp::DeepCopyHeapPtrs { base, offsets } => {
@@ -2267,10 +2315,12 @@ impl MicroOp {
             | MicroOp::BoolAnd { .. }
             | MicroOp::BoolOr { .. }
             | MicroOp::EnumTestTag { .. }
-            | MicroOp::EnumBorrowVariantField { .. }
+            | MicroOp::EnumBorrowVariantFieldByTag { .. }
             | MicroOp::EnumCheckVariant { .. }
-            | MicroOp::EnumReadVariantField { .. }
-            | MicroOp::EnumWriteVariantField { .. } => false,
+            | MicroOp::HeapReadOffset { .. }
+            | MicroOp::HeapWriteOffset { .. }
+            | MicroOp::EnumReadVariantFieldByTag { .. }
+            | MicroOp::EnumWriteVariantFieldByTag { .. } => false,
         }
     }
 
@@ -2343,24 +2393,30 @@ impl MicroOp {
         }
     }
 
+    /// Shift each present data-region-relative offset by [`ENUM_DATA_OFFSET`] to
+    /// a full object-relative offset; `None` holes (variants lacking the field)
+    /// pass through.
+    fn to_object_relative_offsets(data_relative_offsets: &[Option<u32>]) -> Box<[Option<u32>]> {
+        data_relative_offsets
+            .iter()
+            .map(|maybe_offset| maybe_offset.map(|offset| ENUM_DATA_OFFSET as u32 + offset))
+            .collect()
+    }
+
     /// Tag-dispatched variant-field borrow. `data_relative_offsets[tag]` is the
     /// field's data-region-relative offset in that variant, or `None` if the
     /// variant does not declare the field (borrowing it aborts). Offsets are
     /// shifted by `ENUM_DATA_OFFSET` to full object-relative offsets, matching
     /// `enum_borrow`.
-    pub fn enum_borrow_variant_field(
+    pub fn enum_borrow_variant_field_by_tag(
         enum_ref: FrameOffset,
         data_relative_offsets: &[Option<u32>],
         dst: FrameOffset,
     ) -> Self {
-        let offsets = data_relative_offsets
-            .iter()
-            .map(|maybe_offset| maybe_offset.map(|offset| ENUM_DATA_OFFSET as u32 + offset))
-            .collect();
-        MicroOp::EnumBorrowVariantField {
+        MicroOp::EnumBorrowVariantFieldByTag {
             dst,
             enum_ref,
-            offsets,
+            offsets: Self::to_object_relative_offsets(data_relative_offsets),
         }
     }
 
@@ -2380,14 +2436,14 @@ impl MicroOp {
     /// data-region-relative and shifted by `ENUM_DATA_OFFSET` to a full
     /// object-relative offset, matching [`MicroOp::enum_borrow`].
     pub fn enum_read_variant_field(
-        enum_ref: FrameOffset,
+        obj_ref: FrameOffset,
         field_offset: u32,
         dst: FrameOffset,
         size: u32,
     ) -> Self {
-        MicroOp::EnumReadVariantField {
+        MicroOp::HeapReadOffset {
             dst,
-            enum_ref,
+            obj_ref,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
             size,
         }
@@ -2396,14 +2452,49 @@ impl MicroOp {
     /// Uniform-offset variant-field write by value; offset handling mirrors
     /// [`MicroOp::enum_read_variant_field`].
     pub fn enum_write_variant_field(
-        enum_ref: FrameOffset,
+        obj_ref: FrameOffset,
         field_offset: u32,
         src: FrameOffset,
         size: u32,
     ) -> Self {
-        MicroOp::EnumWriteVariantField {
-            enum_ref,
+        MicroOp::HeapWriteOffset {
+            obj_ref,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
+            src,
+            size,
+        }
+    }
+
+    /// Tag-dispatched variant-field read by value. `data_relative_offsets[tag]`
+    /// is the field's data-region-relative offset in that variant, or `None`
+    /// when the variant lacks the field (reading it aborts). Offsets are shifted
+    /// by `ENUM_DATA_OFFSET` to full object-relative offsets, matching
+    /// [`MicroOp::enum_borrow_variant_field_by_tag`].
+    pub fn enum_read_variant_field_by_tag(
+        enum_ref: FrameOffset,
+        data_relative_offsets: &[Option<u32>],
+        dst: FrameOffset,
+        size: u32,
+    ) -> Self {
+        MicroOp::EnumReadVariantFieldByTag {
+            dst,
+            enum_ref,
+            offsets: Self::to_object_relative_offsets(data_relative_offsets),
+            size,
+        }
+    }
+
+    /// Tag-dispatched variant-field write by value; offset handling mirrors
+    /// [`MicroOp::enum_read_variant_field_by_tag`].
+    pub fn enum_write_variant_field_by_tag(
+        enum_ref: FrameOffset,
+        data_relative_offsets: &[Option<u32>],
+        src: FrameOffset,
+        size: u32,
+    ) -> Self {
+        MicroOp::EnumWriteVariantFieldByTag {
+            enum_ref,
+            offsets: Self::to_object_relative_offsets(data_relative_offsets),
             src,
             size,
         }

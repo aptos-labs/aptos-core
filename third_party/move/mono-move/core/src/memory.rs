@@ -2,6 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Raw, typed read/write of values at a byte offset from a base pointer.
+//!
+//! TODO(correctness): audit every caller of the aligned accessors below —
+//! any slot or field offset not guaranteed to meet the accessed type's
+//! alignment must use an unaligned access instead.
 
 use crate::align::MAX_ALIGN;
 use move_core_types::account_address::AccountAddress;

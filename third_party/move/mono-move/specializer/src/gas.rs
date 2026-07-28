@@ -44,6 +44,9 @@ enum GasInstrumentationError {
     #[error("Xfer({xfer}) read without a prior call-return binding")]
     XferReadWithoutBinding { xfer: u16 },
 
+    #[error("empty field chain")]
+    EmptyFieldChain,
+
     #[error("Vid slot in post-allocation IR")]
     VidInPostAllocationIr,
 
@@ -75,6 +78,7 @@ impl IntoExecutionError for GasInstrumentationError {
         match self {
             ExpectedReferenceType
             | XferReadWithoutBinding { .. }
+            | EmptyFieldChain
             | VidInPostAllocationIr
             | FieldOwnerNotStruct
             | VariantOwnerNotEnum
@@ -237,6 +241,19 @@ impl<I: Interner> Emitter<'_, I> {
             .subst_type(self.module.interned_field_type_at(fh), *ty_args)?)
     }
 
+    /// Type of a fused field chain's terminal field (its last `path` step).
+    /// The whole chain reaches one field, so its read/write cost scales with
+    /// that field's size — exactly like the single-field op.
+    fn chain_terminal_ty(
+        &self,
+        path: &[(InternedType, FieldHandleIndex)],
+    ) -> VMResult<InternedType> {
+        let (owner, fh) = path
+            .last()
+            .ok_or(GasInstrumentationError::EmptyFieldChain)?;
+        self.field_ty(*owner, *fh)
+    }
+
     /// Field types of enum `enum_ty`'s variant `variant`, with the enum's type
     /// arguments applied.
     fn variant_field_tys(
@@ -364,6 +381,25 @@ impl<I: Interner> Emitter<'_, I> {
             },
             Instr::WriteLocalField(_, _, _, val) => {
                 b.add_sized(MOVE_BASE, MOVE_PER_BYTE, self.slot_ty(*val)?)
+            },
+
+            // --- Fused field chains: charged exactly what the pre-fusion
+            // sequence charges, so fusing never changes a program's gas.
+            // TODO(metering): emit gas from pre-optimization IR instead of
+            // hand-replicating pre-fusion costs per fused op. ---
+            Instr::ImmBorrowFieldChain(_, path, _)
+            | Instr::MutBorrowFieldChain(_, path, _)
+            | Instr::ImmBorrowLocalFieldChain(_, path, _)
+            | Instr::MutBorrowLocalFieldChain(_, path, _) => {
+                b.add_constant(BORROW * path.len() as u64)
+            },
+            Instr::ReadFieldChain(_, path, _) | Instr::ReadLocalFieldChain(_, path, _) => {
+                b.add_constant(BORROW * (path.len() as u64).saturating_sub(1));
+                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.chain_terminal_ty(path)?);
+            },
+            Instr::WriteFieldChain(path, _, val) | Instr::WriteLocalFieldChain(path, _, val) => {
+                b.add_constant(BORROW * (path.len() as u64).saturating_sub(1));
+                b.add_sized(REF_RW_BASE, REF_RW_PER_BYTE, self.slot_ty(*val)?);
             },
 
             // --- Globals ---

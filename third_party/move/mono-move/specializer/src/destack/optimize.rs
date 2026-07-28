@@ -10,7 +10,8 @@
 
 use crate::stackless_exec_ir::{
     instr_utils::{
-        for_each_def, for_each_slot, for_each_use, remap_all_slots_with, remap_source_slots_with,
+        for_each_def, for_each_slot, for_each_use, mut_local_borrow_target, remap_all_slots_with,
+        remap_source_slots_with,
     },
     FunctionIR, Instr, ModuleIR, Slot,
 };
@@ -75,15 +76,20 @@ fn copy_propagation(func: &mut FunctionIR) {
         for instr in &mut block.instrs {
             remap_source_slots_with(instr, |s| *subst.get(&s).unwrap_or(&s));
 
-            // Kill subst for locals whose storage may be mutated without
-            // a full def: mut borrows (writes go through the ref) and
-            // `WriteLocalField` (partial write).
-            if let Instr::MutBorrowLoc(_, src)
-            | Instr::MutBorrowLocField(_, _, _, src)
-            | Instr::WriteLocalField(_, _, src, _) = instr
-            {
-                subst.remove(src);
-                subst.retain(|_, v| v != src);
+            // Kill subst for locals whose storage may be mutated without a
+            // full def: mut borrows (writes go through the ref) and
+            // `WriteLocalField` (partial write). `WriteLocalFieldChain`
+            // reports its root local as a def, so it is covered by the
+            // `for_each_def` kill below; the ref-rooted `WriteFieldChain`
+            // writes through a reference whose originating mut borrow was
+            // already killed here.
+            let mut hidden_write = mut_local_borrow_target(instr);
+            if let Instr::WriteLocalField(_, _, local, _) = instr {
+                hidden_write = Some(*local);
+            }
+            if let Some(src) = hidden_write {
+                subst.remove(&src);
+                subst.retain(|_, v| *v != src);
             }
 
             for_each_def(instr, |d| {

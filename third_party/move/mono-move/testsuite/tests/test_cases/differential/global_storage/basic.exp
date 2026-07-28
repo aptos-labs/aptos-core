@@ -215,7 +215,7 @@ fun double_publish(r0) {
 }
 
 fun publish_and_read(r0, r1, r2): u64 {
-  slots: params(3), locals(1), temps(7)
+  slots: params(3), locals(1), temps(6)
     r0: signer
     r1: address
     r2: u64
@@ -226,7 +226,6 @@ fun publish_and_read(r0, r1, r2): u64 {
     r7: u64
     r8: 0x42::globals::Inner
     r9: 0x42::globals::R
-    r10: &0x42::globals::Inner
   code:
   L0:
     0: r4 := imm_borrow_loc r0
@@ -240,13 +239,11 @@ fun publish_and_read(r0, r1, r2): u64 {
     8: r5 := read_field R::x, r3
     9: r7 := read_field R::y, r3
     10: r7 := add r5, r7
-    11: r10 := imm_borrow_field R::inner, r3
-    12: r5 := read_field Inner::a, r10
-    13: r5 := add r7, r5
-    14: r10 := imm_borrow_field R::inner, r3
-    15: r7 := read_field Inner::b, r10
-    16: r7 := add r5, r7
-    17: ret [r7]
+    11: r5 := read_field_chain R::inner.Inner::a, r3
+    12: r5 := add r7, r5
+    13: r7 := read_field_chain R::inner.Inner::b, r3
+    14: r7 := add r5, r7
+    15: ret [r7]
 }
 
 fun publish_and_take(r0, r1, r2): u64 {
@@ -281,7 +278,7 @@ fun publish_and_take(r0, r1, r2): u64 {
 }
 
 fun publish_mutate_read(r0, r1, r2): u64 {
-  slots: params(3), locals(1), temps(9)
+  slots: params(3), locals(1), temps(7)
     r0: signer
     r1: address
     r2: u64
@@ -292,9 +289,7 @@ fun publish_mutate_read(r0, r1, r2): u64 {
     r7: u64
     r8: 0x42::globals::Inner
     r9: 0x42::globals::R
-    r10: &mut 0x42::globals::Inner
-    r11: &0x42::globals::R
-    r12: &0x42::globals::Inner
+    r10: &0x42::globals::R
   code:
   L0:
     0: r4 := imm_borrow_loc r0
@@ -307,12 +302,10 @@ fun publish_mutate_read(r0, r1, r2): u64 {
     7: r3 := mut_borrow_global 0x42::globals::R, r1
     8: r5 := read_field R::x, r3
     9: r5 := add r5, #1
-    10: r10 := mut_borrow_field R::inner, r3
-    11: write_field Inner::b, r10, r5
-    12: r11 := imm_borrow_global 0x42::globals::R, r1
-    13: r12 := imm_borrow_field R::inner, r11
-    14: r5 := read_field Inner::b, r12
-    15: ret [r5]
+    10: write_field_chain R::inner.Inner::b, r3, r5
+    11: r10 := imm_borrow_global 0x42::globals::R, r1
+    12: r5 := read_field_chain R::inner.Inner::b, r10
+    13: ret [r5]
 }
 
 fun take_missing(r0): u64 {
@@ -378,7 +371,7 @@ fun double_publish() {
 }
 
 fun publish_and_read() {
-  frame_data_size: 200
+  frame_data_size: 184
   entry_gas: 372
   code:
     0: SlotBorrow [88] <- &[0]
@@ -390,21 +383,19 @@ fun publish_and_read() {
     6: Move(16) [160] <- [128]
     7: Move8 [152] <- [104]
     8: Move8 [144] <- [64]
-    9: HeapNew [192] desc=2
-    10: HeapMoveTo [192]+0 <- [144] (size=32)
-    11: MoveTo<0x42::globals::R> signer=[88], src=[192]
+    9: HeapNew [176] desc=2
+    10: HeapMoveTo [176]+0 <- [144] (size=32)
+    11: MoveTo<0x42::globals::R> signer=[88], src=[176]
     12: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty=
     13: ReadRefOffset [104] <- *([72]+0) (size=8)
     14: ReadRefOffset [120] <- *([72]+8) (size=8)
     15: AddU64 [120] <- [104] + [120]
-    16: DeriveRefOffsetImm [176] <- [72]+16
-    17: ReadRefOffset [104] <- *([176]+0) (size=8)
-    18: AddU64 [104] <- [120] + [104]
-    19: DeriveRefOffsetImm [176] <- [72]+16
-    20: ReadRefOffset [120] <- *([176]+8) (size=8)
-    21: AddU64 [120] <- [104] + [120]
-    22: Move8 [0] <- [120]
-    23: Return
+    16: ReadRefOffset [104] <- *([72]+16) (size=8)
+    17: AddU64 [104] <- [120] + [104]
+    18: ReadRefOffset [120] <- *([72]+24) (size=8)
+    19: AddU64 [120] <- [104] + [120]
+    20: Move8 [0] <- [120]
+    21: Return
   safe_point_layouts:
     9: []
 }
@@ -443,7 +434,7 @@ fun publish_and_take() {
 }
 
 fun publish_mutate_read() {
-  frame_data_size: 232
+  frame_data_size: 200
   entry_gas: 342
   code:
     0: SlotBorrow [88] <- &[0]
@@ -455,19 +446,17 @@ fun publish_mutate_read() {
     6: Move(16) [160] <- [128]
     7: Move8 [152] <- [104]
     8: Move8 [144] <- [64]
-    9: HeapNew [224] desc=2
-    10: HeapMoveTo [224]+0 <- [144] (size=32)
-    11: MoveTo<0x42::globals::R> signer=[88], src=[224]
+    9: HeapNew [192] desc=2
+    10: HeapMoveTo [192]+0 <- [144] (size=32)
+    11: MoveTo<0x42::globals::R> signer=[88], src=[192]
     12: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty=
     13: ReadRefOffset [104] <- *([72]+0) (size=8)
     14: AddU64Imm [104] <- [104] + #1
-    15: DeriveRefOffsetImm [176] <- [72]+16
-    16: WriteRefOffset *([176]+8) <- [104] (size=8)
-    17: BorrowGlobal<0x42::globals::R> [192] <- addr=[32], ty=
-    18: DeriveRefOffsetImm [208] <- [192]+16
-    19: ReadRefOffset [104] <- *([208]+8) (size=8)
-    20: Move8 [0] <- [104]
-    21: Return
+    15: WriteRefOffset *([72]+24) <- [104] (size=8)
+    16: BorrowGlobal<0x42::globals::R> [176] <- addr=[32], ty=
+    17: ReadRefOffset [104] <- *([176]+24) (size=8)
+    18: Move8 [0] <- [104]
+    19: Return
   safe_point_layouts:
     9: []
     12: []

@@ -1364,6 +1364,71 @@ module 0xc0ffee::complexity {
         result
     }
 
+    // complexity: 11
+    // Regression: a `while` loop whose body merely begins with a
+    // `loop { ...; break }` must be counted as a `while` loop (net +1), not
+    // misread as a lowered `for` loop (net -1). Misreading it would undercount
+    // the complexity by 2 (to 9) and suppress this warning.
+    public fun while_with_leading_inner_loop(n: u64): u64 {
+        let i = 0;
+        let sum = 0;
+        while (i < n) { // +1
+            loop { // +1
+                if (i % 2 == 0) { // +1
+                    sum = sum + 2;
+                } else if (i % 3 == 0) { // +1
+                    sum = sum + 3;
+                } else if (i % 4 == 0) { // +1
+                    sum = sum + 4;
+                } else if (i % 5 == 0) { // +1
+                    sum = sum + 5;
+                } else if (i % 6 == 0) { // +1
+                    sum = sum + 6;
+                } else if (i % 7 == 0) { // +1
+                    sum = sum + 7;
+                } else if (i % 8 == 0) { // +1
+                    sum = sum + 8;
+                };
+                break // +1
+            };
+            i = i + 1;
+        };
+        sum
+    }
+
+    // complexity: 12
+    // Regression: a genuine `for` loop with a `continue` must stay recognized as
+    // a `for` loop (net -3 for the lowering scaffold). Losing that recognition
+    // would inflate the reported complexity by 2 (to 14).
+    public fun for_with_continue_high(n: u64): u64 {
+        let sum = 0;
+        for (i in 0..n) { // +1
+            if (i % 2 == 0) { // +1
+                continue // +1
+            };
+            if (i % 3 == 0) { // +1
+                sum = sum + 3;
+            } else if (i % 4 == 0) { // +1
+                sum = sum + 4;
+            } else if (i % 5 == 0) { // +1
+                sum = sum + 5;
+            } else if (i % 6 == 0) { // +1
+                sum = sum + 6;
+            } else if (i % 7 == 0) { // +1
+                sum = sum + 7;
+            } else if (i % 8 == 0) { // +1
+                sum = sum + 8;
+            } else if (i % 9 == 0) { // +1
+                sum = sum + 9;
+            } else if (i % 10 == 0) { // +1
+                sum = sum + 10;
+            } else {
+                sum = sum + i;
+            }
+        };
+        sum
+    }
+
 
     #[lint::skip(cyclomatic_complexity)]
     public fun skipped_function(b: u64): u64 {

@@ -115,6 +115,10 @@ pub enum ImmValue {
 // of the largest integer type.
 const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
+/// A chain of inline-struct field selections, each an `(instantiated owner
+/// type, field handle)` pair.
+pub type FieldPath = Vec<(InternedType, FieldHandleIndex)>;
+
 /// A stackless IR instruction with explicit named-slot operands.
 ///
 /// TODO(cleanup):
@@ -201,6 +205,35 @@ pub enum Instr {
     ReadLocalField(Slot, InternedType, FieldHandleIndex, Slot),
     /// `local.field = src` (mut_borrow_loc + write_field on an inline struct local)
     WriteLocalField(InternedType, FieldHandleIndex, Slot, Slot),
+
+    // --- Fused inline-struct field CHAINS (depth >= 2) ---
+    //
+    // Collapse a run of `*BorrowField` selections (whose intermediate
+    // references are dead after the chain) into one micro-op. `path` is the
+    // non-empty list of `(owner, field)` steps; the deepest field's address is
+    // `base(root) + Σ offsets`. Borrow chains keep the `Imm`/`Mut` split of
+    // the single-field borrows, see [`Instr::MutBorrowLocalFieldChain`] why
+    // this is needed.
+    //
+    /// `dst = root_ref.path` (root is a reference).
+    ReadFieldChain(Slot, FieldPath, Slot),
+    /// `root_ref.path = val`.
+    WriteFieldChain(FieldPath, Slot, Slot),
+    /// `dst = &root_ref.path`.
+    ImmBorrowFieldChain(Slot, FieldPath, Slot),
+    /// `dst = &mut root_ref.path`.
+    MutBorrowFieldChain(Slot, FieldPath, Slot),
+    /// `dst = root_local.path` (root is a by-value inline-struct local).
+    ReadLocalFieldChain(Slot, FieldPath, Slot),
+    /// `root_local.path = val`.
+    WriteLocalFieldChain(FieldPath, Slot, Slot),
+    /// `dst = &root_local.path`.
+    ImmBorrowLocalFieldChain(Slot, FieldPath, Slot),
+    /// `dst = &mut root_local.path`. A later write through `dst` mutates the
+    /// local without a def at the write site, so passes that track the
+    /// local's value must recognize this variant — the reason borrow chains
+    /// keep the `Imm`/`Mut` split.
+    MutBorrowLocalFieldChain(Slot, FieldPath, Slot),
 
     // --- Globals (struct type is the interned `Type` for the named
     // resource; same type contract as `Pack`/`Unpack`) ---
@@ -306,6 +339,14 @@ impl Instr {
             Instr::MutBorrowLocField(..) => "MutBorrowLocField",
             Instr::ReadLocalField(..) => "ReadLocalField",
             Instr::WriteLocalField(..) => "WriteLocalField",
+            Instr::ReadFieldChain(..) => "ReadFieldChain",
+            Instr::WriteFieldChain(..) => "WriteFieldChain",
+            Instr::ImmBorrowFieldChain(..) => "ImmBorrowFieldChain",
+            Instr::MutBorrowFieldChain(..) => "MutBorrowFieldChain",
+            Instr::ReadLocalFieldChain(..) => "ReadLocalFieldChain",
+            Instr::WriteLocalFieldChain(..) => "WriteLocalFieldChain",
+            Instr::ImmBorrowLocalFieldChain(..) => "ImmBorrowLocalFieldChain",
+            Instr::MutBorrowLocalFieldChain(..) => "MutBorrowLocalFieldChain",
             Instr::Exists(..) => "Exists",
             Instr::MoveFrom(..) => "MoveFrom",
             Instr::MoveTo(..) => "MoveTo",
