@@ -88,9 +88,18 @@ We are currently investigating relaxing the requirement of spec blocks for compl
 \label{sec:validation-tests}
 
 Inferred conditions are labeled \texttt{[inferred]} and feed directly back into \MVP for verification, creating a pipeline: code $\leadsto$ code+specs $\leadsto$ VC, with verification expected to succeed.
-Tab.~\ref{tab:inference-tests} summarizes the inference test suite exercising behavioral predicates across all HOF patterns introduced in this paper.
-All categories pass end-to-end, confirming that the encoding of behavioral predicates and state labels is internally consistent and that inferred specifications are tight enough for the verifier to discharge.
-The full inference test suite can be found at~\cite{InferenceTestsuite}.
+This pipeline acts as a \emph{differential-testing oracle} for the extension described in this paper: inference and verification are independent implementations which meet only at the semantics of behavioral predicates and state labels, so a failure indicates a defect in one of them --- conditions inferred unsoundly or not tightly, or axioms too weak to discharge them.
+Tab.~\ref{tab:inference-tests} maps the categories of the inference test suite~\cite{InferenceTestsuite} --- currently 27 cases with over 550 inferred conditions --- to the HOF patterns introduced in this paper.
+All categories pass end-to-end, evidence that the encoding is internally consistent and that the axioms are strong enough to discharge \emph{tight} specifications: usable, not merely sound.
+Mutual recursion deserves a note: inference breaks the specification cycle by phrasing each function's spec in terms of the other's behavioral predicate, which verification resolves against the axioms of Sec.~\ref{sec:enc-bp}.
+
+\SubSection{Empirical Status}
+\label{sec:empirical}
+
+The extension described in this paper is implemented in the production \MVP shipped with the Aptos toolchain; the paper describes Move language version 2.4 and \MVP as of the aptos-core commit pinned in~\cite{PaperExamples, InferenceTestsuite}.
+The closure portion of the prover's test suite comprises 19 test modules with about 240 verified functions and 66 expected-error diagnoses, including the examples of this paper; together with the inference suite, these run in continuous integration on every change to the prover.
+The tests are required to be stable across changes to the prover and underlying tools like Z3, and complete in under 5 minutes on standard GitHub runners, with a default timeout of 40 seconds per verification condition.
+A benchmark over a larger corpus of higher-order Move contracts does not yet exist: higher-order Move shipped in late 2025, and a corpus is only now forming, partly in closed-source projects.
 
 
 
