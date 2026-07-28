@@ -302,6 +302,10 @@ pub enum Operation {
     // Special ops
     Uninit,
     Havoc(HavocKind),
+    /// Havocs the given global memory: its post-state is arbitrary. Emitted
+    /// by loop analysis at loop headers for memory the loop body may modify,
+    /// so the loop-exit path does not retain pre-loop memory.
+    HavocGlobal(ModuleId, StructId, Vec<Type>),
     Stop,
 
     // Debugging
@@ -348,6 +352,7 @@ impl Operation {
             Operation::FreezeRef(_) => false,
             Operation::Vector => false,
             Operation::Havoc(_) => false,
+            Operation::HavocGlobal(..) => false,
             Operation::Stop => false,
             Operation::WriteBack(..) => false,
             Operation::IsParent(..) => false,
@@ -1428,6 +1433,9 @@ impl fmt::Display for OperationDisplay<'_> {
                     HavocKind::MutationValue => "mut",
                     HavocKind::MutationAll => "mut_all",
                 })?;
+            },
+            HavocGlobal(mid, sid, targs) => {
+                write!(f, "havoc_global<{}>", self.struct_str(*mid, *sid, targs))?;
             },
             Stop => {
                 write!(f, "stop")?;

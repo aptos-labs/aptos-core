@@ -63,7 +63,9 @@ spec aptos_framework::coin {
         pragma aborts_if_is_partial;
         global supply<CoinType>: num;
         global aggregate_supply<CoinType>: num;
-        apply TotalSupplyTracked<CoinType> to *<CoinType> except initialize, initialize_internal, initialize_with_parallelizable_supply;
+        // TODO: `migrate_coin_store_to_fungible_store` migrates in an inline `for_each`
+        // loop; the schema needs a loop invariant that cannot be attached there.
+        apply TotalSupplyTracked<CoinType> to *<CoinType> except initialize, initialize_internal, initialize_with_parallelizable_supply, migrate_coin_store_to_fungible_store;
         // TODO(fa_migration)
         // apply TotalSupplyNoChange<CoinType> to *<CoinType> except mint,
         //     burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
