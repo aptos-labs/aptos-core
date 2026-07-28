@@ -281,7 +281,15 @@ fn timed_once<L: Loader + InstantiatedFunctionLoader, R: AptosMoveResolver>(
 
 fn classify_error(err: VMError) -> ExecOutcome {
     match err.into_vm_status() {
-        VMStatus::MoveAbort { code, message, .. } => ExecOutcome::Aborted { code, message },
+        VMStatus::MoveAbort {
+            code,
+            message,
+            location,
+        } => ExecOutcome::Aborted {
+            code,
+            message,
+            location,
+        },
         VMStatus::ExecutionFailure {
             status_code,
             location,

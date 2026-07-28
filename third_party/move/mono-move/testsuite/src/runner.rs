@@ -38,14 +38,14 @@ use mono_move_core::{native::NativeExtensions, types::type_to_string};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::serialize;
-use move_binary_format::CompiledModule;
+use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     int256::{I256, U256},
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
-    vm_status::StatusCode,
+    vm_status::{AbortLocation, StatusCode},
 };
 use move_vm_runtime::{
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
@@ -509,11 +509,14 @@ fn execute_function_v1(
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
-            let display = match err.message() {
-                Some(m) => format!("aborted: code {} ({})", code, m),
-                None => format!("aborted: code {}", code),
+            let location = match err.location() {
+                Location::Module(module_id) => render_module_location(module_id),
+                Location::Script => "script".to_string(),
+                Location::Undefined => "undefined".to_string(),
             };
-            Output { display }
+            Output {
+                display: render_abort(code, err.message().map(String::as_str), &location),
+            }
         },
         Err(err) => Output {
             display: format!("error: {}", err),
@@ -604,13 +607,38 @@ fn execute_function_v2(
     let display = match outcome {
         Err(err) => format!("error: {}", err),
         Ok(RunResult::Error(err)) => format!("error: {}", err),
-        Ok(RunResult::Aborted { code, message }) => match message {
-            Some(m) => format!("aborted: code {} ({})", code, m),
-            None => format!("aborted: code {}", code),
+        Ok(RunResult::Aborted {
+            code,
+            message,
+            location,
+        }) => {
+            let location = match &location {
+                AbortLocation::Module(module_id) => render_module_location(module_id),
+                AbortLocation::Script => "script".to_string(),
+            };
+            render_abort(code, message.as_deref(), &location)
         },
         Ok(RunResult::Success((vals, events))) => render_execution_output(&vals, &events),
     };
     (Output { display }, gc_count)
+}
+
+/// Renders an abort outcome. Both VMs go through this so the abort location
+/// participates in the differential comparison.
+fn render_abort(code: u64, message: Option<&str>, location: &str) -> String {
+    match message {
+        Some(message) => format!("aborted: code {} ({}) in {}", code, message, location),
+        None => format!("aborted: code {} in {}", code, location),
+    }
+}
+
+/// The common rendering of a module abort location: `0x<address>::<module>`.
+pub(crate) fn render_module_location(module_id: &ModuleId) -> String {
+    format!(
+        "0x{}::{}",
+        module_id.address().short_str_lossless(),
+        module_id.name()
+    )
 }
 
 /// Kind supported as an argument or return value in differential tests

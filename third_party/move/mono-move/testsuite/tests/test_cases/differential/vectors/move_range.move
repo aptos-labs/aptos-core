@@ -79,9 +79,9 @@ module 0x66::move_range {
 
 // Out-of-bounds range, then out-of-bounds insert position; both abort.
 // RUN: execute 0x66::move_range::move_u64 --args 1, 5, 0
-// CHECK: aborted: code 1
+// CHECK: aborted: code 1 in 0x1::vector
 // RUN: execute 0x66::move_range::move_u64 --args 0, 1, 5
-// CHECK: aborted: code 1
+// CHECK: aborted: code 1 in 0x1::vector
 
 // Empty (null-pointer) destination.
 // RUN: execute 0x66::move_range::move_into_empty --args 0, 2
