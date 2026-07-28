@@ -1,0 +1,150 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::chained_field_fusion
+
+struct B has drop+copy
+  b_lead: u64
+  z: u64
+
+struct A has drop+copy
+  a_lead: u64
+  y: B
+  w: u64
+
+struct S has drop+copy
+  x: A
+
+// Build S { x: A { a_lead: 0, y: B { b_lead: 0, z }, w } }.
+fun mk(z: u64, w: u64): S
+    ld_u64 0
+    ld_u64 0
+    move_loc z
+    pack B
+    move_loc w
+    pack A
+    pack S
+    ret
+
+// Read a 3-level chain from a by-value local.
+fun read_by_value(s: S): u64
+    borrow_loc s
+    borrow_field S, x
+    borrow_field A, y
+    borrow_field B, z
+    read_ref
+    ret
+
+// Read a 3-level chain from a &S.
+fun read_by_ref(s: &S): u64
+    move_loc s
+    borrow_field S, x
+    borrow_field A, y
+    borrow_field B, z
+    read_ref
+    ret
+
+// Write through a 3-level chain on a &mut S.
+fun write_by_ref(s: &mut S, v: u64)
+    move_loc v
+    move_loc s
+    mut_borrow_field S, x
+    mut_borrow_field A, y
+    mut_borrow_field B, z
+    write_ref
+    ret
+
+// Pure-borrow chain: returns &s.x.y.z.
+fun borrow_chain(s: &S): &u64
+    move_loc s
+    borrow_field S, x
+    borrow_field A, y
+    borrow_field B, z
+    ret
+
+fun use_borrow_chain(s: &S): u64
+    move_loc s
+    call borrow_chain
+    read_ref
+    ret
+
+fun read_shared(s: &S): u64
+    local r: &A
+    move_loc s
+    borrow_field S, x
+    st_loc r
+    copy_loc r
+    borrow_field A, y
+    borrow_field B, z
+    read_ref
+    move_loc r
+    borrow_field A, w
+    read_ref
+    add
+    ret
+
+fun test_read_by_value(z: u64): u64
+    local s: S
+    move_loc z
+    ld_u64 0
+    call mk
+    st_loc s
+    move_loc s
+    call read_by_value
+    ret
+
+fun test_read_by_ref(z: u64): u64
+    local s: S
+    move_loc z
+    ld_u64 0
+    call mk
+    st_loc s
+    borrow_loc s
+    call read_by_ref
+    ret
+
+fun test_write_by_ref(z: u64, v: u64): u64
+    local s: S
+    move_loc z
+    ld_u64 0
+    call mk
+    st_loc s
+    mut_borrow_loc s
+    move_loc v
+    call write_by_ref
+    move_loc s
+    call read_by_value
+    ret
+
+fun test_borrow_chain(z: u64): u64
+    local s: S
+    move_loc z
+    ld_u64 0
+    call mk
+    st_loc s
+    borrow_loc s
+    call use_borrow_chain
+    ret
+
+fun test_read_shared(z: u64, w: u64): u64
+    local s: S
+    move_loc z
+    move_loc w
+    call mk
+    st_loc s
+    borrow_loc s
+    call read_shared
+    ret
+
+// RUN: execute 0x66::chained_field_fusion::test_read_by_value --args 42
+// CHECK: results: 42
+
+// RUN: execute 0x66::chained_field_fusion::test_read_by_ref --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::chained_field_fusion::test_write_by_ref --args 5, 99
+// CHECK: results: 99
+
+// RUN: execute 0x66::chained_field_fusion::test_borrow_chain --args 13
+// CHECK: results: 13
+
+// RUN: execute 0x66::chained_field_fusion::test_read_shared --args 3, 4
+// CHECK: results: 7

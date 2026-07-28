@@ -1,0 +1,40 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x55::chain_abort_order
+
+struct Inner has drop+copy
+  a: u64
+  b: u64
+
+enum E has drop
+  Fa
+    x: u64
+  Fb
+    x: u64
+    y: Inner
+
+// Aborts with code 777, no args, no results.
+fun boom()
+    ld_u64 777
+    abort
+
+fun read_after_call(e: &E): u64
+    move_loc e
+    borrow_variant_field E, Fb::y
+    borrow_field Inner, b
+    call boom
+    read_ref
+    ret
+
+fun run(): u64
+    local e: E
+    ld_u64 7
+    pack_variant E, Fa
+    st_loc e
+    borrow_loc e
+    call read_after_call
+    ret
+
+// Reading y on an Fa must abort with a variant mismatch on BOTH VMs, before
+// boom() runs (not boom()'s code 777).
+// RUN: execute 0x55::chain_abort_order::run
+// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH

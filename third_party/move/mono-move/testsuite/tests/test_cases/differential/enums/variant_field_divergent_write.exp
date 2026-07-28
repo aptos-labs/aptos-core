@@ -1,0 +1,120 @@
+=== micro-ops ===
+// module 0x43::variant_field_divergent_write
+
+fun make_e() {
+  frame_data_size: 40
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=79 gas_fallthrough=76
+    1: StoreImm1 [8] <- #1
+    2: StoreImm1 [9] <- #0
+    3: EnumNew [16] desc=2 tag #0
+    4: HeapMoveTo [16]+8 <- [8] (size=1)
+    5: HeapMoveTo [16]+9 <- [9] (size=1)
+    6: Move8 [0] <- [16]
+    7: Return
+    8: StoreImm2 [24] <- #2
+    9: StoreImm1 [9] <- #0
+    10: EnumNew [16] desc=2 tag #1
+    11: HeapMoveTo [16]+8 <- [24] (size=2)
+    12: HeapMoveTo [16]+10 <- [9] (size=1)
+    13: Move8 [0] <- [16]
+    14: Return
+  safe_point_layouts:
+    3: []
+    10: []
+}
+
+fun make_f() {
+  frame_data_size: 40
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @6 [0] != u64 #0 gas_taken=76 gas_fallthrough=69
+    1: StoreImm1 [8] <- #1
+    2: EnumNew [16] desc=3 tag #0
+    3: HeapMoveTo [16]+8 <- [8] (size=1)
+    4: Move8 [0] <- [16]
+    5: Return
+    6: StoreImm1 [8] <- #1
+    7: StoreImm1 [24] <- #7
+    8: EnumNew [16] desc=3 tag #1
+    9: HeapMoveTo [16]+8 <- [8] (size=1)
+    10: HeapMoveTo [16]+9 <- [24] (size=1)
+    11: Move8 [0] <- [16]
+    12: Return
+  safe_point_layouts:
+    2: []
+    8: []
+}
+
+fun read_y() {
+  frame_data_size: 24
+  entry_gas: 17
+  code:
+    0: EnumReadVariantFieldByTag(1) [16] <- (*[0]) by tag [None, Some(9)]
+    1: Move(1) [0] <- [16]
+    2: Return
+}
+
+fun run_read_y() {
+  frame_data_size: 16
+  entry_gas: 136
+  code:
+    0: Move8 [40] <- [0]
+    1: CallIndirect 0x43::variant_field_divergent_write::make_f
+    2: Move8 [8] <- [40]
+    3: SlotBorrow [40] <- &[8]
+    4: CallIndirect 0x43::variant_field_divergent_write::read_y
+    5: Move(1) [0] <- [40]
+    6: Return
+}
+
+fun run_write_y() {
+  frame_data_size: 24
+  entry_gas: 203
+  code:
+    0: Move8 [48] <- [0]
+    1: CallIndirect 0x43::variant_field_divergent_write::make_f
+    2: Move8 [16] <- [48]
+    3: SlotBorrow [48] <- &[16]
+    4: Move(1) [64] <- [8]
+    5: CallIndirect 0x43::variant_field_divergent_write::set_y
+    6: SlotBorrow [48] <- &[16]
+    7: CallIndirect 0x43::variant_field_divergent_write::read_y
+    8: Move(1) [0] <- [48]
+    9: Return
+}
+
+fun set_x() {
+  frame_data_size: 24
+  entry_gas: 12
+  code:
+    0: IntAdd [17] <- [16] + u8 #1
+    1: EnumWriteVariantFieldByTag(1) (*[0]) <- [17] by tag [Some(9), Some(10)]
+    2: Return
+}
+
+fun set_y() {
+  frame_data_size: 24
+  entry_gas: 12
+  code:
+    0: IntAdd [17] <- [16] + u8 #1
+    1: EnumWriteVariantFieldByTag(1) (*[0]) <- [17] by tag [None, Some(9)]
+    2: Return
+}
+
+fun write_read() {
+  frame_data_size: 48
+  entry_gas: 148
+  code:
+    0: Move8 [72] <- [0]
+    1: CallIndirect 0x43::variant_field_divergent_write::make_e
+    2: Move8 [16] <- [72]
+    3: SlotBorrow [72] <- &[16]
+    4: Move(1) [88] <- [8]
+    5: CallIndirect 0x43::variant_field_divergent_write::set_x
+    6: SlotBorrow [24] <- &[16]
+    7: EnumReadVariantFieldByTag(1) [40] <- (*[24]) by tag [Some(9), Some(10)]
+    8: Move(1) [0] <- [40]
+    9: Return
+}

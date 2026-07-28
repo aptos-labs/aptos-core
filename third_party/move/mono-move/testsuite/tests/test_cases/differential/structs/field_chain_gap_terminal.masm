@@ -1,0 +1,77 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x67::field_chain_gap_terminal
+
+struct B has drop+copy
+  b_lead: u64
+  z: u64
+
+struct A has drop+copy
+  a_lead: u64
+  y: B
+
+struct S has drop+copy
+  x: A
+
+// Build S { x: A { a_lead: 0, y: B { b_lead: 0, z } } }.
+fun mk(z: u64): S
+    ld_u64 0
+    ld_u64 0
+    move_loc z
+    pack B
+    pack A
+    pack S
+    ret
+
+// Read with a gap: the borrow run ends, two unrelated instructions execute
+// (materialize + store a constant), then `read_ref` consumes the chain's ref.
+fun read_gap(s: &S): u64
+    local t: u64
+    move_loc s
+    borrow_field S, x
+    borrow_field A, y
+    borrow_field B, z
+    ld_u64 5
+    st_loc t
+    read_ref
+    ret
+
+// Write with a gap: the value and the borrow run are on the stack, two
+// unrelated instructions execute, then `write_ref` consumes the chain's ref.
+fun write_gap(s: &mut S, v: u64)
+    local t: u64
+    move_loc v
+    move_loc s
+    mut_borrow_field S, x
+    mut_borrow_field A, y
+    mut_borrow_field B, z
+    ld_u64 9
+    st_loc t
+    write_ref
+    ret
+
+fun test_read_gap(z: u64): u64
+    local s: S
+    move_loc z
+    call mk
+    st_loc s
+    borrow_loc s
+    call read_gap
+    ret
+
+fun test_write_gap(z: u64, v: u64): u64
+    local s: S
+    move_loc z
+    call mk
+    st_loc s
+    mut_borrow_loc s
+    move_loc v
+    call write_gap
+    borrow_loc s
+    call read_gap
+    ret
+
+// RUN: execute 0x67::field_chain_gap_terminal::test_read_gap --args 42
+// CHECK: results: 42
+
+// RUN: execute 0x67::field_chain_gap_terminal::test_write_gap --args 5, 99
+// CHECK: results: 99

@@ -179,8 +179,12 @@ enum LoweringError {
     #[error("{op}: dst/src aliases but no enum-pointer scratch reserved")]
     EnumPtrScratchMissing { op: &'static str },
 
-    #[error("{op}: no scratch slot reserved")]
-    VariantFieldScratchMissing { op: &'static str },
+    // ---- fused field chains ----
+    #[error("empty field chain")]
+    EmptyFieldChain,
+
+    #[error("field chain offset overflow")]
+    FieldChainOffsetOverflow,
 
     #[error("Xfer({xfer}) read without a prior def in this block")]
     XferReadWithoutDef { xfer: u16 },
@@ -236,7 +240,8 @@ impl IntoExecutionError for LoweringError {
             | VectorTypeNoDescriptor { .. }
             | VariantOrdinalOutOfRange { .. }
             | EnumPtrScratchMissing { .. }
-            | VariantFieldScratchMissing { .. }
+            | EmptyFieldChain
+            | FieldChainOffsetOverflow
             | XferReadWithoutDef { .. } => ExecutionErrorKind::InvariantViolation,
         }
     }
