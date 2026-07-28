@@ -17,7 +17,7 @@ module 0x42::stored_fun_values {
         f: |u64|u64 has copy+store+drop,
     }
     spec Transformer {
-        invariant forall x: u64: !aborts_of<f>(x);
+        invariant forall S in *, x: u64: S |~ !aborts_of<f>(x);
     }
 
     /// Helper: a safe function that never aborts (identity)
@@ -68,9 +68,9 @@ module 0x42::stored_fun_values {
         f: |u64|u64 has copy+store+drop,
     }
     spec Monotone {
-        invariant forall x: u64: !aborts_of<f>(x);
+        invariant forall S in *, x: u64: S |~ !aborts_of<f>(x);
         // The stored function always returns a value >= its input
-        invariant forall x: u64, r: u64: ensures_of<f>(x, r) ==> r >= x;
+        invariant forall S in *, x: u64, r: u64: S.. |~ ensures_of<f>(x, r) ==> r >= x;
     }
 
     /// Pack with identity (returns x >= x): should verify
@@ -112,8 +112,8 @@ module 0x42::stored_fun_values {
         f: |u64|u64 has copy+store+drop,
     }
     spec Doubler {
-        invariant forall x: u64: !aborts_of<f>(x);
-        invariant forall x: u64: result_of<f>(x) == 2 * x;
+        invariant forall S in *, x: u64: S |~ !aborts_of<f>(x);
+        invariant forall S in *, x: u64: S.. |~ result_of<f>(x) == 2 * x;
     }
 
     public fun double(x: u64): u64 {
@@ -142,7 +142,7 @@ module 0x42::stored_fun_values {
     }
     spec Reader {
         // The stored reader function never aborts (assumes resource exists)
-        invariant forall a: address: !aborts_of<f>(a);
+        invariant forall S in *, a: address: S |~ !aborts_of<f>(a);
     }
 
     // A function that reads a global resource — can abort when missing
@@ -196,7 +196,7 @@ module 0x42::stored_fun_values {
         f: |&signer| has copy+store+drop,
     }
     spec Modifier {
-        invariant forall s: signer: !aborts_of<f>(s);
+        invariant forall S in *, s: signer: S |~ !aborts_of<f>(s);
     }
 
     // A function that modifies a global resource — can abort
@@ -260,9 +260,9 @@ module 0x42::stored_fun_values {
         f: |u64, u64|u64 has copy+store+drop,
     }
     spec SafeOp {
-        invariant forall x: u64, y: u64: !aborts_of<f>(x, y);
-        invariant forall x: u64, y: u64, r: u64:
-            ensures_of<f>(x, y, r) ==> r <= x + y;
+        invariant forall S in *, x: u64, y: u64: S |~ !aborts_of<f>(x, y);
+        invariant forall S in *, x: u64, y: u64, r: u64:
+            S.. |~ ensures_of<f>(x, y, r) ==> r <= x + y;
     }
 
     /// Helper: saturating add (never aborts, result <= x + y)
@@ -308,7 +308,7 @@ module 0x42::stored_fun_values {
     }
     spec CounterReader {
         reads_of<f> Counter;
-        invariant forall a: address: !aborts_of<f>(a);
+        invariant forall S in *, a: address: S |~ !aborts_of<f>(a);
     }
 
     /// Pack with safe_read_counter (reads Counter only): should verify
@@ -340,7 +340,7 @@ module 0x42::stored_fun_values {
     }
     spec CounterModifier {
         modifies_of<f>(s: signer) Counter[std::signer::address_of(s)];
-        invariant forall s: signer: !aborts_of<f>(s);
+        invariant forall S in *, s: signer: S |~ !aborts_of<f>(s);
     }
 
     /// Pack with safe_increment (modifies Counter): should verify
@@ -371,7 +371,7 @@ module 0x42::stored_fun_values {
     spec ConfigAwareModifier {
         reads_of<f> Config;
         modifies_of<f>(s: signer) Counter[std::signer::address_of(s)];
-        invariant forall s: signer: !aborts_of<f>(s);
+        invariant forall S in *, s: signer: S |~ !aborts_of<f>(s);
     }
 
     // A function that reads Config and modifies Counter (never aborts)
@@ -432,7 +432,7 @@ module 0x42::stored_fun_values {
     }
     spec AnyReader {
         reads_of<f> *;
-        invariant forall a: address: !aborts_of<f>(a);
+        invariant forall S in *, a: address: S |~ !aborts_of<f>(a);
     }
 
     /// Pack with safe_read_counter (reads Counter): compliant with wildcard
@@ -482,7 +482,7 @@ module 0x42::stored_fun_values {
     }
     spec AnyModifier {
         modifies_of<f> *;
-        invariant forall s: signer: !aborts_of<f>(s);
+        invariant forall S in *, s: signer: S |~ !aborts_of<f>(s);
     }
 
     /// Pack with safe_increment (modifies Counter): compliant with wildcard
@@ -526,7 +526,7 @@ module 0x42::stored_fun_values {
     spec Action {
         reads_of<self.0> Counter;
         // Use self.0 in invariant via the field variable directly
-        invariant forall a: address: !aborts_of<self.0>(a);
+        invariant forall S in *, a: address: S |~ !aborts_of<self.0>(a);
     }
 
     /// Pack with safe_read_counter: should verify

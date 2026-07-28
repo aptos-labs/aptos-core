@@ -1,3 +1,4 @@
+// separate_baseline: path
 module 0x815::m {
 
     enum TestNoField has copy, drop {

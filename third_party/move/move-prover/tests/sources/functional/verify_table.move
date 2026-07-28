@@ -1,3 +1,4 @@
+// separate_baseline: path
 // This file verifies the intrinsic Table implementation.
 module 0x42::VerifyTable {
     use extensions::table::{Self, Table};

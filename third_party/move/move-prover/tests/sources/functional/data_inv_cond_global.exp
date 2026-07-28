@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+  ┌─ tests/sources/functional/data_inv_cond_global.move:9:14
+  │
+9 │     spec S { invariant x > 0; }
+  │              ^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/data_inv_cond_global.move:12: violates
+  =         a = <redacted>
+  =         c = <redacted>
+  =     at tests/sources/functional/data_inv_cond_global.move:13: violates
+  =     at tests/sources/functional/data_inv_cond_global.move:9
+  =     at tests/sources/functional/data_inv_cond_global.move:13: violates
+  =         tl = <redacted>
+  =     at tests/sources/functional/data_inv_cond_global.move:14: violates
+  =         r = <redacted>
+  =     at tests/sources/functional/data_inv_cond_global.move:15: violates
+  =         r = <redacted>
+  =     at tests/sources/functional/data_inv_cond_global.move:9

@@ -213,6 +213,12 @@ pub struct BoogieOptions {
     /// condition.
     #[arg(long, default_value_t = 5)]
     pub error_limit: usize,
+    /// Mirror of `ProverOptions::path_refs`, derived from the env in `add_prelude`
+    /// (never set by embedders). Consumed only by the Tera prelude to select the
+    /// legacy WriteBack `$Mutation` model (the default is the path-free prophecy
+    /// model). No separate backend CLI flag.
+    #[arg(skip)]
+    pub path_refs: bool,
 }
 
 impl Default for BoogieOptions {
@@ -251,6 +257,7 @@ impl Default for BoogieOptions {
             skip_instance_check: false,
             split_vcs_by_assert: false,
             error_limit: 5,
+            path_refs: false,
         }
     }
 }

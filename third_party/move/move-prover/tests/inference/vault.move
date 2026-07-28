@@ -7,8 +7,8 @@ module 0x42::vault {
     struct Strategy(|FungibleAsset|FungibleAsset) has store, copy;
     spec Strategy {
         modifies_of<self.0> *;
-        invariant forall input: FungibleAsset, result: FungibleAsset:
-            ensures_of<self.0>(input, result) ==>
+        invariant forall S in *, input: FungibleAsset, result: FungibleAsset:
+            S.. |~ ensures_of<self.0>(input, result) ==>
                 fungible_asset::asset_metadata(result) == fungible_asset::asset_metadata(input) &&
                 fungible_asset::amount(result) >= fungible_asset::amount(input);
     }

@@ -513,7 +513,11 @@ impl<'a> Instrumenter<'a> {
         // elimination (live vars). This cleans up some redundancy created by
         // the instrumentation scheme.
         let mut data = instrumenter.builder.data;
-        let reach_def = ReachingDefProcessor::new();
+        let reach_def = if options.path_refs || options.inference {
+            ReachingDefProcessor::new()
+        } else {
+            ReachingDefProcessor::new_no_mut_ref_propagation()
+        };
         let live_vars = LiveVarAnalysisProcessor::new_no_annotate();
         data = reach_def.process(targets, fun_env, data, scc_opt);
         (
@@ -1192,7 +1196,10 @@ impl<'a> Instrumenter<'a> {
                     None,
                 )
             });
-            // write_back[GhostMem](mem_ref)
+            // write_back[GhostMem](mem_ref, addr_temp). The address is passed as a second
+            // source so the prophecy model (whose path-free `$Mutation` carries no location)
+            // can update the resource memory without `$GlobalLocationAddress`; the static
+            // model ignores it.
             self.builder.emit_with(|id| {
                 Bytecode::Call(
                     id,
@@ -1201,7 +1208,7 @@ impl<'a> Instrumenter<'a> {
                         BorrowNode::GlobalRoot(ghost_mem.clone()),
                         BorrowEdge::Direct,
                     ),
-                    vec![mem_ref],
+                    vec![mem_ref, addr_temp],
                     None,
                 )
             });

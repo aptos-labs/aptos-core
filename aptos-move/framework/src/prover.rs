@@ -136,6 +136,11 @@ pub struct ProverOptions {
     #[clap(long)]
     pub no_infer_lambda_specs: bool,
 
+    /// Use the legacy WriteBack-based static (path) reference model instead of the
+    /// default path-free prophecy (RustHorn/Creusot) model. See the prover design notes.
+    #[clap(long)]
+    pub path_refs: bool,
+
     /// Internal flag: use a temp dir for boogie output so parallel invocations
     /// don't interfere. Set automatically by test harnesses.
     #[clap(long, hide = true)]
@@ -285,6 +290,7 @@ impl ProverOptions {
                 skip_loop_analysis: self.keep_loops || base_opts.prover.skip_loop_analysis,
                 no_infer_lambda_specs: self.no_infer_lambda_specs
                     || base_opts.prover.no_infer_lambda_specs,
+                path_refs: self.path_refs || base_opts.prover.path_refs,
                 ..base_opts.prover.clone()
             },
             backend: move_prover_boogie_backend::options::BoogieOptions {

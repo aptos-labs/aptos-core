@@ -481,9 +481,25 @@ datatype $Location {
 // A mutable reference which also carries its current value. Since mutable references
 // are single threaded in Move, we can keep them together and treat them as a value
 // during mutation until the point they are stored back to their original location.
+{%- if not options.path_refs %}
+// Prophecy (RustHorn/Creusot) model: path-free. `v` is the current value, `f` is the
+// prophesied final value the reference will hold when its borrow is resolved.
+// We use an uninterpreted type with hand-written selector axioms rather than a Boogie
+// `datatype`, to avoid the reconstruction axiom `forall m :: m == $Mutation(m->v, m->f)`
+// that a datatype would generate. That axiom triggers on T-typed terms (e.g. `int` when
+// T=u128) and causes Z3 quantifier-instantiation loops with loop-invariant quantifiers in
+// arithmetic-heavy VCs. The axioms below trigger ONLY on explicit constructor applications.
+type $Mutation _;
+function $Mutation<T>(v: T, f: T): $Mutation T;
+function $Mutation_v<T>(m: $Mutation T): T;
+function $Mutation_f<T>(m: $Mutation T): T;
+axiom (forall<T> v: T, f: T :: {$Mutation(v, f)} $Mutation_v($Mutation(v, f)) == v);
+axiom (forall<T> v: T, f: T :: {$Mutation(v, f)} $Mutation_f($Mutation(v, f)) == f);
+{%- else %}
 datatype $Mutation<T> {
     $Mutation(l: $Location, p: Vec int, v: T)
 }
+{%- endif %}
 
 // Representation of memory for a given type.
 datatype $Memory<T> {
@@ -545,6 +561,23 @@ axiom $ConstMemoryDomain(false) == (lambda i: int :: false);
 axiom $ConstMemoryDomain(true) == (lambda i: int :: true);
 
 
+{%- if not options.path_refs %}
+// Dereferences a mutation.
+function {:inline} $Dereference<T>(ref: $Mutation T): T {
+    $Mutation_v(ref)
+}
+
+// Update the current value of a mutation, preserving the prophecy `f`.
+function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
+    $Mutation(v, $Mutation_f(m))
+}
+
+// Havoc the current value of a mutation, preserving the prophecy `f`.
+procedure {:inline 1} $HavocMutation<T>(m: $Mutation T) returns (r: $Mutation T) {
+    var havoced_v: T;
+    r := $Mutation(havoced_v, $Mutation_f(m));
+}
+{%- else %}
 // Dereferences a mutation.
 function {:inline} $Dereference<T>(ref: $Mutation T): T {
     ref->v
@@ -621,6 +654,7 @@ function {:inline} $HasLocalLocation<T>(m: $Mutation T, idx: int): bool {
 function {:inline} $GlobalLocationAddress<T>(m: $Mutation T): int {
     (m->l)->a
 }
+{%- endif %}
 
 
 

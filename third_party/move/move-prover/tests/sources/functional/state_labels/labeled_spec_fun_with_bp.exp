@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:46:9
+   │
+46 │         ensures forall S in *: S |~ wont_abort(a); // error: `bump` aborts in a state without the counter
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:41: touch_bad
+   =         a = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:42: touch_bad
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:9: bump
+   =         a = <redacted>
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:10: bump
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:9: bump
+   =     at tests/sources/functional/state_labels/labeled_spec_fun_with_bp.move:46: touch_bad (spec)

@@ -2,8 +2,8 @@ Move prover returns: exiting with verification errors
 error: data invariant does not hold
    ┌─ tests/sources/functional/closures/stored_fun_values.move:20:9
    │
-20 │         invariant forall x: u64: !aborts_of<f>(x);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 │         invariant forall S in *, x: u64: S |~ !aborts_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/closures/stored_fun_values.move:48: create_invalid
    =     at tests/sources/functional/closures/stored_fun_values.move:20
@@ -11,8 +11,8 @@ error: data invariant does not hold
 error: data invariant does not hold
    ┌─ tests/sources/functional/closures/stored_fun_values.move:73:9
    │
-73 │         invariant forall x: u64, r: u64: ensures_of<f>(x, r) ==> r >= x;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+73 │         invariant forall S in *, x: u64, r: u64: S.. |~ ensures_of<f>(x, r) ==> r >= x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/closures/stored_fun_values.move:93: create_monotone_invalid
    =     at tests/sources/functional/closures/stored_fun_values.move:71
@@ -21,8 +21,8 @@ error: data invariant does not hold
 error: data invariant does not hold
     ┌─ tests/sources/functional/closures/stored_fun_values.move:115:9
     │
-115 │         invariant forall x: u64: !aborts_of<f>(x);
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+115 │         invariant forall S in *, x: u64: S |~ !aborts_of<f>(x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     =     at tests/sources/functional/closures/stored_fun_values.move:129: create_doubler_unsafe
     =     at tests/sources/functional/closures/stored_fun_values.move:115
@@ -30,8 +30,8 @@ error: data invariant does not hold
 error: data invariant does not hold
     ┌─ tests/sources/functional/closures/stored_fun_values.move:145:9
     │
-145 │         invariant forall a: address: !aborts_of<f>(a);
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+145 │         invariant forall S in *, a: address: S |~ !aborts_of<f>(a);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     =     at tests/sources/functional/closures/stored_fun_values.move:161: create_reader_invalid
     =     at tests/sources/functional/closures/stored_fun_values.move:145
@@ -39,8 +39,8 @@ error: data invariant does not hold
 error: data invariant does not hold
     ┌─ tests/sources/functional/closures/stored_fun_values.move:199:9
     │
-199 │         invariant forall s: signer: !aborts_of<f>(s);
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+199 │         invariant forall S in *, s: signer: S |~ !aborts_of<f>(s);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     =     at tests/sources/functional/closures/stored_fun_values.move:219: create_modifier_invalid
     =     at tests/sources/functional/closures/stored_fun_values.move:199

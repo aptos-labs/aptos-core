@@ -16,4 +16,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at tests/sources/functional/modifies_receiver_call.move:13: increment
    =         s = <redacted>
    =     at tests/sources/functional/modifies_receiver_call.move:14: increment
+   =         s = <redacted>
+   =     at tests/sources/functional/modifies_receiver_call.move:14: increment
    =         ABORTED

@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: data invariant must not depend on a free state: a behavioral predicate must be bound to a state variable via `S |~ ...` where S is introduced by an enclosing state quantifier (`forall S in *:` or `exists S in *:`)
+   ┌─ tests/sources/functional/state_labels/nested_state_quant.move:57:9
+   │
+57 │         invariant !aborts_of<read_counter>(addr); // error: data invariant must not depend on a free state
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

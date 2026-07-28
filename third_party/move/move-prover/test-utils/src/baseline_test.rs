@@ -29,14 +29,24 @@ pub fn verify_or_update_baseline(baseline_file_name: &Path, text: &str) -> anyho
 
         Ok(())
     } else {
-        // Read the baseline and diff it.
-        let contents = if baseline_file_name.exists() {
-            fs::read_to_string(baseline_file_name)?
-        } else {
-            String::new()
-        };
-        diff(clean_for_baseline(text).as_ref(), &contents)
+        verify_baseline(baseline_file_name, text)
     }
+}
+
+/// Verifies the generated text against the baseline file without ever updating
+/// it, even when baseline updating is requested via the environment. For a
+/// baseline shared between several test configurations, only the owning
+/// configuration updates; the others verify, so a divergence between the
+/// configurations surfaces as a failure instead of being masked by whichever
+/// one wrote the file last.
+pub fn verify_baseline(baseline_file_name: &Path, text: &str) -> anyhow::Result<()> {
+    // Read the baseline and diff it.
+    let contents = if baseline_file_name.exists() {
+        fs::read_to_string(baseline_file_name)?
+    } else {
+        String::new()
+    };
+    diff(clean_for_baseline(text).as_ref(), &contents)
 }
 
 /// Clean a content to be usable as a baseline file. Currently, we ensure there are no

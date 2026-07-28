@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: state label cannot be applied to a call of `param_wont_abort`: its body (transitively) contains a behavioral predicate over a function-typed value, whose memory footprint is only known per instantiation, and a state label does not distribute into called spec functions — the predicate would be evaluated at a free state. Apply the state label to the behavioral predicate directly, or use a concrete function as the predicate's target
+   ┌─ tests/sources/functional/state_labels/labeled_spec_fun_bp_fun_param.move:25:37
+   │
+25 │         ensures exists S in *: S |~ param_wont_abort(f, a); // error: BP over a function-typed value
+   │                                     ^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label cannot be applied to a call of `param_wraps`: its body (transitively) contains a behavioral predicate over a function-typed value, whose memory footprint is only known per instantiation, and a state label does not distribute into called spec functions — the predicate would be evaluated at a free state. Apply the state label to the behavioral predicate directly, or use a concrete function as the predicate's target
+   ┌─ tests/sources/functional/state_labels/labeled_spec_fun_bp_fun_param.move:26:37
+   │
+26 │         ensures exists S in *: S |~ param_wraps(f, a); // error: transitively BP over a function-typed value
+   │                                     ^^^^^^^^^^^^^^^^^

@@ -24,7 +24,11 @@ use move_model::{
     ty::Type,
     well_known::VECTOR_BORROW_MUT,
 };
-use std::{borrow::BorrowMut, collections::BTreeMap, fmt};
+use std::{
+    borrow::BorrowMut,
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 #[derive(AbstractDomain, Debug, Clone, Eq, Ord, PartialEq, PartialOrd, Default)]
 pub struct BorrowInfo {
@@ -68,23 +72,37 @@ impl BorrowInfo {
     }
 
     /// Gets the parents (together with the edges) of this node.
-    fn get_incoming(&self, node: &BorrowNode) -> Vec<(&BorrowNode, &BorrowEdge)> {
+    pub fn get_incoming(&self, node: &BorrowNode) -> Vec<(&BorrowNode, &BorrowEdge)> {
         self.borrows_from
             .get(node)
             .map(|s| s.iter().map(|(n, e)| (n, e)).collect_vec())
             .unwrap_or_default()
     }
 
+    /// Returns the nodes which are directly alive (excluding nodes only kept alive
+    /// because a live node borrows from them).
+    pub fn live_nodes(&self) -> &SetDomain<BorrowNode> {
+        &self.live_nodes
+    }
+
     /// Checks whether a node is in use. A node is used if it is in the live_nodes set
-    /// or if it is borrowed by a node which is used.
+    /// or if it is borrowed by a node which is used. The graph can contain cycles: a
+    /// temp which is re-defined while its edges from an earlier borrow persist (e.g.
+    /// the move-out/store-back pattern around a method call) collapses two temporal
+    /// lifetimes into one node name, so reachability needs a visited set.
     pub fn is_in_use(&self, node: &BorrowNode) -> bool {
-        if self.live_nodes.contains(node) {
-            true
-        } else {
-            self.get_children(node)
-                .iter()
-                .any(|child| self.is_in_use(child))
+        let mut visited = BTreeSet::new();
+        let mut todo = vec![node];
+        while let Some(n) = todo.pop() {
+            if !visited.insert(n.clone()) {
+                continue;
+            }
+            if self.live_nodes.contains(n) {
+                return true;
+            }
+            todo.extend(self.get_children(n));
         }
+        false
     }
 
     /// Checks whether `node` is being borrowed by at least one live node
@@ -108,6 +126,16 @@ impl BorrowInfo {
             result.push((dying.clone(), dying_trees));
         }
         result
+    }
+
+    /// Checks whether a node already occurs on the path described by the given write-back
+    /// actions. Used to restrict path enumeration to simple paths: a path revisiting a
+    /// node is temporally impossible and only arises from lifetime-collapsed cycles in
+    /// the graph (see `is_in_use`).
+    fn on_path(order: &[WriteBackAction], node: &BorrowNode) -> bool {
+        order.iter().any(|action| {
+            action.dst == *node || matches!(node, BorrowNode::Reference(idx) if *idx == action.src)
+        })
     }
 
     /// Start from this node and follow-up the borrow chain until reaching a live/in-use ancestor.
@@ -147,6 +175,9 @@ impl BorrowInfo {
                         // when there are incoming edges, this borrow occurs within the body
                         // of this function and this node need to be further traced upwards.
                         for (parent, edge) in incoming {
+                            if Self::on_path(&order, parent) {
+                                continue;
+                            }
                             let mut appended = order.clone();
                             appended.push(WriteBackAction {
                                 src: *index,
@@ -180,7 +211,11 @@ impl BorrowInfo {
                 unreachable!("placeholder node type is not expected here");
             },
             _ => {
-                let outgoing = self.get_children_with_edge(node);
+                let outgoing = self
+                    .get_children_with_edge(node)
+                    .into_iter()
+                    .filter(|(child, _)| !Self::on_path(&order, child))
+                    .collect_vec();
                 if outgoing.is_empty() {
                     let mut order = order;
                     order.reverse();

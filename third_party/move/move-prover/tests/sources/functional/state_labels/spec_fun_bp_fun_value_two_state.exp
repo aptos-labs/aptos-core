@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: a two-state behavioral predicate over a function value cannot be used in a spec function body without explicit state labels: the pre-state of resource `0x42::spec_fun_bp_fun_value_two_state::R`, used by a possible target, is not available here; inline the predicate into the spec condition or use a concrete function target
+   ┌─ tests/sources/functional/state_labels/spec_fun_bp_fun_value_two_state.move:25:9
+   │
+25 │         ensures_of<h>(a) // error: two-state behavioral predicate over a function value in spec function body
+   │         ^^^^^^^^^^^^^^^^
