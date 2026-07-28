@@ -498,6 +498,11 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
         self.signatures.insert(validator, signature.clone());
     }
 
+    /// Returns true if the given validator has already contributed a signature.
+    pub fn contains_voter(&self, validator: &AccountAddress) -> bool {
+        self.signatures.contains_key(validator)
+    }
+
     pub fn verified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
         self.signatures.iter().filter_map(|(voter, signature)| {
             if signature.is_verified() {
