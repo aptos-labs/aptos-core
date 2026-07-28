@@ -4,12 +4,68 @@
 **Scope:** Move bytecode format, bytecode verifier, Move VM runtime, and a new
 Rust MIR frontend
 
+## Motivation
+
+Move bytecode is more than the compilation target of the Move language: it is
+a *verified* execution format. The bytecode verifier independently
+re-establishes type, resource, and reference safety on untrusted input, and
+the VM executes it deterministically under gas metering. That combination
+makes it a candidate substrate for other source languages — provided their
+semantics fit the verifier's discipline. This document argues that Rust is a
+uniquely good fit, and that the payoff justifies the (substantial) verifier
+work:
+
+- **Developer reach.** Rust has one of the largest systems-programming
+  communities, mature tooling, and a large body of existing code. Letting
+  Rust programmers write on-chain logic in their own language — with their
+  editors, test harnesses, and crates workflow — lowers the platform's entry
+  barrier more than Move-side ergonomics work alone could.
+- **Code reuse.** Pure-computation Rust (data structures, parsers, codecs,
+  arithmetic-heavy business logic) frequently falls within the safe,
+  sequential, deterministic subset defined below and could be ported on-chain
+  with little or no modification.
+- **No new trust assumptions.** The bytecode verifier re-checks everything at
+  deployment, so rustc never joins the trusted computing base. Rust code
+  obtains Move's on-chain guarantees the same way Move code does — by
+  verification of the produced bytecode, not by trusting its producer.
+- **A semantic fit no other target offers.** Compiling Rust to Wasm or native
+  code discards its ownership discipline at the boundary; the host must
+  re-erect sandboxing around an opaque memory blob. Move bytecode instead
+  *speaks* that discipline: sequential safe Rust's aliasing rules coincide
+  with Move's reference rules (developed below), so Rust's safety story
+  survives compilation and remains checkable at the bytecode level.
+
 ## Overview
 
 This document explores the idea of compiling *safe, sequential* Rust into an
 extended form of Move bytecode. The compilation source would be Rust MIR (the
-mid-level IR of rustc), taken after borrow checking and monomorphization. The
-compilation target would be Move bytecode extended in two directions:
+mid-level IR of rustc), taken after borrow checking and monomorphization.
+
+### The source subset
+
+"Safe, sequential" deserves a precise reading, since on-chain execution adds
+a third requirement — determinism — that Rust does not impose by itself. The
+intended source language is the subset of Rust that is:
+
+- **Safe:** no `unsafe` blocks, raw pointers, `transmute`, or FFI. The
+  aliasing guarantees the compilation relies on are properties of the safe
+  fragment only.
+- **Sequential:** no threads, no `Sync`/atomics, no `async`. Move execution
+  is single-threaded per transaction; concurrency primitives have no
+  counterpart.
+- **Deterministic:** no floating point (`f32`/`f64` have no Move counterpart,
+  and consensus-critical code must not depend on platform-sensitive numeric
+  behavior), and no ambient effects — no clock, no OS randomness, no
+  environment, no I/O of any kind. Practically this means `core` + `alloc`
+  rather than `std`; the library port (D3) must additionally replace
+  randomized data structures (`HashMap`'s default `RandomState` hasher) with
+  deterministic equivalents, and address identity (casting or comparing
+  pointers) is not observable.
+
+Programs outside this subset are rejected by the frontend with an explicit
+diagnostic, not compiled approximately (see C6 on honest subset definition).
+
+The compilation target would be Move bytecode extended in two directions:
 
 1. **References inside structs.** Move today confines references (`&T`,
    `&mut T`) to function parameters, return values, and locals; they cannot be
@@ -361,8 +417,9 @@ The remaining gaps, roughly ordered by severity:
    small intrinsic library (Move arithmetic aborts on overflow; aborting is
    compatible with Rust's checked semantics, but explicit wrapping ops must
    be emulated or added).
-5. **Out of scope** (not "safe sequential" or fundamentally address-based):
+5. **Out of scope** (excluded by the source subset defined in the Overview):
    raw pointers and `unsafe` blocks, `transmute`, threads/`Sync`/atomics,
+   floating point, ambient effects and other sources of non-determinism,
    `mem::size_of`-dependent layout tricks, address-identity observation
    (pointer comparison of `&T` — Move references have no observable
    identity).
