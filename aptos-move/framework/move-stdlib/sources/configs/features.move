@@ -986,6 +986,15 @@ module std::features {
         is_enabled(FUNCTION_VALUE_DISPATCH) && is_enabled(FUNCTION_REFLECTION)
     }
 
+    /// Whether lazy module initialization via `aptos_framework::init::internal_maybe_initialize`
+    /// is enabled. While disabled, that entry point aborts.
+    /// Lifetime: transient
+    const LAZY_MODULE_INITIALIZATION: u64 = 127;
+
+    public fun is_lazy_module_initialization_enabled(): bool {
+        is_enabled(LAZY_MODULE_INITIALIZATION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

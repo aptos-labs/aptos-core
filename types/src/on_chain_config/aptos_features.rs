@@ -221,6 +221,10 @@ pub enum FeatureFlag {
     /// Transient: active while the function value storage format migration is in
     /// progress, so no on-chain state can depend on the old bytes.
     DISABLE_CLOSURE_BCS_SERIALIZATION = 126,
+    /// Enables lazy module initialization via `aptos_framework::init::internal_maybe_initialize`
+    /// (a module self-initializes on first use rather than via a genesis-time `init_module`).
+    /// While disabled, that entry point aborts.
+    LAZY_MODULE_INITIALIZATION = 127,
 }
 
 impl FeatureFlag {
