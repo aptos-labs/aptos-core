@@ -143,22 +143,12 @@ pub fn check_closures(env: &GlobalEnv) {
                                 // a mutable capture as a mutation carried by the closure
                                 // value, havoced across the call and written back to its
                                 // source location when the closure dies. A mutable
-                                // capture makes the closure value linear: copying it
-                                // would duplicate the carried mutation.
-                                if captured_ty.is_mutable_reference()
-                                    && required_abilities.has_ability(Ability::Copy)
-                                {
-                                    env.error_with_notes(
-                                        &env.get_node_loc(captured.node_id()),
-                                        "cannot capture a mutable reference in a closure \
-                                         requiring the `copy` ability",
-                                        vec![format!(
-                                            "expected function type: `{}`{}",
-                                            context_ty.display(&fun_env.get_type_display_ctx()),
-                                            wrapper_msg()
-                                        )],
-                                    );
-                                }
+                                // capture makes the closure value linear: a surviving
+                                // copy would fork the carried mutation. A `copy` ability
+                                // bound on the function type is nevertheless admitted
+                                // (loop-invoking HOF signatures require it); linearity is
+                                // enforced at the model level, where an actual copy of a
+                                // carrying value is rejected (see TODO(#20273)).
                                 if !ref_capture_allowed.contains(id) {
                                     let mut msg = format!(
                                         "captured value cannot be a reference, but has type \

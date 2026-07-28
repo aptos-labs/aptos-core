@@ -6469,13 +6469,15 @@ impl ExpTranslator<'_, '_, '_> {
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Model has a `WriteOf` variant too, but it's internal to spec
-        // inference and never produced by the parser.
         let model_kind = match kind {
             PA::BehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
             PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
             PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
+            PA::BehaviorKind::FunPostOf => BehaviorKind::FunPostOf,
+            PA::BehaviorKind::WriteOf(j) => BehaviorKind::WriteOf(j as usize),
+            PA::BehaviorKind::PartialOf => BehaviorKind::PartialOf,
+            PA::BehaviorKind::CapturesOf => BehaviorKind::CapturesOf,
         };
 
         // Translate the target expression and validate it has function type
@@ -6502,15 +6504,38 @@ impl ExpTranslator<'_, '_, '_> {
             return self.new_error_exp();
         };
 
+        if matches!(
+            model_kind,
+            BehaviorKind::PartialOf | BehaviorKind::CapturesOf
+        ) {
+            return self.translate_variant_observation(
+                loc,
+                model_kind,
+                fun_exp,
+                &arg_ty,
+                &result_ty,
+                args,
+                expected_type,
+                context,
+            );
+        }
+
         let translated_args =
             self.translate_and_check_behavior_args(loc, args, &arg_ty, &result_ty, &model_kind);
 
-        // Determine the result type based on the behavior kind
-        let fun_type = Type::Fun(
-            Box::new(arg_ty.clone()),
-            Box::new(result_ty),
-            AbilitySet::EMPTY,
-        );
+        // Determine the result type based on the behavior kind. For
+        // `fun_post_of` use the subject's actual (specialized) type so its
+        // abilities are preserved; for the other kinds a reconstruction
+        // without abilities suffices.
+        let fun_type = if model_kind == BehaviorKind::FunPostOf {
+            self.subs.specialize(&fun_type_var)
+        } else {
+            Type::Fun(
+                Box::new(arg_ty.clone()),
+                Box::new(result_ty),
+                AbilitySet::EMPTY,
+            )
+        };
         let Some(computed_result_ty) =
             self.compute_behavior_result_type(loc, &model_kind, &fun_type)
         else {
@@ -6706,11 +6731,9 @@ impl ExpTranslator<'_, '_, '_> {
                 ExpData::Call(id, SpecPublish(r) | SpecRemove(r) | SpecUpdate(r), _) => {
                     (*id, r, "mutation builtins (publish/remove/update)")
                 },
-                ExpData::Call(
-                    id,
-                    Behavior(BehaviorKind::EnsuresOf | BehaviorKind::ResultOf, r),
-                    _,
-                ) => (*id, r, "ensures_of/result_of"),
+                ExpData::Call(id, Behavior(kind, r), _) if kind.is_two_state() => {
+                    (*id, r, "ensures_of/result_of/write_of/fun_post_of")
+                },
                 ExpData::Call(id, SpecFunction(mid, fid, r), _) => {
                     let is_two_state = env.get_module_opt(*mid).is_some_and(|m| {
                         m.get_spec_funs()
@@ -6782,17 +6805,130 @@ impl ExpTranslator<'_, '_, '_> {
         types
     }
 
+    /// Type-checks `partial_of<f>(g)` / `captures_of<f>(g)`: the single
+    /// argument must be a plain function name whose signature is the
+    /// subject's inputs preceded by exactly one captured `&mut` parameter
+    /// (v1 scope: single mutable capture, prefix mask). `partial_of` is the
+    /// variant recognizer (bool); `captures_of` denotes the captured value.
+    #[allow(clippy::too_many_arguments)]
+    fn translate_variant_observation(
+        &mut self,
+        loc: &Loc,
+        kind: BehaviorKind,
+        fun_exp: Exp,
+        subject_arg_ty: &Type,
+        subject_result_ty: &Type,
+        args: &[EA::Exp],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        if args.len() != 1 {
+            self.error(
+                loc,
+                &format!("expected 1 argument (a function name) for {}", kind),
+            );
+            return self.new_error_exp();
+        }
+        // The recognizer/selector are closed-world definitions over the
+        // verification session's closure variants. In a generic context they
+        // would be evaluated at skolemized types where no variants exist,
+        // making premises vacuously false while instantiations discharge
+        // them — unsound to transfer. Requires per-instantiation
+        // verification, which is future work (see issue #20273).
+        if !self.type_params.is_empty() {
+            self.error(
+                loc,
+                &format!(
+                    "{} is not yet supported in generic functions or lemmas \
+                     (needs per-type-instantiation verification)",
+                    kind
+                ),
+            );
+            return self.new_error_exp();
+        }
+        let target_var = self.fresh_type_var();
+        let target_exp = self.translate_exp(&args[0], &target_var).into_exp();
+        // The witness is any function value (a plain function name is the
+        // common case); its type carries the full signature. Resolve through
+        // the constraint system (a name produces a SomeFunctionValue var).
+        let Some((target_arg_ty, target_result_ty)) = self.subs.get_fun_type(&target_var) else {
+            self.error(
+                loc,
+                &format!("the argument of {} must be a function value", kind),
+            );
+            return self.new_error_exp();
+        };
+        let target_params: Vec<Type> = target_arg_ty.flatten();
+        let subject_inputs: Vec<Type> = subject_arg_ty.clone().flatten();
+        if target_params.len() != subject_inputs.len() + 1
+            || !target_params[0].is_mutable_reference()
+        {
+            self.error(
+                loc,
+                &format!(
+                    "the witness of {} must take exactly one leading `&mut` (captured) \
+                     parameter followed by the subject's parameters",
+                    kind,
+                ),
+            );
+            return self.new_error_exp();
+        }
+        for (expected, actual) in subject_inputs.iter().zip(&target_params[1..]) {
+            self.check_type(loc, actual, expected, context);
+        }
+        // The witness's result type must also match the subject's: otherwise
+        // no closure over the witness can inhabit the subject's function type
+        // and the observation would be vacuously false.
+        self.check_type(loc, &target_result_ty, subject_result_ty, context);
+        let result_ty = if kind == BehaviorKind::PartialOf {
+            BOOL_TYPE
+        } else {
+            target_params[0].skip_reference().clone()
+        };
+        let result_ty = self.check_type(loc, &result_ty, expected_type, context);
+        let id = self.new_node_id_with_type_loc(&result_ty, loc);
+        ExpData::Call(id, Operation::Behavior(kind, MemoryRange::default()), vec![
+            fun_exp,
+            target_exp.clone(),
+        ])
+    }
+
     /// Result type for a behavior predicate. `ResultOf` returns the
-    /// function's return type and is rejected for void callees; others
-    /// return `bool`. Returns `None` on rejection.
+    /// function's return type and is rejected for void callees; `FunPostOf`
+    /// returns the subject's own function type; others return `bool`.
+    /// Returns `None` on rejection.
     fn compute_behavior_result_type(
         &mut self,
         loc: &Loc,
         kind: &BehaviorKind,
         fun_type: &Type,
     ) -> Option<Type> {
-        if *kind != BehaviorKind::ResultOf {
-            return Some(BOOL_TYPE);
+        match kind {
+            BehaviorKind::ResultOf => {},
+            BehaviorKind::FunPostOf => return Some(fun_type.clone()),
+            BehaviorKind::WriteOf(j) => {
+                let Type::Fun(args, _, _) = fun_type else {
+                    return Some(Type::Error);
+                };
+                let Some(ty) = args
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .nth(*j)
+                else {
+                    self.error(
+                        loc,
+                        &format!(
+                            "`write_of` index {} exceeds the number of `&mut` parameters",
+                            j
+                        ),
+                    );
+                    return None;
+                };
+                return Some(ty.skip_reference().clone());
+            },
+            _ => return Some(BOOL_TYPE),
         }
 
         let Type::Fun(_, result, _abilities) = fun_type else {

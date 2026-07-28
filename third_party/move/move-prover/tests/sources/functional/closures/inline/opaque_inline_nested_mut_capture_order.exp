@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:48:9
+   │
+48 │         ensures result == 0; // error: the nested mutation of `x` reaches the caller
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:38: read_before_nested_mutation_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:39: read_before_nested_mutation_incorrect
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:43: read_before_nested_mutation_incorrect
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:41: read_before_nested_mutation_incorrect
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:40: read_before_nested_mutation_incorrect
+   =         r = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:45: read_before_nested_mutation_incorrect
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:37: read_before_nested_mutation_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_nested_mut_capture_order.move:48: read_before_nested_mutation_incorrect (spec)

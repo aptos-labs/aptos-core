@@ -326,6 +326,17 @@ pub enum BehaviorKind {
     /// surface syntax; emitted by spec inference and translated by the
     /// Boogie backend to a Skolem axiomatized against `ensures_of`.
     WriteOf(usize),
+    /// `fun_post_of<f>(args)` — the function value after one application on
+    /// `args`: for values carrying mutable reference captures, the trailing
+    /// fun slot of the `result_of` Skolem (the one-application successor);
+    /// the subject itself for all other function values.
+    FunPostOf,
+    /// `partial_of<f>(g)` — `f` is a closure over the named function `g`
+    /// with the capture arity implied by `f`'s type (variant recognizer).
+    PartialOf,
+    /// `captures_of<f>(g)` — the value captured by a closure over `g`
+    /// (single `&mut` capture); meaningful under `partial_of<f>(g)`.
+    CapturesOf,
 }
 
 impl BehaviorKind {
@@ -333,7 +344,10 @@ impl BehaviorKind {
     pub fn is_two_state(&self) -> bool {
         matches!(
             self,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_)
+            BehaviorKind::EnsuresOf
+                | BehaviorKind::ResultOf
+                | BehaviorKind::WriteOf(_)
+                | BehaviorKind::FunPostOf
         )
     }
 }
@@ -347,6 +361,9 @@ impl fmt::Display for BehaviorKind {
             EnsuresOf => write!(f, "ensures_of"),
             ResultOf => write!(f, "result_of"),
             WriteOf(j) => write!(f, "write_of_{}", j),
+            FunPostOf => write!(f, "fun_post_of"),
+            PartialOf => write!(f, "partial_of"),
+            CapturesOf => write!(f, "captures_of"),
         }
     }
 }
@@ -3771,7 +3788,13 @@ impl ExpData {
             use Operation::*;
             match e {
                 Temporary(id, _) => {
-                    if env.get_node_type(*id).is_mutable_reference() {
+                    // Function values are state-dependent: a value carrying
+                    // mutable reference captures advances with each
+                    // application (`old(f)` denotes the entry value). For
+                    // values that cannot carry, entry equals current, so
+                    // admitting `old(..)` is harmless.
+                    let ty = env.get_node_type(*id);
+                    if ty.is_mutable_reference() || ty.is_function() {
                         is_pure = false;
                         return false; // done visiting
                     }

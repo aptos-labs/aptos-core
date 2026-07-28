@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: [boogie translator] `fun_post_of` over a function value whose behavior depends on global memory is not supported (see issue #20273)
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_fun_post_of_memory_fail.move:19:22
+   │
+19 │         ensures f == fun_post_of<old(f)>(1); // error: `fun_post_of` over a function value whose behavior depends on global memory is not supported
+   │                      ^^^^^^^^^^^^^^^^^^^^^^

@@ -724,6 +724,31 @@ impl<'a> Instrumenter<'a> {
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
                 self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
             },
+            Call(id, mut dests, Operation::Invoke, srcs, _) => {
+                // For a fun value carrying captured mutations, the apply
+                // procedure returns the updated value as trailing output
+                // (`fun_out` in the Boogie backend). Make that write visible
+                // at the bytecode level by listing the fun temp as trailing
+                // dest, so the subsequent copy propagation does not merge
+                // entry-state saves of the temp across the application.
+                // Whether the type actually carries is only known during
+                // monomorphization; the backend drops the extra dest for
+                // types which do not. (See TODO(#20273).) This is
+                // verification-only: the spec-inference WP walker reads
+                // Invoke dests as application results.
+                let fun_temp = *srcs.last().expect("closure operand of Invoke");
+                if !self.options.inference && !dests.contains(&fun_temp) {
+                    dests.push(fun_temp);
+                }
+                self.builder.emit(Call(
+                    id,
+                    dests,
+                    Operation::Invoke,
+                    srcs,
+                    Some(AbortAction(self.abort_label, self.abort_local)),
+                ));
+                self.can_abort = true;
+            },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
                     id,
@@ -1156,12 +1181,14 @@ impl<'a> Instrumenter<'a> {
 // # Spec Condition Emission
 
 impl<'a> Instrumenter<'a> {
-    /// Checks that at most one `ensures_of` condition constrains each closure
-    /// argument carrying captured mutations. The call-site model havocs each
-    /// captured location once and threads a single post value, so multiple
-    /// `ensures_of` conditions over the same closure would assume constraints
-    /// about different applications on that one value, which is unsatisfiable
-    /// in general and makes the verification context vacuous.
+    /// Checks that exactly one application of each closure argument carrying
+    /// captured mutations is described by the callee's post conditions. The
+    /// call-site model havocs each captured location once and threads a single
+    /// post value, so multiple `ensures_of` conditions over the same closure —
+    /// or a single one under a quantifier, which stands for one constraint per
+    /// instantiation — would assume constraints about different applications
+    /// on that one value, which is unsatisfiable in general and makes the
+    /// verification context vacuous.
     fn check_single_ensures_of_for_carrying(
         &self,
         callee_spec: &TranslatedSpec,
@@ -1172,36 +1199,94 @@ impl<'a> Instrumenter<'a> {
             return;
         }
         // Behavioral predicate args may reference the pre-state snapshot temp of
-        // the closure argument; resolve those back to the original temp.
-        let unsaved: BTreeMap<TempIndex, TempIndex> = callee_spec
+        // the closure argument, or a spec-`let` alias of it; resolve those
+        // back to the original temp (aliases may chain).
+        let mut unsaved: BTreeMap<TempIndex, TempIndex> = callee_spec
             .saved_params
             .iter()
             .map(|(orig, saved)| (*saved, *orig))
             .collect();
+        for (_, _, let_temp, def) in &callee_spec.lets {
+            let mut def = def;
+            loop {
+                match def.as_ref() {
+                    ExpData::Call(_, ast::Operation::Old, inner) if inner.len() == 1 => {
+                        def = &inner[0];
+                    },
+                    ExpData::Temporary(_, idx) => {
+                        let root = unsaved.get(idx).copied().unwrap_or(*idx);
+                        unsaved.insert(*let_temp, root);
+                        break;
+                    },
+                    _ => break,
+                }
+            }
+        }
         let mut counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
+        let mut quantified = false;
+        let mut quant_depth = 0usize;
         for (_, cond) in &callee_spec.post {
-            cond.visit_pre_order(&mut |e| {
-                if let ExpData::Call(
-                    _,
-                    ast::Operation::Behavior(BehaviorKind::EnsuresOf, _),
-                    args,
-                ) = e
-                {
-                    if let Some(ExpData::Temporary(_, idx)) = args.first().map(|a| a.as_ref()) {
-                        let orig = unsaved.get(idx).copied().unwrap_or(*idx);
-                        if carrying_srcs.contains(&orig) {
-                            *counts.entry(orig).or_insert(0) += 1;
+            cond.visit_pre_post(&mut |post, e| {
+                match e {
+                    ExpData::Quant(..) => {
+                        if post {
+                            quant_depth -= 1;
+                        } else {
+                            quant_depth += 1;
                         }
-                    }
+                    },
+                    // Each `ensures_of` over the closure, and each
+                    // `fun_post_of` chain root (a chain nests through the
+                    // subject, so only direct temporary subjects count),
+                    // independently constrains the single havoced post value.
+                    ExpData::Call(
+                        _,
+                        ast::Operation::Behavior(
+                            BehaviorKind::EnsuresOf | BehaviorKind::FunPostOf,
+                            _,
+                        ),
+                        args,
+                    ) if !post => {
+                        let subject = match args.first().map(|a| a.as_ref()) {
+                            Some(ExpData::Temporary(_, idx)) => Some(*idx),
+                            Some(ExpData::Call(_, ast::Operation::Old, inner))
+                                if inner.len() == 1 =>
+                            {
+                                match inner[0].as_ref() {
+                                    ExpData::Temporary(_, idx) => Some(*idx),
+                                    _ => None,
+                                }
+                            },
+                            _ => None,
+                        };
+                        if let Some(idx) = subject {
+                            let orig = unsaved.get(&idx).copied().unwrap_or(idx);
+                            if carrying_srcs.contains(&orig) {
+                                *counts.entry(orig).or_insert(0) += 1;
+                                quantified = quantified || quant_depth > 0;
+                            }
+                        }
+                    },
+                    _ => {},
                 }
                 true
             });
         }
-        if counts.values().any(|count| *count > 1) {
+        if quantified {
             self.builder.global_env().error(
                 loc,
-                "more than one `ensures_of` condition over a function value carrying \
-                 mutable reference captures cannot be used in an opaque spec",
+                "a quantified `ensures_of` or `fun_post_of` over a function value \
+                 carrying mutable reference captures would over-constrain its single \
+                 post value; describing iterated application requires `fun_post_of` \
+                 chains (see issue #20273)",
+            );
+        } else if counts.values().any(|count| *count > 1) {
+            self.builder.global_env().error(
+                loc,
+                "more than one `ensures_of` or `fun_post_of` condition over a function \
+                 value carrying mutable reference captures cannot be used in an opaque \
+                 spec; describe successive applications with a single nested \
+                 `fun_post_of` chain (see issue #20273)",
             );
         }
     }

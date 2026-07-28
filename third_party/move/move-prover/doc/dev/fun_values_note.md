@@ -250,3 +250,151 @@ spec call_twice {
    ensures modifies<f>(Counter[addr]);  
 }
 ```
+
+# Mutable Reference Captures and Application Chains
+
+Closures modifying captured variables (`let s = 0; v.for_each_ref(|e| s += *e)`) are
+supported for retained inline-opaque calls in two layers: a carried-mutation model for the
+values themselves, and a chain vocabulary (`fun_post_of`) for describing repeated
+application. Tracking anchor: issue #20273.
+
+## Carried Mutations
+
+The lambda lifter converts a modified capture into a `&mut` capture over a lifted function.
+The closure value then *carries* the mutation: its datatype variant stores a `$Mutation`
+slot, whose location and path identity stay fixed while the value component evolves. At an
+opaque call site the captured values are havoced (`HavocKind::CaptureValues`, which repacks
+the variant with `$UpdateMutation` per slot) and constrained by the callee's `ensures_of`
+conditions; when the closure dies, the carried mutation is written back to its source
+location (`BorrowEdge::Capture`). Carrying values are linear: the `copy` ability *bound* is
+admitted on function types (loop-invoking HOF signatures require it), but a surviving copy
+of a carrying value is rejected, since it would fork the carried state.
+
+## The Successor Model
+
+One application of a function value is a deterministic transition `f' = step(f, x)`: for
+carrying types, the `$result_of` Skolem gains a trailing fun slot which *is* that successor.
+Three encoding pieces keep definition side and call site coherent:
+
+- The apply procedure advances its fun output to the successor
+  (`fun_out := $result_of'..'(mems, fun, args)[->slot]`), and `Invoke` rebinds the fun temp,
+  also at the bytecode level (spec instrumentation lists the temp as trailing dest so copy
+  propagation cannot merge entry-state saves across an application).
+- The fun-param variant axiom for `ensures_of` constrains its `f_post` slot to the same
+  successor term. A single-application claim `ensures ensures_of<f>(x)` is therefore provable
+  exactly when the body applies the parameter once on `x` — bodies applying zero or several
+  times, or on other arguments, face falsifiable verification conditions.
+- The closure-variant axiom for `ensures_of` *equates* `f_post` with a syntactic constructor
+  application (`f_post == ctor(.., $UpdateMutation(c_i, f_post->field_i->v), ..)`).
+  Semantically this is the recognizer plus mutation-identity constraints, but the planted
+  constructor term keeps e-matching alive when the successor of one application becomes the
+  subject of the next: the constructor-keyed trigger only fires on values whose e-class
+  contains a constructor application.
+
+## `fun_post_of` and Two-State Fun Parameters
+
+`fun_post_of<f>(args)` denotes the successor value (identity for values which cannot carry
+mutations). Chains describe successive applications:
+
+```move
+spec fun apply_all(f: |&u64| has copy + drop, v: vector<u64>, end: u64): |&u64| has copy + drop {
+    if (end == 0) f else fun_post_of<apply_all(f, v, end - 1)>(v[end - 1])
+}
+spec for_each_ref {
+    pragma opaque;
+    requires forall j in 0..len(v): !aborts_of<apply_all(f, v, j)>(v[j]);
+    aborts_if false;
+    ensures f == apply_all(old(f), v, len(v));
+}
+```
+
+A fun parameter becomes *two-state* when the function's spec mentions `old(f)` or
+`fun_post_of` over it: bare `f` in post conditions then denotes the final value and `old(f)`
+the value at entry, like a `&mut` parameter. This is opt-in per parameter — both trigger
+forms are new syntax, so legacy specs keep the entry-value reading of bare `f`. Subjects of
+behavioral predicates always follow the legacy routing (a predicate describes one
+application *from* a state), so `ensures f == fun_post_of<f>(x)` means final ==
+successor-of-entry.
+
+## Verifying the Callee: Indexed Parameter Families
+
+In the callee's own VC the parameter is an abstract family `$param'fn$p'(n: int)`, pinned to
+`$param(0)` at entry. A family axiom keeps successors in the family at a *fresh
+uninterpreted* index (`$result_of(mems, $param(n), p*)->slot == $param($param_next(mems, n,
+p*))`) — never index arithmetic, since an identity closure's successor is itself and no
+ordering between indices may be provable. All per-param behavioral spec functions take the
+index, so each family member is a distinct abstract state.
+
+Loops: every fun temp applied in a loop body is havoced at the loop header with
+`HavocKind::CaptureValues`, whose translation re-indexes advancing family members (and
+repacks carrying closure variants) while remaining a no-op for values which cannot advance —
+existing proofs over non-carrying HOFs are unaffected. The chain invariant
+`invariant f == apply_all(old(f), v, i)` then certifies the application discipline: the
+double-applying or element-skipping body fails the induction step.
+
+## Limitations
+
+- `fun_post_of` requires the fun type's evaluator memory union to be empty (pure lambdas):
+  a chain evaluates all steps at one memory snapshot, while the applications it describes
+  thread distinct intermediate memories, so memory-dependent values have no deterministic
+  successor in `(f, args)`.
+- At most one `ensures_of`/`fun_post_of` chain root per carrying closure argument in an
+  opaque spec, and none under quantifiers: the call site havocs each captured location once,
+  and independent constraints on that single post value are unsatisfiable in general
+  (successive applications belong in one nested chain).
+- Callers extract concrete facts by unfolding the chain, so direct extraction of exact
+  accumulator values needs concrete (or bounded, via case split) lengths. For unbounded
+  symbolic lengths, use the lemma recipe below.
+
+## Compositional Use: Chain Lemmas
+
+For fully symbolic contexts, the induction over the chain is written once as a recursive
+lemma, paired with a *named step function* which the lambda partially applies (in verify
+mode, `|e| step(&mut s, e)` reduces to a closure over `step` capturing `&mut s`, so
+`step`'s own spec is the closure's behavioral contract). Two further builtins make the
+induction hypothesis statable: `partial_of<f>(step)` (f is a closure over `step`;
+variant recognizer) and `captures_of<f>(step)` (the captured value; guarded selector).
+`write_of<g, j>(args)` (the post-state of `g`'s j-th `&mut` parameter) is also surface
+syntax, for value-level fold spec funs.
+
+```move
+spec lemma chain_sum(f: |&u64| has copy + drop, v: vector<u64>, k: u64) {
+    requires partial_of<f>(step);
+    requires k <= len(v);
+    ensures partial_of<apply_all(f, v, k)>(step);
+    ensures captures_of<apply_all(f, v, k)>(step)
+         == captures_of<f>(step) + spec_sum(v, k);
+} proof {
+    if (k > 0) { apply chain_sum(f, v, k - 1); }
+}
+```
+
+A caller with unbounded `len(v)` then verifies
+`ensures result == spec_sum(v, len(v))` with two quantified instantiations in its proof
+block (explicit triggers are load-bearing):
+
+```move
+proof {
+    forall f: |&u64| has copy + drop, k: u64 {apply_all(f, v, k)} apply chain_sum(f, v, k);
+    forall j: u64, k: u64 {spec_sum(v, j), spec_sum(v, k)} apply sum_prefix_bound(v, j, k);
+}
+```
+
+(`sum_prefix_bound` — `spec_sum(v, j) + v[j] <= spec_sum(v, k)` for `j < k <= len(v)` —
+discharges the chain-shaped abort requires.) See
+`tests/sources/functional/closures/inline/inline_opaque_hof_symbolic_sum.move`.
+
+The lemma can moreover be written **generically in the step function** and shipped once
+with the HOF: the witness of `partial_of`/`captures_of` is any function value, and
+`iterate(g, c0, v, k)` — the fold of `write_of<g>` — is the generic meaning of the loop.
+Under a determinism premise (`ensures_of<g>(c, e, w) ==> w == write_of<g>(c, e)`), the
+generic `for_each_chain(f, g, v, k)` proves
+`captures_of<apply_all(f, v, k)>(g) == iterate(g, captures_of<f>(g), v, k)` by the same
+three-line recursion; use sites add only the arithmetic inherent to their step function
+(e.g. `iterate(step, ..) == prefix sum`). See
+`tests/sources/functional/closures/inline/inline_opaque_hof_generic_chain.move`.
+Type-generic (`<A, T>`) lemmas are rejected for now — closed-world recognizers are
+meaningless at skolemized types; per-instantiation lemma verification is #20278. The proof
+of the lemma works over *universally quantified* fun params (lemma params are not pinned
+to `$param` variants) with the guarded (recognizer-triggered) closure-variant axioms.
+Note that recursive lemma application currently lacks a well-foundedness check (#20275).

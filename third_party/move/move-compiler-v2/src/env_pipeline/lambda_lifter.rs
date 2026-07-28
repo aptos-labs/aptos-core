@@ -670,8 +670,26 @@ impl<'a> LambdaLifter<'a> {
                         let mut lambda_param_pos = 0;
                         let mut captured = vec![];
                         let mut mask = ClosureMask::new(0);
+                        let ref_capturable = |arg: &Exp| {
+                            // In verify mode, a direct mutable borrow of a
+                            // local can be captured by the closure value (the
+                            // prover carries the mutation; see the retained
+                            // inline-opaque treatment).
+                            self.fun_env.module_env.env.is_verify_mode()
+                                && matches!(
+                                    arg.as_ref(),
+                                    Call(_, Operation::Borrow(ReferenceKind::Mutable), bargs)
+                                        if matches!(
+                                            bargs.as_slice(),
+                                            [b] if matches!(
+                                                b.as_ref(),
+                                                LocalVar(..) | Temporary(..)
+                                            )
+                                        )
+                                )
+                        };
                         for (pos, arg) in args.iter().enumerate() {
-                            if Self::exp_is_capturable(arg)
+                            if (Self::exp_is_capturable(arg) || ref_capturable(arg))
                                 && arg.free_vars().is_disjoint(&lambda_bound)
                             {
                                 // We can capture an argument if it can be eagerly evaluated and if
@@ -805,7 +823,7 @@ impl<'a> LambdaLifter<'a> {
         };
         if let Some(idx) = self
             .fun_env
-            .get_parameters()
+            .get_parameters_ref()
             .iter()
             .position(|p| p.0 == sym)
         {
@@ -823,8 +841,8 @@ impl<'a> LambdaLifter<'a> {
         F: FnOnce(&mut Self, Exp) -> Exp,
     {
         // Save the current context.
-        let mut curr_free_params = mem::take(&mut self.free_params);
-        let mut curr_free_locals = mem::take(&mut self.free_locals);
+        let curr_free_params = mem::take(&mut self.free_params);
+        let curr_free_locals = mem::take(&mut self.free_locals);
         let curr_scopes = mem::take(&mut self.scopes);
         // Perform the rewrite action.
         let result = rewrite(self, exp);
@@ -840,8 +858,24 @@ impl<'a> LambdaLifter<'a> {
         for sym in to_remove {
             self.free_locals.remove(&sym);
         }
-        self.free_locals.append(&mut curr_free_locals);
-        self.free_params.append(&mut curr_free_params);
+        // Merge the saved context back in. For variables recorded in both
+        // contexts, keep the saved (outer) entry but take the disjunction of
+        // the `modified` flags: a variable mutated inside a nested lambda is
+        // modified from the enclosing lambda's perspective as well — its
+        // lifted body borrows the variable mutably for the nested closure —
+        // which decides `&mut` capture vs. capture by value.
+        for (sym, mut info) in curr_free_locals {
+            if let Some(nested) = self.free_locals.get(&sym) {
+                info.modified |= nested.modified;
+            }
+            self.free_locals.insert(sym, info);
+        }
+        for (idx, mut info) in curr_free_params {
+            if let Some(nested) = self.free_params.get(&idx) {
+                info.modified |= nested.modified;
+            }
+            self.free_params.insert(idx, info);
+        }
         // Return the result of the rewrite.
         result
     }
@@ -1018,8 +1052,14 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
 
         // Try to rewrite a lambda directly into a curry expression. This is not
         // possible with converted `&mut` captures, which require a lifted function
-        // with a rewritten body.
-        if bindings.is_empty() && mut_captures.is_empty() {
+        // with a rewritten body — except when the lambda is a direct partial
+        // application whose capture arguments are mutable borrows themselves
+        // (verify mode): the borrow is then carried by the closure value, and
+        // the named target's own spec is the behavioral contract of the
+        // closure (enabling `partial_of`/`captures_of` over the target).
+        if bindings.is_empty()
+            && (mut_captures.is_empty() || self.fun_env.module_env.env.is_verify_mode())
+        {
             let possible_curry_exp = self.try_to_reduce_lambda_to_curry(id, &lambda_params, body);
             if possible_curry_exp.is_some() {
                 return possible_curry_exp;

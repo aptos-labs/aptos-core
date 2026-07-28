@@ -14,10 +14,28 @@ module 0x42::retained_mut_capture {
       ensures ensures_of($t0, 1);
     }
 
+    private inline fun call_once_copy(f: |u64| has copy + drop) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t0, 1);
+    }
+
     private fun caller(): u64 {
         {
           let x: u64 = 0;
           retained_mut_capture::call_once(closure#1retained_mut_capture::__lambda__1__caller(Borrow(Mutable)(x)));
+          x
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 1);
+    }
+
+    private fun copy_bound_caller(): u64 {
+        {
+          let x: u64 = 0;
+          retained_mut_capture::call_once_copy(closure#1retained_mut_capture::__lambda__1__copy_bound_caller(Borrow(Mutable)(x)));
           x
         }
     }
@@ -88,6 +106,13 @@ module 0x42::retained_mut_capture {
       ensures Eq<u64>($t0, Add(Old<u64>($t0), $t1));
     }
 
+    private fun __lambda__1__copy_bound_caller(x: &mut u64,i: u64) {
+        x = Add<u64>(Deref(x), i)
+    }
+    spec {
+      ensures Eq<u64>($t0, Add(Old<u64>($t0), $t1));
+    }
+
     private fun __lambda__1__field_caller(s: &mut S,i: u64) {
         select retained_mut_capture::S.x<S>(s) = Add<u64>(select retained_mut_capture::S.x<S>(Deref(s)), i)
     }
@@ -140,6 +165,15 @@ module 0x42::retained_mut_capture {
         ensures ensures_of<f>(1);
     }
 
+    inline fun call_once_copy(f: |u64| has copy + drop) {
+        f(1)
+    }
+
+    spec call_once_copy(f: |u64| has copy + drop) {
+        pragma opaque = true;
+        ensures ensures_of<f>(1);
+    }
+
     fun caller(): u64 {
         let x = 0;
         call_once({
@@ -150,6 +184,19 @@ module 0x42::retained_mut_capture {
     }
 
     spec caller(): u64 {
+        ensures result == 1;
+    }
+
+    fun copy_bound_caller(): u64 {
+        let x = 0;
+        call_once_copy({
+            let a = &mut x;
+            |x_1| lambda__1__copy_bound_caller(a, x_1)
+        });
+        x
+    }
+
+    spec copy_bound_caller(): u64 {
         ensures result == 1;
     }
 
@@ -230,6 +277,14 @@ module 0x42::retained_mut_capture {
         ensures x == old(x) + i;
     }
 
+    fun lambda__1__copy_bound_caller(x: &mut u64, i: u64) {
+        *x = *x + i
+    }
+
+    spec lambda__1__copy_bound_caller(x: &mut u64, i: u64) {
+        ensures x == old(x) + i;
+    }
+
     fun lambda__1__field_caller(s: &mut S, i: u64) {
         s.x = (*s).x + i
     }
@@ -282,10 +337,28 @@ module 0x42::retained_mut_capture {
       ensures ensures_of($t0, 1);
     }
 
+    private inline fun call_once_copy(f: |u64| has copy + drop) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t0, 1);
+    }
+
     private fun caller(): u64 {
         {
           let x: u64 = 0;
           retained_mut_capture::call_once(closure#1retained_mut_capture::__lambda__1__caller(Borrow(Mutable)(x)));
+          x
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 1);
+    }
+
+    private fun copy_bound_caller(): u64 {
+        {
+          let x: u64 = 0;
+          retained_mut_capture::call_once_copy(closure#1retained_mut_capture::__lambda__1__copy_bound_caller(Borrow(Mutable)(x)));
           x
         }
     }
@@ -356,6 +429,13 @@ module 0x42::retained_mut_capture {
       ensures Eq<u64>($t0, Add(Old<u64>($t0), $t1));
     }
 
+    private fun __lambda__1__copy_bound_caller(x: &mut u64,i: u64) {
+        x = Add<u64>(Deref(x), i)
+    }
+    spec {
+      ensures Eq<u64>($t0, Add(Old<u64>($t0), $t1));
+    }
+
     private fun __lambda__1__field_caller(s: &mut S,i: u64) {
         select retained_mut_capture::S.x<S>(s) = Add<u64>(select retained_mut_capture::S.x<S>(Deref(s)), i)
     }
@@ -406,6 +486,13 @@ fun call_once(l0: |u64|)
     ret
 
 // Function definition at index 1
+fun call_once_copy(l0: |u64| has copy + drop)
+    ld_u64 1
+    move_loc l0
+    call_closure <|u64| has copy + drop>
+    ret
+
+// Function definition at index 2
 fun caller(): u64
     local l0: u64
     ld_u64 0
@@ -417,7 +504,19 @@ fun caller(): u64
     move_loc l0
     ret
 
-// Function definition at index 2
+// Function definition at index 3
+fun copy_bound_caller(): u64
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+    mut_borrow_loc l0
+    pack_closure __lambda__1__copy_bound_caller, 1
+    call call_once_copy
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 4
 fun count(l0: &V, l1: |u64|)
     ld_u64 1
     move_loc l0
@@ -427,7 +526,7 @@ fun count(l0: &V, l1: |u64|)
     // @5
     ret
 
-// Function definition at index 3
+// Function definition at index 5
 fun field_caller(): u64
     local l0: S
     ld_u64 1
@@ -448,7 +547,7 @@ fun field_caller(): u64
     add
     ret
 
-// Function definition at index 4
+// Function definition at index 6
 fun freeze_caller(): u64
     local l0: u64
     ld_u64 1
@@ -460,7 +559,7 @@ fun freeze_caller(): u64
     move_loc l0
     ret
 
-// Function definition at index 5
+// Function definition at index 7
 fun param_caller(l0: u64): u64
     mut_borrow_loc l0
     pack_closure __lambda__1__param_caller, 1
@@ -468,13 +567,13 @@ fun param_caller(l0: u64): u64
     move_loc l0
     ret
 
-// Function definition at index 6
+// Function definition at index 8
 fun read(l0: &u64): u64
     move_loc l0
     read_ref
     ret
 
-// Function definition at index 7
+// Function definition at index 9
 fun receiver_caller(l0: &V): u64
     local l1: u64
     ld_u64 0
@@ -487,7 +586,7 @@ fun receiver_caller(l0: &V): u64
     move_loc l1
     ret
 
-// Function definition at index 8
+// Function definition at index 10
 fun __lambda__1__caller(l0: &mut u64, l1: u64)
     copy_loc l0
     read_ref
@@ -498,7 +597,18 @@ fun __lambda__1__caller(l0: &mut u64, l1: u64)
     write_ref
     ret
 
-// Function definition at index 9
+// Function definition at index 11
+fun __lambda__1__copy_bound_caller(l0: &mut u64, l1: u64)
+    copy_loc l0
+    read_ref
+    move_loc l1
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 12
 fun __lambda__1__field_caller(l0: &mut S, l1: u64)
     local l2: S
     copy_loc l0
@@ -516,7 +626,7 @@ fun __lambda__1__field_caller(l0: &mut S, l1: u64)
     write_ref
     ret
 
-// Function definition at index 10
+// Function definition at index 13
 fun __lambda__1__freeze_caller(l0: &mut u64, l1: u64)
     copy_loc l0
     read_ref
@@ -532,7 +642,7 @@ fun __lambda__1__freeze_caller(l0: &mut u64, l1: u64)
     // @10
     ret
 
-// Function definition at index 11
+// Function definition at index 14
 fun __lambda__1__param_caller(l0: &mut u64, l1: u64)
     copy_loc l0
     read_ref
@@ -543,7 +653,7 @@ fun __lambda__1__param_caller(l0: &mut u64, l1: u64)
     write_ref
     ret
 
-// Function definition at index 12
+// Function definition at index 15
 fun __lambda__1__receiver_caller(l0: &mut u64, l1: u64)
     copy_loc l0
     read_ref

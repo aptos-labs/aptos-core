@@ -711,15 +711,21 @@ impl TransferFunctions for BorrowAnalysis<'_> {
             .expect("livevar annotation");
 
         match instr {
-            Assign(_, dest, src, kind) if self.carrying_temps.contains(src) => {
+            Assign(attr_id, dest, src, kind) if self.carrying_temps.contains(src) => {
                 // Assignment of a closure value carrying captured mutations: the
                 // mutations move with the value. Model as a direct borrow edge so
-                // write-backs chain through the new temp. Copies are excluded
-                // since they would duplicate live mutations.
-                assert!(
-                    !matches!(kind, AssignKind::Copy),
-                    "copy of a closure value carrying captured mutations"
-                );
+                // write-backs chain through the new temp. Copies are rejected
+                // since a surviving copy would fork the carried mutations; the
+                // `copy` ability bound itself is admitted on such closures and
+                // linearity is enforced here (see TODO(#20273)). The admitted
+                // direct-argument shape consumes the closure at its single use,
+                // so this is only reachable through codegen artifacts.
+                if matches!(kind, AssignKind::Copy) {
+                    self.func_target.global_env().error(
+                        &self.func_target.get_bytecode_loc(*attr_id),
+                        "cannot copy a function value carrying mutable reference captures",
+                    );
+                }
                 let dest_node = BorrowNode::Reference(*dest);
                 state.add_node(dest_node.clone());
                 state.add_edge(BorrowNode::Reference(*src), dest_node, BorrowEdge::Direct);

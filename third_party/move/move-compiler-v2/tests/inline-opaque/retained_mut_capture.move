@@ -89,4 +89,24 @@ module 0x42::retained_mut_capture {
     spec read {
         ensures result == r;
     }
+
+    inline fun call_once_copy(f: |u64| has copy + drop) {
+        f(1)
+    }
+    spec call_once_copy {
+        pragma opaque;
+        ensures ensures_of<f>(1);
+    }
+
+    /// Conversion into a closure satisfying a `copy` ability bound: the
+    /// lifted closure captures `&mut x` and remains linear at the model
+    /// level, but the bound itself is admitted.
+    fun copy_bound_caller(): u64 {
+        let x = 0;
+        call_once_copy(|i| x = x + i spec { ensures x == old(x) + i; });
+        x
+    }
+    spec copy_bound_caller {
+        ensures result == 1;
+    }
 }

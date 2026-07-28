@@ -1,10 +1,11 @@
 // In verify mode, a lambda passed to a retained inline-opaque function may capture
-// mutable references rooted anywhere (locals, parameters, or global storage). The
-// closure must not require the `copy` ability (a mutable capture makes the value
-// linear). An inline function with a `&mut`-returning function parameter does not
-// get the retained treatment at all — its opaque spec is not honored and calls are
-// expanded, so no lambda is lifted. In normal compilation every inline function is
-// expanded, so no capture arises anywhere.
+// mutable references rooted anywhere (locals, parameters, or global storage). A
+// `copy` ability bound on the function parameter is admitted (a mutable capture
+// makes the value linear, but linearity is enforced at the model level, see
+// TODO(#20273)). An inline function with a `&mut`-returning function parameter does
+// not get the retained treatment at all — its opaque spec is not honored and calls
+// are expanded, so no lambda is lifted. In normal compilation every inline function
+// is expanded, so no capture arises anywhere.
 module 0x42::retained_mut_ref_capture {
 
     struct R has key {
@@ -45,7 +46,7 @@ module 0x42::retained_mut_ref_capture {
         apply(|y| { *r = *r + y; *r }, 5)
     }
 
-    /// Rejected: closure requiring the `copy` ability.
+    /// Admitted: closure satisfying a `copy` ability bound.
     fun copy_mut_capture(r: &mut u64): u64 {
         apply_copy(|y| { *r = *r + y; *r }, 5)
     }

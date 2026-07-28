@@ -14,7 +14,31 @@ module 0x42::retained_mut_capture {
       ensures ensures_of($t0, 1);
     }
 
+    private inline fun call_once_copy(f: |u64| has copy + drop) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t0, 1);
+    }
+
     private fun caller(): u64 {
+        {
+          let x: u64 = 0;
+          {
+            let (): ();
+            {
+              let (i: u64): (u64) = Tuple(1);
+              x: u64 = Add<u64>(x, i)
+            }
+          };
+          x
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 1);
+    }
+
+    private fun copy_bound_caller(): u64 {
         {
           let x: u64 = 0;
           {
@@ -134,6 +158,15 @@ module 0x42::retained_mut_capture {
         ensures ensures_of<f>(1);
     }
 
+    inline fun call_once_copy(f: |u64| has copy + drop) {
+        f(1)
+    }
+
+    spec call_once_copy(f: |u64| has copy + drop) {
+        pragma opaque = true;
+        ensures ensures_of<f>(1);
+    }
+
     fun caller(): u64 {
         let x = 0;
         {
@@ -145,6 +178,20 @@ module 0x42::retained_mut_capture {
     }
 
     spec caller(): u64 {
+        ensures result == 1;
+    }
+
+    fun copy_bound_caller(): u64 {
+        let x = 0;
+        {
+            let ();
+            let i = 1;
+            x = x + i
+        };
+        x
+    }
+
+    spec copy_bound_caller(): u64 {
         ensures result == 1;
     }
 
@@ -240,7 +287,25 @@ module 0x42::retained_mut_capture {
       ensures ensures_of($t0, 1);
     }
 
+    private inline fun call_once_copy(f: |u64| has copy + drop) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t0, 1);
+    }
+
     private fun caller(): u64 {
+        {
+          let x: u64 = 0;
+          x: u64 = Add<u64>(x, 1);
+          x
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 1);
+    }
+
+    private fun copy_bound_caller(): u64 {
         {
           let x: u64 = 0;
           x: u64 = Add<u64>(x, 1);
@@ -331,6 +396,13 @@ fun caller(): u64
     ret
 
 // Function definition at index 1
+fun copy_bound_caller(): u64
+    ld_u64 0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 2
 fun field_caller(): u64
     local l0: S
     ld_u64 1
@@ -357,7 +429,7 @@ fun field_caller(): u64
     add
     ret
 
-// Function definition at index 2
+// Function definition at index 3
 fun freeze_caller(): u64
     local l0: u64
     ld_u64 1
@@ -371,20 +443,20 @@ fun freeze_caller(): u64
     add
     ret
 
-// Function definition at index 3
+// Function definition at index 4
 fun param_caller(l0: u64): u64
     move_loc l0
     ld_u64 1
     add
     ret
 
-// Function definition at index 4
+// Function definition at index 5
 fun read(l0: &u64): u64
     move_loc l0
     read_ref
     ret
 
-// Function definition at index 5
+// Function definition at index 6
 fun receiver_caller(l0: &V): u64
     ld_u64 0
     move_loc l0

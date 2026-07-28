@@ -66,6 +66,10 @@ pub struct MonoInfo {
     /// map to ask which intrinsic roles were called and with which type args.
     pub intrinsic_calls: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
     pub all_types: BTreeSet<Type>,
+    /// Fun-type pairs (subject, witness) observed by `partial_of`/
+    /// `captures_of` in specs; the backend emits closed-world recognizer/
+    /// selector definitions per pair.
+    pub variant_obs_pairs: BTreeSet<(Type, Type)>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
     /// A map from function types used in the program to the closures appearing in
     /// code constructing values of this function type.
@@ -947,6 +951,28 @@ impl Analyzer<'_> {
     fn analyze_exp(&mut self, exp: &ExpData) {
         exp.visit_post_order(&mut |e| {
             let node_id = e.node_id();
+            // Record fun-type pairs observed by `partial_of`/`captures_of`
+            // (subject type, witness type): the backend emits the closed-world
+            // recognizer/selector definitions per pair.
+            if let ExpData::Call(
+                _,
+                ast::Operation::Behavior(
+                    ast::BehaviorKind::PartialOf | ast::BehaviorKind::CapturesOf,
+                    _,
+                ),
+                args,
+            ) = e
+            {
+                if let (Some(subject), Some(witness)) = (args.first(), args.get(1)) {
+                    let ty_f = self.normalize_fun_ty(
+                        self.instantiate(&self.env.get_node_type(subject.node_id())),
+                    );
+                    let ty_g = self.normalize_fun_ty(
+                        self.instantiate(&self.env.get_node_type(witness.node_id())),
+                    );
+                    self.info.variant_obs_pairs.insert((ty_f, ty_g));
+                }
+            }
             self.add_type_root(&self.env.get_node_type(node_id));
             for ref ty in self.env.get_node_instantiation(node_id) {
                 self.add_type_root(ty);

@@ -1738,23 +1738,22 @@ impl ModuleBuilder<'_, '_> {
             if let Some(pre_name) = pre_label.and_then(&get_label_name) {
                 used_pre_labels.insert(pre_name);
             }
-            // Reject post-state labels on single-state predicates (requires_of, aborts_of).
+            // Reject post-state labels on single-state predicates
+            // (requires_of, aborts_of, partial_of, captures_of).
             if post_label.is_some() {
-                if let Some(BehaviorKind::RequiresOf | BehaviorKind::AbortsOf) = behavior_kind {
-                    let kind_name = match behavior_kind.unwrap() {
-                        BehaviorKind::RequiresOf => "requires_of",
-                        BehaviorKind::AbortsOf => "aborts_of",
-                        _ => unreachable!(),
-                    };
-                    let exp_loc = self.parent.env.get_node_loc(*node_id);
-                    self.parent.env.error(
-                        &exp_loc,
-                        &format!(
-                            "`{}` describes a single state and cannot have a post-state label; \
-                             only `ensures_of` and `result_of` support state transitions",
-                            kind_name,
-                        ),
-                    );
+                if let Some(kind) = behavior_kind {
+                    if !kind.is_two_state() {
+                        let exp_loc = self.parent.env.get_node_loc(*node_id);
+                        self.parent.env.error(
+                            &exp_loc,
+                            &format!(
+                                "`{}` describes a single state and cannot have a post-state \
+                                 label; only `ensures_of`, `result_of`, `write_of` and \
+                                 `fun_post_of` support state transitions",
+                                kind,
+                            ),
+                        );
+                    }
                 }
             }
         }

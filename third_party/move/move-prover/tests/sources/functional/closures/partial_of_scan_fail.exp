@@ -1,0 +1,31 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `f`. Consider removing the parameter, or prefixing with an underscore (e.g., `_f`), or binding to `_`
+   ┌─ tests/sources/functional/closures/partial_of_scan_fail.move:30:21
+   │
+30 │     fun observe_via(f: |&u64| has copy + drop): u64 {
+   │                     ^
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/partial_of_scan_fail.move:20:13
+   │
+20 │             assert 1 == 2; // error: unknown assertion failed
+   │             ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:17: observe_inline
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:19: observe_inline
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:20: observe_inline
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/partial_of_scan_fail.move:35:9
+   │
+35 │         ensures 1 == 2; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:30: observe_via
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:34: observe_via (spec)
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:30: observe_via
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:31: observe_via
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/partial_of_scan_fail.move:35: observe_via (spec)

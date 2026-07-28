@@ -1,7 +1,6 @@
 // Restrictions on modifying captured variables in lambdas passed to retained
 // inline-opaque functions: converted variables cannot appear in tuple
-// assignments. (A mutating lambda for a `copy`-requiring function parameter is
-// rejected by the closure checker; see the prover test suite.)
+// assignments.
 module 0x42::retained_mut_capture_err {
 
     inline fun call_once(f: |u64|) {

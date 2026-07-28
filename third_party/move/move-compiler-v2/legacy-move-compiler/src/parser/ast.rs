@@ -731,6 +731,15 @@ pub enum BehaviorKind {
     EnsuresOf,
     /// `result_of<f>(x)` - deterministic result selector based on `ensures_of`
     ResultOf,
+    /// `fun_post_of<f>(x)` - the function value after one application on `x`
+    /// (for values carrying mutable reference captures; identity otherwise)
+    FunPostOf,
+    /// `write_of<f, j>(x)` - the post-state of the j-th `&mut` parameter of `f`
+    WriteOf(u64),
+    /// `partial_of<f>(g)` - `f` is a closure over named function `g`
+    PartialOf,
+    /// `captures_of<f>(g)` - the `&mut`-captured value of a closure over `g`
+    CapturesOf,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -2428,6 +2437,10 @@ impl AstDebug for Exp_ {
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
                     BehaviorKind::ResultOf => "result_of",
+                    BehaviorKind::FunPostOf => "fun_post_of",
+                    BehaviorKind::WriteOf(_) => "write_of",
+                    BehaviorKind::PartialOf => "partial_of",
+                    BehaviorKind::CapturesOf => "captures_of",
                 };
                 w.write(kind_str);
                 w.write("<");

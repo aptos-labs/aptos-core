@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: behavior predicate target must have function type, found `u64`
+   ┌─ tests/checking-lang-v2.4/specs/variant_observation_check_err.move:21:17
+   │
+21 │         ensures partial_of<x>(step);
+   │                 ^^^^^^^^^^^^^^^^^^^
+
+error: the argument of partial_of must be a function value
+   ┌─ tests/checking-lang-v2.4/specs/variant_observation_check_err.move:30:17
+   │
+30 │         ensures partial_of<f>(x + 1);
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: the witness of captures_of must take exactly one leading `&mut` (captured) parameter followed by the subject's parameters
+   ┌─ tests/checking-lang-v2.4/specs/variant_observation_check_err.move:39:17
+   │
+39 │         ensures captures_of<f>(no_capture) == 0;
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `write_of` index 3 exceeds the number of `&mut` parameters
+   ┌─ tests/checking-lang-v2.4/specs/variant_observation_check_err.move:48:17
+   │
+48 │         ensures write_of<step, 3>(1, 2) == 0;
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `bool` but found a value of type `u64`
+   ┌─ tests/checking-lang-v2.4/specs/variant_observation_check_err.move:57:17
+   │
+57 │         ensures captures_of<f>(step);
+   │                 ^^^^^^^^^^^^^^^^^^^^

@@ -2485,6 +2485,10 @@ fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
         "aborts_of" => Some(BehaviorKind::AbortsOf),
         "ensures_of" => Some(BehaviorKind::EnsuresOf),
         "result_of" => Some(BehaviorKind::ResultOf),
+        "fun_post_of" => Some(BehaviorKind::FunPostOf),
+        "write_of" => Some(BehaviorKind::WriteOf(0)),
+        "partial_of" => Some(BehaviorKind::PartialOf),
+        "captures_of" => Some(BehaviorKind::CapturesOf),
         _ => None,
     }
 }
@@ -2629,7 +2633,8 @@ fn parse_bare_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
                 current_token_loc(context.tokens),
                 format!(
                     "expected a behavior predicate keyword \
-                     (requires_of, aborts_of, ensures_of, result_of), found '{}'",
+                     (requires_of, aborts_of, ensures_of, result_of, fun_post_of, write_of, \
+                     partial_of, captures_of), found '{}'",
                     kind_content
                 )
             )
@@ -2642,6 +2647,23 @@ fn parse_bare_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     // dots, and indexing, and naturally stops at `>`.
     consume_token(context.tokens, Tok::Less)?;
     let target = parse_dot_or_index_chain(context)?;
+    let kind = if matches!(kind, BehaviorKind::WriteOf(_)) && context.tokens.peek() == Tok::Comma {
+        // `write_of<f, j>`: explicit index of the `&mut` parameter
+        // (counted among `&mut` parameters); defaults to 0.
+        context.tokens.advance()?;
+        let loc = current_token_loc(context.tokens);
+        let idx_str = context.tokens.content().to_string();
+        consume_token(context.tokens, Tok::NumValue)?;
+        let idx = idx_str.parse::<u64>().map_err(|_| {
+            Box::new(diag!(
+                Syntax::UnexpectedToken,
+                (loc, "expected a decimal `&mut`-parameter index".to_string())
+            ))
+        })?;
+        BehaviorKind::WriteOf(idx)
+    } else {
+        kind
+    };
     consume_token(context.tokens, Tok::Greater)?;
 
     // Parse `(` args `)`

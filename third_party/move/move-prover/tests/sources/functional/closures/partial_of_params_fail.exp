@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/partial_of_params_fail.move:22:9
+   │
+22 │ ╭         ensures captures_of<fun_post_of<old(f)>(1)>(step)
+23 │ │              == captures_of<old(f)>(step) + 2; // error: post-condition does not hold
+   │ ╰──────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:15: bump_once
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:20: bump_once (spec)
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:21: bump_once (spec)
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:15: bump_once
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:16: bump_once
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:7: step
+   =         s = <redacted>
+   =         e = <redacted>
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:8: step
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:7: step
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/partial_of_params_fail.move:22: bump_once (spec)

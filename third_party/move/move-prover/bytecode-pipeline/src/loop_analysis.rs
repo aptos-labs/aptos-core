@@ -174,6 +174,30 @@ impl LoopAnalysisProcessor {
                             );
                             builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
                         }
+                        // Fun values applied in the loop body advance at the
+                        // translation level (captured mutations, advancing
+                        // fun-param family members). The capture-value havoc
+                        // frees exactly that state, preserving the variant;
+                        // for values which cannot advance it is a no-op.
+                        // Verification-only: the spec-inference WP would
+                        // generalize a havoc-defined fun temp into a
+                        // quantified variable.
+                        for idx in loop_info
+                            .spec_info()
+                            .fun_targets
+                            .iter()
+                            .filter(|_| !options.inference)
+                        {
+                            builder.emit_with(|attr_id| {
+                                Bytecode::Call(
+                                    attr_id,
+                                    vec![*idx],
+                                    Operation::Havoc(HavocKind::CaptureValues),
+                                    vec![],
+                                    None,
+                                )
+                            });
+                        }
 
                         // havoc all memory the loop body may modify, so the
                         // loop-exit path does not retain pre-loop memory; the
