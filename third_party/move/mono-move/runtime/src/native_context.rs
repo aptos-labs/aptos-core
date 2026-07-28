@@ -10,10 +10,13 @@ use crate::{
     error::RuntimeError,
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr, Heap,
-        TopFrame,
+        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr,
+        realloc_vec, Heap, TopFrame,
     },
-    memory::{read_ptr, write_enum_tag, write_u64},
+    memory::{
+        read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
+        write_u64,
+    },
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
@@ -362,6 +365,122 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    unsafe fn vector_move_range(
+        &self,
+        from: &Ref<'_, Opaque>,
+        removal_position: u64,
+        length: u64,
+        to: &Ref<'_, Opaque>,
+        insert_position: u64,
+        elem_ty: InternedType,
+    ) -> VMResult<bool> {
+        let elem_size = self.value_size(elem_ty)? as usize;
+
+        // Vector pointers behind the rooted references (null when empty); re-read
+        // after the grow, the only point a GC can relocate them.
+        // SAFETY: the references hold `vector<elem_ty>` pointers.
+        let mut from_ptr = unsafe { read_ptr(from.ptr(), 0usize) };
+        let mut to_ptr = unsafe { read_ptr(to.ptr(), 0usize) };
+
+        // Reject aliasing before any other work -- a defensive measure against
+        // bytecode verifier bugs. The null guard is required to avoid a false positive
+        // on two empty (null) vectors.
+        if !from_ptr.is_null() && from_ptr == to_ptr {
+            return Err(native_invariant_violation(
+                "vector_move_range: `from` and `to` alias the same vector".into(),
+            ));
+        }
+
+        // Check the removal range and insert position are in bounds. Phrased with
+        // subtraction rather than `removal_position + length` to avoid overflow on
+        // the user-supplied u64s; short-circuiting keeps `from_len - removal_position`
+        // from underflowing.
+        let from_len = unsafe { read_vec_len(from_ptr) };
+        let to_len = unsafe { read_vec_len(to_ptr) };
+
+        if removal_position > from_len
+            || length > from_len - removal_position
+            || insert_position > to_len
+        {
+            return Ok(false);
+        }
+        if length == 0 {
+            return Ok(true);
+        }
+
+        // Grow the `to` vector when it can't hold the inserted elements.
+        let required = to_len + length;
+        let to_cap = if to_ptr.is_null() {
+            0
+        } else {
+            // SAFETY: `to_ptr` is a live vector object.
+            let total = unsafe { read_obj_size(to_ptr) } as usize;
+            ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size) as u64
+        };
+        if required > to_cap {
+            // SAFETY: distinct fields, reborrowed exclusively (the aliasing rule).
+            let heap = unsafe { &mut **self.heap.get() };
+            let rws = unsafe { &mut **self.rws.get() };
+
+            // `to` may be null (an unallocated empty vector), so take the shared
+            // `vector<T>` descriptor from `from`, which is non-null here: length > 0
+            // and the bounds check force `from_len >= length >= 1`.
+            // SAFETY: `from_ptr` is a live `vector<elem_ty>`; `to_ptr` is null or live.
+            let new_ptr = unsafe {
+                realloc_vec(
+                    heap,
+                    self.desc_provider,
+                    rws,
+                    &self.pool,
+                    self.extensions,
+                    self.frame_ptr,
+                    TopFrame::Native(self.abi),
+                    to_ptr,
+                    DescriptorId(read_descriptor(from_ptr)),
+                    elem_size as u32,
+                    required,
+                )
+            }?;
+            // Write the grown `to` back and re-read `from`, both current after the GC.
+            // SAFETY: the rooted references yield live pointers.
+            unsafe {
+                write_ptr(to.ptr(), 0usize, new_ptr);
+                from_ptr = read_ptr(from.ptr(), 0usize);
+            }
+            to_ptr = new_ptr;
+        }
+
+        let rp = removal_position as usize;
+        let ip = insert_position as usize;
+        let len = length as usize;
+        // Open a gap in `to`, copy the range in (distinct vectors, non-overlapping),
+        // then close the gap in `from`.
+        // SAFETY: bounds check and grow keep every range in-allocation; no
+        // allocation runs past this point.
+        unsafe {
+            let from_data = from_ptr.add(VEC_DATA_OFFSET);
+            let to_data = to_ptr.add(VEC_DATA_OFFSET);
+            std::ptr::copy(
+                to_data.add(ip * elem_size),
+                to_data.add((ip + len) * elem_size),
+                (to_len as usize - ip) * elem_size,
+            );
+            std::ptr::copy_nonoverlapping(
+                from_data.add(rp * elem_size),
+                to_data.add(ip * elem_size),
+                len * elem_size,
+            );
+            std::ptr::copy(
+                from_data.add((rp + len) * elem_size),
+                from_data.add(rp * elem_size),
+                (from_len as usize - rp - len) * elem_size,
+            );
+            write_u64(from_ptr, VEC_LENGTH_OFFSET, from_len - length);
+            write_u64(to_ptr, VEC_LENGTH_OFFSET, to_len + length);
+        }
+        Ok(true)
     }
 
     unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {

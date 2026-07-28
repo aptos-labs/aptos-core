@@ -16,8 +16,9 @@ use crate::{
     global_storage::ResourceReadWriteSet,
     invariant_violation,
     memory::{
-        read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
-        write_forwarding, write_object_header, write_ptr, write_u64, MemoryRegion,
+        read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, read_vec_len,
+        write_descriptor, write_forwarding, write_object_header, write_ptr, write_u64,
+        MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
@@ -642,19 +643,82 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
     )
 }
 
-/// Grow a vector to at least `required_cap_in_elems` elements, accessed
-/// through a fat pointer reference at `fp + vec_ref_offset`. The vector
-/// pointer is written back through the reference; returns the new object
-/// pointer.
+/// Allocate a fresh vector holding at least `required` elements, tagged with
+/// `descriptor`, and move the `old` vector's contents into it (length
+/// preserved), returning the new object pointer for the caller to write back.
 ///
 /// # Safety
 ///
-/// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
-/// offset of a 16-byte fat pointer `(base, offset)` whose target holds
-/// the current vector heap pointer. `alloc_vec` may trigger GC which
-/// relocates objects; the fat pointer's base in `heap_ptr_offsets` and the
-/// vector pointer in the struct's `pointer_offsets` are updated by the GC.
-/// We re-read through the fat pointer after allocation.
+/// `old` is null or a live vector of `elem_size`-byte elements. Rooting keeps
+/// it live across the allocation's GC, so its contents survive the copy.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn realloc_vec<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    old: *mut u8,
+    descriptor: DescriptorId,
+    elem_size: u32,
+    required: u64,
+) -> VMResult<*mut u8> {
+    // SAFETY: `old` is null or a live vector.
+    let old_len = unsafe { read_vec_len(old) };
+    let old_cap = if old.is_null() {
+        0
+    } else {
+        // SAFETY: `old` is a live vector object.
+        ((unsafe { read_obj_size(old) } as usize - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
+            / elem_size as usize) as u64
+    };
+    // Amortized doubling keeps repeated growth linear; `required` wins for a
+    // large one-shot grow.
+    let doubled = if old_cap == 0 { 4 } else { old_cap * 2 };
+    let new_cap = doubled.max(required);
+    // Root the source so its (relocated) pointer is recoverable after the GC
+    // `alloc_vec` may trigger.
+    // SAFETY: `old` is null or a live heap object.
+    let old_handle = unsafe { extra_roots.root_object(old) };
+    let new_ptr = alloc_vec(
+        heap,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
+        fp,
+        top_frame,
+        descriptor,
+        elem_size,
+        new_cap,
+    )?;
+    let byte_count = old_len as usize * elem_size as usize;
+    if byte_count > 0 {
+        // SAFETY: the source holds `old_len` elements and `new_ptr` has room for them.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                old_handle.ptr().add(VEC_DATA_OFFSET),
+                new_ptr.add(VEC_DATA_OFFSET),
+                byte_count,
+            );
+        }
+    }
+    // SAFETY: `new_ptr` is a freshly allocated vector.
+    unsafe { write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len) };
+    Ok(new_ptr)
+}
+
+/// Grow a vector to at least `required_cap_in_elems` elements, accessed through
+/// a fat pointer reference at `fp + vec_ref_offset`, writing the new pointer
+/// back through the reference and returning it.
+///
+/// # Safety
+///
+/// `fp` must point to a valid frame and `vec_ref_offset` to a 16-byte fat
+/// pointer whose target holds the current (non-null) vector pointer. The GC
+/// updates that fat pointer, so it is re-read for the write-back.
 pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
@@ -671,24 +735,14 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
         let old_ptr = read_ptr(base, off);
-
-        let old_len = read_u64(old_ptr, VEC_LENGTH_OFFSET);
-        let old_total = read_obj_size(old_ptr) as usize;
-        let old_cap_in_elems =
-            ((old_total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size as usize) as u64;
+        // Guard the descriptor read below: an empty vector is allocated fresh,
+        // never grown, so a null here is a caller-side invariant violation.
+        if old_ptr.is_null() {
+            invariant_violation!(GrowNullVector);
+        }
         let descriptor_id = DescriptorId(read_descriptor(old_ptr));
 
-        let mut new_cap_in_elems = if old_cap_in_elems == 0 {
-            4
-        } else {
-            old_cap_in_elems * 2
-        };
-        if new_cap_in_elems < required_cap_in_elems {
-            new_cap_in_elems = required_cap_in_elems;
-        }
-
-        // alloc_vec may trigger GC. Re-read through the fat pointer afterward.
-        let new_ptr = alloc_vec(
+        let new_ptr = realloc_vec(
             heap,
             provider,
             rws,
@@ -696,25 +750,15 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
             extensions,
             fp,
             top_frame,
+            old_ptr,
             descriptor_id,
             elem_size,
-            new_cap_in_elems,
+            required_cap_in_elems,
         )?;
+
+        // Write the new pointer back through the (GC-updated) reference.
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
-        let old_ptr = read_ptr(base, off);
-
-        let byte_count = old_len as usize * elem_size as usize;
-        if byte_count > 0 {
-            std::ptr::copy_nonoverlapping(
-                old_ptr.add(VEC_DATA_OFFSET),
-                new_ptr.add(VEC_DATA_OFFSET),
-                byte_count,
-            );
-        }
-        write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len);
-
-        // Write new pointer back through the reference.
         write_ptr(base, off, new_ptr);
         Ok(new_ptr)
     }
