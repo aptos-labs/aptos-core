@@ -146,12 +146,12 @@ pub trait NativeContext {
     unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize>;
 
     /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
-    /// representation.
+    /// representation, or `None` when `bytes` is not a valid encoding of `ty`.
     ///
     /// The returned bytes may embed pointers to freshly allocated, unrooted heap
     /// objects, so they must be written into a frame slot before any further
     /// heap allocation.
-    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Vec<u8>>;
+    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>>;
 
     /// The constant BCS-serialized size of any value of type `ty`.
     /// Returns `None` if the size is data-dependent (e.g. vectors).

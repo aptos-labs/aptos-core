@@ -28,8 +28,9 @@ use mono_move_core::{
     },
     storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
-    DescriptorId, DescriptorProvider, Function, GasMeter, LayoutProvider, ResourceProvider,
-    VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
+    ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
 use std::{
@@ -494,7 +495,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         unsafe { crate::value_utils::serialized_size(self.layouts, base, ty) }
     }
 
-    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Vec<u8>> {
+    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>> {
         let layout = self.layouts.layout_by_ty(ty).ok_or_else(|| {
             native_invariant_violation("bcs deserialize: no layout for type".into())
         })?;
@@ -506,7 +507,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // `bytes` is off-heap (the native copied it), so it survives the GC the
         // retry may run.
         // SAFETY: `out` is `layout.size` writable bytes.
-        unsafe {
+        let result = unsafe {
             deserialize_or_gc(
                 self.layouts,
                 heap,
@@ -520,8 +521,14 @@ impl NativeContext for ProductionNativeContext<'_> {
                 self.frame_ptr,
                 TopFrame::Native(self.abi),
             )
+        };
+        match result {
+            Ok(()) => Ok(Some(out)),
+            // Malformed input: the bytes are not a valid encoding of `ty`. Heap
+            // exhaustion and missing layouts carry other kinds and still propagate.
+            Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
+            Err(e) => Err(e),
         }
-        .map(|()| out)
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {

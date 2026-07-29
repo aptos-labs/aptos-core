@@ -75,13 +75,10 @@ module 0x1::main {
 // RUN: execute 0x1::main::roundtrip_bytes
 // CHECK: results: 0x68656c6c6f
 
-// Malformed input: the legacy VM aborts with EFROM_BYTES, while mono-move
-// surfaces the deserializer's error directly (V1/V2 diverge by design).
+// Malformed input aborts with EFROM_BYTES on both VMs.
 
 // RUN: execute 0x1::main::truncated
-// CHECK-V1: aborted: code 65537
-// CHECK-V2: error: BCS deserialize: unexpected end of input
+// CHECK: aborted: code 65537
 
 // RUN: execute 0x1::main::trailing
-// CHECK-V1: aborted: code 65537
-// CHECK-V2: error: BCS deserialize: 1 trailing byte(s) after value
+// CHECK: aborted: code 65537
