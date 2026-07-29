@@ -263,6 +263,9 @@ pub enum RuntimeInvariantViolation {
     #[error("GC found forwarding marker in to-space")]
     GcForwardingMarkerInToSpace,
 
+    #[error("grow_vec_ref called on a null (empty) vector")]
+    GrowNullVector,
+
     #[error("CallClosure: null closure pointer")]
     NullClosure,
 

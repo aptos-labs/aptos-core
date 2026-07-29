@@ -108,6 +108,27 @@ pub trait NativeContext {
     /// native call.
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> VMResult<Vector<'a, u8>>;
 
+    /// Moves the elements of `from` at `[removal_position, removal_position + length)`
+    /// into `to` at `insert_position`.
+    ///
+    /// `from` and `to` must be distinct vectors, per Move's reference safety rules.
+    ///
+    /// Returns `false` when the positions/length fall outside the vectors, which
+    /// the caller surfaces as an abort.
+    ///
+    /// # Safety
+    ///
+    /// `from` and `to` must reference live, distinct `vector<elem_ty>` values.
+    unsafe fn vector_move_range(
+        &self,
+        from: &Ref<'_, Opaque>,
+        removal_position: u64,
+        length: u64,
+        to: &Ref<'_, Opaque>,
+        insert_position: u64,
+        elem_ty: InternedType,
+    ) -> VMResult<bool>;
+
     /// BCS-serializes the value of type `ty` stored at `base`.
     ///
     /// # Safety
@@ -125,12 +146,12 @@ pub trait NativeContext {
     unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize>;
 
     /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
-    /// representation.
+    /// representation, or `None` when `bytes` is not a valid encoding of `ty`.
     ///
     /// The returned bytes may embed pointers to freshly allocated, unrooted heap
     /// objects, so they must be written into a frame slot before any further
     /// heap allocation.
-    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Vec<u8>>;
+    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>>;
 
     /// The constant BCS-serialized size of any value of type `ty`.
     /// Returns `None` if the size is data-dependent (e.g. vectors).

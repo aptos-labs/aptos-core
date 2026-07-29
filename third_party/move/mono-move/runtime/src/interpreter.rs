@@ -419,6 +419,23 @@ impl<'guard> InterpreterContext<'guard> {
         }
     }
 
+    /// Reads a heap `vector<u64>` from the root result slot at `offset`; empty if
+    /// the pointer is null. For tests.
+    pub fn root_result_u64_vector_for_test(&self, offset: u32) -> Vec<u64> {
+        // SAFETY: the slot holds a live pointer to a heap vector<u64>; the heap is
+        // still owned by this context, so the reads stay in bounds.
+        unsafe {
+            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
+            if ptr.is_null() {
+                return vec![];
+            }
+            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
+            (0..len)
+                .map(|i| read_u64(ptr, VEC_DATA_OFFSET + i * 8))
+                .collect()
+        }
+    }
+
     /// Copy argument bytes into the root frame at the given byte offset.
     pub fn set_root_arg(&mut self, offset: u32, arg: &[u8]) {
         unsafe {
