@@ -349,7 +349,7 @@ impl PipelinedBlock {
     //   https://github.com/aptos-labs/aptos-core/pull/18699  (upstream optimization that introduced the cycle)
     //   https://github.com/aptos-labs/aptos-core/pull/19359  (corrective patch)
     //   https://github.com/aptos-labs/aptos-core/commit/fefcfade3edf26f0396d63963f7ea04364f3666f
-    //   https://github.com/movementlabsxyz/aptos-core/pull/322  (full analysis with diagrams)
+    //   https://github.com/movement-network/aptos-core/pull/322  (full analysis with diagrams)
     //
     // If a similar change is ever introduced here — anything that makes
     // rand aggregation wait on a pipeline-derived future — this function

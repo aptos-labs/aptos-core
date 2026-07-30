@@ -110,14 +110,14 @@ container-build container="aptos-node" tag="latest" profile="release":
     docker build \
         --build-arg BINARY_PATH="$BINARY_PATH" \
         -f docker/{{container}}/Dockerfile \
-        -t ghcr.io/movementlabsxyz/{{container}}:{{tag}} .
+        -t ghcr.io/movement-network/{{container}}:{{tag}} .
     
     # Clean up the copied binary
     rm -f aptos-test
 
 # Push a container image to GHCR
 container-push container="aptos-node" tag="latest":
-    docker push ghcr.io/movementlabsxyz/{{container}}:{{tag}}
+    docker push ghcr.io/movement-network/{{container}}:{{tag}}
 
 # Build and push a container image
 container-release container="aptos-node" tag="latest" profile="release":

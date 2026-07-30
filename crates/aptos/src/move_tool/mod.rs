@@ -207,7 +207,7 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/movementlabsxyz/aptos-core.git";
+        const APTOS_GIT_PATH: &str = "https://github.com/movement-network/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
         const DEFAULT_BRANCH: &str = "m1";
 
@@ -232,30 +232,24 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(
-                APTOS_FRAMEWORK.to_string(),
-                Dependency {
-                    local: Some(path.display().to_string()),
-                    git: None,
-                    rev: None,
-                    subdir: None,
-                    aptos: None,
-                    address: None,
-                },
-            );
+            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+                local: Some(path.display().to_string()),
+                git: None,
+                rev: None,
+                subdir: None,
+                aptos: None,
+                address: None,
+            });
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(
-                APTOS_FRAMEWORK.to_string(),
-                Dependency {
-                    local: None,
-                    git: Some(APTOS_GIT_PATH.to_string()),
-                    rev: Some(git_rev.to_string()),
-                    subdir: Some(SUBDIR_PATH.to_string()),
-                    aptos: None,
-                    address: None,
-                },
-            );
+            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+                local: None,
+                git: Some(APTOS_GIT_PATH.to_string()),
+                rev: Some(git_rev.to_string()),
+                subdir: Some(SUBDIR_PATH.to_string()),
+                aptos: None,
+                address: None,
+            });
         }
 
         let manifest = MovePackageManifest {

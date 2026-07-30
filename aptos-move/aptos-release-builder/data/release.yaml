@@ -6,8 +6,8 @@ proposals:
     metadata:
       title: "Disable concurrent fungible balance"
       description: "This is for disabling concurrent fungible balance"
-      source_code_url: "https://github.com/movementlabsxyz/aptos-core"
-      discussion_url: "https://github.com/movementlabsxyz/aptos-core"
+      source_code_url: "https://github.com/movement-network/aptos-core"
+      discussion_url: "https://github.com/movement-network/aptos-core"
     execution_mode: RootSigner
     update_sequence:
       - Framework:

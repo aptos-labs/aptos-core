@@ -13,7 +13,7 @@ name: Claude Audit PR
 # because that would expose repository secrets to untrusted code.
 #
 # Audit *content* (subagent definition, analyzers, prompt, settings) lives in
-# movementlabsxyz/claude-pr-reviewer and is checked out + staged at runtime.
+# movement-network/claude-pr-reviewer and is checked out + staged at runtime.
 # Bump REVIEWER_REF below to upgrade. See that repo's README for the consumer
 # contract.
 
@@ -43,7 +43,7 @@ concurrency:
 env:
   # Pin to a tag (e.g. v1, v0.1.0) or an immutable SHA. Rolling tags pick up
   # patches automatically; SHAs require a bump PR but are tamper-evident.
-  REVIEWER_REPO: movementlabsxyz/claude-pr-reviewer
+  REVIEWER_REPO: movement-network/claude-pr-reviewer
   REVIEWER_REF: v1
 
 jobs:

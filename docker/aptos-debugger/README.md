@@ -24,7 +24,7 @@ From the repository root:
 just container-build aptos-debugger latest release
 
 # Verify
-docker run --rm ghcr.io/movementlabsxyz/aptos-debugger:latest --version
+docker run --rm ghcr.io/movement-network/aptos-debugger:latest --version
 ```
 
 ## Pushing to GHCR
@@ -34,14 +34,14 @@ docker run --rm ghcr.io/movementlabsxyz/aptos-debugger:latest --version
 docker login ghcr.io -u <username>
 
 # Push
-docker push ghcr.io/movementlabsxyz/aptos-debugger:latest
+docker push ghcr.io/movement-network/aptos-debugger:latest
 ```
 
 ## CI
 
 The `build-versions.yaml` workflow automatically builds and pushes this image on
 every push to the default branch. The image is tagged with the short git SHA
-(e.g., `ghcr.io/movementlabsxyz/aptos-debugger:f24a5bc`).
+(e.g., `ghcr.io/movement-network/aptos-debugger:f24a5bc`).
 
 ## Runtime Dependencies
 

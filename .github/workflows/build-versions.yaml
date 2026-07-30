@@ -5,12 +5,12 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'The git ref to build (branch, tag, sha).'
+        description: "The git ref to build (branch, tag, sha)."
         required: true
-        default: 'main'
+        default: "main"
       build_profile:
-        description: 'The cargo build profile to use.'
-        default: 'release'
+        description: "The cargo build profile to use."
+        default: "release"
 
 jobs:
   setup:
@@ -72,7 +72,7 @@ jobs:
           echo "build_profile=${{ inputs.build_profile || 'release' }}" >> $GITHUB_OUTPUT
 
   binaries-aptos-node:
-    needs: 
+    needs:
       - setup
     runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "Build ${{ matrix.binary.package }} with Nix"
@@ -90,14 +90,14 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha}}
       - name: Build binary ${{ matrix.binary.package }}
-        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@m1
+        uses: movement-network/aptos-core/.github/actions/build-binary@m1
         with:
           binary_package: ${{ matrix.binary.package }}
           profile: ${{ needs.setup.outputs.build_profile }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_sha: ${{ needs.setup.outputs.git_sha }}
   container-aptos-node:
-    needs: 
+    needs:
       - setup
       - binaries-aptos-node
     runs-on: blacksmith-16vcpu-ubuntu-2204
@@ -130,11 +130,11 @@ jobs:
           path: ${{ env.TARGET_FOLDER }}
       - name: List binaries
         run: ls -la ${{ env.TARGET_FOLDER }}
-        
+
       - name: Build Container
-        uses: movementlabsxyz/aptos-core/.github/actions/build-container@m1
+        uses: movement-network/aptos-core/.github/actions/build-container@m1
         with:
-          image_name: ghcr.io/movementlabsxyz/aptos-node
+          image_name: ghcr.io/movement-network/aptos-node
           dockerfile_subdir: aptos-node
           build_args: |
             BINARY_PATH=${{ env.TARGET_FOLDER }}
@@ -170,9 +170,9 @@ jobs:
       - name: List binaries
         run: ls -la ${{ env.TARGET_FOLDER }}
       - name: Build Container
-        uses: movementlabsxyz/aptos-core/.github/actions/build-container@m1
+        uses: movement-network/aptos-core/.github/actions/build-container@m1
         with:
-          image_name: ghcr.io/movementlabsxyz/aptos-debugger
+          image_name: ghcr.io/movement-network/aptos-debugger
           dockerfile_subdir: aptos-debugger
           build_args: |
             BINARY_PATH=${{ env.TARGET_FOLDER }}
@@ -185,7 +185,7 @@ jobs:
           git_sha: ${{ needs.setup.outputs.git_sha }}
 
   binaries-aptos-faucet-service:
-    needs: 
+    needs:
       - setup
     runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "Build ${{ matrix.binary.package }} with Nix"
@@ -200,14 +200,14 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha}}
       - name: Build binary ${{ matrix.binary.package }}
-        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@m1
+        uses: movement-network/aptos-core/.github/actions/build-binary@m1
         with:
           binary_package: ${{ matrix.binary.package }}
           profile: ${{ needs.setup.outputs.build_profile }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_sha: ${{ needs.setup.outputs.git_sha }}
   container-aptos-faucet-service:
-    needs: 
+    needs:
       - setup
       - binaries-aptos-faucet-service
     runs-on: blacksmith-16vcpu-ubuntu-2204
@@ -230,11 +230,11 @@ jobs:
           path: ${{ env.TARGET_FOLDER }}
       - name: List binaries
         run: ls -la ${{ env.TARGET_FOLDER }}
-        
+
       - name: Build Container
-        uses: movementlabsxyz/aptos-core/.github/actions/build-container@m1
+        uses: movement-network/aptos-core/.github/actions/build-container@m1
         with:
-          image_name: ghcr.io/movementlabsxyz/aptos-faucet-service
+          image_name: ghcr.io/movement-network/aptos-faucet-service
           dockerfile_subdir: aptos-faucet-service
           build_args: |
             BINARY_PATH=${{ env.TARGET_FOLDER }}
@@ -247,7 +247,7 @@ jobs:
           git_sha: ${{ needs.setup.outputs.git_sha }}
 
   binaries-aptos-tools:
-    needs: 
+    needs:
       - setup
     runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "Build ${{ matrix.binary.package }} with Nix"
@@ -262,7 +262,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha}}
       - name: Build binary ${{ matrix.binary.package }}
-        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@m1
+        uses: movement-network/aptos-core/.github/actions/build-binary@m1
         with:
           binary_package: ${{ matrix.binary.package }}
           profile: ${{ needs.setup.outputs.build_profile }}

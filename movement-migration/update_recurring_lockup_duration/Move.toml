@@ -8,7 +8,7 @@ authors = []
 [dev-addresses]
 
 [dependencies.AptosFramework]
-git = "https://github.com/movementlabsxyz/aptos-core.git"
+git = "https://github.com/movement-network/aptos-core.git"
 rev = "l1-migration"
 subdir = "aptos-move/framework/aptos-framework"
 
