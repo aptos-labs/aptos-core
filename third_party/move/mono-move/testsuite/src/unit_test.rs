@@ -345,6 +345,7 @@ fn classify_runtime_error(err: &RuntimeError) -> TestResult {
         | RuntimeError::BCSInvalidBool { .. }
         | RuntimeError::BCSSequenceTooLong { .. }
         | RuntimeError::BCSRemainingInput { .. }
+        | RuntimeError::BCSSignerNotDeserializable
         | RuntimeError::StackOverflow
         | RuntimeError::OutOfHeapMemory { .. }
         | RuntimeError::AllocationTooLarge { .. }

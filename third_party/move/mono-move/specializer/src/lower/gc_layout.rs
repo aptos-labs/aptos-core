@@ -159,7 +159,8 @@ fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> VMResul
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => vec![],
+        | LayoutKind::Address
+        | LayoutKind::Signer => vec![],
         LayoutKind::Ref
         | LayoutKind::Vector { .. }
         | LayoutKind::FrozenEnum { .. }

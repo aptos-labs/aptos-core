@@ -102,6 +102,9 @@ pub enum RuntimeError {
 
     #[error("BCS deserialize: non-canonical bool byte {byte}")]
     BCSInvalidBool { byte: u8 },
+
+    #[error("BCS deserialize: cannot deserialize a signer")]
+    BCSSignerNotDeserializable,
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -135,7 +138,8 @@ impl IntoExecutionError for RuntimeError {
             | BCSInvalidUleb
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
-            | BCSInvalidBool { .. } => ExecutionErrorKind::InvalidOperation,
+            | BCSInvalidBool { .. }
+            | BCSSignerNotDeserializable => ExecutionErrorKind::InvalidOperation,
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
             ResourceProvider(e) => e.kind(),

@@ -115,8 +115,9 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => Err(VMInternalError::new(unreachable(
-            "Primitive types have no padding / pointers and must be already handled",
+        | LayoutKind::Address
+        | LayoutKind::Signer => Err(VMInternalError::new(unreachable(
+            "Scalars serialize on the no-pointers-no-padding fast path and never reach this arm",
         ))),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
@@ -255,7 +256,8 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => Err(VMInternalError::new(unreachable(
+        | LayoutKind::Address
+        | LayoutKind::Signer => Err(VMInternalError::new(unreachable(
             "Primitive layouts must be handled by fast-path",
         ))),
         LayoutKind::Struct { fields } => {
@@ -472,7 +474,7 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                 }
             })
         },
-        LayoutKind::Address => {
+        LayoutKind::Address | LayoutKind::Signer => {
             // SAFETY: values are valid byte arrays of the size specified by
             // the layout, as guaranteed by the precondition of this function.
             Ok(unsafe { bytes_cmp(a, b, layout.size as usize) })
@@ -670,6 +672,8 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => {
             Err(unreachable("Integer and address layouts must be handled by fast-path").into())
         },
+        // A signer is never deserialized.
+        LayoutKind::Signer => Err(RuntimeError::BCSSignerNotDeserializable.into()),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
                 let field_layout = layouts.layout(field.id).ok_or_else(layout_not_found)?;
@@ -927,7 +931,9 @@ mod tests {
     use mono_move_core::{
         align_up_u32,
         types::U64_TY,
-        value_layout::{BOOL_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
+        value_layout::{
+            BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID,
+        },
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
     };
     use serde::Serialize;
@@ -939,6 +945,74 @@ mod tests {
 
     fn vector_layout(elem_id: LayoutId) -> ValueLayout {
         ValueLayout::vector(elem_id, DescriptorId(2))
+    }
+
+    #[test]
+    fn deserialize_rejects_signer() {
+        let table = ValueLayoutTable::new();
+        let layout = table.layout(SIGNER_LAYOUT_ID).unwrap();
+        assert!(layout.has_no_pointers_no_padding());
+        assert!(!layout.all_byte_patterns_valid());
+
+        let mut heap = Heap::new(64);
+        let bytes = [0u8; 32];
+        let mut slot = [0u8; 32];
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                slot.as_mut_ptr(),
+            )
+        };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSSignerNotDeserializable
+            ))
+        ));
+    }
+
+    #[test]
+    fn deserialize_rejects_signer_in_vector() {
+        let mut table = ValueLayoutTable::new();
+        let vid = table.push(U64_TY, vector_layout(SIGNER_LAYOUT_ID));
+        let layout = table.layout(vid).unwrap();
+        let mut heap = Heap::new(4096);
+        // Length 1, then a 32-byte address.
+        let mut bytes = vec![0x01u8];
+        bytes.extend_from_slice(&[0u8; 32]);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+            )
+        };
+        assert!(matches!(
+            result,
+            Err(AllocationError::RuntimeError(
+                RuntimeError::BCSSignerNotDeserializable
+            ))
+        ));
+    }
+
+    #[test]
+    fn serialize_signer_emits_address_bytes() {
+        let table = ValueLayoutTable::new();
+        let layout = table.layout(SIGNER_LAYOUT_ID).unwrap();
+        let addr = [7u8; 32];
+        let mut out = vec![];
+        unsafe { serialize_impl(&table, addr.as_ptr(), layout, &mut out).unwrap() };
+        assert_eq!(out, addr);
     }
 
     #[test]
