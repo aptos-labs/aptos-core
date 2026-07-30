@@ -140,7 +140,7 @@ fun pts_neq(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64, l5: u64, l6: u64, l7: u
 // module 0x1::test
 
 fun bag_eq(r0, r1, r2, r3, r4, r5): bool {
-  slots: params(6), locals(0), temps(2), xfer(3)
+  slots: params(6), locals(0), temps(2), transfer(3)
     r0: u64
     r1: u64
     r2: u64
@@ -158,7 +158,7 @@ fun bag_eq(r0, r1, r2, r3, r4, r5): bool {
 }
 
 fun bag_eq_len(r0, r1, r2, r3, r4): bool {
-  slots: params(5), locals(0), temps(2), xfer(3)
+  slots: params(5), locals(0), temps(2), transfer(3)
     r0: u64
     r1: u64
     r2: u64
@@ -175,7 +175,7 @@ fun bag_eq_len(r0, r1, r2, r3, r4): bool {
 }
 
 fun bag_neq(r0, r1, r2, r3, r4, r5): bool {
-  slots: params(6), locals(0), temps(2), xfer(3)
+  slots: params(6), locals(0), temps(2), transfer(3)
     r0: u64
     r1: u64
     r2: u64
@@ -249,7 +249,7 @@ fun mk_points(r0, r1, r2, r3): vector<Point> {
 }
 
 fun pts_eq(r0, r1, r2, r3, r4, r5, r6, r7): bool {
-  slots: params(8), locals(0), temps(2), xfer(4)
+  slots: params(8), locals(0), temps(2), transfer(4)
     r0: u64
     r1: u64
     r2: u64
@@ -269,7 +269,7 @@ fun pts_eq(r0, r1, r2, r3, r4, r5, r6, r7): bool {
 }
 
 fun pts_neq(r0, r1, r2, r3, r4, r5, r6, r7): bool {
-  slots: params(8), locals(0), temps(2), xfer(4)
+  slots: params(8), locals(0), temps(2), transfer(4)
     r0: u64
     r1: u64
     r2: u64

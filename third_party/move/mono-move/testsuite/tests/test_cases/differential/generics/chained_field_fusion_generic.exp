@@ -27,7 +27,7 @@ fun read_chain(r0): _0 {
 }
 
 fun run_u64(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(2)
+  slots: params(1), locals(1), temps(0), transfer(2)
     r0: u64
     r1: 0x77::chained_field_fusion_generic::S<u64>
   code:
@@ -40,7 +40,7 @@ fun run_u64(r0): u64 {
 }
 
 fun run_u8(r0): u8 {
-  slots: params(1), locals(1), temps(0), xfer(2)
+  slots: params(1), locals(1), temps(0), transfer(2)
     r0: u8
     r1: 0x77::chained_field_fusion_generic::S<u8>
   code:

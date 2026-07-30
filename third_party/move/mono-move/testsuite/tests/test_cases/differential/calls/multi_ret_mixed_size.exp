@@ -21,7 +21,7 @@ fun other_call(r0, r1) {
 }
 
 fun caller(r0) {
-  slots: params(1), locals(0), temps(1), xfer(2)
+  slots: params(1), locals(0), temps(1), transfer(2)
     r0: &mut u64
     r1: u64
   code:
@@ -35,7 +35,7 @@ fun caller(r0) {
 }
 
 fun trigger(): u64 {
-  slots: params(0), locals(1), temps(0), xfer(1)
+  slots: params(0), locals(1), temps(0), transfer(1)
     r0: u64
   code:
   L0:

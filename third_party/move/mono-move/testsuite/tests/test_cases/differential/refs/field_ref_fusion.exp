@@ -38,7 +38,7 @@ fun read_field_ref_twice(r0): u64 {
 }
 
 fun test_read_and_add(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
   code:

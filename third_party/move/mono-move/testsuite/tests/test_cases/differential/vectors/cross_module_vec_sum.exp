@@ -131,7 +131,7 @@ use 0xc0ffee::foo
 // module 0xc0ffee::bar
 
 fun sum_first_n(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
   code:
   L0:

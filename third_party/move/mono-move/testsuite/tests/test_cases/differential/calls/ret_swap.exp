@@ -45,7 +45,7 @@ fun swap_back(l0: u64, l1: u64): (u64, u64)
 // module 0xc0ffee::ret_swap
 
 fun first(): u64 {
-  slots: params(0), locals(0), temps(1), xfer(2)
+  slots: params(0), locals(0), temps(1), transfer(2)
     r0: u64
   code:
   L0:
@@ -56,7 +56,7 @@ fun first(): u64 {
 }
 
 fun second(): u64 {
-  slots: params(0), locals(1), temps(1), xfer(2)
+  slots: params(0), locals(1), temps(1), transfer(2)
     r0: u64
     r1: u64
   code:
@@ -68,7 +68,7 @@ fun second(): u64 {
 }
 
 fun second_offset(): u64 {
-  slots: params(0), locals(1), temps(2), xfer(2)
+  slots: params(0), locals(1), temps(2), transfer(2)
     r0: u64
     r1: u64
     r2: u64

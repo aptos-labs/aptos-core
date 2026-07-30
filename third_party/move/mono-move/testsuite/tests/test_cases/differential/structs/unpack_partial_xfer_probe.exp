@@ -23,7 +23,7 @@ fun id(r0): u64 {
 }
 
 fun trigger(): u64 {
-  slots: params(0), locals(0), temps(1), xfer(1)
+  slots: params(0), locals(0), temps(1), transfer(1)
     r0: u64
   code:
   L0:

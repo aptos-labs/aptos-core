@@ -19,7 +19,7 @@ fun build(r0): S {
 }
 
 fun bump(r0): u64 {
-  slots: params(1), locals(2), temps(1), xfer(1)
+  slots: params(1), locals(2), temps(1), transfer(1)
     r0: u64
     r1: 0x88::mut_local_field_chain::S
     r2: &mut u64

@@ -64,7 +64,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
                 .with_fusion_passes()
                 .with_test_utils_passes(&module)?;
 
-            // Pass: Greedy Slot Allocation (consumes SSA, remaps in-place)
+            // Pass: Greedy Slot Allocation (consumes SSA, produces named-slot IR)
             let alloc = super::slot_alloc::allocate_slots(ssa)?;
 
             Ok(Some(FunctionIR {
@@ -73,7 +73,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
                 num_params,
                 num_locals,
                 num_home_slots: alloc.num_home_slots,
-                num_xfer_positions: alloc.num_xfer_positions,
+                num_transfer_positions: alloc.num_transfer_positions,
                 blocks: alloc.blocks,
                 home_slot_types: alloc.home_slot_types,
                 // Populated by the gas instrumentation pass.

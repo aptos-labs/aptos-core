@@ -23,7 +23,7 @@ fun add_two_fields(r0): u64 {
 }
 
 fun field_to_call(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: 0x66::field_fusion::Pair
   code:
   L0:
@@ -33,7 +33,7 @@ fun field_to_call(r0): u64 {
 }
 
 fun two_fields_to_call(r0, r1): u64 {
-  slots: params(2), locals(0), temps(2), xfer(1)
+  slots: params(2), locals(0), temps(2), transfer(1)
     r0: 0x66::field_fusion::Pair
     r1: 0x66::field_fusion::Pair
     r2: u64
@@ -71,7 +71,7 @@ fun increment_field(r0) {
 }
 
 fun test_add_two_fields(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(1)
+  slots: params(2), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
     r2: 0x66::field_fusion::Pair
@@ -83,7 +83,7 @@ fun test_add_two_fields(r0, r1): u64 {
 }
 
 fun test_field_to_call(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(1)
+  slots: params(2), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
     r2: 0x66::field_fusion::Pair
@@ -95,7 +95,7 @@ fun test_field_to_call(r0, r1): u64 {
 }
 
 fun test_two_fields_to_call(r0, r1, r2, r3): u64 {
-  slots: params(4), locals(2), temps(0), xfer(2)
+  slots: params(4), locals(2), temps(0), transfer(2)
     r0: u64
     r1: u64
     r2: u64
@@ -111,7 +111,7 @@ fun test_two_fields_to_call(r0, r1, r2, r3): u64 {
 }
 
 fun test_field_plus_constant(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(1)
+  slots: params(2), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
     r2: 0x66::field_fusion::Pair
@@ -123,7 +123,7 @@ fun test_field_plus_constant(r0, r1): u64 {
 }
 
 fun test_increment_field(r0, r1): u64 {
-  slots: params(2), locals(1), temps(2), xfer(1)
+  slots: params(2), locals(1), temps(2), transfer(1)
     r0: u64
     r1: u64
     r2: 0x66::field_fusion::Pair

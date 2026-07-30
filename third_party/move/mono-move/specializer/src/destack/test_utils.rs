@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Maps certain calls to VM intrinsics (special instructions). This runs before
-//! slot allocation so the original call does not clobber xfer slots or cause
+//! slot allocation so the original call does not clobber transfer slots or cause
 //! other side effects.
 
 use super::ssa_function::SSAFunction;

@@ -2,7 +2,7 @@
 // module 0x77::variant_field_tail_borrows
 
 fun bump_via_mut_ref(r0, r1): u8 {
-  slots: params(2), locals(2), temps(1), xfer(2)
+  slots: params(2), locals(2), temps(1), transfer(2)
     r0: u64
     r1: u8
     r2: 0x77::variant_field_tail_borrows::E
@@ -71,7 +71,7 @@ fun mut_ref(r0): &mut u8 {
 }
 
 fun read_via_imm_ref(r0, r1): u8 {
-  slots: params(2), locals(1), temps(1), xfer(2)
+  slots: params(2), locals(1), temps(1), transfer(2)
     r0: u64
     r1: u8
     r2: 0x77::variant_field_tail_borrows::E

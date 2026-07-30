@@ -14,7 +14,7 @@ fun call_identity(r0): u64 {
 }
 
 fun call_pick(r0): u64 {
-  slots: params(1), locals(2), temps(3), xfer(1)
+  slots: params(1), locals(2), temps(3), transfer(1)
     r0: u64
     r1: |u64, bool|u64
     r2: |u64, bool|u64
