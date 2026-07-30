@@ -117,7 +117,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         | LayoutKind::SignedInt
         | LayoutKind::Address
         | LayoutKind::Signer => Err(VMInternalError::new(unreachable(
-            "Primitive types have no padding / pointers and must be already handled",
+            "Scalars serialize on the no-pointers-no-padding fast path and never reach this arm",
         ))),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {

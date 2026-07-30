@@ -355,7 +355,8 @@ fn classify_runtime_error(err: &RuntimeError) -> FailureKind {
         | E::BCSInvalidUleb
         | E::BCSSequenceTooLong { .. }
         | E::BCSRemainingInput { .. }
-        | E::BCSInvalidBool { .. } => FailureKind::Other,
+        | E::BCSInvalidBool { .. }
+        | E::BCSSignerNotDeserializable => FailureKind::Other,
         E::InvariantViolation(_) | E::ResourceProvider(_) => FailureKind::InvariantViolation,
     }
 }

@@ -56,9 +56,10 @@ bitflags! {
         const NO_POINTERS_NO_PADDING = 0b0000_0001;
         /// Every byte pattern of this value's in-memory image is a valid value,
         /// so deserialization needs no per-byte validation and can copy the BCS
-        /// bytes in one `memcpy`. Holds for integers and addresses but not for
-        /// `bool` (only `0`/`1` are canonical). An aggregate has this flag only
-        /// when it has no padding, no pointers, and no `bool` reachable.
+        /// bytes in one `memcpy`. Holds for integers and addresses. It does not
+        /// hold for `bool` (only `0`/`1` are canonical) or `signer` (never
+        /// deserializable). An aggregate has this flag only when it has no
+        /// padding, no pointers, and no `bool` or `signer` reachable.
         const ALL_BYTE_PATTERNS_VALID = 0b0000_0010;
     }
 }
@@ -161,8 +162,9 @@ impl ValueLayout {
     }
 
     /// Returns true if every byte pattern of this value's in-memory size is a
-    /// valid value, so deserialization can blit the BCS bytes without per-byte
-    /// validation. False for anything that reaches a `bool`.
+    /// valid value, so deserialization can copy the BCS bytes in one `memcpy`
+    /// without per-byte validation. False for anything that reaches a `bool`
+    /// or `signer`.
     pub fn all_byte_patterns_valid(&self) -> bool {
         self.flags.contains(LayoutFlags::ALL_BYTE_PATTERNS_VALID)
     }
@@ -255,14 +257,14 @@ impl ValueLayout {
         }
     }
 
-    /// Layout of `signer`: the address shape without
-    /// [`LayoutFlags::ALL_BYTE_PATTERNS_VALID`], so deserialization does not
-    /// blit and can reject it.
+    /// Layout of `signer`: the address shape, but never deserializable.
     pub fn signer() -> Self {
         Self {
             size: 32,
             align: MAX_ALIGN as u32,
             fixed_bcs_size: Some(32),
+            // No `ALL_BYTE_PATTERNS_VALID`: without it deserialization takes the
+            // per-byte path, which rejects `signer` instead of copying the bytes.
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::Signer,
         }
