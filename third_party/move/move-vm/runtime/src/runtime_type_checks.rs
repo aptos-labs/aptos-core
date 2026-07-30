@@ -108,11 +108,12 @@ pub fn verify_pack_closure(
         .iter()
         .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
-    operand_stack.push_ty(Type::Function {
-        args,
-        results,
-        abilities,
-    })?;
+    let function_ty = ty_builder
+        .create_function_ty(args, results, abilities)
+        .map_err(|e| {
+            e.append_message_with_separator('.', "Failed to pack closure: function type exceeds depth/size limits".to_string())
+        })?;
+    operand_stack.push_ty(function_ty)?;
 
     Ok(())
 }

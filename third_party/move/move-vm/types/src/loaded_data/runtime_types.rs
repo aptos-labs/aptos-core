@@ -1018,6 +1018,48 @@ impl TypeBuilder {
         })
     }
 
+    /// Creates a function type from the given argument and result types.
+    /// The function-type node itself is counted towards type size and depth limits,
+    /// with arguments and results treated as its children at depth 2. Returns an
+    /// error if the resulting type would exceed the configured limits.
+    pub fn create_function_ty(
+        &self,
+        args: Vec<Type>,
+        results: Vec<Type>,
+        abilities: AbilitySet,
+    ) -> PartialVMResult<Type> {
+        // Count 1 for the function-type node itself; children start at depth 2.
+        let mut count = 1;
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+
+        let args = args
+            .iter()
+            .map(|ty| self.clone_impl(ty, &mut count, 2, check))
+            .collect::<PartialVMResult<Vec<_>>>()
+            .map_err(|e| {
+                e.append_message_with_separator(
+                    '.',
+                    "Failed to create function type: argument type exceeds limits".to_string(),
+                )
+            })?;
+        let results = results
+            .iter()
+            .map(|ty| self.clone_impl(ty, &mut count, 2, check))
+            .collect::<PartialVMResult<Vec<_>>>()
+            .map_err(|e| {
+                e.append_message_with_separator(
+                    '.',
+                    "Failed to create function type: result type exceeds limits".to_string(),
+                )
+            })?;
+
+        Ok(Type::Function {
+            args,
+            results,
+            abilities,
+        })
+    }
+
     /// Creates a type for a Move constant. Note that constant types can be
     /// more restrictive and therefore have their own creation API.
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
@@ -1860,6 +1902,53 @@ mod unit_tests {
 
         let (_, _, vec_tag) = nested_vec_for_test(max_ty_size + 1);
         let err = assert_err!(ty_builder.create_ty(&vec_tag, no_op));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_create_function_ty_depth() {
+        use Type::*;
+
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+
+        // A function type with no args or results succeeds (depth = 1, the node itself).
+        assert_ok!(ty_builder.create_function_ty(vec![], vec![], AbilitySet::EMPTY));
+
+        // A result type max_ty_depth-1 levels deep is allowed: function node is at depth 1,
+        // result root at depth 2, deepest result node at depth max_ty_depth.
+        let (shallow_result, _, _) = nested_vec_for_test(max_ty_depth - 1);
+        assert_ok!(ty_builder.create_function_ty(vec![], vec![shallow_result], AbilitySet::EMPTY));
+
+        // A result type max_ty_depth levels deep is rejected: the function-type node occupies
+        // depth 1, pushing the deepest result node to depth max_ty_depth + 1.
+        let (deep_result, _, _) = nested_vec_for_test(max_ty_depth);
+        let err = assert_err!(
+            ty_builder.create_function_ty(vec![], vec![deep_result], AbilitySet::EMPTY)
+        );
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+
+        // Confirm that the same deep result type passes create_ty_with_subst (which does not
+        // account for the enclosing function-type node), showing what the old code permitted.
+        let (deep_result_again, _, _) = nested_vec_for_test(max_ty_depth);
+        assert_ok!(ty_builder.create_ty_with_subst(&deep_result_again, &[]));
+    }
+
+    #[test]
+    fn test_create_function_ty_size() {
+        use Type::*;
+
+        let max_ty_size = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+
+        // max_ty_size - 1 Bool args: 1 (function node) + 4 = 5 total nodes, at the limit.
+        let at_limit = vec![Bool; (max_ty_size - 1) as usize];
+        assert_ok!(ty_builder.create_function_ty(at_limit, vec![], AbilitySet::EMPTY));
+
+        // max_ty_size Bool args: 1 (function node) + 5 = 6 total nodes, over the limit.
+        let over_limit = vec![Bool; max_ty_size as usize];
+        let err =
+            assert_err!(ty_builder.create_function_ty(over_limit, vec![], AbilitySet::EMPTY));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 }
