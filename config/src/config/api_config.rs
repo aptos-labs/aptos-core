@@ -60,6 +60,13 @@ pub struct ApiConfig {
     pub max_events_page_size: u16,
     /// Maximum page size for resource paginated APIs
     pub max_account_resources_page_size: u16,
+    /// Maximum **real live heap bytes** a single resource-annotation request may allocate before
+    /// it is aborted. Measured via jemalloc per-thread counters on production (jemalloc) builds;
+    /// a no-op on builds without the `metered-allocations` reader. Must be > 0 (see `sanitize`).
+    pub max_resource_annotation_bytes: usize,
+    /// Process resident-memory cap (bytes) above which the API sheds new requests
+    /// with 503. `0` disables the gate.
+    pub memory_admission_cap_bytes: usize,
     /// Maximum page size for module paginated APIs
     pub max_account_modules_page_size: u16,
     /// Maximum gas unit limit for view functions
@@ -98,6 +105,10 @@ const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
 pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
 pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
 const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
+pub const DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES: usize = 100_000_000;
+/// Process resident-memory cap (bytes) above which the API sheds new requests with 503.
+/// `0` disables the gate. Sized relative to machine RAM, not annotation load.
+pub const DEFAULT_MEMORY_ADMISSION_CAP_BYTES: usize = 20_000_000_000;
 const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
 const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
 
@@ -131,6 +142,8 @@ impl Default for ApiConfig {
             max_transactions_page_size: DEFAULT_MAX_PAGE_SIZE,
             max_events_page_size: DEFAULT_MAX_PAGE_SIZE,
             max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,
+            max_resource_annotation_bytes: DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES,
+            memory_admission_cap_bytes: DEFAULT_MEMORY_ADMISSION_CAP_BYTES,
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
             max_runtime_workers: None,
@@ -192,6 +205,15 @@ impl ConfigSanitizer for ApiConfig {
             ));
         }
 
+        // A zero annotation budget makes every resource read fail closed with "Query exceeds
+        // size limit" and gives operators no startup signal. Reject it.
+        if api_config.max_resource_annotation_bytes == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_resource_annotation_bytes must be greater than 0!".into(),
+            ));
+        }
+
         // Sanitize the gas estimation config
         GasEstimationConfig::sanitize(node_config, node_type, chain_id)?;
 
@@ -246,6 +268,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_resource_annotation_limit_default() {
+        assert_eq!(
+            ApiConfig::default().max_resource_annotation_bytes,
+            DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES
+        );
+    }
+
+    #[test]
+    fn test_memory_admission_cap_default() {
+        assert_eq!(
+            ApiConfig::default().memory_admission_cap_bytes,
+            DEFAULT_MEMORY_ADMISSION_CAP_BYTES
+        );
+    }
+
+    #[test]
     fn test_sanitize_disabled_api() {
         // Create a node config with the API disabled
         let node_config = NodeConfig {
@@ -285,6 +323,23 @@ mod tests {
 
         // Sanitize the config for an unknown network and verify that it succeeds
         ApiConfig::sanitize(&node_config, NodeType::Validator, None).unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_rejects_zero_resource_annotation_limit() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                max_resource_annotation_bytes: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()));
+        assert!(
+            result.is_err(),
+            "a zero resource-annotation budget must be rejected by sanitize"
+        );
     }
 
     #[test]

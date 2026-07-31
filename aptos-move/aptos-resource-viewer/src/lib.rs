@@ -8,6 +8,7 @@
 pub mod module_view;
 
 use crate::module_view::ModuleView;
+use aptos_config::config::DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES;
 use aptos_types::state_store::StateView;
 use aptos_vm::data_cache::get_resource_group_member_from_metadata;
 use move_binary_format::CompiledModule;
@@ -19,7 +20,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{
-    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, MoveTableInfo,
+    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, Meter, MoveTableInfo,
 };
 use std::sync::Arc;
 
@@ -27,8 +28,18 @@ pub struct AptosValueAnnotator<'a, S>(MoveValueAnnotator<ModuleView<'a, S>>);
 
 impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
     pub fn new(state_view: &'a S) -> Self {
-        let view = ModuleView::new(state_view);
-        Self(MoveValueAnnotator::new(view))
+        Self::new_with_resource_annotation_limit(state_view, DEFAULT_MAX_RESOURCE_ANNOTATION_BYTES)
+    }
+
+    pub fn new_with_resource_annotation_limit(
+        state_view: &'a S,
+        max_annotation_bytes: usize,
+    ) -> Self {
+        Self(MoveValueAnnotator::new_with_meter_config(
+            ModuleView::new(state_view),
+            max_annotation_bytes,
+            aptos_jemalloc::current_live_bytes,
+        ))
     }
 
     /// Collect information about tables contained in the value represented by the blob.
@@ -43,6 +54,15 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
         self.0.view_value(ty_tag, blob)
+    }
+
+    pub fn view_value_with_limit(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        meter: &mut Meter,
+    ) -> anyhow::Result<AnnotatedMoveValue> {
+        self.0.view_value_with_limit(ty_tag, blob, meter)
     }
 
     pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Arc<CompiledModule>>> {
@@ -71,6 +91,21 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         blob: &[u8],
     ) -> anyhow::Result<AnnotatedMoveStruct> {
         self.0.view_resource(tag, blob)
+    }
+
+    pub fn view_resource_with_limit(
+        &self,
+        tag: &StructTag,
+        blob: &[u8],
+        meter: &mut Meter,
+    ) -> anyhow::Result<AnnotatedMoveStruct> {
+        self.0.view_resource_with_limit(tag, blob, meter)
+    }
+
+    /// A fresh [`Meter`] seeded with this annotator's configured annotation byte budget.
+    /// The annotator is the single owner of that budget value.
+    pub fn fresh_meter(&self) -> Meter {
+        self.0.fresh_meter()
     }
 
     pub fn view_struct_fields(

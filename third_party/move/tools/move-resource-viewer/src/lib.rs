@@ -7,7 +7,7 @@ use crate::fat_type::{
     FatFunctionType, FatStructLayout, FatStructRef, FatStructType, FatType, StructName,
 };
 use anyhow::{anyhow, bail};
-pub use limit::Limiter;
+pub use limit::{Meter, DEFAULT_MAX_ANNOTATION_BYTES};
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     binary_views::BinaryIndexedView,
@@ -19,7 +19,8 @@ use move_binary_format::{
     views::FunctionHandleView,
     CompiledModule,
 };
-use move_bytecode_utils::{compiled_module_viewer::CompiledModuleView, layout::TypeLayoutBuilder};
+pub use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
+use move_bytecode_utils::layout::TypeLayoutBuilder;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -102,12 +103,15 @@ pub struct MoveTableInfo {
 
 pub struct MoveValueAnnotator<V> {
     module_viewer: V,
+    max_annotation_bytes: usize,
+    /// Reads the calling thread's current live bytes, so annotation is bounded by real allocation.
+    read_live: fn() -> i64,
     /// A cache for fat type info for structs. For a generic struct, the uninstantiated
     /// FatStructType of the base definition will be stored here as well.
     ///
-    /// Notice that this cache (and the next one) effect the computation `Limit`: no-cached
-    /// annotation may hit limits which cached ones don't. Since limits aren't precise metering,
-    /// this effect is expected and OK.
+    /// Notice that this cache (and the next one) effect the metering: a non-cached
+    /// annotation may hit limits which cached ones don't. Since the meter observes real
+    /// allocation rather than precise per-node cost, this effect is expected and OK.
     fat_struct_def_cache: RefCell<BTreeMap<StructName, FatStructRef>>,
     /// A cache for fat type info for struct instantiations. This cache is build from
     /// substituting parameters for the uninstantiated types in `fat_struct_def_cache`.
@@ -116,7 +120,7 @@ pub struct MoveValueAnnotator<V> {
     contains_tables_cache: RefCell<BTreeMap<TypeTag, bool>>,
     /// Caches resolved captured types per closure signature, so many closures
     /// with the same signature resolve only once. Like the caches above, this
-    /// affects the `Limiter`, which is fine on a read path.
+    /// affects the `Meter`, which is fine on a read path.
     captured_tys_cache: RefCell<BTreeMap<ClosureCapturedTysCacheKey, Rc<Vec<FatType>>>>,
 }
 
@@ -125,14 +129,33 @@ pub struct MoveValueAnnotator<V> {
 type ClosureCapturedTysCacheKey = (ModuleId, Identifier, Vec<TypeTag>, ClosureMask);
 
 impl<V: CompiledModuleView> MoveValueAnnotator<V> {
+    /// No-op metering (reader returns 0). Used where no allocator counters are wired.
     pub fn new(module_viewer: V) -> Self {
+        Self::new_with_meter_config(module_viewer, DEFAULT_MAX_ANNOTATION_BYTES, || 0)
+    }
+
+    /// Inject the live-bytes reader so annotation is bounded by real allocation.
+    pub fn new_with_meter_config(
+        module_viewer: V,
+        max_annotation_bytes: usize,
+        read_live: fn() -> i64,
+    ) -> Self {
         Self {
             module_viewer,
+            max_annotation_bytes,
+            read_live,
             fat_struct_def_cache: RefCell::default(),
             fat_struct_inst_cache: RefCell::default(),
             contains_tables_cache: RefCell::default(),
             captured_tys_cache: RefCell::default(),
         }
+    }
+
+    /// A fresh [`Meter`] seeded with this annotator's configured budget and reader. The annotator
+    /// is the single owner of that budget; callers that need to bound a batch in aggregate take one
+    /// meter and thread it across the batch, while single-value entry points take a fresh one.
+    pub fn fresh_meter(&self) -> Meter {
+        Meter::new(self.max_annotation_bytes, self.read_live)
     }
 
     pub fn get_type_layout_with_types(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
@@ -156,7 +179,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         args: &[TransactionArgument],
         ty_args: &[TypeTag],
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
-        let mut limit = Limiter::default();
+        let mut meter = self.fresh_meter();
         let compiled_script = CompiledScript::deserialize(script_bytes)
             .map_err(|err| anyhow!("Failed to deserialzie script: {:?}", err))?;
         let param_tys = compiled_script
@@ -164,11 +187,11 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             .0
             .iter()
             .map(|tok| {
-                self.resolve_signature(BinaryIndexedView::Script(&compiled_script), tok, &mut limit)
+                self.resolve_signature(BinaryIndexedView::Script(&compiled_script), tok, &mut meter)
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         let args_bytes = convert_txn_args(args);
-        self.view_arguments_or_returns(&param_tys, ty_args, &args_bytes, &mut limit)
+        self.view_arguments_or_returns(&param_tys, ty_args, &args_bytes, &mut meter)
     }
 
     pub fn view_function_arguments(
@@ -178,9 +201,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         ty_args: &[TypeTag],
         args: &[Vec<u8>],
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
-        let mut limit = Limiter::default();
-        let param_tys = self.resolve_function_arguments(module, function, &mut limit)?;
-        self.view_arguments_or_returns(&param_tys, ty_args, args, &mut limit)
+        let mut meter = self.fresh_meter();
+        let param_tys = self.resolve_function_arguments(module, function, &mut meter)?;
+        self.view_arguments_or_returns(&param_tys, ty_args, args, &mut meter)
     }
 
     pub fn view_function_returns(
@@ -190,9 +213,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         ty_args: &[TypeTag],
         returns: &[Vec<u8>],
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
-        let mut limit = Limiter::default();
-        let return_tys = self.resolve_function_returns(module, function, &mut limit)?;
-        self.view_arguments_or_returns(&return_tys, ty_args, returns, &mut limit)
+        let mut meter = self.fresh_meter();
+        let return_tys = self.resolve_function_returns(module, function, &mut meter)?;
+        self.view_arguments_or_returns(&return_tys, ty_args, returns, &mut meter)
     }
 
     fn view_arguments_or_returns(
@@ -200,7 +223,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         param_tys: &[FatType],
         ty_args: &[TypeTag],
         args: &[Vec<u8>],
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let types: Vec<&FatType> = param_tys
             .iter()
@@ -237,24 +260,24 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         // Convert type args
         let ty_args: Vec<FatType> = ty_args
             .iter()
-            .map(|ty| self.resolve_type_impl(ty, limit))
+            .map(|ty| self.resolve_type_impl(ty, meter))
             .collect::<anyhow::Result<_>>()?;
 
         if ty_args.is_empty() {
             types
                 .iter()
                 .enumerate()
-                .map(|(i, ty)| self.view_value_by_fat_type(ty, &args[i], limit))
+                .map(|(i, ty)| self.view_value_by_fat_type(ty, &args[i], meter))
                 .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
         } else {
             types
                 .iter()
                 .enumerate()
                 .map(|(i, ty)| {
-                    ty.subst(&ty_args, &self.struct_substitutor(), limit)
+                    ty.subst(&ty_args, &self.struct_substitutor(), meter)
                         .map_err(anyhow::Error::from)
                         .and_then(|fat_type| {
-                            self.view_value_by_fat_type(&fat_type, &args[i], limit)
+                            self.view_value_by_fat_type(&fat_type, &args[i], meter)
                         })
                 })
                 .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
@@ -263,8 +286,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
 
     fn struct_substitutor(
         &self,
-    ) -> impl Fn(&FatStructType, &[FatType], &mut Limiter) -> PartialVMResult<FatStructRef> {
-        |st, ty_args, limiter| {
+    ) -> impl Fn(&FatStructType, &[FatType], &mut Meter) -> PartialVMResult<FatStructRef> {
+        |st, ty_args, meter| {
             assert!(
                 !ty_args.is_empty(),
                 "Type arguments cannot be empty for substitution"
@@ -272,9 +295,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             let st_ty_args = st
                 .ty_args
                 .iter()
-                .map(|ty| ty.subst(ty_args, &self.struct_substitutor(), limiter))
+                .map(|ty| ty.subst(ty_args, &self.struct_substitutor(), meter))
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            self.resolve_generic_struct(st.struct_name(), st_ty_args, limiter)
+            self.resolve_generic_struct(st.struct_name(), st_ty_args, meter)
                 .map_err(|e| {
                     PartialVMError::new_invariant_violation(format!(
                         "cannot annotate generic value: {}",
@@ -288,7 +311,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         module: &ModuleId,
         function: &IdentStr,
-        limit: &mut Limiter,
+        meter: &mut Meter,
         selector: F,
     ) -> anyhow::Result<Vec<FatType>>
     where
@@ -304,7 +327,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     .0
                     .iter()
                     .map(|signature| {
-                        self.resolve_signature(BinaryIndexedView::Module(m), signature, limit)
+                        self.resolve_signature(BinaryIndexedView::Module(m), signature, meter)
                     })
                     .collect::<anyhow::Result<_>>();
             }
@@ -316,18 +339,18 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         module: &ModuleId,
         function: &IdentStr,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<Vec<FatType>> {
-        self.resolve_function_types(module, function, limit, |fh| fh.parameters())
+        self.resolve_function_types(module, function, meter, |fh| fh.parameters())
     }
 
     fn resolve_function_returns(
         &self,
         module: &ModuleId,
         function: &IdentStr,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<Vec<FatType>> {
-        self.resolve_function_types(module, function, limit, |fh| fh.return_())
+        self.resolve_function_types(module, function, meter, |fh| fh.return_())
     }
 
     pub fn view_resource(
@@ -335,19 +358,20 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         tag: &StructTag,
         blob: &[u8],
     ) -> anyhow::Result<AnnotatedMoveStruct> {
-        self.view_resource_with_limit(tag, blob, &mut Limiter::default())
+        self.view_resource_with_limit(tag, blob, &mut self.fresh_meter())
     }
 
     pub fn view_resource_with_limit(
         &self,
         tag: &StructTag,
         blob: &[u8],
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<AnnotatedMoveStruct> {
-        let ty = self.resolve_struct_tag(tag, &mut Limiter::default())?;
+        let ty = self.resolve_struct_tag(tag, meter)?;
         let struct_def = (ty.as_ref()).try_into().map_err(into_vm_status)?;
         let move_struct = MoveStruct::simple_deserialize(blob, &struct_def)?;
-        self.annotate_struct(&move_struct, &ty, limit)
+        meter.check()?;
+        self.annotate_struct(&move_struct, &ty, meter)
     }
 
     pub fn move_struct_fields(
@@ -355,9 +379,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         tag: &StructTag,
         blob: &[u8],
     ) -> anyhow::Result<(Option<Identifier>, Vec<(Identifier, MoveValue)>)> {
-        let ty = self.resolve_struct_tag(tag, &mut Limiter::default())?;
+        let meter = &mut self.fresh_meter();
+        let ty = self.resolve_struct_tag(tag, meter)?;
         let struct_def = (ty.as_ref()).try_into().map_err(into_vm_status)?;
-        Ok(match MoveStruct::simple_deserialize(blob, &struct_def)? {
+        let decoded = MoveStruct::simple_deserialize(blob, &struct_def)?;
+        meter.check()?;
+        Ok(match decoded {
             MoveStruct::Runtime(values) => {
                 let (tag, field_names) = self.get_field_information(&ty, None)?;
                 debug_assert_eq!(tag, None);
@@ -381,7 +408,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     fn resolve_struct_tag(
         &self,
         struct_tag: &StructTag,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<FatStructRef> {
         let StructTag {
             address,
@@ -395,29 +422,29 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             name: name.to_owned(),
         };
         if type_args.is_empty() {
-            return self.resolve_basic_struct(&struct_name, limit);
+            return self.resolve_basic_struct(&struct_name, meter);
         }
         let type_args = type_args
             .iter()
-            .map(|ty| self.resolve_type_impl(ty, limit))
+            .map(|ty| self.resolve_type_impl(ty, meter))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        self.resolve_generic_struct(struct_name, type_args, limit)
+        self.resolve_generic_struct(struct_name, type_args, meter)
     }
 
     fn resolve_generic_struct(
         &self,
         struct_name: StructName,
         type_args: Vec<FatType>,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<FatStructRef> {
         let name_and_args = (struct_name, type_args);
         if let Some(fat_ty) = self.fat_struct_inst_cache.borrow().get(&name_and_args) {
             return Ok(fat_ty.clone());
         }
-        let base_type = self.resolve_basic_struct(&name_and_args.0, limit)?;
+        let base_type = self.resolve_basic_struct(&name_and_args.0, meter)?;
         let inst_type = FatStructRef::new(
             base_type
-                .subst(&name_and_args.1, &self.struct_substitutor(), limit)
+                .subst(&name_and_args.1, &self.struct_substitutor(), meter)
                 .map_err(|e: PartialVMError| {
                     anyhow!("type {:?} cannot be resolved: {:?}", name_and_args, e)
                 })?,
@@ -431,7 +458,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     fn resolve_basic_struct(
         &self,
         struct_name: &StructName,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<FatStructRef> {
         if let Some(fat_ty) = self.fat_struct_def_cache.borrow().get(struct_name) {
             return Ok(fat_ty.clone());
@@ -443,7 +470,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
 
         let struct_def = find_struct_def_in_module(module, struct_name.name.as_ident_str())?;
         let base_type =
-            FatStructRef::new(self.resolve_struct_definition(module, struct_def, limit)?);
+            FatStructRef::new(self.resolve_struct_definition(module, struct_def, meter)?);
         self.fat_struct_def_cache
             .borrow_mut()
             .insert(struct_name.to_owned(), base_type.clone());
@@ -454,7 +481,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         module: &CompiledModule,
         idx: StructDefinitionIndex,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<FatStructType> {
         let struct_def = module.struct_def_at(idx);
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
@@ -466,23 +493,21 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             .map(FatType::TyParam)
             .collect();
 
-        limit.charge(std::mem::size_of::<AccountAddress>())?;
-        limit.charge(module_name.as_bytes().len())?;
-        limit.charge(name.as_bytes().len())?;
+        meter.check()?;
 
         let table_id = &*TABLE_MODULE_ID;
         let mut contains_tables = address == table_id.address
             && module_name == table_id.name
             && name == *TABLE_STRUCT_NAME;
         let mut make_fields =
-            |fields: &[FieldDefinition], limit: &mut Limiter| -> anyhow::Result<Vec<FatType>> {
+            |fields: &[FieldDefinition], meter: &mut Meter| -> anyhow::Result<Vec<FatType>> {
                 fields
                     .iter()
                     .map(|field_def| {
                         let ty = self.resolve_signature(
                             BinaryIndexedView::Module(module),
                             &field_def.signature.0,
-                            limit,
+                            meter,
                         );
                         if !contains_tables {
                             contains_tables =
@@ -496,7 +521,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         match &struct_def.field_information {
             StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
             StructFieldInformation::Declared(fields) => {
-                let fat_fields = make_fields(fields, limit)?;
+                let fat_fields = make_fields(fields, meter)?;
                 Ok(FatStructType {
                     address,
                     module: module_name,
@@ -510,7 +535,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             StructFieldInformation::DeclaredVariants(variants) => {
                 let fat_variants = variants
                     .iter()
-                    .map(|variant| make_fields(&variant.fields, limit))
+                    .map(|variant| make_fields(&variant.fields, meter))
                     .collect::<anyhow::Result<_>>()?;
                 Ok(FatStructType {
                     address,
@@ -529,7 +554,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         module: BinaryIndexedView,
         sig: &SignatureToken,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<FatType> {
         Ok(match sig {
             SignatureToken::Bool => FatType::Bool,
@@ -548,20 +573,20 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::Address => FatType::Address,
             SignatureToken::Signer => FatType::Signer,
             SignatureToken::Vector(ty) => {
-                FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
+                FatType::Vector(Box::new(self.resolve_signature(module, ty, meter)?))
             },
             SignatureToken::Function(args, results, abilities) => {
-                let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
+                let resolve_slice = |toks: &[SignatureToken], meter: &mut Meter| {
                     toks.iter()
                         .map(|tok| {
                             // Function type can have references as immediate argument or return
                             // types.
                             Ok(match tok {
                                 SignatureToken::Reference(t) => FatType::Reference(Box::new(
-                                    self.resolve_signature(module, t, limit)?,
+                                    self.resolve_signature(module, t, meter)?,
                                 )),
                                 SignatureToken::MutableReference(t) => FatType::MutableReference(
-                                    Box::new(self.resolve_signature(module, t, limit)?),
+                                    Box::new(self.resolve_signature(module, t, meter)?),
                                 ),
                                 SignatureToken::Bool
                                 | SignatureToken::U8
@@ -583,29 +608,29 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                                 | SignatureToken::I64
                                 | SignatureToken::I128
                                 | SignatureToken::I256 => {
-                                    self.resolve_signature(module, tok, limit)?
+                                    self.resolve_signature(module, tok, meter)?
                                 },
                             })
                         })
                         .collect::<anyhow::Result<Vec<_>>>()
                 };
                 FatType::Function(Box::new(FatFunctionType {
-                    args: resolve_slice(args, limit)?,
-                    results: resolve_slice(results, limit)?,
+                    args: resolve_slice(args, meter)?,
+                    results: resolve_slice(results, meter)?,
                     abilities: *abilities,
                 }))
             },
             SignatureToken::Struct(idx) => {
                 let struct_name = self.handle_to_struct_name(module, *idx);
-                FatType::Struct(self.resolve_basic_struct(&struct_name, limit)?)
+                FatType::Struct(self.resolve_basic_struct(&struct_name, meter)?)
             },
             SignatureToken::StructInstantiation(idx, toks) => {
                 let struct_name = self.handle_to_struct_name(module, *idx);
                 let ty_args = toks
                     .iter()
-                    .map(|tok| self.resolve_signature(module, tok, limit))
+                    .map(|tok| self.resolve_signature(module, tok, meter))
                     .collect::<anyhow::Result<Vec<_>>>()?;
-                FatType::Struct(self.resolve_generic_struct(struct_name, ty_args, limit)?)
+                FatType::Struct(self.resolve_generic_struct(struct_name, ty_args, meter)?)
             },
             SignatureToken::TypeParameter(idx) => FatType::TyParam(*idx as usize),
             SignatureToken::MutableReference(_) => return Err(anyhow!("Unexpected Reference")),
@@ -630,16 +655,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         }
     }
 
-    fn resolve_type_impl(
-        &self,
-        type_tag: &TypeTag,
-        limit: &mut Limiter,
-    ) -> anyhow::Result<FatType> {
+    fn resolve_type_impl(&self, type_tag: &TypeTag, meter: &mut Meter) -> anyhow::Result<FatType> {
         Ok(match type_tag {
             TypeTag::Address => FatType::Address,
             TypeTag::Signer => FatType::Signer,
             TypeTag::Bool => FatType::Bool,
-            TypeTag::Struct(st) => FatType::Struct(self.resolve_struct_tag(st, limit)?),
+            TypeTag::Struct(st) => FatType::Struct(self.resolve_struct_tag(st, meter)?),
             TypeTag::U8 => FatType::U8,
             TypeTag::U16 => FatType::U16,
             TypeTag::U32 => FatType::U32,
@@ -652,7 +673,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::I64 => FatType::I64,
             TypeTag::I128 => FatType::I128,
             TypeTag::I256 => FatType::I256,
-            TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
+            TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, meter)?)),
             TypeTag::Function(function_tag) => {
                 let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
                     tags.iter()
@@ -660,12 +681,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             use FunctionParamOrReturnTag::*;
                             Ok(match t {
                                 Reference(t) => {
-                                    FatType::Reference(Box::new(self.resolve_type_impl(t, limit)?))
+                                    FatType::Reference(Box::new(self.resolve_type_impl(t, meter)?))
                                 },
                                 MutableReference(t) => FatType::MutableReference(Box::new(
-                                    self.resolve_type_impl(t, limit)?,
+                                    self.resolve_type_impl(t, meter)?,
                                 )),
-                                Value(t) => self.resolve_type_impl(t, limit)?,
+                                Value(t) => self.resolve_type_impl(t, meter)?,
                             })
                         })
                         .collect::<anyhow::Result<Vec<_>>>()
@@ -680,9 +701,21 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
-        let mut limit = Limiter::default();
-        let ty = self.resolve_type_impl(ty_tag, &mut limit)?;
-        self.view_value_by_fat_type(&ty, blob, &mut limit)
+        self.view_value_with_limit(ty_tag, blob, &mut self.fresh_meter())
+    }
+
+    /// Annotate a single value against a caller-supplied [`Meter`]. Threading one meter across a
+    /// batch (e.g. a page of events) bounds the batch's *aggregate* live heap, mirroring
+    /// [`view_resource_with_limit`] for resources. Callers wanting an isolated per-call budget use
+    /// [`view_value`], which seeds a fresh meter.
+    pub fn view_value_with_limit(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        meter: &mut Meter,
+    ) -> anyhow::Result<AnnotatedMoveValue> {
+        let ty = self.resolve_type_impl(ty_tag, meter)?;
+        self.view_value_by_fat_type(&ty, blob, meter)
     }
 
     /// Collect information about tables contained in the value represented by the blob.
@@ -692,21 +725,22 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         blob: &[u8],
         infos: &mut Vec<MoveTableInfo>,
     ) -> anyhow::Result<()> {
-        let mut limit = Limiter::default();
-        if !self.contains_tables(ty_tag, &mut limit)? {
+        let mut meter = self.fresh_meter();
+        if !self.contains_tables(ty_tag, &mut meter)? {
             return Ok(());
         }
-        let fat_ty = self.resolve_type_impl(ty_tag, &mut limit)?;
+        let fat_ty = self.resolve_type_impl(ty_tag, &mut meter)?;
         let layout = (&fat_ty).try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.collect_table_info_from_value(&fat_ty, move_value, &mut limit, infos)
+        meter.check()?;
+        self.collect_table_info_from_value(&fat_ty, move_value, &mut meter, infos)
     }
 
-    fn contains_tables(&self, ty_tag: &TypeTag, limit: &mut Limiter) -> anyhow::Result<bool> {
+    fn contains_tables(&self, ty_tag: &TypeTag, meter: &mut Meter) -> anyhow::Result<bool> {
         if let Some(contains) = self.contains_tables_cache.borrow().get(ty_tag) {
             return Ok(*contains);
         }
-        let ty = self.resolve_type_impl(ty_tag, limit)?;
+        let ty = self.resolve_type_impl(ty_tag, meter)?;
         let contains = ty.contains_tables();
         self.contains_tables_cache
             .borrow_mut()
@@ -718,32 +752,28 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         ty: &FatType,
         blob: &[u8],
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<AnnotatedMoveValue> {
         let layout = ty.try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.annotate_value(&move_value, ty, limit)
+        meter.check()?;
+        self.annotate_value(&move_value, ty, meter)
     }
 
     fn annotate_struct(
         &self,
         move_struct: &MoveStruct,
         ty: &FatStructType,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<AnnotatedMoveStruct> {
         let struct_tag = ty
-            .struct_tag(limit)
+            .struct_tag(meter)
             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let (variant_tag, field_values) = move_struct.optional_variant_and_fields();
         let (variant_info, field_names) = self.get_field_information(ty, variant_tag)?;
-        if let Some((_, name)) = &variant_info {
-            limit.charge(name.as_bytes().len())?;
-        }
-        for name in field_names.iter() {
-            limit.charge(name.as_bytes().len())?;
-        }
+        meter.check()?;
 
-        let annotate_values = |values: &[MoveValue], tys: &[FatType], limit: &mut Limiter| {
+        let annotate_values = |values: &[MoveValue], tys: &[FatType], meter: &mut Meter| {
             anyhow::ensure!(
                 values.len() == tys.len() && tys.len() == field_names.len(),
                 "struct field count mismatch: {} values, {} types, {} names",
@@ -755,7 +785,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 .iter()
                 .zip(tys)
                 .zip(field_names)
-                .map(|((v, ty), n)| self.annotate_value(v, ty, limit).map(|v| (n, v)))
+                .map(|((v, ty), n)| self.annotate_value(v, ty, meter).map(|v| (n, v)))
                 .collect::<anyhow::Result<Vec<_>>>()
         };
 
@@ -764,7 +794,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 abilities: ty.abilities,
                 ty_tag: struct_tag,
                 variant_info: None,
-                value: annotate_values(field_values, field_tys, limit)?,
+                value: annotate_values(field_values, field_tys, meter)?,
             }),
             FatStructLayout::Variants(variants) => match variant_tag {
                 Some(tag) if (tag as usize) < variants.len() => {
@@ -773,7 +803,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                         abilities: ty.abilities,
                         ty_tag: struct_tag,
                         variant_info,
-                        value: annotate_values(field_values, field_tys, limit)?,
+                        value: annotate_values(field_values, field_tys, meter)?,
                     })
                 },
                 _ => bail!("type and value mismatch: malformed variant tag"),
@@ -823,7 +853,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         move_closure: &MoveClosure,
         _ty: &FatFunctionType,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<AnnotatedMoveClosure> {
         let MoveClosure {
             module_id,
@@ -837,7 +867,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         // This gives fully named annotations (real struct and field names) instead of
         // the raw, nameless layouts stored with the closure, at the cost of requiring
         // the defining module to be loadable at the read version.
-        let captured_tys = self.resolve_captured_types(module_id, fun_id, ty_args, *mask, limit)?;
+        let captured_tys = self.resolve_captured_types(module_id, fun_id, ty_args, *mask, meter)?;
         let captured_tys = captured_tys.as_deref().map_or(&[][..], Vec::as_slice);
         anyhow::ensure!(
             captured.len() == captured_tys.len(),
@@ -848,7 +878,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let captured = captured
             .iter()
             .zip(captured_tys)
-            .map(|((_layout, value), ty)| self.annotate_value(value, ty, limit))
+            .map(|((_layout, value), ty)| self.annotate_value(value, ty, meter))
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(AnnotatedMoveClosure {
             module_id: module_id.clone(),
@@ -869,7 +899,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
         mask: ClosureMask,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<Option<Rc<Vec<FatType>>>> {
         if mask.captured_count() == 0 {
             return Ok(None);
@@ -879,11 +909,11 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             return Ok(Some(tys.clone()));
         }
 
-        let captured_tys = self.resolve_captured_parameter_types(module_id, fun_id, mask, limit)?;
+        let captured_tys = self.resolve_captured_parameter_types(module_id, fun_id, mask, meter)?;
 
         let ty_args = ty_args
             .iter()
-            .map(|ty| self.resolve_type_impl(ty, limit))
+            .map(|ty| self.resolve_type_impl(ty, meter))
             .collect::<anyhow::Result<Vec<_>>>()?;
         let resolved = captured_tys
             .into_iter()
@@ -891,7 +921,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 if ty_args.is_empty() {
                     Ok(ty)
                 } else {
-                    ty.subst(&ty_args, &self.struct_substitutor(), limit)
+                    ty.subst(&ty_args, &self.struct_substitutor(), meter)
                         .map_err(anyhow::Error::from)
                 }
             })
@@ -912,15 +942,11 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         module_id: &ModuleId,
         fun_id: &IdentStr,
         mask: ClosureMask,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<Vec<FatType>> {
         let module = self.view_existing_module(module_id)?;
         let module = module.borrow();
-
-        // Pseudo-cost for loading + scanning this module's function table. Bounds the
-        // amplification where a vector of small closures forces repeated module loads
-        // and O(functions) scans; the captured data itself is already size-bounded.
-        limit.charge(10 * module.function_defs.len())?;
+        meter.check()?;
 
         for def in module.function_defs.iter() {
             let fhandle = module.function_handle_at(def.function);
@@ -942,7 +968,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 return captured_tokens
                     .into_iter()
                     .map(|tok| {
-                        self.resolve_signature(BinaryIndexedView::Module(module), tok, limit)
+                        self.resolve_signature(BinaryIndexedView::Module(module), tok, meter)
                     })
                     .collect();
             }
@@ -958,8 +984,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         value: &MoveValue,
         ty: &FatType,
-        limit: &mut Limiter,
+        meter: &mut Meter,
     ) -> anyhow::Result<AnnotatedMoveValue> {
+        meter.check()?;
         Ok(match (value, ty) {
             (MoveValue::Bool(b), FatType::Bool) => AnnotatedMoveValue::Bool(*b),
             (MoveValue::U8(i), FatType::U8) => AnnotatedMoveValue::U8(*i),
@@ -984,18 +1011,21 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                         })
                         .collect::<anyhow::Result<_>>()?,
                 ),
-                _ => AnnotatedMoveValue::Vector(
-                    ty.type_tag(limit).unwrap(),
-                    a.iter()
-                        .map(|v| self.annotate_value(v, ty.as_ref(), limit))
-                        .collect::<anyhow::Result<_>>()?,
-                ),
+                _ => {
+                    let elem_tag = ty.type_tag(meter)?;
+                    AnnotatedMoveValue::Vector(
+                        elem_tag,
+                        a.iter()
+                            .map(|v| self.annotate_value(v, ty.as_ref(), meter))
+                            .collect::<anyhow::Result<_>>()?,
+                    )
+                },
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
-                AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit)?)
+                AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), meter)?)
             },
             (MoveValue::Closure(c), FatType::Function(ty)) => {
-                AnnotatedMoveValue::Closure(self.annotate_closure(c, ty, limit)?)
+                AnnotatedMoveValue::Closure(self.annotate_closure(c, ty, meter)?)
             },
             (MoveValue::U8(_), _)
             | (MoveValue::U64(_), _)
@@ -1029,14 +1059,14 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         ty: &FatType,
         val: MoveValue,
-        limit: &mut Limiter,
+        meter: &mut Meter,
         infos: &mut Vec<MoveTableInfo>,
     ) -> anyhow::Result<()> {
         match (ty, val) {
             (FatType::Vector(elem_ty), MoveValue::Vector(elem_vals)) => {
                 if elem_ty.contains_tables() {
                     for val in elem_vals {
-                        self.collect_table_info_from_value(elem_ty, val, limit, infos)?
+                        self.collect_table_info_from_value(elem_ty, val, meter, infos)?
                     }
                 }
                 Ok(())
@@ -1048,8 +1078,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     && let Some(MoveValue::Address(handle)) = vals.first()
                 {
                     infos.push(MoveTableInfo {
-                        key_type: key_type.type_tag(limit)?,
-                        value_type: value_type.type_tag(limit)?,
+                        key_type: key_type.type_tag(meter)?,
+                        value_type: value_type.type_tag(meter)?,
                         handle: *handle,
                     });
                     Ok(())
@@ -1060,7 +1090,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             MoveStruct::Runtime(field_vals),
                         ) => {
                             for (ty, val) in field_tys.iter().zip(field_vals) {
-                                self.collect_table_info_from_value(ty, val, limit, infos)?
+                                self.collect_table_info_from_value(ty, val, meter, infos)?
                             }
                             Ok(())
                         },
@@ -1069,7 +1099,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             MoveStruct::RuntimeVariant(tag, field_vals),
                         ) if (tag as usize) < variants.len() => {
                             for (ty, val) in variants[tag as usize].iter().zip(field_vals) {
-                                self.collect_table_info_from_value(ty, val, limit, infos)?
+                                self.collect_table_info_from_value(ty, val, meter, infos)?
                             }
                             Ok(())
                         },
@@ -1081,7 +1111,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     Ok(())
                 }
             },
-
             // Every other combo cannot harbor tables.
             (FatType::Bool, _)
             | (FatType::U8, _)
@@ -1393,5 +1422,101 @@ impl Display for AnnotatedMoveValue {
 impl Display for AnnotatedMoveStruct {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         pretty_print_struct(f, self, 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_binary_format::CompiledModule;
+    use move_core_types::language_storage::ModuleId;
+    use std::{cell::Cell, sync::Arc};
+
+    struct EmptyModuleView;
+    impl CompiledModuleView for EmptyModuleView {
+        type Item = Arc<CompiledModule>;
+
+        fn view_compiled_module(&self, _id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
+            Ok(None)
+        }
+    }
+
+    thread_local! {
+        // Simulated live-bytes counter for the metered annotation path. `fake_read` is a plain
+        // `fn() -> i64` (no captured state) so it can be installed as the annotator's reader.
+        static FAKE_LIVE: Cell<i64> = const { Cell::new(0) };
+    }
+    fn fake_read() -> i64 {
+        FAKE_LIVE.with(|c| c.get())
+    }
+    fn set_live(v: i64) {
+        FAKE_LIVE.with(|c| c.set(v));
+    }
+
+    /// With a metered reader, annotation aborts (rather than panicking) once the request's live
+    /// delta exceeds the budget.
+    #[test]
+    fn annotate_vector_of_struct_aborts_when_meter_over_budget() {
+        set_live(0);
+        let annotator =
+            MoveValueAnnotator::new_with_meter_config(EmptyModuleView, 1_000, fake_read);
+        let struct_ty = FatStructRef::new(FatStructType {
+            address: AccountAddress::ZERO,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new("abcdefghij").unwrap(),
+            abilities: AbilitySet::EMPTY,
+            ty_args: vec![],
+            layout: FatStructLayout::Singleton(vec![]),
+            contains_tables: false,
+        });
+        let ty = FatType::Vector(Box::new(FatType::Struct(struct_ty)));
+        let mut meter = annotator.fresh_meter();
+        // Simulate the request having allocated past the budget before the meter is checked.
+        set_live(2_000);
+        let res = annotator.annotate_value(&MoveValue::Vector(vec![]), &ty, &mut meter);
+        let err = res.expect_err("must return Err, not panic");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("Query exceeds size limit"),
+            "expected size-limit error, got: {msg}"
+        );
+    }
+
+    /// A configured metered reader bounds annotation: once the live delta since the meter was
+    /// constructed crosses the budget, the post-deserialize `check()` rejects the blob.
+    #[test]
+    fn view_value_uses_configured_meter() {
+        set_live(0);
+        let annotator =
+            MoveValueAnnotator::new_with_meter_config(EmptyModuleView, 1_000, fake_read);
+        let blob = MoveValue::Vector((0..100u8).map(MoveValue::U8).collect())
+            .simple_serialize()
+            .expect("serializes");
+        let ty = FatType::Vector(Box::new(FatType::U8));
+        // Construct the meter while live==0, then simulate the request allocating past the budget.
+        let mut meter = annotator.fresh_meter();
+        set_live(5_000);
+        let err = annotator
+            .view_value_by_fat_type(&ty, &blob, &mut meter)
+            .expect_err("configured meter must reject this blob");
+        assert!(
+            format!("{err}").contains("Query exceeds size limit"),
+            "expected size-limit error, got: {err}"
+        );
+    }
+
+    /// The default no-op meter (reader returns 0) never rejects: annotation succeeds regardless of
+    /// blob size.
+    #[test]
+    fn noop_meter_does_not_reject() {
+        let annotator = MoveValueAnnotator::new(EmptyModuleView);
+        let blob = MoveValue::Vector((0..100u8).map(MoveValue::U8).collect())
+            .simple_serialize()
+            .expect("serializes");
+        let ty = FatType::Vector(Box::new(FatType::U8));
+        let mut meter = annotator.fresh_meter();
+        annotator
+            .view_value_by_fat_type(&ty, &blob, &mut meter)
+            .expect("no-op meter must not reject");
     }
 }

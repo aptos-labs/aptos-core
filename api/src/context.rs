@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
     transaction::ReplayProtector, AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo,
-    ResourceGroup, TransactionOnChainData, TransactionSummary,
+    MoveConverter, ResourceGroup, TransactionOnChainData, TransactionSummary,
 };
 use aptos_config::config::{GasEstimationConfig, NodeConfig, RoleType};
 use aptos_crypto::HashValue;
@@ -40,7 +40,7 @@ use aptos_types::{
     },
     state_store::{
         state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
-        TStateView,
+        StateView, TStateView,
     },
     transaction::{
         block_epilogue::BlockEndInfo,
@@ -150,6 +150,14 @@ impl Context {
 
     pub fn max_account_modules_page_size(&self) -> u16 {
         self.node_config.api.max_account_modules_page_size
+    }
+
+    pub fn as_converter<'a, S: StateView>(&self, state_view: &'a S) -> MoveConverter<'a, S> {
+        state_view.as_converter_with_resource_annotation_limit(
+            self.db.clone(),
+            self.indexer_reader.clone(),
+            self.node_config.api.max_resource_annotation_bytes,
+        )
     }
 
     pub fn latest_state_view(&self) -> Result<DbStateView> {
@@ -509,7 +517,7 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
-        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
+        let converter = self.as_converter(&state_view);
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
@@ -713,7 +721,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
+        let converter = self.as_converter(&state_view);
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -745,7 +753,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
+        let converter = self.as_converter(&state_view);
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {

@@ -15,8 +15,8 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    verify_field_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
-    MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
+    verify_field_identifier, Address, AptosErrorCode, IdentifierWrapper, LedgerInfo, MoveStructTag,
+    VerifyInputWithRecursion, VersionedEvent, U64,
 };
 use aptos_types::event::EventKey;
 use poem_openapi::{
@@ -179,10 +179,10 @@ impl EventsApi {
 
         match accept_type {
             AcceptType::Json => {
+                let state_view = self.context.latest_state_view_poem(&latest_ledger_info)?;
                 let events = self
                     .context
-                    .latest_state_view_poem(&latest_ledger_info)?
-                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+                    .as_converter(&state_view)
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response")
                     .map_err(|err| {

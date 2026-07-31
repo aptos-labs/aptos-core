@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["async-trait", "poem", "poem-openapi-derive"]
 
+[features]
+metered-allocations = ["aptos-resource-viewer/metered-allocations"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }

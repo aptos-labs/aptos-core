@@ -317,6 +317,7 @@ impl From<RestError> for ApiError {
                 },
                 AptosErrorCode::MempoolIsFull => ApiError::MempoolIsFull(Some(err.error.message)),
                 AptosErrorCode::RateLimited => ApiError::RateLimited(Some(err.error.message)),
+                AptosErrorCode::Overloaded => ApiError::RateLimited(Some(err.error.message)),
                 AptosErrorCode::WebFrameworkError => {
                     ApiError::InternalError(Some(err.error.message))
                 },

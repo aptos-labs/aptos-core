@@ -14,8 +14,8 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
+    AccountData, Address, AptosErrorCode, AssetType, LedgerInfo, MoveModuleBytecode, MoveModuleId,
+    MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
 use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
 use aptos_types::{
@@ -476,8 +476,7 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converter = state_view
-                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
+                let converter = self.context.as_converter(&state_view);
                 let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -658,8 +657,9 @@ impl Account {
         let (ledger_info, requested_ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
 
-        let bytes = state_view
-            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+        let bytes = self
+            .context
+            .as_converter(&state_view)
             .find_resource(&state_view, self.address, resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
@@ -682,8 +682,8 @@ impl Account {
                 )
             })?;
 
-        state_view
-            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+        self.context
+            .as_converter(&state_view)
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {

@@ -104,6 +104,8 @@ pub enum AptosErrorCode {
     MempoolIsFull = 501,
     /// The transaction was dropped because the inbound transaction rate limit was exceeded.
     RateLimited = 502,
+    /// The server is shedding load due to memory pressure; retry later.
+    Overloaded = 503,
 
     /// Internal server error
     InternalError = 600,
@@ -136,4 +138,9 @@ fn test_serialize_deserialize() {
     let _: AptosError = bcs::from_bytes(&bcs::to_bytes(&without_code).unwrap()).unwrap();
     let _: AptosError =
         serde_json::from_str(&serde_json::to_string(&without_code).unwrap()).unwrap();
+}
+
+#[test]
+fn test_overloaded_error_code_discriminant() {
+    assert_eq!(AptosErrorCode::Overloaded as u32, 503);
 }

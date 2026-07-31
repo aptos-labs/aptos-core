@@ -3,10 +3,19 @@
 
 use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
-    HistogramVec, IntCounterVec, IntGauge,
+    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
+
+/// Number of API requests rejected by the memory admission middleware.
+pub static MEMORY_ADMISSION_REJECTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_api_memory_admission_rejected_total",
+        "Number of API requests rejected by the memory admission middleware (over the resident-memory cap)"
+    )
+    .unwrap()
+});
 
 pub const GAS_ESTIMATE_DEPRIORITIZED: &str = "deprioritized";
 pub const GAS_ESTIMATE_CURRENT: &str = "current";
