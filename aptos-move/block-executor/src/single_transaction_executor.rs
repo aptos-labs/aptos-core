@@ -1,9 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! How the block executor drives a VM for a single transaction, independent of
-//! the concrete VM. The legacy Move VM (its `ExecutorTask`) is adapted via
-//! `LegacyAdapter`; other VMs implement `SingleTransactionExecutor` directly.
+//! Interfaces for executing a single transaction.
 
 use crate::{
     captured_reads::{LegacyReads, SnapshotModuleView, TxnInput},
@@ -30,12 +28,13 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, prelude::*};
+use mono_move_global_context::GlobalContext;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::Serialize;
-use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::atomic::AtomicU32};
+use std::{cell::RefCell, fmt::Debug, hash::Hash, marker::PhantomData, sync::atomic::AtomicU32};
 
 /// Mode-invariant ingredients for a per-transaction view. The legacy code cache
 /// is isolated here; a VM with its own code caching ignores it.
@@ -64,7 +63,7 @@ pub enum ViewMode<'a, I: TxnInput> {
 }
 
 /// A VM used by the block executor to run a single transaction.
-pub trait SingleTransactionExecutor {
+pub trait SingleTransactionExecutor<'ctx> {
     type Txn: Transaction;
     type AuxiliaryInfo: AuxiliaryInfoTrait;
     type Key: Ord + Send + Sync + Clone + Hash + Debug + 'static;
@@ -75,15 +74,18 @@ pub trait SingleTransactionExecutor {
     type Output: TxnOutput<Txn = Self::Txn, Key = Self::Key, Tag = Self::Tag, Value = Self::Value>
         + 'static;
 
-    /// The async-runtime-checks decision is made by the block executor and passed
-    /// in; VMs that do not defer runtime checks ignore it.
+    /// Returns the per-worker executor.
     fn init(
         environment: &AptosEnvironment,
+        ctx: &'ctx GlobalContext,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        worker_id: u32,
         async_runtime_checks_enabled: bool,
     ) -> Self;
 
-    /// Execute a single transaction, returning its recorded outcome and read set.
+    /// Executse a single transaction, returning its recorded outcome and read set.
+    /// Returns an error if some invariant is broken and execution fails where it
+    /// is not supposed to (e.g., for system transactions).
     fn execute<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
         shared: SharedViewArgs<'_, S>,
@@ -93,8 +95,7 @@ pub trait SingleTransactionExecutor {
         txn_idx: TxnIndex,
     ) -> Result<(ExecutionStatus<Self::Output>, Self::Input), PanicError>;
 
-    /// Materialize a committed output, using the read set for delayed field
-    /// exchange and (legacy) trace replay. Trace replay is performed internally.
+    /// Materializes a committed output of a transaction.
     fn materialize<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
         output: Self::Output,
@@ -107,9 +108,11 @@ pub trait SingleTransactionExecutor {
         PanicOr<ResourceGroupSerializationError>,
     >;
 
-    /// Whether this output can be materialized (bcs-serialized to its storage
-    /// representation). Only invoked during the sequential resource-group
-    /// serialization fallback, to discard an output that would not serialize.
+    /// Returns true if this output can be materialized (e.g., writes can be
+    /// BCS-serialized to their storage representation).
+    // TODO:
+    //  This is only invoked during the sequential resource-group serialization
+    //  fallback, to discard an output that would not serialize - consider refactoring.
     fn check_materialization<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
         output: &Self::Output,
@@ -122,6 +125,13 @@ pub trait SingleTransactionExecutor {
     fn pre_write_values(_txn: &Self::Txn) -> Vec<(Self::Key, Self::Value)> {
         vec![]
     }
+
+    /// Materializes a VM in-memory key into the storage key persisted at the
+    /// block epilogue.
+    fn materialize_storage_key(
+        &self,
+        key: Self::Key,
+    ) -> Result<<Self::Txn as Transaction>::Key, PanicError>;
 }
 
 /// Builds the legacy `LatestView` from the view ingredients.
@@ -160,12 +170,13 @@ fn build_latest_view<'a, T: Transaction, S: TStateView<Key = T::Key>>(
 }
 
 /// Adapts any legacy [`ExecutorTask`] to [`SingleTransactionExecutor`].
-pub struct LegacyTransactionExecutor<E> {
+pub struct LegacyTransactionExecutor<'ctx, E> {
     inner: E,
     async_runtime_checks_enabled: bool,
+    _ctx: PhantomData<&'ctx ()>,
 }
 
-impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E> {
+impl<'ctx, E: ExecutorTask> SingleTransactionExecutor<'ctx> for LegacyTransactionExecutor<'ctx, E> {
     type AuxiliaryInfo = E::AuxiliaryInfo;
     type Input = LegacyReads<E::Txn>;
     // Legacy: the in-memory key/tag are the storage key/tag; the map value wraps
@@ -178,12 +189,15 @@ impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E>
 
     fn init(
         environment: &AptosEnvironment,
+        _ctx: &'ctx GlobalContext,
         state_view: &impl TStateView<Key = <E::Txn as Transaction>::Key>,
+        _worker_id: u32,
         async_runtime_checks_enabled: bool,
     ) -> Self {
         Self {
             inner: E::init(environment, state_view, async_runtime_checks_enabled),
             async_runtime_checks_enabled,
+            _ctx: PhantomData,
         }
     }
 
@@ -275,5 +289,12 @@ impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E>
         ValueWithLayout<<E::Txn as Transaction>::Value>,
     )> {
         E::pre_write_values(txn)
+    }
+
+    fn materialize_storage_key(
+        &self,
+        key: Self::Key,
+    ) -> Result<<E::Txn as Transaction>::Key, PanicError> {
+        Ok(key)
     }
 }

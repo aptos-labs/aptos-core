@@ -12,7 +12,7 @@ use crate::{
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorModuleCacheLocalConfig,
+        config::{BlockExecutorLocalConfig, BlockExecutorModuleCacheLocalConfig},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::PanicError,
@@ -22,6 +22,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
+use mono_move_global_context::GlobalContext;
 use move_binary_format::{
     errors::{Location, VMError},
     CompiledModule,
@@ -32,7 +33,11 @@ use move_core_types::{
 use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
-use std::{hash::Hash, ops::Deref, sync::Arc};
+use std::{
+    hash::Hash,
+    ops::Deref,
+    sync::{Arc, OnceLock},
+};
 
 /// Raises an alert with the specified message. In case we run in testing mode, instead prints the
 /// message to standard output.
@@ -53,8 +58,7 @@ macro_rules! alert_or_println {
 /// This snapshot of the global module cache for fuzzing allows comparison of parallel and sequential
 /// executions of the same block. It captures the cache state before the block is executed for the first
 /// time and rolls it back afterwards.
-pub type ModuleHotCacheSnapshot =
-    GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
+pub type ModuleHotCacheSnapshot = LegacyModuleCache;
 
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
@@ -175,10 +179,20 @@ where
     }
 }
 
+/// Manager for global module cache used for legacy VM only.
+pub type LegacyModuleCacheManager =
+    ModuleCacheManager<ModuleId, CompiledModule, Module, AptosModuleExtension>;
+/// Module cache used across blocks. Used for legacy VM only.
+pub type LegacyModuleCache =
+    GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
+
 /// Module cache manager used by Aptos block executor. Ensures that only one thread has exclusive
 /// access to it at a time.
 pub struct AptosModuleCacheManager {
-    inner: Mutex<ModuleCacheManager<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+    /// Global execution context for MonoMove VM.
+    global_context: OnceLock<GlobalContext>,
+
+    legacy_manager: Mutex<LegacyModuleCacheManager>,
 }
 
 impl AptosModuleCacheManager {
@@ -186,7 +200,8 @@ impl AptosModuleCacheManager {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(ModuleCacheManager::new()),
+            global_context: OnceLock::new(),
+            legacy_manager: Mutex::new(ModuleCacheManager::new()),
         }
     }
 
@@ -196,17 +211,35 @@ impl AptosModuleCacheManager {
     fn try_lock_inner(
         &self,
         state_view: &impl StateView,
-        config: &BlockExecutorModuleCacheLocalConfig,
+        config: &BlockExecutorLocalConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<AptosModuleCacheManagerGuard<'_>, VMStatus> {
         // Get the current environment from storage.
         let storage_environment =
             AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
 
-        Ok(match self.inner.try_lock() {
+        // The global context lives on the manager (not behind the lock), so both the
+        // locked and lock-failed guards vend the same `&'a GlobalContext`. Borrowing it
+        // (rather than owning per-guard) is what lets the guard hand out a context whose
+        // lifetime is the guard's own, so the mono executor can store it without a GAT.
+        //
+        // TODO(completeness): check readiness / run maintenance for the global context.
+        // TODO(cleanup): consider passing number of workers to manager initializer
+        let global_context = self
+            .global_context
+            .get_or_init(|| GlobalContext::with_num_execution_workers(config.concurrency_level));
+
+        Ok(match self.legacy_manager.try_lock() {
             Some(mut guard) => {
-                guard.check_ready(storage_environment, config, transaction_slice_metadata)?;
-                AptosModuleCacheManagerGuard::Guard { guard }
+                guard.check_ready(
+                    storage_environment,
+                    &config.module_cache_config,
+                    transaction_slice_metadata,
+                )?;
+                AptosModuleCacheManagerGuard::Guard {
+                    guard,
+                    global_context,
+                }
             },
             None => {
                 alert_or_println!("Locking module cache manager failed, fallback to empty caches");
@@ -216,6 +249,7 @@ impl AptosModuleCacheManager {
                 AptosModuleCacheManagerGuard::None {
                     environment: storage_environment,
                     module_cache: GlobalModuleCache::empty(),
+                    global_context,
                 }
             },
         })
@@ -226,7 +260,7 @@ impl AptosModuleCacheManager {
     pub fn try_lock(
         &self,
         state_view: &impl StateView,
-        config: &BlockExecutorModuleCacheLocalConfig,
+        config: &BlockExecutorLocalConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<AptosModuleCacheManagerGuard<'_>, VMStatus> {
         let mut guard = self.try_lock_inner(state_view, config, transaction_slice_metadata)?;
@@ -234,7 +268,9 @@ impl AptosModuleCacheManager {
         // To avoid cold starts, fetch the framework code. This ensures the state with 0 modules
         // cached is not possible for block execution (as long as the config enables the framework
         // prefetch).
-        if guard.module_cache().num_modules() == 0 && config.prefetch_framework_code {
+        if guard.module_cache().num_modules() == 0
+            && config.module_cache_config.prefetch_framework_code
+        {
             prefetch_aptos_framework(state_view, &mut guard).map_err(|err| {
                 alert_or_println!("Failed to load Aptos framework to module cache: {:?}", err);
                 VMError::from(err).into_vm_status()
@@ -250,24 +286,32 @@ impl AptosModuleCacheManager {
 pub enum AptosModuleCacheManagerGuard<'a> {
     /// Holds the guard to the [AptosModuleCacheManager], and has exclusive access to it.
     Guard {
-        guard: MutexGuard<
-            'a,
-            ModuleCacheManager<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        >,
+        guard: MutexGuard<'a, LegacyModuleCacheManager>,
+        global_context: &'a GlobalContext,
     },
     /// Either there is no [AptosModuleCacheManager], or acquiring the lock for it failed.
     None {
         environment: AptosEnvironment,
-        module_cache: GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        module_cache: LegacyModuleCache,
+        // TODO(correctness): for tests/concurrent blocks we should be owning this.
+        //   This does not apply to prod execution though - only sharded executor and
+        //   concurrent tests. So fine to keep for now but should be fixed.
+        global_context: &'a GlobalContext,
     },
 }
 
-impl AptosModuleCacheManagerGuard<'_> {
+#[cfg(any(test, feature = "testing"))]
+fn test_global_context() -> &'static GlobalContext {
+    static TEST_GLOBAL_CONTEXT: OnceLock<GlobalContext> = OnceLock::new();
+    TEST_GLOBAL_CONTEXT.get_or_init(|| GlobalContext::with_num_execution_workers(1))
+}
+
+impl<'a> AptosModuleCacheManagerGuard<'a> {
     /// Returns the references to the environment. If environment is not set, panics.
     pub fn environment(&self) -> &AptosEnvironment {
         use AptosModuleCacheManagerGuard::*;
         match self {
-            Guard { guard } => guard
+            Guard { guard, .. } => guard
                 .environment
                 .as_ref()
                 .expect("Guard always has environment set"),
@@ -276,23 +320,27 @@ impl AptosModuleCacheManagerGuard<'_> {
     }
 
     /// Returns the references to the module cache.
-    pub fn module_cache(
-        &self,
-    ) -> &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension> {
+    pub fn module_cache(&self) -> &LegacyModuleCache {
         use AptosModuleCacheManagerGuard::*;
         match self {
-            Guard { guard } => &guard.module_cache,
+            Guard { guard, .. } => &guard.module_cache,
             None { module_cache, .. } => module_cache,
         }
     }
 
-    /// Returns the mutable references to the module cache.
-    pub fn module_cache_mut(
-        &mut self,
-    ) -> &mut GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension> {
+    /// The MonoMove global context for this block.
+    pub fn global_context(&self) -> &'a GlobalContext {
         use AptosModuleCacheManagerGuard::*;
         match self {
-            Guard { guard } => &mut guard.module_cache,
+            Guard { global_context, .. } | None { global_context, .. } => *global_context,
+        }
+    }
+
+    /// Returns the mutable references to the module cache.
+    pub fn module_cache_mut(&mut self) -> &mut LegacyModuleCache {
+        use AptosModuleCacheManagerGuard::*;
+        match self {
+            Guard { guard, .. } => &mut guard.module_cache,
             None { module_cache, .. } => module_cache,
         }
     }
@@ -312,6 +360,7 @@ impl AptosModuleCacheManagerGuard<'_> {
         AptosModuleCacheManagerGuard::None {
             environment: AptosEnvironment::new(state_view),
             module_cache: GlobalModuleCache::empty(),
+            global_context: test_global_context(),
         }
     }
 
@@ -323,6 +372,7 @@ impl AptosModuleCacheManagerGuard<'_> {
         AptosModuleCacheManagerGuard::None {
             environment: AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view),
             module_cache: GlobalModuleCache::empty(),
+            global_context: test_global_context(),
         }
     }
 
@@ -850,7 +900,7 @@ mod test {
         let manager = AptosModuleCacheManager::new();
 
         let state_view = MockStateView::empty();
-        let config = BlockExecutorModuleCacheLocalConfig::default();
+        let config = BlockExecutorLocalConfig::default_with_concurrency_level(1);
         let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
 
         let guard = assert_ok!(manager.try_lock(&state_view, &config, metadata));
@@ -862,7 +912,7 @@ mod test {
         let manager = Arc::new(AptosModuleCacheManager::new());
 
         let state_view = Arc::new(MockStateView::empty());
-        let config = Arc::new(BlockExecutorModuleCacheLocalConfig::default());
+        let config = Arc::new(BlockExecutorLocalConfig::default_with_concurrency_level(1));
         let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
 
         let counter = Arc::new(AtomicU64::new(0));

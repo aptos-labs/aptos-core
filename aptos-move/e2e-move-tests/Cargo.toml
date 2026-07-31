@@ -60,6 +60,7 @@ aptos-resource-viewer = { workspace = true }
 aptos-vm-types = { workspace = true }
 claims = { workspace = true }
 memory-stats = { workspace = true }
+mono-move-global-context = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
