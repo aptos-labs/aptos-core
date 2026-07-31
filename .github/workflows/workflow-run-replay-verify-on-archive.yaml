@@ -91,6 +91,7 @@ jobs:
   build-images:
     needs: validate-inputs
     permissions:
+      contents: read
       id-token: write
     secrets: inherit
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
@@ -105,6 +106,7 @@ jobs:
     timeout-minutes: 420 # 7 hours
     needs: build-images
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Checkout code
