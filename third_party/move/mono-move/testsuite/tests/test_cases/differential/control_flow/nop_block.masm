@@ -1,0 +1,26 @@
+// RUN: publish --print(stackless)
+module 0x66::nop_block
+
+// A conditional whose fallthrough block holds only `nop`.
+fun taken(): u64
+    ld_true
+    br_true done
+    nop
+done:
+    ld_u64 7
+    ret
+
+// Same shape with the branch not taken.
+fun not_taken(): u64
+    ld_false
+    br_true done
+    nop
+done:
+    ld_u64 8
+    ret
+
+// RUN: execute 0x66::nop_block::taken
+// CHECK: results: 7
+
+// RUN: execute 0x66::nop_block::not_taken
+// CHECK: results: 8

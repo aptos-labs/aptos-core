@@ -703,11 +703,10 @@ pub fn try_build_context<'a>(
             CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
         let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, handle_idx);
-        // TODO(correctness): The native registry is trusted unconditionally here.
-        //
-        // Consider cross-checking against the callee module's `is_native` flag
-        // against the callee module's `is_native` flag so a registered impl cannot
-        // shadow a Move-body function with the same qualified name.
+        // TODO(correctness): The native registry is trusted unconditionally
+        // here. Consider cross-checking against the callee module's
+        // `is_native` flag so a registered impl cannot shadow a Move-body
+        // function with the same qualified name.
         let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
         // Descriptor IDs for the native's resource types (published by the
         // discovery pass, keyed on the concrete type); e.g. `add_box` uses its

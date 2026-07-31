@@ -77,80 +77,16 @@
 //! upstream `MutBorrowLoc` (or `MutBorrowLocField`). (Field-level
 //! coalescing, if ever added, would need to revisit this.)
 
-#[cfg(debug_assertions)]
-use crate::stackless_exec_ir::instr_utils::for_each_value_use;
 use crate::stackless_exec_ir::{
-    instr_utils::{
-        call_boundary_rets_and_args, clobbers_transfer, for_each_def, for_each_use,
-        mut_local_borrow_target,
-    },
-    HomeIndex, Instr, NamedSlot, SsaSlot, TransferPosition,
+    instr_utils::{clobbers_transfer, for_each_def, for_each_use, mut_local_borrow_target},
+    HomeIndex, Instr, SsaSlot, TransferPosition,
 };
 #[cfg(debug_assertions)]
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult};
+use crate::validate::transfer::check_call_structural_invariants;
 use shared_dsa::{UnorderedMap, UnorderedSet};
 use smallbitvec::SmallBitVec;
 #[cfg(debug_assertions)]
 use std::collections::BTreeMap;
-#[cfg(debug_assertions)]
-use thiserror::Error;
-
-#[cfg(debug_assertions)]
-#[derive(Debug, Error)]
-enum TransferVerifierError {
-    #[error("post-optimize Transfer verifier: block {block}, instr {instr}: {inner}")]
-    TransferCallStructural {
-        block: usize,
-        instr: usize,
-        inner: Box<TransferVerifierError>,
-    },
-
-    #[error(
-        "arg positionality: args[{arg_idx}] resolves to Transfer({got}), expected Transfer({arg_idx})"
-    )]
-    TransferArgPositionality { arg_idx: usize, got: u16 },
-
-    #[error(
-        "return Transfer prefix: rets[{ret_idx}] resolves to Transfer({got}) after a non-Transfer ret"
-    )]
-    TransferReturnPrefix { ret_idx: usize, got: u16 },
-
-    #[error("return monotonicity: rets[{ret_idx}] = Transfer({got}) <= prev Transfer({prev})")]
-    TransferReturnNotMonotonic { ret_idx: usize, got: u16, prev: u16 },
-
-    #[error("post-optimize Transfer verifier: block {block}, instr {instr}: use of Transfer({transfer}) with no live def earlier in this block")]
-    TransferUseWithoutLiveDef {
-        block: usize,
-        instr: usize,
-        transfer: u16,
-    },
-
-    #[error("post-optimize Transfer verifier: block {block}, instr {instr}: Transfer({transfer}) bound at call boundary but not consumed as args[{transfer}]")]
-    TransferBoundNotConsumed {
-        block: usize,
-        instr: usize,
-        transfer: u16,
-    },
-
-    #[error("post-optimize Transfer verifier: block {block}: Transfer({transfer}) bound at block end (Transfer lifetimes must be block-local)")]
-    TransferBoundAtBlockEnd { block: usize, transfer: u16 },
-}
-
-#[cfg(debug_assertions)]
-impl IntoExecutionError for TransferVerifierError {
-    fn kind(&self) -> ExecutionErrorKind {
-        use TransferVerifierError::*;
-        match self {
-            TransferCallStructural { .. }
-            | TransferArgPositionality { .. }
-            | TransferReturnPrefix { .. }
-            | TransferReturnNotMonotonic { .. }
-            | TransferUseWithoutLiveDef { .. }
-            | TransferBoundNotConsumed { .. }
-            | TransferBoundAtBlockEnd { .. } => ExecutionErrorKind::InvariantViolation,
-        }
-    }
-}
 
 /// Analysis results for a single basic block. All map keys are `ValueId`s.
 pub(crate) struct BlockAnalysis {
@@ -562,58 +498,6 @@ fn next_arg_lifetime_overlaps(
     !(a_lu <= b_def || b_lu <= a_def)
 }
 
-/// Check the per-call structural Transfer invariants:
-///
-/// - **Arg positionality** (invariant 2): if `args[j]` resolves to
-///   `Transfer(i)`, then `i == j`.
-/// - **Return Transfer prefix** (invariant 5): the rets list is a
-///   (possibly empty) Transfer-resolved prefix followed by a non-Transfer
-///   suffix.
-/// - **Return monotonicity** (invariant 3): within the Transfer prefix,
-///   resolved Transfer indices strictly increase.
-#[cfg(debug_assertions)]
-fn check_call_structural_invariants<SlotForm, F>(
-    args: &[SlotForm],
-    rets: &[SlotForm],
-    transfer_pos: F,
-) -> Result<(), TransferVerifierError>
-where
-    F: Fn(&SlotForm) -> Option<u16>,
-{
-    for (j, slot) in args.iter().enumerate() {
-        if let Some(i) = transfer_pos(slot)
-            && i as usize != j
-        {
-            return Err(TransferVerifierError::TransferArgPositionality { arg_idx: j, got: i });
-        }
-    }
-
-    let mut seen_non_transfer = false;
-    let mut last_transfer: Option<u16> = None;
-    for (k, slot) in rets.iter().enumerate() {
-        match transfer_pos(slot) {
-            Some(i) => {
-                if seen_non_transfer {
-                    return Err(TransferVerifierError::TransferReturnPrefix { ret_idx: k, got: i });
-                }
-                if let Some(prev) = last_transfer
-                    && i <= prev
-                {
-                    return Err(TransferVerifierError::TransferReturnNotMonotonic {
-                        ret_idx: k,
-                        got: i,
-                        prev,
-                    });
-                }
-                last_transfer = Some(i);
-            },
-            None => seen_non_transfer = true,
-        }
-    }
-
-    Ok(())
-}
-
 /// Verifies the seven Transfer invariants from the file header on the
 /// just-built `transfer_precolor` map. Per-call invariants (arg
 /// positionality, return monotonicity, pass-through contiguity, return
@@ -829,128 +713,6 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
     // Find the first element >= lo.
     let idx = sorted.partition_point(|&x| x < lo);
     idx < sorted.len() && sorted[idx] < hi
-}
-
-/// Verify that the post-optimize, slot-allocated IR satisfies the
-/// Transfer-slot invariants the lowering depends on.
-///
-/// The seven invariants at the top of this file are established by
-/// `BlockAnalysis::analyze` on the SSA-form IR, before slot allocation, but are not
-/// re-checked through `optimize_module`. This walk re-checks the
-/// subset that survives slot allocation:
-///
-/// 1. Every use of `Transfer(j)` is preceded by a def in the same block.
-/// 2. At a call boundary, every bound Transfer slot is consumed by the
-///    call's args (orphans signal an upstream regression).
-/// 3. Calls clobber every Transfer slot; ret defs re-bind on the same
-///    instruction.
-/// 4. No Transfer binding leaks across a block boundary.
-/// 5. Per-call structural invariants — arg positionality, return
-///    Transfer prefix, return monotonicity — via
-///    `check_call_structural_invariants`, the same helper
-///    `assert_transfer_invariants` uses on the ValueId-level maps.
-///
-/// Pass-through contiguity (invariant 4 in the header) is not
-/// checked here: it requires distinguishing bound positions that
-/// came from the previous call's rets from positions defined by
-/// intermediate non-call instrs, which this walk doesn't track.
-#[cfg(debug_assertions)]
-pub(crate) fn assert_transfer_invariants_on_final_ir(
-    func: &crate::stackless_exec_ir::FunctionIR,
-) -> VMResult<()> {
-    let num_transfer = func.num_transfer_positions as usize;
-    let mut bound: Vec<bool> = vec![false; num_transfer];
-    for (b_idx, block) in func.blocks.iter().enumerate() {
-        // Block-local lifetime: a fresh state at every block.
-        bound.iter_mut().for_each(|b| *b = false);
-        for (i, instr) in block.instrs.iter().enumerate() {
-            // (1) every Transfer value use must be live.
-            let mut unbound: Option<u16> = None;
-            for_each_value_use(instr, |s| {
-                if let NamedSlot::Transfer(j) = s
-                    && !bound[j.0 as usize]
-                    && unbound.is_none()
-                {
-                    unbound = Some(j.0);
-                }
-            });
-            if let Some(j) = unbound {
-                return Err(VMInternalError::new(
-                    TransferVerifierError::TransferUseWithoutLiveDef {
-                        block: b_idx,
-                        instr: i,
-                        transfer: j,
-                    },
-                ));
-            }
-
-            // (2) at a call boundary, every bound Transfer slot must
-            // be consumed by this call's args as args[j] = Transfer(j)
-            // (arg positionality).
-            if let Some((rets, args)) = call_boundary_rets_and_args(instr) {
-                // Structural invariants (arg positionality, return Transfer prefix,
-                // return monotonicity).
-                check_call_structural_invariants(args, rets, |s| match s {
-                    NamedSlot::Transfer(i) => Some(i.0),
-                    NamedSlot::Home(_) => None,
-                })
-                .map_err(|e| TransferVerifierError::TransferCallStructural {
-                    block: b_idx,
-                    instr: i,
-                    inner: Box::new(e),
-                })?;
-                // Orphan check: every bound slot must be consumed
-                // by this call's args. A bound position not in args
-                // signals a dead Transfer def from earlier in the block.
-                for (j, &b) in bound.iter().enumerate() {
-                    if b {
-                        let consumed_here = j < args.len()
-                            && args[j] == NamedSlot::Transfer(TransferPosition(j as u16));
-                        if !consumed_here {
-                            return Err(VMInternalError::new(
-                                TransferVerifierError::TransferBoundNotConsumed {
-                                    block: b_idx,
-                                    instr: i,
-                                    transfer: j as u16,
-                                },
-                            ));
-                        }
-                    }
-                }
-                // Clobber: a call reuses the entire callee region;
-                // the ret defs below re-bind whatever positions
-                // this call returns to.
-                bound.iter_mut().for_each(|b| *b = false);
-            } else {
-                // Non-call: value uses release their bindings (single-use).
-                for_each_value_use(instr, |s| {
-                    if let NamedSlot::Transfer(j) = s {
-                        bound[j.0 as usize] = false;
-                    }
-                });
-            }
-            // Defs bind: ret-Transfers for calls, Move/Copy dst (etc.)
-            // for non-calls.
-            for_each_def(instr, |s| {
-                if let NamedSlot::Transfer(j) = s {
-                    bound[j.0 as usize] = true;
-                }
-            });
-        }
-
-        // (3) no Transfer binding may survive past the end of a block.
-        for (j, &b) in bound.iter().enumerate() {
-            if b {
-                return Err(VMInternalError::new(
-                    TransferVerifierError::TransferBoundAtBlockEnd {
-                        block: b_idx,
-                        transfer: j as u16,
-                    },
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

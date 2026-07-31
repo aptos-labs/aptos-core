@@ -59,10 +59,8 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
 
             // Pass: Bytecode -> Intra-Block SSA -> Fusion
             let converter = SsaConverter::new(local_types, interner);
-            let ssa = converter
-                .convert_function(&module, &code.code)?
-                .with_fusion_passes()
-                .with_test_utils_passes(&module)?;
+            let (ssa, witness) = converter.convert_function(&module, &code.code)?;
+            let ssa = ssa.with_fusion_passes().with_test_utils_passes(&module)?;
 
             // Pass: Greedy Slot Allocation (consumes SSA, produces named-slot IR)
             let alloc = super::slot_alloc::allocate_slots(ssa)?;
@@ -78,6 +76,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
                 home_slot_types: alloc.home_slot_types,
                 // Populated by the gas instrumentation pass.
                 block_costs: Vec::new(),
+                witness,
             }))
         })
         .collect::<VMResult<Vec<_>>>()?;

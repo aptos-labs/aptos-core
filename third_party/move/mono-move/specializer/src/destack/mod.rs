@@ -42,10 +42,10 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> VMResult<Mod
     // over-approximating (charging for instructions that optimization removes).
     gas::instrument(&mut module_ir, interner)?;
 
-    // Debug-mode failsafe: verify transfer invariants hold after optimization.
+    // Debug-mode failsafe: lightweight translation validation of the final
+    // IR against the bytecode it was translated from (CFG equivalence +
+    // transfer invariants).
     #[cfg(debug_assertions)]
-    for func in module_ir.functions.iter().flatten() {
-        analysis::assert_transfer_invariants_on_final_ir(func)?;
-    }
+    crate::validate::validate_module(&module_ir)?;
     Ok(module_ir)
 }
