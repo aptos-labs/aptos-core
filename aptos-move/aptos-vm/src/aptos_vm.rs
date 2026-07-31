@@ -120,6 +120,7 @@ use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format::CompiledScript,
+    file_format_common::VERSION_5,
     CompiledModule,
 };
 use move_core_types::{
@@ -1811,6 +1812,7 @@ impl AptosVM {
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
         self.reject_unstable_bytecode(modules)?;
+        self.reject_legacy_module_bytecode(modules)?;
         native_validation::validate_module_natives(modules)?;
 
         for m in modules {
@@ -1858,6 +1860,29 @@ impl AptosVM {
             return Err(Self::metadata_validation_error(
                 "not all registered modules published",
             ));
+        }
+        Ok(())
+    }
+
+    /// Reject publishing of legacy (v5) module bytecode. Publishing only; modules already on chain
+    /// keep loading and executing at any version.
+    fn reject_legacy_module_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
+        if self
+            .timed_features()
+            .is_enabled(TimedFeatureFlag::RejectV5ModulePublishing)
+        {
+            for module in modules {
+                if module.version <= VERSION_5 {
+                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                        .with_message(format!(
+                            "publishing module bytecode version {} is not allowed; the minimum \
+                             publishable version is {}",
+                            module.version,
+                            VERSION_5 + 1
+                        ))
+                        .finish(Location::Undefined));
+                }
+            }
         }
         Ok(())
     }
