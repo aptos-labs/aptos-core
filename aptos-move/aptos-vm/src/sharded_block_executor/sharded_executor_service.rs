@@ -156,7 +156,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 let ret = match ret {
                     Ok(ret) => Ok(ret),
                     Err(err) => {
-                        // TODO: figure out what to do with failed blocks
+                        // Sharded execution is not enabled in production, so a
+                        // block-level error here is unreachable on the production
+                        // path. Rather than plumbing BlockError through the whole
+                        // sharded stack, we panic.
+                        // TODO: figure out what to do with failed blocks.
                         unimplemented!("unsupported sharded block execution error: {}", err)
                     },
                 };

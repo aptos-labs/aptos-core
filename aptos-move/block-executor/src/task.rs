@@ -37,8 +37,8 @@ use triomphe::Arc as TriompheArc;
 pub enum ExecutionStatus<O> {
     /// Transaction was executed successfully.
     Success(O),
-    /// Transaction hit a none recoverable error during execution, halt the execution and propagate
-    /// the error back to the caller.
+    /// Transaction hit a non-recoverable error during execution. Halts execution
+    /// and returns the error message to the caller.
     Abort(String),
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list

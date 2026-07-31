@@ -59,6 +59,10 @@ fn fail_no_epoch_change_write_set() {
     let receiver = executor.create_raw_account_data(100_000, 10);
     let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000, 0);
 
-    let output = executor.execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)]);
-    assert!(output.is_err());
+    let output_err = executor
+        .execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)])
+        .unwrap_err();
+    // Block execution no longer threads the original StatusCode; the specific
+    // failure reason survives only in the stringified error message.
+    assert!(output_err.message().unwrap().contains("INVALID_WRITE_SET"));
 }
