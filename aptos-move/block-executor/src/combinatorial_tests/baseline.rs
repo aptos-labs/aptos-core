@@ -992,16 +992,17 @@ where
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Clone + Debug + Send + Sync + TransactionEvent + 'static>(
         &self,
-        results: &BlockExecutionResult<BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>, usize>,
+        results: &BlockExecutionResult<BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>>,
     ) {
         match results {
             Ok(block_output) => {
                 self.assert_success(block_output);
             },
-            Err(BlockExecutionError::FatalVMError(idx)) => {
+            Err(BlockExecutionError::FatalVMError(msg)) => {
                 assert_matches!(&self.status, BaselineStatus::Aborted);
-                assert_eq!(*idx, self.read_values.len());
-                assert_eq!(*idx, self.resolved_deltas.len());
+                // The mock aborts with its transaction index stringified.
+                assert_eq!(*msg, self.read_values.len().to_string());
+                assert_eq!(self.read_values.len(), self.resolved_deltas.len());
             },
             Err(BlockExecutionError::FatalBlockExecutorError(e)) => {
                 unimplemented!("not tested here FallbackToSequential({:?})", e);

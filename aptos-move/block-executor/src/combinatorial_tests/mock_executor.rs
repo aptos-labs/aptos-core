@@ -6,7 +6,7 @@ use crate::{
         DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
         RESERVED_TAG,
     },
-    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutorTask, RecordedOutput, TransactionOutput},
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
     },
@@ -83,6 +83,31 @@ macro_rules! try_with_direct {
             Err(e) => return e,
         }
     };
+}
+
+/// The mock builder's internal execution outcome. Mirrors the rich set of
+/// outcomes the mock exercises; converted to [`RecordedOutput`] at the executor
+/// boundary (the real trait no longer uses this shape).
+#[derive(Debug)]
+pub(crate) enum ExecutionStatus<O, E> {
+    Success(O),
+    Abort(E),
+    SkipRest(O),
+}
+
+/// Converts the mock's execution outcome into the block executor's recorded form.
+fn into_recorded<O>(status: ExecutionStatus<O, usize>) -> RecordedOutput<O> {
+    match status {
+        ExecutionStatus::Success(output) => RecordedOutput::Committed {
+            output,
+            skips_rest: false,
+        },
+        ExecutionStatus::SkipRest(output) => RecordedOutput::Committed {
+            output,
+            skips_rest: true,
+        },
+        ExecutionStatus::Abort(code) => RecordedOutput::Aborted(code.to_string()),
+    }
 }
 
 /// Macro for returning Err(e) when Result is an error
@@ -690,16 +715,14 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type BeforeMaterializationGuard<'a> = &'a Self;
     type CommittedOutput = MockOutput<K, E>;
+    type Key = K;
+    type Tag = u32;
     type Txn = MockTransaction<K, E>;
+    type Value = ValueWithLayout<ValueType>;
 
     fn skip_output() -> Self {
         Self::skipped_output(None)
-    }
-
-    fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
-        Ok(self)
     }
 
     fn incorporate_materialized_txn_output(
@@ -716,13 +739,7 @@ where
         // and patched writes the baseline verifies.
         Ok((self.clone(), Trace::empty()))
     }
-}
 
-impl<K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
-{
     fn resource_write_set(&self) -> HashMap<K, ValueWithLayout<ValueType>> {
         self.writes
             .iter()
@@ -846,6 +863,20 @@ where
         Ok(())
     }
 
+    fn resource_group_metadata_ops(&self) -> Vec<(K, ValueType)> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, (op, _, _))| (key, op.extract_value().clone()))
+            .collect()
+    }
+
+    fn legacy_v1_resource_group_tags(&self) -> Vec<(K, HashSet<u32>)> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, (_, _, group_ops))| (key, group_ops.keys().cloned().collect()))
+            .collect()
+    }
+
     fn output_approx_size(&self) -> u64 {
         // TODO: add block output limit testing
         0
@@ -942,7 +973,6 @@ where
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
@@ -963,78 +993,83 @@ where
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
-        match txn {
-            MockTransaction::Write {
-                incarnation_counter,
-                incarnation_behaviors,
-                delta_test_kind,
-                ..
-            } => {
-                // Use incarnation counter value as an index to determine the read-
-                // and write-sets of the execution. Increment incarnation counter to
-                // simulate dynamic behavior when there are multiple possible read-
-                // and write-sets (i.e. each are selected round-robin).
-                let idx = incarnation_counter.fetch_add(1, Ordering::SeqCst);
-                let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
+    ) -> Result<RecordedOutput<Self::Output>, PanicError> {
+        let status: ExecutionStatus<MockOutput<K, E>, usize> = 'execute: {
+            match txn {
+                MockTransaction::Write {
+                    incarnation_counter,
+                    incarnation_behaviors,
+                    delta_test_kind,
+                    ..
+                } => {
+                    // Use incarnation counter value as an index to determine the read-
+                    // and write-sets of the execution. Increment incarnation counter to
+                    // simulate dynamic behavior when there are multiple possible read-
+                    // and write-sets (i.e. each are selected round-robin).
+                    let idx = incarnation_counter.fetch_add(1, Ordering::SeqCst);
+                    let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
-                // Initialize the builder and use the railway pattern to execute builder operations.
-                let mut builder = MockOutputBuilder::from_mock_incarnation(behavior);
-                let builder_result = BuilderOperation::new(&mut builder)
-                    .and_then(|b| b.add_module_reads(view, &behavior.module_reads))
-                    .and_then(|b| {
-                        b.add_resource_reads(
-                            view,
-                            &behavior.resource_reads,
-                            *delta_test_kind == DeltaTestKind::DelayedFields,
-                        )
-                    })
-                    .and_then(|b| {
-                        b.add_group_reads(
-                            view,
-                            &behavior.group_reads,
-                            *delta_test_kind == DeltaTestKind::DelayedFields,
-                        )
-                    })
-                    .and_then(|b| b.add_group_queries(view, &behavior.group_queries))
-                    .and_then(|b| {
-                        b.add_group_writes(
-                            view,
-                            &behavior.group_writes,
-                            *delta_test_kind == DeltaTestKind::DelayedFields,
-                            txn_idx,
-                        )
-                    })
-                    .and_then(|b| {
-                        b.add_resource_writes(
-                            view,
-                            &behavior.resource_writes,
-                            *delta_test_kind == DeltaTestKind::DelayedFields,
-                            txn_idx,
-                        )
-                    })
-                    .and_then(|b| b.add_deltas(view, &behavior.deltas, *delta_test_kind))
-                    .finish();
+                    // Initialize the builder and use the railway pattern to execute builder operations.
+                    let mut builder = MockOutputBuilder::from_mock_incarnation(behavior);
+                    let builder_result = BuilderOperation::new(&mut builder)
+                        .and_then(|b| b.add_module_reads(view, &behavior.module_reads))
+                        .and_then(|b| {
+                            b.add_resource_reads(
+                                view,
+                                &behavior.resource_reads,
+                                *delta_test_kind == DeltaTestKind::DelayedFields,
+                            )
+                        })
+                        .and_then(|b| {
+                            b.add_group_reads(
+                                view,
+                                &behavior.group_reads,
+                                *delta_test_kind == DeltaTestKind::DelayedFields,
+                            )
+                        })
+                        .and_then(|b| b.add_group_queries(view, &behavior.group_queries))
+                        .and_then(|b| {
+                            b.add_group_writes(
+                                view,
+                                &behavior.group_writes,
+                                *delta_test_kind == DeltaTestKind::DelayedFields,
+                                txn_idx,
+                            )
+                        })
+                        .and_then(|b| {
+                            b.add_resource_writes(
+                                view,
+                                &behavior.resource_writes,
+                                *delta_test_kind == DeltaTestKind::DelayedFields,
+                                txn_idx,
+                            )
+                        })
+                        .and_then(|b| b.add_deltas(view, &behavior.deltas, *delta_test_kind))
+                        .finish();
 
-                // Use the direct return variant for ExecutionStatus functions
-                try_with_direct!(builder_result);
+                    // Short-circuit out of the labeled block with the forced outcome.
+                    if let Err(e) = builder_result {
+                        break 'execute e;
+                    }
 
-                ExecutionStatus::Success(builder.build())
-            },
-            MockTransaction::SkipRest(gas) => {
-                let mut mock_output = MockOutput::retry();
-                mock_output.total_gas = *gas;
-                ExecutionStatus::SkipRest(mock_output)
-            },
-            MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
-            MockTransaction::InterruptRequested => {
-                while !view.interrupt_requested() {}
-                ExecutionStatus::SkipRest(MockOutput::skip_output())
-            },
-            MockTransaction::StateCheckpoint => {
-                ExecutionStatus::Success(MockOutput::empty_success_output())
-            },
-        }
+                    ExecutionStatus::Success(builder.build())
+                },
+                MockTransaction::SkipRest(gas) => {
+                    let mut mock_output = MockOutput::retry();
+                    mock_output.total_gas = *gas;
+                    ExecutionStatus::SkipRest(mock_output)
+                },
+                MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
+                MockTransaction::InterruptRequested => {
+                    while !view.interrupt_requested() {}
+                    ExecutionStatus::SkipRest(MockOutput::skip_output())
+                },
+                MockTransaction::StateCheckpoint => {
+                    ExecutionStatus::Success(MockOutput::empty_success_output())
+                },
+            }
+        };
+        Ok(into_recorded(status))
     }
 
     fn pre_write_values(txn: &Self::Txn) -> Vec<(K, ValueWithLayout<ValueType>)> {

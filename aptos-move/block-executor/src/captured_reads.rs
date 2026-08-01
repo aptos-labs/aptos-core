@@ -21,7 +21,7 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    block_executor::value::ValueWithLayout,
+    block_executor::value::{SpeculativeValue, ValueWithLayout},
     error::{code_invariant_error, PanicError, PanicOr},
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
@@ -513,6 +513,270 @@ pub enum CacheRead<T> {
     Miss,
 }
 
+/// The read set captured during a transaction's parallel execution, validated
+/// against the multi-version data structures to decide whether the transaction
+/// must be re-executed. Abstracts the concrete read-set representation so the
+/// executor and its output store do not depend on a specific VM's form.
+///
+/// The associated key/tag/value types are the multi-version map's types. The
+/// module caches are always the legacy code-cache types.
+pub trait TxnInput: Send + Sync {
+    type Key;
+    type Tag;
+    type Value: SpeculativeValue;
+
+    /// Validates captured resource reads against the versioned data map.
+    fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<Self::Key, Self::Value>,
+        idx_to_validate: TxnIndex,
+    ) -> bool;
+
+    /// Validates captured resource group reads against the versioned group map.
+    fn validate_group_reads(
+        &self,
+        group_map: &VersionedGroupData<Self::Key, Self::Tag, Self::Value>,
+        idx_to_validate: TxnIndex,
+    ) -> bool;
+
+    /// Validates captured delayed field reads against the versioned delayed fields.
+    fn validate_delayed_field_reads(
+        &self,
+        delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError>;
+
+    /// Validates captured module reads against the global and per-block module caches.
+    fn validate_module_reads(
+        &self,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        per_block_module_cache: &SyncModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+            Option<TxnIndex>,
+        >,
+        maybe_updated_module_keys: Option<&BTreeSet<ModuleId>>,
+    ) -> bool;
+
+    /// Records a delayed-field delta application failure into the read set, so a
+    /// re-validation of this transaction fails and it re-executes. Reached during
+    /// output processing when applying a delayed field change to the versioned map
+    /// fails with a delta application error.
+    fn record_delayed_field_application_failure(&mut self);
+
+    /// The incarnation whose reads were captured, used for BlockSTMv2 module validation.
+    fn incarnation(&self) -> Option<Incarnation>;
+
+    /// Whether an incorrect (non-speculative) use was recorded during execution.
+    fn is_incorrect_use(&self) -> bool;
+
+    /// Summary of the keys read, used for read/write conflict accounting.
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
+}
+
+/// The read set produced by the legacy Move VM path (captured via `LatestView`).
+pub type CapturedReadSet<T> =
+    CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
+
+impl<T: Transaction> TxnInput for CapturedReadSet<T> {
+    type Key = T::Key;
+    type Tag = T::Tag;
+    type Value = ValueWithLayout<T::Value>;
+
+    fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        CapturedReads::validate_data_reads(self, data_map, idx_to_validate)
+    }
+
+    fn validate_group_reads(
+        &self,
+        group_map: &VersionedGroupData<T::Key, T::Tag, ValueWithLayout<T::Value>>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        CapturedReads::validate_group_reads(self, group_map, idx_to_validate)
+    }
+
+    fn validate_delayed_field_reads(
+        &self,
+        delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        CapturedReads::validate_delayed_field_reads(self, delayed_fields, idx_to_validate)
+    }
+
+    fn validate_module_reads(
+        &self,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        per_block_module_cache: &SyncModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+            Option<TxnIndex>,
+        >,
+        maybe_updated_module_keys: Option<&BTreeSet<ModuleId>>,
+    ) -> bool {
+        CapturedReads::validate_module_reads(
+            self,
+            global_module_cache,
+            per_block_module_cache,
+            maybe_updated_module_keys,
+        )
+    }
+
+    fn record_delayed_field_application_failure(&mut self) {
+        self.capture_delayed_field_read_error(&PanicOr::Or(
+            MVDelayedFieldsError::DeltaApplicationFailure,
+        ));
+    }
+
+    fn incarnation(&self) -> Option<Incarnation> {
+        self.blockstm_v2_incarnation()
+    }
+
+    fn is_incorrect_use(&self) -> bool {
+        CapturedReads::is_incorrect_use(self)
+    }
+
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+        CapturedReads::get_read_summary(self)
+    }
+}
+
+/// The legacy Move VM's read set, which differs by execution mode: BlockSTM
+/// (parallel) captures `CapturedReads`, sequential execution captures an
+/// `UnsyncReadSet`. Adapts both to `TxnInput` behind one type so the executor
+/// stores a single read-set type. The `validate_*` methods are only reached for
+/// the parallel variant — sequential execution never re-validates, and the
+/// parallel store never holds a sequential read set.
+pub enum LegacyReads<T: Transaction> {
+    Parallel(CapturedReadSet<T>),
+    Sequential(UnsyncReadSet<T, ModuleId>),
+}
+
+impl<T: Transaction> TxnInput for LegacyReads<T> {
+    type Key = T::Key;
+    type Tag = T::Tag;
+    type Value = ValueWithLayout<T::Value>;
+
+    fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<T::Key, ValueWithLayout<T::Value>>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        match self {
+            LegacyReads::Parallel(reads) => reads.validate_data_reads(data_map, idx_to_validate),
+            LegacyReads::Sequential(_) => {
+                unreachable!("Sequential execution does not validate reads")
+            },
+        }
+    }
+
+    fn validate_group_reads(
+        &self,
+        group_map: &VersionedGroupData<T::Key, T::Tag, ValueWithLayout<T::Value>>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        match self {
+            LegacyReads::Parallel(reads) => reads.validate_group_reads(group_map, idx_to_validate),
+            LegacyReads::Sequential(_) => {
+                unreachable!("Sequential execution does not validate reads")
+            },
+        }
+    }
+
+    fn validate_delayed_field_reads(
+        &self,
+        delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        match self {
+            LegacyReads::Parallel(reads) => {
+                reads.validate_delayed_field_reads(delayed_fields, idx_to_validate)
+            },
+            LegacyReads::Sequential(_) => {
+                unreachable!("Sequential execution does not validate reads")
+            },
+        }
+    }
+
+    fn validate_module_reads(
+        &self,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        per_block_module_cache: &SyncModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+            Option<TxnIndex>,
+        >,
+        maybe_updated_module_keys: Option<&BTreeSet<ModuleId>>,
+    ) -> bool {
+        match self {
+            LegacyReads::Parallel(reads) => reads.validate_module_reads(
+                global_module_cache,
+                per_block_module_cache,
+                maybe_updated_module_keys,
+            ),
+            LegacyReads::Sequential(_) => {
+                unreachable!("Sequential execution does not validate reads")
+            },
+        }
+    }
+
+    fn record_delayed_field_application_failure(&mut self) {
+        match self {
+            LegacyReads::Parallel(reads) => reads.capture_delayed_field_read_error(
+                &PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure),
+            ),
+            LegacyReads::Sequential(_) => {
+                unreachable!("Sequential execution does not apply delayed field changes speculatively")
+            },
+        }
+    }
+
+    fn incarnation(&self) -> Option<Incarnation> {
+        match self {
+            LegacyReads::Parallel(reads) => reads.blockstm_v2_incarnation(),
+            LegacyReads::Sequential(_) => None,
+        }
+    }
+
+    fn is_incorrect_use(&self) -> bool {
+        match self {
+            LegacyReads::Parallel(reads) => reads.is_incorrect_use(),
+            LegacyReads::Sequential(reads) => reads.incorrect_use,
+        }
+    }
+
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+        match self {
+            LegacyReads::Parallel(reads) => reads.get_read_summary(),
+            LegacyReads::Sequential(reads) => reads.get_read_summary(),
+        }
+    }
+}
+
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
@@ -520,7 +784,7 @@ pub enum CacheRead<T> {
 /// resolution from MVHashMap/storage should be captured. This enforces an invariant that
 /// 'capture_read' will never be called with a read that can be resolved from the already
 /// captured variant (e.g. Size, Metadata, or exists if SizeAndMetadata is already captured).
-pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
+pub struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
@@ -1150,7 +1414,7 @@ where
 
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct UnsyncReadSet<T: Transaction, K> {
+pub struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) resource_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<DelayedFieldID>,

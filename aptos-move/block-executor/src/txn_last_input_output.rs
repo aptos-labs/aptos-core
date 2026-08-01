@@ -2,14 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::TxnInput,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
-    errors::{ParallelBlockExecutionError, ResourceGroupSerializationError},
-    executor_utilities::{materialize_output, Materializer},
+    errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
-    task::{BeforeMaterializationOutput, ExecutionStatus, TransactionOutput},
+    task::{RecordedOutput, TransactionOutput},
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
@@ -25,188 +24,48 @@ use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::{execution_tracing::Trace, Module, RuntimeEnvironment};
+use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use parking_lot::Mutex;
 use std::{
     collections::{BTreeSet, HashSet},
-    fmt::Debug,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
 
-type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
-
-macro_rules! with_success_or_skip_rest {
-    // The simple form for a single method call.
-    ($self:ident, $txn_idx:ident, $f:ident, $fallback:expr) => {
-        with_success_or_skip_rest!(
-            $self,
-            $txn_idx,
-            |t| t.before_materialization().map(|inner| inner.$f()),
-            Ok($fallback)
-        )
-    };
-    // The flexible form for any expression.
-    ($self:ident, $txn_idx:ident, | $t:ident | $body:expr, $fallback:expr) => {{
-        let wrapper = $self.output_wrappers[$txn_idx as usize].lock();
-        let status_kind = wrapper.output_status_kind.clone();
-        match (&status_kind, &wrapper.output) {
-            (OutputStatusKind::Success, Some($t)) | (OutputStatusKind::SkipRest, Some($t)) => $body,
-            (OutputStatusKind::Abort(_), None)
-            | (OutputStatusKind::SpeculativeExecutionAbortError, None)
-            | (OutputStatusKind::DelayedFieldsCodeInvariantError, None)
-            | (OutputStatusKind::None, None) => $fallback,
-            // The remaining arms are all unreachable.
-            (OutputStatusKind::Success, None)
-            | (OutputStatusKind::SkipRest, None)
-            | (OutputStatusKind::Abort(_), Some(_))
-            | (OutputStatusKind::SpeculativeExecutionAbortError, Some(_))
-            | (OutputStatusKind::DelayedFieldsCodeInvariantError, Some(_))
-            | (OutputStatusKind::None, Some(_)) => {
-                unreachable!(
-                    "Inconsistent wrapper status kind {:?} and output {:?}",
-                    status_kind, wrapper.output
-                )
-            },
-        }
-    }};
-    // The flexible form for any expression where the output needs to be mutable.
-    ($self:ident, $txn_idx:ident, | mut $t:ident | $body:expr, $fallback:expr) => {{
-        let mut wrapper = $self.output_wrappers[$txn_idx as usize].lock();
-        let status_kind = wrapper.output_status_kind.clone();
-        match (&status_kind, &mut wrapper.output) {
-            (OutputStatusKind::Success, Some($t)) | (OutputStatusKind::SkipRest, Some($t)) => $body,
-            (OutputStatusKind::Abort(_), None)
-            | (OutputStatusKind::SpeculativeExecutionAbortError, None)
-            | (OutputStatusKind::DelayedFieldsCodeInvariantError, None)
-            | (OutputStatusKind::None, None) => $fallback,
-            // The remaining arms are all unreachable.
-            (OutputStatusKind::Success, None)
-            | (OutputStatusKind::SkipRest, None)
-            | (OutputStatusKind::Abort(_), Some(_))
-            | (OutputStatusKind::SpeculativeExecutionAbortError, Some(_))
-            | (OutputStatusKind::DelayedFieldsCodeInvariantError, Some(_))
-            | (OutputStatusKind::None, Some(_)) => {
-                unreachable!(
-                    "Inconsistent wrapper status kind {:?} and output {:?}",
-                    status_kind, wrapper.output
-                )
-            },
-        }
-    }};
-}
-
-#[derive(Debug, PartialEq, Clone)]
-enum OutputStatusKind {
-    Success,
-    SkipRest,
-    Abort(String),
-    SpeculativeExecutionAbortError,
-    DelayedFieldsCodeInvariantError,
-    None,
-}
-
-struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T>> {
-    output: Option<O>,
+struct OutputEntry<T: Transaction, O> {
+    recorded: Option<RecordedOutput<O>>,
     maybe_read_write_summary: Option<ReadWriteSummary<T>>,
     maybe_approx_output_size: Option<u64>,
-    output_status_kind: OutputStatusKind,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
-    fn empty_with_status(output_status_kind: OutputStatusKind) -> Self {
+impl<T: Transaction, O> OutputEntry<T, O> {
+    fn empty() -> Self {
         Self {
-            output: None,
+            recorded: None,
             maybe_read_write_summary: None,
             maybe_approx_output_size: None,
-            output_status_kind,
         }
-    }
-
-    fn from_execution_status<E: Debug>(
-        output: ExecutionStatus<O, E>,
-        read_set: &TxnInput<T>,
-        block_gas_limit_type: &BlockGasLimitType,
-        user_txn_bytes_len: u64,
-    ) -> Result<Self, PanicError> {
-        let is_skip_rest = matches!(output, ExecutionStatus::SkipRest(_));
-
-        Ok(match output {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                let output_before_guard = output.before_materialization()?;
-
-                let maybe_approx_output_size =
-                    block_gas_limit_type.block_output_limit().map(|_| {
-                        output_before_guard.output_approx_size()
-                            + if block_gas_limit_type.include_user_txn_size_in_block_output() {
-                                user_txn_bytes_len
-                            } else {
-                                0
-                            }
-                    });
-
-                let maybe_read_write_summary =
-                    block_gas_limit_type.conflict_penalty_window().map(|_| {
-                        ReadWriteSummary::new(
-                            read_set.get_read_summary(),
-                            output_before_guard.get_write_summary(),
-                        )
-                    });
-                drop(output_before_guard);
-
-                Self {
-                    output: Some(output),
-                    maybe_approx_output_size,
-                    maybe_read_write_summary,
-                    output_status_kind: if is_skip_rest {
-                        OutputStatusKind::SkipRest
-                    } else {
-                        OutputStatusKind::Success
-                    },
-                }
-            },
-            ExecutionStatus::Abort(err) => {
-                Self::empty_with_status(OutputStatusKind::Abort(format!("{:?}", err)))
-            },
-            ExecutionStatus::SpeculativeExecutionAbortError(_) => {
-                Self::empty_with_status(OutputStatusKind::SpeculativeExecutionAbortError)
-            },
-            ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
-                Self::empty_with_status(OutputStatusKind::DelayedFieldsCodeInvariantError)
-            },
-        })
-    }
-
-    fn check_success_or_skip_status(&self) -> Result<&O, PanicError> {
-        if self.output_status_kind != OutputStatusKind::Success
-            && self.output_status_kind != OutputStatusKind::SkipRest
-        {
-            return Err(code_invariant_error(format!(
-                "Output status {:?}!= success or skip rest",
-                self.output_status_kind
-            )));
-        }
-
-        Ok(self
-            .output
-            .as_ref()
-            .expect("Output must be set when status is success or skip rest"))
     }
 }
 
-pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
-    inputs: Vec<CachePadded<Mutex<Option<Arc<TxnInput<T>>>>>>, // txn_idx -> input (read set).
+pub(crate) struct TxnLastInputOutput<T: Transaction, I: TxnInput, O: TransactionOutput<Txn = T>> {
+    inputs: Vec<CachePadded<Mutex<Option<Arc<I>>>>>, // txn_idx -> input (read set).
 
-    output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
+    outputs: Vec<CachePadded<Mutex<OutputEntry<T, O>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
     // speculative nature of parallel execution.
     speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
+impl<T, I, O> TxnLastInputOutput<T, I, O>
+where
+    T: Transaction,
+    I: TxnInput<Key = T::Key, Tag = T::Tag>,
+    O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+{
     /// num_txns passed here is typically larger than the number of txns in the block,
     /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
@@ -214,12 +73,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             inputs: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(None)))
                 .collect(),
-            output_wrappers: (0..num_txns)
-                .map(|_| {
-                    CachePadded::new(Mutex::new(OutputWrapper::empty_with_status(
-                        OutputStatusKind::None,
-                    )))
-                })
+            outputs: (0..num_txns)
+                .map(|_| CachePadded::new(Mutex::new(OutputEntry::empty())))
                 .collect(),
             speculative_failures: (0..num_txns)
                 .map(|_| CachePadded::new(AtomicBool::new(false)))
@@ -227,21 +82,42 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         }
     }
 
-    pub(crate) fn record<E: Debug>(
+    pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: TxnInput<T>,
-        output: ExecutionStatus<O, E>,
+        input: I,
+        recorded: RecordedOutput<O>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
     ) -> Result<(), PanicError> {
         self.speculative_failures[txn_idx as usize].store(false, Ordering::Relaxed);
-        *self.output_wrappers[txn_idx as usize].lock() = OutputWrapper::from_execution_status(
-            output,
-            &input,
-            block_gas_limit_type,
-            user_txn_bytes_len,
-        )?;
+
+        // Summaries are only meaningful for committable outputs.
+        let (maybe_approx_output_size, maybe_read_write_summary) = match &recorded {
+            RecordedOutput::Committed { output, .. } => {
+                let maybe_approx_output_size =
+                    block_gas_limit_type.block_output_limit().map(|_| {
+                        output.output_approx_size()
+                            + if block_gas_limit_type.include_user_txn_size_in_block_output() {
+                                user_txn_bytes_len
+                            } else {
+                                0
+                            }
+                    });
+                let maybe_read_write_summary =
+                    block_gas_limit_type.conflict_penalty_window().map(|_| {
+                        ReadWriteSummary::new(input.get_read_summary(), output.get_write_summary())
+                    });
+                (maybe_approx_output_size, maybe_read_write_summary)
+            },
+            RecordedOutput::Aborted(_) | RecordedOutput::SpeculativeFailure => (None, None),
+        };
+
+        *self.outputs[txn_idx as usize].lock() = OutputEntry {
+            recorded: Some(recorded),
+            maybe_read_write_summary,
+            maybe_approx_output_size,
+        };
         *self.inputs[txn_idx as usize].lock() = Some(Arc::new(input));
 
         Ok(())
@@ -255,7 +131,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<I>> {
         Some(Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?))
     }
 
@@ -280,79 +156,77 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         maybe_block_epilogue_txn_idx: &ExplicitSyncWrapper<Option<TxnIndex>>,
         scheduler: &SchedulerWrapper,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        let mut output_wrapper = self.output_wrappers[txn_idx as usize].lock();
-        let maybe_read_write_summary = output_wrapper.maybe_read_write_summary.take();
+        let mut output_entry = self.outputs[txn_idx as usize].lock();
+        let maybe_read_write_summary = output_entry.maybe_read_write_summary.take();
+        let maybe_approx_output_size = output_entry.maybe_approx_output_size;
 
-        // Transaction cannot be committed with below statuses, as:
-        // - Speculative error must have failed validation.
-        // - Execution w. delayed field code error propagates the error directly
-        // and does not finish execution. Similar for FatalVMError / abort.
+        // Transaction cannot be committed with any non-committable outcome:
+        // - Aborted is a fatal VM error (handled below as FatalVMError).
+        // - SpeculativeFailure must have failed validation before commit.
         // - None means there is no output to commit.
-        // check_success_or_skip_status below returns an invariant error for all
-        // these cases, but we handle Abort case separately first.
-        if let OutputStatusKind::Abort(msg) = &output_wrapper.output_status_kind {
-            // Fatal VM error.
-            error!(
-                "FatalVMError from parallel execution {:?} at txn {}",
-                msg, txn_idx
-            );
-            return Err(PanicOr::Or(ParallelBlockExecutionError::FatalVMError));
-        }
-        let output_before_guard = output_wrapper
-            .check_success_or_skip_status()?
-            .before_materialization()?;
+        let (output, skips_rest_flag) = match &mut output_entry.recorded {
+            Some(RecordedOutput::Committed { output, skips_rest }) => (&*output, skips_rest),
+            Some(RecordedOutput::Aborted(msg)) => {
+                // Fatal VM error.
+                error!(
+                    "FatalVMError from parallel execution {:?} at txn {}",
+                    msg, txn_idx
+                );
+                return Err(PanicOr::Or(ParallelBlockExecutionError::FatalVMError));
+            },
+            Some(RecordedOutput::SpeculativeFailure) | None => {
+                return Err(code_invariant_error(format!(
+                    "Transaction {} cannot be committed: no committable output",
+                    txn_idx
+                ))
+                .into());
+            },
+        };
 
-        let (mut skips_rest, mut must_create_epilogue_txn) =
-            if output_wrapper.output_status_kind == OutputStatusKind::SkipRest {
-                (true, !output_before_guard.has_new_epoch_event())
-            } else {
-                assert!(output_wrapper.output_status_kind == OutputStatusKind::Success);
-                (
-                    false,
-                    txn_idx == num_txns - 1 && !output_before_guard.has_new_epoch_event(),
-                )
-            };
-        let fee_statement = output_before_guard.fee_statement();
+        // Read the output facts up front, before flipping the (disjoint) skips_rest
+        // flag below.
+        let has_new_epoch_event = output.has_new_epoch_event();
+        let fee_statement = output.fee_statement();
 
         // For committed txns, calculate the accumulated gas costs.
         block_limit_processor.accumulate_fee_statement(
             fee_statement,
             maybe_read_write_summary,
-            output_wrapper.maybe_approx_output_size,
+            maybe_approx_output_size,
         );
         if block_limit_processor.is_hot_state_accumulation_enabled() {
-            block_limit_processor.accumulate_hot_state_rw(
-                output_before_guard.storage_keys_written(),
-                output_before_guard.storage_keys_read(),
-            );
+            block_limit_processor
+                .accumulate_hot_state_rw(output.storage_keys_written(), output.storage_keys_read());
         }
+
+        let mut must_create_epilogue_txn = if *skips_rest_flag {
+            !has_new_epoch_event
+        } else {
+            txn_idx == num_txns - 1 && !has_new_epoch_event
+        };
 
         if txn_idx < num_txns - 1
             && block_limit_processor.should_end_block_parallel()
-            && !skips_rest
+            && !*skips_rest_flag
         {
-            if output_wrapper.output_status_kind == OutputStatusKind::Success {
-                must_create_epilogue_txn |= !output_before_guard.has_new_epoch_event();
-                drop(output_before_guard);
-                output_wrapper.output_status_kind = OutputStatusKind::SkipRest;
-            }
-            skips_rest = true;
+            // Was a Success output; the block gas limit ends the block early here.
+            must_create_epilogue_txn |= !has_new_epoch_event;
+            *skips_rest_flag = true;
         }
 
         // Add before halt, so SchedulerV2 can organically observe and process post commit
         // processing tasks even after it has halted.
         scheduler.add_to_post_commit(txn_idx)?;
 
-        // !!! CAUTION !!! after the txn_idx is added to the post commit queue, it is no longer
-        // safe to expect an output be stored for txn_idx: post-commit materialization takes
-        // the output (instead of cloning for efficiency) for parallel post-processing.
+        // Once txn_idx is on the post-commit queue, its output may be taken by
+        // post-commit materialization at any time; after that its slot is empty.
 
         // While panic errors can lead to halting parallel execution (and fallback),
         // below we may halt the execution by design (no errors) in cases when:
         // a) all transactions are scheduled for committing, or
         // b) we skip_rest after a transaction
         // Either all txn committed, or a committed txn caused an early halt.
-        if (txn_idx + 1 == num_txns || skips_rest) && scheduler.halt() {
+        if (txn_idx + 1 == num_txns || *skips_rest_flag) && scheduler.halt() {
             block_limit_processor.finish_parallel_update_counters_and_log_info(
                 txn_idx + 1,
                 num_txns,
@@ -379,11 +253,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         txn_idx: TxnIndex,
         mut callback: impl FnMut(&T::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
-        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
-        if let Some(output) = output_wrapper.output.as_ref() {
-            output
-                .before_materialization()?
-                .for_each_resource_key(&mut callback)?;
+        let output_entry = self.outputs[txn_idx as usize].lock();
+        if let Some(output) = output_entry
+            .recorded
+            .as_ref()
+            .and_then(|r| r.committed_output())
+        {
+            output.for_each_resource_key(&mut callback)?;
         }
 
         Ok(())
@@ -395,11 +271,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         txn_idx: TxnIndex,
         mut callback: impl FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
-        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
-        if let Some(output) = output_wrapper.output.as_ref() {
-            output
-                .before_materialization()?
-                .for_each_resource_group_key_and_tags(&mut callback)?;
+        let output_entry = self.outputs[txn_idx as usize].lock();
+        if let Some(output) = output_entry
+            .recorded
+            .as_ref()
+            .and_then(|r| r.committed_output())
+        {
+            output.for_each_resource_group_key_and_tags(&mut callback)?;
         }
 
         Ok(())
@@ -409,8 +287,15 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         &self,
         txn_idx: TxnIndex,
     ) -> Vec<(T::Key, HashSet<T::Tag>)> {
-        with_success_or_skip_rest!(self, txn_idx, legacy_v1_resource_group_tags, vec![])
-            .expect("Output must be set")
+        let output_entry = self.outputs[txn_idx as usize].lock();
+        match output_entry
+            .recorded
+            .as_ref()
+            .and_then(|r| r.committed_output())
+        {
+            Some(output) => output.legacy_v1_resource_group_tags(),
+            None => vec![],
+        }
     }
 
     // Extracts a set of resource paths (keys) written or updated during execution from
@@ -419,18 +304,15 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = T::Key>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| {
-                let inner = t.before_materialization().expect("Output must be set");
-                Some(inner.resource_write_set().into_keys())
-            },
-            None
-        )
+        let output_entry = self.outputs[txn_idx as usize].lock();
+        let output = output_entry
+            .recorded
+            .as_ref()
+            .and_then(|r| r.committed_output())?;
+        Some(output.resource_write_set().into_keys())
     }
 
-    // The output needs to be Success or SkipRest, o.w. invariant error is returned.
+    // The output needs to be committable, o.w. invariant error is returned.
     pub(crate) fn publish_module_write_set(
         &self,
         txn_idx: TxnIndex,
@@ -444,14 +326,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         runtime_environment: &RuntimeEnvironment,
         scheduler: &SchedulerWrapper<'_>,
     ) -> Result<bool, PanicError> {
-        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
-        let output_before_guard = output_wrapper
-            .check_success_or_skip_status()?
-            .before_materialization()?;
+        let output_entry = self.outputs[txn_idx as usize].lock();
+        let output = output_entry
+            .recorded
+            .as_ref()
+            .and_then(|r| r.committed_output())
+            .ok_or_else(|| {
+                code_invariant_error(format!(
+                    "Module publish requires a committable output, txn {}",
+                    txn_idx
+                ))
+            })?;
 
         let mut published = false;
         let mut module_ids_for_v2 = BTreeSet::new();
-        output_before_guard.for_each_module_write(&mut |module_id, state_value| {
+        output.for_each_module_write(&mut |module_id, state_value| {
             published = true;
             if scheduler.is_v2() {
                 module_ids_for_v2.insert(module_id.clone());
@@ -476,36 +365,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = DelayedFieldID>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| Some(
-                t.before_materialization()
-                    .expect("Output must be set")
-                    .delayed_field_change_set()
-                    .into_keys()
-            ),
-            None
-        )
+        let output_entry = self.outputs[txn_idx as usize].lock();
+        let output = output_entry
+            .recorded
+            .as_ref()
+            .and_then(|r| r.committed_output())?;
+        Some(output.delayed_field_change_set().into_keys())
     }
 
     // Called when a transaction is committed to materialize its recorded output:
     // resource group updates are finalized and serialized, and delayed field
     // identifiers are replaced with committed values in resource writes and events.
     //
-    // !!! [CAUTION] !!!: This finalizes the output and may not be concurrent with
-    // any other accesses to the output (e.g. querying the write-set, events, etc),
-    // as these read accesses are not synchronized and assumed to have terminated.
-    pub(crate) fn materialize<M: Materializer<T>>(
-        &self,
-        txn_idx: TxnIndex,
-        materializer: &M,
-    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |mut t| materialize_output(t, materializer),
-            Err(code_invariant_error("[BlockSTM]: Output must be recorded after execution").into())
-        )
+    // The output is taken out of its slot (leaving `None`), so it is materialized
+    // exactly once and any later access observes an empty slot rather than a
+    // half-materialized output. The entry lock is only held for the take; the
+    // materialization itself runs on the owned output without the lock.
+    pub(crate) fn take_committed_output(&self, txn_idx: TxnIndex) -> Result<O, PanicError> {
+        let recorded = self.outputs[txn_idx as usize].lock().recorded.take();
+        match recorded {
+            Some(RecordedOutput::Committed { output, .. }) => Ok(output),
+            Some(RecordedOutput::Aborted(_)) | Some(RecordedOutput::SpeculativeFailure) | None => {
+                Err(code_invariant_error(
+                    "[BlockSTM]: Output must be recorded after execution",
+                ))
+            },
+        }
     }
 }

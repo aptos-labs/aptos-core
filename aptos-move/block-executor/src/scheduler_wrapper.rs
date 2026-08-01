@@ -2,10 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    captured_reads::TxnInput,
     executor_utilities::update_transaction_on_abort,
     scheduler::{DependencyResult, Scheduler, TWaitForDependency},
     scheduler_v2::SchedulerV2,
-    task::ExecutorTask,
+    single_transaction_executor::SingleTransactionExecutor,
     txn_last_input_output::TxnLastInputOutput,
 };
 use aptos_mvhashmap::{
@@ -24,7 +25,7 @@ use std::{
 };
 
 #[derive(Copy, Clone)]
-pub(crate) enum SchedulerWrapper<'a> {
+pub enum SchedulerWrapper<'a> {
     // The AtomicBool contains a flag that determines whether to skip module reads
     // when performing validation. BlockSTMv1 uses this as an optimization to
     // avoid unnecessary work when no modules have been published. BlockSTMv2 has
@@ -110,12 +111,15 @@ impl SchedulerWrapper<'_> {
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     ) -> Result<(), PanicError>
     where
         T: BlockExecutableTransaction,
-        E: ExecutorTask<Txn = T>,
+        E: SingleTransactionExecutor<
+            Txn = T,
+            Input: TxnInput<Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+        >,
     {
         match self {
             SchedulerWrapper::V1(_, _) => {
@@ -133,12 +137,15 @@ impl SchedulerWrapper<'_> {
     pub(crate) fn prepare_for_block_epilogue<T, E>(
         &self,
         block_epilogue_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
     ) -> Result<Incarnation, PanicError>
     where
         T: BlockExecutableTransaction,
-        E: ExecutorTask<Txn = T>,
+        E: SingleTransactionExecutor<
+            Txn = T,
+            Input: TxnInput<Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+        >,
     {
         match self {
             SchedulerWrapper::V1(scheduler, _) => {

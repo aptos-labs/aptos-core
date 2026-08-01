@@ -135,7 +135,7 @@ and threads that perform these tasks can already detect validation failures
 due to the ESTIMATE markers on memory locations, instead of waiting for a
 subsequent incarnation to finish.
 **/
-mod captured_reads;
+pub mod captured_reads;
 mod code_cache;
 pub mod code_cache_global;
 pub mod code_cache_global_manager;
@@ -148,10 +148,11 @@ mod executor_utilities;
 pub mod explicit_sync_wrapper;
 pub mod hot_state_op_accumulator;
 mod limit_processor;
-mod scheduler;
+pub mod scheduler;
 mod scheduler_status;
-mod scheduler_v2;
-mod scheduler_wrapper;
+pub mod scheduler_v2;
+pub mod scheduler_wrapper;
+pub mod single_transaction_executor;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;

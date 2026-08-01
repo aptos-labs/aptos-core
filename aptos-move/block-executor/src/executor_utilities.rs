@@ -2,10 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::{CapturedReads, DataRead, ReadKind},
+    captured_reads::{CapturedReads, DataRead, ReadKind, TxnInput},
     counters,
     errors::ResourceGroupSerializationError,
-    task::{BeforeMaterializationOutput, ExecutorTask, TransactionOutput},
+    single_transaction_executor::SingleTransactionExecutor,
+    task::TransactionOutput,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ViewState},
 };
@@ -29,7 +30,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{execution_tracing::Trace, Module};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 use triomphe::Arc as TriompheArc;
 
 /// Block executor state access required to materialize a transaction output at
@@ -63,13 +64,13 @@ pub(crate) trait Materializer<T: Transaction> {
 /// during execution are fetched from the captured read-set.
 pub(crate) struct ParallelMaterializer<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     latest_view: &'a LatestView<'a, T, S>,
-    read_set: Arc<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+    read_set: &'a CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ParallelMaterializer<'a, T, S> {
     pub(crate) fn new(
         latest_view: &'a LatestView<'a, T, S>,
-        read_set: Arc<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+        read_set: &'a CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
     ) -> Self {
         Self {
             latest_view,
@@ -187,7 +188,7 @@ pub(crate) fn materialize_output<T, O, M>(
 ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
 where
     T: Transaction,
-    O: TransactionOutput<Txn = T>,
+    O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
     M: Materializer<T>,
 {
     let (
@@ -196,16 +197,13 @@ where
         resource_write_set,
         reads_needing_exchange,
         events,
-    ) = {
-        let guard = output.before_materialization()?;
-        (
-            guard.resource_group_metadata_ops(),
-            guard.group_reads_needing_delayed_field_exchange(),
-            guard.resource_write_set(),
-            guard.reads_needing_delayed_field_exchange(),
-            guard.get_events(),
-        )
-    };
+    ) = (
+        output.resource_group_metadata_ops(),
+        output.group_reads_needing_delayed_field_exchange(),
+        output.resource_write_set(),
+        output.reads_needing_delayed_field_exchange(),
+        output.get_events(),
+    );
 
     let finalized_groups = group_metadata_ops
         .into_iter()
@@ -503,11 +501,14 @@ fn replace_ids_with_values<T: Transaction, M: Materializer<T>>(
 
 pub(crate) fn update_transaction_on_abort<T, E>(
     txn_idx: TxnIndex,
-    last_input_output: &TxnLastInputOutput<T, E::Output>,
+    last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
     versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
 ) where
     T: Transaction,
-    E: ExecutorTask<Txn = T>,
+    E: SingleTransactionExecutor<
+        Txn = T,
+        Input: TxnInput<Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+    >,
 {
     counters::SPECULATIVE_ABORT_COUNT.inc();
 

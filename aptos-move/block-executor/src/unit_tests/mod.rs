@@ -15,6 +15,7 @@ use crate::{
     },
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
+    single_transaction_executor::LegacyAdapter,
     scheduler::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },
@@ -52,7 +53,7 @@ fn test_block_epilogue_happy_path() {
 
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -116,7 +117,7 @@ fn test_block_epilogue_block_gas_limit_reached() {
 
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -204,7 +205,7 @@ fn test_resource_group_deletion() {
     };
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -276,7 +277,7 @@ fn resource_group_bcs_fallback() {
     };
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -385,7 +386,7 @@ fn interrupt_requested() {
     let data_view = MockStateView::empty();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -425,7 +426,7 @@ fn block_output_err_precedence() {
     let data_view = MockStateView::empty();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -462,7 +463,7 @@ fn skip_rest_gas_limit() {
     let data_view = MockStateView::empty();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
-        MockTask<KeyType<u32>, MockEvent>,
+        LegacyAdapter<MockTask<KeyType<u32>, MockEvent>>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
@@ -498,7 +499,7 @@ where
 
         BlockExecutor::<
             MockTransaction<K, E>,
-            MockTask<K, E>,
+            LegacyAdapter<MockTask<K, E>>,
             DeltaDataView<K>,
             NoOpTransactionCommitHook<usize>,
             _,
@@ -517,7 +518,7 @@ where
         let data_view = MockStateView::empty();
         BlockExecutor::<
             MockTransaction<K, E>,
-            MockTask<K, E>,
+            LegacyAdapter<MockTask<K, E>>,
             MockStateView<K>,
             NoOpTransactionCommitHook<usize>,
             _,
