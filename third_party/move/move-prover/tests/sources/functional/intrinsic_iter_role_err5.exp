@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_iter_borrow_mut` function must take exactly the iterator and the map as parameters and have exactly two type parameters (key and value)
+   ┌─ tests/sources/functional/intrinsic_iter_role_err5.move:20:5
+   │
+20 │     native fun ibm<K: copy + drop, V, W>(it: Iter<K>, m: &mut Map<K, V>, w: W): &mut V;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

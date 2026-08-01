@@ -17,20 +17,21 @@ use move_model::{
     },
     pragmas::{
         INTRINSIC_FUN_MAP_BACK_KEY, INTRINSIC_FUN_MAP_BORROW_BACK, INTRINSIC_FUN_MAP_BORROW_FRONT,
-        INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_KEYS,
-        INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK,
-        INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+        INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_ITER_BORROW_MUT,
+        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY,
+        INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY,
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL, INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE, INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL, INTRINSIC_FUN_MAP_TO_VEC_PAIR,
         INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
     },
     symbol::Symbol,
-    ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
+    ty::{NoUnificationContext, ReferenceKind, Type, TypeDisplayContext, Variance},
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
         TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
@@ -333,6 +334,10 @@ impl Analyzer<'_> {
             INTRINSIC_FUN_MAP_POP_BACK,
             INTRINSIC_FUN_MAP_PREV_KEY,
             INTRINSIC_FUN_MAP_NEXT_KEY,
+            // keys/to_vec_pair state key-vector sortedness, which needs
+            // `cmp::compare<K>` (the clause is gated on `cmp_available`).
+            INTRINSIC_FUN_MAP_KEYS,
+            INTRINSIC_FUN_MAP_TO_VEC_PAIR,
         ];
         // Option<K> tracks all cmp roles (not just prev/next): prev_key/next_key
         // templates are emitted whenever `cmp_available` is set, and reference `Option<K>`.
@@ -355,11 +360,13 @@ impl Analyzer<'_> {
             INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
             INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
             INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
         ];
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
         let mut vec_k_to_register: Vec<Type> = vec![];
+        let mut iter_ptr_to_register: Vec<Type> = vec![];
         let mut spec_fun_to_register: Vec<(QualifiedId<SpecFunId>, Vec<Type>)> = vec![];
         for (struct_qid, ty_args) in self.info.table_inst.iter() {
             let Some(decl) = intrinsics.get_decl_for_struct(struct_qid) else {
@@ -379,6 +386,113 @@ impl Analyzer<'_> {
             if needs_vec_k {
                 for (k, _v) in ty_args.iter() {
                     vec_k_to_register.push(k.clone());
+                }
+            }
+            // to_vec_pair's template also references `$IsValid'vec<V>'` for the
+            // values vector, so register vec<V> eagerly as well.
+            if decl
+                .lookup_move_fun(self.env, INTRINSIC_FUN_MAP_TO_VEC_PAIR)
+                .is_some()
+            {
+                for (_k, v) in ty_args.iter() {
+                    vec_k_to_register.push(v.clone());
+                }
+            }
+            // iter_borrow_mut's template references the iterator enum `Iter<K>`
+            // (its first parameter type), so register it eagerly per instance.
+            if let Some(fun_qid) = decl.lookup_move_fun(self.env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT)
+            {
+                let fun_env = self.env.get_function(fun_qid);
+                let param_tys = fun_env.get_parameter_types();
+                // The template has a fixed `(self: Iter<K>, m: $Mutation Map<K,V>)
+                // returns ($Mutation V, $Mutation Map)` shape specialized only by
+                // `K`/`V`: the binding must have exactly two parameters and two
+                // type parameters, and take the iterator BY VALUE (the template
+                // parameter is by value; a `&mut Iter<K>` binding would pass a
+                // `$Mutation` into a value slot). Extra parameters or a wider
+                // type-parameter list would make emitted calls arity-mismatched.
+                if param_tys.len() != 2 || fun_env.get_type_parameters().len() != 2 {
+                    self.env.error(
+                        &fun_env.get_loc(),
+                        "a `map_iter_borrow_mut` function must take exactly the \
+                         iterator and the map as parameters and have exactly two \
+                         type parameters (key and value)",
+                    );
+                } else if param_tys.first().is_some_and(Type::is_reference) {
+                    self.env.error(
+                        &fun_env.get_loc(),
+                        "a `map_iter_borrow_mut` function must take its iterator \
+                         enum by value as the first parameter",
+                    );
+                } else if let Some(Type::Struct(mid, sid, inst)) =
+                    param_tys.first().map(|ty| ty.skip_reference())
+                {
+                    // The fabricated `Iter<K>` instantiation assumes the
+                    // iterator enum has exactly one type parameter; visiting
+                    // a fabricated instance of a wider enum would index its
+                    // argument list out of bounds. Report a diagnostic for a
+                    // malformed binding instead of crashing.
+                    if self
+                        .env
+                        .get_struct(mid.qualified(*sid))
+                        .get_type_parameters()
+                        .len()
+                        != 1
+                    {
+                        self.env.error(
+                            &fun_env.get_loc(),
+                            "the iterator enum of a `map_iter_borrow_mut` function must \
+                             have exactly one type parameter (the key type)",
+                        );
+                    } else if inst.first() != Some(&Type::TypeParameter(0)) {
+                        // The template hardcodes the map instance's key type
+                        // for the iterator parameter; a binding instantiated
+                        // with anything but the function's first (key) type
+                        // parameter would make the emitted call ill-typed.
+                        self.env.error(
+                            &fun_env.get_loc(),
+                            "the iterator parameter of a `map_iter_borrow_mut` function \
+                             must be instantiated with the function's first (key) type \
+                             parameter",
+                        );
+                    } else if !{
+                        // The template's write-back updates the abstract table
+                        // at the iterator key through the RETURNED reference:
+                        // the binding must take `&mut` of the declaring map
+                        // type (instantiated with the function's type
+                        // parameters in order) and return `&mut` of the value
+                        // type parameter — otherwise a verified caller could
+                        // prove a table-value update the runtime applies to
+                        // unrelated state.
+                        let expected_map = Type::Struct(
+                            decl.get_move_type().module_id,
+                            decl.get_move_type().id,
+                            vec![Type::TypeParameter(0), Type::TypeParameter(1)],
+                        );
+                        let map_ok = matches!(
+                            param_tys.get(1),
+                            Some(Type::Reference(ReferenceKind::Mutable, inner))
+                                if **inner == expected_map
+                        );
+                        let ret_ok = matches!(
+                            &fun_env.get_result_type(),
+                            Type::Reference(ReferenceKind::Mutable, inner)
+                                if **inner == Type::TypeParameter(1)
+                        );
+                        map_ok && ret_ok
+                    } {
+                        self.env.error(
+                            &fun_env.get_loc(),
+                            "a `map_iter_borrow_mut` function must take a mutable \
+                             reference to the intrinsic map (instantiated with the \
+                             function's type parameters) and return a mutable reference \
+                             to the value type parameter",
+                        );
+                    } else {
+                        for (k, _v) in ty_args.iter() {
+                            iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![k.clone()]));
+                        }
+                    }
                 }
             }
             for role in &cmp_k_roles {
@@ -462,6 +576,9 @@ impl Analyzer<'_> {
         }
         for ty in vec_k_to_register {
             self.info.vec_inst.insert(ty);
+        }
+        for ty in iter_ptr_to_register {
+            self.add_type(&ty);
         }
         if let Some(cmp_mid) = cmp_mid {
             for ty in cmp_k_to_register {

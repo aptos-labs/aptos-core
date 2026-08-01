@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: the first parameter of a `map_iter_borrow_mut` function must be an enum carrying the key
+   ┌─ tests/sources/functional/intrinsic_iter_role_err.move:14:5
+   │
+14 │     native fun ibm<K: copy + drop, V>(it: NotEnum<K>, m: &mut Map<K, V>): &mut V;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
