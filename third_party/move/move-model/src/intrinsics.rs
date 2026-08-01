@@ -32,6 +32,11 @@ pub struct IntrinsicDecl {
 }
 
 impl IntrinsicDecl {
+    /// The struct type this intrinsic declaration is attached to.
+    pub fn get_move_type(&self) -> QualifiedId<StructId> {
+        self.move_type
+    }
+
     pub fn get_fun_triple(&self, env: &GlobalEnv, name: &str) -> Option<(Address, String, String)> {
         let symbol_pool = env.symbol_pool();
         let sym = symbol_pool.make(name);

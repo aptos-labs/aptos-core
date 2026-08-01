@@ -93,9 +93,12 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
         // Rule 1: never verify if "pragma verify = false;"
         // In inference mode, ignore this pragma — we still need the verification
-        // variant as input to spec inference.
+        // variant as input to spec inference. Lifted lambdas cannot carry named
+        // spec blocks and thus no pragmas (their inline spec provides only
+        // requires/ensures), so the pragma is resolved on their enclosing function.
         let options = ProverOptions::get(fun_env.module_env.env);
-        if !options.inference && !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
+        if !options.inference && !Self::spec_carrier(fun_env).is_pragma_true(VERIFY_PRAGMA, || true)
+        {
             return data;
         }
 
@@ -381,6 +384,29 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
 /// This impl block contains functions on marking a function as verified or inlined
 impl VerificationAnalysisProcessor {
+    /// Resolves the function whose spec blocks and pragmas govern verification
+    /// decisions for `fun_env`. Compiler-lifted lambda functions (named
+    /// `__lambda__<n>__<parent>`) cannot carry named spec blocks or pragmas
+    /// (their inline lambda spec provides only requires/ensures), so they
+    /// inherit pragma- and scope-based decisions from their enclosing function.
+    fn spec_carrier<'env>(fun_env: &FunctionEnv<'env>) -> FunctionEnv<'env> {
+        let mut current = fun_env.clone();
+        loop {
+            let name = current.symbol_pool().string(current.get_name());
+            let Some(rest) = name.strip_prefix("__lambda__") else {
+                return current;
+            };
+            let Some(pos) = rest.find("__") else {
+                return current;
+            };
+            let parent_sym = current.symbol_pool().make(&rest[pos + 2..]);
+            match current.module_env.find_function(parent_sym) {
+                Some(parent) if parent.get_id() != current.get_id() => current = parent,
+                _ => return current,
+            }
+        }
+    }
+
     /// Check whether the function falls within the verification scope given in the options
     fn is_within_verification_scope(fun_env: &FunctionEnv) -> bool {
         // All lemma functions are always verified.
@@ -399,14 +425,17 @@ impl VerificationAnalysisProcessor {
         }
         let env = fun_env.module_env.env;
         let options = ProverOptions::get(env);
+        // Scope matching and exclusions go by the spec-carrying function, so a
+        // lifted lambda is in scope exactly when its enclosing function is.
+        let carrier = Self::spec_carrier(fun_env);
         let in_scope = match &options.verify_scope {
-            VerificationScope::Public => fun_env.is_exposed(),
+            VerificationScope::Public => carrier.is_exposed(),
             VerificationScope::All => true,
-            VerificationScope::Only(name) => fun_env.matches_name(name),
-            VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
+            VerificationScope::Only(name) => carrier.matches_name(name),
+            VerificationScope::OnlyModule(name) => carrier.module_env.matches_name(name),
             VerificationScope::None => false,
         };
-        in_scope && !Self::is_excluded_from_verification(fun_env, &options)
+        in_scope && !Self::is_excluded_from_verification(&carrier, &options)
     }
 
     /// Check whether the function matches any entry in the exclusion list.
