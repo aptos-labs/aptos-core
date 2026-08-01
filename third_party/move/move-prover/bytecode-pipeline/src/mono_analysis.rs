@@ -17,13 +17,14 @@ use move_model::{
     },
     pragmas::{
         INTRINSIC_FUN_MAP_BACK_KEY, INTRINSIC_FUN_MAP_BORROW_BACK, INTRINSIC_FUN_MAP_BORROW_FRONT,
-        INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_KEYS,
-        INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY, INTRINSIC_FUN_MAP_POP_BACK,
-        INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY, INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
+        INTRINSIC_FUN_MAP_FRONT_KEY, INTRINSIC_FUN_MAP_GET, INTRINSIC_FUN_MAP_ITER_BORROW_MUT,
+        INTRINSIC_FUN_MAP_KEYS, INTRINSIC_FUN_MAP_NEW_FROM, INTRINSIC_FUN_MAP_NEXT_KEY,
+        INTRINSIC_FUN_MAP_POP_BACK, INTRINSIC_FUN_MAP_POP_FRONT, INTRINSIC_FUN_MAP_PREV_KEY,
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD_ALL, INTRINSIC_FUN_MAP_SPEC_ABORTS_APPEND_DISJOINT,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE, INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL, INTRINSIC_FUN_MAP_TO_VEC_PAIR,
@@ -333,6 +334,10 @@ impl Analyzer<'_> {
             INTRINSIC_FUN_MAP_POP_BACK,
             INTRINSIC_FUN_MAP_PREV_KEY,
             INTRINSIC_FUN_MAP_NEXT_KEY,
+            // keys/to_vec_pair state key-vector sortedness, which needs
+            // `cmp::compare<K>` (the clause is gated on `cmp_available`).
+            INTRINSIC_FUN_MAP_KEYS,
+            INTRINSIC_FUN_MAP_TO_VEC_PAIR,
         ];
         // Option<K> tracks all cmp roles (not just prev/next): prev_key/next_key
         // templates are emitted whenever `cmp_available` is set, and reference `Option<K>`.
@@ -355,11 +360,13 @@ impl Analyzer<'_> {
             INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
             INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
             INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
         ];
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
         let mut vec_k_to_register: Vec<Type> = vec![];
+        let mut iter_ptr_to_register: Vec<Type> = vec![];
         let mut spec_fun_to_register: Vec<(QualifiedId<SpecFunId>, Vec<Type>)> = vec![];
         for (struct_qid, ty_args) in self.info.table_inst.iter() {
             let Some(decl) = intrinsics.get_decl_for_struct(struct_qid) else {
@@ -379,6 +386,29 @@ impl Analyzer<'_> {
             if needs_vec_k {
                 for (k, _v) in ty_args.iter() {
                     vec_k_to_register.push(k.clone());
+                }
+            }
+            // to_vec_pair's template also references `$IsValid'vec<V>'` for the
+            // values vector, so register vec<V> eagerly as well.
+            if decl
+                .get_fun_triple(self.env, INTRINSIC_FUN_MAP_TO_VEC_PAIR)
+                .is_some()
+            {
+                for (_k, v) in ty_args.iter() {
+                    vec_k_to_register.push(v.clone());
+                }
+            }
+            // iter_borrow_mut's template references the iterator enum `Iter<K>`
+            // (its first parameter type), so register it eagerly per instance.
+            if let Some(fun_qid) = decl.lookup_move_fun(self.env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT)
+            {
+                let param_tys = self.env.get_function(fun_qid).get_parameter_types();
+                if let Some(Type::Struct(mid, sid, _)) =
+                    param_tys.first().map(|ty| ty.skip_reference())
+                {
+                    for (k, _v) in ty_args.iter() {
+                        iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![k.clone()]));
+                    }
                 }
             }
             for role in &cmp_k_roles {
@@ -462,6 +492,9 @@ impl Analyzer<'_> {
         }
         for ty in vec_k_to_register {
             self.info.vec_inst.insert(ty);
+        }
+        for ty in iter_ptr_to_register {
+            self.add_type(&ty);
         }
         if let Some(cmp_mid) = cmp_mid {
             for ty in cmp_k_to_register {
