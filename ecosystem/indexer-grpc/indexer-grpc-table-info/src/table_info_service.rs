@@ -295,15 +295,9 @@ impl TableInfoService {
                     .await;
                 }
 
-                assert!(
-                    self.indexer_async_v2.is_indexer_async_v2_pending_on_empty(),
-                    "Missing data in table info parsing after sequential retry"
-                );
-
-                // Update rocksdb's to be processed next version after verifying all txns are successfully parsed
-                self.indexer_async_v2
-                    .update_next_version(end_version + 1)
-                    .unwrap();
+                // Drop any handles still unresolved after the retry and advance, so parsing
+                // keeps making progress instead of stalling on them.
+                self.indexer_async_v2.finalize_batch(end_version).unwrap();
 
                 res
             },

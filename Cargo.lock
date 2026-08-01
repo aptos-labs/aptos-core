@@ -1325,6 +1325,7 @@ dependencies = [
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-storage-interface",
+ "aptos-temppath",
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
