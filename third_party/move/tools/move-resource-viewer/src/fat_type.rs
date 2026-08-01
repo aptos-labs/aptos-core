@@ -419,6 +419,9 @@ impl FatType {
             FatType::MutableReference(ty) | FatType::Reference(ty) | FatType::Vector(ty) => {
                 ty.contains_tables()
             },
+            // A function value's captured arguments aren't described by its static type, so
+            // assume it may hold tables and let the value traversal inspect the captures.
+            FatType::Function(_) => true,
             FatType::Bool
             | FatType::U8
             | FatType::U64
@@ -429,7 +432,6 @@ impl FatType {
             | FatType::U16
             | FatType::U32
             | FatType::U256
-            | FatType::Function(_)
             | FatType::I8
             | FatType::I16
             | FatType::I32
