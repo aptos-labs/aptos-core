@@ -127,6 +127,11 @@ struct MapImpl {
     iter_ptr_prefix: String,
     iter_variant: String,
     iter_key_sel: String,
+    // Whether the map has iterator support (an iterator role is bound); controls
+    // iterator-validity ghost state (epoch bumps in mutating templates).
+    has_iterators: bool,
+    // Unique key-type suffixes of `insts`, for declaring per-K iterator ghost state.
+    iter_ghost_ks: Vec<String>,
     fun_get: String,
     fun_borrow_front: String,
     fun_borrow_back: String,
@@ -549,7 +554,7 @@ impl MapImpl {
         ty_args: &BTreeSet<(Type, Type)>,
         bv_flag: bool,
     ) -> Self {
-        let insts = ty_args
+        let insts: Vec<(TypeInfo, TypeInfo)> = ty_args
             .iter()
             .map(|(kty, vty)| {
                 (
@@ -574,6 +579,19 @@ impl MapImpl {
             env,
             decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT),
         );
+        let has_iterators = !fun_iter_borrow_mut.is_empty();
+        // Ghost state is keyed by (map struct, K) and shared with bv twins; only
+        // the plain impl declares it (twins would re-declare the same names).
+        let iter_ghost_ks: Vec<String> = if has_iterators && !bv_flag {
+            insts
+                .iter()
+                .map(|(k, _): &(TypeInfo, TypeInfo)| k.suffix.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect()
+        } else {
+            vec![]
+        };
 
         MapImpl {
             struct_name,
@@ -640,6 +658,8 @@ impl MapImpl {
             iter_ptr_prefix: iter_parts.0,
             iter_variant: iter_parts.1,
             iter_key_sel: iter_parts.2,
+            has_iterators,
+            iter_ghost_ks,
             fun_get: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_GET)),
             fun_borrow_front: Self::triple_opt_to_name(
                 env,

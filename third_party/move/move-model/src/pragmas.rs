@@ -657,6 +657,9 @@ pub fn is_pragma_valid_for_block(
                 | BV_RET_PROP
                 | UNROLL_PRAGMA
                 | INFERENCE_PRAGMA
+                | ITERATOR_CREATE_PRAGMA
+                | ITERATOR_USE_PRAGMA
+                | ITERATOR_INVALIDATE_PRAGMA
         ),
         Struct(..) => match pragma {
             INTRINSIC_PRAGMA | BV_PARAM_PROP => true,
@@ -673,6 +676,24 @@ pub fn is_pragma_valid_for_block(
         _ => false,
     }
 }
+
+/// Pragma on an (opaque) function spec stating that the function returns a fresh
+/// map iterator. The backend stamps the returned iterator's ghost creation epoch
+/// at call sites. An optional symbol value names a field of the result holding
+/// the iterator.
+pub const ITERATOR_CREATE_PRAGMA: &str = "iterator_create";
+
+/// Pragma on an (opaque) function spec stating that the function consumes a map
+/// iterator (its first parameter). The backend asserts at call sites that the
+/// iterator's ghost creation epoch is current, so using an iterator after a
+/// structural map mutation fails verification. An optional symbol value names a
+/// field of the first parameter holding the iterator.
+pub const ITERATOR_USE_PRAGMA: &str = "iterator_use";
+
+/// Pragma on an (opaque) function spec stating that the function structurally
+/// mutates the map, invalidating all outstanding iterators; the backend bumps
+/// the iterator epoch at call sites.
+pub const ITERATOR_INVALIDATE_PRAGMA: &str = "iterator_invalidate";
 
 /// Internal property attached to conditions if they are injected via an apply or a module
 /// invariant.

@@ -10,12 +10,12 @@ use crate::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
         boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_choice_fun_name,
         boogie_closure_pack_name, boogie_declare_global, boogie_field_sel, boogie_field_update,
-        boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr,
-        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        boogie_inst_suffix, boogie_iter_ghost_state, boogie_iter_stamp_sel,
+        boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
+        boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
+        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_type, boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
+        boogie_well_formed_expr, compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
@@ -31,6 +31,7 @@ use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     exp_rewriter::strip_all_olds,
+    intrinsics::find_iterator_target,
     model::{
         FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
         SpecFunId, SpecVarId, StructEnv, StructId,
@@ -1624,6 +1625,10 @@ impl SpecTranslator<'_> {
             Operation::MaxU128 => emit!(self.writer, "$MAX_U128"),
             Operation::MaxU256 => emit!(self.writer, "$MAX_U256"),
             Operation::WellFormed => self.translate_well_formed(&args[0]),
+            Operation::IterValid => self.translate_iter_valid(&args[0]),
+            // Lowered to havoc statements at `Prop(Assume, ..)` translation; in
+            // any other position the marker is inert.
+            Operation::IterEpochHavoc => emit!(self.writer, "true"),
             Operation::AbortCode => emit!(self.writer, "$abort_code"),
             Operation::AbortFlag => emit!(self.writer, "$abort_flag"),
             Operation::NoOp => { /* do nothing. */ },
@@ -4288,6 +4293,46 @@ impl SpecTranslator<'_> {
                 self.translate_exp(exp);
                 emit!(self.writer, "; {})", check);
             },
+        }
+    }
+
+    /// Translates the internal `IterValid` operation: the argument (a temp
+    /// holding an iterator of an intrinsic map with validity tracking —
+    /// directly, behind a reference, or wrapped in a struct field) carries a
+    /// ghost `stamp` equal to the current iterator epoch. Key-less variants
+    /// (e.g. `End`) are exempt. Translates to `true` when the argument is not
+    /// a tracked iterator temp or the iterator type declares no stamp ghost.
+    fn translate_iter_valid(&self, exp: &Exp) {
+        let ty = self.get_node_type(exp.node_id());
+        let target = find_iterator_target(self.env, &ty);
+        match (exp.as_ref(), target) {
+            (ExpData::Temporary(_, idx), Some((iter_ty, field))) => {
+                let (Some(ghost), Some(stamp_sel)) = (
+                    boogie_iter_ghost_state(self.env, &iter_ty),
+                    boogie_iter_stamp_sel(self.env, &iter_ty),
+                ) else {
+                    emit!(self.writer, "true");
+                    return;
+                };
+                let mut value = format!("$t{}", idx);
+                if ty.is_reference() {
+                    value = format!("$Dereference({})", value);
+                }
+                if let Some(field) = field {
+                    let Type::Struct(mid, sid, _) = ty.skip_reference() else {
+                        unreachable!("wrapper is a struct")
+                    };
+                    let struct_env = self.env.get_struct(mid.qualified(*sid));
+                    let field_env = struct_env.find_field(field).expect("wrapper field");
+                    value = format!("{}->{}", value, boogie_field_sel(&field_env));
+                }
+                emit!(self.writer, "(");
+                if let Some(variant) = &ghost.key_variant {
+                    emit!(self.writer, "!({} is {}) || ", value, variant);
+                }
+                emit!(self.writer, "{}->{} == {})", value, stamp_sel, ghost.epoch);
+            },
+            _ => emit!(self.writer, "true"),
         }
     }
 }

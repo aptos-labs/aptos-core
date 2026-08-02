@@ -1,0 +1,171 @@
+Move prover returns: exiting with verification errors
+warning: This assignment/binding to the left-hand-side variable `it` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_it`), or renaming to `_`
+    ┌─ tests/sources/functional/verify_iterator_validity.move:155:18
+    │
+155 │         let it = find(&t, 1);
+    │                  ^^^^^^^^^^^
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:157:10
+    │
+157 │         *iter_borrow(it, &t)
+    │          ^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:151: forward_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:152: forward_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:153: forward_stale_fails
+    =         b = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:154: forward_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:155: forward_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:156: forward_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:157: forward_stale_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:183:9
+    │
+183 │         box_use(b, &t)
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:177: implant_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:178: implant_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:179: implant_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:180: implant_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:181: implant_stale_fails
+    =         b = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:182: implant_stale_fails
+    =         b = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:183: implant_stale_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:261:10
+    │
+261 │         *iter_table::iter_borrow(it, &t)
+    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:257: stale_use_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:258: stale_use_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:259: stale_use_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:260: stale_use_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:261: stale_use_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:271:10
+    │
+271 │         *iter_table::iter_borrow_mut(it, &mut t) = 5;
+    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:266: stale_borrow_mut_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:267: stale_borrow_mut_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:268: stale_borrow_mut_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:269: stale_borrow_mut_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:270: stale_borrow_mut_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:271: stale_borrow_mut_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:284:10
+    │
+284 │         *iter_table::iter_borrow(it2, &t)
+    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:278: use_after_invalidate_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:279: use_after_invalidate_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:280: use_after_invalidate_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:281: use_after_invalidate_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:282: use_after_invalidate_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:283: use_after_invalidate_fails
+    =         it2 = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:283: use_after_invalidate_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:284: use_after_invalidate_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:307:10
+    │
+307 │         *iter_table::iter_borrow(it, t)
+    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:303: generic_stale_fails
+    =         t = <redacted>
+    =         k1 = <redacted>
+    =         k2 = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:304: generic_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:305: generic_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:306: generic_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:307: generic_stale_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:332:19
+    │
+332 │         let _n2 = iter_table::node_next(n, &t);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:328: node_walk_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:329: node_walk_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:330: node_walk_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:331: node_walk_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:332: node_walk_stale_fails
+
+error: iterator may be invalidated by an intervening map mutation
+    ┌─ tests/sources/functional/verify_iterator_validity.move:346:10
+    │
+346 │         *iter_table::iter_borrow(it_old, &t)
+    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:341: revalidation_by_alias_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:342: revalidation_by_alias_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:343: revalidation_by_alias_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:344: revalidation_by_alias_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:345: revalidation_by_alias_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:346: revalidation_by_alias_fails
+
+error: iterator held across loop iterations may be invalidated by a map mutation in the loop
+    ┌─ tests/sources/functional/verify_iterator_validity.move:372:16
+    │
+372 │         while (i < n) {
+    │                ^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:366: loop_mutation_fails
+    =         n = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:367: loop_mutation_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:368: loop_mutation_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:369: loop_mutation_fails
+    =         it = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:370: loop_mutation_fails
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:371: loop_mutation_fails
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:372: loop_mutation_fails
+    =     enter loop, variable(s) t, $t5, $t4 havocked and reassigned
+    =         t = <redacted>
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:373: loop_mutation_fails
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:374: loop_mutation_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:375: loop_mutation_fails
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:372: loop_mutation_fails

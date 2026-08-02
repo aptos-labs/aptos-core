@@ -574,6 +574,10 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
     m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -596,6 +600,10 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
     m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -772,6 +780,10 @@ returns (m': $Mutation ({{Self}})) {
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
         {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -808,6 +820,10 @@ returns (m': $Mutation ({{Self}})) {
             !$IsEqual'{{instance.0.suffix}}'(ReadVec(keys_arg, j), ReadVec(keys_arg, i))) ==>
         {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -827,6 +843,10 @@ returns (m': $Mutation ({{Self}})) {
         ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -848,6 +868,10 @@ returns (m': $Mutation ({{Self}})) {
         ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -878,6 +902,10 @@ returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
         !({{impl.fun_spec_has_key}}{{S}}(t_new, k) && {{impl.fun_spec_has_key}}{{S}}(result, k)));
 {%- endif %}
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -914,6 +942,10 @@ returns (m': $Mutation ({{Self}})) {
         !$IsEqual'{{instance.0.suffix}}'(k, new_key) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k) == {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
     m' := $UpdateMutation(m, t_new);
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -927,6 +959,10 @@ procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}),
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 100/*EALREADY_EXISTS*/));
     } else {
         m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -941,6 +977,10 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
         m' := $UpdateMutation(m, UpdateTable(t, enc_k, v));
     } else {
         m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -960,6 +1000,10 @@ returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     } else {
         prev_v := $1_option_Option{{SV}}_None();
         m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -976,6 +1020,10 @@ returns (v: {{V}}, m': $Mutation({{Self}})) {
     } else {
         v := GetTable(t, enc_k);
         m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -992,6 +1040,10 @@ returns (result: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     if (ContainsTable(t, enc_k)) {
         result := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
         m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     } else {
         result := $1_option_Option{{SV}}_None();
         m' := m;
@@ -1012,6 +1064,10 @@ returns (k': {{K}}, v: {{V}}, m': $Mutation({{Self}})) {
         k' := k;
         v := GetTable(t, enc_k);
         m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
     }
 }
 {%- endif %}
@@ -1054,6 +1110,10 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     t := $Dereference(m);
     if (!ContainsTable(t, enc_k)) {
         m' := $UpdateMutation(m, AddTable(t, enc_k, default));
+{%- if impl.has_iterators %}
+    {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' := {{impl.struct_name}}_iter_epoch'{{instance.0.suffix}}' + 1;
+    {{impl.struct_name}}_iter_epoch$all := {{impl.struct_name}}_iter_epoch$all + 1;
+{%- endif %}
         t' := $Dereference(m');
         dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t', enc_k));
     } else {
