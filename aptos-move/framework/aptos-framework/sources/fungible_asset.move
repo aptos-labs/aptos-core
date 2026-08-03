@@ -1462,7 +1462,6 @@ module aptos_framework::fungible_asset {
             error::permission_denied(ENOT_STORE_OWNER)
         );
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
-        let fungible_store_address = store.object_address();
         assert!(
             allow_upgrade_to_concurrent_fungible_balance(),
             error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED)

@@ -170,9 +170,7 @@ module aptos_framework::dispatchable_fungible_asset {
     public fun derived_balance_snapshot<T: key>(store: Object<T>): AggregatorSnapshot<u64> {
         let func_opt = fungible_asset::derived_balance_dispatch_function(store);
         if (func_opt.is_some()) {
-            let func = func_opt.borrow();
-            function_info::load_module_from_function(func);
-            aggregator_v2::create_snapshot(dispatchable_derived_balance(store, func))
+            aggregator_v2::create_snapshot(dispatched_derived_balance(store, func_opt.borrow()))
         } else {
             fungible_asset::balance_snapshot(store)
         }
