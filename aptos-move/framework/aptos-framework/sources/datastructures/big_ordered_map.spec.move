@@ -18,13 +18,24 @@ spec aptos_framework::big_ordered_map {
     // not modeled. Traversal specs' abort conditions are exhaustive modulo
     // this presumption.
     //
-    // Iterator staleness presumption: the iterator overlay specs apply to an
-    // iterator only for the map state it was created from (the documented API
-    // contract: the map must not be mutated while iterators are held). All
-    // iterator specs model reads and writes at the iterator's cached key; at
-    // runtime a stale iterator navigates by its retained position, so it may
-    // abort, return arbitrary results, or read/mutate a DIFFERENT entry than
-    // modeled (e.g. `iter_borrow_mut`, `iter_modify`, `iter_remove`).
+    // Iterator staleness: the iterator overlay specs apply to an iterator only
+    // for the map state it was created from (the documented API contract: the
+    // map must not be mutated while iterators are held). All iterator specs
+    // model reads and writes at the iterator's cached key; at runtime a stale
+    // iterator navigates by its retained position, so it may abort, return
+    // arbitrary results, or read/mutate a DIFFERENT entry than modeled. The
+    // prover enforces this contract mechanically and per map OBJECT: the
+    // validity bindings below give the map and its iterator types hidden
+    // version slots (fresh at creation, havocked by every structural
+    // mutation, preserved by value writes, excluded from equality, not
+    // nameable in specs), and validity — the bound native predicates, defined
+    // by the prover as slot equality — is stated as ordinary
+    // `requires`/`ensures` on the iterator API below. Any use of a stale
+    // iterator, or of an iterator against a different map object (also a
+    // sibling of the same type, or another element of a vector of maps),
+    // fails verification. Loops that advance an iterator carry
+    // `invariant spec_iter_valid(it, map)`; loops that merely hold one while
+    // leaving the map unmutated need no invariant.
     spec BigOrderedMap {
         pragma intrinsic = map,
             map_new = new,
@@ -66,7 +77,26 @@ spec aptos_framework::big_ordered_map {
             map_spec_aborts_add = spec_aborts_add,
             map_spec_aborts_del = spec_aborts_del,
             map_spec_aborts_borrow = spec_aborts_borrow,
-            map_is_empty = is_empty;
+            map_is_empty = is_empty,
+            map_spec_iter_valid = spec_iter_current,
+            map_spec_leaf_iter_valid = spec_leaf_iter_valid,
+            map_spec_iter_preserved = spec_iter_preserved;
+    }
+
+    // The iterator-validity predicates; their definitions (hidden-slot
+    // equality: the iterator was created from this map object and no
+    // structural mutation has intervened) come from the role bindings above.
+    spec native fun spec_iter_current<K, V>(it: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool;
+    spec native fun spec_leaf_iter_valid<K, V>(it: LeafNodeIteratorPtr, map: BigOrderedMap<K, V>): bool;
+    // Frame predicate: no structural mutation between the two states, so
+    // iterators valid for the old state stay valid for the new one.
+    spec native fun spec_iter_preserved<K, V>(m_new: BigOrderedMap<K, V>, m_old: BigOrderedMap<K, V>): bool;
+
+    /// An iterator is valid for `map` iff it was created from this map object
+    /// and the object has not been structurally mutated since. End iterators
+    /// carry no position and are always valid.
+    spec fun spec_iter_valid<K, V>(it: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool {
+        (it is IteratorPtr::End<K>) || spec_iter_current(it, map)
     }
 
     spec native fun spec_len<K, V>(t: BigOrderedMap<K, V>): num;
@@ -198,6 +228,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_borrow {
         pragma opaque;
         pragma verify = false;
+        requires spec_iter_valid(self, map);
         aborts_if iter_is_end(self, map);
         ensures result == spec_get(map, self.key);
     }
@@ -208,6 +239,7 @@ spec aptos_framework::big_ordered_map {
     // assert is covered by the size presumption above.
     spec iter_borrow_mut {
         pragma intrinsic;
+        requires spec_iter_valid(self, map);
     }
 
     spec fun spec_aborts_iter_borrow_mut<K, V>(self: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool {
@@ -231,6 +263,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_is_begin {
         pragma opaque;
         pragma verify = false;
+        requires spec_iter_valid(self, map);
         aborts_if false;
         ensures result <==> spec_iter_is_begin(self, map);
     }
@@ -241,6 +274,7 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
+        ensures spec_iter_current(result, self);
         // End iff no key >= input exists (all keys are Less than input).
         ensures iter_is_end(result, self) <==>
             (forall k: K where spec_contains_key(self, k):
@@ -264,6 +298,10 @@ spec aptos_framework::big_ordered_map {
     spec allocate_spare_slots {
         pragma verify = false;
         pragma opaque;
+        // Allocates vacant storage slots only: map content and iterator
+        // navigation are untouched, so iterators stay valid.
+        ensures self == old(self);
+        ensures spec_iter_preserved(self, old(self));
     }
 
     spec validate_size_and_init_max_degrees {
@@ -295,6 +333,10 @@ spec aptos_framework::big_ordered_map {
 
     spec upsert {
         pragma intrinsic;
+        // An existing-key upsert replaces the value in place (`add_at`
+        // overwrites before ever splitting): not a structural mutation. The
+        // intrinsic model preserves iterator validity on that branch, so no
+        // annotation is needed here (see `test_verify_iter_across_upsert`).
     }
 
     spec add_all {
@@ -338,6 +380,7 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
+        ensures spec_iter_current(result, self);
         ensures iter_is_end(result, self) <==> !spec_contains_key(self, key);
         ensures !iter_is_end(result, self) ==> result.key == key;
     }
@@ -346,6 +389,7 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
+        ensures spec_iter_current(result, self);
         ensures iter_is_end(result, self) <==> spec_len(self) == 0;
         ensures !iter_is_end(result, self) ==> spec_contains_key(self, result.key);
         // result.key is the smallest key in the map.
@@ -364,7 +408,9 @@ spec aptos_framework::big_ordered_map {
     spec iter_next {
         pragma opaque;
         pragma verify = false;
+        requires spec_iter_valid(self, map);
         aborts_if iter_is_end(self, map);
+        ensures spec_iter_current(result, map);
         // End iff self.key has no strict successor in the map.
         ensures (result is IteratorPtr::End<K>) <==>
             (forall k: K where spec_contains_key(map, k):
@@ -382,7 +428,9 @@ spec aptos_framework::big_ordered_map {
     spec iter_prev {
         pragma opaque;
         pragma verify = false;
+        requires spec_iter_valid(self, map);
         aborts_if spec_iter_is_begin(self, map);
+        ensures spec_iter_current(result, map);
         // A predecessor always exists when self is not begin; from End the result
         // is the largest key. The result always points at an in-map key.
         ensures !(result is IteratorPtr::End<K>);
@@ -417,8 +465,11 @@ spec aptos_framework::big_ordered_map {
         // body's post-callback size validation is covered by the size
         // presumption above.
         requires iter_is_end(self, map) || requires_of<f>(spec_get(map, self.key));
+        requires spec_iter_valid(self, map);
         aborts_if iter_is_end(self, map);
         aborts_if aborts_of<f>(spec_get(map, self.key));
+        // A value modification is not a structural mutation: iterators stay valid.
+        ensures spec_iter_preserved(map, old(map));
         // iter_modify mutates the value at self.key via the closure. Containment is
         // unchanged for every key; values for keys other than self.key are preserved;
         // the closure's contract relates the old value, the new value, and the result.
@@ -432,13 +483,15 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
+        ensures spec_iter_current(result.iterator, self);
         ensures iter_is_end(result.iterator, self) <==> !spec_contains_key(self, key);
         ensures !iter_is_end(result.iterator, self) ==> result.iterator.key == key;
     }
 
+    // TRANSPARENT (the body is a plain projection): equality in an opaque
+    // ensures would not carry the projected iterator's hidden validity slot;
+    // inlined value flow does.
     spec iter_with_path_get_iter {
-        pragma opaque;
-        pragma verify = false;
         aborts_if false;
         ensures result == self.iterator;
     }
@@ -446,6 +499,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_remove {
         pragma opaque;
         pragma verify = false;
+        requires spec_iter_valid(self.iterator, map);
         aborts_if iter_is_end(self.iterator, map);
         ensures result == spec_get(old(map), self.iterator.key);
         ensures !spec_contains_key(map, self.iterator.key);
@@ -457,6 +511,7 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
+        ensures spec_leaf_iter_valid(result, self);
         // Points at `min_leaf_index`, which is never NULL_INDEX: an empty map's
         // leaf walk visits the (empty) root leaf once.
         ensures !internal_leaf_iter_is_end(result);
@@ -478,7 +533,9 @@ spec aptos_framework::big_ordered_map {
     spec internal_leaf_iter_borrow_entries_and_next_leaf_index {
         pragma opaque;
         pragma verify = false;
+        requires spec_leaf_iter_valid(self, map);
         aborts_if internal_leaf_iter_is_end(self);
+        ensures spec_leaf_iter_valid(result_2, map);
         // Soundness direction only: every entry in the returned leaf is a real
         // map entry (a Leaf child with contained key and matching value).
         // Completeness — that the leaves together visit every key — is not modeled.
