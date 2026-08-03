@@ -4,6 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- `aptos move simulate` now supports unauthenticated remote simulation with `--sender-account` or a profile `account`, and adds `--local-simulation` for unauthenticated local Simulation VM debugging. `--local` continues to require a private key and executes a real signature through the normal VM path.
+
 ## [9.5.0]
 - Compiler now uses receiver style calls for macro-generated code.
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.

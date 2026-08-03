@@ -2300,6 +2300,8 @@ impl CliCommand<TransactionSummary> for RunFunction {
 /// authentication key. Without key material, supply `--sender-account` (or configure
 /// a profile account); it uses an unauthenticated simulation transaction and skips
 /// authentication-key validation, so the result does not establish submit authorization.
+/// A selected profile with private or public key material continues to use authenticated
+/// zero-signature simulation, even when `--sender-account` overrides the sender address.
 ///
 /// `--local` preserves normal local execution semantics: it needs a private key,
 /// creates a real signature, and runs the normal VM without submitting the transaction.

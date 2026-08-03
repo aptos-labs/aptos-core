@@ -84,7 +84,7 @@ aptos move simulate \
 
 | Flag | Meaning |
 |---|---|
-| Default | Requests remote fullnode simulation. With no key material, supply `--sender-account` or configure the profile account; authentication-key validation is skipped. |
+| Default | Requests remote fullnode simulation. With no key material, supply `--sender-account` or configure the profile account; authentication-key validation is skipped. A profile with a private or public key uses zero-signature Ed25519 simulation instead, even with `--sender-account`. To use unauthenticated simulation, select a profile without key material. |
 | `--local` | Execute locally with a real transaction signature and the normal VM path. Requires a private key. The transaction is not submitted. |
 | `--local-simulation` | Execute locally in simulation mode. Without key material, supply `--sender-account`; authentication-key validation is skipped, so the result does not establish submit authorization. |
 | `--sender-account <ADDR>` | Override the sender address. Key requirements depend on the selected mode. |

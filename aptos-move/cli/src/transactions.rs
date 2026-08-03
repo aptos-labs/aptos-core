@@ -7,9 +7,10 @@ use crate::{local_simulation, MoveEnv};
 // Re-export from aptos-cli-common to eliminate the duplicate definition.
 pub use aptos_cli_common::ReplayProtectionType;
 use aptos_cli_common::{
-    format_txn_status, get_account_with_state, CliError, CliTypedResult, EncodingOptions,
-    GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions,
-    TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
+    account_address_from_public_key, format_txn_status, get_account_with_state, CliError,
+    CliTypedResult, EncodingOptions, GasOptions, PrivateKeyInputOptions, ProfileConfig,
+    ProfileOptions, PromptOptions, RestOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US,
+    US_IN_SECS,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
@@ -270,6 +271,14 @@ impl TxnOptions {
     /// compatibility fallback for callers that have not yet stored an account
     /// address.
     fn get_simulation_address(&self) -> CliTypedResult<AccountAddress> {
+        let profile = self.profile_options.profile().ok();
+        self.get_simulation_address_with_profile(profile.as_ref())
+    }
+
+    fn get_simulation_address_with_profile(
+        &self,
+        profile: Option<&ProfileConfig>,
+    ) -> CliTypedResult<AccountAddress> {
         if let Some(sender) = self.sender_account {
             return Ok(sender);
         }
@@ -278,7 +287,7 @@ impl TxnOptions {
             return self.get_address();
         }
 
-        if let Ok(profile) = self.profile_options.profile() {
+        if let Some(profile) = profile {
             if let Some(account) = profile.account {
                 return Ok(account);
             }
@@ -301,13 +310,15 @@ impl TxnOptions {
     fn simulation_sender_and_authenticator(
         &self,
     ) -> CliTypedResult<(AccountAddress, AccountAuthenticator, bool)> {
-        let has_profile_private_key = self
-            .profile_options
-            .profile()
-            .ok()
-            .and_then(|profile| profile.private_key)
-            .is_some();
-        if self.private_key_options.has_key_or_file() || has_profile_private_key {
+        let profile = self.profile_options.profile().ok();
+        self.simulation_sender_and_authenticator_with_profile(profile.as_ref())
+    }
+
+    fn simulation_sender_and_authenticator_with_profile(
+        &self,
+        profile: Option<&ProfileConfig>,
+    ) -> CliTypedResult<(AccountAddress, AccountAuthenticator, bool)> {
+        if self.private_key_options.has_key_or_file() {
             let (private_key, sender) = self.private_key_options.extract_private_key_and_address(
                 self.encoding_options.encoding,
                 &self.profile_options,
@@ -323,18 +334,30 @@ impl TxnOptions {
             ));
         }
 
-        if let Ok((public_key, sender)) = self
-            .private_key_options
-            .extract_ed25519_public_key_and_address(
-                self.encoding_options.encoding,
-                &self.profile_options,
-                self.sender_account,
-            )
-        {
+        if let Some(private_key) = profile.and_then(|profile| profile.private_key.as_ref()) {
+            let sender = self
+                .sender_account
+                .or(profile.and_then(|profile| profile.account))
+                .unwrap_or_else(|| account_address_from_public_key(&private_key.public_key()));
             return Ok((
                 sender,
                 AccountAuthenticator::ed25519(
-                    public_key,
+                    private_key.public_key(),
+                    Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+                ),
+                false,
+            ));
+        }
+
+        if let Some(public_key) = profile.and_then(|profile| profile.public_key.as_ref()) {
+            let sender = self
+                .sender_account
+                .or(profile.and_then(|profile| profile.account))
+                .unwrap_or_else(|| account_address_from_public_key(public_key));
+            return Ok((
+                sender,
+                AccountAuthenticator::ed25519(
+                    public_key.clone(),
                     Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
                 ),
                 false,
@@ -342,7 +365,7 @@ impl TxnOptions {
         }
 
         Ok((
-            self.get_simulation_address()?,
+            self.get_simulation_address_with_profile(profile)?,
             AccountAuthenticator::NoAccountAuthenticator,
             true,
         ))
@@ -390,7 +413,7 @@ impl TxnOptions {
         // Warn local user that clock is skewed behind the blockchain.
         // There will always be a little lag from real time to blockchain time
         if now_usecs < state.timestamp_usecs - ACCEPTED_CLOCK_SKEW_US {
-            eprintln!("Local clock is is skewed from blockchain clock.  Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, state.timestamp_usecs / US_IN_SECS );
+            eprintln!("Local clock is skewed from blockchain clock. Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, state.timestamp_usecs / US_IN_SECS );
         }
         let expiration_time_secs = now + self.gas_options.expiration_secs;
 
@@ -559,7 +582,7 @@ impl TxnOptions {
         show_details: bool,
     ) -> CliTypedResult<TransactionSummary> {
         println!();
-        println!("Simulating transaction locally...");
+        println!("Executing transaction locally...");
 
         let client = self.rest_client()?;
         const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
@@ -659,7 +682,8 @@ impl TxnOptions {
 mod tests {
     use super::{local_events_to_json, local_write_set_to_json, serialize_as_json, TxnOptions};
     use aptos_cli_common::{
-        account_address_from_public_key, PrivateKeyInputOptions, ProfileOptions, TransactionSummary,
+        account_address_from_public_key, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
+        TransactionSummary,
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
     use aptos_sdk::transaction_builder::TransactionFactory;
@@ -768,6 +792,70 @@ mod tests {
         let (sender, authenticator, skips_auth_key_check) =
             options.simulation_sender_and_authenticator().unwrap();
         assert_eq!(sender, expected_address);
+        assert!(!skips_auth_key_check);
+        assert!(matches!(
+            authenticator,
+            AccountAuthenticator::Ed25519 { .. }
+        ));
+    }
+
+    #[test]
+    fn simulation_sender_uses_profile_account_without_key_material() {
+        let profile = ProfileConfig {
+            account: Some(AccountAddress::ONE),
+            ..Default::default()
+        };
+        let options = TxnOptions::default();
+
+        let (sender, authenticator, skips_auth_key_check) = options
+            .simulation_sender_and_authenticator_with_profile(Some(&profile))
+            .unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+        assert!(skips_auth_key_check);
+        assert!(matches!(
+            authenticator,
+            AccountAuthenticator::NoAccountAuthenticator
+        ));
+    }
+
+    #[test]
+    fn simulation_sender_uses_profile_public_key() {
+        let private_key = Ed25519PrivateKey::generate(&mut rand::rngs::OsRng);
+        let profile = ProfileConfig {
+            account: Some(AccountAddress::ONE),
+            public_key: Some(private_key.public_key()),
+            ..Default::default()
+        };
+        let options = TxnOptions::default();
+
+        let (sender, authenticator, skips_auth_key_check) = options
+            .simulation_sender_and_authenticator_with_profile(Some(&profile))
+            .unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+        assert!(!skips_auth_key_check);
+        assert!(matches!(
+            authenticator,
+            AccountAuthenticator::Ed25519 { .. }
+        ));
+    }
+
+    #[test]
+    fn simulation_sender_allows_sender_account_to_override_profile_private_key_address() {
+        let private_key = Ed25519PrivateKey::generate(&mut rand::rngs::OsRng);
+        let profile = ProfileConfig {
+            account: Some(AccountAddress::ONE),
+            private_key: Some(private_key),
+            ..Default::default()
+        };
+        let options = TxnOptions {
+            sender_account: Some(AccountAddress::TWO),
+            ..Default::default()
+        };
+
+        let (sender, authenticator, skips_auth_key_check) = options
+            .simulation_sender_and_authenticator_with_profile(Some(&profile))
+            .unwrap();
+        assert_eq!(sender, AccountAddress::TWO);
         assert!(!skips_auth_key_check);
         assert!(matches!(
             authenticator,
