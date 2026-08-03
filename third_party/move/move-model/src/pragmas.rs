@@ -105,6 +105,20 @@ pub const INTRINSIC_FUN_MAP_NEW_WITH_CONFIG: &str = "map_new_with_config";
 /// `[spec] fun map_new<K, V>(): Map<K, V>`
 pub const INTRINSIC_FUN_MAP_SPEC_NEW: &str = "map_spec_new";
 
+/// Iterator validity predicates: `(iterator_enum, map): bool`, true iff the
+/// iterator's hidden validity slot matches the map's — i.e. the iterator was
+/// created from the map's current version. Binding one of these gives the map
+/// a backend-synthesized validity slot (havoced by structural mutations) and
+/// the predicate's iterator enum a matching slot; neither is visible to or
+/// nameable from user specs. Two role names so a map can cover both a keyed
+/// iterator and a key-agnostic (leaf/node) walker.
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_VALID: &str = "map_spec_iter_valid";
+pub const INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID: &str = "map_spec_leaf_iter_valid";
+/// Validity-preservation predicate: `(map_new, map_old): bool`, true iff the
+/// two map states share a validity version (no structural mutation between
+/// them) — the frame promise for operations that keep iterators valid.
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED: &str = "map_spec_iter_preserved";
+
 /// Get the value associated with key `k`.
 /// The behavior is undefined if `k` does not exist in the map
 /// `[spec] fun map_get<K, V>(m: Map<K, V>, k: K): V`
@@ -403,6 +417,18 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 ),
             ),
             (INTRINSIC_FUN_MAP_SPEC_NEW, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
+                IntrinsicFunDef::spec_fun(),
+            ),
             (INTRINSIC_FUN_MAP_SPEC_GET, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_SET, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_DEL, IntrinsicFunDef::spec_fun()),

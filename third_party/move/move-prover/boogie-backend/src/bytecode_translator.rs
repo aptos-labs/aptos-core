@@ -46,7 +46,7 @@ use move_model::{
         StructEnv, StructId,
     },
     pragmas::{
-        ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
+        ADDITION_OVERFLOW_UNCHECKED_PRAGMA, INTRINSIC_TYPE_MAP, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
     },
     symbol::Symbol,
@@ -6346,59 +6346,107 @@ impl FunctionTranslator<'_> {
                     Pack(mid, sid, inst) => {
                         let inst = &self.inst_slice(inst);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
-                        let mut args = srcs.iter().cloned().map(str_local).collect_vec();
-                        args.extend(self.ghost_field_pack_args(
-                            &struct_env,
-                            inst,
-                            Some(srcs),
-                            &loc,
-                        ));
-                        let dest_str = str_local(dests[0]);
-                        emitln!(
-                            writer,
-                            "{} := {}({});",
-                            dest_str,
-                            boogie_struct_name(&struct_env, inst, false),
-                            args.iter().join(", ")
-                        );
+                        // Intrinsic maps cannot be packed in verified code:
+                        // their declared fields are erased (creation goes
+                        // through the bound roles), so the constructor would
+                        // be ill-typed.
+                        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                            env.error(
+                                &loc,
+                                "cannot pack a value of an intrinsic map type in verified \
+                                 code; use the map's creation functions",
+                            );
+                        } else {
+                            let mut args = srcs.iter().cloned().map(str_local).collect_vec();
+                            args.extend(self.ghost_field_pack_args(
+                                &struct_env,
+                                inst,
+                                Some(srcs),
+                                &loc,
+                            ));
+                            let dest_str = str_local(dests[0]);
+                            emitln!(
+                                writer,
+                                "{} := {}({});",
+                                dest_str,
+                                boogie_struct_name(&struct_env, inst, false),
+                                args.iter().join(", ")
+                            );
+                        }
                     },
                     PackVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
-                        let mut args = srcs.iter().cloned().map(str_local).collect_vec();
-                        args.extend(self.ghost_field_pack_args(&struct_env, inst, None, &loc));
-                        let dest_str = str_local(dests[0]);
-                        emitln!(
-                            writer,
-                            "{} := {}({});",
-                            dest_str,
-                            boogie_struct_variant_name(&struct_env, inst, *variant),
-                            args.iter().join(", ")
-                        );
+                        // See `Pack`: the intrinsic representation (raw table
+                        // or ghost carrier) declares no variant constructors.
+                        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                            env.error(
+                                &loc,
+                                "cannot pack a value of an intrinsic map type in verified \
+                                 code; use the map's creation functions",
+                            );
+                        } else {
+                            let mut args = srcs.iter().cloned().map(str_local).collect_vec();
+                            args.extend(self.ghost_field_pack_args(&struct_env, inst, None, &loc));
+                            let dest_str = str_local(dests[0]);
+                            emitln!(
+                                writer,
+                                "{} := {}({});",
+                                dest_str,
+                                boogie_struct_variant_name(&struct_env, inst, *variant),
+                                args.iter().join(", ")
+                            );
+                        }
                     },
                     Unpack(mid, sid, _) => {
                         let struct_env = env.get_module(*mid).into_struct(*sid);
-                        for (i, ref field_env) in struct_env.get_fields().enumerate() {
-                            let field_sel =
-                                format!("{}->{}", str_local(srcs[0]), boogie_field_sel(field_env),);
-                            emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
+                        // See `Pack`: intrinsic map fields are erased, so the
+                        // emitted selectors would be ill-typed.
+                        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                            env.error(
+                                &loc,
+                                "cannot unpack a value of an intrinsic map type in verified \
+                                 code",
+                            );
+                        } else {
+                            for (i, ref field_env) in struct_env.get_fields().enumerate() {
+                                let field_sel = format!(
+                                    "{}->{}",
+                                    str_local(srcs[0]),
+                                    boogie_field_sel(field_env),
+                                );
+                                emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
+                            }
                         }
                     },
                     UnpackVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let src_str = str_local(srcs[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
-                        let struct_variant_name =
-                            boogie_struct_variant_name(&struct_env, inst, *variant);
-                        emitln!(writer, "if ({} is {}) {{", src_str, struct_variant_name);
-                        for (i, ref field_env) in
-                            struct_env.get_fields_of_variant(*variant).enumerate()
-                        {
-                            let field_sel =
-                                format!("{}->{}", str_local(srcs[0]), boogie_field_sel(field_env),);
-                            emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
+                        // See `Pack`: the intrinsic representation (raw table
+                        // or ghost carrier) declares no variant constructors.
+                        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                            env.error(
+                                &loc,
+                                "cannot unpack a value of an intrinsic map type in verified \
+                                 code",
+                            );
+                        } else {
+                            let struct_variant_name =
+                                boogie_struct_variant_name(&struct_env, inst, *variant);
+                            emitln!(writer, "if ({} is {}) {{", src_str, struct_variant_name);
+                            for (i, ref field_env) in
+                                struct_env.get_fields_of_variant(*variant).enumerate()
+                            {
+                                let field_sel = format!(
+                                    "{}->{}",
+                                    str_local(srcs[0]),
+                                    boogie_field_sel(field_env),
+                                );
+                                emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
+                            }
+                            emitln!(writer, "} else { call $ExecFailureAbort(); }");
                         }
-                        emitln!(writer, "} else { call $ExecFailureAbort(); }");
                     },
                     BorrowField(mid, sid, _, field_offset) => {
                         let src_str = str_local(srcs[0]);
@@ -7379,6 +7427,24 @@ impl FunctionTranslator<'_> {
                 if matches!(edge, BorrowEdge::Invoke) {
                     emitln!(writer, "call $t{} := $HavocMutation($t{});", idx, idx);
                 } else {
+                    // Type and bitvector rendering of the value behind the
+                    // destination reference (matching its declared Boogie
+                    // type), for carrier detection and twin selection.
+                    let root_ty = self
+                        .inst(self.get_local_type(*idx).skip_reference())
+                        .clone();
+                    let global_state = &self
+                        .parent
+                        .env
+                        .get_extension::<GlobalNumberOperationState>()
+                        .expect("global number operation state");
+                    let baseline_flag = self.fun_target.data.variant == FunctionVariant::Baseline;
+                    let mid = self.fun_target.func_env.module_env.get_id();
+                    let fid = self.fun_target.func_env.get_id();
+                    let root_bv_flag = global_state
+                        .get_temp_index_oper(mid, fid, *idx, baseline_flag)
+                        .unwrap_or(&Bottom)
+                        == &Bitwise;
                     let update = if let BorrowEdge::Hyper(edges) = edge {
                         self.translate_write_back_update(
                             &mut || dst_value.clone(),
@@ -7386,6 +7452,8 @@ impl FunctionTranslator<'_> {
                             src_value,
                             edges,
                             0,
+                            &root_ty,
+                            root_bv_flag,
                         )
                     } else {
                         self.translate_write_back_update(
@@ -7394,6 +7462,8 @@ impl FunctionTranslator<'_> {
                             src_value,
                             &[edge.to_owned()],
                             0,
+                            &root_ty,
+                            root_bv_flag,
                         )
                     };
                     emitln!(
@@ -7409,7 +7479,15 @@ impl FunctionTranslator<'_> {
     }
 
     fn check_intrinsic_select(&self, attr_id: AttrId, struct_env: &StructEnv) {
-        if struct_env.is_intrinsic() && self.fun_target.global_env().generated_by_v2() {
+        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+            // Map fields are erased, so the selector would be ill-typed
+            // against the table or its carrier. Hard error (vs the warning
+            // below): no reachable code selects a map field today.
+            self.parent.env.error(
+                &self.fun_target.get_bytecode_loc(attr_id),
+                "cannot select a field of an intrinsic map type in verified code",
+            )
+        } else if struct_env.is_intrinsic() && self.fun_target.global_env().generated_by_v2() {
             // There is code in the framework which produces this warning.
             // Only report if we are running v2.
             self.parent.env.diag(
@@ -7431,6 +7509,13 @@ impl FunctionTranslator<'_> {
         None
     }
 
+    /// `dest_ty` is the type of the value denoted by `mk_dest()` at this edge
+    /// position (threaded from the borrow root), used to detect intrinsic-map
+    /// ghost carriers on `Index(Table)` edges. `Type::Error` when unknown
+    /// (custom index edges), which never matches a carrier. `bv_flag` is that
+    /// value's bitvector rendering (fields switch to their own
+    /// classification, container elements inherit), selecting the matching
+    /// carrier twin.
     fn translate_write_back_update(
         &self,
         mk_dest: &mut dyn FnMut() -> String,
@@ -7438,14 +7523,22 @@ impl FunctionTranslator<'_> {
         src: String,
         edges: &[BorrowEdge],
         at: usize,
+        dest_ty: &Type,
+        bv_flag: bool,
     ) -> String {
         if at >= edges.len() {
             src
         } else {
             match &edges[at] {
-                BorrowEdge::Direct => {
-                    self.translate_write_back_update(mk_dest, get_path_index, src, edges, at + 1)
-                },
+                BorrowEdge::Direct => self.translate_write_back_update(
+                    mk_dest,
+                    get_path_index,
+                    src,
+                    edges,
+                    at + 1,
+                    dest_ty,
+                    bv_flag,
+                ),
                 BorrowEdge::Field(memory, variant, offset) => {
                     let memory = memory.to_owned().instantiate(self.type_inst);
                     let struct_env = &self.parent.env.get_struct_qid(memory.to_qualified_id());
@@ -7457,6 +7550,7 @@ impl FunctionTranslator<'_> {
                             *offset,
                         )
                     };
+                    let field_ty = field_env.get_type().instantiate(&memory.inst);
                     let field_sel = boogie_field_sel(&field_env);
                     let new_dest = format!("{}->{}", (*mk_dest)(), field_sel);
                     let mut new_dest_needed = false;
@@ -7469,6 +7563,15 @@ impl FunctionTranslator<'_> {
                         src,
                         edges,
                         at + 1,
+                        &field_ty,
+                        field_bv_flag_global_state(
+                            &self
+                                .parent
+                                .env
+                                .get_extension::<GlobalNumberOperationState>()
+                                .expect("global number operation state"),
+                            &field_env,
+                        ),
                     );
                     let update_fun = if variant.is_none() {
                         boogie_field_update(&field_env, &memory.inst)
@@ -7514,6 +7617,39 @@ impl FunctionTranslator<'_> {
                             self.get_borrow_native_aggregate_names(name).unwrap()
                         },
                     };
+                    let env = self.parent.env;
+                    // A ghost-carrier map wraps its table: content reads
+                    // through `->$$t`, and the update rebuilds the carrier
+                    // PRESERVING ghosts — a value write is not a structural
+                    // mutation and must not disturb e.g. the validity brand.
+                    let carrier = if matches!(index_edge_kind, IndexEdgeKind::Table) {
+                        if let Type::Struct(mid, sid, targs) = dest_ty.skip_reference() {
+                            let struct_env = env.get_struct(mid.qualified(*sid));
+                            let ghost_sels: Vec<String> = struct_env
+                                .get_ghost_fields()
+                                .map(|f| boogie_field_sel(&f))
+                                .collect();
+                            if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP)
+                                && !ghost_sels.is_empty()
+                            {
+                                Some((boogie_struct_name(&struct_env, targs, bv_flag), ghost_sels))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    // The element/value type for the recursion step.
+                    let elem_ty = match (index_edge_kind, dest_ty.skip_reference()) {
+                        (IndexEdgeKind::Vector, Type::Vector(elem)) => (**elem).clone(),
+                        (IndexEdgeKind::Table, Type::Struct(_, _, targs)) if targs.len() >= 2 => {
+                            targs[1].clone()
+                        },
+                        _ => Type::Error,
+                    };
 
                     // Compute the offset into the path where to retrieve the index.
                     let offset = edges[0..at]
@@ -7521,7 +7657,12 @@ impl FunctionTranslator<'_> {
                         .filter(|e| !matches!(e, BorrowEdge::Direct))
                         .count();
                     let index = (*get_path_index)(offset);
-                    let new_dest = format!("{}({}, {})", read_aggregate, (*mk_dest)(), index);
+                    let content = |dest: String| match &carrier {
+                        Some(_) => format!("{}->$$t", dest),
+                        None => dest,
+                    };
+                    let new_dest =
+                        format!("{}({}, {})", read_aggregate, content((*mk_dest)()), index);
                     let mut new_dest_needed = false;
                     // Recursively perform write backs for next edges
                     let new_src = self.translate_write_back_update(
@@ -7533,25 +7674,33 @@ impl FunctionTranslator<'_> {
                         src,
                         edges,
                         at + 1,
+                        &elem_ty,
+                        bv_flag,
                     );
+                    let mk_update = |dest: String, new_src: &str| match &carrier {
+                        Some((carrier_name, ghost_sels)) => {
+                            let ghosts = ghost_sels
+                                .iter()
+                                .map(|sel| format!(", {}->{}", dest, sel))
+                                .join("");
+                            format!(
+                                "{}({}({}->$$t, {}, {}){})",
+                                carrier_name, update_aggregate, dest, index, new_src, ghosts
+                            )
+                        },
+                        None => {
+                            format!("{}({}, {}, {})", update_aggregate, dest, index, new_src)
+                        },
+                    };
                     if new_dest_needed {
                         format!(
-                            "(var $$sel{} := {}; {}({}, {}, {}))",
+                            "(var $$sel{} := {}; {})",
                             at,
                             new_dest,
-                            update_aggregate,
-                            (*mk_dest)(),
-                            index,
-                            new_src
+                            mk_update((*mk_dest)(), &new_src)
                         )
                     } else {
-                        format!(
-                            "{}({}, {}, {})",
-                            update_aggregate,
-                            (*mk_dest)(),
-                            index,
-                            new_src
-                        )
+                        mk_update((*mk_dest)(), &new_src)
                     }
                 },
                 BorrowEdge::Hyper(_) | BorrowEdge::Invoke => unreachable!("unexpected borrow edge"),
