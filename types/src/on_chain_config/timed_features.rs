@@ -272,11 +272,11 @@ impl TimedFeatureFlag {
 
             (MeterBcsByValueSize, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
             (MeterBcsByValueSize, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 8, 4, 10, 0, 0)
+                .with_ymd_and_hms(2026, 8, 4, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterBcsByValueSize, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 8, 5, 10, 0, 0)
+                .with_ymd_and_hms(2026, 8, 6, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
