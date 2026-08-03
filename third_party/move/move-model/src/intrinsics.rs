@@ -132,6 +132,17 @@ pub(crate) fn process_intrinsic_declaration(
     // prepare the decl
     let type_entry = builder.parent.struct_table.get(&type_qsym).expect("struct");
     let move_type = type_entry.module_id.qualified(type_entry.struct_id);
+    // The map templates and monomorphization assume exactly a key and a value
+    // type parameter; any other arity would index the instantiation out of
+    // bounds downstream.
+    if type_entry.type_params.len() != 2 {
+        builder.parent.error(
+            loc,
+            "a `map` intrinsic type must have exactly two type parameters \
+             (key and value)",
+        );
+        return;
+    }
 
     let mut decl = IntrinsicDecl {
         move_type,
@@ -213,6 +224,24 @@ fn populate_intrinsic_decl(
                     // signature. This is implicitly done by Boogie right now, but we may want to
                     // make it more explicit and do the checking ourselves.
                     let qid = entry.module_id.qualified(entry.fun_id);
+                    // Also reject sharing across intrinsic types: template
+                    // definitions are emitted once per type under the bound
+                    // function's name and would collide.
+                    if builder
+                        .parent
+                        .intrinsics
+                        .iter()
+                        .any(|d| d.move_fun_to_intrinsic.contains_key(&qid))
+                    {
+                        builder.parent.error(
+                            loc,
+                            &format!(
+                                "move function is already bound to another intrinsic type: {}",
+                                qualified_sym.display(builder.parent.env)
+                            ),
+                        );
+                        continue;
+                    }
                     decl.intrinsic_to_move_fun.insert(key_sym, qid);
                     if decl.move_fun_to_intrinsic.insert(qid, key_sym).is_some() {
                         builder.parent.error(
@@ -266,6 +295,23 @@ fn populate_intrinsic_decl(
                     // make it more explicit and do the checking ourselves.
                     if let Operation::SpecFunction(mid, fid, ..) = &entry.oper {
                         let qid = mid.qualified(*fid);
+                        // Same cross-type sharing rejection as for move
+                        // functions: per-type template definitions collide.
+                        if builder
+                            .parent
+                            .intrinsics
+                            .iter()
+                            .any(|d| d.spec_fun_to_intrinsic.contains_key(&qid))
+                        {
+                            builder.parent.error(
+                                loc,
+                                &format!(
+                                    "spec function is already bound to another intrinsic type: {}",
+                                    qualified_sym.display(builder.parent.env)
+                                ),
+                            );
+                            continue;
+                        }
                         decl.intrinsic_to_spec_fun.insert(key_sym, qid);
                         if decl.spec_fun_to_intrinsic.insert(qid, key_sym).is_some() {
                             builder.parent.error(

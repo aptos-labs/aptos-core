@@ -27,11 +27,16 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT, INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_FROM,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_NEW_WITH_CONFIG,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_REPLACE_KEY_INPLACE, INTRINSIC_FUN_MAP_SPEC_ABORTS_TRIM,
-        INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL, INTRINSIC_FUN_MAP_TO_VEC_PAIR,
-        INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL, INTRINSIC_FUN_MAP_SPEC_DEL,
+        INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
+        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_SET,
+        INTRINSIC_FUN_MAP_TO_ORDERED_MAP, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT,
+        INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
     symbol::Symbol,
-    ty::{NoUnificationContext, ReferenceKind, Type, TypeDisplayContext, Variance},
+    ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
         TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
@@ -492,6 +497,390 @@ impl Analyzer<'_> {
                         for (k, _v) in ty_args.iter() {
                             iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![k.clone()]));
                         }
+                    }
+                }
+            }
+            // The abort predicate for `map_iter_borrow_mut` is called by the
+            // behavioral `aborts_of` translation with exactly the Move
+            // function's two parameters, whatever the binding's own signature
+            // — so validate it for every binding kind, not only the natives
+            // the template defines. The iterator type comes from the
+            // `map_iter_borrow_mut` binding, which must be co-bound.
+            if let Some(sf_qid) =
+                decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT)
+            {
+                let module_env = self.env.get_module(sf_qid.module_id);
+                let sf = module_env.get_spec_fun(sf_qid.id);
+                match decl.lookup_move_fun(self.env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT) {
+                    None => {
+                        self.env.error(
+                            &sf.loc,
+                            "a `map_spec_aborts_iter_borrow_mut` binding requires \
+                             `map_iter_borrow_mut` bound on the same map",
+                        );
+                    },
+                    Some(fun_qid) => {
+                        let iter_ty = self
+                            .env
+                            .get_function(fun_qid)
+                            .get_parameter_types()
+                            .first()
+                            .map(|ty| ty.skip_reference().clone());
+                        if matches!(iter_ty, Some(Type::Struct(..))) {
+                            let expected_map = Type::Struct(
+                                decl.get_move_type().module_id,
+                                decl.get_move_type().id,
+                                vec![Type::TypeParameter(0), Type::TypeParameter(1)],
+                            );
+                            if sf.type_params.len() != 2
+                                || sf.params.len() != 2
+                                || Some(&sf.params[0].1) != iter_ty.as_ref()
+                                || sf.params[1].1 != expected_map
+                                || sf.result_type != Type::Primitive(PrimitiveType::Bool)
+                            {
+                                self.env.error(
+                                    &sf.loc,
+                                    "a `map_spec_aborts_iter_borrow_mut` function must \
+                                     have two type parameters and the signature \
+                                     (iterator_enum<K>, map<K, V>): bool, with the \
+                                     iterator enum of the `map_iter_borrow_mut` binding",
+                                );
+                            }
+                        }
+                    },
+                }
+            }
+            // Template-defined roles have fixed signatures: the template
+            // emits the definition in that shape while user spec text calls
+            // the binding as declared — a deviating declaration makes the
+            // two disagree in emitted Boogie.
+            {
+                let map_ty = || {
+                    Type::Struct(
+                        decl.get_move_type().module_id,
+                        decl.get_move_type().id,
+                        vec![Type::TypeParameter(0), Type::TypeParameter(1)],
+                    )
+                };
+                let k = || Type::TypeParameter(0);
+                let v = || Type::TypeParameter(1);
+                let num = || Type::Primitive(PrimitiveType::Num);
+                let boolean = || Type::Primitive(PrimitiveType::Bool);
+                let fixed_sigs: [(&str, Vec<Type>, Type, &str); 11] = [
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_NEW,
+                        vec![],
+                        map_ty(),
+                        "(): map<K, V>",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_LEN,
+                        vec![map_ty()],
+                        num(),
+                        "(map<K, V>): num",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_IS_EMPTY,
+                        vec![map_ty()],
+                        boolean(),
+                        "(map<K, V>): bool",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+                        vec![map_ty(), k()],
+                        boolean(),
+                        "(map<K, V>, K): bool",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_GET,
+                        vec![map_ty(), k()],
+                        v(),
+                        "(map<K, V>, K): V",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_SET,
+                        vec![map_ty(), k(), v()],
+                        map_ty(),
+                        "(map<K, V>, K, V): map<K, V>",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_DEL,
+                        vec![map_ty(), k()],
+                        map_ty(),
+                        "(map<K, V>, K): map<K, V>",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+                        vec![map_ty()],
+                        boolean(),
+                        "(map<K, V>): bool",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+                        vec![map_ty(), k(), v()],
+                        boolean(),
+                        "(map<K, V>, K, V): bool",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+                        vec![map_ty(), k()],
+                        boolean(),
+                        "(map<K, V>, K): bool",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                        vec![map_ty(), k()],
+                        boolean(),
+                        "(map<K, V>, K): bool",
+                    ),
+                ];
+                for (role, exp_params, exp_result, shape) in fixed_sigs {
+                    let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
+                        continue;
+                    };
+                    let module_env = self.env.get_module(sf_qid.module_id);
+                    let sf = module_env.get_spec_fun(sf_qid.id);
+                    if sf.type_params.len() != 2
+                        || sf.params.len() != exp_params.len()
+                        || sf
+                            .params
+                            .iter()
+                            .zip(exp_params.iter())
+                            .any(|(Parameter(_, ty, _), exp)| ty != exp)
+                        || sf.result_type != exp_result
+                    {
+                        self.env.error(
+                            &sf.loc,
+                            &format!(
+                                "a `{}` function must have two type parameters \
+                                 and the signature {}",
+                                role, shape
+                            ),
+                        );
+                    }
+                }
+            }
+            // Call-only abort predicates are defined by spec-function
+            // translation (never by the template) and are invoked by the
+            // behavioral `aborts_of` translation with exactly the paired
+            // Move function's parameters — so the binding must not be a
+            // `spec native fun`, and its signature must match the pairing.
+            {
+                let fixed_or_bespoke = [
+                    INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+                    INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+                    INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+                    INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                    INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
+                ];
+                let mut checked: BTreeSet<QualifiedId<SpecFunId>> = BTreeSet::new();
+                for (role_name, fun_def) in INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.iter() {
+                    let Some(abort_name) = fun_def.abort_spec_fun else {
+                        continue;
+                    };
+                    if fixed_or_bespoke.contains(&abort_name) {
+                        continue;
+                    }
+                    let Some(sf_qid) = decl.lookup_spec_fun(self.env, abort_name) else {
+                        continue;
+                    };
+                    let Some(fun_qid) = decl.lookup_move_fun(self.env, role_name) else {
+                        continue;
+                    };
+                    if !checked.insert(sf_qid) {
+                        continue;
+                    }
+                    let module_env = self.env.get_module(sf_qid.module_id);
+                    let sf = module_env.get_spec_fun(sf_qid.id);
+                    if sf.body.is_none() && !sf.uninterpreted {
+                        self.env.error(
+                            &sf.loc,
+                            &format!(
+                                "a `{}` binding must have a body or be declared \
+                                 uninterpreted; the prover's model does not define it",
+                                abort_name
+                            ),
+                        );
+                        continue;
+                    }
+                    let fun_env = self.env.get_function(fun_qid);
+                    let exp_params: Vec<Type> = fun_env
+                        .get_parameter_types()
+                        .iter()
+                        .map(|ty| ty.skip_reference().clone())
+                        .collect();
+                    if sf.type_params.len() != fun_env.get_type_parameter_count()
+                        || sf.params.len() != exp_params.len()
+                        || sf
+                            .params
+                            .iter()
+                            .zip(exp_params.iter())
+                            .any(|(Parameter(_, ty, _), exp)| ty != exp)
+                        || sf.result_type != Type::Primitive(PrimitiveType::Bool)
+                    {
+                        self.env.error(
+                            &sf.loc,
+                            &format!(
+                                "a `{}` function must take the parameters of its \
+                                 `{}` binding (references by value) and return bool",
+                                abort_name, role_name
+                            ),
+                        );
+                    }
+                }
+            }
+            // Data invariants on the map itself are never applied: its
+            // validity predicate is template-defined and its pack/unpack
+            // sites are erased, so an `invariant` would be silently inert.
+            {
+                let struct_env = self.env.get_struct(*struct_qid);
+                for cond in struct_env
+                    .get_spec()
+                    .filter_kind(ConditionKind::StructInvariant)
+                {
+                    self.env.error(
+                        &cond.loc,
+                        "data invariants are not supported on intrinsic map types; \
+                         the map's validity is defined by its model",
+                    );
+                }
+            }
+            // Validity predicates have the fixed template shape
+            // `(iterator_enum, map<K, V>): bool` with the iterator enum either
+            // unparameterized (a key-agnostic walker) or instantiated with the
+            // key type parameter; anything else would emit ill-typed Boogie.
+            // Register the iterator enum's instances eagerly: the template
+            // references them per map instance.
+            for role in [
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+            ] {
+                let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
+                    continue;
+                };
+                let module_env = self.env.get_module(sf_qid.module_id);
+                let sf = module_env.get_spec_fun(sf_qid.id);
+                let expected_map = Type::Struct(
+                    decl.get_move_type().module_id,
+                    decl.get_move_type().id,
+                    vec![Type::TypeParameter(0), Type::TypeParameter(1)],
+                );
+                let iter_ok = matches!(
+                    sf.params.first().map(|Parameter(_, ty, _)| ty),
+                    Some(Type::Struct(_, _, inst))
+                        if inst.is_empty() || inst[..] == [Type::TypeParameter(0)]
+                );
+                if sf.type_params.len() != 2
+                    || sf.params.len() != 2
+                    || !iter_ok
+                    || sf.params[1].1 != expected_map
+                    || sf.result_type != Type::Primitive(PrimitiveType::Bool)
+                {
+                    self.env.error(
+                        &sf.loc,
+                        &format!(
+                            "a `{}` function must have two type parameters and the \
+                             signature (iterator_enum, map<K, V>): bool, with the \
+                             iterator enum either unparameterized or instantiated \
+                             with the key type parameter",
+                            role
+                        ),
+                    );
+                    continue;
+                }
+                if let Some(Parameter(_, Type::Struct(imid, isid, iinst), _)) = sf.params.first() {
+                    let generic = !iinst.is_empty();
+                    for (k, _v) in ty_args.iter() {
+                        iter_ptr_to_register.push(Type::Struct(
+                            *imid,
+                            *isid,
+                            if generic { vec![k.clone()] } else { vec![] },
+                        ));
+                    }
+                }
+            }
+            if let Some(sf_qid) =
+                decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED)
+            {
+                let module_env = self.env.get_module(sf_qid.module_id);
+                let sf = module_env.get_spec_fun(sf_qid.id);
+                let expected_map = Type::Struct(
+                    decl.get_move_type().module_id,
+                    decl.get_move_type().id,
+                    vec![Type::TypeParameter(0), Type::TypeParameter(1)],
+                );
+                if sf.type_params.len() != 2
+                    || sf.params.len() != 2
+                    || sf.params[0].1 != expected_map
+                    || sf.params[1].1 != expected_map
+                    || sf.result_type != Type::Primitive(PrimitiveType::Bool)
+                {
+                    self.env.error(
+                        &sf.loc,
+                        "a `map_spec_iter_preserved` function must have two type \
+                         parameters and the signature (map<K, V>, map<K, V>): bool",
+                    );
+                }
+            }
+            // Roles whose definitions the prelude template emits must bind
+            // `spec native fun`s: they are the map model's own observers, and
+            // for a bodied (or uninterpreted) spec fun the spec translator
+            // emits a second Boogie function under the same name once any
+            // spec uses it. (`map_spec_aborts_iter_borrow_mut` is exempt: its
+            // template definition is gated on the binding being native, so a
+            // bodied predicate supplies the abort semantics itself.)
+            for role in [
+                INTRINSIC_FUN_MAP_SPEC_NEW,
+                INTRINSIC_FUN_MAP_SPEC_LEN,
+                INTRINSIC_FUN_MAP_SPEC_IS_EMPTY,
+                INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+                INTRINSIC_FUN_MAP_SPEC_GET,
+                INTRINSIC_FUN_MAP_SPEC_SET,
+                INTRINSIC_FUN_MAP_SPEC_DEL,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
+            ] {
+                let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
+                    continue;
+                };
+                let module_env = self.env.get_module(sf_qid.module_id);
+                let sf = module_env.get_spec_fun(sf_qid.id);
+                if sf.body.is_some() || sf.uninterpreted {
+                    self.env.error(
+                        &sf.loc,
+                        &format!(
+                            "a `{}` binding must be a `spec native fun`; \
+                             its definition is provided by the intrinsic model",
+                            role
+                        ),
+                    );
+                }
+            }
+            // `to_ordered_map`'s template returns the destination map as a raw
+            // table. A destination type that declares ghost fields is
+            // represented by a carrier the template does not construct, so
+            // calls would be ill-typed; reject the binding.
+            if let Some(fun_qid) = decl.lookup_move_fun(self.env, INTRINSIC_FUN_MAP_TO_ORDERED_MAP)
+            {
+                let fun_env = self.env.get_function(fun_qid);
+                if let Type::Struct(dmid, dsid, _) = fun_env.get_result_type().skip_reference() {
+                    if self
+                        .env
+                        .get_struct(dmid.qualified(*dsid))
+                        .get_ghost_fields()
+                        .next()
+                        .is_some()
+                    {
+                        self.env.error(
+                            &fun_env.get_loc(),
+                            "a `map_to_ordered_map` function whose result map type \
+                             carries iterator-validity state is not supported",
+                        );
                     }
                 }
             }

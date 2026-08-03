@@ -1,0 +1,12 @@
+Move prover returns: exiting with condition generation errors
+error: cannot pack a value of an intrinsic map type in verified code; use the map's creation functions
+   ┌─ tests/sources/functional/intrinsic_map_field_access_err.move:14:9
+   │
+14 │         MapD { dummy: true } // error: cannot pack an intrinsic map
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot select a field of an intrinsic map type in verified code
+   ┌─ tests/sources/functional/intrinsic_map_field_access_err.move:18:9
+   │
+18 │         m.dummy // error: cannot select a field of an intrinsic map
+   │         ^^^^^^^

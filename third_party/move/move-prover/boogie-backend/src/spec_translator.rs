@@ -2825,7 +2825,12 @@ impl SpecTranslator<'_> {
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_intrinsic() {
+        // Ghost fields of intrinsic maps live in the carrier datatype and are
+        // selectable; runtime fields of intrinsic structs are erased.
+        let is_ghost_sel = struct_env
+            .get_ghost_fields()
+            .any(|f| f.get_id() == field_id);
+        if struct_env.is_intrinsic() && !is_ghost_sel {
             self.env.error(
                 &self.env.get_node_loc(node_id),
                 "cannot select field of intrinsic struct",
@@ -2923,7 +2928,7 @@ impl SpecTranslator<'_> {
 
     fn translate_update_field(
         &self,
-        _node_id: NodeId,
+        node_id: NodeId,
         module_id: ModuleId,
         struct_id: StructId,
         field_id: FieldId,
@@ -2931,6 +2936,15 @@ impl SpecTranslator<'_> {
     ) {
         let struct_env = &self.env.get_module(module_id).into_struct(struct_id);
         let field_env = struct_env.get_field(field_id);
+        // Fields of an intrinsic map cannot be updated in specifications:
+        // they are erased by the intrinsic representation.
+        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "cannot update a field of an intrinsic map type in a specification",
+            );
+            return;
+        }
         let receiver_type = self.get_node_type(args[0].node_id());
         let struct_inst = receiver_type.skip_reference().require_struct().2;
         let update_fun = if struct_env.has_variants() {
@@ -3663,11 +3677,19 @@ impl SpecTranslator<'_> {
                 Type::Struct(mid, sid, targs) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                        // A ghost-carrier map wraps its table; membership
+                        // reads through the raw-table selector.
+                        let unwrap = if struct_env.get_ghost_fields().next().is_some() {
+                            "->$$t"
+                        } else {
+                            ""
+                        };
                         emit!(
                             self.writer,
-                            "{}ContainsTable({}, $EncodeKey'{}'({}))",
+                            "{}ContainsTable({}{}, $EncodeKey'{}'({}))",
                             separator,
                             range_tmps.get(&var_name).unwrap(),
+                            unwrap,
                             boogie_type_suffix(self.env, &targs[0], num_oper == Bitwise),
                             var_name_str,
                         );
