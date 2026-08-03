@@ -604,6 +604,11 @@ impl Frame {
         let (module, function) = loader
             .load_function_definition(gas_meter, traversal_context, module_id, function_name)
             .map_err(|err| err.to_partial())?;
+
+        // Lazy loading resolves the callee dynamically, so re-validate the caller's type
+        // arguments against the callee actually resolved here.
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &verified_ty_args)?;
+
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,

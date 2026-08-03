@@ -472,6 +472,20 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
         // Construct result.
         let env = self.module_storage.runtime_environment();
         let ty_args_id = env.ty_pool().intern_ty_args(&ty_args);
+
+        // Record the version (hash) of the defining module so that the resolved function does not
+        // need to be re-resolved on its first call just to learn its version. The module was just
+        // loaded here, so this lookup is a cache hit.
+        let module_hash = if env.vm_config().revalidate_resolved_closures {
+            let module_id = module.self_id();
+            self.module_storage
+                .unmetered_get_module_hash_and_size(module_id.address(), module_id.name())
+                .map_err(|err| err.to_partial())?
+                .map(|(hash, _)| hash)
+        } else {
+            None
+        };
+
         let loaded_fun = Rc::new(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args,
@@ -479,7 +493,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
             function: func,
         });
         Ok(Ok(Box::new(
-            LazyLoadedFunction::new_resolved_not_capturing(env, loaded_fun)?,
+            LazyLoadedFunction::new_resolved_not_capturing(env, loaded_fun, module_hash)?,
         )))
     }
 }
