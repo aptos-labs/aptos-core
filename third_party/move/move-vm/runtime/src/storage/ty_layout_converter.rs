@@ -17,7 +17,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     int256,
-    language_storage::LEGACY_OPTION_VEC,
+    language_storage::{ModuleId, LEGACY_OPTION_VEC},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -238,6 +238,16 @@ where
     /// Returns the runtime environment used in the system.
     pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.struct_definition_loader.runtime_environment()
+    }
+
+    /// Returns the hash and size of the specified module, without charging gas.
+    pub(crate) fn unmetered_get_module_hash_and_size(
+        &self,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<([u8; 32], usize)> {
+        self.struct_definition_loader
+            .unmetered_get_module_hash_and_size(module_id.address(), module_id.name())
+            .map_err(|err| err.to_partial())
     }
 
     /// Returns the struct name for the specified index.
