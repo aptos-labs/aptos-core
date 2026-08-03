@@ -584,6 +584,8 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                 mask,
                 ty_args,
                 captured_layouts,
+                // Serialization stays name-based: the resolved module version is not stored.
+                module_hash: _,
             } => {
                 // If there are no captured layouts, then this closure is non-storable, i.e., the
                 // function is not persistent (not public or not private with #[persistent]
