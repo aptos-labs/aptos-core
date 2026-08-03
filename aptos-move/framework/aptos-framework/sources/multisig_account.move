@@ -111,9 +111,9 @@ module aptos_framework::multisig_account {
     const ETIMELOCK_DOES_NOT_EXIST: u64 = 24;
     /// Feature flag for multisig timelock is not enabled.
     const ETIMELOCK_NOT_ENABLED: u64 = 25;
-    /// Sequence-number-based creation proofs cannot be used in orderless transactions, since the
-    /// sequence number does not advance and the signed proof would remain replayable.
-    const ESEQ_NUM_PROOF_IN_ORDERLESS_TXN: u64 = 26;
+    /// Sequence-number-based creation proofs cannot be used when the proof-bearing account's
+    /// sequence number will not advance, since the signed proof would remain replayable.
+    const ESEQ_NUM_PROOF_REPLAYABLE_CONTEXT: u64 = 26;
 
 
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -634,8 +634,8 @@ module aptos_framework::multisig_account {
         metadata_values: vector<vector<u8>>,
     ) {
         // The creation message embeds the existing account's sequence number so that outstanding
-        // signed messages can be invalidated by advancing it. Reject orderless transactions so
-        // this function only runs where sequence numbers are meaningful.
+        // signed messages can be invalidated by advancing it. Reject execution contexts where the
+        // proof-bearing account's sequence number does not advance.
         assert_seq_num_proof_replay_protected();
         // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
         // owner's key.
@@ -719,8 +719,8 @@ module aptos_framework::multisig_account {
         metadata_values: vector<vector<u8>>,
     ) {
         // The creation message embeds the existing account's sequence number so that outstanding
-        // signed messages can be invalidated by advancing it. Reject orderless transactions so
-        // this function only runs where sequence numbers are meaningful.
+        // signed messages can be invalidated by advancing it. Reject execution contexts where the
+        // proof-bearing account's sequence number does not advance.
         assert_seq_num_proof_replay_protected();
         // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
         // owner's key.
@@ -1521,11 +1521,13 @@ module aptos_framework::multisig_account {
 
     /// Creation proofs embed the existing account's sequence number to allow invalidating
     /// outstanding signed messages by advancing it. Orderless transactions do not interact with
-    /// sequence numbers, so functions verifying such a proof must reject them.
+    /// sequence numbers, and multisig payload execution increments only the outer submitter's
+    /// sequence number. Functions verifying such a proof must reject them.
     inline fun assert_seq_num_proof_replay_protected() {
         assert!(
-            !transaction_context::is_orderless_txn(),
-            error::invalid_state(ESEQ_NUM_PROOF_IN_ORDERLESS_TXN),
+            !transaction_context::is_orderless_txn()
+                && !transaction_context::is_multisig_payload_txn(),
+            error::invalid_state(ESEQ_NUM_PROOF_REPLAYABLE_CONTEXT),
         );
     }
 

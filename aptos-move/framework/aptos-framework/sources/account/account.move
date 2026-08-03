@@ -235,9 +235,9 @@ module aptos_framework::account {
     const EENCRYPTED_DK_NOT_FOUND: u64 = 29;
     /// The permissioned signer feature has been removed.
     const EPERMISSIONED_SIGNER_REMOVED: u64 = 30;
-    /// Sequence-number-based proof challenges cannot be used in orderless transactions, since the
-    /// sequence number does not advance and the signed proof would remain replayable.
-    const ESEQ_NUM_PROOF_IN_ORDERLESS_TXN: u64 = 31;
+    /// Sequence-number-based proof challenges cannot be used when the proof-bearing account's
+    /// sequence number will not advance, since the signed proof would remain replayable.
+    const ESEQ_NUM_PROOF_REPLAYABLE_CONTEXT: u64 = 31;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -265,13 +265,14 @@ module aptos_framework::account {
 
     /// Proof challenges that embed an account's sequence number rely on the sequence number
     /// advancing with the submitting transaction to prevent the signed proof from being accepted
-    /// twice. Orderless transactions do not increment the sender's sequence number, so accepting
-    /// such a proof in an orderless transaction would leave it replayable. Functions verifying a
-    /// sequence-number-based proof must call this first.
+    /// twice. Orderless transactions do not increment the sender's sequence number, and multisig
+    /// payload execution increments only the outer submitter's sequence number. Functions verifying
+    /// a sequence-number-based proof must call this first.
     inline fun assert_seq_num_proof_replay_protected() {
         assert!(
-            !transaction_context::is_orderless_txn(),
-            error::invalid_state(ESEQ_NUM_PROOF_IN_ORDERLESS_TXN),
+            !transaction_context::is_orderless_txn()
+                && !transaction_context::is_multisig_payload_txn(),
+            error::invalid_state(ESEQ_NUM_PROOF_REPLAYABLE_CONTEXT),
         );
     }
 

@@ -218,6 +218,27 @@ module aptos_framework::transaction_context {
     /// `is_orderless_txn` (e.g. sequence-number-based proof checks).
     native fun is_orderless_txn_internal_for_test_only(): bool;
 
+    /// Returns whether the transaction is a multisig transaction (or, equivalently, whether the
+    /// current execution is running the inner payload of a multisig transaction). In this case
+    /// the executing account's sequence number does not advance, so sequence-number-based proof
+    /// challenges are replayable.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    /// When compiled for testing, this function returns false instead of aborting when no
+    /// transaction context is available, so unit tests can exercise callers of this function.
+    public fun is_multisig_payload_txn(): bool {
+        if (__COMPILE_FOR_TESTING__) {
+            is_multisig_payload_txn_internal_for_test_only()
+        } else {
+            is_multisig_payload_txn_internal()
+        }
+    }
+    native fun is_multisig_payload_txn_internal(): bool;
+
+    /// Test-only version of `is_multisig_payload_txn` that returns false when no user transaction
+    /// context is available instead of aborting, so unit tests can call functions guarded by
+    /// `is_multisig_payload_txn`.
+    native fun is_multisig_payload_txn_internal_for_test_only(): bool;
+
     /// Returns a monotonically increasing counter value that combines timestamp, transaction index,
     /// session counter, and local counter into a 128-bit value.
     /// Format: `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session_counter (8 bits) || local_counter (16 bits)`

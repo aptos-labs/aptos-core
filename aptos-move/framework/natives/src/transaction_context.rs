@@ -583,6 +583,41 @@ fn native_is_orderless_txn_internal_for_test_only(
     )])
 }
 
+fn native_is_multisig_payload_txn_internal(
+    context: &mut SafeNativeContext,
+    _ty_args: &[Type],
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_IS_MULTISIG_PAYLOAD_TXN_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    if let Some(transaction_context) = user_transaction_context_opt {
+        Ok(smallvec![Value::bool(
+            transaction_context.multisig_payload().is_some()
+        )])
+    } else {
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (is_multisig_payload_txn can only be accessed during transaction execution)",
+        ))
+    }
+}
+
+fn native_is_multisig_payload_txn_internal_for_test_only(
+    context: &mut SafeNativeContext,
+    _ty_args: &[Type],
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_IS_MULTISIG_PAYLOAD_TXN_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    Ok(smallvec![Value::bool(
+        user_transaction_context_opt
+            .as_ref()
+            .is_some_and(|transaction_context| transaction_context.multisig_payload().is_some())
+    )])
+}
+
 fn get_user_transaction_context_opt_from_context<'a>(
     context: &'a SafeNativeContext,
 ) -> &'a Option<UserTransactionContext> {
@@ -639,6 +674,14 @@ pub fn make_all(
         (
             "is_orderless_txn_internal_for_test_only",
             native_is_orderless_txn_internal_for_test_only,
+        ),
+        (
+            "is_multisig_payload_txn_internal",
+            native_is_multisig_payload_txn_internal,
+        ),
+        (
+            "is_multisig_payload_txn_internal_for_test_only",
+            native_is_multisig_payload_txn_internal_for_test_only,
         ),
     ];
 
