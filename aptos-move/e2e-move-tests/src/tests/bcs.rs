@@ -131,10 +131,6 @@ fn test_constant_serialized_size_dag_no_stall() {
 /// Generates a module with a `depth`-deep single-field wrapper chain
 /// (`D1{f: D2} ... D{depth}{f: u8}`) and an entry `run` that builds a
 /// `vector<D1>` of `n_elems` such values and serializes it `iters` times.
-///
-/// Mirrors the PoC: each wrapper struct is one Value node but serializes to zero
-/// BCS bytes, so the node count far exceeds the output byte count. This is the
-/// case the per-output-byte cost under-charges.
 fn deep_wrapper_source(depth: usize, n_elems: u64, iters: u64) -> String {
     let mut src =
         String::from("module 0xcafe::test {\n    use std::bcs;\n    use std::vector;\n\n");
@@ -169,7 +165,7 @@ fn publish_deep_wrapper(
     n_elems: u64,
     iters: u64,
 ) {
-    let mut builder = PackageBuilder::new("BcsGas");
+    let mut builder = PackageBuilder::new("P");
     builder.add_source("test", &deep_wrapper_source(depth, n_elems, iters));
     builder.add_local_dep(
         "MoveStdlib",
@@ -187,20 +183,13 @@ fn run_id() -> MemberId {
     MemberId::from_str("0xcafe::test::run").unwrap()
 }
 
-/// `bcs::to_bytes` of a node-heavy, byte-light value should cost far more once the
-/// value-size metering flag is on. Run with `-- --nocapture` to see the numbers.
-///
-/// `MoveHarness::new()` starts on the TESTING chain before the flag's activation
-/// time, so the first run is metered the old (per-byte) way; `new_epoch` forwards
-/// past the activation time to turn the flag on for the second run.
 #[test]
 fn test_bcs_to_bytes_value_size_metering() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    publish_deep_wrapper(&mut h, &acc, 120, 200, 50);
+    publish_deep_wrapper(&mut h, &acc, 120, 100, 30);
 
     let gas_off = h.evaluate_entry_function_gas(&acc, run_id(), vec![], vec![]);
-
     h.new_epoch();
     let gas_on = h.evaluate_entry_function_gas(&acc, run_id(), vec![], vec![]);
 
@@ -211,28 +200,22 @@ fn test_bcs_to_bytes_value_size_metering() {
     );
 }
 
-/// With the flag on, repeatedly serializing a node-heavy value exhausts the
-/// execution-gas budget that the old per-byte cost sails under -- the liveness
-/// attack is now metered. Same value + iteration count, opposite outcomes.
 #[test]
 fn test_bcs_to_bytes_execution_limit() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     publish_deep_wrapper(&mut h, &acc, 120, 200, 100);
 
-    // Flag off: byte-metered, cheap -> the whole loop succeeds.
     assert_success!(h.run_entry_function(&acc, run_id(), vec![], vec![]));
 
-    // Flag on: node-metered -> the loop blows max_execution_gas.
+    // Enable timed feature flag.
     h.new_epoch();
+
     let status = h.run_entry_function(&acc, run_id(), vec![], vec![]);
-    assert!(
-        matches!(
-            status,
-            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                EXECUTION_LIMIT_REACHED
-            )))
-        ),
-        "expected EXECUTION_LIMIT_REACHED, got {status:?}"
-    );
+    assert!(matches!(
+        status,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            EXECUTION_LIMIT_REACHED
+        )))
+    ));
 }

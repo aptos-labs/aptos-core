@@ -60,9 +60,8 @@ pub enum TimedFeatureFlag {
     /// module version instead of executing stale pre-upgrade code.
     RevalidateResolvedClosures,
 
-    /// Charge `bcs::to_bytes` and `bcs::serialized_size` per input value node instead of only per
-    /// output byte, so values whose nodes serialize to few or zero bytes (e.g. single-field wrapper
-    /// structs) are metered for the deep copy, serialization, and drop work they actually cost.
+    /// Charge `bcs::to_bytes` and `bcs::serialized_size` per input value node
+    /// instead of only per output byte.
     MeterBcsByValueSize,
 }
 
@@ -271,9 +270,6 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
-            // Security fix: meter bcs serialization natives by input value size.
-            // For testing, time set to 1 hour after the beginning of time so tests can
-            // exercise the old and new behaviors on the same harness via `new_epoch`.
             (MeterBcsByValueSize, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
             (MeterBcsByValueSize, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 8, 4, 10, 0, 0)
