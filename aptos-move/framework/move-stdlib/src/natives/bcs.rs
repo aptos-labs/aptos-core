@@ -5,6 +5,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_gas_algebra::{InternalGas, InternalGasPerAbstractValueUnit};
 use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -25,6 +26,13 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+
+// Set to 3x `cmp::compare`'s base and per-abstract-value-unit costs
+// (3670 and 140).
+// TODO: add these to 1.50 schedule.
+const BCS_PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
+const BCS_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
+    InternalGasPerAbstractValueUnit::new(420);
 
 pub fn create_option_u64(enum_option_enabled: bool, value: Option<u64>) -> Value {
     if enum_option_enabled {
@@ -62,14 +70,13 @@ fn native_to_bytes(
     let reference_value = safely_pop_arg!(args);
     let arg_type = &ty_args[0];
 
-    // Charge for the value traversal before the deep copy. `to_bytes` makes three
-    // O(node-count) passes over the value -- the `read_ref` deep copy, the
-    // serialization, and the drop of the copy -- which the per-output-byte cost
-    // misses for node-heavy but byte-light values (e.g. single-field wrapper
-    // structs). Uses the same dimension and constants as `cmp::compare`.
+    // Charge for the value traversal before (read_ref's deep copy, later
+    // serialization traversal and drop).
     if context.timed_feature_enabled(TimedFeatureFlag::MeterBcsByValueSize) {
         let size = context.abs_val_size_dereferenced(&reference_value)?;
-        context.charge(CMP_COMPARE_BASE + CMP_COMPARE_PER_ABS_VAL_UNIT * size)?;
+        context.charge(
+            BCS_PER_VALUE_TRAVERSAL_BASE + BCS_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * size,
+        )?;
     }
 
     let layout = if context.get_feature_flags().is_lazy_loading_enabled() {
@@ -146,12 +153,13 @@ fn native_serialized_size(
     let reference_value = safely_pop_arg!(args);
     let ty = &ty_args[0];
 
-    // See `native_to_bytes`: charge for the value traversal (deep copy,
-    // serialization, drop) before the `read_ref` deep copy inside
-    // `serialized_size_impl`.
+    // Charge for the value traversal before (read_ref's deep copy, later
+    // serialization traversal and drop).
     if context.timed_feature_enabled(TimedFeatureFlag::MeterBcsByValueSize) {
         let size = context.abs_val_size_dereferenced(&reference_value)?;
-        context.charge(CMP_COMPARE_BASE + CMP_COMPARE_PER_ABS_VAL_UNIT * size)?;
+        context.charge(
+            BCS_PER_VALUE_TRAVERSAL_BASE + BCS_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * size,
+        )?;
     }
 
     let reference = reference_value
