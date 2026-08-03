@@ -17,6 +17,10 @@ use std::{
 /// Estimated per-txn size minus the raw transaction
 pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
 
+/// Estimated memory cost of a public key held in a transaction authenticator.
+/// Note: this is an over-approximation used for capacity accounting.
+pub const PUBLIC_KEY_ESTIMATED_BYTES: usize = 250;
+
 #[derive(Clone, Debug)]
 pub struct MempoolTransaction {
     pub txn: SignedTransaction,
@@ -68,7 +72,14 @@ impl MempoolTransaction {
     }
 
     pub(crate) fn get_estimated_bytes(&self) -> usize {
-        self.txn.raw_txn_bytes_len() + TXN_FIXED_ESTIMATED_BYTES + TXN_INDEX_ESTIMATED_BYTES
+        let txn_bytes = self.txn.txn_bytes_len();
+        let public_key_bytes = self
+            .txn
+            .authenticator_ref()
+            .number_of_public_keys()
+            .saturating_mul(PUBLIC_KEY_ESTIMATED_BYTES);
+
+        txn_bytes + public_key_bytes + TXN_FIXED_ESTIMATED_BYTES + TXN_INDEX_ESTIMATED_BYTES
     }
 }
 
@@ -149,14 +160,22 @@ impl InsertionInfo {
 #[cfg(test)]
 mod test {
     use crate::{
-        core_mempool::{MempoolTransaction, TimelineState},
+        core_mempool::{
+            transaction::{PUBLIC_KEY_ESTIMATED_BYTES, TXN_FIXED_ESTIMATED_BYTES},
+            MempoolTransaction, TimelineState, TXN_INDEX_ESTIMATED_BYTES,
+        },
         network::BroadcastPeerPriority,
     };
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use aptos_crypto::{
+        ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+        multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+        PrivateKey, SigningKey, Uniform,
+    };
     use aptos_types::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{
+            authenticator::{AccountAuthenticator, TransactionAuthenticator},
             RawTransaction, ReplayProtector, Script, SignedTransaction, TransactionExecutable,
         },
     };
@@ -170,6 +189,91 @@ mod test {
         let mempool_txn2 = create_test_mempool_transaction(txn2);
 
         assert!(mempool_txn1.get_estimated_bytes() < mempool_txn2.get_estimated_bytes());
+    }
+
+    #[test]
+    fn test_public_key_estimated_bytes_bound() {
+        let public_key_size = size_of::<Ed25519PublicKey>();
+        assert!(
+            PUBLIC_KEY_ESTIMATED_BYTES >= public_key_size,
+            "PUBLIC_KEY_ESTIMATED_BYTES ({}) must bound the in-memory size of Ed25519PublicKey ({})",
+            PUBLIC_KEY_ESTIMATED_BYTES,
+            public_key_size,
+        );
+    }
+
+    #[test]
+    fn test_estimated_bytes_accounts_for_authenticator_key_material() {
+        // Build a small transaction with a single signature
+        let small_txn = create_test_transaction(ReplayProtector::SequenceNumber(0), vec![0x1]);
+
+        // Build a multi-agent transaction with many public keys
+        let num_secondary_signers = 4;
+        let keys_per_signer = 32;
+        let raw_txn = small_txn.clone().into_raw_transaction();
+        let secondary_signers: Vec<_> = (0..num_secondary_signers)
+            .map(|_| create_multi_ed25519_authenticator(&raw_txn, keys_per_signer))
+            .collect();
+        let secondary_signer_addresses: Vec<_> = (0..num_secondary_signers)
+            .map(|_| AccountAddress::random())
+            .collect();
+        let authenticator = TransactionAuthenticator::multi_agent(
+            create_multi_ed25519_authenticator(&raw_txn, keys_per_signer),
+            secondary_signer_addresses,
+            secondary_signers,
+        );
+        let bloated_txn = SignedTransaction::new_signed_transaction(raw_txn, authenticator.clone());
+        let bloated_txn_estimate =
+            create_test_mempool_transaction(bloated_txn.clone()).get_estimated_bytes();
+
+        // Verify that the authenticator contains the expected number of public keys
+        let total_keys = authenticator.number_of_public_keys();
+        assert_eq!(total_keys, keys_per_signer * (num_secondary_signers + 1));
+
+        // Verify that the estimated bytes is at least the serialized size of the transaction
+        assert!(
+            bloated_txn_estimate >= bloated_txn.txn_bytes_len(),
+            "Estimate: {}, must cover full serialized size {}!",
+            bloated_txn_estimate,
+            bloated_txn.txn_bytes_len(),
+        );
+
+        // Verify that the estimated bytes includes the public key surcharge for all keys
+        assert!(
+            bloated_txn_estimate
+                >= bloated_txn.txn_bytes_len() + (total_keys * PUBLIC_KEY_ESTIMATED_BYTES),
+            "Estimate: {}, must include the public key surcharge for {} keys!",
+            bloated_txn_estimate,
+            total_keys,
+        );
+
+        // Create an incorrect estimate that does not include the public key surcharge
+        let incorrect_estimate =
+            bloated_txn.raw_txn_bytes_len() + TXN_FIXED_ESTIMATED_BYTES + TXN_INDEX_ESTIMATED_BYTES;
+
+        // Verify that the correct estimate is larger than the incorrect one by at least the public key surcharge
+        assert!(
+            (bloated_txn_estimate - incorrect_estimate)
+                >= (total_keys * PUBLIC_KEY_ESTIMATED_BYTES),
+            "the authenticator must add at least the per-key surcharge: new {} vs old {}",
+            bloated_txn_estimate,
+            incorrect_estimate,
+        );
+    }
+
+    /// Creates a multi-ed25519 account authenticator carrying `num_public_keys` public keys
+    fn create_multi_ed25519_authenticator(
+        raw_txn: &RawTransaction,
+        num_public_keys: usize,
+    ) -> AccountAuthenticator {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_keys = vec![private_key.public_key(); num_public_keys];
+        let signature =
+            MultiEd25519Signature::new(vec![(private_key.sign(raw_txn).unwrap(), 0)]).unwrap();
+        AccountAuthenticator::multi_ed25519(
+            MultiEd25519PublicKey::new(public_keys, 1).unwrap(),
+            signature,
+        )
     }
 
     fn create_test_mempool_transaction(signed_txn: SignedTransaction) -> MempoolTransaction {
