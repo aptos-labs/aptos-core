@@ -22,6 +22,7 @@ mod dependencies;
 mod enum_upgrade;
 mod enum_upgrade_fv;
 mod enum_variant_count;
+mod enum_variant_tag_serialization;
 mod error_map;
 mod events;
 mod fee_payer;
