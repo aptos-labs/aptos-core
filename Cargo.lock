@@ -3370,6 +3370,7 @@ dependencies = [
 name = "aptos-move-stdlib"
 version = "0.1.1"
 dependencies = [
+ "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-native-interface",
  "aptos-types",
